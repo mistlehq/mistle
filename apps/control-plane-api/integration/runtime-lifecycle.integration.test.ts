@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
@@ -12,9 +13,10 @@ const IntegrationConnectionTokenConfig = {
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const IntegrationSandboxRuntimeConfig = {
-  defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+  defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
   gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
 } as const;
 

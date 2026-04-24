@@ -1,3 +1,4 @@
+import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   createDataPlaneDatabase,
@@ -44,6 +45,7 @@ const MatchingDeadlineDueAt = "2026-04-14T12:00:00.000Z";
 const AlternateDeadlineDueAt = "2026-04-14T12:05:00.000Z";
 const RuntimeStateWaitTimeoutMs = 5_000;
 const RuntimeStatePollIntervalMs = 50;
+const LocalTestSandboxBaseImageRef = getLocalTestSandboxBaseImageRef();
 
 type DatabaseStack = {
   directUrl: string;
@@ -110,7 +112,7 @@ function createWorkerRuntimeConfig(input: { gatewayBaseUrl: string }) {
     MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
     MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: InternalAuthServiceToken,
     MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "mistle/sandbox-base:test",
+    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: LocalTestSandboxBaseImageRef,
     MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: `${input.gatewayBaseUrl.replace("http://", "ws://")}/tunnel/sandbox`,
     MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: `${input.gatewayBaseUrl.replace("http://", "ws://")}/tunnel/sandbox`,
     MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "integration-connect-secret",

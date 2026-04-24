@@ -2,6 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -11,6 +12,7 @@ import {
 } from "./prepared-runtime.js";
 
 const temporaryDirectories: string[] = [];
+const LocalPreparedRuntimeSandboxBaseImageRef = getLocalPreparedRuntimeSandboxBaseImageRef();
 
 afterEach(async () => {
   await Promise.all(
@@ -52,7 +54,7 @@ describe("prepared runtime manifest", () => {
           },
         },
         sandboxBaseImage: {
-          localReference: "mistle/sandbox-base:dev",
+          localReference: LocalPreparedRuntimeSandboxBaseImageRef,
           repositoryPath: "mistle/sandbox-base",
         },
         appImages: {
@@ -84,7 +86,7 @@ describe("prepared runtime manifest", () => {
         },
       },
       sandboxBaseImage: {
-        localReference: "mistle/sandbox-base:dev",
+        localReference: LocalPreparedRuntimeSandboxBaseImageRef,
         repositoryPath: "mistle/sandbox-base",
       },
       appImages: {

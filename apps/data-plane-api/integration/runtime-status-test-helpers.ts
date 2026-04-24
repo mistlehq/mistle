@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemSleeper } from "@mistle/time";
 import WebSocket from "ws";
@@ -17,6 +18,7 @@ export const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secr
 export const IntegrationBootstrapTokenIssuer = "integration-data-plane-worker";
 export const IntegrationBootstrapTokenAudience = "integration-data-plane-gateway";
 export const IntegrationConnectTokenSecret = "integration-connect-token-secret";
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 export type StartedGatewayProcess = {
   baseUrl: string;
@@ -41,7 +43,7 @@ function createGatewayEnvironment(input: {
     MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
     MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: input.internalAuthServiceToken,
     MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: LocalDevDockerRegistrySandboxBaseImageRef,
     MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: `ws://${host}:${String(input.port)}/tunnel/sandbox`,
     MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: `ws://${host}:${String(input.port)}/tunnel/sandbox`,
     MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: IntegrationConnectTokenSecret,

@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -13,6 +14,7 @@ import {
 const EmptyTargetConfigSchema = z.object({});
 const EmptyTargetSecretsSchema = z.object({});
 const EmptyBindingConfigSchema = z.object({});
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const InstallPath = "/tmp/jq";
 const ApiKeyConnectionMethods = [
@@ -158,7 +160,7 @@ describe("github release helper integration", () => {
       version: 1,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -218,7 +220,7 @@ describe("github release helper integration", () => {
       version: 1,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [

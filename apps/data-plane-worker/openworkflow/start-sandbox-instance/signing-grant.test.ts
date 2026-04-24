@@ -1,7 +1,10 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { verifySigningGrant } from "@mistle/sandbox-signing-auth";
 import { describe, expect, it } from "vitest";
 
 import { createSigningGrant } from "./signing-grant.js";
+
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const TestConfig = {
   app: {
@@ -34,7 +37,7 @@ const TestConfig = {
   },
   sandbox: {
     provider: "docker",
-    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     publish: {

@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   IntegrationConnectionStatuses,
@@ -33,6 +34,7 @@ import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const EmptyConfigSchema = z.object({}).strict();
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 const OAuth2AuthorizationCodeTestConnectionConfigSchema = z
   .object({
     region: z.string().min(1),
@@ -136,7 +138,7 @@ async function createOAuth2AuthorizationCodeTestApp(input: {
   const app = createApp({
     config: input.fixture.config,
     sandboxConfig: {
-      defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
       gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
     },
     internalAuthServiceToken: input.fixture.internalAuthServiceToken,

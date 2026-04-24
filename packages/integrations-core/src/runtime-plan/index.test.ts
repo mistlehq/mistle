@@ -1,9 +1,11 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
 const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 const GitHubCliPlaceholderToken = [
   "g",
   "h",
@@ -49,7 +51,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 1,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       compiledBindingResults: [
         {
@@ -96,7 +98,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 7,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       compiledBindingResults: [
         {
@@ -166,7 +168,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 3,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         compiledBindingResults: [
           {
@@ -190,7 +192,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 7,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       compiledBindingResults: [
         {
@@ -458,7 +460,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 1,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       compiledBindingResults: [
         {
@@ -542,7 +544,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         compiledBindingResults: [
           {
@@ -594,7 +596,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         compiledBindingResults: [
           {
@@ -654,7 +656,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         compiledBindingResults: [
           {
@@ -716,7 +718,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         compiledBindingResults: [
           {
@@ -785,7 +787,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 7,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       egressRoutes: [
         {
@@ -835,7 +837,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 7,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         egressRoutes: [
           {
@@ -878,7 +880,7 @@ describe("assembleCompiledRuntimePlan", () => {
       version: 7,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       egressRoutes: [
         {
@@ -941,7 +943,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 7,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         egressRoutes: [
           {
@@ -999,7 +1001,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 7,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         egressRoutes: [
           {
@@ -1050,7 +1052,7 @@ describe("assembleCompiledRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         egressRoutes: [],
         artifacts: [

@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 
 import { createControlPlaneApiRuntime } from "../../src/main.js";
@@ -9,8 +10,9 @@ const IntegrationConnectionTokenConfig = {
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 const IntegrationSandboxRuntimeConfig = {
-  defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+  defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
   gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
 } as const;
 

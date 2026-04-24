@@ -1,3 +1,4 @@
+import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
 import {
   IntegrationBindingKinds,
   integrationConnections,
@@ -21,6 +22,7 @@ import {
 import { it } from "./test-context.js";
 
 const Definitions = createDefinitionsBundle();
+const LocalPreparedRuntimeSandboxBaseImageRef = getLocalPreparedRuntimeSandboxBaseImageRef();
 
 describe("sandbox profile internal runtime plan compiler integration", () => {
   it("fails when the resolved target secrets omit an existing target entry", async ({
@@ -94,7 +96,7 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       }),
     ).rejects.toMatchObject({

@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   integrationConnectionDeviceAuthorizationAttempts,
@@ -33,6 +34,8 @@ import {
 import { createAppResources, stopAppResources } from "../src/resources.js";
 import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it } from "./test-context.js";
+
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 describe("integration connections device authorization integration", () => {
   it("returns 400 when a target does not support device authorization start", async ({
@@ -202,7 +205,7 @@ describe("integration connections device authorization integration", () => {
       const app = createApp({
         config: fixture.config,
         sandboxConfig: {
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
         },
         internalAuthServiceToken: fixture.internalAuthServiceToken,
@@ -517,7 +520,7 @@ describe("integration connections device authorization integration", () => {
       const app = createApp({
         config: fixture.config,
         sandboxConfig: {
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
         },
         internalAuthServiceToken: fixture.internalAuthServiceToken,

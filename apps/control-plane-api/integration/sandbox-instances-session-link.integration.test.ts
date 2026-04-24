@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { sandboxInstances } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
@@ -13,6 +14,7 @@ import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
@@ -82,7 +84,7 @@ describe("sandbox instance session link integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -129,7 +131,7 @@ describe("sandbox instance session link integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -192,7 +194,7 @@ describe("sandbox instance session link integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -242,7 +244,7 @@ describe("sandbox instance session link integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });

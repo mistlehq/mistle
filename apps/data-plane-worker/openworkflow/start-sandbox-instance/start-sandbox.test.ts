@@ -1,6 +1,9 @@
+import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
+
+const LocalTestSandboxBaseImageRef = getLocalTestSandboxBaseImageRef();
 
 describe("createSandboxRuntimeEnv", () => {
   it("includes the sandboxd test faults env when the worker config enables it", () => {
@@ -33,7 +36,7 @@ describe("createSandboxRuntimeEnv", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "mistle/sandbox-base:test",
+          defaultBaseImage: LocalTestSandboxBaseImageRef,
           gatewayWsUrl: "ws://gateway/tunnel/sandbox",
           internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
           connect: {
@@ -118,7 +121,7 @@ describe("createSandboxRuntimeEnv", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "mistle/sandbox-base:test",
+          defaultBaseImage: LocalTestSandboxBaseImageRef,
           gatewayWsUrl: "ws://gateway/tunnel/sandbox",
           internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
           connect: {

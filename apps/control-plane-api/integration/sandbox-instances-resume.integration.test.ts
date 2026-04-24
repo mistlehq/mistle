@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { sandboxInstanceRuntimePlans, sandboxInstances } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect } from "vitest";
@@ -30,6 +31,7 @@ type WorkflowRunRow = {
   status: string;
   input: unknown;
 };
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const WorkflowRunInputSchema = z
   .object({
@@ -219,7 +221,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -309,7 +311,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -386,7 +388,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -477,7 +479,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -567,7 +569,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -647,7 +649,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });
@@ -748,7 +750,7 @@ describe("sandbox instance resume integration", () => {
       },
       portAccess: IntegrationPortAccessConfig,
       sandbox: {
-        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
         gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
       },
     });

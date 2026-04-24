@@ -1,3 +1,4 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -33,6 +34,7 @@ const AgentBindingConfigSchema = z.object({
 const ConnectorBindingConfigSchema = z.object({
   defaultModel: z.string().min(1),
 });
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const LinearConnectorBindingConfigSchema = z.object({
   tools: z.array(z.literal("linear-mcp")).default([]),
@@ -800,7 +802,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -990,7 +992,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1043,7 +1045,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1114,7 +1116,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1182,7 +1184,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1250,7 +1252,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1315,7 +1317,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1364,7 +1366,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1447,7 +1449,7 @@ describe("compileRuntimePlan", () => {
       version: 12,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [
@@ -1532,7 +1534,7 @@ describe("compileRuntimePlan", () => {
         version: 12,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1630,7 +1632,7 @@ describe("compileRuntimePlan", () => {
         version: 12,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1737,7 +1739,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1774,7 +1776,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1820,7 +1822,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1857,7 +1859,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1903,7 +1905,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -1951,7 +1953,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2033,7 +2035,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2081,7 +2083,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2138,7 +2140,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2186,7 +2188,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2244,7 +2246,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: {
           integrationRegistry: registry,
@@ -2318,7 +2320,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: {
           integrationRegistry: registry,
@@ -2394,7 +2396,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: createDefinitionsBundle(registry),
         bindings: [
@@ -2531,7 +2533,7 @@ describe("compileRuntimePlan", () => {
         version: 1,
         image: {
           source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
         },
         definitions: {
           integrationRegistry: registry,
@@ -2667,7 +2669,7 @@ describe("compileRuntimePlan", () => {
       version: 1,
       image: {
         source: "base",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        imageRef: LocalDevDockerRegistrySandboxBaseImageRef,
       },
       definitions: createDefinitionsBundle(registry),
       bindings: [

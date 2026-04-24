@@ -1,7 +1,10 @@
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { verifyEgressGrant } from "@mistle/sandbox-egress-auth";
 import { describe, expect, it } from "vitest";
 
 import { createEgressGrantByRuleId } from "./egress-grants.js";
+
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const [, payload] = token.split(".");
@@ -46,7 +49,7 @@ describe("createEgressGrantByRuleId", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           publish: {
@@ -239,7 +242,7 @@ describe("createEgressGrantByRuleId", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           publish: {
@@ -379,7 +382,7 @@ describe("createEgressGrantByRuleId", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
           publish: {

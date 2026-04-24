@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 
+import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   createDataPlaneDatabase,
@@ -38,6 +39,7 @@ import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/en
 
 const IntegrationTestTimeoutMs = 120_000;
 const DockerSocketPath = "/var/run/docker.sock";
+const LocalTestSandboxBaseImageRef = getLocalTestSandboxBaseImageRef();
 
 type DatabaseStack = {
   directUrl: string;
@@ -120,7 +122,7 @@ function createWorkerRuntimeConfig() {
     MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
     MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: "integration-service-token",
     MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "mistle/sandbox-base:test",
+    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: LocalTestSandboxBaseImageRef,
     MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
     MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:5003/tunnel/sandbox",
     MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "integration-connect-secret",

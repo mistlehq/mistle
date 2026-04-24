@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { loadConfig, parseConfigRecord } from "./loader.js";
 import { AppIds } from "./modules.js";
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "./sandbox-base-images.js";
+
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 describe("parseConfigRecord", () => {
   it("parses a minimal config record", () => {
@@ -27,7 +30,7 @@ describe("parseConfigRecord", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           connect: {
@@ -239,7 +242,7 @@ describe("parseConfigRecord", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           connect: {
@@ -451,7 +454,7 @@ describe("parseConfigRecord", () => {
         },
         sandbox: {
           provider: "docker",
-          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           connect: {
@@ -654,7 +657,7 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             provider: "docker",
-            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
             gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
             internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
             connect: {

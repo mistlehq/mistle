@@ -1,3 +1,4 @@
+import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
 import {
   IntegrationBindingKinds,
   integrationConnections,
@@ -35,6 +36,7 @@ import {
 import { it } from "./test-context.js";
 
 const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+const LocalPreparedRuntimeSandboxBaseImageRef = getLocalPreparedRuntimeSandboxBaseImageRef();
 
 function expectArtifactInstallStep(
   step: RuntimeArtifactInstallStep | undefined,
@@ -144,7 +146,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -291,7 +293,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -375,7 +377,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -493,7 +495,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -650,7 +652,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -823,7 +825,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -949,7 +951,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -1078,7 +1080,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileVersion: 1,
         image: {
           source: "base",
-          imageRef: "mistle/sandbox-base:dev",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
       },
     );
@@ -1133,7 +1135,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           profileVersion: 1,
           image: {
             source: "base",
-            imageRef: "mistle/sandbox-base:dev",
+            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
           },
         },
       );
@@ -1171,7 +1173,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           profileVersion: 9,
           image: {
             source: "base",
-            imageRef: "mistle/sandbox-base:dev",
+            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
           },
         },
       );
@@ -1256,7 +1258,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           profileVersion: 1,
           image: {
             source: "base",
-            imageRef: "mistle/sandbox-base:dev",
+            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
           },
         },
       );
@@ -1343,7 +1345,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           profileVersion: 1,
           image: {
             source: "base",
-            imageRef: "mistle/sandbox-base:dev",
+            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
           },
         },
       );

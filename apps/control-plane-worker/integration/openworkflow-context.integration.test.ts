@@ -1,9 +1,12 @@
+import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { describe, expect } from "vitest";
 
 import { closeWorkflowContext, getWorkflowContext } from "../openworkflow/core/context.js";
 import { closeOpenWorkflowRuntime, getOpenWorkflowRuntime } from "../openworkflow/core/runtime.js";
 import type { ControlPlaneWorkerIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
+
+const LocalTestSandboxBaseImageRef = getLocalTestSandboxBaseImageRef();
 
 function assignEnvironment(overrides: Record<string, string | undefined>): () => void {
   const previousEntries = Object.entries(overrides).map(
@@ -40,7 +43,7 @@ function createWorkerEnvironment(
     MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
     MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: fixture.internalAuthServiceToken,
     MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "mistle/sandbox-base:test",
+    MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: LocalTestSandboxBaseImageRef,
     MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: "ws://127.0.0.1:8084/tunnel/sandbox",
     MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:8084/tunnel/sandbox",
     MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "integration-connect-secret",

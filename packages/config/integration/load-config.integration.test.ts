@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { loadConfig } from "../src/loader.js";
 import { AppIds } from "../src/modules.js";
+import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../src/sandbox-base-images.js";
 import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
@@ -25,6 +26,7 @@ const sandboxPublishAccessTokenSecret = "fixture-publish-token-secret";
 const sandboxPublishAccessTokenIssuer = "control-plane-api";
 const sandboxPublishAccessTokenAudience = "data-plane-gateway";
 const sandboxPublishSessionCookieSigningSecret = "fixture-publish-cookie-secret";
+const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 const globalDevelopmentConfig = {
   env: "development",
@@ -50,7 +52,7 @@ const globalDevelopmentConfig = {
     storage: {
       backend: "archil",
     },
-    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     publish: {
@@ -106,7 +108,7 @@ const globalProductionConfig = {
     storage: {
       backend: "archil",
     },
-    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     publish: {
