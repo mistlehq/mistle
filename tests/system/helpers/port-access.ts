@@ -23,8 +23,7 @@ export const WebSocketOpenTimeoutMs = 15_000;
 export const WebSocketMessageTimeoutMs = 15_000;
 export const ListenerProbeTimeoutMs = 10_000;
 export const ExecCommandDefaultTimeoutMs = 60_000;
-export const NodeToolCommand = "/opt/mistle/bin/mise exec node@25 --";
-const MiseCommandPath = "/opt/mistle/bin/mise";
+export const NodeToolCommand = "/usr/local/bin/node";
 
 const PollIntervalMs = 1_000;
 
@@ -749,12 +748,8 @@ export async function waitForTcpListenerReady(input: {
           socket: input.socket,
           pump: input.pump,
           streamId: input.allocateStreamId(),
-          command: MiseCommandPath,
+          command: NodeToolCommand,
           args: [
-            "exec",
-            "node@25",
-            "--",
-            "node",
             "-e",
             [
               'const net = require("node:net");',

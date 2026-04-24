@@ -168,18 +168,7 @@ RUN chmod +x /opt/mistle/bin/sandboxd \
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
 
-FROM sandbox-base-common AS sandbox-base-system-tests
-
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    fuse \
-    libatomic1 \
-    procps \
-    strace \
-    vim \
-  && curl -fsSL https://archil.com/install | ARCHIL_SKIP_IAM_CHECK=1 sh \
-  && ln -sf /usr/bin/archil /opt/mistle/bin/archil \
-  && rm -rf /var/lib/apt/lists/*
+FROM sandbox-base AS sandbox-base-system-tests
 
 COPY --from=sandboxd-system-tests-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
 
