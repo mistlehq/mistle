@@ -103,6 +103,17 @@ export const DockerInspectSandboxRequestSchema = z
   .strict();
 export type DockerInspectSandboxRequest = z.output<typeof DockerInspectSandboxRequestSchema>;
 
+export const DockerCaptureSandboxSnapshotRequestSchema = z
+  .object({
+    runtimeId: z.string().trim().min(1, {
+      message: "Docker request field `runtimeId` is required.",
+    }),
+  })
+  .strict();
+export type DockerCaptureSandboxSnapshotRequest = z.output<
+  typeof DockerCaptureSandboxSnapshotRequestSchema
+>;
+
 export const DockerStopSandboxRequestSchema = z
   .object({
     runtimeId: z.string().trim().min(1, {

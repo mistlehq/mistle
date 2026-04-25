@@ -12,6 +12,7 @@ export type E2BAdapterIntegrationFixture = {
   baseImage: SandboxImageHandle;
   createTemplateRegistry(): E2BApiTemplateRegistry;
   connectSandbox(id: string): Promise<Sandbox>;
+  deleteSnapshot(snapshotId: string): Promise<void>;
 };
 
 export const sandboxIntegrationSettings = resolveSandboxIntegrationSettings(process.env);
@@ -72,6 +73,9 @@ export const it = vitestIt.extend<{ fixture: E2BAdapterIntegrationFixture }>({
         },
         connectSandbox(id: string) {
           return Sandbox.connect(id, createConnectionOptions());
+        },
+        async deleteSnapshot(snapshotId: string) {
+          await Sandbox.deleteSnapshot(snapshotId, createConnectionOptions());
         },
       });
     },

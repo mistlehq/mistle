@@ -147,6 +147,12 @@ async function readSandboxFile(input: {
   return result.output.trimEnd();
 }
 
+async function removeDockerImage(input: { dockerClient: Docker; imageId: string }): Promise<void> {
+  await input.dockerClient.getImage(input.imageId).remove({
+    force: true,
+  });
+}
+
 describeDockerAdapterIntegration("docker adapter integration", () => {
   it("creates and deletes a named Docker volume", async ({ fixture }) => {
     if (!dockerAdapterIntegrationSettings.enabled) {
@@ -214,6 +220,63 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
     } finally {
       if (id !== undefined) {
         await fixture.adapter.destroy({ id });
+      }
+    }
+  }, 300_000);
+
+  it("captures a snapshot and starts a new sandbox from it", async ({ fixture }) => {
+    const marker = `mistle-docker-snapshot-${randomUUID()}`;
+    let sourceId: string | undefined;
+    let restoredId: string | undefined;
+    let snapshotImageId: string | undefined;
+
+    try {
+      const sourceSandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+      });
+      sourceId = sourceSandbox.id;
+
+      await writeSandboxFile({
+        dockerClient: fixture.dockerClient,
+        id: sourceSandbox.id,
+        path: START_MARKER_FILE_PATH,
+        fileContents: marker,
+      });
+
+      const snapshotHandle = await fixture.adapter.captureSnapshot({
+        id: sourceSandbox.id,
+      });
+      snapshotImageId = snapshotHandle.imageId;
+
+      expect(snapshotHandle.provider).toBe(SandboxProvider.DOCKER);
+      expect(snapshotHandle.imageId).not.toBe("");
+
+      await fixture.adapter.destroy({ id: sourceSandbox.id });
+      sourceId = undefined;
+
+      const restoredSandbox = await fixture.adapter.start({
+        image: snapshotHandle,
+      });
+      restoredId = restoredSandbox.id;
+
+      const readback = await readSandboxFile({
+        dockerClient: fixture.dockerClient,
+        id: restoredSandbox.id,
+        path: START_MARKER_FILE_PATH,
+      });
+      expect(readback).toBe(marker);
+    } finally {
+      if (sourceId !== undefined) {
+        await fixture.adapter.destroy({ id: sourceId });
+      }
+      if (restoredId !== undefined) {
+        await fixture.adapter.destroy({ id: restoredId });
+      }
+      if (snapshotImageId !== undefined) {
+        await removeDockerImage({
+          dockerClient: fixture.dockerClient,
+          imageId: snapshotImageId,
+        }).catch(() => undefined);
       }
     }
   }, 300_000);

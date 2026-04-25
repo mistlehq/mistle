@@ -52,6 +52,17 @@ export const E2BInspectSandboxRequestSchema = z
   .strict();
 export type E2BInspectSandboxRequest = z.output<typeof E2BInspectSandboxRequestSchema>;
 
+export const E2BCaptureSandboxSnapshotRequestSchema = z
+  .object({
+    sandboxId: z.string().trim().min(1, {
+      message: "E2B request field `sandboxId` is required.",
+    }),
+  })
+  .strict();
+export type E2BCaptureSandboxSnapshotRequest = z.output<
+  typeof E2BCaptureSandboxSnapshotRequestSchema
+>;
+
 export const E2BStopSandboxRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {

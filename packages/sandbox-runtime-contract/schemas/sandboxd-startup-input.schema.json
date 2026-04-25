@@ -6,6 +6,10 @@
       "type": "string",
       "enum": ["new", "existing"]
     },
+    "executionMode": {
+      "type": "string",
+      "enum": ["session", "snapshot_materialization"]
+    },
     "bootstrapToken": {
       "type": "string",
       "minLength": 1

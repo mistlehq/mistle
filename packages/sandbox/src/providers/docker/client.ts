@@ -10,6 +10,7 @@ import {
 import {
   DockerCreateVolumeRequestSchema,
   DockerDeleteVolumeRequestSchema,
+  DockerCaptureSandboxSnapshotRequestSchema,
   DockerPrepareVolumeForStartRequestSchema,
   DockerDestroySandboxRequestSchema,
   DockerInspectSandboxRequestSchema,
@@ -18,6 +19,7 @@ import {
   DockerStopSandboxRequestSchema,
   type DockerCreateVolumeRequest,
   type DockerDeleteVolumeRequest,
+  type DockerCaptureSandboxSnapshotRequest,
   type DockerPrepareVolumeForStartRequest,
   type DockerDestroySandboxRequest,
   type DockerInspectSandboxRequest,
@@ -47,16 +49,29 @@ export type DockerCreateVolumeResponse = {
   volumeName: string;
 };
 
+export type DockerCaptureSandboxSnapshotResponse = {
+  imageId: string;
+};
+
 export interface DockerClient {
   createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
   prepareVolumeForStart(request: DockerPrepareVolumeForStartRequest): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   inspectSandbox(request: DockerInspectSandboxRequest): Promise<DockerSandboxInspectResult>;
   resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
+  captureSandboxSnapshot(
+    request: DockerCaptureSandboxSnapshotRequest,
+  ): Promise<DockerCaptureSandboxSnapshotResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
   deleteVolume(request: DockerDeleteVolumeRequest): Promise<void>;
   destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
 }
+
+const DockerCommitResponseSchema = z
+  .object({
+    Id: z.string().trim().min(1),
+  })
+  .strip();
 
 const DockerProgressMessageSchema = z
   .object({
@@ -178,6 +193,10 @@ function normalizeDockerTimestamp(value: string): string | null {
   return value;
 }
 
+function isDockerLocalImageId(imageRef: string): boolean {
+  return /^sha256:[a-f0-9]{64}$/i.test(imageRef);
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -268,7 +287,9 @@ export class DockerApiClient implements DockerClient {
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
-    await this.#pullImage(parsedRequest.imageRef);
+    if (!isDockerLocalImageId(parsedRequest.imageRef)) {
+      await this.#pullImage(parsedRequest.imageRef);
+    }
 
     const hostConfig: DockerHostConfig = {};
     if (this.#config.networkName !== undefined) {
@@ -334,6 +355,24 @@ export class DockerApiClient implements DockerClient {
       startedAt: normalizeDockerTimestamp(inspect.State.StartedAt),
       endedAt: normalizeDockerTimestamp(inspect.State.FinishedAt),
       raw: inspect,
+    };
+  }
+
+  async captureSandboxSnapshot(
+    request: DockerCaptureSandboxSnapshotRequest,
+  ): Promise<DockerCaptureSandboxSnapshotResponse> {
+    const parsedRequest = DockerCaptureSandboxSnapshotRequestSchema.parse(request);
+    const container = await this.#resolveContainer(parsedRequest.runtimeId);
+    const commitResult = DockerCommitResponseSchema.parse(
+      await this.#runDockerClientOperation(DockerClientOperationIds.COMMIT_CONTAINER, () =>
+        container.commit({
+          pause: true,
+        }),
+      ),
+    );
+
+    return {
+      imageId: commitResult.Id,
     };
   }
 

@@ -167,6 +167,51 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     }
   }, 300_000);
 
+  it("captures a snapshot and starts a new sandbox from it", async ({ fixture }) => {
+    const marker = `mistle-e2b-snapshot-${randomUUID()}`;
+    let sourceId: string | undefined;
+    let restoredId: string | undefined;
+    let snapshotId: string | undefined;
+
+    try {
+      const sourceSandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+      });
+      sourceId = sourceSandbox.id;
+
+      const connectedSourceSandbox = await fixture.connectSandbox(sourceSandbox.id);
+      await connectedSourceSandbox.files.write(SANDBOX_STATE_FILE_PATH, marker);
+
+      const snapshotHandle = await fixture.adapter.captureSnapshot({
+        id: sourceSandbox.id,
+      });
+      snapshotId = snapshotHandle.imageId;
+
+      expect(snapshotHandle.provider).toBe(SandboxProvider.E2B);
+      expect(snapshotHandle.imageId).not.toBe("");
+
+      const restoredSandbox = await fixture.adapter.start({
+        image: snapshotHandle,
+      });
+      restoredId = restoredSandbox.id;
+
+      const connectedRestoredSandbox = await fixture.connectSandbox(restoredSandbox.id);
+      const readback = await connectedRestoredSandbox.files.read(SANDBOX_STATE_FILE_PATH);
+
+      expect(readback).toBe(marker);
+    } finally {
+      if (sourceId !== undefined) {
+        await fixture.adapter.destroy({ id: sourceId }).catch(() => undefined);
+      }
+      if (restoredId !== undefined) {
+        await fixture.adapter.destroy({ id: restoredId }).catch(() => undefined);
+      }
+      if (snapshotId !== undefined) {
+        await fixture.deleteSnapshot(snapshotId).catch(() => undefined);
+      }
+    }
+  }, 300_000);
+
   it("surfaces sandbox not found after destroy", async ({ fixture }) => {
     const sandbox = await fixture.adapter.start({
       image: fixture.baseImage,

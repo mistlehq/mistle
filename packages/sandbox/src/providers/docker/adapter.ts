@@ -8,12 +8,14 @@ import {
   SandboxProvider,
   SandboxStorageBackend,
   type SandboxAdapter,
+  type SandboxCaptureSnapshotRequest,
   type SandboxDockerVolumeStartStoragePreparation,
   type SandboxDockerVolumeStorageAttachment,
   type SandboxAttachStorageRequest,
   type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxImageHandle,
   type SandboxInspectRequest,
   type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
@@ -29,6 +31,14 @@ function createSandboxHandle(runtimeId: string): SandboxHandle {
   return {
     provider: SandboxProvider.DOCKER,
     id: runtimeId,
+  };
+}
+
+function createSandboxImageHandle(imageId: string): SandboxImageHandle {
+  return {
+    provider: SandboxProvider.DOCKER,
+    imageId,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -127,6 +137,26 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       });
 
       return createSandboxHandle(response.runtimeId);
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
+  }
+
+  async captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle> {
+    if (request.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      const response = await this.#client.captureSandboxSnapshot({
+        runtimeId: request.id,
+      });
+
+      return createSandboxImageHandle(response.imageId);
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);

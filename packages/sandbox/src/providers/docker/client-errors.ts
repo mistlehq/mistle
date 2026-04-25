@@ -54,6 +54,12 @@ export const DockerClientOperationIds = {
    */
   INSPECT_CONTAINER: "inspect_container",
   /**
+   * `container.commit(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L25-L45
+   */
+  COMMIT_CONTAINER: "commit_container",
+  /**
    * `container.inspect(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L47-L76

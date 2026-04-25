@@ -5,7 +5,11 @@ import { describe, expect, it } from "vitest";
 import startupInitResponseErrorFixture from "../tests/fixtures/startup-init-response.error.valid.json" with { type: "json" };
 import startupInitResponseOkFixture from "../tests/fixtures/startup-init-response.ok.valid.json" with { type: "json" };
 import startupInputFixture from "../tests/fixtures/startup-input.valid.json" with { type: "json" };
-import { SandboxdInitResponseSchema, SandboxdStartupInputSchema } from "./startup.js";
+import {
+  SandboxdExecutionModes,
+  SandboxdInitResponseSchema,
+  SandboxdStartupInputSchema,
+} from "./startup.js";
 
 const startupInitResponseSchemaJson: unknown = JSON.parse(
   readFileSync(new URL("../schemas/sandboxd-init-response.schema.json", import.meta.url), "utf8"),
@@ -72,6 +76,18 @@ describe("startup contracts", () => {
         name: "Mistle User",
         email: "mistle-user@example.com",
       },
+    });
+  });
+
+  it("accepts startup input with optional snapshot materialization execution mode", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
+        ...startupInputFixture,
+        executionMode: SandboxdExecutionModes.SNAPSHOT_MATERIALIZATION,
+      }),
+    ).toEqual({
+      ...startupInputFixture,
+      executionMode: SandboxdExecutionModes.SNAPSHOT_MATERIALIZATION,
     });
   });
 

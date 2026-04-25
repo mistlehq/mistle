@@ -8,6 +8,10 @@ export type SandboxRuntimeProvider = SandboxProvider;
 
 export interface SandboxImageHandle {
   readonly provider: SandboxRuntimeProvider;
+  /**
+   * Provider-specific image/template identifier that can be passed back to the
+   * same provider's `start({ image })` path.
+   */
   readonly imageId: string;
   readonly createdAt: string;
 }
@@ -197,6 +201,10 @@ export interface SandboxDestroyRequest {
   readonly id: string;
 }
 
+export interface SandboxCaptureSnapshotRequest {
+  readonly id: string;
+}
+
 export interface SandboxAdapter {
   prepareStorageForStart(
     request: SandboxPrepareStorageForStartRequest,
@@ -204,6 +212,7 @@ export interface SandboxAdapter {
   start(request: SandboxStartRequest): Promise<SandboxHandle>;
   inspect(request: SandboxInspectRequest): Promise<SandboxInspectResult>;
   resume(request: SandboxResumeRequestV1): Promise<SandboxHandle>;
+  captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle>;
   attachStorage(request: SandboxAttachStorageRequest): Promise<void>;
   cleanupStorage(request: SandboxCleanupStorageRequest): Promise<void>;
   stop(request: SandboxStopRequest): Promise<void>;

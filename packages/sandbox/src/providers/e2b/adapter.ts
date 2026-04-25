@@ -10,9 +10,11 @@ import {
   type SandboxArchilStorageAttachment,
   type SandboxArchilStorageCleanup,
   type SandboxAttachStorageRequest,
+  type SandboxCaptureSnapshotRequest,
   type SandboxCleanupStorageRequest,
   type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxImageHandle,
   type SandboxInspectRequest,
   type SandboxPrepareStorageForStartRequest,
   type SandboxResumeRequestV1,
@@ -33,6 +35,14 @@ function createSandboxHandle(sandboxId: string): SandboxHandle {
   return {
     provider: SandboxProvider.E2B,
     id: sandboxId,
+  };
+}
+
+function createSandboxImageHandle(imageId: string): SandboxImageHandle {
+  return {
+    provider: SandboxProvider.E2B,
+    imageId,
+    createdAt: new Date().toISOString(),
   };
 }
 
@@ -116,6 +126,24 @@ export class E2BSandboxAdapter implements SandboxAdapter {
     try {
       const sandbox = await this.#client.resumeSandbox({ sandboxId: request.id });
       return createSandboxHandle(sandbox.sandboxId);
+    } catch (error) {
+      if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
+        throw toSandboxNotFoundError(request.id, error);
+      }
+
+      throw error;
+    }
+  }
+
+  async captureSnapshot(request: SandboxCaptureSnapshotRequest): Promise<SandboxImageHandle> {
+    requireSandboxId(request.id);
+
+    try {
+      const response = await this.#client.captureSandboxSnapshot({
+        sandboxId: request.id,
+      });
+
+      return createSandboxImageHandle(response.snapshotId);
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
         throw toSandboxNotFoundError(request.id, error);

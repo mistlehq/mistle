@@ -1,5 +1,5 @@
 import { systemSleeper } from "@mistle/time";
-import { CommandExitError, Sandbox, type ConnectionOpts } from "e2b";
+import { CommandExitError, Sandbox, Template, type ConnectionOpts } from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
@@ -14,6 +14,7 @@ import {
   createE2BSandboxCreateOptions,
 } from "./sandbox-options.js";
 import {
+  E2BCaptureSandboxSnapshotRequestSchema,
   E2BDefaultTemplateCpuCount,
   E2BDefaultTemplateMemoryMb,
   E2BDestroySandboxRequestSchema,
@@ -22,6 +23,7 @@ import {
   E2BResumeSandboxRequestSchema,
   E2BStartSandboxRequestSchema,
   E2BStopSandboxRequestSchema,
+  type E2BCaptureSandboxSnapshotRequest,
   type E2BDestroySandboxRequest,
   type E2BInitRequest,
   type E2BInspectSandboxRequest,
@@ -46,10 +48,17 @@ export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
 
+export type E2BCaptureSandboxSnapshotResponse = {
+  snapshotId: string;
+};
+
 export interface E2BClient {
   startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse>;
   inspectSandbox(request: E2BInspectSandboxRequest): Promise<E2BSandboxInspectResult>;
   resumeSandbox(request: E2BResumeSandboxRequest): Promise<E2BStartSandboxResponse>;
+  captureSandboxSnapshot(
+    request: E2BCaptureSandboxSnapshotRequest,
+  ): Promise<E2BCaptureSandboxSnapshotResponse>;
   stopSandbox(request: E2BStopSandboxRequest): Promise<void>;
   destroySandbox(request: E2BDestroySandboxRequest): Promise<void>;
   init(request: E2BInitRequest): Promise<void>;
@@ -167,7 +176,7 @@ export class E2BApiClient implements E2BClient {
 
   async startSandbox(request: E2BStartSandboxRequest): Promise<E2BStartSandboxResponse> {
     const parsedRequest = E2BStartSandboxRequestSchema.parse(request);
-    const templateAlias = await this.#templateRegistry.resolveAlias(parsedRequest.imageRef);
+    const templateAlias = await this.#resolveStartTemplateRef(parsedRequest.imageRef);
 
     try {
       const sandbox = await Sandbox.create(
@@ -221,6 +230,23 @@ export class E2BApiClient implements E2BClient {
       };
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.CONNECT_SANDBOX, error);
+    }
+  }
+
+  async captureSandboxSnapshot(
+    request: E2BCaptureSandboxSnapshotRequest,
+  ): Promise<E2BCaptureSandboxSnapshotResponse> {
+    const parsedRequest = E2BCaptureSandboxSnapshotRequestSchema.parse(request);
+
+    try {
+      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      const snapshot = await sandbox.createSnapshot();
+
+      return {
+        snapshotId: snapshot.snapshotId,
+      };
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.CREATE_SNAPSHOT, error);
     }
   }
 
@@ -433,5 +459,21 @@ export class E2BApiClient implements E2BClient {
     );
 
     return result.stdout.trim() === "ready";
+  }
+
+  async #resolveStartTemplateRef(imageRef: string): Promise<string> {
+    if (imageRef.includes("/")) {
+      return this.#templateRegistry.resolveAlias(imageRef);
+    }
+
+    try {
+      if (await Template.exists(imageRef, this.#connectionOptions)) {
+        return imageRef;
+      }
+    } catch (error) {
+      throw mapE2BClientError(E2BClientOperationIds.RESOLVE_TEMPLATE_ALIAS, error);
+    }
+
+    return this.#templateRegistry.resolveAlias(imageRef);
   }
 }
