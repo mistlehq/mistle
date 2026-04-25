@@ -26,6 +26,11 @@ import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
+const GitHubCloudTargetConfig = {
+  api_base_url: "https://api.github.com",
+  web_base_url: "https://github.com",
+} as const;
+
 async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
   await fixture.db
     .insert(integrationTargets)
@@ -34,10 +39,7 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
       familyId: "github",
       variantId: "github-cloud",
       enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
+      config: GitHubCloudTargetConfig,
     })
     .onConflictDoUpdate({
       target: integrationTargets.targetKey,
@@ -45,10 +47,7 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
+        config: GitHubCloudTargetConfig,
       },
     });
 }
