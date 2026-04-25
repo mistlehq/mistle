@@ -209,7 +209,6 @@ export async function deleteIntegrationConnection(input: {
 
 export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
-  methodId: "oauth2-authorization-code";
   displayName?: string;
   config?: Record<string, unknown>;
 }): Promise<StartedRedirectConnection> {
