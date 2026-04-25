@@ -382,13 +382,6 @@ function hasInstalledGitHubApp(connection: IntegrationConnection): boolean {
   );
 }
 
-function buildGitHubAppSetupCallbackUrl(): string {
-  return new URL(
-    "/p/integration/callbacks/github-app-installation",
-    getDashboardConfig().controlPlaneApiOrigin,
-  ).toString();
-}
-
 function resolveJsonParseErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
     return error.message;
@@ -1338,7 +1331,10 @@ export function GitHubAppSetupPane(input: {
 
             {setupMode === "existing-app" ? (
               <GitHubSetupUrls
-                setupCallbackUrl={buildGitHubAppSetupCallbackUrl()}
+                setupCallbackUrl={new URL(
+                  "/p/integration/callbacks/github-app-installation",
+                  getDashboardConfig().controlPlaneApiOrigin,
+                ).toString()}
                 webhookCallbackState={webhookCallbackState}
               />
             ) : null}
