@@ -13,6 +13,23 @@ type SandboxPresenceLeaseRecord = {
   expiresAtMs: number;
 };
 
+function isDefined<T>(value: T | null): value is T {
+  return value !== null;
+}
+
+function parseIntegerReply(input: unknown): number {
+  if (typeof input === "number" && Number.isInteger(input)) {
+    return input;
+  }
+
+  const parsed = Number(input);
+  if (Number.isInteger(parsed)) {
+    return parsed;
+  }
+
+  throw new Error(`Unexpected Valkey integer reply: ${String(input)}`);
+}
+
 function buildSandboxPresenceIndexKey(input: {
   keyPrefix: string;
   sandboxInstanceId: string;
@@ -50,26 +67,26 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
     nowMs: number;
   }): Promise<void> {
     const expiresAtMs = input.nowMs + input.ttlMs;
+    const indexKey = buildSandboxPresenceIndexKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const detailKey = buildSandboxPresenceDetailKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+      leaseId: input.leaseId,
+    });
 
-    await Promise.all([
-      this.client.zAdd(
-        buildSandboxPresenceIndexKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
-        [
-          {
-            score: expiresAtMs,
-            value: input.leaseId,
-          },
-        ],
-      ),
-      this.client.set(
-        buildSandboxPresenceDetailKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-          leaseId: input.leaseId,
-        }),
+    await this.client
+      .multi()
+      .zAdd(indexKey, [
+        {
+          score: expiresAtMs,
+          value: input.leaseId,
+        },
+      ])
+      .set(
+        detailKey,
         JSON.stringify({
           sandboxInstanceId: input.sandboxInstanceId,
           leaseId: input.leaseId,
@@ -80,8 +97,8 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
         {
           PX: input.ttlMs,
         },
-      ),
-    ]);
+      )
+      .exec();
 
     logger.debug(
       {
@@ -98,21 +115,17 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
   }
 
   async releaseLease(input: { sandboxInstanceId: string; leaseId: string }): Promise<boolean> {
-    const removedCount = await this.client.zRem(
-      buildSandboxPresenceIndexKey({
-        keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
-      }),
-      input.leaseId,
-    );
-
-    await this.client.del(
-      buildSandboxPresenceDetailKey({
-        keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
-        leaseId: input.leaseId,
-      }),
-    );
+    const indexKey = buildSandboxPresenceIndexKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const detailKey = buildSandboxPresenceDetailKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+      leaseId: input.leaseId,
+    });
+    const results = await this.client.multi().zRem(indexKey, input.leaseId).del(detailKey).exec();
+    const removedCount = parseIntegerReply(results[0]);
 
     logger.debug(
       {
@@ -143,6 +156,31 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
 
     await this.client.zRemRangeByScore(indexKey, "-inf", input.nowMs);
 
-    return await this.client.zCard(indexKey);
+    const activeLeaseIds = await this.client.zRange(indexKey, 0, -1);
+    if (activeLeaseIds.length === 0) {
+      return 0;
+    }
+
+    const missingLeaseIds = (
+      await Promise.all(
+        activeLeaseIds.map(async (leaseId) => {
+          const detailExists = await this.client.exists(
+            buildSandboxPresenceDetailKey({
+              keyPrefix: this.keyPrefix,
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId,
+            }),
+          );
+
+          return detailExists === 0 ? leaseId : null;
+        }),
+      )
+    ).filter(isDefined);
+
+    if (missingLeaseIds.length > 0) {
+      await this.client.zRem(indexKey, missingLeaseIds);
+    }
+
+    return activeLeaseIds.length - missingLeaseIds.length;
   }
 }

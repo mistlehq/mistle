@@ -275,6 +275,67 @@ describe("runtime-state store integrations", () => {
     }
   });
 
+  it("ignores orphaned presence index entries left by overlapping release and touch operations", async () => {
+    const keyPrefix = `mistle:runtime-state:presence-orphan-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
+    const client = createValkeyClient({
+      url: valkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxPresenceStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_presence_orphan_it";
+      const leaseId = "spl_orphan";
+      const indexKey = `${keyPrefix}:sandbox-presence:${sandboxInstanceId}`;
+      const detailKey = `${keyPrefix}:sandbox-presence:${sandboxInstanceId}:lease:${leaseId}`;
+
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId,
+        source: "dashboard",
+        sessionId: "session_first",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+
+      // Emulate an old release interleaving with a concurrent touch on the same lease id:
+      // 1. stale release removes the sorted-set member
+      // 2. current touch recreates the lease detail + sorted-set member
+      // 3. stale release deletes the recreated detail key
+      await client.zRem(indexKey, leaseId);
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId,
+        source: "dashboard",
+        sessionId: "session_second",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+      await client.del(detailKey);
+
+      await expect(
+        store.countActiveLeases({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(0);
+      await expect(
+        store.hasAnyActiveLease({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(false);
+      await expect(client.zCard(indexKey)).resolves.toBe(0);
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
   it("renews keepalives without losing their stored metadata", async () => {
     const keyPrefix = `mistle:runtime-state:keepalive-it:${randomUUID()}`;
     const valkeyUrl = await readValkeyUrl();
@@ -331,6 +392,61 @@ describe("runtime-state store integrations", () => {
           nowMs: Date.now(),
         }),
       ).resolves.toBe(false);
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
+  it("ignores orphaned keepalive index entries left by overlapping release and renew operations", async () => {
+    const keyPrefix = `mistle:runtime-state:keepalive-orphan-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
+    const client = createValkeyClient({
+      url: valkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxKeepaliveStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_keepalive_orphan_it";
+      const keepaliveId = "skp_orphan";
+      const indexKey = `${keyPrefix}:sandbox-keepalive:${sandboxInstanceId}`;
+      const detailKey = `${keyPrefix}:sandbox-keepalive:${sandboxInstanceId}:record:${keepaliveId}`;
+
+      await store.touchKeepalive({
+        sandboxInstanceId,
+        keepaliveId,
+        source: "codex",
+        nodeId: "dpg_it",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+
+      // Emulate an old release interleaving with a current renew on the same keepalive id:
+      // 1. stale release removes the sorted-set member
+      // 2. renew recreates the sorted-set member + detail key
+      // 3. stale release deletes the recreated detail key
+      await client.zRem(indexKey, keepaliveId);
+      await expect(
+        store.renewKeepalive({
+          sandboxInstanceId,
+          keepaliveId,
+          ttlMs: 30_000,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(true);
+      await client.del(detailKey);
+
+      await expect(
+        store.summarize({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toEqual({ active: false });
+      await expect(client.zCard(indexKey)).resolves.toBe(0);
     } finally {
       await deleteKeysByPrefix({
         client,
