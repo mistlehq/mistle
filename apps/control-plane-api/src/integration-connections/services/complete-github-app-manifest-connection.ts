@@ -32,6 +32,7 @@ import {
   createRedirectQueryParams,
   resolveGitHubAppManifestConnectionId,
 } from "./redirect-flow.js";
+import { buildUrlWithPath } from "./url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
@@ -56,15 +57,6 @@ const GitHubAppManifestConversionResponseSchema = z
     webhook_secret: z.string().min(1),
   })
   .loose();
-
-function appendUrlPath(input: { baseUrl: string; path: string }): string {
-  const url = new URL(input.baseUrl);
-  const basePath = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
-  url.pathname = `${basePath}${input.path}`;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
@@ -116,10 +108,10 @@ function assertGitHubAppConnectionOrThrow(input: {
 }
 
 function buildGitHubAppManifestConversionUrl(input: { apiBaseUrl: string; code: string }): string {
-  return appendUrlPath({
-    baseUrl: input.apiBaseUrl,
-    path: `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
-  });
+  return buildUrlWithPath(
+    input.apiBaseUrl,
+    `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
+  );
 }
 
 async function convertGitHubAppManifest(input: {

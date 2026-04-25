@@ -17,6 +17,7 @@ import {
   createRedirectState,
   encodeGitHubAppManifestStateMetadata,
 } from "./redirect-flow.js";
+import { buildUrlWithPath } from "./url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
@@ -48,15 +49,6 @@ type StartedGitHubAppManifestConnection = {
   };
 };
 
-function appendUrlPath(input: { baseUrl: string; path: string }): string {
-  const url = new URL(input.baseUrl);
-  const basePath = url.pathname.endsWith("/") ? url.pathname.slice(0, -1) : url.pathname;
-  url.pathname = `${basePath}${input.path}`;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
 function buildGitHubAppManifestSubmissionUrl(input: {
   owner: GitHubAppManifestOwner;
   state: string;
@@ -66,12 +58,7 @@ function buildGitHubAppManifestSubmissionUrl(input: {
     input.owner.kind === "personal"
       ? "/settings/apps/new"
       : `/organizations/${encodeURIComponent(input.owner.organizationSlug)}/settings/apps/new`;
-  const submissionUrl = new URL(
-    appendUrlPath({
-      baseUrl: input.webBaseUrl,
-      path,
-    }),
-  );
+  const submissionUrl = new URL(buildUrlWithPath(input.webBaseUrl, path));
   submissionUrl.searchParams.set("state", input.state);
   return submissionUrl.toString();
 }
