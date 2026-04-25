@@ -10,6 +10,7 @@ import {
   Route,
   RouterProvider,
 } from "react-router";
+import { z } from "zod";
 
 import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
@@ -194,6 +195,16 @@ function createPageResponse<T>(items: readonly T[]): {
   };
 }
 
+const StoryFormUpdateRequestBodySchema = z.object({
+  displayName: z.string(),
+  config: z.record(z.string(), z.unknown()),
+  secrets: z.record(z.string(), z.string()).optional(),
+});
+
+const StoryDraftConnectionRequestBodySchema = z.object({
+  displayName: z.string(),
+});
+
 function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -240,11 +251,8 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
       const updateFormMatch = path.match(/^\/v1\/integration\/connections\/([^/]+)\/form$/);
       if (method === "PUT" && updateFormMatch !== null) {
         const connectionId = decodeURIComponent(updateFormMatch[1] ?? "");
-        const body = (await request.json()) as {
-          displayName: string;
-          config: Record<string, unknown>;
-          secrets?: Record<string, string>;
-        };
+        const requestBody: unknown = await request.json();
+        const body = StoryFormUpdateRequestBodySchema.parse(requestBody);
         const currentConnection =
           directoryData.connections.find((connection) => connection.id === connectionId) ?? null;
         if (currentConnection === null) {
@@ -294,7 +302,8 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
       );
       if (method === "POST" && createDraftMatch !== null) {
         const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
-        const body = (await request.json()) as { displayName: string };
+        const requestBody: unknown = await request.json();
+        const body = StoryDraftConnectionRequestBodySchema.parse(requestBody);
         const createdConnection: IntegrationConnection = {
           id: "icn_github_story_created",
           targetKey,
