@@ -1445,6 +1445,10 @@
                       "kind": {
                         "type": "string",
                         "enum": ["base", "snapshot"]
+                      },
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
                       }
                     },
                     "required": ["imageId", "kind"],

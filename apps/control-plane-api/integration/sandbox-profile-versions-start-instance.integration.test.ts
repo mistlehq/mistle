@@ -50,6 +50,7 @@ const WorkflowRunInputSchema = z.looseObject({
       imageId: z.string().min(1),
       createdAt: z.iso.datetime().optional(),
       kind: z.enum(["base", "snapshot"]),
+      provider: z.enum(["docker", "e2b"]).optional(),
     })
     .strict()
     .optional(),
@@ -441,6 +442,7 @@ describe("sandbox profile version start instance integration", () => {
       expect(queuedWorkflowInput.image).toEqual({
         imageId: "sha256:snapshot-launch-image",
         kind: "snapshot",
+        provider: "docker",
       });
       expect(queuedWorkflowInput.runtimePlan.image).toEqual({
         source: "snapshot",

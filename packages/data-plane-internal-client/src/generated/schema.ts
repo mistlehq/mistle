@@ -139,6 +139,8 @@ export interface paths {
               imageId: string;
               /** @enum {string} */
               kind: "base" | "snapshot";
+              /** @enum {string} */
+              provider?: "docker" | "e2b";
             };
             organizationId: string;
             runtimePlan: {

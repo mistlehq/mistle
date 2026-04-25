@@ -6,7 +6,7 @@ import {
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import { type CompiledRuntimePlan, type ResolvedSandboxImage } from "@mistle/integrations-core";
-import { SandboxStartImageKinds } from "@mistle/workflow-registry/data-plane";
+import { SandboxProvider, type SandboxProvider as SandboxProviderType } from "@mistle/sandbox";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
@@ -50,9 +50,23 @@ type ResolvedLaunchImage = {
   workflowImage: {
     imageId: string;
     createdAt?: string;
-    kind: (typeof SandboxStartImageKinds)[keyof typeof SandboxStartImageKinds];
+    kind: "base" | "snapshot";
+    provider?: SandboxProviderType;
   };
 };
+
+const LaunchImageKinds = {
+  BASE: "base",
+  SNAPSHOT: "snapshot",
+} as const;
+
+function assertSnapshotImageProvider(provider: string): SandboxProviderType {
+  if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
+    return provider;
+  }
+
+  throw new Error(`Unsupported persisted snapshot image provider '${provider}'.`);
+}
 
 async function resolveEffectiveRuntimePlan(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
@@ -168,7 +182,8 @@ async function resolveLaunchImage(
       },
       workflowImage: {
         imageId: sandboxProfileVersion.snapshotImageId,
-        kind: SandboxStartImageKinds.SNAPSHOT,
+        kind: LaunchImageKinds.SNAPSHOT,
+        provider: assertSnapshotImageProvider(sandboxProfileVersion.snapshotImageProvider),
       },
     };
   }
@@ -182,7 +197,7 @@ async function resolveLaunchImage(
     workflowImage: {
       imageId: defaultBaseImage,
       createdAt: new Date().toISOString(),
-      kind: SandboxStartImageKinds.BASE,
+      kind: LaunchImageKinds.BASE,
     },
   };
 }

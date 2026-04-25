@@ -1,6 +1,6 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
-import type { SandboxImageHandle } from "@mistle/sandbox";
+import type { SandboxImageHandle, SandboxProvider } from "@mistle/sandbox";
 import type { Client } from "openapi-fetch";
 import createClient from "openapi-fetch";
 import { z } from "zod";
@@ -50,6 +50,7 @@ export type StartSandboxInstanceInput = {
   image: Pick<SandboxImageHandle, "imageId"> & {
     createdAt?: SandboxImageHandle["createdAt"];
     kind: "base" | "snapshot";
+    provider?: SandboxProvider;
   };
   idempotencyKey?: string;
 };

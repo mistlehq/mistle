@@ -4,7 +4,7 @@ import type {
   SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
-import type { SandboxImageHandle } from "@mistle/sandbox";
+import type { SandboxImageHandle, SandboxProvider } from "@mistle/sandbox";
 import { defineWorkflowSpec } from "openworkflow";
 
 export const StartSandboxInstanceWorkflowName = "data-plane.sandbox-instances.start";
@@ -36,6 +36,7 @@ export type SandboxStartImageKind =
 export type StartSandboxInstanceWorkflowImageInput = Pick<SandboxImageHandle, "imageId"> & {
   createdAt?: SandboxImageHandle["createdAt"];
   kind: SandboxStartImageKind;
+  provider?: SandboxProvider;
 };
 
 export type SandboxWorkflowGitIdentityInput = {

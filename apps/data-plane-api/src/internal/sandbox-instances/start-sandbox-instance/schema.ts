@@ -39,6 +39,7 @@ export const StartSandboxInstanceInputSchema = z
         imageId: z.string().min(1),
         createdAt: z.string().min(1).optional(),
         kind: z.enum(["base", "snapshot"]),
+        provider: z.enum(["docker", "e2b"]).optional(),
       })
       .strict(),
   })
