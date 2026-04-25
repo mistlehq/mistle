@@ -231,5 +231,10 @@ describe("GitHubManualSetupPane", () => {
       throw new Error("invalid manifest JSON must return an invalid validation result");
     }
     expect(invalidResult.message.length).toBeGreaterThan(0);
+
+    expect(validateGitHubManifestJson("[]")).toEqual({
+      message: "Manifest must be a JSON object.",
+      status: "invalid",
+    });
   });
 });

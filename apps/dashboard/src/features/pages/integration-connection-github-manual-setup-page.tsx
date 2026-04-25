@@ -452,17 +452,7 @@ function resolveJsonParseErrorMessage(error: unknown): string {
 
 export function validateGitHubManifestJson(value: string): GitHubManifestValidation {
   try {
-    const parsedManifest: unknown = JSON.parse(value);
-    if (
-      typeof parsedManifest !== "object" ||
-      parsedManifest === null ||
-      Array.isArray(parsedManifest)
-    ) {
-      return {
-        message: "Manifest must be a JSON object.",
-        status: "invalid",
-      };
-    }
+    parseGitHubManifestObject(value);
     return { status: "valid" };
   } catch (error) {
     return {
@@ -473,12 +463,16 @@ export function validateGitHubManifestJson(value: string): GitHubManifestValidat
 }
 
 export function formatGitHubManifestJson(value: string): string {
-  const parsedManifest: unknown = JSON.parse(value);
+  const parsedManifest = parseJsonValue(value);
   return JSON.stringify(parsedManifest, null, 2);
 }
 
-function parseGitHubManifestRecord(value: string): Record<string, unknown> {
-  const parsedManifest: unknown = JSON.parse(value);
+function parseJsonValue(value: string): unknown {
+  return JSON.parse(value);
+}
+
+function parseGitHubManifestObject(value: string): object {
+  const parsedManifest = parseJsonValue(value);
   if (
     typeof parsedManifest !== "object" ||
     parsedManifest === null ||
@@ -487,6 +481,11 @@ function parseGitHubManifestRecord(value: string): Record<string, unknown> {
     throw new Error("Manifest must be a JSON object.");
   }
 
+  return parsedManifest;
+}
+
+function parseGitHubManifestRecord(value: string): Record<string, unknown> {
+  const parsedManifest = parseGitHubManifestObject(value);
   const manifest: Record<string, unknown> = {};
   for (const [key, entryValue] of Object.entries(parsedManifest)) {
     manifest[key] = entryValue;
