@@ -7,14 +7,12 @@ export async function deleteSandboxProfile(
   },
   input: { organizationId: string; profileId: string },
 ): Promise<void> {
-  await ctx.db.transaction(async (tx) => {
-    await tx
-      .delete(sandboxProfiles)
-      .where(
-        and(
-          eq(sandboxProfiles.id, input.profileId),
-          eq(sandboxProfiles.organizationId, input.organizationId),
-        ),
-      );
-  });
+  await ctx.db
+    .delete(sandboxProfiles)
+    .where(
+      and(
+        eq(sandboxProfiles.id, input.profileId),
+        eq(sandboxProfiles.organizationId, input.organizationId),
+      ),
+    );
 }

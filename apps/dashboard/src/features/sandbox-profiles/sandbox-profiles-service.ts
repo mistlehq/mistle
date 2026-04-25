@@ -8,12 +8,12 @@ import type {
   CreateSandboxProfileInput,
   DeleteSandboxProfileResult,
   LaunchableSandboxProfilesResult,
-  SandboxProfileRepositoryOption,
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
+  SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionSetupScript,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
@@ -385,9 +385,7 @@ const SandboxProfileVersionSetupScriptResponseSchema = z
 export async function listSandboxProfileVersions(input: {
   profileId: string;
   signal?: AbortSignal;
-}): Promise<{
-  versions: SandboxProfileVersion[];
-}> {
+}): Promise<{ versions: SandboxProfileVersion[] }> {
   try {
     const response = await requestControlPlane({
       operation: "listSandboxProfileVersions",
@@ -571,9 +569,7 @@ export async function getSandboxProfileVersionIntegrationBindings(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-}> {
+}): Promise<{ bindings: SandboxProfileVersionIntegrationBinding[] }> {
   try {
     const response = await requestControlPlane({
       operation: "getSandboxProfileVersionIntegrationBindings",
@@ -613,10 +609,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-  repositoryOptions: SandboxProfileRepositoryOption[];
-}> {
+}): Promise<SandboxProfileVersionAutomationConfig> {
   try {
     const response = await requestControlPlane({
       operation: "getSandboxProfileVersionAutomationConfig",
@@ -701,9 +694,7 @@ export async function putSandboxProfileVersionIntegrationBindings(input: {
     kind: SandboxIntegrationBindingKind;
     config: Record<string, unknown>;
   }>;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-}> {
+}): Promise<{ bindings: SandboxProfileVersionIntegrationBinding[] }> {
   try {
     const response = await requestControlPlane({
       operation: "putSandboxProfileVersionIntegrationBindings",
