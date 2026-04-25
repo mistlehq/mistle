@@ -158,7 +158,15 @@ function buildConvertedConnectionSecrets(input: {
   conversion: z.output<typeof GitHubAppManifestConversionResponseSchema>;
   supportsClientSecret: boolean;
 }): Record<string, string> {
-  if (input.supportsClientSecret && input.conversion.client_secret === undefined) {
+  if (!input.supportsClientSecret) {
+    return {
+      appPrivateKeyPem: input.conversion.pem,
+      webhookSecret: input.conversion.webhook_secret,
+    };
+  }
+
+  const clientSecret = input.conversion.client_secret;
+  if (clientSecret === undefined) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
       "GitHub App manifest conversion response is missing `client_secret`.",
@@ -168,7 +176,7 @@ function buildConvertedConnectionSecrets(input: {
   return {
     appPrivateKeyPem: input.conversion.pem,
     webhookSecret: input.conversion.webhook_secret,
-    ...(input.supportsClientSecret ? { clientSecret: input.conversion.client_secret ?? "" } : {}),
+    clientSecret,
   };
 }
 
