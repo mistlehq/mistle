@@ -14,10 +14,7 @@ import { z } from "zod";
 
 import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
-import {
-  IntegrationConnectionDetailView,
-  type IntegrationConnectionDetailViewProps,
-} from "../integrations/integration-connection-detail-view.js";
+import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { createGitHubAppDetailViewStoryProps } from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
@@ -435,34 +432,6 @@ function GitHubAppSetupPageStory(input: {
   );
 }
 
-function GitHubDetailStory(input: {
-  props: Omit<
-    IntegrationConnectionDetailViewProps,
-    | "onCreateWebhookSource"
-    | "onDeleteWebhookSource"
-    | "onEditAuthentication"
-    | "onRefreshResource"
-    | "onStartGitHubAppInstallation"
-  >;
-}): React.JSX.Element {
-  return (
-    <IntegrationConnectionDetailView
-      {...input.props}
-      onCreateWebhookSource={() => {}}
-      onDeleteWebhookSource={() => {}}
-      onEditAuthentication={() => {}}
-      onRefreshResource={() => {}}
-      onStartGitHubAppInstallation={async () => {}}
-      titleEditor={{
-        disabled: false,
-        errorMessageByConnectionId: {},
-        onStartEditing: () => {},
-        onSave: async () => {},
-      }}
-    />
-  );
-}
-
 const pageMeta = {
   title: "Dashboard/Integrations/GitHub App Flows",
   decorators: [withDashboardPageStory],
@@ -538,6 +507,21 @@ export const ManifestCreationSuccess: PageStory = {
 export const InstalledDetail: PageStory = {
   decorators: [withDashboardCenteredStory],
   render: function RenderStory() {
-    return <GitHubDetailStory props={createGitHubAppDetailViewStoryProps()} />;
+    return (
+      <IntegrationConnectionDetailView
+        {...createGitHubAppDetailViewStoryProps()}
+        onCreateWebhookSource={() => {}}
+        onDeleteWebhookSource={() => {}}
+        onEditAuthentication={() => {}}
+        onRefreshResource={() => {}}
+        onStartGitHubAppInstallation={async () => {}}
+        titleEditor={{
+          disabled: false,
+          errorMessageByConnectionId: {},
+          onStartEditing: () => {},
+          onSave: async () => {},
+        }}
+      />
+    );
   },
 };
