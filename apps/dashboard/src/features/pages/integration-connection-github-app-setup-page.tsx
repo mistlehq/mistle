@@ -1093,7 +1093,7 @@ export function GitHubAppSetupPane(input: {
         fieldKey,
       });
 
-      await updateFormIntegrationConnection({
+      const updatedConnection = await updateFormIntegrationConnection({
         connectionId: input.connection.id,
         displayName: input.connection.displayName,
         config: buildGitHubExistingAppSetupConfig(currentDraft),
@@ -1118,11 +1118,7 @@ export function GitHubAppSetupPane(input: {
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
       if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
-        setConfiguredSecretFieldKeys((currentConfiguredSecretFieldKeys) => {
-          const nextConfiguredSecretFieldKeys = new Set(currentConfiguredSecretFieldKeys);
-          nextConfiguredSecretFieldKeys.add(fieldKey);
-          return nextConfiguredSecretFieldKeys;
-        });
+        setConfiguredSecretFieldKeys(resolveConfiguredSecretFieldKeys(updatedConnection));
       }
       setActionErrorMessage(null);
       setFieldStates((currentFieldStates) => ({
