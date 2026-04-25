@@ -417,7 +417,7 @@ export function formatGitHubManifestJson(value: string): string {
   return JSON.stringify(parsedManifest, null, 2);
 }
 
-function parseGitHubManifestObject(value: string): object {
+function parseGitHubManifestObject(value: string): Record<string, unknown> {
   const parsedManifest: unknown = JSON.parse(value);
   if (
     typeof parsedManifest !== "object" ||
@@ -427,11 +427,6 @@ function parseGitHubManifestObject(value: string): object {
     throw new Error("Manifest must be a JSON object.");
   }
 
-  return parsedManifest;
-}
-
-function parseGitHubManifestRecord(value: string): Record<string, unknown> {
-  const parsedManifest = parseGitHubManifestObject(value);
   const manifest: Record<string, unknown> = {};
   for (const [key, entryValue] of Object.entries(parsedManifest)) {
     manifest[key] = entryValue;
@@ -939,7 +934,7 @@ export function GitHubAppSetupPane(input: {
 
       return startGitHubAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseGitHubManifestRecord(manifestValue),
+        manifest: parseGitHubManifestObject(manifestValue),
         owner:
           manifestAppOwnerKind === "personal"
             ? { kind: "personal" }
