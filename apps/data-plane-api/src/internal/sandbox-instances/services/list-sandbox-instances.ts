@@ -1,4 +1,5 @@
 import {
+  SandboxInstancePurposes,
   sandboxInstances,
   type DataPlaneDatabase,
   SandboxInstanceStatuses,
@@ -256,7 +257,10 @@ export async function listSandboxInstances(
             failureMessage: true,
           },
           where: (table, { and, eq, gt, lt, or }) => {
-            const organizationScope = eq(table.organizationId, input.organizationId);
+            const organizationScope = and(
+              eq(table.organizationId, input.organizationId),
+              eq(table.purpose, SandboxInstancePurposes.SESSION),
+            );
 
             if (cursor === undefined) {
               return organizationScope;
@@ -292,7 +296,9 @@ export async function listSandboxInstances(
             totalResults: sql<number>`count(*)::int`,
           })
           .from(sandboxInstances)
-          .where(sql`${sandboxInstances.organizationId} = ${input.organizationId}`);
+          .where(
+            sql`${sandboxInstances.organizationId} = ${input.organizationId} and ${sandboxInstances.purpose} = ${SandboxInstancePurposes.SESSION}`,
+          );
 
         return result?.totalResults ?? 0;
       },

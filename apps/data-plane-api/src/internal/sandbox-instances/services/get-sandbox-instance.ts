@@ -1,5 +1,9 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
-import { sandboxInstanceRuntimePlans, sandboxInstances } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  sandboxInstanceRuntimePlans,
+  sandboxInstances,
+} from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -40,6 +44,7 @@ export async function getSandboxInstance(
       and(
         eq(sandboxInstances.id, input.instanceId),
         eq(sandboxInstances.organizationId, input.organizationId),
+        eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
       ),
     )
     .limit(1);

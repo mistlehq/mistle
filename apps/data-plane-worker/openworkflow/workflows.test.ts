@@ -1,4 +1,5 @@
 import {
+  MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
   HandleSandboxInstanceDeadlineWorkflowSpec,
   ReconcileSandboxInstanceWorkflowSpec,
   ResumeSandboxInstanceWorkflowSpec,
@@ -7,6 +8,7 @@ import {
 } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 
+import { MaterializeSandboxProfileVersionSnapshotWorkflow } from "./materialize-sandbox-profile-version-snapshot/workflow.js";
 import { ReconcileSandboxInstanceWorkflow } from "./reconcile-sandbox-instance/workflow.js";
 import { ResumeSandboxInstanceWorkflow } from "./resume-sandbox-instance/workflow.js";
 import { HandleSandboxInstanceDeadlineWorkflow } from "./sandbox-instance-deadlines/workflow.js";
@@ -16,6 +18,12 @@ import { StopSandboxInstanceWorkflow } from "./stop-sandbox-instance/workflow.js
 describe("data-plane worker openworkflow entrypoints", () => {
   it("preserves the start sandbox instance workflow identity", () => {
     expect(StartSandboxInstanceWorkflow.spec).toMatchObject(StartSandboxInstanceWorkflowSpec);
+  });
+
+  it("preserves the snapshot materialization workflow identity", () => {
+    expect(MaterializeSandboxProfileVersionSnapshotWorkflow.spec).toMatchObject(
+      MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
+    );
   });
 
   it("preserves the resume sandbox instance workflow identity", () => {

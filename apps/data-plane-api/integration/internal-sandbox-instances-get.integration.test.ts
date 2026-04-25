@@ -3,6 +3,7 @@ import type { StartSandboxInstanceInput } from "@mistle/data-plane-internal-clie
 import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
 } from "@mistle/db/data-plane";
@@ -177,6 +178,38 @@ async function waitForRuntimeReadiness(input: {
 }
 
 describe("internal sandbox instances get integration", () => {
+  it("returns null for snapshot-purpose sandbox instances", async ({ fixture }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_snapshot",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_snapshot_hidden",
+      title: "Snapshot builder",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-snapshot-hidden-001",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "system",
+      startedById: "ssj_snapshot_hidden",
+      source: "system",
+      purpose: SandboxInstancePurposes.SNAPSHOT,
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_snapshot?organizationId=org_dp_api_conventional_get`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toBeNull();
+  });
+
   it("returns pending before provider provisioning begins", async ({ fixture }) => {
     await fixture.db.insert(sandboxInstances).values({
       id: "sbi_conventional_get_pending",

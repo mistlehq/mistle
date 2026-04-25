@@ -17,6 +17,7 @@ export async function markSandboxInstanceFailed(
     failureCode: string;
     failureMessage: string;
     allowStoppedCurrentStatus?: boolean;
+    allowRunningCurrentStatus?: boolean;
   },
 ): Promise<void> {
   const updatedRows = await ctx.db.transaction(async (tx) => {
@@ -36,6 +37,9 @@ export async function markSandboxInstanceFailed(
           or(
             eq(sandboxInstances.status, SandboxInstanceStatuses.PENDING),
             eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+            ...(input.allowRunningCurrentStatus === true
+              ? [eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING)]
+              : []),
             ...(input.allowStoppedCurrentStatus === true
               ? [eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED)]
               : []),

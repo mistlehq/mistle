@@ -75,6 +75,18 @@ export type RequestIntegrationConnectionResourceRefreshInput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
 export type RequestIntegrationConnectionResourceRefreshOutput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
+export type ClaimSandboxProfileVersionSnapshotJobInput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/claim"]["post"]["requestBody"]["content"]["application/json"];
+export type ClaimSandboxProfileVersionSnapshotJobOutput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/claim"]["post"]["responses"]["200"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobSucceededInput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded"]["post"]["requestBody"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobSucceededOutput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded"]["post"]["responses"]["200"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobFailedInput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-failed"]["post"]["requestBody"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobFailedOutput =
+  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-failed"]["post"]["responses"]["200"]["content"]["application/json"];
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -387,5 +399,71 @@ export class ControlPlaneInternalClient {
     throw new Error(
       `Control-plane internal resource refresh failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
+  }
+
+  async claimSandboxProfileVersionSnapshotJob(
+    input: ClaimSandboxProfileVersionSnapshotJobInput,
+  ): Promise<ClaimSandboxProfileVersionSnapshotJobOutput> {
+    const result = await this.#client.POST(
+      "/internal/sandbox-profile-version-snapshot-jobs/claim",
+      {
+        body: input,
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal snapshot job claim failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
+  }
+
+  async markSandboxProfileVersionSnapshotJobSucceeded(
+    input: MarkSandboxProfileVersionSnapshotJobSucceededInput,
+  ): Promise<MarkSandboxProfileVersionSnapshotJobSucceededOutput> {
+    const result = await this.#client.POST(
+      "/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded",
+      {
+        body: input,
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal snapshot job success update failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
+  }
+
+  async markSandboxProfileVersionSnapshotJobFailed(
+    input: MarkSandboxProfileVersionSnapshotJobFailedInput,
+  ): Promise<MarkSandboxProfileVersionSnapshotJobFailedOutput> {
+    const result = await this.#client.POST(
+      "/internal/sandbox-profile-version-snapshot-jobs/mark-failed",
+      {
+        body: input,
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal snapshot job failure update failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
   }
 }

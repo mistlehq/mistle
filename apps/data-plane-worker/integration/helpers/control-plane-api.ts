@@ -25,7 +25,9 @@ function createControlPlaneApiEnvironment(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
-  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
+  sandboxStorageBackend:
+    | typeof SandboxStorageBackend.ARCHIL
+    | typeof SandboxStorageBackend.DOCKER_VOLUME;
   commitSignBinaryPath: string;
 }): NodeJS.ProcessEnv {
   return {
@@ -52,7 +54,9 @@ function startControlPlaneApiChildProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
-  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
+  sandboxStorageBackend:
+    | typeof SandboxStorageBackend.ARCHIL
+    | typeof SandboxStorageBackend.DOCKER_VOLUME;
   commitSignBinaryPath: string;
 }): ControlPlaneApiChildProcess {
   return spawn(
@@ -102,7 +106,9 @@ export async function startControlPlaneApiProcess(input: {
   dataPlaneApiBaseUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken: string;
-  sandboxStorageBackend: typeof SandboxStorageBackend.ARCHIL;
+  sandboxStorageBackend:
+    | typeof SandboxStorageBackend.ARCHIL
+    | typeof SandboxStorageBackend.DOCKER_VOLUME;
   commitSignBinaryPath: string;
 }): Promise<StartedControlPlaneApiProcess> {
   const childProcess = startControlPlaneApiChildProcess(input);

@@ -1,10 +1,10 @@
 import {
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import type { SandboxProvider } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 export async function ensureSandboxInstance(
   ctx: {
@@ -16,9 +16,13 @@ export async function ensureSandboxInstance(
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
-    persistenceMode: StartSandboxInstanceWorkflowInput["persistenceMode"];
-    startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
-    source: StartSandboxInstanceWorkflowInput["source"];
+    persistenceMode: "ephemeral" | "persistent";
+    purpose?: "session" | "snapshot";
+    startedBy: {
+      kind: "user" | "system";
+      id: string;
+    };
+    source: "dashboard" | "webhook" | "system";
   },
 ): Promise<{
   sandboxInstanceId: string;
@@ -37,6 +41,7 @@ export async function ensureSandboxInstance(
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,
+      purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
       persistenceMode: input.persistenceMode,
     })
     .onConflictDoNothing({

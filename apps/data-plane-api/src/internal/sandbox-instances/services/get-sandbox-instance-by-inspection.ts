@@ -1,5 +1,6 @@
 import {
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
   sandboxInstances,
@@ -644,7 +645,11 @@ export async function getSandboxInstanceByInspection(
       failureMessage: true,
     },
     where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(eq(table.id, input.instanceId), whereEq(table.organizationId, input.organizationId)),
+      whereAnd(
+        eq(table.id, input.instanceId),
+        whereEq(table.organizationId, input.organizationId),
+        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
+      ),
   });
   if (sandboxInstance === undefined) {
     return null;

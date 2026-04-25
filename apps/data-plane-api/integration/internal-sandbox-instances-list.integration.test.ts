@@ -2,7 +2,11 @@ import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   createDataPlaneSandboxInstancesClient,
 } from "@mistle/data-plane-internal-client";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
@@ -77,6 +81,22 @@ describe("internal sandbox instances list integration", () => {
         source: "dashboard",
         createdAt: "2026-03-13T00:00:00.000Z",
         updatedAt: "2026-03-13T00:00:00.000Z",
+      },
+      {
+        id: "sbi_list_org_a_snapshot_001",
+        organizationId: "org_dp_list_a",
+        sandboxProfileId: "sbp_snapshot",
+        title: "Hidden snapshot worker",
+        sandboxProfileVersion: 9,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-list-a-snapshot-001",
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "system",
+        startedById: "ssj_list_a",
+        source: "system",
+        purpose: SandboxInstancePurposes.SNAPSHOT,
+        createdAt: "2026-03-14T00:00:00.000Z",
+        updatedAt: "2026-03-14T00:00:00.000Z",
       },
     ]);
 

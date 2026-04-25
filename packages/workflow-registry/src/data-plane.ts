@@ -18,6 +18,9 @@ export const ReconcileSandboxInstanceWorkflowVersion = "1";
 export const HandleSandboxInstanceDeadlineWorkflowName =
   "data-plane.sandbox-instance-deadlines.handle";
 export const HandleSandboxInstanceDeadlineWorkflowVersion = "1";
+export const MaterializeSandboxProfileVersionSnapshotWorkflowName =
+  "data-plane.sandbox-profile-version-snapshots.materialize";
+export const MaterializeSandboxProfileVersionSnapshotWorkflowVersion = "1";
 
 export type SandboxStopReason = "idle";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
@@ -69,6 +72,31 @@ export const StartSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 >({
   name: StartSandboxInstanceWorkflowName,
   version: StartSandboxInstanceWorkflowVersion,
+});
+
+export type MaterializeSandboxProfileVersionSnapshotWorkflowInput = {
+  snapshotJobId: string;
+  sandboxInstanceId: string;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  runtimePlan: CompiledRuntimePlan;
+  image: StartSandboxInstanceWorkflowImageInput;
+};
+
+export type MaterializeSandboxProfileVersionSnapshotWorkflowOutput = {
+  snapshotJobId: string;
+  sandboxInstanceId: string;
+  claimed: boolean;
+  image?: SandboxImageHandle;
+};
+
+export const MaterializeSandboxProfileVersionSnapshotWorkflowSpec = defineWorkflowSpec<
+  MaterializeSandboxProfileVersionSnapshotWorkflowInput,
+  MaterializeSandboxProfileVersionSnapshotWorkflowOutput
+>({
+  name: MaterializeSandboxProfileVersionSnapshotWorkflowName,
+  version: MaterializeSandboxProfileVersionSnapshotWorkflowVersion,
 });
 
 export type ResumeSandboxInstanceWorkflowInput = {
