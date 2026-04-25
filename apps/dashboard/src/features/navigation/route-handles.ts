@@ -36,9 +36,10 @@ function resolveIntegrationDefinitionMetadata(targetKey: string): {
   displayName: string;
   logoKey: string;
 } | null {
+  const definitions = listBrowserIntegrationDefinitions();
   const definition =
-    listBrowserIntegrationDefinitions().find((candidate) => candidate.variantId === targetKey) ??
-    listBrowserIntegrationDefinitions().find((candidate) => candidate.familyId === targetKey) ??
+    definitions.find((candidate) => candidate.variantId === targetKey) ??
+    definitions.find((candidate) => candidate.familyId === targetKey) ??
     null;
 
   if (definition === null) {
