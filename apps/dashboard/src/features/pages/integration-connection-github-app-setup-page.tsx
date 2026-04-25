@@ -296,28 +296,8 @@ function getGitHubExistingAppSetupFieldValidationMessage(input: {
 }): string | null {
   const normalizedValue = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
 
-  if (input.fieldKey === "appId" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.appId} is required.`;
-  }
-
-  if (input.fieldKey === "appSlug" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.appSlug} is required.`;
-  }
-
-  if (input.fieldKey === "appPrivateKeyPem" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.appPrivateKeyPem} is required.`;
-  }
-
-  if (input.fieldKey === "clientId" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.clientId} is required.`;
-  }
-
-  if (input.fieldKey === "clientSecret" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.clientSecret} is required.`;
-  }
-
-  if (input.fieldKey === "webhookSecret" && normalizedValue.length === 0) {
-    return `${GitHubExistingAppSetupRequiredFieldLabels.webhookSecret} is required.`;
+  if (normalizedValue.length === 0) {
+    return `${GitHubExistingAppSetupRequiredFieldLabels[input.fieldKey]} is required.`;
   }
 
   return null;
