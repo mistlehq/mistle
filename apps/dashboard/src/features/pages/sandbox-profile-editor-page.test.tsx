@@ -220,6 +220,7 @@ function DeleteProfileDialogHarness(input: {
         version: 1,
         activeVersion: 1,
         hasDraft: false,
+        draftVersion: null,
       }}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={setIsOpen}
@@ -287,6 +288,50 @@ function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }):
   );
 }
 
+function PublishedWithDraftActionsHarness(): JSX.Element {
+  const [discarded, setDiscarded] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      deleteProfileAutomationUsages={[]}
+      deleteProfileAutomationUsagesError={null}
+      deleteProfileAutomationUsagesIsPending={false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      hasUnsavedIntegrationChanges={false}
+      isDeleteProfileDialogOpen={false}
+      mode={{
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: true,
+        draftVersion: 2,
+      }}
+      onConfirmDeleteProfile={() => {}}
+      onDeleteProfileDialogOpenChange={() => {}}
+      onDiscardChangesAndLeaveDraft={() => {
+        setDiscarded(true);
+      }}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Published profile"
+      profileNameFallback="Published profile"
+      renderSectionPanel={() => <div>{discarded ? "Discarded" : "Not discarded"}</div>}
+      sections={[
+        {
+          id: "integrations",
+          label: "Integrations",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
 function renderDeleteProfileDialogHarness(input: {
   automationUsages?: readonly {
     id: string;
@@ -307,6 +352,14 @@ function renderDeleteProfileDialogHarness(input: {
 function renderDraftActionsHarness(input?: { hasUnsavedIntegrationChanges?: boolean }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(<Route element={<DraftActionsHarness {...input} />} path="/" />),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
+function renderPublishedWithDraftActionsHarness(): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(<Route element={<PublishedWithDraftActionsHarness />} path="/" />),
   );
 
   render(<RouterProvider router={router} />);
@@ -340,6 +393,7 @@ describe("SandboxProfileEditorPage", () => {
         version: 1,
         activeVersion: 1,
         hasDraft: true,
+        draftVersion: 2,
       },
     });
   });
@@ -396,6 +450,7 @@ describe("SandboxProfileEditorPage", () => {
         version: 1,
         activeVersion: 1,
         hasDraft: true,
+        draftVersion: 2,
       },
     });
   });
@@ -540,6 +595,24 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
   });
 
+  it("shows discard draft in the published actions menu when a draft exists", () => {
+    renderPublishedWithDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getByRole("menuitem", { name: "Discard draft" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Delete profile" })).toBeDefined();
+  });
+
+  it("discards an existing draft from the published actions menu", () => {
+    renderPublishedWithDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Discard draft" }));
+
+    expect(screen.getByText("Discarded")).toBeDefined();
+  });
+
   it("renders draft profiles with publish action", () => {
     renderSandboxProfileEditor();
 
@@ -564,9 +637,11 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Resume editing" }));
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
-    expect(screen.getByRole("menuitem", { name: "Discard draft" })).toBeDefined();
-    expect(screen.getByRole("menuitem", { name: "View published" })).toBeDefined();
-    expect(screen.getByRole("menuitem", { name: "Delete profile" })).toBeDefined();
+    expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
+      "View published",
+      "Discard draft",
+      "Delete profile",
+    ]);
   });
 
   it("discards draft changes directly from the draft actions menu", () => {

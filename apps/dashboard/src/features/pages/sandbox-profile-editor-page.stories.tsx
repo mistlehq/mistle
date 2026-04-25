@@ -237,6 +237,7 @@ function SandboxProfileEditorPageStoryView(
           version: 1,
           activeVersion: 1,
           hasDraft: input.lifecycleState === "published-with-draft",
+          draftVersion: input.lifecycleState === "published-with-draft" ? 2 : null,
         }
       : {
           kind: "draft" as const,

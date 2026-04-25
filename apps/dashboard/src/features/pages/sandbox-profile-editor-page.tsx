@@ -93,6 +93,7 @@ type SandboxProfileEditorVersionMode =
       version: number;
       activeVersion: number;
       hasDraft: boolean;
+      draftVersion: number | null;
     };
 
 type ViewedVersionKind = "draft" | "active";
@@ -168,6 +169,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
       version: activeVersion.version,
       activeVersion: input.activeVersion,
       hasDraft: draftVersion !== null,
+      draftVersion: draftVersion?.version ?? null,
     },
   };
 }
@@ -832,12 +834,7 @@ export function SandboxProfileEditorView(input: {
     ((input.hasUnsavedIntegrationChanges ?? false) ||
       (input.hasUnsavedSetupScriptChanges ?? false));
   const versionActionIsDisabled = input.versionActionIsPending || hasUnsavedDraftChanges;
-  const discardChangesInput =
-    input.mode.kind === "draft" && input.mode.activeVersion !== null
-      ? {
-          draftVersion: input.mode.version,
-        }
-      : null;
+  const discardChangesInput = resolveDiscardDraftInput(input.mode);
   const discardChangesMenuItem =
     discardChangesInput === null ? null : (
       <DropdownMenuItem
@@ -908,8 +905,8 @@ export function SandboxProfileEditorView(input: {
                 triggerLabel="More actions"
                 triggerVariant="default"
               >
-                {discardChangesMenuItem}
                 {viewPublishedMenuItem}
+                {discardChangesMenuItem}
                 {deleteProfileMenuItem}
               </MoreActionsMenu>
             </ButtonGroup>
@@ -928,6 +925,7 @@ export function SandboxProfileEditorView(input: {
                 triggerLabel="More actions"
                 triggerVariant="default"
               >
+                {discardChangesMenuItem}
                 {deleteProfileMenuItem}
               </MoreActionsMenu>
             </ButtonGroup>
@@ -959,6 +957,24 @@ export function SandboxProfileEditorView(input: {
       />
     </div>
   );
+}
+
+function resolveDiscardDraftInput(
+  mode: SandboxProfileEditorVersionMode,
+): { draftVersion: number } | null {
+  if (mode.kind === "draft" && mode.activeVersion !== null) {
+    return {
+      draftVersion: mode.version,
+    };
+  }
+
+  if (mode.kind === "active" && mode.draftVersion !== null) {
+    return {
+      draftVersion: mode.draftVersion,
+    };
+  }
+
+  return null;
 }
 
 function LoadedSandboxProfileIntegrationSetupSection(input: {
