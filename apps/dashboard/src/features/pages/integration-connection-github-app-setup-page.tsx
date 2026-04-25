@@ -571,7 +571,6 @@ function GitHubExistingAppSetupPanel(input: {
   configuredSecretFieldKeys: ReadonlySet<GitHubExistingAppSetupSecretFieldKey>;
   draft: GitHubExistingAppSetupDraft;
   fieldStates: Record<GitHubExistingAppSetupFieldKey, SavingFieldState>;
-  isSecretReplacementDialogOpen: boolean;
   onCommitField: (fieldKey: GitHubExistingAppSetupFieldKey) => void;
   onReplacementDialogOpenChange: (open: boolean) => void;
   onRevertSecretReplacement: (fieldKey: GitHubExistingAppSetupSecretFieldKey) => void;
@@ -1336,7 +1335,6 @@ export function GitHubAppSetupPane(input: {
                 configuredSecretFieldKeys={configuredSecretFieldKeys}
                 draft={draft}
                 fieldStates={fieldStates}
-                isSecretReplacementDialogOpen={isSecretReplacementDialogOpen}
                 onCommitField={(fieldKey) => {
                   void commitField(fieldKey);
                 }}

@@ -145,7 +145,6 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          code?: string;
           error?: string;
           error_description?: string;
           error_uri?: string;
