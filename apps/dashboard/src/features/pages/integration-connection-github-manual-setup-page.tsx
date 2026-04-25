@@ -463,16 +463,12 @@ export function validateGitHubManifestJson(value: string): GitHubManifestValidat
 }
 
 export function formatGitHubManifestJson(value: string): string {
-  const parsedManifest = parseJsonValue(value);
+  const parsedManifest: unknown = JSON.parse(value);
   return JSON.stringify(parsedManifest, null, 2);
 }
 
-function parseJsonValue(value: string): unknown {
-  return JSON.parse(value);
-}
-
 function parseGitHubManifestObject(value: string): object {
-  const parsedManifest = parseJsonValue(value);
+  const parsedManifest: unknown = JSON.parse(value);
   if (
     typeof parsedManifest !== "object" ||
     parsedManifest === null ||
