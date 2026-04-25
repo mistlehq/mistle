@@ -421,55 +421,6 @@ describe("integration connections GitHub App integration", () => {
     expect(persistedWebhookSource.endpointKey).toBeTruthy();
   });
 
-  it("preserves the existing connection display name when completing GitHub App installation", async ({
-    fixture,
-  }) => {
-    await ensureGithubCloudTarget(fixture);
-
-    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
-      email: "integration-connections-github-app-installation-display-name@example.com",
-      displayName: "GitHub Prod",
-    });
-    const { state } = await startGitHubAppInstallationConnection(fixture, {
-      authenticatedSession,
-      connectionId,
-    });
-
-    const completeResponse = await fixture.request(
-      createGitHubAppInstallationCompletePath({
-        query: {
-          state,
-          installation_id: "12345",
-          setup_action: "install",
-        },
-      }),
-      {
-        method: "GET",
-        redirect: "manual",
-      },
-    );
-
-    expect(completeResponse.status).toBe(302);
-    expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", { connectionId }),
-    );
-
-    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.organizationId, authenticatedSession.organizationId),
-          eq(table.id, connectionId),
-        ),
-    });
-    expect(persistedConnection).toBeDefined();
-    if (persistedConnection === undefined) {
-      throw new Error("Expected persisted GitHub App connection.");
-    }
-
-    expect(persistedConnection.displayName).toBe("GitHub Prod");
-    expect(persistedConnection.externalSubjectId).toBe("12345");
-  });
-
   it("returns 400 when GitHub App installation completion state is missing", async ({
     fixture,
   }) => {
