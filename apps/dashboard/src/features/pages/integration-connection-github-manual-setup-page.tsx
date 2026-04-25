@@ -990,27 +990,14 @@ export function GitHubAppSetupPane(input: {
       }
 
       const normalizedOrganizationSlug = manifestOrganizationSlug.trim();
-      const owner:
-        | {
-            kind: "personal";
-          }
-        | {
-            kind: "organization";
-            organizationSlug: string;
-          } =
-        manifestAppOwnerKind === "personal"
-          ? {
-              kind: "personal",
-            }
-          : {
-              kind: "organization",
-              organizationSlug: normalizedOrganizationSlug,
-            };
 
       return startGitHubAppManifestCreation({
         connectionId: input.connection.id,
         manifest: parseGitHubManifestRecord(manifestValue),
-        owner,
+        owner:
+          manifestAppOwnerKind === "personal"
+            ? { kind: "personal" }
+            : { kind: "organization", organizationSlug: normalizedOrganizationSlug },
       });
     },
   });
