@@ -264,7 +264,6 @@ describe("resolvePersistedSecretRefOrThrow", () => {
 describe("parseCreateFormSecretsOrThrow", () => {
   it("returns normalized persisted secrets for all declared secret fields", () => {
     const parsedSecrets = parseCreateFormSecretsOrThrow({
-      targetKey: "openai-default",
       method: {
         id: IntegrationConnectionMethodIds.API_KEY,
         label: "API key",
@@ -306,7 +305,6 @@ describe("parseCreateFormSecretsOrThrow", () => {
 
   it("allows optional secret fields to be omitted during create", () => {
     const parsedSecrets = parseCreateFormSecretsOrThrow({
-      targetKey: "slack-default",
       method: {
         id: "slack-bot-token",
         label: "Slack app",
@@ -358,7 +356,6 @@ describe("parseCreateFormSecretsOrThrow", () => {
 describe("parseUpdateFormSecretsOrThrow", () => {
   it("returns only the provided secrets during update", () => {
     const parsedSecrets = parseUpdateFormSecretsOrThrow({
-      targetKey: "openai-default",
       method: {
         id: IntegrationConnectionMethodIds.API_KEY,
         label: "API key",

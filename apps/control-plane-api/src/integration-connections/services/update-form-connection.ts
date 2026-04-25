@@ -123,7 +123,6 @@ export async function updateFormConnection(
   });
   const parsedSecrets = input.secrets
     ? parseUpdateFormSecretsOrThrow({
-        targetKey: existingConnection.targetKey,
         method: formMethod,
         secrets: input.secrets,
         invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,

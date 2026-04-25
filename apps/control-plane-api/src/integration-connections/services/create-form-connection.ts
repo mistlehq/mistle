@@ -83,7 +83,6 @@ export async function createFormConnection(
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   });
   const parsedSecrets = parseCreateFormSecretsOrThrow({
-    targetKey: input.targetKey,
     method: formMethod,
     secrets: input.secrets,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,

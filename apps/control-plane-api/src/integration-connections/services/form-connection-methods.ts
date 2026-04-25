@@ -166,7 +166,6 @@ function createSecretFieldsByNameOrThrow(input: {
 }
 
 export function parseCreateFormSecretsOrThrow(input: {
-  targetKey: string;
   method: FormConnectionMethod;
   secrets: Record<string, string>;
   invalidInputCode: FormConnectionInvalidInputCode;
@@ -210,7 +209,6 @@ export function parseCreateFormSecretsOrThrow(input: {
 }
 
 export function parseUpdateFormSecretsOrThrow(input: {
-  targetKey: string;
   method: FormConnectionMethod;
   secrets: Record<string, string>;
   invalidInputCode: FormConnectionInvalidInputCode;

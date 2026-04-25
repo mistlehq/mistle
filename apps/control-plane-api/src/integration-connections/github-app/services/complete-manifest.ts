@@ -260,7 +260,6 @@ export async function completeGitHubAppManifestConnection(
     code,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
-    targetKey: connection.targetKey,
     method: formMethod,
     secrets: buildConvertedConnectionSecrets({
       conversion,
