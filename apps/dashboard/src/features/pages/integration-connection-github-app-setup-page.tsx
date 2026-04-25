@@ -260,9 +260,7 @@ function buildGitHubExistingAppSetupConfig(
     connection_method: "github-app-installation",
     app_id: normalizeGitHubExistingAppSetupValue(draft.appId),
     app_slug: normalizeGitHubExistingAppSetupValue(draft.appSlug),
-    ...(normalizeGitHubExistingAppSetupValue(draft.clientId).length === 0
-      ? {}
-      : { client_id: normalizeGitHubExistingAppSetupValue(draft.clientId) }),
+    client_id: normalizeGitHubExistingAppSetupValue(draft.clientId),
   };
 }
 
