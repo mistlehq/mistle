@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   Dialog,
   DialogContent,
@@ -36,6 +37,10 @@ import { TablePagination } from "../shared/table-pagination.js";
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
+
+function formatSandboxProfilePublicationStatus(activeVersion: number | null): string {
+  return activeVersion === null ? "Not published" : "Published";
+}
 
 function parseListLimit(rawValue: string | null): number {
   if (rawValue === null) {
@@ -286,11 +291,14 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
       {!listQuery.isPending && !listQuery.isError ? (
         <>
-          <Table className="min-w-[32rem]">
+          <Table className="min-w-[40rem]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Name
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
+                  Status
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Updated
@@ -313,6 +321,18 @@ export function SandboxProfilesPage(): React.JSX.Element {
                     >
                       {profile.displayName}
                     </button>
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Badge
+                      className={
+                        profile.activeVersion === null
+                          ? undefined
+                          : "border-blue-200 bg-blue-50 text-blue-700"
+                      }
+                      variant={profile.activeVersion === null ? "outline" : "secondary"}
+                    >
+                      {formatSandboxProfilePublicationStatus(profile.activeVersion)}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                     {formatSandboxProfileUpdatedAt(profile.updatedAt)}

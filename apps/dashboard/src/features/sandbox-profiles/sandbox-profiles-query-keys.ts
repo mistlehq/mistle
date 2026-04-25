@@ -20,6 +20,12 @@ export function sandboxProfileDetailQueryKey(
   return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "detail", profileId];
 }
 
+export function sandboxProfileAutomationUsagesQueryKey(
+  profileId: string,
+): readonly ["sandbox-profiles", "automation-usages", string] {
+  return [SANDBOX_PROFILES_QUERY_KEY_PREFIX[0], "automation-usages", profileId];
+}
+
 export function sandboxProfileVersionsQueryKey(
   profileId: string,
 ): readonly ["sandbox-profiles", "versions", string] {

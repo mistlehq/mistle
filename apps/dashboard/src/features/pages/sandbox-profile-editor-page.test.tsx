@@ -2,6 +2,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState, type JSX } from "react";
 import {
   createMemoryRouter,
   createRoutesFromElements,
@@ -21,6 +22,7 @@ import {
 import {
   resolveSandboxProfileEditorVersionMode,
   SandboxProfileEditorPage,
+  SandboxProfileEditorView,
 } from "./sandbox-profile-editor-page.js";
 
 afterEach(() => {
@@ -157,8 +159,75 @@ function renderSandboxProfileEditor(input?: {
   );
 }
 
+function DeleteProfileDialogHarness(input: {
+  automationUsages?: readonly {
+    id: string;
+    name: string;
+  }[];
+  automationUsagesError?: string | null;
+  automationUsagesIsPending?: boolean;
+}): JSX.Element {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      deleteProfileAutomationUsages={input.automationUsages ?? []}
+      deleteProfileAutomationUsagesError={input.automationUsagesError ?? null}
+      deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      hasUnsavedIntegrationChanges={false}
+      isCancelDraftDialogOpen={false}
+      isDeleteProfileDialogOpen={isOpen}
+      mode={{
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: false,
+      }}
+      onCancelDraftDialogOpenChange={() => {}}
+      onConfirmDeleteProfile={() => {}}
+      onDeleteProfileDialogOpenChange={setIsOpen}
+      onDiscardChangesAndLeaveDraft={() => {}}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Production profile"
+      profileNameFallback="Production profile"
+      renderSectionPanel={() => <div>Section panel</div>}
+      sections={[
+        {
+          id: "integrations",
+          label: "Integrations",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
+function renderDeleteProfileDialogHarness(input: {
+  automationUsages?: readonly {
+    id: string;
+    name: string;
+  }[];
+  automationUsagesError?: string | null;
+  automationUsagesIsPending?: boolean;
+}): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(
+      <Route element={<DeleteProfileDialogHarness {...input} />} path="/" />,
+    ),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
 describe("SandboxProfileEditorPage", () => {
-  it("defaults to draft when draft and published versions both exist", () => {
+  it("defaults to the active version when draft and published versions both exist", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: 1,
       viewedVersionKind: null,
@@ -181,9 +250,34 @@ describe("SandboxProfileEditorPage", () => {
     expect(result).toEqual({
       ok: true,
       mode: {
-        kind: "draft",
-        version: 2,
+        kind: "active",
+        version: 1,
         activeVersion: 1,
+        hasDraft: true,
+      },
+    });
+  });
+
+  it("defaults to draft when the profile has not been published yet", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: null,
+      viewedVersionKind: null,
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: 1,
+        activeVersion: null,
         hasDraft: true,
       },
     });
@@ -356,5 +450,42 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.queryByText("You are in draft mode")).toBeNull();
     expect(screen.getByRole("button", { name: "Publish Changes" })).toBeDefined();
+  });
+
+  it("confirms profile deletion with automation usage context", () => {
+    renderDeleteProfileDialogHarness({
+      automationUsages: [
+        {
+          id: "atm_triage",
+          name: "Repository triage",
+        },
+        {
+          id: "atm_release",
+          name: "Release notes",
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More profile actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete profile" }));
+
+    expect(screen.getByRole("heading", { name: "Delete profile?" })).toBeDefined();
+    expect(screen.getByText("Repository triage")).toBeDefined();
+    expect(screen.getByText("Release notes")).toBeDefined();
+    expect(screen.getByText("All of these automations will be removed.")).toBeDefined();
+  });
+
+  it("blocks profile deletion while automation usage context is loading", () => {
+    renderDeleteProfileDialogHarness({
+      automationUsagesIsPending: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More profile actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete profile" }));
+
+    expect(screen.getByText("Loading automations...")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Delete profile" }).hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 });

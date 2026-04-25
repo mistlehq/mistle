@@ -6,6 +6,7 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
   CreateSandboxProfileInput,
+  DeleteSandboxProfileResult,
   LaunchableSandboxProfilesResult,
   SandboxProfileRepositoryOption,
   SandboxIntegrationBindingKind,
@@ -227,6 +228,42 @@ export async function updateSandboxProfile(input: {
         operation: "updateSandboxProfile",
         error,
         fallbackMessage: "Could not update sandbox profile.",
+      }),
+    );
+  }
+}
+
+export async function deleteSandboxProfile(input: {
+  profileId: string;
+}): Promise<DeleteSandboxProfileResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.DELETE("/v1/sandbox/profiles/{profileId}", {
+      credentials: "include",
+      params: {
+        path: {
+          profileId: input.profileId,
+        },
+      },
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "deleteSandboxProfile",
+        status: 500,
+        body: null,
+        message: "Delete sandbox profile response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "deleteSandboxProfile",
+        error,
+        fallbackMessage: "Could not delete sandbox profile.",
       }),
     );
   }

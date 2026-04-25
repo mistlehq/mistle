@@ -252,7 +252,15 @@ function SandboxProfileEditorPageStoryView(
   return (
     <QueryClientProvider client={queryClient}>
       <SandboxProfileEditorView
+        deleteProfileAutomationUsages={[]}
+        deleteProfileAutomationUsagesError={null}
+        deleteProfileAutomationUsagesIsPending={false}
+        deleteProfileError={null}
+        deleteProfileIsPending={false}
+        isDeleteProfileDialogOpen={false}
         mode={mode}
+        onConfirmDeleteProfile={() => {}}
+        onDeleteProfileDialogOpenChange={() => {}}
         onMakeChanges={() => {}}
         onDiscardChangesAndLeaveDraft={() => {}}
         onCancelDraftDialogOpenChange={setIsCancelDraftDialogOpen}

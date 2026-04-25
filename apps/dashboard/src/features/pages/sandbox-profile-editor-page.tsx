@@ -25,10 +25,13 @@ import { useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
+import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { UnsavedChangesGuard } from "../navigation/unsaved-changes-guard.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
+  sandboxProfileAutomationUsagesQueryKey,
   sandboxProfileDetailQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
@@ -36,6 +39,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   createSandboxProfileVersionDraft,
+  deleteSandboxProfile,
   discardSandboxProfileDraftChanges,
   getSandboxProfile,
   getSandboxProfileVersionPublishability,
@@ -129,7 +133,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     };
   }
 
-  const preferredView = input.viewedVersionKind ?? (draftVersion === null ? "active" : "draft");
+  const preferredView = input.viewedVersionKind ?? (activeVersion === null ? "draft" : "active");
 
   if (preferredView === "draft") {
     if (draftVersion === null) {
@@ -375,6 +379,8 @@ function LoadedSandboxProfileEditorPage(
   const [viewedVersionKind, setViewedVersionKind] = useState<ViewedVersionKind | null>(null);
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isCancelDraftDialogOpen, setIsCancelDraftDialogOpen] = useState(false);
+  const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
+  const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
   const profileVersionsQuery = useQuery({
     queryKey: sandboxProfileVersionsQueryKey(input.profileId),
     queryFn: async ({ signal }) =>
@@ -382,6 +388,16 @@ function LoadedSandboxProfileEditorPage(
         profileId: input.profileId,
         signal,
       }),
+    retry: false,
+  });
+  const automationUsagesQuery = useQuery({
+    queryKey: sandboxProfileAutomationUsagesQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listWebhookAutomationsForSandboxProfile({
+        sandboxProfileId: input.profileId,
+        signal,
+      }),
+    enabled: isDeleteProfileDialogOpen,
     retry: false,
   });
   const createDraftMutation = useMutation({
@@ -487,6 +503,29 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
+  const deleteProfileMutation = useMutation({
+    mutationFn: async () =>
+      deleteSandboxProfile({
+        profileId: input.profileId,
+      }),
+    onSuccess: async () => {
+      setDeleteProfileError(null);
+      setIsDeleteProfileDialogOpen(false);
+      await Promise.all([
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+      void input.navigate("/sandbox-profiles");
+    },
+    onError: (error: unknown) => {
+      setDeleteProfileError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not delete sandbox profile.",
+        }),
+      );
+    },
+  });
 
   if (profileVersionsQuery.isPending) {
     return <></>;
@@ -546,8 +585,36 @@ function LoadedSandboxProfileEditorPage(
       profileId={input.profileId}
       publishIsPending={publishMutation.isPending}
       discardChangesIsPending={discardChangesMutation.isPending}
+      deleteProfileAutomationUsages={automationUsagesQuery.data ?? []}
+      deleteProfileAutomationUsagesError={
+        automationUsagesQuery.isError
+          ? resolveApiErrorMessage({
+              error: automationUsagesQuery.error,
+              fallbackMessage: "Could not load automations.",
+            })
+          : null
+      }
+      deleteProfileAutomationUsagesIsPending={
+        isDeleteProfileDialogOpen && automationUsagesQuery.isPending
+      }
+      deleteProfileError={deleteProfileError}
+      deleteProfileIsPending={deleteProfileMutation.isPending}
       isCancelDraftDialogOpen={isCancelDraftDialogOpen}
+      isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
       onCancelDraftDialogOpenChange={setIsCancelDraftDialogOpen}
+      onConfirmDeleteProfile={() => {
+        if (automationUsagesQuery.isPending || automationUsagesQuery.isError) {
+          return;
+        }
+        deleteProfileMutation.mutate();
+      }}
+      onDeleteProfileDialogOpenChange={(open) => {
+        if (deleteProfileMutation.isPending) {
+          return;
+        }
+        setDeleteProfileError(null);
+        setIsDeleteProfileDialogOpen(open);
+      }}
       versionActionError={versionActionError}
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -566,10 +633,18 @@ function ReadySandboxProfileEditorPage(input: {
   publishIsPending: boolean;
   createDraftIsPending: boolean;
   discardChangesIsPending: boolean;
+  deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  deleteProfileAutomationUsagesError: string | null;
+  deleteProfileAutomationUsagesIsPending: boolean;
+  deleteProfileError: string | null;
+  deleteProfileIsPending: boolean;
   isCancelDraftDialogOpen: boolean;
+  isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number; activeVersion: number }) => void;
   onCancelDraftDialogOpenChange: (open: boolean) => void;
+  onConfirmDeleteProfile: () => void;
+  onDeleteProfileDialogOpenChange: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -600,7 +675,14 @@ function ReadySandboxProfileEditorPage(input: {
       hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
       isSavingProfileName={metaState.isUpdating}
       mode={input.mode}
+      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+      deleteProfileError={input.deleteProfileError}
+      deleteProfileIsPending={input.deleteProfileIsPending}
       onMakeChanges={input.onMakeChanges}
+      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
       onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
       onCancelDraftDialogOpenChange={input.onCancelDraftDialogOpenChange}
       onPublish={input.onPublish}
@@ -614,6 +696,7 @@ function ReadySandboxProfileEditorPage(input: {
         input.publishIsPending || input.createDraftIsPending || input.discardChangesIsPending
       }
       isCancelDraftDialogOpen={input.isCancelDraftDialogOpen}
+      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "configurations") {
           return (
@@ -666,12 +749,20 @@ export function SandboxProfileEditorView(input: {
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
+  deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  deleteProfileAutomationUsagesError: string | null;
+  deleteProfileAutomationUsagesIsPending: boolean;
+  deleteProfileError: string | null;
+  deleteProfileIsPending: boolean;
   versionActionError: string | null;
   versionActionIsPending: boolean;
   isCancelDraftDialogOpen: boolean;
+  isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
+  onConfirmDeleteProfile: () => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number; activeVersion: number }) => void;
   onCancelDraftDialogOpenChange: (open: boolean) => void;
+  onDeleteProfileDialogOpenChange: (open: boolean) => void;
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
@@ -687,6 +778,20 @@ export function SandboxProfileEditorView(input: {
           activeVersion: input.mode.activeVersion,
         }
       : null;
+  const deleteProfileIsBlocked =
+    input.deleteProfileIsPending ||
+    input.deleteProfileAutomationUsagesIsPending ||
+    input.deleteProfileAutomationUsagesError !== null;
+  const deleteProfileMenuItem = (
+    <DropdownMenuItem
+      onClick={() => {
+        input.onDeleteProfileDialogOpenChange(true);
+      }}
+      variant="destructive"
+    >
+      Delete profile
+    </DropdownMenuItem>
+  );
 
   return (
     <div className="gap-4 flex flex-col">
@@ -721,7 +826,6 @@ export function SandboxProfileEditorView(input: {
                   }}
                   type="button"
                   variant="ghost"
-                  className="pr-0.5 text-muted-foreground hover:text-foreground hover:bg-transparent"
                 >
                   Cancel
                 </Button>
@@ -735,26 +839,22 @@ export function SandboxProfileEditorView(input: {
                   type="button"
                   variant="outline"
                 >
-                  Publish
+                  Publish Changes
                 </Button>
                 <MoreActionsMenu
                   disabled={input.versionActionIsPending}
                   triggerLabel="More draft actions"
                   triggerVariant="outline"
                 >
-                  <DropdownMenuItem variant="destructive">Delete profile</DropdownMenuItem>
+                  {deleteProfileMenuItem}
                 </MoreActionsMenu>
               </ButtonGroup>
             </>
-          ) : input.mode.hasDraft ? (
-            <Button onClick={input.onViewDraft} type="button">
-              Back to draft
-            </Button>
           ) : (
             <ButtonGroup>
               <Button
                 disabled={input.versionActionIsPending}
-                onClick={input.onMakeChanges}
+                onClick={input.mode.hasDraft ? input.onViewDraft : input.onMakeChanges}
                 type="button"
                 variant="outline"
               >
@@ -765,7 +865,7 @@ export function SandboxProfileEditorView(input: {
                 triggerLabel="More profile actions"
                 triggerVariant="outline"
               >
-                <DropdownMenuItem variant="destructive">Delete profile</DropdownMenuItem>
+                {deleteProfileMenuItem}
               </MoreActionsMenu>
             </ButtonGroup>
           )}
@@ -814,6 +914,74 @@ export function SandboxProfileEditorView(input: {
           </DialogContent>
         </Dialog>
       )}
+
+      <Dialog
+        isBusy={input.deleteProfileIsPending}
+        isDismissible={!input.deleteProfileIsPending}
+        onOpenChange={input.onDeleteProfileDialogOpenChange}
+        open={input.isDeleteProfileDialogOpen}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Delete profile?</DialogTitle>
+            <DialogDescription>
+              This removes {input.profileName ?? input.profileNameFallback}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {input.deleteProfileAutomationUsagesIsPending ? (
+              <p className="text-muted-foreground text-sm">Loading automations...</p>
+            ) : null}
+
+            {input.deleteProfileAutomationUsagesError === null ? null : (
+              <Notice title="Could not load automations" variant="alert">
+                {input.deleteProfileAutomationUsagesError}
+              </Notice>
+            )}
+
+            {input.deleteProfileAutomationUsages.length === 0 ||
+            input.deleteProfileAutomationUsagesIsPending ||
+            input.deleteProfileAutomationUsagesError !== null ? null : (
+              <div className="space-y-2">
+                <p className="text-sm">These automations use this profile and will be removed:</p>
+                <ul className="list-disc space-y-1 pl-5 text-sm">
+                  {input.deleteProfileAutomationUsages.map((automation) => (
+                    <li key={automation.id}>{automation.name}</li>
+                  ))}
+                </ul>
+                <p className="text-sm">All of these automations will be removed.</p>
+              </div>
+            )}
+
+            {input.deleteProfileError === null ? null : (
+              <Notice title="Delete failed" variant="alert">
+                {input.deleteProfileError}
+              </Notice>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              disabled={input.deleteProfileIsPending}
+              onClick={() => {
+                input.onDeleteProfileDialogOpenChange(false);
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={deleteProfileIsBlocked}
+              onClick={input.onConfirmDeleteProfile}
+              type="button"
+            >
+              {input.deleteProfileIsPending ? "Deleting..." : "Delete profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SandboxProfileEditorSections
         renderPanel={input.renderSectionPanel}

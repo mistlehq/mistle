@@ -14,6 +14,7 @@ import {
   WebhookAutomationSchema,
   WebhookAutomationsListResultSchema,
   type WebhookAutomation,
+  type WebhookAutomationSandboxProfileUsage,
   type WebhookAutomationsListResult,
 } from "./webhook-automations-types.js";
 
@@ -72,6 +73,44 @@ export async function listWebhookAutomations(input: {
       fallbackMessage: "Could not load webhook automations.",
     });
   }
+}
+
+export async function listWebhookAutomationsForSandboxProfile(input: {
+  sandboxProfileId: string;
+  signal?: AbortSignal;
+}): Promise<WebhookAutomationSandboxProfileUsage[]> {
+  const matchingAutomations: WebhookAutomationSandboxProfileUsage[] = [];
+  let after: string | null = null;
+
+  do {
+    const page = await listWebhookAutomations({
+      limit: 100,
+      after,
+      before: null,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+    const automations = await Promise.all(
+      page.items.map((item) =>
+        getWebhookAutomation({
+          automationId: item.id,
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
+        }),
+      ),
+    );
+
+    for (const automation of automations) {
+      if (automation.target.sandboxProfileId === input.sandboxProfileId) {
+        matchingAutomations.push({
+          id: automation.id,
+          name: automation.name,
+        });
+      }
+    }
+
+    after = page.nextPage?.after ?? null;
+  } while (after !== null);
+
+  return matchingAutomations;
 }
 
 export async function getWebhookAutomation(input: {

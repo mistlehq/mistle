@@ -10,6 +10,8 @@ type CreateSandboxProfileRequest =
   paths["/v1/sandbox/profiles"]["post"]["requestBody"]["content"]["application/json"];
 type UpdateSandboxProfileRequest =
   paths["/v1/sandbox/profiles/{profileId}"]["patch"]["requestBody"]["content"]["application/json"];
+type DeleteSandboxProfileResponse =
+  paths["/v1/sandbox/profiles/{profileId}"]["delete"]["responses"][202]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
@@ -33,6 +35,7 @@ export type LaunchableSandboxProfilesResult = Omit<
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
 export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
 export type CreateSandboxProfileInput = CreateSandboxProfileRequest;
+export type DeleteSandboxProfileResult = DeleteSandboxProfileResponse;
 export type UpdateSandboxProfileInput = UpdateSandboxProfileRequest & {
   profileId: string;
 };
