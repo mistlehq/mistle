@@ -63,8 +63,8 @@ function buildGitHubAppManifestSubmissionUrl(input: {
   return submissionUrl.toString();
 }
 
-function buildCallbackUrl(input: { controlPlaneBaseUrl: string; path: string }): string {
-  return new URL(input.path, input.controlPlaneBaseUrl).toString();
+function buildCallbackUrl(controlPlaneBaseUrl: string, path: string): string {
+  return new URL(path, controlPlaneBaseUrl).toString();
 }
 
 function buildGitHubAppManifest(input: {
@@ -78,20 +78,17 @@ function buildGitHubAppManifest(input: {
       active: true,
       url: input.webhookCallbackUrl,
     },
-    redirect_url: buildCallbackUrl({
-      controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-      path: "/p/integration/callbacks/github-app-manifest",
-    }),
+    redirect_url: buildCallbackUrl(
+      input.controlPlaneBaseUrl,
+      "/p/integration/callbacks/github-app-manifest",
+    ),
     callback_urls: [
-      buildCallbackUrl({
-        controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-        path: "/p/identity-linking/callbacks/github",
-      }),
+      buildCallbackUrl(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
     ],
-    setup_url: buildCallbackUrl({
-      controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-      path: "/p/integration/callbacks/github-app-installation",
-    }),
+    setup_url: buildCallbackUrl(
+      input.controlPlaneBaseUrl,
+      "/p/integration/callbacks/github-app-installation",
+    ),
   };
 }
 
