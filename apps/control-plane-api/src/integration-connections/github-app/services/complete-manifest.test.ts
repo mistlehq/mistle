@@ -8,6 +8,17 @@ import {
   parseGitHubAppManifestConversionResponse,
 } from "./complete-manifest.js";
 
+function createGitHubAppManifestConversionFixture(input?: { clientSecret?: string }) {
+  return parseGitHubAppManifestConversionResponse({
+    id: "123",
+    slug: "mistle-github-app",
+    client_id: "Iv1.manifestclientid",
+    ...(input?.clientSecret === undefined ? {} : { client_secret: input.clientSecret }),
+    pem: "private-key",
+    webhook_secret: "webhook-secret",
+  });
+}
+
 describe("parseGitHubAppManifestConversionResponse", () => {
   it("accepts GitHub manifest conversion responses with numeric ids", () => {
     const conversion = parseGitHubAppManifestConversionResponse({
@@ -56,13 +67,7 @@ describe("parseGitHubAppManifestConversionResponse", () => {
 
 describe("buildConvertedGitHubAppConnectionConfig", () => {
   it("maps conversion metadata into GitHub App installation config", () => {
-    const conversion = parseGitHubAppManifestConversionResponse({
-      id: 123,
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      pem: "private-key",
-      webhook_secret: "webhook-secret",
-    });
+    const conversion = createGitHubAppManifestConversionFixture();
 
     expect(buildConvertedGitHubAppConnectionConfig({ conversion })).toEqual({
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
@@ -75,13 +80,8 @@ describe("buildConvertedGitHubAppConnectionConfig", () => {
 
 describe("buildConvertedConnectionSecrets", () => {
   it("maps required GitHub credential material into connection secrets", () => {
-    const conversion = parseGitHubAppManifestConversionResponse({
-      id: "123",
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      client_secret: "manifest-client-secret",
-      pem: "private-key",
-      webhook_secret: "webhook-secret",
+    const conversion = createGitHubAppManifestConversionFixture({
+      clientSecret: "manifest-client-secret",
     });
 
     expect(
@@ -97,13 +97,7 @@ describe("buildConvertedConnectionSecrets", () => {
   });
 
   it("omits client secret when the target method does not support it", () => {
-    const conversion = parseGitHubAppManifestConversionResponse({
-      id: "123",
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      pem: "private-key",
-      webhook_secret: "webhook-secret",
-    });
+    const conversion = createGitHubAppManifestConversionFixture();
 
     expect(
       buildConvertedConnectionSecrets({
@@ -117,13 +111,7 @@ describe("buildConvertedConnectionSecrets", () => {
   });
 
   it("fails fast when a supported client secret is missing from the conversion", () => {
-    const conversion = parseGitHubAppManifestConversionResponse({
-      id: "123",
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      pem: "private-key",
-      webhook_secret: "webhook-secret",
-    });
+    const conversion = createGitHubAppManifestConversionFixture();
     let thrownError: unknown = null;
 
     try {
