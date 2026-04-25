@@ -12409,9 +12409,67 @@
                     },
                     "isActive": {
                       "type": "boolean"
+                    },
+                    "usable": {
+                      "type": "boolean"
+                    },
+                    "latestSnapshotJob": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["queued", "running", "succeeded", "failed"]
+                        },
+                        "errorCode": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "errorMessage": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "startedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "finishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "trigger",
+                        "state",
+                        "errorCode",
+                        "errorMessage",
+                        "createdAt",
+                        "startedAt",
+                        "finishedAt"
+                      ],
+                      "additionalProperties": false
                     }
                   },
-                  "required": ["sandboxProfileId", "version", "state", "isActive"],
+                  "required": [
+                    "sandboxProfileId",
+                    "version",
+                    "state",
+                    "isActive",
+                    "usable",
+                    "latestSnapshotJob"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -12580,9 +12638,67 @@
                           },
                           "isActive": {
                             "type": "boolean"
+                          },
+                          "usable": {
+                            "type": "boolean"
+                          },
+                          "latestSnapshotJob": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "trigger": {
+                                "type": "string",
+                                "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": ["queued", "running", "succeeded", "failed"]
+                              },
+                              "errorCode": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "errorMessage": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "startedAt": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "finishedAt": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "trigger",
+                              "state",
+                              "errorCode",
+                              "errorMessage",
+                              "createdAt",
+                              "startedAt",
+                              "finishedAt"
+                            ],
+                            "additionalProperties": false
                           }
                         },
-                        "required": ["sandboxProfileId", "version", "state", "isActive"],
+                        "required": [
+                          "sandboxProfileId",
+                          "version",
+                          "state",
+                          "isActive",
+                          "usable",
+                          "latestSnapshotJob"
+                        ],
                         "additionalProperties": false
                       }
                     }
@@ -14665,9 +14781,67 @@
                         },
                         "isActive": {
                           "type": "boolean"
+                        },
+                        "usable": {
+                          "type": "boolean"
+                        },
+                        "latestSnapshotJob": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "trigger": {
+                              "type": "string",
+                              "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": ["queued", "running", "succeeded", "failed"]
+                            },
+                            "errorCode": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "errorMessage": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "startedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            },
+                            "finishedAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "trigger",
+                            "state",
+                            "errorCode",
+                            "errorMessage",
+                            "createdAt",
+                            "startedAt",
+                            "finishedAt"
+                          ],
+                          "additionalProperties": false
                         }
                       },
-                      "required": ["sandboxProfileId", "version", "state", "isActive"],
+                      "required": [
+                        "sandboxProfileId",
+                        "version",
+                        "state",
+                        "isActive",
+                        "usable",
+                        "latestSnapshotJob"
+                      ],
                       "additionalProperties": false
                     },
                     "activeVersion": {
@@ -14688,9 +14862,38 @@
                         "state": {
                           "type": "string",
                           "enum": ["queued", "running", "succeeded", "failed"]
+                        },
+                        "errorCode": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "errorMessage": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "startedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "finishedAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
                         }
                       },
-                      "required": ["id", "trigger", "state"],
+                      "required": [
+                        "id",
+                        "trigger",
+                        "state",
+                        "errorCode",
+                        "errorMessage",
+                        "createdAt",
+                        "startedAt",
+                        "finishedAt"
+                      ],
                       "additionalProperties": false
                     }
                   },

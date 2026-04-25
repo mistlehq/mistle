@@ -52,6 +52,11 @@ export type PublishSandboxProfileVersionResult = {
     id: string;
     trigger: "publish" | "manual_refresh" | "scheduled_refresh";
     state: "queued" | "running" | "succeeded" | "failed";
+    errorCode: string | null;
+    errorMessage: string | null;
+    createdAt: string;
+    startedAt: string | null;
+    finishedAt: string | null;
   };
   version: SandboxProfileVersion;
 };

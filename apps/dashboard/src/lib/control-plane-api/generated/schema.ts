@@ -6980,9 +6980,22 @@ export interface paths {
             "application/json": {
               versions: {
                 isActive: boolean;
+                latestSnapshotJob: {
+                  createdAt: string;
+                  errorCode: string | null;
+                  errorMessage: string | null;
+                  finishedAt: string | null;
+                  id: string;
+                  startedAt: string | null;
+                  /** @enum {string} */
+                  state: "queued" | "running" | "succeeded" | "failed";
+                  /** @enum {string} */
+                  trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                } | null;
                 sandboxProfileId: string;
                 /** @enum {string} */
                 state: "draft" | "published";
+                usable: boolean;
                 version: number;
               }[];
             };
@@ -7071,9 +7084,22 @@ export interface paths {
           content: {
             "application/json": {
               isActive: boolean;
+              latestSnapshotJob: {
+                createdAt: string;
+                errorCode: string | null;
+                errorMessage: string | null;
+                finishedAt: string | null;
+                id: string;
+                startedAt: string | null;
+                /** @enum {string} */
+                state: "queued" | "running" | "succeeded" | "failed";
+                /** @enum {string} */
+                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+              } | null;
               sandboxProfileId: string;
               /** @enum {string} */
               state: "draft" | "published";
+              usable: boolean;
               version: number;
             };
           };
@@ -7832,7 +7858,12 @@ export interface paths {
             "application/json": {
               activeVersion: number | null;
               snapshotJob: {
+                createdAt: string;
+                errorCode: string | null;
+                errorMessage: string | null;
+                finishedAt: string | null;
                 id: string;
+                startedAt: string | null;
                 /** @enum {string} */
                 state: "queued" | "running" | "succeeded" | "failed";
                 /** @enum {string} */
@@ -7840,9 +7871,22 @@ export interface paths {
               };
               version: {
                 isActive: boolean;
+                latestSnapshotJob: {
+                  createdAt: string;
+                  errorCode: string | null;
+                  errorMessage: string | null;
+                  finishedAt: string | null;
+                  id: string;
+                  startedAt: string | null;
+                  /** @enum {string} */
+                  state: "queued" | "running" | "succeeded" | "failed";
+                  /** @enum {string} */
+                  trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                } | null;
                 sandboxProfileId: string;
                 /** @enum {string} */
                 state: "draft" | "published";
+                usable: boolean;
                 version: number;
               };
             };

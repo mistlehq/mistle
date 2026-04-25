@@ -29,12 +29,28 @@ type PublishProfileVersionOutput = {
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     isActive: boolean;
+    usable: boolean;
+    latestSnapshotJob: {
+      id: string;
+      trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+      state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+      errorCode: string | null;
+      errorMessage: string | null;
+      createdAt: string;
+      startedAt: string | null;
+      finishedAt: string | null;
+    };
   };
   activeVersion: number | null;
   snapshotJob: {
     id: string;
     trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
     state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+    errorCode: string | null;
+    errorMessage: string | null;
+    createdAt: string;
+    startedAt: string | null;
+    finishedAt: string | null;
   };
 };
 
@@ -167,6 +183,11 @@ export async function publishProfileVersion(
         id: sandboxProfileVersionSnapshotJobs.id,
         trigger: sandboxProfileVersionSnapshotJobs.trigger,
         state: sandboxProfileVersionSnapshotJobs.state,
+        errorCode: sandboxProfileVersionSnapshotJobs.errorCode,
+        errorMessage: sandboxProfileVersionSnapshotJobs.errorMessage,
+        createdAt: sandboxProfileVersionSnapshotJobs.createdAt,
+        startedAt: sandboxProfileVersionSnapshotJobs.startedAt,
+        finishedAt: sandboxProfileVersionSnapshotJobs.finishedAt,
       });
 
     if (snapshotJob === undefined) {
@@ -179,6 +200,8 @@ export async function publishProfileVersion(
       version: {
         ...publishedVersion,
         isActive: false,
+        usable: false,
+        latestSnapshotJob: snapshotJob,
       },
       activeVersion: sandboxProfile.activeVersion,
       snapshotJob,

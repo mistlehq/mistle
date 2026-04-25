@@ -34,6 +34,22 @@ afterEach(() => {
   void cleanupTestQueryClients();
 });
 
+function createSandboxProfileVersionFixture(input: {
+  sandboxProfileId: string;
+  version: number;
+  state: SandboxProfileVersion["state"];
+  isActive: boolean;
+}): SandboxProfileVersion {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    state: input.state,
+    isActive: input.isActive,
+    usable: input.state === "published",
+    latestSnapshotJob: null,
+  };
+}
+
 function renderSandboxProfileEditor(input?: {
   bindings?: readonly {
     id: string;
@@ -87,41 +103,41 @@ function renderSandboxProfileEditor(input?: {
   const versions: SandboxProfileVersion[] =
     resolvedVersionState === "draft-with-published"
       ? [
-          {
+          createSandboxProfileVersionFixture({
             sandboxProfileId: profileId,
             version: version - 1,
             state: "published",
             isActive: true,
-          },
-          {
+          }),
+          createSandboxProfileVersionFixture({
             sandboxProfileId: profileId,
             version,
             state: "draft",
             isActive: false,
-          },
+          }),
         ]
       : resolvedVersionState === "published-with-draft"
         ? [
-            {
+            createSandboxProfileVersionFixture({
               sandboxProfileId: profileId,
               version,
               state: "published",
               isActive: true,
-            },
-            {
+            }),
+            createSandboxProfileVersionFixture({
               sandboxProfileId: profileId,
               version: version + 1,
               state: "draft",
               isActive: false,
-            },
+            }),
           ]
         : [
-            {
+            createSandboxProfileVersionFixture({
               sandboxProfileId: profileId,
               version,
               state: singleVersionState,
               isActive: resolvedVersionState === "published",
-            },
+            }),
           ];
 
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
@@ -387,18 +403,18 @@ describe("SandboxProfileEditorPage", () => {
       activeVersion: 1,
       view: "published",
       versions: [
-        {
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 1,
           state: "published",
           isActive: true,
-        },
-        {
+        }),
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 2,
           state: "draft",
           isActive: false,
-        },
+        }),
       ],
     });
 
@@ -419,12 +435,12 @@ describe("SandboxProfileEditorPage", () => {
       activeVersion: null,
       view: "draft",
       versions: [
-        {
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 1,
           state: "draft",
           isActive: false,
-        },
+        }),
       ],
     });
 
@@ -464,18 +480,18 @@ describe("SandboxProfileEditorPage", () => {
       activeVersion: 1,
       view: "published",
       versions: [
-        {
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 1,
           state: "published",
           isActive: true,
-        },
-        {
+        }),
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 2,
           state: "draft",
           isActive: false,
-        },
+        }),
       ],
     });
 

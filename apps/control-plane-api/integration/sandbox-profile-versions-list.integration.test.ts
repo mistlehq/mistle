@@ -1,6 +1,9 @@
 import {
+  sandboxProfileVersionSnapshotJobs,
   sandboxProfiles,
   sandboxProfileVersions,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
@@ -36,16 +39,43 @@ describe("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
       }),
-      createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_versions_list_001",
-        version: 2,
-        state: SandboxProfileVersionStates.PUBLISHED,
-      }),
+      {
+        ...createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_versions_list_001",
+          version: 2,
+          state: SandboxProfileVersionStates.PUBLISHED,
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:version-2-usable",
+      },
       createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_versions_list_001",
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
       }),
+    ]);
+    await fixture.db.insert(sandboxProfileVersionSnapshotJobs).values([
+      {
+        id: "ssj_versions_list_v1_publish",
+        sandboxProfileId: "sbp_versions_list_001",
+        sandboxProfileVersion: 1,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+        createdAt: "2026-03-01T00:02:00.000Z",
+        startedAt: "2026-03-01T00:02:05.000Z",
+      },
+      {
+        id: "ssj_versions_list_v2_refresh_failed",
+        sandboxProfileId: "sbp_versions_list_001",
+        sandboxProfileVersion: 2,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+        state: SandboxProfileVersionSnapshotJobStates.FAILED,
+        errorCode: "snapshot_refresh_failed",
+        errorMessage: "Snapshot refresh failed.",
+        createdAt: "2026-03-01T00:03:00.000Z",
+        startedAt: "2026-03-01T00:03:05.000Z",
+        finishedAt: "2026-03-01T00:03:25.000Z",
+      },
     ]);
 
     const response = await fixture.request("/v1/sandbox/profiles/sbp_versions_list_001/versions", {
@@ -62,18 +92,42 @@ describe("sandbox profile versions list integration", () => {
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
         isActive: false,
+        usable: false,
+        latestSnapshotJob: null,
       },
       {
         sandboxProfileId: "sbp_versions_list_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
         isActive: true,
+        usable: true,
+        latestSnapshotJob: {
+          id: "ssj_versions_list_v2_refresh_failed",
+          trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+          state: SandboxProfileVersionSnapshotJobStates.FAILED,
+          errorCode: "snapshot_refresh_failed",
+          errorMessage: "Snapshot refresh failed.",
+          createdAt: "2026-03-01 00:03:00+00",
+          startedAt: "2026-03-01 00:03:05+00",
+          finishedAt: "2026-03-01 00:03:25+00",
+        },
       },
       {
         sandboxProfileId: "sbp_versions_list_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         isActive: false,
+        usable: false,
+        latestSnapshotJob: {
+          id: "ssj_versions_list_v1_publish",
+          trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: "2026-03-01 00:02:00+00",
+          startedAt: "2026-03-01 00:02:05+00",
+          finishedAt: null,
+        },
       },
     ]);
   }, 60_000);
@@ -117,6 +171,8 @@ describe("sandbox profile versions list integration", () => {
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
         isActive: false,
+        usable: false,
+        latestSnapshotJob: null,
       },
     ]);
   }, 60_000);

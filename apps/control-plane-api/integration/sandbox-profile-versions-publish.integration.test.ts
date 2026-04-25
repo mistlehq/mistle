@@ -168,12 +168,28 @@ describe("sandbox profile versions publish integration", () => {
           version: 2,
           state: SandboxProfileVersionStates.PUBLISHED,
           isActive: false,
+          usable: false,
+          latestSnapshotJob: {
+            id: expect.any(String),
+            trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+            state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+            errorCode: null,
+            errorMessage: null,
+            createdAt: expect.any(String),
+            startedAt: null,
+            finishedAt: null,
+          },
         },
         activeVersion: 1,
         snapshotJob: {
           id: expect.any(String),
           trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: expect.any(String),
+          startedAt: null,
+          finishedAt: null,
         },
       });
 

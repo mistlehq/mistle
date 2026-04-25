@@ -127,11 +127,15 @@ function createSandboxProfileVersion(input: {
   isActive?: boolean;
   state?: "draft" | "published";
 }) {
+  const state = input.state ?? "published";
+
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
-    state: input.state ?? "published",
+    state,
     isActive: input.isActive ?? true,
+    usable: state === "published",
+    latestSnapshotJob: null,
   };
 }
 

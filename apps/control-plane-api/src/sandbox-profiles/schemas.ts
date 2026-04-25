@@ -41,6 +41,18 @@ const sandboxProfileVersionSnapshotJobStateSchema = z.enum([
   SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
   SandboxProfileVersionSnapshotJobStates.FAILED,
 ]);
+const sandboxProfileVersionSnapshotJobSummarySchema = z
+  .object({
+    id: z.string().min(1),
+    trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
+    state: sandboxProfileVersionSnapshotJobStateSchema,
+    errorCode: z.string().min(1).nullable(),
+    errorMessage: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+    startedAt: z.string().min(1).nullable(),
+    finishedAt: z.string().min(1).nullable(),
+  })
+  .strict();
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   activeVersion: z.number().int().min(1).nullable(),
@@ -94,6 +106,8 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   })
   .extend({
     isActive: z.boolean(),
+    usable: z.boolean(),
+    latestSnapshotJob: sandboxProfileVersionSnapshotJobSummarySchema.nullable(),
   })
   .strict();
 
@@ -145,6 +159,11 @@ export const publishSandboxProfileVersionResponseSchema = z
         id: z.string().min(1),
         trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
         state: sandboxProfileVersionSnapshotJobStateSchema,
+        errorCode: z.string().min(1).nullable(),
+        errorMessage: z.string().min(1).nullable(),
+        createdAt: z.string().min(1),
+        startedAt: z.string().min(1).nullable(),
+        finishedAt: z.string().min(1).nullable(),
       })
       .strict(),
   })

@@ -151,6 +151,8 @@ describe("sandbox profile versions create integration", () => {
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
       isActive: false,
+      usable: false,
+      latestSnapshotJob: null,
     });
 
     const persistedDraftVersion = await fixture.db.query.sandboxProfileVersions.findFirst({

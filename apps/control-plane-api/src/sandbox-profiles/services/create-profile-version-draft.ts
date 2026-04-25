@@ -24,6 +24,8 @@ type CreateProfileVersionDraftOutput = {
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   isActive: boolean;
+  usable: boolean;
+  latestSnapshotJob: null;
 };
 
 export async function createProfileVersionDraft(
@@ -131,6 +133,8 @@ export async function createProfileVersionDraft(
       return {
         ...createdDraftVersion,
         isActive: false,
+        usable: false,
+        latestSnapshotJob: null,
       };
     });
   } catch (error) {
