@@ -1,8 +1,6 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
-import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
-import { z } from "zod";
 
 import type { AppContext } from "../../../types.js";
 import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
@@ -19,7 +17,10 @@ import {
   resolveConnectionWithTargetOrThrow,
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
-import { assertGitHubAppInstallationConnectionMethodOrThrow } from "./installation-config.js";
+import {
+  assertGitHubAppInstallationConnectionMethodOrThrow,
+  parseGitHubTargetConfigOrThrow,
+} from "./installation-config.js";
 
 export type GitHubAppManifestOwner =
   | {
@@ -110,19 +111,11 @@ export async function startGitHubAppManifestConnection(
     config: connectionConfig,
   });
 
-  let parsedTargetConfig: z.output<typeof GitHubTargetConfigSchema>;
-  try {
-    parsedTargetConfig = GitHubTargetConfigSchema.parse(connection.target.config);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT,
-        `Integration target '${connection.targetKey}' has invalid target config.`,
-      );
-    }
-
-    throw error;
-  }
+  const parsedTargetConfig = parseGitHubTargetConfigOrThrow({
+    config: connection.target.config,
+    targetKey: connection.targetKey,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT,
+  });
 
   const {
     webhookSourceCapability,

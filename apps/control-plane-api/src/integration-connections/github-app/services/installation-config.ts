@@ -1,6 +1,9 @@
 import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { parseGitHubAppInstallationConnectionConfig } from "@mistle/integrations-definitions";
+import {
+  GitHubTargetConfigSchema,
+  parseGitHubAppInstallationConnectionConfig,
+} from "@mistle/integrations-definitions";
 import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
@@ -57,6 +60,25 @@ export function parseGitHubAppInstallationConnectionConfigOrThrow(input: {
       throw new BadRequestError(
         input.invalidInputCode,
         `Integration connection '${input.connectionId}' has invalid GitHub App configuration.`,
+      );
+    }
+
+    throw error;
+  }
+}
+
+export function parseGitHubTargetConfigOrThrow(input: {
+  config: unknown;
+  targetKey: string;
+  invalidInputCode: string;
+}): z.output<typeof GitHubTargetConfigSchema> {
+  try {
+    return GitHubTargetConfigSchema.parse(input.config);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        input.invalidInputCode,
+        `Integration target '${input.targetKey}' has invalid target config.`,
       );
     }
 

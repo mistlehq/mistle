@@ -10,7 +10,6 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -38,7 +37,10 @@ import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
-import { assertGitHubAppInstallationConnectionMethodOrThrow } from "./installation-config.js";
+import {
+  assertGitHubAppInstallationConnectionMethodOrThrow,
+  parseGitHubTargetConfigOrThrow,
+} from "./installation-config.js";
 
 type CompleteGitHubAppManifestConnectionInput = {
   query: Record<string, string>;
@@ -237,19 +239,12 @@ export async function completeGitHubAppManifestConnection(
     );
   }
 
-  let parsedTargetConfig: z.output<typeof GitHubTargetConfigSchema>;
-  try {
-    parsedTargetConfig = GitHubTargetConfigSchema.parse(connection.target.config);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-        `Integration target '${connection.targetKey}' has invalid target config.`,
-      );
-    }
-
-    throw error;
-  }
+  const parsedTargetConfig = parseGitHubTargetConfigOrThrow({
+    config: connection.target.config,
+    targetKey: connection.targetKey,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+  });
 
   const formMethod = resolveFormConnectionMethodOrThrow({
     targetKey: connection.targetKey,
