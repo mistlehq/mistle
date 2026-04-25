@@ -266,6 +266,7 @@ describe("internal sandbox runtime", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_internal_start_git_identity",
       version: 1,
+      state: "draft",
     });
     await fixture.db.insert(integrationTargets).values([
       {
@@ -463,6 +464,7 @@ describe("internal sandbox runtime", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_internal_start_primary_repository",
       version: 1,
+      state: "draft",
     });
     await fixture.db.insert(integrationTargets).values([
       {

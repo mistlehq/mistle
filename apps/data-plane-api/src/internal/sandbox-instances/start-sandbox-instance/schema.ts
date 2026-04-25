@@ -37,7 +37,8 @@ export const StartSandboxInstanceInputSchema = z
     image: z
       .object({
         imageId: z.string().min(1),
-        createdAt: z.string().min(1),
+        createdAt: z.string().min(1).optional(),
+        kind: z.enum(["base", "snapshot"]),
       })
       .strict(),
   })

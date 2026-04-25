@@ -1,9 +1,12 @@
 import {
-  sandboxProfiles,
+  sandboxProfileVersionSnapshotJobs,
   sandboxProfileVersions,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { sql } from "drizzle-orm";
+import { typeid } from "typeid-js";
 
 import {
   SandboxProfilesConflictCodes,
@@ -27,17 +30,53 @@ type PublishProfileVersionOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     isActive: boolean;
   };
-  activeVersion: number;
+  activeVersion: number | null;
+  snapshotJob: {
+    id: string;
+    trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
+    state: (typeof SandboxProfileVersionSnapshotJobStates)[keyof typeof SandboxProfileVersionSnapshotJobStates];
+  };
 };
 
-export async function publishProfileVersion(
+async function markQueuedSnapshotJobFailedToEnqueue(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  input: {
+    snapshotJobId: string;
+    message: string;
+  },
+): Promise<void> {
+  await db
+    .update(sandboxProfileVersionSnapshotJobs)
+    .set({
+      state: SandboxProfileVersionSnapshotJobStates.FAILED,
+      finishedAt: sql`now()`,
+      errorCode: "snapshot_materialization_enqueue_failed",
+      errorMessage: input.message,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      sql`${sandboxProfileVersionSnapshotJobs.id} = ${input.snapshotJobId}
+        and ${sandboxProfileVersionSnapshotJobs.state} = ${SandboxProfileVersionSnapshotJobStates.QUEUED}`,
+    );
+}
+
+export async function publishProfileVersion(
+  {
+    db,
+    dataPlaneClient,
+    defaultBaseImage,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient"> & {
+    defaultBaseImage: string;
+  },
   input: PublishProfileVersionInput,
 ): Promise<PublishProfileVersionOutput> {
-  return db.transaction(async (tx) => {
+  const sandboxInstanceId = typeid("sbi").toString();
+
+  const publishedResult = await db.transaction(async (tx) => {
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
       columns: {
         id: true,
+        activeVersion: true,
       },
       where: (table, { and, eq }) =>
         and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
@@ -112,28 +151,61 @@ export async function publishProfileVersion(
       );
     }
 
-    const [updatedProfile] = await tx
-      .update(sandboxProfiles)
-      .set({
-        activeVersion: input.profileVersion,
+    const [snapshotJob] = await tx
+      .insert(sandboxProfileVersionSnapshotJobs)
+      .values({
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: input.profileVersion,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
       })
-      .where(sql`${sandboxProfiles.id} = ${input.profileId}`)
       .returning({
-        activeVersion: sandboxProfiles.activeVersion,
+        id: sandboxProfileVersionSnapshotJobs.id,
+        trigger: sandboxProfileVersionSnapshotJobs.trigger,
+        state: sandboxProfileVersionSnapshotJobs.state,
       });
 
-    if (updatedProfile === undefined || updatedProfile.activeVersion === null) {
+    if (snapshotJob === undefined) {
       throw new Error(
-        `Failed to set active version '${String(input.profileVersion)}' for sandbox profile '${input.profileId}'.`,
+        `Failed to create snapshot job for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
       );
     }
 
     return {
       version: {
         ...publishedVersion,
-        isActive: true,
+        isActive: false,
       },
-      activeVersion: updatedProfile.activeVersion,
+      activeVersion: sandboxProfile.activeVersion,
+      snapshotJob,
     };
   });
+
+  try {
+    await dataPlaneClient.materializeSandboxProfileVersionSnapshotJob({
+      snapshotJobId: publishedResult.snapshotJob.id,
+      sandboxInstanceId,
+      organizationId: input.organizationId,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
+      image: {
+        imageId: defaultBaseImage,
+        createdAt: new Date().toISOString(),
+        kind: "base",
+      },
+    });
+  } catch (error) {
+    await markQueuedSnapshotJobFailedToEnqueue(
+      {
+        db,
+      },
+      {
+        snapshotJobId: publishedResult.snapshotJob.id,
+        message: `Failed to enqueue snapshot materialization for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
+      },
+    );
+    throw error;
+  }
+
+  return publishedResult;
 }

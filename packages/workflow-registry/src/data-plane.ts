@@ -26,10 +26,17 @@ export type SandboxStopReason = "idle";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
 export type SandboxInstanceDeadlineKind = "idle" | "disconnect";
 
-export type StartSandboxInstanceWorkflowImageInput = Pick<
-  SandboxImageHandle,
-  "imageId" | "createdAt"
->;
+export const SandboxStartImageKinds = {
+  BASE: "base",
+  SNAPSHOT: "snapshot",
+} as const;
+export type SandboxStartImageKind =
+  (typeof SandboxStartImageKinds)[keyof typeof SandboxStartImageKinds];
+
+export type StartSandboxInstanceWorkflowImageInput = Pick<SandboxImageHandle, "imageId"> & {
+  createdAt?: SandboxImageHandle["createdAt"];
+  kind: SandboxStartImageKind;
+};
 
 export type SandboxWorkflowGitIdentityInput = {
   name: string;
@@ -80,7 +87,6 @@ export type MaterializeSandboxProfileVersionSnapshotWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  runtimePlan: CompiledRuntimePlan;
   image: StartSandboxInstanceWorkflowImageInput;
 };
 

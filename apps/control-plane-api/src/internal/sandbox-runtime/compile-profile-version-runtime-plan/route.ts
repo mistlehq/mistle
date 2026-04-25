@@ -6,35 +6,35 @@ import {
   InternalSandboxRuntimeErrorResponseSchema,
 } from "../schemas.js";
 import {
-  InternalSandboxRuntimeStartProfileInstanceRequestSchema,
-  InternalSandboxRuntimeStartProfileInstanceResponseSchema,
+  InternalSandboxRuntimeCompileProfileVersionRuntimePlanRequestSchema,
+  InternalSandboxRuntimeCompileProfileVersionRuntimePlanResponseSchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "post",
-  path: "/start-profile-instance",
+  path: "/compile-profile-version-runtime-plan",
   tags: ["Internal"],
   request: {
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: InternalSandboxRuntimeStartProfileInstanceRequestSchema,
+          schema: InternalSandboxRuntimeCompileProfileVersionRuntimePlanRequestSchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Start sandbox profile instance provisioning for internal callers.",
+      description: "Compile a sandbox profile version runtime plan for internal callers.",
       content: {
         "application/json": {
-          schema: InternalSandboxRuntimeStartProfileInstanceResponseSchema,
+          schema: InternalSandboxRuntimeCompileProfileVersionRuntimePlanResponseSchema,
         },
       },
     },
     400: {
-      description: "Invalid request body.",
+      description: "Invalid request body or compile-time validation failure.",
       content: {
         "application/json": {
           schema: InternalSandboxRuntimeBadRequestResponseSchema,
@@ -51,14 +51,6 @@ export const route = createRoute({
     },
     404: {
       description: "Referenced sandbox profile version was not found.",
-      content: {
-        "application/json": {
-          schema: InternalSandboxRuntimeErrorResponseSchema,
-        },
-      },
-    },
-    409: {
-      description: "Referenced sandbox profile version cannot be launched in its current state.",
       content: {
         "application/json": {
           schema: InternalSandboxRuntimeErrorResponseSchema,

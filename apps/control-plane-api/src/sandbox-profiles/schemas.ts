@@ -2,6 +2,8 @@ import { z } from "@hono/zod-openapi";
 import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
@@ -27,6 +29,17 @@ const integrationBindingKindSchema = z.enum([
 const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,
   SandboxProfileVersionStates.PUBLISHED,
+]);
+const sandboxProfileVersionSnapshotJobTriggerSchema = z.enum([
+  SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+  SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+  SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+]);
+const sandboxProfileVersionSnapshotJobStateSchema = z.enum([
+  SandboxProfileVersionSnapshotJobStates.QUEUED,
+  SandboxProfileVersionSnapshotJobStates.RUNNING,
+  SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
+  SandboxProfileVersionSnapshotJobStates.FAILED,
 ]);
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
@@ -126,7 +139,14 @@ export const createSandboxProfileVersionResponseSchema = sandboxProfileVersionSc
 export const publishSandboxProfileVersionResponseSchema = z
   .object({
     version: sandboxProfileVersionSchema,
-    activeVersion: z.number().int().min(1),
+    activeVersion: z.number().int().min(1).nullable(),
+    snapshotJob: z
+      .object({
+        id: z.string().min(1),
+        trigger: sandboxProfileVersionSnapshotJobTriggerSchema,
+        state: sandboxProfileVersionSnapshotJobStateSchema,
+      })
+      .strict(),
   })
   .strict();
 

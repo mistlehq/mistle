@@ -2,6 +2,7 @@ import { isPostgresUniqueConstraintError } from "../postgres-errors.js";
 
 export const ControlPlaneConstraintIds = {
   SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE: "sandbox_profile_versions_one_draft_per_profile",
+  SNAPSHOT_JOB_ACTIVE_PER_VERSION: "snapshot_job_active_per_version",
 } as const;
 
 export type ControlPlaneConstraintId =
@@ -14,6 +15,9 @@ const ControlPlaneUniqueConstraintNamesById: Record<
   [ControlPlaneConstraintIds.SANDBOX_PROFILE_VERSIONS_ONE_DRAFT_PER_PROFILE]: [
     "sandbox_profile_versions_one_draft_per_profile_uidx",
     "sandbox_profile_versions_pkey",
+  ],
+  [ControlPlaneConstraintIds.SNAPSHOT_JOB_ACTIVE_PER_VERSION]: [
+    "spv_snapshot_jobs_active_job_per_version_uidx",
   ],
 };
 

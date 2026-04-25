@@ -135,8 +135,10 @@ export interface paths {
             };
             idempotencyKey?: string;
             image: {
-              createdAt: string;
+              createdAt?: string;
               imageId: string;
+              /** @enum {string} */
+              kind: "base" | "snapshot";
             };
             organizationId: string;
             runtimePlan: {
@@ -385,6 +387,11 @@ export interface paths {
                     imageRef: string;
                     /** @enum {string} */
                     source: "base";
+                  }
+                | {
+                    imageRef: string;
+                    /** @enum {string} */
+                    source: "snapshot";
                   };
               runtimeClients: {
                 clientId: string;
@@ -819,6 +826,11 @@ export interface paths {
                       imageRef: string;
                       /** @enum {string} */
                       source: "base";
+                    }
+                  | {
+                      imageRef: string;
+                      /** @enum {string} */
+                      source: "snapshot";
                     };
                 runtimeClients: {
                   clientId: string;
@@ -1426,6 +1438,94 @@ export interface paths {
               code: "VALIDATION_ERROR";
               message: string;
             };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/profile-version-snapshot-jobs/materialize": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            image: {
+              createdAt: string;
+              imageId: string;
+              /** @enum {string} */
+              kind: "base";
+            };
+            organizationId: string;
+            sandboxInstanceId: string;
+            sandboxProfileId: string;
+            sandboxProfileVersion: number;
+            snapshotJobId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Enqueue snapshot materialization for a sandbox profile version snapshot job. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              snapshotJobId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
           };
         };
         /** @description Internal service authentication failed. */

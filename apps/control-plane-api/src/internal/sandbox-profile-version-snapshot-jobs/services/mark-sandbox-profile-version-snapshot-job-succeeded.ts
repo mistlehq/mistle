@@ -1,6 +1,9 @@
 import {
+  sandboxProfiles,
   sandboxProfileVersionSnapshotJobs,
+  sandboxProfileVersions,
   SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionStates,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -31,8 +34,31 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
         workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
         candidateImageProvider: sandboxProfileVersionSnapshotJobs.candidateImageProvider,
         candidateImageId: sandboxProfileVersionSnapshotJobs.candidateImageId,
+        sandboxProfileId: sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+        sandboxProfileVersion: sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+        versionState: sandboxProfileVersions.state,
+        versionSnapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
+        versionSnapshotImageId: sandboxProfileVersions.snapshotImageId,
+        activeVersion: sandboxProfiles.activeVersion,
       })
       .from(sandboxProfileVersionSnapshotJobs)
+      .innerJoin(
+        sandboxProfileVersions,
+        and(
+          eq(
+            sandboxProfileVersions.sandboxProfileId,
+            sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+          ),
+          eq(
+            sandboxProfileVersions.version,
+            sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+          ),
+        ),
+      )
+      .innerJoin(
+        sandboxProfiles,
+        eq(sandboxProfiles.id, sandboxProfileVersionSnapshotJobs.sandboxProfileId),
+      )
       .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
       .for("update");
 
@@ -44,6 +70,12 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     const workflowRunId = lockedRow.workflowRunId;
     const candidateImageProvider = lockedRow.candidateImageProvider;
     const candidateImageId = lockedRow.candidateImageId;
+    const sandboxProfileId = lockedRow.sandboxProfileId;
+    const sandboxProfileVersion = lockedRow.sandboxProfileVersion;
+    const versionState = lockedRow.versionState;
+    const versionSnapshotImageProvider = lockedRow.versionSnapshotImageProvider;
+    const versionSnapshotImageId = lockedRow.versionSnapshotImageId;
+    const activeVersion = lockedRow.activeVersion;
 
     if (workflowRunId !== input.workflowRunId) {
       throw createSnapshotJobOwnershipMismatchError({
@@ -55,7 +87,9 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     if (
       actualState === SandboxProfileVersionSnapshotJobStates.SUCCEEDED &&
       candidateImageProvider === input.image.provider &&
-      candidateImageId === input.image.imageId
+      candidateImageId === input.image.imageId &&
+      versionSnapshotImageProvider === input.image.provider &&
+      versionSnapshotImageId === input.image.imageId
     ) {
       return;
     }
@@ -67,6 +101,17 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
         message: "Snapshot job is not running and cannot be marked succeeded.",
       });
     }
+
+    if (versionState !== SandboxProfileVersionStates.PUBLISHED) {
+      throw createSnapshotJobStateConflictError({
+        snapshotJobId: input.snapshotJobId,
+        actualState,
+        message: "Snapshot job belongs to a sandbox profile version that is not published.",
+      });
+    }
+
+    const isInitialMaterialization =
+      versionSnapshotImageProvider === null && versionSnapshotImageId === null;
 
     const updatedRows = await tx
       .update(sandboxProfileVersionSnapshotJobs)
@@ -99,6 +144,43 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
         actualState,
         message: "Snapshot job could not be marked succeeded.",
       });
+    }
+
+    const promotedVersions = await tx
+      .update(sandboxProfileVersions)
+      .set({
+        snapshotImageProvider: input.image.provider,
+        snapshotImageId: input.image.imageId,
+      })
+      .where(
+        and(
+          eq(sandboxProfileVersions.sandboxProfileId, sandboxProfileId),
+          eq(sandboxProfileVersions.version, sandboxProfileVersion),
+          eq(sandboxProfileVersions.state, SandboxProfileVersionStates.PUBLISHED),
+        ),
+      )
+      .returning({
+        sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
+      });
+
+    if (promotedVersions[0] === undefined) {
+      throw createSnapshotJobStateConflictError({
+        snapshotJobId: input.snapshotJobId,
+        actualState,
+        message: "Snapshot job succeeded but the published version could not be promoted.",
+      });
+    }
+
+    if (
+      isInitialMaterialization &&
+      (activeVersion === null || activeVersion < sandboxProfileVersion)
+    ) {
+      await tx
+        .update(sandboxProfiles)
+        .set({
+          activeVersion: sandboxProfileVersion,
+        })
+        .where(eq(sandboxProfiles.id, sandboxProfileId));
     }
   });
 

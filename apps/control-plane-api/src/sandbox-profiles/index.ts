@@ -72,6 +72,7 @@ export {
 } from "./discard-sandbox-profile-version-draft/schema.js";
 export {
   badRequestResponseSchema as StartSandboxProfileInstanceBadRequestResponseSchema,
+  conflictResponseSchema as StartSandboxProfileInstanceConflictResponseSchema,
   notFoundResponseSchema as StartSandboxProfileInstanceNotFoundResponseSchema,
 } from "./start-sandbox-profile-instance/schema.js";
 export {

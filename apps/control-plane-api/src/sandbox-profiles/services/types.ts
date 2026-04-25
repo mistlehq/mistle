@@ -22,7 +22,10 @@ export type CreateSandboxProfilesServiceInput = {
     activeMasterEncryptionKeyVersion: number;
     masterEncryptionKeys: Record<string, string>;
   };
-  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  dataPlaneClient: Pick<
+    DataPlaneSandboxInstancesClient,
+    "materializeSandboxProfileVersionSnapshotJob" | "startSandboxInstance"
+  >;
 };
 
 export type SandboxProfilesService = {
@@ -98,10 +101,6 @@ export type SandboxProfilesService = {
       id: string;
     };
     source: SandboxInstanceSource;
-    image: {
-      imageId: string;
-      createdAt: string;
-    };
   }) => Promise<{
     status: "accepted";
     workflowRunId: string;
@@ -124,7 +123,12 @@ export type SandboxProfilesService = {
       state: SandboxProfileVersionState;
       isActive: boolean;
     };
-    activeVersion: number;
+    activeVersion: number | null;
+    snapshotJob: {
+      id: string;
+      trigger: "publish";
+      state: "queued";
+    };
   }>;
   discardProfileVersionDraft: (input: {
     organizationId: string;

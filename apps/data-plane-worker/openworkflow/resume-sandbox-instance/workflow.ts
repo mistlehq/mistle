@@ -2,6 +2,7 @@ import { isSandboxResourceNotFoundError, type SandboxProvider } from "@mistle/sa
 import {
   type ResumeSandboxInstanceWorkflowOutput,
   ResumeSandboxInstanceWorkflowSpec,
+  SandboxStartImageKinds,
   type StartSandboxInstanceWorkflowImageInput,
 } from "@mistle/workflow-registry/data-plane";
 
@@ -1438,6 +1439,7 @@ function createReplacementSandboxImage(input: {
   return {
     imageId: input.runtimePlan.image.imageRef,
     createdAt: new Date().toISOString(),
+    kind: SandboxStartImageKinds.BASE,
   };
 }
 

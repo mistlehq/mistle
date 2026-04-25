@@ -309,7 +309,14 @@ const SandboxProfileVersionPublishabilitySchema = z
 
 const PublishSandboxProfileVersionResultSchema = z
   .object({
-    activeVersion: z.number().int().min(1),
+    activeVersion: z.number().int().min(1).nullable(),
+    snapshotJob: z
+      .object({
+        id: z.string().min(1),
+        trigger: z.enum(["publish", "manual_refresh", "scheduled_refresh"]),
+        state: z.enum(["queued", "running", "succeeded", "failed"]),
+      })
+      .strict(),
     version: SandboxProfileVersionSchema,
   })
   .strict();

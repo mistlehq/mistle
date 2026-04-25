@@ -22,6 +22,7 @@ import {
   SandboxStorageBackend,
 } from "@mistle/sandbox";
 import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { SandboxStartImageKinds } from "@mistle/workflow-registry/data-plane";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket, { WebSocketServer } from "ws";
@@ -187,6 +188,7 @@ function createReplacementImage() {
   return {
     imageId: SandboxBaseImageReference,
     createdAt: new Date().toISOString(),
+    kind: SandboxStartImageKinds.BASE,
   };
 }
 
@@ -377,6 +379,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
           image: {
             imageId: SandboxBaseImageReference,
             createdAt: new Date().toISOString(),
+            kind: SandboxStartImageKinds.BASE,
           },
           storagePreparation: await sandboxAdapter.prepareStorageForStart({
             sandboxInstanceId,

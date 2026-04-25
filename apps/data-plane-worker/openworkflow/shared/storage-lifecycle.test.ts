@@ -1,5 +1,6 @@
 import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
 import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import { SandboxStartImageKinds } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 
 import { cleanupSandboxStorage } from "./cleanup-sandbox-storage.js";
@@ -30,6 +31,7 @@ describe("sandbox storage lifecycle helpers", () => {
           image: {
             imageId: "image-ref",
             createdAt: "2026-04-17T00:00:00.000Z",
+            kind: SandboxStartImageKinds.BASE,
           },
           persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
           runtimeProvider: SandboxProvider.E2B,
@@ -83,6 +85,7 @@ describe("sandbox storage lifecycle helpers", () => {
           image: {
             imageId: "image-ref",
             createdAt: "2026-04-17T00:00:00.000Z",
+            kind: SandboxStartImageKinds.BASE,
           },
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.E2B,
@@ -140,6 +143,7 @@ describe("sandbox storage lifecycle helpers", () => {
           image: {
             imageId: "image-ref",
             createdAt: "2026-04-17T00:00:00.000Z",
+            kind: SandboxStartImageKinds.BASE,
           },
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.E2B,

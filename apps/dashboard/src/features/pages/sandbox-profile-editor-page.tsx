@@ -507,19 +507,24 @@ function LoadedSandboxProfileEditorPage(
     },
     onSuccess: async (result) => {
       setVersionActionError(null);
-      await Promise.all([
+      const invalidationPromises = [
         input.invalidateProfileVersions(input.profileId),
         input.invalidateSandboxProfiles(),
         input.invalidateProfileDetail(input.profileId),
-        input.invalidateVersionBindings({
-          profileId: input.profileId,
-          version: result.activeVersion,
-        }),
-        input.invalidateVersionSetupScript({
-          profileId: input.profileId,
-          version: result.activeVersion,
-        }),
-      ]);
+      ];
+      if (result.activeVersion !== null) {
+        invalidationPromises.push(
+          input.invalidateVersionBindings({
+            profileId: input.profileId,
+            version: result.activeVersion,
+          }),
+          input.invalidateVersionSetupScript({
+            profileId: input.profileId,
+            version: result.activeVersion,
+          }),
+        );
+      }
+      await Promise.all(invalidationPromises);
       void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
     },
     onError: (error: unknown) => {

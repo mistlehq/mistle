@@ -22,6 +22,7 @@ const routeHandler = async (
       db,
       integrationsConfig,
       dataPlaneClient,
+      defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
     {
       organizationId: session.activeOrganizationId,
@@ -39,10 +40,6 @@ const routeHandler = async (
         ? {}
         : { primaryRepositoryId: body.primaryRepositoryId }),
       ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
-      image: {
-        imageId: sandboxConfig.defaultBaseImage,
-        createdAt: new Date().toISOString(),
-      },
     },
   );
 

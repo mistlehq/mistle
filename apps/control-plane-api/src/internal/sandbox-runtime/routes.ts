@@ -4,6 +4,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 import { createRequireInternalAuthMiddleware } from "../../middleware/require-internal-auth.js";
 import type { AppContextBindings, AppRoutes } from "../../types.js";
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../constants.js";
+import * as compileProfileVersionRuntimePlan from "./compile-profile-version-runtime-plan/index.js";
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "./constants.js";
 import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as mintConnectionToken from "./mint-connection-token/index.js";
@@ -28,6 +29,7 @@ export function createInternalSandboxRuntimeRoutes(): AppRoutes<
     }),
   );
 
+  routes.openapi(compileProfileVersionRuntimePlan.route, compileProfileVersionRuntimePlan.handler);
   routes.openapi(startProfileInstance.route, startProfileInstance.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(mintConnectionToken.route, mintConnectionToken.handler);

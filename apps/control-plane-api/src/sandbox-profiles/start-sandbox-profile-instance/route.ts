@@ -6,7 +6,11 @@ import {
   startSandboxProfileInstanceBodySchema,
   startSandboxProfileInstanceResponseSchema,
 } from "../schemas.js";
-import { badRequestResponseSchema, notFoundResponseSchema } from "./schema.js";
+import {
+  badRequestResponseSchema,
+  conflictResponseSchema,
+  notFoundResponseSchema,
+} from "./schema.js";
 
 export const route = createRoute({
   method: "post",
@@ -45,6 +49,14 @@ export const route = createRoute({
       content: {
         "application/json": {
           schema: notFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox profile version cannot be launched in its current state.",
+      content: {
+        "application/json": {
+          schema: conflictResponseSchema,
         },
       },
     },

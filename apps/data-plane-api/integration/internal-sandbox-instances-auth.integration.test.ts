@@ -53,6 +53,7 @@ function createStartSandboxInput(input: {
     image: {
       imageId: input.imageId,
       createdAt: "2026-02-27T00:00:00.000Z",
+      kind: "base",
     },
   };
 }
@@ -193,6 +194,7 @@ describe("internal sandbox instances auth integration", () => {
           image: {
             imageId: "im_dp_api_integration_invalid_body",
             createdAt: "2026-02-27T00:00:00.000Z",
+            kind: "base",
           },
         }),
       },

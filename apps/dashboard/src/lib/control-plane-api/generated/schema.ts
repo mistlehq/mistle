@@ -7515,6 +7515,19 @@ export interface paths {
             };
           };
         };
+        /** @description Sandbox profile version cannot be launched in its current state. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_USABLE";
+              message: string;
+            };
+          };
+        };
         /** @description Internal server error. */
         500: {
           headers: {
@@ -7810,14 +7823,21 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Publish the specified sandbox profile draft version and make it active. */
+        /** @description Publish the specified sandbox profile draft version and queue snapshot materialization. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              activeVersion: number;
+              activeVersion: number | null;
+              snapshotJob: {
+                id: string;
+                /** @enum {string} */
+                state: "queued" | "running" | "succeeded" | "failed";
+                /** @enum {string} */
+                trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+              };
               version: {
                 isActive: boolean;
                 sandboxProfileId: string;

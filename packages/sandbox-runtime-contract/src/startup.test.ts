@@ -91,6 +91,18 @@ describe("startup contracts", () => {
     });
   });
 
+  it("accepts startup input with optional snapshot launch execution mode", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
+        ...startupInputFixture,
+        executionMode: SandboxdExecutionModes.SNAPSHOT_LAUNCH,
+      }),
+    ).toEqual({
+      ...startupInputFixture,
+      executionMode: SandboxdExecutionModes.SNAPSHOT_LAUNCH,
+    });
+  });
+
   it("accepts startup input with optional git signing config", () => {
     expect(
       SandboxdStartupInputSchema.parse({

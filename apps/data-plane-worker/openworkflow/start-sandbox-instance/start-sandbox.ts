@@ -47,6 +47,7 @@ export async function startSandbox(
     image: {
       ...input.image,
       provider: ctx.config.sandbox.provider,
+      createdAt: input.image.createdAt ?? new Date().toISOString(),
     },
     env: createSandboxRuntimeEnv({
       config: ctx.config,

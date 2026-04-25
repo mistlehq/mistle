@@ -7,6 +7,7 @@ import {
 import {
   SandboxProfilesBadRequestCodes,
   SandboxProfilesCompileErrorCodes,
+  SandboxProfilesConflictCodes,
   SandboxProfilesNotFoundCodes,
 } from "../errors.js";
 
@@ -32,6 +33,10 @@ export const badRequestResponseSchema = z.union([
   ),
   ValidationErrorResponseSchema,
 ]);
+
+export const conflictResponseSchema = createCodeMessageErrorSchema(
+  z.enum([SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE]),
+);
 
 export const notFoundResponseSchema = createCodeMessageErrorSchema(
   z.enum([

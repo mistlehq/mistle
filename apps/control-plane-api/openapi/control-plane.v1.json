@@ -14643,7 +14643,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Publish the specified sandbox profile draft version and make it active.",
+            "description": "Publish the specified sandbox profile draft version and queue snapshot materialization.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14671,11 +14671,30 @@
                       "additionalProperties": false
                     },
                     "activeVersion": {
-                      "type": "integer",
+                      "type": ["integer", "null"],
                       "minimum": 1
+                    },
+                    "snapshotJob": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "trigger": {
+                          "type": "string",
+                          "enum": ["publish", "manual_refresh", "scheduled_refresh"]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": ["queued", "running", "succeeded", "failed"]
+                        }
+                      },
+                      "required": ["id", "trigger", "state"],
+                      "additionalProperties": false
                     }
                   },
-                  "required": ["version", "activeVersion"],
+                  "required": ["version", "activeVersion", "snapshotJob"],
                   "additionalProperties": false
                 }
               }
@@ -15003,6 +15022,28 @@
                     "code": {
                       "type": "string",
                       "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version cannot be launched in its current state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_USABLE"]
                     },
                     "message": {
                       "type": "string",

@@ -9,6 +9,147 @@
     "parameters": {}
   },
   "paths": {
+    "/internal/sandbox/profile-version-snapshot-jobs/materialize": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "snapshotJobId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxInstanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxProfileId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxProfileVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "image": {
+                    "type": "object",
+                    "properties": {
+                      "imageId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["base"]
+                      }
+                    },
+                    "required": ["imageId", "createdAt", "kind"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "snapshotJobId",
+                  "sandboxInstanceId",
+                  "organizationId",
+                  "sandboxProfileId",
+                  "sandboxProfileVersion",
+                  "image"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Enqueue snapshot materialization for a sandbox profile version snapshot job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "snapshotJobId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "snapshotJobId", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox/instances": {
       "post": {
         "tags": ["Internal"],
@@ -78,6 +219,21 @@
                               "source": {
                                 "type": "string",
                                 "enum": ["base"]
+                              },
+                              "imageRef": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["source", "imageRef"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string",
+                                "enum": ["snapshot"]
                               },
                               "imageRef": {
                                 "type": "string",
@@ -1285,9 +1441,13 @@
                       "createdAt": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": ["base", "snapshot"]
                       }
                     },
-                    "required": ["imageId", "createdAt"],
+                    "required": ["imageId", "kind"],
                     "additionalProperties": false
                   }
                 },
@@ -1736,6 +1896,21 @@
                                 "source": {
                                   "type": "string",
                                   "enum": ["base"]
+                                },
+                                "imageRef": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["source", "imageRef"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "enum": ["snapshot"]
                                 },
                                 "imageRef": {
                                   "type": "string",

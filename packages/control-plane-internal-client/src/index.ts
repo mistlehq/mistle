@@ -42,6 +42,10 @@ export type StartSandboxProfileInstanceInput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["requestBody"]["content"]["application/json"];
 export type StartSandboxProfileInstanceOutput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["responses"]["200"]["content"]["application/json"];
+export type CompileSandboxProfileVersionRuntimePlanInput =
+  paths["/internal/sandbox-runtime/compile-profile-version-runtime-plan"]["post"]["requestBody"]["content"]["application/json"];
+export type CompileSandboxProfileVersionRuntimePlanOutput =
+  paths["/internal/sandbox-runtime/compile-profile-version-runtime-plan"]["post"]["responses"]["200"]["content"]["application/json"];
 export type GetSandboxInstanceInput =
   paths["/internal/sandbox-runtime/get-sandbox-instance"]["post"]["requestBody"]["content"]["application/json"];
 export type GetSandboxInstanceOutput =
@@ -238,6 +242,28 @@ export class ControlPlaneInternalClient {
     throw new Error(
       `Control-plane internal sandbox start failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
+  }
+
+  async compileSandboxProfileVersionRuntimePlan(
+    input: CompileSandboxProfileVersionRuntimePlanInput,
+  ): Promise<CompileSandboxProfileVersionRuntimePlanOutput> {
+    const result = await this.#client.POST(
+      "/internal/sandbox-runtime/compile-profile-version-runtime-plan",
+      {
+        body: input,
+        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+      },
+    );
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new ControlPlaneInternalClientRequestError({
+      status: result.response.status,
+      code: extractErrorCode(result.error),
+      message: `Control-plane internal runtime plan compile failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    });
   }
 
   async mintSandboxConnectionToken(

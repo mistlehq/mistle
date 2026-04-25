@@ -20,7 +20,8 @@ export const route = createRoute({
   },
   responses: {
     200: {
-      description: "Publish the specified sandbox profile draft version and make it active.",
+      description:
+        "Publish the specified sandbox profile draft version and queue snapshot materialization.",
       content: {
         "application/json": {
           schema: publishSandboxProfileVersionResponseSchema,

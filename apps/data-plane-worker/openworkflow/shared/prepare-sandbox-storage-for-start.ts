@@ -6,6 +6,7 @@ import {
 } from "@mistle/db/data-plane";
 import {
   type SandboxAdapter,
+  type SandboxImageHandle,
   type SandboxProvider,
   SandboxProvider as SandboxProviderIds,
   type SandboxStorageBackend,
@@ -15,6 +16,17 @@ import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-re
 
 import type { DataPlaneWorkerConfig } from "../core/config.js";
 import { createSandboxStorageBackendAdapter } from "./sandbox-storage/create-sandbox-storage-backend-adapter.js";
+
+function toSandboxImageHandle(input: {
+  image: StartSandboxInstanceWorkflowImageInput;
+  provider: SandboxProvider;
+}): SandboxImageHandle {
+  return {
+    provider: input.provider,
+    imageId: input.image.imageId,
+    createdAt: input.image.createdAt ?? new Date().toISOString(),
+  };
+}
 
 export async function prepareSandboxStorageForStart(
   ctx: {
@@ -46,10 +58,10 @@ export async function prepareSandboxStorageForStart(
   if (input.runtimeProvider !== SandboxProviderIds.DOCKER) {
     return ctx.sandboxAdapter.prepareStorageForStart({
       sandboxInstanceId: input.sandboxInstanceId,
-      image: {
-        ...input.image,
+      image: toSandboxImageHandle({
+        image: input.image,
         provider: input.runtimeProvider,
-      },
+      }),
     });
   }
 
@@ -67,10 +79,10 @@ export async function prepareSandboxStorageForStart(
 
   return ctx.sandboxAdapter.prepareStorageForStart({
     sandboxInstanceId: input.sandboxInstanceId,
-    image: {
-      ...input.image,
+    image: toSandboxImageHandle({
+      image: input.image,
       provider: input.runtimeProvider,
-    },
+    }),
     storage: resolvedStorage,
   });
 }

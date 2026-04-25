@@ -7,6 +7,7 @@ import {
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
+  SandboxProfileVersionStates,
   userExternalPrincipalCredentialSecrets,
   UserExternalPrincipalCredentialSecretKinds,
   userExternalPrincipalCredentials,
@@ -30,6 +31,7 @@ import {
 } from "../src/lib/crypto.js";
 import {
   StartSandboxProfileInstanceBadRequestResponseSchema,
+  StartSandboxProfileInstanceConflictResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
   StartSandboxProfileInstanceResponseSchema,
 } from "../src/sandbox-profiles/index.js";
@@ -43,6 +45,14 @@ const StartWorkflowName = "data-plane.sandbox-instances.start";
 const WorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   actingUserId: z.string().min(1).optional(),
+  image: z
+    .object({
+      imageId: z.string().min(1),
+      createdAt: z.iso.datetime().optional(),
+      kind: z.enum(["base", "snapshot"]),
+    })
+    .strict()
+    .optional(),
   runtimePlan: CompiledRuntimePlanSchema,
   gitIdentity: z
     .object({
@@ -192,6 +202,42 @@ describe("sandbox profile version start instance integration", () => {
     expect(body.code).toBe("PROFILE_VERSION_NOT_FOUND");
   });
 
+  it("returns 409 when a published version does not yet have a usable snapshot", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-start-instance-not-usable@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_start_instance_not_usable",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Not Usable Profile",
+      status: "active",
+      activeVersion: null,
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_start_instance_not_usable",
+      version: 1,
+      state: SandboxProfileVersionStates.PUBLISHED,
+      publishedAt: "2026-04-24T00:00:00.000Z",
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_start_instance_not_usable/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+    expect(response.status).toBe(409);
+
+    const body = StartSandboxProfileInstanceConflictResponseSchema.parse(await response.json());
+    expect(body.code).toBe("PROFILE_VERSION_NOT_USABLE");
+  });
+
   it("returns 400 when compile preflight fails", async ({ fixture }) => {
     const targetKey = "openai-start-instance-preflight";
     const authenticatedSession = await fixture.authSession({
@@ -210,6 +256,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_compile_error",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(integrationTargets).values({
       targetKey,
@@ -279,6 +326,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_missing_agent_binding",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
 
     const response = await fixture.request(
@@ -298,6 +346,110 @@ describe("sandbox profile version start instance integration", () => {
     }
     expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
   });
+
+  it("queues launches for usable published versions from the stored snapshot image", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_start_instance_snapshot_launch",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-start-instance-snapshot-launch@example.com",
+      });
+
+      await fixture.db.insert(sandboxProfiles).values({
+        id: "sbp_start_instance_snapshot_launch",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Snapshot Launch Profile",
+        status: "active",
+        activeVersion: 1,
+      });
+      await fixture.db.insert(sandboxProfileVersions).values({
+        sandboxProfileId: "sbp_start_instance_snapshot_launch",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-04-24T00:00:00.000Z",
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:snapshot-launch-image",
+      });
+      await fixture.db.insert(integrationTargets).values({
+        targetKey: "openai-start-instance-snapshot-launch",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+          binding_capabilities_by_connection_method:
+            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+        },
+      });
+      await fixture.db.insert(integrationConnections).values({
+        id: "icn_start_instance_snapshot_launch",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-start-instance-snapshot-launch",
+        displayName: "Snapshot Launch Agent Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      });
+      await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+        id: "ibd_start_instance_snapshot_launch",
+        sandboxProfileId: "sbp_start_instance_snapshot_launch",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_start_instance_snapshot_launch",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {
+              reasoningEffort: "medium",
+            },
+          },
+        },
+      });
+
+      const response = await fixture.request(
+        "/v1/sandbox/profiles/sbp_start_instance_snapshot_launch/versions/1/instances",
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+        },
+      );
+      expect(response.status).toBe(201);
+
+      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: body.sandboxInstanceId,
+      });
+
+      expect(queuedWorkflowInput.image).toEqual({
+        imageId: "sha256:snapshot-launch-image",
+        kind: "snapshot",
+      });
+      expect(queuedWorkflowInput.runtimePlan.image).toEqual({
+        source: "snapshot",
+        imageRef: "sha256:snapshot-launch-image",
+      });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
 
   it("starts the session in the selected primary repository", async ({ fixture }) => {
     const dataPlaneFixture = await createDisposableDataPlaneRuntime({
@@ -322,6 +474,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_primary_repository",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(integrationTargets).values([
       {
@@ -460,6 +613,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_workspace_root",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai-start-instance-workspace-root",
@@ -559,6 +713,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_git_identity",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(integrationTargets).values([
       {
@@ -727,6 +882,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_invalid_primary_repository",
       version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
     });
     await fixture.db.insert(integrationTargets).values([
       {

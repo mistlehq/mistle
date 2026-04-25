@@ -40,6 +40,7 @@ export async function startProfileInstance(
       db,
       integrationsConfig,
       dataPlaneClient,
+      defaultBaseImage,
     },
     {
       organizationId: input.organizationId,
@@ -51,10 +52,6 @@ export async function startProfileInstance(
       startedBy: input.startedBy,
       ...(input.actingUser === undefined ? {} : { actingUser: input.actingUser }),
       source: input.source,
-      image: {
-        imageId: defaultBaseImage,
-        createdAt: new Date().toISOString(),
-      },
     },
   );
 }

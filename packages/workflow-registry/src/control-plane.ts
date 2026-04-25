@@ -1,7 +1,8 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { CompiledRuntimePlan } from "@mistle/integrations-core";
-import type { SandboxImageHandle } from "@mistle/sandbox";
 import { defineWorkflowSpec } from "openworkflow";
+
+import type { StartSandboxInstanceWorkflowImageInput } from "./data-plane.js";
 
 export type OTPVerificationType = "sign-in" | "email-verification" | "forget-password";
 
@@ -76,11 +77,6 @@ export const StartSandboxProfileInstanceWorkflowName =
   "control-plane.sandbox-instances.start-profile-instance";
 export const StartSandboxProfileInstanceWorkflowVersion = "1";
 
-export type StartSandboxProfileInstanceWorkflowImageInput = Pick<
-  SandboxImageHandle,
-  "imageId" | "createdAt"
->;
-
 export type StartSandboxProfileInstanceWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
@@ -91,7 +87,7 @@ export type StartSandboxProfileInstanceWorkflowInput = {
     id: string;
   };
   source: SandboxInstanceSource;
-  image: StartSandboxProfileInstanceWorkflowImageInput;
+  image: StartSandboxInstanceWorkflowImageInput;
 };
 
 export type StartSandboxProfileInstanceWorkflowOutput = {

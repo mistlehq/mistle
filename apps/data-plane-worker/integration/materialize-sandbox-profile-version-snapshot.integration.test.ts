@@ -33,7 +33,6 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import {
   createSandboxAdapter,
   createSandboxRuntimeControl,
@@ -280,27 +279,6 @@ function createWorkerRuntimeConfig(input: {
   });
 }
 
-function createRuntimePlan(input: {
-  sandboxProfileId: string;
-  marker: string;
-  setupScript?: string;
-}): CompiledRuntimePlan {
-  return {
-    sandboxProfileId: input.sandboxProfileId,
-    version: 1,
-    image: {
-      source: "base",
-      imageRef: SandboxBaseImageReference,
-    },
-    setupScript: input.setupScript ?? `printf '%s' '${input.marker}' > '${SnapshotMarkerPath}'`,
-    egressRoutes: [],
-    artifacts: [],
-    workspaceSources: [],
-    runtimeClients: [],
-    agentRuntimes: [],
-  };
-}
-
 function createInlineStepApi(): SnapshotWorkflowStepRunner {
   return {
     run: async (_config, fn) => await fn(),
@@ -454,6 +432,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: new Date().toISOString(),
+        setupScript: `printf '%s' '${marker}' > '${SnapshotMarkerPath}'`,
       });
       await controlPlaneDb.insert(sandboxProfileVersionSnapshotJobs).values({
         id: snapshotJobId,
@@ -493,13 +472,10 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
             organizationId,
             sandboxProfileId,
             sandboxProfileVersion: 1,
-            runtimePlan: createRuntimePlan({
-              sandboxProfileId,
-              marker,
-            }),
             image: {
               imageId: requireSandboxBaseImageId(),
               createdAt: new Date().toISOString(),
+              kind: "base",
             },
           },
           workflowRunId,
@@ -584,6 +560,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: new Date().toISOString(),
+        setupScript: `printf '%s' '${marker}' > '${SnapshotMarkerPath}'`,
       });
       await controlPlaneDb.insert(sandboxProfileVersionSnapshotJobs).values({
         id: snapshotJobId,
@@ -616,13 +593,10 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
             organizationId,
             sandboxProfileId,
             sandboxProfileVersion: 1,
-            runtimePlan: createRuntimePlan({
-              sandboxProfileId,
-              marker,
-            }),
             image: {
               imageId: requireSandboxBaseImageId(),
               createdAt: new Date().toISOString(),
+              kind: "base",
             },
           },
           workflowRunId,
@@ -747,7 +721,6 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
       const snapshotJobId = `ssj_snapshot_init_failure_${randomUUID()}`;
       const sandboxInstanceId = `sbi_snapshot_init_failure_${randomUUID()}`;
       const workflowRunId = `wr_snapshot_init_failure_${randomUUID()}`;
-      const marker = `snapshot-init-failure-${randomUUID()}`;
 
       await controlPlaneDb.insert(organizations).values({
         id: organizationId,
@@ -764,6 +737,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: new Date().toISOString(),
+        setupScript: "exit 17",
       });
       await controlPlaneDb.insert(sandboxProfileVersionSnapshotJobs).values({
         id: snapshotJobId,
@@ -797,14 +771,10 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
               organizationId,
               sandboxProfileId,
               sandboxProfileVersion: 1,
-              runtimePlan: createRuntimePlan({
-                sandboxProfileId,
-                marker,
-                setupScript: "exit 17",
-              }),
               image: {
                 imageId: requireSandboxBaseImageId(),
                 createdAt: new Date().toISOString(),
+                kind: "base",
               },
             },
             workflowRunId,

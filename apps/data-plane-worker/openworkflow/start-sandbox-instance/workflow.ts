@@ -17,7 +17,7 @@ import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
-import { SandboxStartupModes } from "./sandbox-startup-input.js";
+import { SandboxExecutionModes, SandboxStartupModes } from "./sandbox-startup-input.js";
 import { startSandbox } from "./start-sandbox.js";
 import { waitForSandboxRuntimeReadiness } from "./wait-for-sandbox-runtime-readiness.js";
 
@@ -520,6 +520,9 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
             providerSandboxId: startedSandbox.providerSandboxId,
             startupMode: SandboxStartupModes.NEW,
+            ...(workflowInput.image.kind === "snapshot"
+              ? { executionMode: SandboxExecutionModes.SNAPSHOT_LAUNCH }
+              : {}),
             runtimePlan: workflowInput.runtimePlan,
             ...(workflowInput.actingUserId === undefined
               ? {}

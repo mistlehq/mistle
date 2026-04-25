@@ -139,6 +139,7 @@ describe("sandboxInstances.start integration", () => {
       image: {
         imageId: "im_dp_api_integration_001",
         createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
       },
     };
 
@@ -207,6 +208,7 @@ describe("sandboxInstances.start integration", () => {
       image: {
         imageId: "im_dp_api_integration_idempotent",
         createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
       },
     };
 
@@ -261,6 +263,7 @@ describe("sandboxInstances.start integration", () => {
       image: {
         imageId: "im_dp_api_sync_insert",
         createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
       },
     };
 
@@ -330,6 +333,7 @@ describe("sandboxInstances.start integration", () => {
       image: {
         imageId: "im_dp_api_persistent_mode",
         createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
       },
     };
 
@@ -440,6 +444,7 @@ describe("sandboxInstances.start integration", () => {
         image: {
           imageId: "im_dp_api_e2b_archil_persistent_mode",
           createdAt: "2026-02-27T00:00:00.000Z",
+          kind: "base",
         },
       };
 
@@ -553,6 +558,7 @@ describe("sandboxInstances.start integration", () => {
         image: {
           imageId: "im_dp_api_persistent_without_backend",
           createdAt: "2026-02-27T00:00:00.000Z",
+          kind: "base",
         },
       };
 

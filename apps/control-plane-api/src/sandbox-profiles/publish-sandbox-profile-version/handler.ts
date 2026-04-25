@@ -11,11 +11,15 @@ const routeHandler = async (
   { session }: AppSession,
 ) => {
   const db = ctx.get("db");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
+  const sandboxConfig = ctx.get("sandboxConfig");
   const { profileId, version } = ctx.req.valid("param");
 
   const response = await publishProfileVersion(
     {
       db,
+      dataPlaneClient,
+      defaultBaseImage: sandboxConfig.defaultBaseImage,
     },
     {
       organizationId: session.activeOrganizationId,
