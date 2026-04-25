@@ -177,6 +177,74 @@ describe("sandbox profile versions list integration", () => {
     ]);
   }, 60_000);
 
+  it("returns failed initial materialization state for published versions without a usable snapshot", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-versions-list-failed-materialization@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      ...createSandboxProfileFixture({
+        id: "sbp_versions_list_failed_materialization_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Failed Materialization Profile",
+        activeVersion: null,
+        createdAt: "2026-03-03T00:00:00.000Z",
+      }),
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      ...createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_versions_list_failed_materialization_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+      }),
+    });
+    await fixture.db.insert(sandboxProfileVersionSnapshotJobs).values({
+      id: "ssj_versions_list_failed_materialization_publish",
+      sandboxProfileId: "sbp_versions_list_failed_materialization_001",
+      sandboxProfileVersion: 1,
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.FAILED,
+      errorCode: "snapshot_materialization_failed",
+      errorMessage: "Snapshot materialization failed.",
+      createdAt: "2026-03-03T00:01:00.000Z",
+      startedAt: "2026-03-03T00:01:05.000Z",
+      finishedAt: "2026-03-03T00:01:30.000Z",
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_versions_list_failed_materialization_001/versions",
+      {
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = ListSandboxProfileVersionsResponseSchema.parse(await response.json());
+    expect(responseBody.versions).toEqual([
+      {
+        sandboxProfileId: "sbp_versions_list_failed_materialization_001",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        isActive: false,
+        usable: false,
+        latestSnapshotJob: {
+          id: "ssj_versions_list_failed_materialization_publish",
+          trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+          state: SandboxProfileVersionSnapshotJobStates.FAILED,
+          errorCode: "snapshot_materialization_failed",
+          errorMessage: "Snapshot materialization failed.",
+          createdAt: "2026-03-03 00:01:00+00",
+          startedAt: "2026-03-03 00:01:05+00",
+          finishedAt: "2026-03-03 00:01:30+00",
+        },
+      },
+    ]);
+  }, 60_000);
+
   it("returns 404 when profile is outside authenticated organization", async ({ fixture }) => {
     const firstOrgSession = await fixture.authSession({
       email: "integration-sandbox-profile-versions-list-org-a@example.com",

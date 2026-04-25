@@ -39,14 +39,16 @@ function createSandboxProfileVersionFixture(input: {
   version: number;
   state: SandboxProfileVersion["state"];
   isActive: boolean;
+  usable?: boolean;
+  latestSnapshotJob?: SandboxProfileVersion["latestSnapshotJob"];
 }): SandboxProfileVersion {
   return {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state,
     isActive: input.isActive,
-    usable: input.state === "published",
-    latestSnapshotJob: null,
+    usable: input.usable ?? input.state === "published",
+    latestSnapshotJob: input.latestSnapshotJob ?? null,
   };
 }
 
