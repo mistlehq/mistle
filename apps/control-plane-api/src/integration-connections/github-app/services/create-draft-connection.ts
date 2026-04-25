@@ -17,7 +17,7 @@ import {
 import { buildIntegrationConnectionResponse } from "../../services/build-integration-connection-response.js";
 import { ensureImplicitConnectionWebhookSource } from "../../services/webhook-sources.js";
 
-export type CreateGitHubAppDraftConnectionInput = {
+type CreateGitHubAppDraftConnectionInput = {
   organizationId: string;
   targetKey: string;
   displayName: string;

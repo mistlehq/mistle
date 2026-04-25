@@ -23,7 +23,7 @@ import {
   parseGitHubTargetConfigOrThrow,
 } from "./installation-config.js";
 
-export type StartGitHubAppInstallationConnectionInput = {
+type StartGitHubAppInstallationConnectionInput = {
   organizationId: string;
   connectionId: string;
 };

@@ -22,7 +22,7 @@ import {
   parseGitHubTargetConfigOrThrow,
 } from "./installation-config.js";
 
-export type GitHubAppManifestOwner =
+type GitHubAppManifestOwner =
   | {
       kind: "personal";
     }
@@ -31,7 +31,7 @@ export type GitHubAppManifestOwner =
       organizationSlug: string;
     };
 
-export type StartGitHubAppManifestConnectionInput = {
+type StartGitHubAppManifestConnectionInput = {
   organizationId: string;
   connectionId: string;
   controlPlaneBaseUrl: string;
