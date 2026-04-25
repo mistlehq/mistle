@@ -293,7 +293,6 @@ function buildGitHubExistingAppSetupSecrets(input: {
 function getGitHubExistingAppSetupFieldValidationMessage(input: {
   fieldKey: GitHubExistingAppSetupFieldKey;
   draft: GitHubExistingAppSetupDraft;
-  savedDraft: GitHubExistingAppSetupDraft;
 }): string | null {
   const normalizedValue = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
 
@@ -1123,7 +1122,6 @@ export function GitHubAppSetupPane(input: {
     const validationMessage = getGitHubExistingAppSetupFieldValidationMessage({
       fieldKey,
       draft: currentDraft,
-      savedDraft,
     });
     if (validationMessage !== null) {
       setFieldStates((currentFieldStates) => ({
