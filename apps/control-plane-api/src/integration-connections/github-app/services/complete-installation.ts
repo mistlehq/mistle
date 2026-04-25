@@ -10,7 +10,7 @@ import {
 } from "@mistle/integrations-core";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
 import { parseGitHubAppInstallationConnectionConfig } from "@mistle/integrations-definitions";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -31,13 +31,6 @@ type CompleteGitHubAppInstallationConnectionInput = {
 type CompletedConnection = {
   id: string;
   targetKey: string;
-  displayName: string;
-  status: "active" | "error" | "revoked";
-  externalSubjectId?: string;
-  config?: Record<string, unknown>;
-  targetSnapshotConfig?: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
 };
 
 function toUnknownRecord(value: unknown): Record<string, unknown> | null {
@@ -196,11 +189,10 @@ export async function completeGitHubAppInstallationConnection(
   });
 
   return db.transaction(async (tx) => {
-    const usedAtTimestamp = new Date().toISOString();
     const consumedSessionRows = await tx
       .update(integrationConnectionRedirectSessions)
       .set({
-        usedAt: usedAtTimestamp,
+        usedAt: sql`now()`,
       })
       .where(
         and(
@@ -270,17 +262,6 @@ export async function completeGitHubAppInstallationConnection(
     return {
       id: updatedConnection.id,
       targetKey: updatedConnection.targetKey,
-      displayName: updatedConnection.displayName,
-      status: updatedConnection.status,
-      ...(updatedConnection.externalSubjectId === null
-        ? {}
-        : { externalSubjectId: updatedConnection.externalSubjectId }),
-      ...(updatedConnection.config === null ? {} : { config: updatedConnection.config }),
-      ...(updatedConnection.targetSnapshotConfig === null
-        ? {}
-        : { targetSnapshotConfig: updatedConnection.targetSnapshotConfig }),
-      createdAt: updatedConnection.createdAt,
-      updatedAt: updatedConnection.updatedAt,
     };
   });
 }

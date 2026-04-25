@@ -964,6 +964,7 @@ export function GitHubAppSetupPane(input: {
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
   const webhookSourcesQuery = useQuery({
+    enabled: setupMode === "existing-app",
     queryKey: ["integration-webhook-sources", input.connection.id],
     queryFn: async ({ signal }) =>
       listIntegrationWebhookSources({
