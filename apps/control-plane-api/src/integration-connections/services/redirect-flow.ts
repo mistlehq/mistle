@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import {
   type ControlPlaneDatabase,
   type IntegrationConnectionRedirectSession,
+  integrationConnectionRedirectSessions,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 
@@ -15,6 +16,42 @@ export function createRedirectState(): string {
 
 export function createRedirectSessionExpiryTimestamp(): string {
   return new Date(Date.now() + REDIRECT_SESSION_TTL_MS).toISOString();
+}
+
+export async function persistRedirectSessionOrThrow(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  targetKey: string;
+  state: string;
+  expiresAt: string;
+  failureMessage: string;
+  pkceVerifierEncrypted?: string;
+  providerStateEncrypted?: string;
+}): Promise<void> {
+  const insertedRows = await input.db
+    .insert(integrationConnectionRedirectSessions)
+    .values({
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      state: input.state,
+      expiresAt: input.expiresAt,
+      ...(input.pkceVerifierEncrypted === undefined
+        ? {}
+        : { pkceVerifierEncrypted: input.pkceVerifierEncrypted }),
+      ...(input.providerStateEncrypted === undefined
+        ? {}
+        : { providerStateEncrypted: input.providerStateEncrypted }),
+    })
+    .onConflictDoNothing({
+      target: integrationConnectionRedirectSessions.state,
+    })
+    .returning({
+      id: integrationConnectionRedirectSessions.id,
+    });
+
+  if (insertedRows.length !== 1) {
+    throw new Error(input.failureMessage);
+  }
 }
 
 export function encodeRedirectStateMetadata(input: {

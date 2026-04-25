@@ -1,9 +1,6 @@
 import { createHash } from "node:crypto";
 
-import {
-  integrationConnectionRedirectSessions,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
@@ -16,6 +13,7 @@ import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeRedirectStateMetadata,
+  persistRedirectSessionOrThrow,
 } from "./redirect-flow.js";
 import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
@@ -98,39 +96,6 @@ function createPkceChallenge(verifier: string): string {
   return createHash("sha256").update(verifier, "utf8").digest("base64url");
 }
 
-async function persistRedirectSession(input: {
-  db: ControlPlaneDatabase;
-  organizationId: string;
-  targetKey: string;
-  state: string;
-  pkceVerifierEncrypted: string;
-  providerStateEncrypted?: string;
-  expiresAt: string;
-}): Promise<void> {
-  const insertedRows = await input.db
-    .insert(integrationConnectionRedirectSessions)
-    .values({
-      organizationId: input.organizationId,
-      targetKey: input.targetKey,
-      state: input.state,
-      pkceVerifierEncrypted: input.pkceVerifierEncrypted,
-      ...(input.providerStateEncrypted === undefined
-        ? {}
-        : { providerStateEncrypted: input.providerStateEncrypted }),
-      expiresAt: input.expiresAt,
-    })
-    .onConflictDoNothing({
-      target: integrationConnectionRedirectSessions.state,
-    })
-    .returning({
-      id: integrationConnectionRedirectSessions.id,
-    });
-
-  if (insertedRows.length !== 1) {
-    throw new Error("Failed to persist OAuth 2.0 (Authorization Code) redirect session state.");
-  }
-}
-
 export async function startOAuth2AuthorizationCodeConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -202,7 +167,7 @@ export async function startOAuth2AuthorizationCodeConnection(
           masterEncryptionKeyMaterial,
         });
 
-  await persistRedirectSession({
+  await persistRedirectSessionOrThrow({
     db,
     organizationId: input.organizationId,
     targetKey: input.targetKey,
@@ -210,6 +175,7 @@ export async function startOAuth2AuthorizationCodeConnection(
     pkceVerifierEncrypted,
     ...(providerStateEncrypted === undefined ? {} : { providerStateEncrypted }),
     expiresAt: createRedirectSessionExpiryTimestamp(),
+    failureMessage: "Failed to persist OAuth 2.0 (Authorization Code) redirect session state.",
   });
 
   return {

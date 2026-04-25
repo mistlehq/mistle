@@ -1,7 +1,4 @@
-import {
-  integrationConnectionRedirectSessions,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
@@ -13,6 +10,7 @@ import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeGitHubAppManifestStateMetadata,
+  persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import { buildUrlWithPath } from "../../services/url-path.js";
 import {
@@ -88,33 +86,6 @@ function buildGitHubAppManifest(input: {
       "/p/integration/callbacks/github-app-installation",
     ),
   };
-}
-
-async function persistRedirectSession(input: {
-  db: ControlPlaneDatabase;
-  organizationId: string;
-  targetKey: string;
-  state: string;
-  expiresAt: string;
-}): Promise<void> {
-  const insertedRows = await input.db
-    .insert(integrationConnectionRedirectSessions)
-    .values({
-      organizationId: input.organizationId,
-      targetKey: input.targetKey,
-      state: input.state,
-      expiresAt: input.expiresAt,
-    })
-    .onConflictDoNothing({
-      target: integrationConnectionRedirectSessions.state,
-    })
-    .returning({
-      id: integrationConnectionRedirectSessions.id,
-    });
-
-  if (insertedRows.length !== 1) {
-    throw new Error("Failed to persist GitHub App manifest redirect session state.");
-  }
 }
 
 export async function startGitHubAppManifestConnection(
@@ -212,12 +183,13 @@ export async function startGitHubAppManifestConnection(
     state: createRedirectState(),
     connectionId: connection.id,
   });
-  await persistRedirectSession({
+  await persistRedirectSessionOrThrow({
     db: ctx.db,
     organizationId: input.organizationId,
     targetKey: connection.targetKey,
     state,
     expiresAt: createRedirectSessionExpiryTimestamp(),
+    failureMessage: "Failed to persist GitHub App manifest redirect session state.",
   });
 
   const manifest = buildGitHubAppManifest({

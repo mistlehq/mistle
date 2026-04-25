@@ -1,7 +1,4 @@
-import {
-  integrationConnectionRedirectSessions,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
@@ -17,6 +14,7 @@ import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeGitHubAppInstallationStateMetadata,
+  persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
   resolveConnectionSecretsOrThrow,
@@ -32,33 +30,6 @@ export type StartGitHubAppInstallationConnectionInput = {
 type StartedGitHubAppInstallationConnection = {
   authorizationUrl: string;
 };
-
-async function persistRedirectSession(input: {
-  db: ControlPlaneDatabase;
-  organizationId: string;
-  targetKey: string;
-  state: string;
-  expiresAt: string;
-}): Promise<void> {
-  const insertedRows = await input.db
-    .insert(integrationConnectionRedirectSessions)
-    .values({
-      organizationId: input.organizationId,
-      targetKey: input.targetKey,
-      state: input.state,
-      expiresAt: input.expiresAt,
-    })
-    .onConflictDoNothing({
-      target: integrationConnectionRedirectSessions.state,
-    })
-    .returning({
-      id: integrationConnectionRedirectSessions.id,
-    });
-
-  if (insertedRows.length !== 1) {
-    throw new Error("Failed to persist redirect session state.");
-  }
-}
 
 function buildGitHubAppInstallationUrl(input: {
   appSlug: string;
@@ -146,12 +117,13 @@ export async function startGitHubAppInstallationConnection(
     connectionId: connection.id,
   });
 
-  await persistRedirectSession({
+  await persistRedirectSessionOrThrow({
     db,
     organizationId: input.organizationId,
     targetKey: connection.targetKey,
     state,
     expiresAt: createRedirectSessionExpiryTimestamp(),
+    failureMessage: "Failed to persist redirect session state.",
   });
 
   return {
