@@ -123,15 +123,6 @@ function createGitHubTargetFixture(): IntegrationTarget {
         };
       }
 
-      if (method.kind === "redirect") {
-        return {
-          id: method.id,
-          label: method.label,
-          kind: method.kind,
-          ui: method.ui,
-        };
-      }
-
       return {
         id: method.id,
         label: method.label,
