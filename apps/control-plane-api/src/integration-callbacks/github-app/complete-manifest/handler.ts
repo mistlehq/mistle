@@ -1,9 +1,9 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { buildDashboardUrl } from "../../lib/dashboard-url.js";
-import type { AppContextBindings } from "../../types.js";
-import { completeGitHubAppManifestConnection } from "../services/complete-github-app-manifest-connection.js";
+import { completeGitHubAppManifestConnection } from "../../../integration-connections/github-app/services/complete-manifest.js";
+import { buildDashboardUrl } from "../../../lib/dashboard-url.js";
+import type { AppContextBindings } from "../../../types.js";
 import { route } from "./route.js";
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {

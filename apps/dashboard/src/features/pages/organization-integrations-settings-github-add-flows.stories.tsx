@@ -25,7 +25,7 @@ import type {
 } from "../integrations/integrations-service.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
-import { IntegrationConnectionGitHubManualSetupPage } from "./integration-connection-github-manual-setup-page.js";
+import { IntegrationConnectionGitHubAppSetupPage } from "./integration-connection-github-app-setup-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -48,8 +48,8 @@ const StoryIntegrationCreateHandle = {
   ...ROUTE_HANDLES.integrationCreate,
   description: "",
 } as const;
-const StoryIntegrationGitHubManualSetupHandle = {
-  ...ROUTE_HANDLES.integrationGitHubManualSetup,
+const StoryIntegrationGitHubAppSetupHandle = {
+  ...ROUTE_HANDLES.integrationGitHubAppSetup,
   description: "",
 } as const;
 
@@ -395,7 +395,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
   );
 }
 
-function GitHubManualSetupPageStory(input: {
+function GitHubAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
   webhookSources: readonly IntegrationWebhookSource[];
@@ -414,8 +414,8 @@ function GitHubManualSetupPageStory(input: {
           <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
-                element={<IntegrationConnectionGitHubManualSetupPage />}
-                handle={StoryIntegrationGitHubManualSetupHandle}
+                element={<IntegrationConnectionGitHubAppSetupPage />}
+                handle={StoryIntegrationGitHubAppSetupHandle}
                 path=":connectionId/github-app/setup"
               />
             </Route>
@@ -484,7 +484,7 @@ export const AddConnection: PageStory = {
 export const SetupDraftWithManifest: PageStory = {
   render: function RenderStory() {
     return (
-      <GitHubManualSetupPageStory
+      <GitHubAppSetupPageStory
         connection={createDraftGitHubConnection()}
         webhookSources={[createWebhookSourceFixture()]}
       />
@@ -492,10 +492,10 @@ export const SetupDraftWithManifest: PageStory = {
   },
 };
 
-export const SetupDraftManually: PageStory = {
+export const SetupDraftWithExistingApp: PageStory = {
   render: function RenderStory() {
     return (
-      <GitHubManualSetupPageStory
+      <GitHubAppSetupPageStory
         connection={createDraftGitHubConnection({
           config: {
             app_id: "12345",
@@ -512,7 +512,7 @@ export const SetupDraftManually: PageStory = {
 export const SetupDraftReadyToInstall: PageStory = {
   render: function RenderStory() {
     return (
-      <GitHubManualSetupPageStory
+      <GitHubAppSetupPageStory
         connection={createDraftGitHubConnection({
           config: {
             app_id: "12345",
@@ -530,7 +530,7 @@ export const SetupDraftReadyToInstall: PageStory = {
 export const ManifestCreationSuccess: PageStory = {
   render: function RenderStory() {
     return (
-      <GitHubManualSetupPageStory
+      <GitHubAppSetupPageStory
         connection={createDraftGitHubConnection({
           config: {
             app_id: "12345",

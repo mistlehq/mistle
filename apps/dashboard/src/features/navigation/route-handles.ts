@@ -114,7 +114,7 @@ function resolveIntegrationEditTitle(input: RouteTextResolverInput): string {
   return `Edit ${resolveIntegrationDetailTitle(input)} Connection`;
 }
 
-function resolveGitHubManualSetupTitle(input: RouteTextResolverInput): string {
+function resolveGitHubAppSetupTitle(input: RouteTextResolverInput): string {
   return `Setup ${resolveIntegrationDetailTitle(input)} App`;
 }
 
@@ -202,10 +202,10 @@ export const ROUTE_HANDLES = {
       icon: resolveIntegrationDetailHeaderIcon,
     },
   },
-  integrationGitHubManualSetup: {
+  integrationGitHubAppSetup: {
     appShellInsetOwner: "child",
     breadcrumb: "Setup",
-    title: resolveGitHubManualSetupTitle,
+    title: resolveGitHubAppSetupTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,

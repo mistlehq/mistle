@@ -10,20 +10,20 @@ import {
 import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
-import type { AppContext } from "../../types.js";
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+import type { AppContext } from "../../../types.js";
+import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeGitHubAppManifestStateMetadata,
-} from "./redirect-flow.js";
-import { buildUrlWithPath } from "./url-path.js";
+} from "../../services/redirect-flow.js";
+import { buildUrlWithPath } from "../../services/url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
   resolveWebhookSourceCapabilityOrThrow,
-} from "./webhook-sources.js";
+} from "../../services/webhook-sources.js";
 
 export type GitHubAppManifestOwner =
   | {

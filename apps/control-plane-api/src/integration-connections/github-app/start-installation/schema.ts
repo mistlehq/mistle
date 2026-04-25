@@ -7,7 +7,7 @@ import {
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../constants.js";
+} from "../../constants.js";
 
 export const StartGitHubAppInstallationConnectionParamsSchema = z
   .object({

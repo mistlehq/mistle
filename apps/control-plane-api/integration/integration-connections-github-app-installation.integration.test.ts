@@ -13,15 +13,15 @@ import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
-} from "../src/integration-connections/complete-github-app-installation-connection/schema.js";
-import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
-import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+} from "../src/integration-callbacks/github-app/complete-installation/schema.js";
 import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
   StartGitHubAppInstallationConnectionNotFoundResponseSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
-} from "../src/integration-connections/start-github-app-installation-connection/schema.js";
-import { StartGitHubAppManifestConnectionResponseSchema } from "../src/integration-connections/start-github-app-manifest-connection/schema.js";
+} from "../src/integration-connections/github-app/start-installation/schema.js";
+import { StartGitHubAppManifestConnectionResponseSchema } from "../src/integration-connections/github-app/start-manifest/schema.js";
+import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
+import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";

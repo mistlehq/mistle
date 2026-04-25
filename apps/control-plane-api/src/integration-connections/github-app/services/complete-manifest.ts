@@ -18,25 +18,25 @@ import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../../lib/crypto.js";
-import type { AppContext } from "../../types.js";
+} from "../../../lib/crypto.js";
+import type { AppContext } from "../../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../constants.js";
+} from "../../constants.js";
 import {
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
-} from "./form-connection-methods.js";
+} from "../../services/form-connection-methods.js";
 import {
   createRedirectQueryParams,
   resolveGitHubAppManifestConnectionId,
-} from "./redirect-flow.js";
-import { buildUrlWithPath } from "./url-path.js";
+} from "../../services/redirect-flow.js";
+import { buildUrlWithPath } from "../../services/url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
-} from "./webhook-sources.js";
+} from "../../services/webhook-sources.js";
 
 type CompleteGitHubAppManifestConnectionInput = {
   query: Record<string, string>;

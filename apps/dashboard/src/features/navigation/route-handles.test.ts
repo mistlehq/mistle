@@ -16,10 +16,10 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.integrationCreate.description).toBe("function");
     expect(ROUTE_HANDLES.integrationCreate.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
-    expect(typeof ROUTE_HANDLES.integrationGitHubManualSetup.title).toBe("function");
-    expect(typeof ROUTE_HANDLES.integrationGitHubManualSetup.description).toBe("function");
-    expect(ROUTE_HANDLES.integrationGitHubManualSetup.header?.icon).toBeDefined();
-    expect(ROUTE_HANDLES.integrationGitHubManualSetup.appShellInsetOwner).toBe("child");
+    expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.title).toBe("function");
+    expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.description).toBe("function");
+    expect(ROUTE_HANDLES.integrationGitHubAppSetup.header?.icon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationGitHubAppSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
@@ -138,12 +138,12 @@ describe("route handles", () => {
     );
   });
 
-  it("resolves GitHub manual setup title from the target key", () => {
-    const setupTitle = ROUTE_HANDLES.integrationGitHubManualSetup.title;
+  it("resolves GitHub App setup title from the target key", () => {
+    const setupTitle = ROUTE_HANDLES.integrationGitHubAppSetup.title;
     expect(typeof setupTitle).toBe("function");
 
     if (typeof setupTitle !== "function") {
-      throw new Error("integrationGitHubManualSetup title must be a function");
+      throw new Error("integrationGitHubAppSetup title must be a function");
     }
 
     expect(setupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");

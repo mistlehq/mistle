@@ -50,7 +50,7 @@ import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/for
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
-type GitHubManualSetupDraft = {
+type GitHubExistingAppSetupDraft = {
   appId: string;
   appSlug: string;
   clientId: string;
@@ -59,8 +59,8 @@ type GitHubManualSetupDraft = {
   webhookSecret: string;
 };
 
-type GitHubManualSetupFieldKey = keyof GitHubManualSetupDraft;
-type GitHubAppSetupMode = "manifest" | "manual";
+type GitHubExistingAppSetupFieldKey = keyof GitHubExistingAppSetupDraft;
+type GitHubAppSetupMode = "manifest" | "existing-app";
 type GitHubManifestAppOwnerKind = "personal" | "organization";
 type GitHubManifestValidation =
   | {
@@ -71,7 +71,7 @@ type GitHubManifestValidation =
       status: "invalid";
     };
 
-const GitHubManualSetupRequiredFieldLabels = {
+const GitHubExistingAppSetupRequiredFieldLabels = {
   appId: "App ID",
   appSlug: "App slug",
   clientId: "Client ID",
@@ -80,30 +80,30 @@ const GitHubManualSetupRequiredFieldLabels = {
   webhookSecret: "Webhook secret",
 } as const;
 
-const GitHubManualSetupFieldKeys = [
+const GitHubExistingAppSetupFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubManualSetupFieldKey[];
+] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
 
-const GitHubManualSetupConfigFieldKeys = [
+const GitHubExistingAppSetupConfigFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
-] as const satisfies readonly GitHubManualSetupFieldKey[];
+] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
 
-type GitHubManualSetupConfigFieldKey = (typeof GitHubManualSetupConfigFieldKeys)[number];
+type GitHubExistingAppSetupConfigFieldKey = (typeof GitHubExistingAppSetupConfigFieldKeys)[number];
 
-const GitHubManualSetupSecretFieldKeys = [
+const GitHubExistingAppSetupSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubManualSetupFieldKey[];
+] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
 
-type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
+type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
 
 const GitHubDraftManifest = JSON.stringify(
   {
@@ -139,29 +139,29 @@ const GitHubDraftManifest = JSON.stringify(
   2,
 );
 
-type GitHubManualSetupTimeoutRefs = Record<
-  GitHubManualSetupFieldKey,
+type GitHubExistingAppSetupTimeoutRefs = Record<
+  GitHubExistingAppSetupFieldKey,
   {
     fadeStartTimeoutRef: { current: TimerHandle | null };
     fadeEndTimeoutRef: { current: TimerHandle | null };
   }
 >;
 
-function isGitHubManualSetupSecretFieldKey(
+function isGitHubExistingAppSetupSecretFieldKey(
   fieldKey: string,
-): fieldKey is GitHubManualSetupSecretFieldKey {
+): fieldKey is GitHubExistingAppSetupSecretFieldKey {
   return (
     fieldKey === "clientSecret" || fieldKey === "appPrivateKeyPem" || fieldKey === "webhookSecret"
   );
 }
 
-function isGitHubManualSetupConfigFieldKey(
-  fieldKey: GitHubManualSetupFieldKey,
-): fieldKey is GitHubManualSetupConfigFieldKey {
+function isGitHubExistingAppSetupConfigFieldKey(
+  fieldKey: GitHubExistingAppSetupFieldKey,
+): fieldKey is GitHubExistingAppSetupConfigFieldKey {
   return fieldKey === "appId" || fieldKey === "appSlug" || fieldKey === "clientId";
 }
 
-function createInitialDraft(connection: IntegrationConnection): GitHubManualSetupDraft {
+function createInitialDraft(connection: IntegrationConnection): GitHubExistingAppSetupDraft {
   const config = connection.config;
 
   return {
@@ -176,11 +176,11 @@ function createInitialDraft(connection: IntegrationConnection): GitHubManualSetu
 
 function resolveConfiguredSecretFieldKeys(
   connection: IntegrationConnection,
-): ReadonlySet<GitHubManualSetupSecretFieldKey> {
-  const configuredSecretFieldKeys = new Set<GitHubManualSetupSecretFieldKey>();
+): ReadonlySet<GitHubExistingAppSetupSecretFieldKey> {
+  const configuredSecretFieldKeys = new Set<GitHubExistingAppSetupSecretFieldKey>();
 
   for (const configuredSecretName of connection.configuredSecretNames ?? []) {
-    if (isGitHubManualSetupSecretFieldKey(configuredSecretName)) {
+    if (isGitHubExistingAppSetupSecretFieldKey(configuredSecretName)) {
       configuredSecretFieldKeys.add(configuredSecretName);
     }
   }
@@ -198,10 +198,10 @@ function hasConfiguredGitHubAppValues(connection: IntegrationConnection): boolea
 }
 
 function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
-  return hasConfiguredGitHubAppValues(connection) ? "manual" : "manifest";
+  return hasConfiguredGitHubAppValues(connection) ? "existing-app" : "manifest";
 }
 
-function createInitialFieldStates(): Record<GitHubManualSetupFieldKey, SavingFieldState> {
+function createInitialFieldStates(): Record<GitHubExistingAppSetupFieldKey, SavingFieldState> {
   return {
     appId: { status: "idle", errorMessage: null },
     appSlug: { status: "idle", errorMessage: null },
@@ -212,7 +212,7 @@ function createInitialFieldStates(): Record<GitHubManualSetupFieldKey, SavingFie
   };
 }
 
-function createFieldTimeoutRefs(): GitHubManualSetupTimeoutRefs {
+function createFieldTimeoutRefs(): GitHubExistingAppSetupTimeoutRefs {
   return {
     appId: {
       fadeStartTimeoutRef: { current: null },
@@ -241,92 +241,94 @@ function createFieldTimeoutRefs(): GitHubManualSetupTimeoutRefs {
   };
 }
 
-function normalizeGitHubManualSetupValue(value: string): string {
+function normalizeGitHubExistingAppSetupValue(value: string): string {
   return value.trim();
 }
 
-function hasRequiredGitHubSetupConfigValues(draft: GitHubManualSetupDraft): boolean {
+function hasRequiredGitHubSetupConfigValues(draft: GitHubExistingAppSetupDraft): boolean {
   return (
-    normalizeGitHubManualSetupValue(draft.appId).length > 0 &&
-    normalizeGitHubManualSetupValue(draft.appSlug).length > 0 &&
-    normalizeGitHubManualSetupValue(draft.clientId).length > 0
+    normalizeGitHubExistingAppSetupValue(draft.appId).length > 0 &&
+    normalizeGitHubExistingAppSetupValue(draft.appSlug).length > 0 &&
+    normalizeGitHubExistingAppSetupValue(draft.clientId).length > 0
   );
 }
 
-function buildGitHubManualSetupConfig(draft: GitHubManualSetupDraft): Record<string, string> {
+function buildGitHubExistingAppSetupConfig(
+  draft: GitHubExistingAppSetupDraft,
+): Record<string, string> {
   return {
     connection_method: "github-app-installation",
-    app_id: normalizeGitHubManualSetupValue(draft.appId),
-    app_slug: normalizeGitHubManualSetupValue(draft.appSlug),
-    ...(normalizeGitHubManualSetupValue(draft.clientId).length === 0
+    app_id: normalizeGitHubExistingAppSetupValue(draft.appId),
+    app_slug: normalizeGitHubExistingAppSetupValue(draft.appSlug),
+    ...(normalizeGitHubExistingAppSetupValue(draft.clientId).length === 0
       ? {}
-      : { client_id: normalizeGitHubManualSetupValue(draft.clientId) }),
+      : { client_id: normalizeGitHubExistingAppSetupValue(draft.clientId) }),
   };
 }
 
-function buildGitHubManualSetupSecrets(input: {
-  draft: GitHubManualSetupDraft;
-  fieldKey: GitHubManualSetupFieldKey;
+function buildGitHubExistingAppSetupSecrets(input: {
+  draft: GitHubExistingAppSetupDraft;
+  fieldKey: GitHubExistingAppSetupFieldKey;
 }): Record<string, string> | undefined {
   if (input.fieldKey === "clientSecret") {
-    const clientSecret = normalizeGitHubManualSetupValue(input.draft.clientSecret);
+    const clientSecret = normalizeGitHubExistingAppSetupValue(input.draft.clientSecret);
     return clientSecret.length === 0 ? undefined : { clientSecret };
   }
 
   if (input.fieldKey === "appPrivateKeyPem") {
     return {
-      appPrivateKeyPem: normalizeGitHubManualSetupValue(input.draft.appPrivateKeyPem),
+      appPrivateKeyPem: normalizeGitHubExistingAppSetupValue(input.draft.appPrivateKeyPem),
     };
   }
 
   if (input.fieldKey === "webhookSecret") {
     return {
-      webhookSecret: normalizeGitHubManualSetupValue(input.draft.webhookSecret),
+      webhookSecret: normalizeGitHubExistingAppSetupValue(input.draft.webhookSecret),
     };
   }
 
   return undefined;
 }
 
-function getGitHubManualSetupFieldValidationMessage(input: {
-  fieldKey: GitHubManualSetupFieldKey;
-  draft: GitHubManualSetupDraft;
-  savedDraft: GitHubManualSetupDraft;
+function getGitHubExistingAppSetupFieldValidationMessage(input: {
+  fieldKey: GitHubExistingAppSetupFieldKey;
+  draft: GitHubExistingAppSetupDraft;
+  savedDraft: GitHubExistingAppSetupDraft;
 }): string | null {
-  const normalizedValue = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
+  const normalizedValue = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
 
   if (input.fieldKey === "appId" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.appId} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.appId} is required.`;
   }
 
   if (input.fieldKey === "appSlug" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.appSlug} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.appSlug} is required.`;
   }
 
   if (input.fieldKey === "appPrivateKeyPem" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.appPrivateKeyPem} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.appPrivateKeyPem} is required.`;
   }
 
   if (input.fieldKey === "clientId" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.clientId} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.clientId} is required.`;
   }
 
   if (input.fieldKey === "clientSecret" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.clientSecret} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.clientSecret} is required.`;
   }
 
   if (input.fieldKey === "webhookSecret" && normalizedValue.length === 0) {
-    return `${GitHubManualSetupRequiredFieldLabels.webhookSecret} is required.`;
+    return `${GitHubExistingAppSetupRequiredFieldLabels.webhookSecret} is required.`;
   }
 
   return null;
 }
 
-function shouldPersistGitHubManualSetupField(input: {
-  fieldKey: GitHubManualSetupFieldKey;
-  draft: GitHubManualSetupDraft;
+function shouldPersistGitHubExistingAppSetupField(input: {
+  fieldKey: GitHubExistingAppSetupFieldKey;
+  draft: GitHubExistingAppSetupDraft;
 }): boolean {
-  if (isGitHubManualSetupConfigFieldKey(input.fieldKey)) {
+  if (isGitHubExistingAppSetupConfigFieldKey(input.fieldKey)) {
     return hasRequiredGitHubSetupConfigValues(input.draft);
   }
 
@@ -334,68 +336,74 @@ function shouldPersistGitHubManualSetupField(input: {
     return false;
   }
 
-  return normalizeGitHubManualSetupValue(input.draft[input.fieldKey]).length > 0;
+  return normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]).length > 0;
 }
 
 function buildNextSavedDraft(input: {
-  savedDraft: GitHubManualSetupDraft;
-  draft: GitHubManualSetupDraft;
-  fieldKey: GitHubManualSetupFieldKey;
-}): GitHubManualSetupDraft {
-  const nextSavedDraft: GitHubManualSetupDraft = {
+  savedDraft: GitHubExistingAppSetupDraft;
+  draft: GitHubExistingAppSetupDraft;
+  fieldKey: GitHubExistingAppSetupFieldKey;
+}): GitHubExistingAppSetupDraft {
+  const nextSavedDraft: GitHubExistingAppSetupDraft = {
     ...input.savedDraft,
   };
 
-  for (const configFieldKey of GitHubManualSetupConfigFieldKeys) {
-    nextSavedDraft[configFieldKey] = normalizeGitHubManualSetupValue(input.draft[configFieldKey]);
+  for (const configFieldKey of GitHubExistingAppSetupConfigFieldKeys) {
+    nextSavedDraft[configFieldKey] = normalizeGitHubExistingAppSetupValue(
+      input.draft[configFieldKey],
+    );
   }
 
-  if (isGitHubManualSetupSecretFieldKey(input.fieldKey)) {
-    nextSavedDraft[input.fieldKey] = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
+  if (isGitHubExistingAppSetupSecretFieldKey(input.fieldKey)) {
+    nextSavedDraft[input.fieldKey] = normalizeGitHubExistingAppSetupValue(
+      input.draft[input.fieldKey],
+    );
   }
 
   return nextSavedDraft;
 }
 
 function buildNextDraftAfterSave(input: {
-  draft: GitHubManualSetupDraft;
-  fieldKey: GitHubManualSetupFieldKey;
-}): GitHubManualSetupDraft {
-  const nextDraft: GitHubManualSetupDraft = {
+  draft: GitHubExistingAppSetupDraft;
+  fieldKey: GitHubExistingAppSetupFieldKey;
+}): GitHubExistingAppSetupDraft {
+  const nextDraft: GitHubExistingAppSetupDraft = {
     ...input.draft,
   };
 
-  for (const configFieldKey of GitHubManualSetupConfigFieldKeys) {
-    nextDraft[configFieldKey] = normalizeGitHubManualSetupValue(input.draft[configFieldKey]);
+  for (const configFieldKey of GitHubExistingAppSetupConfigFieldKeys) {
+    nextDraft[configFieldKey] = normalizeGitHubExistingAppSetupValue(input.draft[configFieldKey]);
   }
 
-  if (isGitHubManualSetupSecretFieldKey(input.fieldKey)) {
-    nextDraft[input.fieldKey] = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
+  if (isGitHubExistingAppSetupSecretFieldKey(input.fieldKey)) {
+    nextDraft[input.fieldKey] = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
   }
 
   return nextDraft;
 }
 
-function isGitHubManualSetupFieldDirty(input: {
-  fieldKey: GitHubManualSetupFieldKey;
-  draft: GitHubManualSetupDraft;
-  savedDraft: GitHubManualSetupDraft;
+function isGitHubExistingAppSetupFieldDirty(input: {
+  fieldKey: GitHubExistingAppSetupFieldKey;
+  draft: GitHubExistingAppSetupDraft;
+  savedDraft: GitHubExistingAppSetupDraft;
 }): boolean {
   return (
-    normalizeGitHubManualSetupValue(input.draft[input.fieldKey]) !==
-    normalizeGitHubManualSetupValue(input.savedDraft[input.fieldKey])
+    normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]) !==
+    normalizeGitHubExistingAppSetupValue(input.savedDraft[input.fieldKey])
   );
 }
 
-function isGitHubManualSetupFieldReadyForInstall(input: {
-  fieldKey: GitHubManualSetupFieldKey;
-  draft: GitHubManualSetupDraft;
-  savedDraft: GitHubManualSetupDraft;
+function isGitHubExistingAppSetupFieldReadyForInstall(input: {
+  fieldKey: GitHubExistingAppSetupFieldKey;
+  draft: GitHubExistingAppSetupDraft;
+  savedDraft: GitHubExistingAppSetupDraft;
   fieldState: SavingFieldState;
   isConfiguredOnServer?: boolean;
 }): boolean {
-  const normalizedDraftValue = normalizeGitHubManualSetupValue(input.draft[input.fieldKey]);
-  const normalizedSavedValue = normalizeGitHubManualSetupValue(input.savedDraft[input.fieldKey]);
+  const normalizedDraftValue = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
+  const normalizedSavedValue = normalizeGitHubExistingAppSetupValue(
+    input.savedDraft[input.fieldKey],
+  );
 
   if (
     input.isConfiguredOnServer === true &&
@@ -609,15 +617,15 @@ function GitHubManifestSetupPanel(input: {
   );
 }
 
-function GitHubManualSetupPanel(input: {
-  configuredSecretFieldKeys: ReadonlySet<GitHubManualSetupSecretFieldKey>;
-  draft: GitHubManualSetupDraft;
-  fieldStates: Record<GitHubManualSetupFieldKey, SavingFieldState>;
+function GitHubExistingAppSetupPanel(input: {
+  configuredSecretFieldKeys: ReadonlySet<GitHubExistingAppSetupSecretFieldKey>;
+  draft: GitHubExistingAppSetupDraft;
+  fieldStates: Record<GitHubExistingAppSetupFieldKey, SavingFieldState>;
   isSecretReplacementDialogOpen: boolean;
-  onCommitField: (fieldKey: GitHubManualSetupFieldKey) => void;
+  onCommitField: (fieldKey: GitHubExistingAppSetupFieldKey) => void;
   onReplacementDialogOpenChange: (open: boolean) => void;
-  onRevertSecretReplacement: (fieldKey: GitHubManualSetupSecretFieldKey) => void;
-  onUpdateFieldDraft: (fieldKey: GitHubManualSetupFieldKey, nextValue: string) => void;
+  onRevertSecretReplacement: (fieldKey: GitHubExistingAppSetupSecretFieldKey) => void;
+  onUpdateFieldDraft: (fieldKey: GitHubExistingAppSetupFieldKey, nextValue: string) => void;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-8">
@@ -834,7 +842,7 @@ function GitHubAppSetupActions(input: {
   );
 }
 
-export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element {
+export function IntegrationConnectionGitHubAppSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const navigate = useNavigate();
   const params = useParams();
@@ -1052,7 +1060,7 @@ export function GitHubAppSetupPane(input: {
 
   useEffect(() => {
     return () => {
-      for (const fieldKey of GitHubManualSetupFieldKeys) {
+      for (const fieldKey of GitHubExistingAppSetupFieldKeys) {
         clearPendingStatusTimeouts({
           fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
           fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
@@ -1062,7 +1070,7 @@ export function GitHubAppSetupPane(input: {
     };
   }, []);
 
-  function resetFieldFeedback(fieldKey: GitHubManualSetupFieldKey): void {
+  function resetFieldFeedback(fieldKey: GitHubExistingAppSetupFieldKey): void {
     clearPendingStatusTimeouts({
       fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
       fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
@@ -1077,7 +1085,7 @@ export function GitHubAppSetupPane(input: {
     }));
   }
 
-  function updateFieldDraft(fieldKey: GitHubManualSetupFieldKey, nextValue: string): void {
+  function updateFieldDraft(fieldKey: GitHubExistingAppSetupFieldKey, nextValue: string): void {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [fieldKey]: nextValue,
@@ -1089,15 +1097,15 @@ export function GitHubAppSetupPane(input: {
   }
 
   async function persistField(
-    fieldKey: GitHubManualSetupFieldKey,
-    currentDraft: GitHubManualSetupDraft,
+    fieldKey: GitHubExistingAppSetupFieldKey,
+    currentDraft: GitHubExistingAppSetupDraft,
   ): Promise<void> {
     if (fieldStates[fieldKey].status === "saving") {
       return;
     }
 
     if (
-      !isGitHubManualSetupFieldDirty({
+      !isGitHubExistingAppSetupFieldDirty({
         fieldKey,
         draft: currentDraft,
         savedDraft,
@@ -1111,7 +1119,7 @@ export function GitHubAppSetupPane(input: {
       return;
     }
 
-    const validationMessage = getGitHubManualSetupFieldValidationMessage({
+    const validationMessage = getGitHubExistingAppSetupFieldValidationMessage({
       fieldKey,
       draft: currentDraft,
       savedDraft,
@@ -1128,7 +1136,7 @@ export function GitHubAppSetupPane(input: {
     }
 
     if (
-      !shouldPersistGitHubManualSetupField({
+      !shouldPersistGitHubExistingAppSetupField({
         fieldKey,
         draft: currentDraft,
       })
@@ -1145,7 +1153,7 @@ export function GitHubAppSetupPane(input: {
     }));
 
     try {
-      const secrets = buildGitHubManualSetupSecrets({
+      const secrets = buildGitHubExistingAppSetupSecrets({
         draft: currentDraft,
         fieldKey,
       });
@@ -1153,7 +1161,7 @@ export function GitHubAppSetupPane(input: {
       await updateFormIntegrationConnection({
         connectionId: input.connection.id,
         displayName: input.connection.displayName,
-        config: buildGitHubManualSetupConfig(currentDraft),
+        config: buildGitHubExistingAppSetupConfig(currentDraft),
         ...(secrets === undefined ? {} : { secrets }),
       });
 
@@ -1173,7 +1181,7 @@ export function GitHubAppSetupPane(input: {
 
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
-      if (isGitHubManualSetupSecretFieldKey(fieldKey)) {
+      if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
         setConfiguredSecretFieldKeys((currentConfiguredSecretFieldKeys) => {
           const nextConfiguredSecretFieldKeys = new Set(currentConfiguredSecretFieldKeys);
           nextConfiguredSecretFieldKeys.add(fieldKey);
@@ -1228,11 +1236,11 @@ export function GitHubAppSetupPane(input: {
     }
   }
 
-  async function commitField(fieldKey: GitHubManualSetupFieldKey): Promise<void> {
+  async function commitField(fieldKey: GitHubExistingAppSetupFieldKey): Promise<void> {
     await persistField(fieldKey, draft);
   }
 
-  function revertSecretReplacement(fieldKey: GitHubManualSetupSecretFieldKey): void {
+  function revertSecretReplacement(fieldKey: GitHubExistingAppSetupSecretFieldKey): void {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [fieldKey]: "",
@@ -1269,16 +1277,16 @@ export function GitHubAppSetupPane(input: {
         ? { kind: "missing" }
         : { kind: "ready", value: webhookCallbackUrl };
   const isInstalled = hasInstalledGitHubApp(input.connection);
-  const requiredConfigReady = GitHubManualSetupConfigFieldKeys.every((fieldKey) =>
-    isGitHubManualSetupFieldReadyForInstall({
+  const requiredConfigReady = GitHubExistingAppSetupConfigFieldKeys.every((fieldKey) =>
+    isGitHubExistingAppSetupFieldReadyForInstall({
       fieldKey,
       draft,
       savedDraft,
       fieldState: fieldStates[fieldKey],
     }),
   );
-  const requiredSecretsReady = GitHubManualSetupSecretFieldKeys.every((fieldKey) =>
-    isGitHubManualSetupFieldReadyForInstall({
+  const requiredSecretsReady = GitHubExistingAppSetupSecretFieldKeys.every((fieldKey) =>
+    isGitHubExistingAppSetupFieldReadyForInstall({
       fieldKey,
       draft,
       savedDraft,
@@ -1334,7 +1342,7 @@ export function GitHubAppSetupPane(input: {
     <FormPageStack>
       <Tabs
         onValueChange={(nextValue) => {
-          if (nextValue === "manifest" || nextValue === "manual") {
+          if (nextValue === "manifest" || nextValue === "existing-app") {
             setSetupMode(nextValue);
           }
         }}
@@ -1352,7 +1360,7 @@ export function GitHubAppSetupPane(input: {
           <div className="flex flex-col gap-6 p-4">
             <TabsList className="w-full">
               <TabsTrigger value="manifest">Create from manifest</TabsTrigger>
-              <TabsTrigger value="manual">Use existing app</TabsTrigger>
+              <TabsTrigger value="existing-app">Use existing app</TabsTrigger>
             </TabsList>
 
             {actionErrorMessage === null ? null : (
@@ -1372,8 +1380,8 @@ export function GitHubAppSetupPane(input: {
               />
             </TabsContent>
 
-            <TabsContent value="manual">
-              <GitHubManualSetupPanel
+            <TabsContent value="existing-app">
+              <GitHubExistingAppSetupPanel
                 configuredSecretFieldKeys={configuredSecretFieldKeys}
                 draft={draft}
                 fieldStates={fieldStates}
@@ -1387,7 +1395,7 @@ export function GitHubAppSetupPane(input: {
               />
             </TabsContent>
 
-            {setupMode === "manual" ? (
+            {setupMode === "existing-app" ? (
               <GitHubSetupUrls
                 setupCallbackUrl={buildGitHubAppSetupCallbackUrl()}
                 webhookCallbackState={webhookCallbackState}

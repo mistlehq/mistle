@@ -16,18 +16,18 @@ import { z } from "zod";
 import {
   InternalIntegrationCredentialsError,
   InternalIntegrationCredentialsErrorCodes,
-} from "../../internal/integration-credentials/services/errors.js";
-import type { AppContext } from "../../types.js";
-import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+} from "../../../internal/integration-credentials/services/errors.js";
+import type { AppContext } from "../../../types.js";
+import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
   encodeGitHubAppInstallationStateMetadata,
-} from "./redirect-flow.js";
+} from "../../services/redirect-flow.js";
 import {
   resolveConnectionSecretsOrThrow,
   resolveConnectionWithTargetOrThrow,
-} from "./webhook-sources.js";
+} from "../../services/webhook-sources.js";
 
 export type StartGitHubAppInstallationConnectionInput = {
   organizationId: string;

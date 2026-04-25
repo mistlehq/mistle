@@ -1,6 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
 
-import { RedirectLocationHeaderSchema } from "../schemas.js";
+import { RedirectLocationHeaderSchema } from "../../../integration-connections/schemas.js";
 import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,

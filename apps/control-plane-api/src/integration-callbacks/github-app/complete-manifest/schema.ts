@@ -7,24 +7,22 @@ import {
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../constants.js";
+} from "../../../integration-connections/constants.js";
 
-export const CompleteGitHubAppInstallationConnectionQuerySchema = z
+export const CompleteGitHubAppManifestConnectionQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
     code: z.string().min(1).optional(),
     error: z.string().min(1).optional(),
     error_description: z.string().min(1).optional(),
     error_uri: z.string().min(1).optional(),
-    installation_id: z.string().min(1).optional(),
-    setup_action: z.string().min(1).optional(),
   })
   .catchall(z.string());
 
-export const CompleteGitHubAppInstallationConnectionBadRequestResponseSchema = z.union([
+export const CompleteGitHubAppManifestConnectionBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
@@ -34,5 +32,5 @@ export const CompleteGitHubAppInstallationConnectionBadRequestResponseSchema = z
   ValidationErrorResponseSchema,
 ]);
 
-export const CompleteGitHubAppInstallationConnectionNotFoundResponseSchema =
+export const CompleteGitHubAppManifestConnectionNotFoundResponseSchema =
   createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND));

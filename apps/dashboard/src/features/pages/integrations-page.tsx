@@ -6,7 +6,7 @@ import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integr
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-manual-setup-page.js";
+import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,

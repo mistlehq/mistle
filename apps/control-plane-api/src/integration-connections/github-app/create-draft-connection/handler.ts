@@ -1,9 +1,9 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { withRequiredSession } from "../../middleware/with-required-session.js";
-import type { AppContextBindings, AppSession } from "../../types.js";
-import { createGitHubAppDraftConnection } from "../services/create-github-app-draft-connection.js";
+import { withRequiredSession } from "../../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../../types.js";
+import { createGitHubAppDraftConnection } from "../services/create-draft-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (

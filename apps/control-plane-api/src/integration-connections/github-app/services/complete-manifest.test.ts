@@ -6,7 +6,7 @@ import {
   buildConvertedConnectionSecrets,
   buildConvertedGitHubAppConnectionConfig,
   parseGitHubAppManifestConversionResponse,
-} from "./complete-github-app-manifest-connection.js";
+} from "./complete-manifest.js";
 
 describe("parseGitHubAppManifestConversionResponse", () => {
   it("accepts GitHub manifest conversion responses with numeric ids", () => {

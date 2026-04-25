@@ -16,13 +16,13 @@ import { z } from "zod";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../constants.js";
-import { createRedirectQueryParams } from "./redirect-flow.js";
-import { resolveGitHubAppInstallationConnectionId } from "./redirect-flow.js";
+} from "../../constants.js";
+import { createRedirectQueryParams } from "../../services/redirect-flow.js";
+import { resolveGitHubAppInstallationConnectionId } from "../../services/redirect-flow.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
-} from "./webhook-sources.js";
+} from "../../services/webhook-sources.js";
 
 type CompleteGitHubAppInstallationConnectionInput = {
   query: Record<string, string>;

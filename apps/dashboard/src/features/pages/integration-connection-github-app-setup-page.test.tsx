@@ -14,13 +14,13 @@ import {
   formatGitHubManifestJson,
   GitHubAppSetupPane,
   validateGitHubManifestJson,
-} from "./integration-connection-github-manual-setup-page.js";
+} from "./integration-connection-github-app-setup-page.js";
 
-function createGitHubManualSetupConnection(input?: {
+function createGitHubAppSetupConnection(input?: {
   configuredSecretNames?: readonly string[];
 }): IntegrationConnection {
   return {
-    id: "icn_github_manual_setup",
+    id: "icn_github_app_setup",
     targetKey: "github-cloud",
     displayName: "Engineering GitHub",
     status: "active",
@@ -42,13 +42,13 @@ function createGitHubManualSetupConnection(input?: {
 
 function createWebhookSourceFixture(): IntegrationWebhookSource {
   return {
-    id: "iws_github_manual_setup",
+    id: "iws_github_app_setup",
     targetKey: "github-cloud",
-    integrationConnectionId: "icn_github_manual_setup",
+    integrationConnectionId: "icn_github_app_setup",
     displayName: "GitHub App webhook",
-    endpointKey: "eps_github_manual_setup",
+    endpointKey: "eps_github_app_setup",
     callbackUrl:
-      "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_manual_setup",
+      "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_app_setup",
     status: "active",
     providerMetadata: {},
     createdAt: "2026-04-24T00:00:00.000Z",
@@ -66,7 +66,7 @@ function renderGitHubAppSetupPane(input?: {
   };
   resetDashboardConfigForTest();
 
-  const connection = input?.connection ?? createGitHubManualSetupConnection();
+  const connection = input?.connection ?? createGitHubAppSetupConnection();
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -101,7 +101,7 @@ describe("GitHubAppSetupPane", () => {
   it("defaults a blank draft connection to the manifest setup mode", () => {
     renderGitHubAppSetupPane({
       connection: {
-        ...createGitHubManualSetupConnection(),
+        ...createGitHubAppSetupConnection(),
         config: {
           connection_method: "github-app-installation",
         },
@@ -132,7 +132,7 @@ describe("GitHubAppSetupPane", () => {
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
   });
 
-  it("defaults a prefilled connection to the manual setup mode", () => {
+  it("defaults a prefilled connection to the existing app setup mode", () => {
     const { container } = renderGitHubAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
@@ -160,7 +160,7 @@ describe("GitHubAppSetupPane", () => {
 
   it("keeps installation available when required secrets are already configured on the server", () => {
     renderGitHubAppSetupPane({
-      connection: createGitHubManualSetupConnection({
+      connection: createGitHubAppSetupConnection({
         configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
       }),
     });
@@ -171,7 +171,7 @@ describe("GitHubAppSetupPane", () => {
   });
 
   it("marks installed connections as external management actions", () => {
-    const connection = createGitHubManualSetupConnection({
+    const connection = createGitHubAppSetupConnection({
       configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
     });
 
@@ -192,7 +192,7 @@ describe("GitHubAppSetupPane", () => {
 
   it("shows a GitHub App creation success view with an install app action", () => {
     renderGitHubAppSetupPane({
-      connection: createGitHubManualSetupConnection({
+      connection: createGitHubAppSetupConnection({
         configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
       }),
       manifestCreationSucceeded: true,

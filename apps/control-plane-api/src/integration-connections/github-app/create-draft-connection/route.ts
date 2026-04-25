@@ -1,7 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionSchema } from "../schemas.js";
+import { IntegrationConnectionSchema } from "../../schemas.js";
 import {
   CreateGitHubAppDraftConnectionBadRequestResponseSchema,
   CreateGitHubAppDraftConnectionBodySchema,

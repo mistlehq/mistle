@@ -484,7 +484,7 @@ function GitHubManagedSetupSummary(input: {
       description:
         "The connection now has both the app credentials and installation_id, so webhook delivery and repository access can work with the current contract.",
       helper:
-        "This final state matches what Mistle already expects after a successful manual setup plus installation.",
+        "This final state matches what Mistle already expects after a successful existing-app setup plus installation.",
       title: "Installed and ready",
     },
   };
