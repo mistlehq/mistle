@@ -32,20 +32,6 @@ function normalizeIntegrationBreadcrumbLabel(targetKey: string): string {
   return normalizedId.split(" ").map(toTitleCaseWord).join(" ");
 }
 
-function resolveIntegrationDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const targetKey = input.params["targetKey"];
-  if (targetKey === undefined || targetKey.trim().length === 0) {
-    return "Connection";
-  }
-
-  const metadata = resolveIntegrationDefinitionMetadata(targetKey);
-  if (metadata !== null) {
-    return metadata.displayName;
-  }
-
-  return normalizeIntegrationBreadcrumbLabel(targetKey);
-}
-
 function resolveIntegrationDefinitionMetadata(targetKey: string): {
   displayName: string;
   logoKey: string;
@@ -176,7 +162,7 @@ export const ROUTE_HANDLES = {
   },
   integrationDetail: {
     appShellInsetOwner: "child",
-    breadcrumb: resolveIntegrationDetailBreadcrumb,
+    breadcrumb: resolveIntegrationDetailTitle,
     breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
@@ -319,7 +305,7 @@ export const ROUTE_HANDLES = {
     description: "",
   },
   settingsOrganizationIntegrationDetail: {
-    breadcrumb: resolveIntegrationDetailBreadcrumb,
+    breadcrumb: resolveIntegrationDetailTitle,
     title: resolveIntegrationDetailTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {
