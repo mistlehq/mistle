@@ -457,7 +457,7 @@ function GitHubDetailStory(input: {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Add Flows/GitHub",
+  title: "Dashboard/Integrations/GitHub App Flows",
   decorators: [withDashboardPageStory],
 } satisfies Meta;
 
