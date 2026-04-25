@@ -22,7 +22,11 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
-import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
+import {
+  createRedirectQueryParams,
+  resolveActiveRedirectSessionOrThrow,
+  resolveRedirectDisplayName,
+} from "./redirect-flow.js";
 import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
 
 type CompleteOAuth2AuthorizationCodeConnectionInput = {
@@ -132,39 +136,16 @@ export async function completeOAuth2AuthorizationCodeConnection(
   const queryParams = createRedirectQueryParams(input.query);
   const state = resolveRedirectStateOrThrow(queryParams);
 
-  const redirectSession = await db.query.integrationConnectionRedirectSessions.findFirst({
-    where: (table, { and, eq }) =>
-      and(eq(table.targetKey, input.targetKey), eq(table.state, state)),
+  const redirectSession = await resolveActiveRedirectSessionOrThrow({
+    db,
+    targetKey: input.targetKey,
+    state,
+    invalidStateCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+    alreadyUsedCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+    expiredCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
   });
 
-  if (redirectSession === undefined) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
-      "Redirect state is invalid.",
-    );
-  }
-
   const requestedDisplayName = resolveRedirectDisplayName(redirectSession.state);
-
-  if (redirectSession.usedAt !== null) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
-      "Redirect state has already been used.",
-    );
-  }
-
-  const now = Date.now();
-  const expiresAt = Date.parse(redirectSession.expiresAt);
-  if (Number.isNaN(expiresAt)) {
-    throw new Error(`Redirect session '${redirectSession.id}' has an invalid expiry timestamp.`);
-  }
-
-  if (expiresAt <= now) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
-      "Redirect state has expired.",
-    );
-  }
 
   const redirectUrl = buildOAuth2AuthorizationCodeCompleteUrl({
     controlPlaneBaseUrl: input.controlPlaneBaseUrl,

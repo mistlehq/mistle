@@ -119,12 +119,16 @@ export function createRedirectQueryParams(query: Record<string, string>): URLSea
 export async function resolveActiveRedirectSessionOrThrow(input: {
   db: ControlPlaneDatabase;
   state: string;
+  targetKey?: string;
   invalidStateCode: string;
   alreadyUsedCode: string;
   expiredCode: string;
 }): Promise<IntegrationConnectionRedirectSession> {
   const redirectSession = await input.db.query.integrationConnectionRedirectSessions.findFirst({
-    where: (table, { eq }) => eq(table.state, input.state),
+    where: (table, { and, eq }) =>
+      input.targetKey === undefined
+        ? eq(table.state, input.state)
+        : and(eq(table.targetKey, input.targetKey), eq(table.state, input.state)),
   });
 
   if (redirectSession === undefined) {
