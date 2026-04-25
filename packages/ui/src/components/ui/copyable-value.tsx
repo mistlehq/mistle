@@ -100,17 +100,13 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   }
 
   const readyInput = input;
+  const usesGenericCopyLabel = readyInput.variant === "panel" || readyInput.variant === "inline";
 
   const copyAriaLabel =
-    readyInput.copyAriaLabel ??
-    (readyInput.variant === "panel" || readyInput.variant === "inline"
-      ? "Copy value"
-      : `Copy ${readyInput.label}`);
+    readyInput.copyAriaLabel ?? (usesGenericCopyLabel ? "Copy value" : `Copy ${readyInput.label}`);
   const idleTitle =
-    readyInput.copyTitle ??
-    (readyInput.variant === "panel" || readyInput.variant === "inline"
-      ? "Copy value"
-      : `Copy ${readyInput.label}`);
+    readyInput.copyTitle ?? (usesGenericCopyLabel ? "Copy value" : `Copy ${readyInput.label}`);
+  const failureMessage = readyInput.failureMessage ?? "Could not copy automatically.";
   const visibleCopyState =
     copyFeedback.state === "idle" || copyFeedback.value !== readyInput.value
       ? "idle"
@@ -162,9 +158,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
           {readyInput.value}
         </pre>
         {visibleCopyState === "failed" ? (
-          <p className="text-destructive mt-2 px-3 pb-3 text-xs">
-            {readyInput.failureMessage ?? "Could not copy automatically."}
-          </p>
+          <p className="text-destructive mt-2 px-3 pb-3 text-xs">{failureMessage}</p>
         ) : null}
       </div>
     );
@@ -178,9 +172,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
           {button}
         </div>
         {visibleCopyState === "failed" ? (
-          <p className="text-destructive text-xs">
-            {readyInput.failureMessage ?? "Could not copy automatically."}
-          </p>
+          <p className="text-destructive text-xs">{failureMessage}</p>
         ) : null}
       </div>
     );
@@ -194,9 +186,7 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
         {button}
       </div>
       {visibleCopyState === "failed" ? (
-        <p className="text-destructive text-xs">
-          {readyInput.failureMessage ?? "Could not copy automatically."}
-        </p>
+        <p className="text-destructive text-xs">{failureMessage}</p>
       ) : null}
     </div>
   );
