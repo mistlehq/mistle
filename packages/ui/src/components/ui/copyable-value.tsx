@@ -22,7 +22,6 @@ type LoadingCopyableValueProps = {
   label: string;
   loading: true;
   loadingLabel?: string;
-  variant?: "field";
 };
 
 type ReadyCopyableValueBaseProps = {
