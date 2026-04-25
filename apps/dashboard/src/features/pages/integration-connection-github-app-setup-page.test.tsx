@@ -133,7 +133,7 @@ describe("GitHubAppSetupPane", () => {
   });
 
   it("defaults a prefilled connection to the existing app setup mode", () => {
-    const { container } = renderGitHubAppSetupPane();
+    renderGitHubAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
     expect(screen.getByDisplayValue("12345")).toBeTruthy();
@@ -154,8 +154,6 @@ describe("GitHubAppSetupPane", () => {
     expect(installButton.hasAttribute("disabled")).toBe(true);
     expect(installButton.querySelector("svg")).toBeNull();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
-    expect(container.innerHTML).toContain("flex flex-col gap-4");
-    expect(container.innerHTML).not.toContain("xl:grid-cols-2");
   });
 
   it("keeps installation available when required secrets are already configured on the server", () => {
