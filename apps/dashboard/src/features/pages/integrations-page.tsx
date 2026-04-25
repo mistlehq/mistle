@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
@@ -24,7 +25,7 @@ function isUninstalledGitHubAppConnection(input: {
   config: Record<string, unknown> | undefined;
   externalSubjectId: string | undefined;
 }): boolean {
-  if (input.connectionMethodId !== "github-app-installation") {
+  if (input.connectionMethodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
     return false;
   }
 

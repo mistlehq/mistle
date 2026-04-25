@@ -1,6 +1,7 @@
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
@@ -254,7 +255,7 @@ function buildGitHubExistingAppSetupConfig(
   draft: GitHubExistingAppSetupDraft,
 ): Record<string, string> {
   return {
-    connection_method: "github-app-installation",
+    connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     app_id: normalizeGitHubExistingAppSetupValue(draft.appId),
     app_slug: normalizeGitHubExistingAppSetupValue(draft.appSlug),
     client_id: normalizeGitHubExistingAppSetupValue(draft.clientId),
@@ -858,7 +859,7 @@ export function IntegrationConnectionGitHubAppSetupPage(): React.JSX.Element {
     );
   }
 
-  if (connection.connectionMethodId !== "github-app-installation") {
+  if (connection.connectionMethodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
     throw new Error(`Integration connection '${connectionId}' is not a GitHub App connection.`);
   }
 

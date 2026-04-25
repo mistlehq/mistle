@@ -1,3 +1,4 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { JiraWebhookEventDisplayNameByType } from "@mistle/integrations-definitions";
 import {
   Badge,
@@ -137,11 +138,13 @@ function resolveConnectionDetailPaneViewState(input: {
       ? undefined
       : {
           ...input.connection.installation,
-          ...(input.connection.authMethodId === "github-app-installation" &&
+          ...(input.connection.authMethodId ===
+            IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
           input.webhookSourceState?.items[0]?.callbackUrl !== undefined
             ? { callbackUrl: input.webhookSourceState.items[0].callbackUrl }
             : {}),
-          ...(input.connection.authMethodId === "github-app-installation" &&
+          ...(input.connection.authMethodId ===
+            IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
           input.webhookSourceState?.isLoading === true &&
           input.webhookSourceState.items[0]?.callbackUrl === undefined
             ? { isCallbackUrlLoading: true }
@@ -156,7 +159,8 @@ function resolveConnectionDetailPaneViewState(input: {
       installation.postInstallationSetupUrl !== undefined ||
       installation.actionLabel !== undefined ||
       ("callbackUrl" in installation && installation.callbackUrl !== undefined));
-  const hidesStandaloneWebhookSection = input.connection.authMethodId === "github-app-installation";
+  const hidesStandaloneWebhookSection =
+    input.connection.authMethodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
   const shouldRenderWebhookSection =
     hidesStandaloneWebhookSection === false &&
     input.webhookPolicy?.showWebhookSources === true &&
@@ -709,13 +713,6 @@ function InstallationSection(input: {
     return null;
   }
 
-  const resolvedPostInstallationSetupUrl = resolveGitHubPostInstallationSetupUrl({
-    ...(input.callbackUrl === undefined ? {} : { callbackUrl: input.callbackUrl }),
-    ...(input.postInstallationSetupUrl === undefined
-      ? {}
-      : { fallbackUrl: input.postInstallationSetupUrl }),
-  });
-
   return (
     <div className="gap-3 flex flex-col">
       {input.fields === undefined || input.fields.length === 0 ? null : (
@@ -727,14 +724,14 @@ function InstallationSection(input: {
           }))}
         />
       )}
-      {resolvedPostInstallationSetupUrl === undefined &&
+      {input.postInstallationSetupUrl === undefined &&
       input.callbackUrl === undefined &&
       input.isCallbackUrlLoading !== true ? null : (
         <div className="flex flex-col gap-3">
-          {resolvedPostInstallationSetupUrl === undefined ? null : (
+          {input.postInstallationSetupUrl === undefined ? null : (
             <CopyableValue
               label="Post-installation setup URL"
-              value={resolvedPostInstallationSetupUrl}
+              value={input.postInstallationSetupUrl}
             />
           )}
           {input.callbackUrl === undefined &&
@@ -747,24 +744,6 @@ function InstallationSection(input: {
       )}
     </div>
   );
-}
-
-function resolveGitHubPostInstallationSetupUrl(input: {
-  callbackUrl?: string;
-  fallbackUrl?: string;
-}): string | undefined {
-  if (input.callbackUrl !== undefined) {
-    try {
-      return new URL(
-        "/p/integration/callbacks/github-app-installation",
-        input.callbackUrl,
-      ).toString();
-    } catch {
-      return input.fallbackUrl;
-    }
-  }
-
-  return input.fallbackUrl;
 }
 
 function ResourcesSection(input: {

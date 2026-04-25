@@ -333,7 +333,7 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
       }
 
       return createJsonResponse(
-        { code: "STORYBOOK_UNHANDLED", message: `${method} ${path} is not stubbed in Storybook.` },
+        { code: "STORYBOOK_UNHANDLED", message: `${method} ${path} is not handled in Storybook.` },
         500,
       );
     };

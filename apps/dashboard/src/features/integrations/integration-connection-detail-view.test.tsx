@@ -1334,9 +1334,7 @@ describe("IntegrationConnectionDetailView", () => {
       ),
     ).toBeNull();
     expect(
-      screen.getByText(
-        "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
-      ),
+      screen.getByText("http://localhost:5100/p/integration/callbacks/github-app-installation"),
     ).toBeTruthy();
     expect(
       screen.getAllByText(

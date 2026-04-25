@@ -4,7 +4,10 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
-import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
+import {
+  IntegrationConnectionEditorPage,
+  IntegrationConnectionMethodIds,
+} from "../integrations/integration-connection-editor.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
@@ -115,7 +118,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
       if (
         connectionId !== null &&
         editor.targetFamilyId === "github" &&
-        methodId === "github-app-installation"
+        methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
       ) {
         await navigate(
           `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/github-app/setup`,
