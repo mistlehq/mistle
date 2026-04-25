@@ -37,6 +37,7 @@ import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
+import { assertGitHubAppInstallationConnectionMethodOrThrow } from "./installation-config.js";
 
 type CompleteGitHubAppManifestConnectionInput = {
   query: Record<string, string>;
@@ -91,20 +92,6 @@ function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       "Redirect state is invalid.",
-    );
-  }
-}
-
-function assertGitHubAppConnectionOrThrow(input: {
-  connectionId: string;
-  config: Record<string, unknown> | null;
-}): void {
-  if (
-    input.config?.["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
     );
   }
 }
@@ -256,7 +243,7 @@ export async function completeGitHubAppManifestConnection(
     );
   }
 
-  assertGitHubAppConnectionOrThrow({
+  assertGitHubAppInstallationConnectionMethodOrThrow({
     connectionId: connection.id,
     config: connection.config,
   });

@@ -22,6 +22,20 @@ function toUnknownRecord(value: unknown): Record<string, unknown> | null {
   return record;
 }
 
+export function assertGitHubAppInstallationConnectionMethodOrThrow(input: {
+  connectionId: string;
+  config: Record<string, unknown> | null;
+}): void {
+  if (
+    input.config?.["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
+    );
+  }
+}
+
 export function parseGitHubAppInstallationConnectionConfigOrThrow(input: {
   config: unknown;
   connectionId: string;
@@ -29,14 +43,11 @@ export function parseGitHubAppInstallationConnectionConfigOrThrow(input: {
 }) {
   const configRecord = toUnknownRecord(input.config);
 
-  if (
-    configRecord !== null &&
-    configRecord["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
-    );
+  if (configRecord !== null) {
+    assertGitHubAppInstallationConnectionMethodOrThrow({
+      connectionId: input.connectionId,
+      config: configRecord,
+    });
   }
 
   try {

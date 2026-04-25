@@ -3,10 +3,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import {
-  IntegrationConnectionMethodIds,
-  type IntegrationRegistry,
-} from "@mistle/integrations-core";
+import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
@@ -24,6 +21,7 @@ import {
   resolveConnectionWithTargetOrThrow,
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
+import { assertGitHubAppInstallationConnectionMethodOrThrow } from "./installation-config.js";
 
 export type GitHubAppManifestOwner =
   | {
@@ -92,20 +90,6 @@ function buildGitHubAppManifest(input: {
   };
 }
 
-function assertGitHubAppConnectionOrThrow(input: {
-  connectionId: string;
-  config: Record<string, unknown>;
-}): void {
-  if (
-    input.config["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
-    );
-  }
-}
-
 async function persistRedirectSession(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
@@ -150,7 +134,7 @@ export async function startGitHubAppManifestConnection(
     connectionId: connection.id,
     config: connection.config,
   });
-  assertGitHubAppConnectionOrThrow({
+  assertGitHubAppInstallationConnectionMethodOrThrow({
     connectionId: connection.id,
     config: connectionConfig,
   });
