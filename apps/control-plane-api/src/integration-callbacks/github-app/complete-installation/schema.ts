@@ -12,7 +12,6 @@ import {
 export const CompleteGitHubAppInstallationConnectionQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
-    code: z.string().min(1).optional(),
     error: z.string().min(1).optional(),
     error_description: z.string().min(1).optional(),
     error_uri: z.string().min(1).optional(),
