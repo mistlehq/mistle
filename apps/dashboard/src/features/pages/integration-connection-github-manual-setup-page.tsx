@@ -97,12 +97,6 @@ const GitHubManualSetupConfigFieldKeys = [
 
 type GitHubManualSetupConfigFieldKey = (typeof GitHubManualSetupConfigFieldKeys)[number];
 
-const GitHubManualSetupRequiredConfigFieldKeys = [
-  "appId",
-  "appSlug",
-  "clientId",
-] as const satisfies readonly GitHubManualSetupConfigFieldKey[];
-
 const GitHubManualSetupSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
@@ -110,12 +104,6 @@ const GitHubManualSetupSecretFieldKeys = [
 ] as const satisfies readonly GitHubManualSetupFieldKey[];
 
 type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
-
-const GitHubManualSetupRequiredSecretFieldKeys = [
-  "clientSecret",
-  "appPrivateKeyPem",
-  "webhookSecret",
-] as const satisfies readonly GitHubManualSetupSecretFieldKey[];
 
 const GitHubDraftManifest = JSON.stringify(
   {
@@ -1281,7 +1269,7 @@ export function GitHubAppSetupPane(input: {
         ? { kind: "missing" }
         : { kind: "ready", value: webhookCallbackUrl };
   const isInstalled = hasInstalledGitHubApp(input.connection);
-  const requiredConfigReady = GitHubManualSetupRequiredConfigFieldKeys.every((fieldKey) =>
+  const requiredConfigReady = GitHubManualSetupConfigFieldKeys.every((fieldKey) =>
     isGitHubManualSetupFieldReadyForInstall({
       fieldKey,
       draft,
@@ -1289,7 +1277,7 @@ export function GitHubAppSetupPane(input: {
       fieldState: fieldStates[fieldKey],
     }),
   );
-  const requiredSecretsReady = GitHubManualSetupRequiredSecretFieldKeys.every((fieldKey) =>
+  const requiredSecretsReady = GitHubManualSetupSecretFieldKeys.every((fieldKey) =>
     isGitHubManualSetupFieldReadyForInstall({
       fieldKey,
       draft,
