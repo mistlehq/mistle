@@ -12,6 +12,7 @@ export const notFoundResponseSchema = createCodeMessageErrorSchema(
 
 export const conflictResponseSchema = createCodeMessageErrorSchema(
   z.enum([
+    SandboxProfilesConflictCodes.DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED,
     SandboxProfilesConflictCodes.PROFILE_VERSION_ACTIVE,
     SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_DRAFT,
   ]),

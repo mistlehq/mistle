@@ -14254,7 +14254,11 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_VERSION_ACTIVE", "PROFILE_VERSION_NOT_DRAFT"]
+                      "enum": [
+                        "DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED",
+                        "PROFILE_VERSION_ACTIVE",
+                        "PROFILE_VERSION_NOT_DRAFT"
+                      ]
                     },
                     "message": {
                       "type": "string",

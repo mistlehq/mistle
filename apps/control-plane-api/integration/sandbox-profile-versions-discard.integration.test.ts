@@ -158,4 +158,54 @@ describe("sandbox profile versions discard integration", () => {
     );
     expect(body.code).toBe("PROFILE_VERSION_ACTIVE");
   });
+
+  it("rejects discarding the only draft version", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-discard-only-draft@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values(
+      createSandboxProfileFixture({
+        id: "sbp_version_discard_only_draft_001",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Discard Only Draft Profile",
+        activeVersion: null,
+        createdAt: "2026-04-24T02:00:00.000Z",
+      }),
+    );
+    await fixture.db.insert(sandboxProfileVersions).values(
+      createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_version_discard_only_draft_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_version_discard_only_draft_001/versions/1/discard",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(409);
+    const body = DiscardSandboxProfileVersionDraftConflictResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.code).toBe("DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED");
+
+    const profile = await fixture.db.query.sandboxProfiles.findFirst({
+      where: (table, { eq }) => eq(table.id, "sbp_version_discard_only_draft_001"),
+    });
+    const version = await fixture.db.query.sandboxProfileVersions.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxProfileId, "sbp_version_discard_only_draft_001"), eq(table.version, 1)),
+    });
+
+    expect(profile?.activeVersion).toBeNull();
+    expect(version?.state).toBe(SandboxProfileVersionStates.DRAFT);
+  });
 });

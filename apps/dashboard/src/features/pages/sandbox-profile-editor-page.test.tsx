@@ -620,6 +620,16 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
   });
 
+  it("does not offer discard for draft-only profiles", () => {
+    renderSandboxProfileEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
+      "Delete profile",
+    ]);
+  });
+
   it("blocks draft version actions while draft changes are saving", () => {
     renderDraftActionsHarness({
       hasUnsavedIntegrationChanges: true,
@@ -673,7 +683,10 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("heading", { name: "Delete profile?" })).toBeDefined();
     expect(screen.getByText("Repository triage")).toBeDefined();
     expect(screen.getByText("Release notes")).toBeDefined();
-    expect(screen.getByText("All of these automations will be removed.")).toBeDefined();
+    expect(screen.getByText("These automations use this profile and will break:")).toBeDefined();
+    expect(
+      screen.getByText("They will stop working until you delete or retarget them."),
+    ).toBeDefined();
   });
 
   it("blocks profile deletion while automation usage context is loading", () => {

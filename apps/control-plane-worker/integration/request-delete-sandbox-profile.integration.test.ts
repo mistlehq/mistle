@@ -41,7 +41,9 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 }
 
 describe("request delete sandbox profile", () => {
-  it("deletes automations that use the sandbox profile", async ({ fixture }) => {
+  it("deletes the sandbox profile and leaves automations that used it broken", async ({
+    fixture,
+  }) => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
@@ -93,7 +95,11 @@ describe("request delete sandbox profile", () => {
       });
 
       expect(persistedProfile).toBeUndefined();
-      expect(persistedAutomation).toBeUndefined();
+      expect(persistedAutomation).toEqual(
+        expect.objectContaining({
+          id: "atm_delete_profile_worker",
+        }),
+      );
       expect(persistedTarget).toBeUndefined();
     } finally {
       await database.stop();

@@ -42,6 +42,13 @@ export async function discardProfileVersionDraft(
       );
     }
 
+    if (sandboxProfile.activeVersion === null) {
+      throw new SandboxProfilesConflictError(
+        SandboxProfilesConflictCodes.DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED,
+        "Draft-only sandbox profiles cannot discard their only version. Delete the profile instead.",
+      );
+    }
+
     if (sandboxProfile.activeVersion === input.profileVersion) {
       throw new SandboxProfilesConflictError(
         SandboxProfilesConflictCodes.PROFILE_VERSION_ACTIVE,

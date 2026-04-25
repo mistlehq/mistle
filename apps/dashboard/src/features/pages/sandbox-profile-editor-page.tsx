@@ -766,13 +766,13 @@ function DeleteSandboxProfileDialog(input: {
           input.automationUsagesIsPending ||
           input.automationUsagesError !== null ? null : (
             <div className="space-y-2">
-              <p className="text-sm">These automations use this profile and will be removed:</p>
+              <p className="text-sm">These automations use this profile and will break:</p>
               <ul className="list-disc space-y-1 pl-5 text-sm">
                 {input.automationUsages.map((automation) => (
                   <li key={automation.id}>{automation.name}</li>
                 ))}
               </ul>
-              <p className="text-sm">All of these automations will be removed.</p>
+              <p className="text-sm">They will stop working until you delete or retarget them.</p>
             </div>
           )}
 

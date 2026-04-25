@@ -7174,7 +7174,10 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "PROFILE_VERSION_ACTIVE" | "PROFILE_VERSION_NOT_DRAFT";
+              code:
+                | "DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED"
+                | "PROFILE_VERSION_ACTIVE"
+                | "PROFILE_VERSION_NOT_DRAFT";
               message: string;
             };
           };
