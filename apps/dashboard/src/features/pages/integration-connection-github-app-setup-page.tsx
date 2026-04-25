@@ -318,36 +318,13 @@ function shouldPersistGitHubExistingAppSetupField(input: {
   return normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]).length > 0;
 }
 
-function buildNextSavedDraft(input: {
-  savedDraft: GitHubExistingAppSetupDraft;
-  draft: GitHubExistingAppSetupDraft;
-  fieldKey: GitHubExistingAppSetupFieldKey;
-}): GitHubExistingAppSetupDraft {
-  const nextSavedDraft: GitHubExistingAppSetupDraft = {
-    ...input.savedDraft,
-  };
-
-  for (const configFieldKey of GitHubExistingAppSetupConfigFieldKeys) {
-    nextSavedDraft[configFieldKey] = normalizeGitHubExistingAppSetupValue(
-      input.draft[configFieldKey],
-    );
-  }
-
-  if (isGitHubExistingAppSetupSecretFieldKey(input.fieldKey)) {
-    nextSavedDraft[input.fieldKey] = normalizeGitHubExistingAppSetupValue(
-      input.draft[input.fieldKey],
-    );
-  }
-
-  return nextSavedDraft;
-}
-
-function buildNextDraftAfterSave(input: {
+function buildDraftWithSavedFieldValues(input: {
+  baseDraft: GitHubExistingAppSetupDraft;
   draft: GitHubExistingAppSetupDraft;
   fieldKey: GitHubExistingAppSetupFieldKey;
 }): GitHubExistingAppSetupDraft {
   const nextDraft: GitHubExistingAppSetupDraft = {
-    ...input.draft,
+    ...input.baseDraft,
   };
 
   for (const configFieldKey of GitHubExistingAppSetupConfigFieldKeys) {
@@ -1148,12 +1125,13 @@ export function GitHubAppSetupPane(input: {
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
       });
 
-      const nextSavedDraft = buildNextSavedDraft({
-        savedDraft,
+      const nextSavedDraft = buildDraftWithSavedFieldValues({
+        baseDraft: savedDraft,
         draft: currentDraft,
         fieldKey,
       });
-      const nextDraft = buildNextDraftAfterSave({
+      const nextDraft = buildDraftWithSavedFieldValues({
+        baseDraft: currentDraft,
         draft: currentDraft,
         fieldKey,
       });
