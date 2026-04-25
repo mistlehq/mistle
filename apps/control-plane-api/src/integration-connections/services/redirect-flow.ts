@@ -7,8 +7,15 @@ import {
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
+
 const REDIRECT_STATE_BYTE_LENGTH = 32;
 const REDIRECT_SESSION_TTL_MS = 10 * 60 * 1000;
+
+type RedirectStateBadRequestCode =
+  | typeof IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID
+  | typeof IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED
+  | typeof IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED;
 
 export function createRedirectState(): string {
   return randomBytes(REDIRECT_STATE_BYTE_LENGTH).toString("base64url");
@@ -120,9 +127,9 @@ export async function resolveActiveRedirectSessionOrThrow(input: {
   db: ControlPlaneDatabase;
   state: string;
   targetKey?: string;
-  invalidStateCode: string;
-  alreadyUsedCode: string;
-  expiredCode: string;
+  invalidStateCode: RedirectStateBadRequestCode;
+  alreadyUsedCode: RedirectStateBadRequestCode;
+  expiredCode: RedirectStateBadRequestCode;
 }): Promise<IntegrationConnectionRedirectSession> {
   const redirectSession = await input.db.query.integrationConnectionRedirectSessions.findFirst({
     where: (table, { and, eq }) =>
