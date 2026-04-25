@@ -283,6 +283,7 @@ function createWorkerRuntimeConfig(input: {
 function createRuntimePlan(input: {
   sandboxProfileId: string;
   marker: string;
+  setupScript?: string;
 }): CompiledRuntimePlan {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -291,7 +292,7 @@ function createRuntimePlan(input: {
       source: "base",
       imageRef: SandboxBaseImageReference,
     },
-    setupScript: `printf '%s' '${input.marker}' > '${SnapshotMarkerPath}'`,
+    setupScript: input.setupScript ?? `printf '%s' '${input.marker}' > '${SnapshotMarkerPath}'`,
     egressRoutes: [],
     artifacts: [],
     workspaceSources: [],
@@ -713,6 +714,149 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
             imageId: snapshotImageId,
           }).catch(() => undefined);
         }
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "marks the snapshot job and hidden sandbox instance as failed when runtime initialization fails",
+    async () => {
+      const pool = requireDbPool();
+      const controlPlaneDb = getControlPlaneDb(pool);
+      const dataPlaneDb = getDataPlaneDb(pool);
+      const controlPlaneInternalClient = new ControlPlaneInternalClient({
+        baseUrl: requireControlPlaneApi().baseUrl,
+        internalAuthServiceToken: InternalAuthServiceToken,
+      });
+      const sandboxAdapter = createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: DockerSocketPath,
+        },
+      });
+      const sandboxRuntimeControl = createSandboxRuntimeControl({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: DockerSocketPath,
+        },
+      });
+
+      const organizationId = `org_snapshot_init_failure_${randomUUID()}`;
+      const sandboxProfileId = `sbp_snapshot_init_failure_${randomUUID()}`;
+      const snapshotJobId = `ssj_snapshot_init_failure_${randomUUID()}`;
+      const sandboxInstanceId = `sbi_snapshot_init_failure_${randomUUID()}`;
+      const workflowRunId = `wr_snapshot_init_failure_${randomUUID()}`;
+      const marker = `snapshot-init-failure-${randomUUID()}`;
+
+      await controlPlaneDb.insert(organizations).values({
+        id: organizationId,
+        name: "Snapshot Init Failure Org",
+        slug: `snapshot-init-failure-${randomUUID()}`,
+      });
+      await controlPlaneDb.insert(sandboxProfiles).values({
+        id: sandboxProfileId,
+        organizationId,
+        displayName: "Snapshot Init Failure Profile",
+      });
+      await controlPlaneDb.insert(sandboxProfileVersions).values({
+        sandboxProfileId,
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: new Date().toISOString(),
+      });
+      await controlPlaneDb.insert(sandboxProfileVersionSnapshotJobs).values({
+        id: snapshotJobId,
+        sandboxProfileId,
+        sandboxProfileVersion: 1,
+        trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+        state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      });
+
+      const bootstrapServer = await startBootstrapWebSocketServer();
+      try {
+        const runtimeConfig = createWorkerRuntimeConfig({
+          databaseUrl: databaseStack!.directUrl,
+          controlPlaneApiBaseUrl: requireControlPlaneApi().baseUrl,
+          websocketBaseUrl: bootstrapServer.baseUrl,
+        });
+
+        await expect(
+          executeMaterializeSandboxProfileVersionSnapshot({
+            ctx: {
+              config: runtimeConfig,
+              controlPlaneInternalClient,
+              db: dataPlaneDb,
+              logger: dataPlaneWorkerLogger,
+              sandboxAdapter,
+              sandboxRuntimeControl,
+            },
+            workflowInput: {
+              snapshotJobId,
+              sandboxInstanceId,
+              organizationId,
+              sandboxProfileId,
+              sandboxProfileVersion: 1,
+              runtimePlan: createRuntimePlan({
+                sandboxProfileId,
+                marker,
+                setupScript: "exit 17",
+              }),
+              image: {
+                imageId: requireSandboxBaseImageId(),
+                createdAt: new Date().toISOString(),
+              },
+            },
+            workflowRunId,
+            step: createInlineStepApi(),
+          }),
+        ).rejects.toThrow("Failed to initialize snapshot sandbox runtime.");
+
+        const persistedJob = await controlPlaneDb.query.sandboxProfileVersionSnapshotJobs.findFirst(
+          {
+            where: (table, { eq }) => eq(table.id, snapshotJobId),
+          },
+        );
+
+        expect(persistedJob).toMatchObject({
+          id: snapshotJobId,
+          state: SandboxProfileVersionSnapshotJobStates.FAILED,
+          workflowRunId,
+          errorCode: "snapshot_sandbox_init_failed",
+          candidateImageProvider: null,
+          candidateImageId: null,
+        });
+        expect(persistedJob?.startedAt).not.toBeNull();
+        expect(persistedJob?.finishedAt).not.toBeNull();
+        expect(persistedJob?.errorMessage).toContain(
+          "Failed to initialize snapshot sandbox runtime.",
+        );
+
+        const persistedSandboxInstance = await dataPlaneDb.query.sandboxInstances.findFirst({
+          where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+        });
+
+        expect(persistedSandboxInstance).toMatchObject({
+          id: sandboxInstanceId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          status: SandboxInstanceStatuses.FAILED,
+          startedByKind: SandboxInstanceStarterKinds.SYSTEM,
+          startedById: snapshotJobId,
+          source: SandboxInstanceSources.SYSTEM,
+          purpose: SandboxInstancePurposes.SNAPSHOT,
+          persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+          stopReason: SandboxStopReasons.FAILED,
+          failureCode: "snapshot_sandbox_init_failed",
+        });
+        expect(persistedSandboxInstance?.failedAt).not.toBeNull();
+        expect(persistedSandboxInstance?.failureMessage).toContain(
+          "Failed to initialize snapshot sandbox runtime.",
+        );
+      } finally {
+        await bootstrapServer.close();
+        await sandboxRuntimeControl.close();
       }
     },
     IntegrationTestTimeoutMs,
