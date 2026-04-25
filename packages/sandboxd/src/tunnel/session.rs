@@ -5984,6 +5984,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -6338,6 +6339,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -6577,6 +6579,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -6686,6 +6689,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -6804,6 +6808,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -6927,6 +6932,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -7014,6 +7020,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -7210,6 +7217,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -7461,6 +7469,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -7568,6 +7577,7 @@ mod tests {
 
             let startup_input = StartupInput {
                 startup_mode: StartupMode::New,
+                execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
                 bootstrap_token: "bootstrap-token-initial".to_string(),
                 tunnel_exchange_token: "exchange-token-initial".to_string(),
                 tunnel_gateway_ws_url: bootstrap_url,
@@ -7774,6 +7784,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -7916,6 +7927,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8068,6 +8080,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8270,6 +8283,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8395,6 +8409,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8596,6 +8611,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8734,6 +8750,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -8882,6 +8899,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -9085,6 +9103,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -9252,6 +9271,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -9392,6 +9412,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
@@ -9528,6 +9549,7 @@ mod tests {
 
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,

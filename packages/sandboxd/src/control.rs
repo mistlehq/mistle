@@ -251,6 +251,7 @@ struct ControlServerState {
     init_phase: InitPhase,
     startup_input: Option<StartupInput>,
     sandboxd_state: Option<SandboxdState>,
+    shutdown_after_init: bool,
 }
 
 type InitThread = JoinHandle<Result<(), ControlError>>;
@@ -422,6 +423,7 @@ where
         init_phase: InitPhase::Uninitialized,
         startup_input: None,
         sandboxd_state: None,
+        shutdown_after_init: false,
     }));
     let init_thread: SharedInitThread = Arc::new(Mutex::new(None));
     let (shutdown_sender, shutdown_receiver) = mpsc::channel::<()>();
@@ -572,6 +574,9 @@ fn run_control_server_loop(
         if shutdown_receiver.try_recv().is_ok() {
             return Ok(());
         }
+        if should_shutdown_after_init(state) {
+            return Ok(());
+        }
 
         match listener.accept() {
             Ok((mut stream, _)) => {
@@ -604,6 +609,13 @@ fn run_control_server_loop(
             }
         }
     }
+}
+
+fn should_shutdown_after_init(state: &Arc<Mutex<ControlServerState>>) -> bool {
+    state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .shutdown_after_init
 }
 
 fn run_health_server_loop(
@@ -937,6 +949,7 @@ fn begin_init(
                 let mut state_guard = state_for_thread
                     .lock()
                     .expect("control server state lock should not be poisoned");
+                state_guard.shutdown_after_init = startup_input.is_snapshot_materialization();
                 state_guard.sandboxd_state = Some(sandboxd_state);
                 state_guard.init_phase = InitPhase::Initialized;
                 Ok(())
@@ -1251,7 +1264,9 @@ mod tests {
         EGRESS_PROXY_FAULT_KILL_PATH, InitPhase, TEST_FAULTS_ENABLED_ENV,
         start_control_server_with_health_endpoint, submit_init, submit_resume, submit_signing,
     };
-    use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
+    use crate::protocol::startup::{
+        GitIdentity, GitSigningConfig, StartupExecutionMode, StartupInput, StartupMode,
+    };
     use crate::test_support::TestEnvVarGuard;
     use crate::time::testing::ManualSleeper;
     use crate::time::{Sleeper, ThreadSleeper};
@@ -1560,6 +1575,95 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_materialization_init_applies_runtime_plan_and_exits_after_init() {
+        let _env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let test_dir = create_temp_test_dir("control_snapshot_materialization");
+        let socket_path = test_dir.join("control.sock");
+        let startup_output_path = test_dir.join("snapshot-artifact-output.txt");
+        let server = start_test_control_server(&socket_path, ThreadSleeper);
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            execution_mode: StartupExecutionMode::SnapshotMaterialization,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: "ws://127.0.0.1:9/bootstrap".to_string(),
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [
+                    {
+                        "artifactKey": "artifact_1",
+                        "name": "artifact one",
+                        "lifecycle": {
+                            "install": [
+                                {
+                                    "op": "exec",
+                                    "command": {
+                                        "args": [
+                                            "sh",
+                                            "-c",
+                                            format!("printf snapshot-artifact > {}", startup_output_path.display())
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "runtimeClients": [
+                    {
+                        "clientId": "snapshot-client",
+                        "setup": {
+                            "env": {},
+                            "files": []
+                        },
+                        "processes": [
+                            {
+                                "processKey": "should-not-start",
+                                "command": {
+                                    "args": ["/definitely/missing-binary"]
+                                },
+                                "readiness": {
+                                    "type": "none"
+                                },
+                                "stop": {
+                                    "signal": "sigterm",
+                                    "timeoutMs": 10000,
+                                    "gracePeriodMs": 2000
+                                }
+                            }
+                        ],
+                        "endpoints": []
+                    }
+                ],
+                "workspaceSources": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: std::collections::BTreeMap::new(),
+            git_identity: None,
+        };
+
+        submit_init(&socket_path, &startup_input)
+            .expect("snapshot materialization init submission should succeed");
+
+        server
+            .wait()
+            .expect("control server should exit after snapshot materialization init");
+        assert_eq!(
+            std::fs::read_to_string(&startup_output_path)
+                .expect("snapshot runtime-plan artifact output should exist"),
+            "snapshot-artifact"
+        );
+        std::fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+    }
+
+    #[test]
     fn rejects_fault_injection_requests_when_runtime_opt_in_is_missing() {
         let _fault_guard = TestEnvVarGuard::unset(TEST_FAULTS_ENABLED_ENV);
         let test_dir = create_temp_test_dir("control_fault_injection_disabled");
@@ -1695,6 +1799,7 @@ mod tests {
     ) -> StartupInput {
         StartupInput {
             startup_mode,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
@@ -1719,6 +1824,7 @@ mod tests {
     fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, key_ref: String) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

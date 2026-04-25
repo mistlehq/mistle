@@ -9,6 +9,14 @@ pub enum StartupMode {
     Existing,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StartupExecutionMode {
+    #[default]
+    Session,
+    SnapshotMaterialization,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct GitSigningConfig {
@@ -33,12 +41,23 @@ pub struct GitIdentity {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StartupInput {
     pub startup_mode: StartupMode,
+    #[serde(default)]
+    pub execution_mode: StartupExecutionMode,
     pub bootstrap_token: String,
     pub tunnel_exchange_token: String,
     pub tunnel_gateway_ws_url: String,
     pub runtime_plan: serde_json::Value,
     pub egress_grant_by_rule_id: BTreeMap<String, String>,
     pub git_identity: Option<GitIdentity>,
+}
+
+impl StartupInput {
+    pub fn is_snapshot_materialization(&self) -> bool {
+        matches!(
+            self.execution_mode,
+            StartupExecutionMode::SnapshotMaterialization
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,4 +78,70 @@ pub struct StartupInitErrorResponse {
 pub enum StartupInitResponse {
     Ok(StartupInitOkResponse),
     Error(StartupInitErrorResponse),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{StartupExecutionMode, StartupInput, StartupMode};
+
+    #[test]
+    fn defaults_execution_mode_to_session_when_missing() {
+        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
+            "startupMode": "new",
+            "bootstrapToken": "bootstrap-token",
+            "tunnelExchangeToken": "exchange-token",
+            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
+            "runtimePlan": {
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            },
+            "egressGrantByRuleId": {}
+        }))
+        .expect("startup input should deserialize");
+
+        assert_eq!(startup_input.startup_mode, StartupMode::New);
+        assert_eq!(startup_input.execution_mode, StartupExecutionMode::Session);
+        assert!(!startup_input.is_snapshot_materialization());
+    }
+
+    #[test]
+    fn parses_snapshot_materialization_execution_mode() {
+        let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
+            "startupMode": "new",
+            "executionMode": "snapshot_materialization",
+            "bootstrapToken": "bootstrap-token",
+            "tunnelExchangeToken": "exchange-token",
+            "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
+            "runtimePlan": {
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": "registry.example.test/base:latest"
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            },
+            "egressGrantByRuleId": {}
+        }))
+        .expect("startup input should deserialize");
+
+        assert_eq!(
+            startup_input.execution_mode,
+            StartupExecutionMode::SnapshotMaterialization
+        );
+        assert!(startup_input.is_snapshot_materialization());
+    }
 }

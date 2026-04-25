@@ -154,6 +154,62 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
     fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
+    let test_dir = create_temp_test_dir("git_signing_snapshot_materialization");
+    let home_dir = test_dir.join("home");
+    let global_git_config_path = home_dir.join(".gitconfig");
+    let _env_guard = MultiEnvGuard::set([
+        (
+            TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
+            "http://127.0.0.1:5205".to_string(),
+        ),
+        (
+            "HOME",
+            home_dir
+                .to_str()
+                .expect("home dir should be representable as utf-8")
+                .to_string(),
+        ),
+        (
+            "GIT_CONFIG_GLOBAL",
+            global_git_config_path
+                .to_str()
+                .expect("global git config path should be representable as utf-8")
+                .to_string(),
+        ),
+    ]);
+    fs::create_dir_all(&home_dir).expect("home dir should be creatable");
+
+    let control_socket_path = test_dir.join("control.sock");
+    let server = control::start_control_server(
+        &control_socket_path,
+        ThreadSleeper,
+        control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+    )
+    .expect("control server should start");
+    let mut startup_input = valid_signing_startup_input(
+        "ws://127.0.0.1:9/bootstrap",
+        "/opt/mistle/bin/mistle-ssh-sign",
+    );
+    startup_input.execution_mode =
+        sandboxd::protocol::startup::StartupExecutionMode::SnapshotMaterialization;
+
+    control::submit_init(&control_socket_path, &startup_input)
+        .expect("snapshot materialization init submission should succeed");
+
+    server
+        .wait()
+        .expect("control server should exit after snapshot materialization init");
+    assert!(
+        !global_git_config_path.exists(),
+        "snapshot materialization should not write acting-user git identity into the global git config"
+    );
+
+    fs::remove_dir_all(test_dir).expect("temp test dir should be removable");
+}
+
 #[test]
 fn git_signing_without_config_matches_expected_git_behavior() {
     git_commit_without_signing_config_succeeds_without_a_signature();
@@ -416,6 +472,7 @@ fn wait_for_init_phase(server: &control::ControlServer, expected: control::InitP
 fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str) -> StartupInput {
     StartupInput {
         startup_mode: StartupMode::New,
+        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

@@ -18,6 +18,7 @@ export async function createSandboxStartupInput(input: {
   organizationId: string;
   sandboxInstanceId: string;
   startupMode: SandboxStartupInput["startupMode"];
+  executionMode?: SandboxStartupInput["executionMode"];
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
   gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
@@ -92,6 +93,7 @@ export async function createSandboxStartupInput(input: {
 
   return {
     startupMode: input.startupMode,
+    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
     bootstrapToken,
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
@@ -111,6 +113,7 @@ export async function initializeSandboxRuntime(
     sandboxInstanceId: string;
     providerSandboxId: string;
     startupMode: SandboxStartupInput["startupMode"];
+    executionMode?: SandboxStartupInput["executionMode"];
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
     actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
     gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
@@ -121,6 +124,7 @@ export async function initializeSandboxRuntime(
     organizationId: input.organizationId,
     sandboxInstanceId: input.sandboxInstanceId,
     startupMode: input.startupMode,
+    ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
     runtimePlan: input.runtimePlan,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),

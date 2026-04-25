@@ -258,6 +258,7 @@ mod tests {
     ) -> StartupInput {
         StartupInput {
             startup_mode,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: bootstrap_token.to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

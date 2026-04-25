@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  SandboxExecutionModes,
   SandboxStartupModes,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
@@ -243,6 +244,9 @@ const RuntimePlanSchema = z.object({
 
 const SandboxStartupInputSchema = z.object({
   startupMode: z.enum([SandboxStartupModes.NEW, SandboxStartupModes.EXISTING]),
+  executionMode: z
+    .enum([SandboxExecutionModes.SESSION, SandboxExecutionModes.SNAPSHOT_MATERIALIZATION])
+    .optional(),
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
@@ -374,6 +378,21 @@ describe("encodeSandboxStartupInput", () => {
       name: "Mistle User",
       email: "mistle-user@example.com",
     });
+  });
+
+  it("encodes optional snapshot materialization execution mode when present", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      executionMode: SandboxExecutionModes.SNAPSHOT_MATERIALIZATION,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {},
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.executionMode).toBe(SandboxExecutionModes.SNAPSHOT_MATERIALIZATION);
   });
 
   it("encodes optional git signing config when present", () => {

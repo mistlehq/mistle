@@ -262,6 +262,7 @@ mod tests {
     fn valid_startup_input(tunnel_gateway_ws_url: &str) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),

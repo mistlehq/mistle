@@ -350,6 +350,7 @@ mod tests {
     fn rejects_unknown_runtime_ids() {
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5000/tunnel/sandbox".to_string(),

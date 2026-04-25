@@ -7,6 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::fs;
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -21,7 +23,7 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
-use crate::protocol::startup::StartupInput;
+use crate::protocol::startup::{StartupExecutionMode, StartupInput};
 use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
 use crate::runtime::RuntimePlanApplyError;
@@ -103,9 +105,13 @@ const MANAGED_RUNTIME_PATH_ENV: &str = "PATH";
 const MANAGED_RUNTIME_PATH_VALUE: &str =
     "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
+const SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY: &str = "/run/mistle";
+const SNAPSHOT_TRUST_STORE_CERT_PATH: &str =
+    "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
 
 /// Owns the initialized sandbox runtime resources for one daemon process.
 pub struct SandboxdState {
+    execution_mode: StartupExecutionMode,
     egress_proxy: Option<EgressProxy>,
     process_manager: Option<process::RuntimeClientProcessManager>,
     runtime_adapters: RuntimeAdapters,
@@ -156,18 +162,21 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
+        let execution_mode = startup_input.execution_mode;
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
-        runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "apply_git_identity",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.clone()),
-                )]),
-            );
-            SandboxdStateError::ApplyGitIdentity(error)
-        })?;
+        if !startup_input.is_snapshot_materialization() {
+            runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "apply_git_identity",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.clone()),
+                    )]),
+                );
+                SandboxdStateError::ApplyGitIdentity(error)
+            })?;
+        }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
         runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
@@ -176,7 +185,7 @@ impl SandboxdState {
         })?;
         record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
         record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
-        let egress_proxy = EgressProxy::start(
+        let mut egress_proxy = EgressProxy::start(
             &runtime_plan,
             startup_input,
             &tokenizer_proxy_egress_base_url,
@@ -211,6 +220,49 @@ impl SandboxdState {
             SandboxdStateError::RunSetupScript(error.message)
         })?;
         record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
+        if startup_input.is_snapshot_materialization() {
+            // Snapshot materialization captures image-layer state only. Later session launches may
+            // mount persistent storage at paths like /root and /etc/codex, which would shadow any
+            // image contents there, so snapshot workflows must stop here and run on ephemeral
+            // sandboxes without session runtime resources or persistent mounts.
+            record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
+            if let Some(egress_proxy) = egress_proxy.take() {
+                egress_proxy.close().map_err(|error| {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "stop_egress_proxy",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.to_string()),
+                        )]),
+                    );
+                    SandboxdStateError::StopEgressProxy(error.to_string())
+                })?;
+            }
+            record_operation_phase_completed(&diagnostics_logger, "stop_egress_proxy");
+
+            return Ok(Self {
+                execution_mode,
+                egress_proxy: None,
+                process_manager: None,
+                runtime_adapters: RuntimeAdapters::default(),
+                codex_app_server_observation_handle: None,
+                codex_app_server_control_handle: None,
+                codex_proxy_control_handle: None,
+                codex_coordination_shutdown_requested: Arc::new(AtomicBool::new(false)),
+                codex_coordination_thread: None,
+                runtime_readiness_shutdown_requested: Arc::new(AtomicBool::new(false)),
+                runtime_readiness_thread: None,
+                supervisor_handle,
+                keepalive_manager: Arc::new(Mutex::new(KeepaliveManager::default())),
+                runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
+                agent_endpoint_url: None,
+                runtime_env,
+                clock,
+                sleeper,
+                tunnel_session: None,
+            });
+        }
         let process_specs =
             process::flatten_runtime_client_processes(&runtime_plan.runtime_clients, &runtime_env);
         record_operation_phase_started(&diagnostics_logger, "start_runtime_processes");
@@ -349,6 +401,7 @@ impl SandboxdState {
         };
 
         Ok(Self {
+            execution_mode,
             egress_proxy,
             process_manager,
             runtime_adapters,
@@ -376,6 +429,14 @@ impl SandboxdState {
         startup_input: &StartupInput,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
+        if self.execution_mode == StartupExecutionMode::SnapshotMaterialization
+            || startup_input.is_snapshot_materialization()
+        {
+            return Err(SandboxdStateError::StartTunnelSession(
+                "snapshot materialization sandboxes do not support resume".to_string(),
+            ));
+        }
+
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
             record_operation_phase_failure(
@@ -476,6 +537,9 @@ impl SandboxdState {
             .map(EgressProxy::close)
             .transpose()
             .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
+        if self.execution_mode == StartupExecutionMode::SnapshotMaterialization {
+            scrub_snapshot_runtime_artifacts().map_err(SandboxdStateError::StopEgressProxy)?;
+        }
 
         Ok(())
     }
@@ -1071,6 +1135,42 @@ fn merge_managed_runtime_environment(
     Ok(runtime_env)
 }
 
+fn scrub_snapshot_runtime_artifacts() -> Result<(), String> {
+    scrub_snapshot_runtime_artifacts_at_paths(
+        Path::new(SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY),
+        Path::new(SNAPSHOT_TRUST_STORE_CERT_PATH),
+    )
+}
+
+fn scrub_snapshot_runtime_artifacts_at_paths(
+    runtime_artifacts_directory: &Path,
+    trust_store_certificate_path: &Path,
+) -> Result<(), String> {
+    match fs::remove_dir_all(runtime_artifacts_directory) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "failed to remove snapshot runtime artifacts directory '{}': {error}",
+                runtime_artifacts_directory.display()
+            ));
+        }
+    }
+
+    match fs::remove_file(trust_store_certificate_path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => {
+            return Err(format!(
+                "failed to remove snapshot trust-store certificate '{}': {error}",
+                trust_store_certificate_path.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn run_setup_script<C, S>(
     runtime_plan: &runtime::CompiledRuntimePlan,
     runtime_env: &BTreeMap<String, String>,
@@ -1282,7 +1382,7 @@ mod tests {
     use crate::codex_proxy::start_codex_proxy_with_supervisor;
     use crate::keepalive::KeepaliveManager;
     use crate::process::start_runtime_client_process_manager_with_supervisor;
-    use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::protocol::startup::{GitIdentity, StartupExecutionMode, StartupInput, StartupMode};
     use crate::runtime::readiness::{RuntimeReadinessManager, RuntimeReadinessMode};
     use crate::runtime::{
         CompiledRuntimePlan, RuntimeClient, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
@@ -1292,12 +1392,14 @@ mod tests {
     };
     use crate::sandboxd_state::{
         MANAGED_RUNTIME_PATH_ENV, MANAGED_RUNTIME_PATH_VALUE, SETUP_SCRIPT_WORKING_DIRECTORY,
-        apply_runtime_startup_overrides, build_setup_script_environment,
-        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
-        run_setup_script_in_directory, spawn_codex_coordination_thread,
+        SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, apply_runtime_startup_overrides,
+        build_setup_script_environment, collect_runtime_environment,
+        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
+        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
         spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
+    use crate::test_support::TestEnvVarGuard;
     use crate::time::{SystemClock, ThreadSleeper};
 
     #[test]
@@ -1444,6 +1546,7 @@ supports_websockets = false
         };
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5000/bootstrap".to_string(),
@@ -1869,6 +1972,218 @@ supports_websockets = false
             error.output_tails.stderr_tail.as_deref(),
             Some("stderr-line")
         );
+    }
+
+    #[test]
+    fn scrub_snapshot_runtime_artifacts_removes_runtime_directory_and_trust_store_file() {
+        let unique_suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        let temp_root =
+            std::env::temp_dir().join(format!("mistle-snapshot-runtime-artifacts-{unique_suffix}"));
+        let runtime_directory = temp_root.join("run/mistle");
+        let trust_store_certificate_path =
+            temp_root.join("usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt");
+
+        std::fs::create_dir_all(runtime_directory.join("sandboxd"))
+            .expect("runtime directory should be creatable");
+        std::fs::create_dir_all(
+            trust_store_certificate_path
+                .parent()
+                .expect("trust store path should have a parent"),
+        )
+        .expect("trust store directory should be creatable");
+        std::fs::write(runtime_directory.join("init.log"), "diagnostics")
+            .expect("runtime diagnostics file should be writable");
+        std::fs::write(&trust_store_certificate_path, "cert")
+            .expect("trust store certificate should be writable");
+
+        scrub_snapshot_runtime_artifacts_at_paths(
+            &runtime_directory,
+            &trust_store_certificate_path,
+        )
+        .expect("snapshot runtime artifacts should scrub cleanly");
+
+        assert!(!runtime_directory.exists());
+        assert!(!trust_store_certificate_path.exists());
+        std::fs::remove_dir_all(&temp_root).ok();
+    }
+
+    #[test]
+    fn snapshot_materialization_initialization_applies_runtime_plan_and_skips_session_runtime_resources()
+     {
+        let _tokenizer_proxy_env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let output_path = std::env::temp_dir().join(format!(
+            "mistle-snapshot-materialization-artifact-output-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::SnapshotMaterialization,
+                "ws://127.0.0.1:9/bootstrap",
+                serde_json::json!({
+                    "egressRoutes": [],
+                    "artifacts": [
+                        {
+                            "artifactKey": "artifact_1",
+                            "name": "artifact one",
+                            "lifecycle": {
+                                "install": [
+                                    {
+                                        "op": "exec",
+                                        "command": {
+                                            "args": [
+                                                "sh",
+                                                "-c",
+                                                format!("printf snapshot-artifact > {}", output_path.display())
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "workspaceSources": [],
+                    "runtimeClients": [
+                        {
+                            "clientId": "snapshot-client",
+                            "setup": {
+                                "env": {},
+                                "files": []
+                            },
+                            "processes": [
+                                {
+                                    "processKey": "should-not-start",
+                                    "command": {
+                                        "args": ["/definitely/missing-binary"]
+                                    },
+                                    "readiness": {
+                                        "type": "none"
+                                    },
+                                    "stop": {
+                                        "signal": "sigterm",
+                                        "timeoutMs": 10000,
+                                        "gracePeriodMs": 2000
+                                    }
+                                }
+                            ],
+                            "endpoints": [
+                                {
+                                    "endpointKey": "app-server",
+                                    "processKey": "should-not-start",
+                                    "transport": {
+                                        "type": "ws",
+                                        "url": "ws://127.0.0.1:4500/codex"
+                                    },
+                                    "connectionMode": "dedicated"
+                                }
+                            ]
+                        }
+                    ],
+                    "agentRuntimes": [
+                        {
+                            "bindingId": "arb_123",
+                            "runtimeId": "codex",
+                            "runtimeKey": "should-not-start",
+                            "clientId": "snapshot-client",
+                            "endpointKey": "app-server",
+                            "ptyLaunch": {}
+                        }
+                    ]
+                }),
+                None,
+            ),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            None,
+        )
+        .expect("snapshot materialization init should succeed after static runtime-plan setup");
+
+        assert_eq!(
+            state.execution_mode,
+            StartupExecutionMode::SnapshotMaterialization
+        );
+        assert!(state.process_manager.is_none());
+        assert!(state.runtime_adapters.adapters().is_empty());
+        assert!(state.tunnel_session.is_none());
+
+        let output = std::fs::read_to_string(&output_path)
+            .expect("runtime-plan artifact install should write its output file");
+        assert_eq!(output, "snapshot-artifact");
+
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
+    fn snapshot_materialization_state_rejects_resume() {
+        let _tokenizer_proxy_env_guard =
+            TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
+        let mut state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::SnapshotMaterialization,
+                "ws://127.0.0.1:9/bootstrap",
+                minimal_runtime_plan_json(),
+                None,
+            ),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            None,
+        )
+        .expect("snapshot materialization init should succeed");
+
+        let error = state
+            .resume(
+                &build_startup_input(
+                    StartupMode::Existing,
+                    StartupExecutionMode::Session,
+                    "ws://127.0.0.1:9/bootstrap",
+                    minimal_runtime_plan_json(),
+                    None,
+                ),
+                None,
+            )
+            .expect_err("snapshot materialization state should reject resume");
+
+        assert_eq!(
+            error.to_string(),
+            "failed to start bootstrap tunnel session: snapshot materialization sandboxes do not support resume"
+        );
+    }
+
+    fn minimal_runtime_plan_json() -> serde_json::Value {
+        serde_json::json!({
+            "egressRoutes": [],
+            "artifacts": [],
+            "workspaceSources": [],
+            "runtimeClients": [],
+            "agentRuntimes": []
+        })
+    }
+
+    fn build_startup_input(
+        startup_mode: StartupMode,
+        execution_mode: StartupExecutionMode,
+        tunnel_gateway_ws_url: &str,
+        runtime_plan: serde_json::Value,
+        git_identity: Option<GitIdentity>,
+    ) -> StartupInput {
+        StartupInput {
+            startup_mode,
+            execution_mode,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            runtime_plan,
+            egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity,
+        }
     }
 
     #[test]

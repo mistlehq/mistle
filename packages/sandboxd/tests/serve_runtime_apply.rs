@@ -30,6 +30,7 @@ fn daemon_applies_startup_input_after_init_submission() {
 
     let startup_input = StartupInput {
         startup_mode: StartupMode::New,
+        execution_mode: sandboxd::protocol::startup::StartupExecutionMode::Session,
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: bootstrap_gateway.ws_url.clone(),
