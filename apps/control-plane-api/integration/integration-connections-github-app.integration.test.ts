@@ -8,6 +8,7 @@ import {
 } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import {
   CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
@@ -69,19 +70,6 @@ function createDashboardOrganizationIntegrationsUrl(
     fixture.config.dashboard.baseUrl,
     `/integrations/${encodeURIComponent(targetKey)}${query}`,
   );
-}
-
-function parseJsonRecord(value: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(value);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Expected JSON record.");
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(parsed)) {
-    record[key] = entryValue;
-  }
-  return record;
 }
 
 describe("integration connections GitHub App integration", () => {
@@ -221,7 +209,10 @@ describe("integration connections GitHub App integration", () => {
     const state = resolveGitHubAppManifestSubmissionState(submissionUrl);
     expect(responseBody.fields).not.toHaveProperty("state");
 
-    const manifest = parseJsonRecord(responseBody.fields.manifest);
+    const manifest = z
+      .record(z.string(), z.unknown())
+      .parse(JSON.parse(responseBody.fields.manifest));
+
     expect(manifest["name"]).toBe("Mistle GitHub App");
     expect(manifest["redirect_url"]).toBe(
       `${fixture.config.auth.baseUrl}/p/integration/callbacks/github-app-manifest`,
