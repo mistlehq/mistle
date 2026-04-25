@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  readCodexThread,
+  listLoadedCodexThreads,
   resumeCodexThread,
   unsubscribeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
@@ -23,24 +23,6 @@ import {
 import { it } from "./system-test-context.js";
 
 const describeIf = hasRequiredGitHubWebhookAutomationEnv() ? describe : describe.skip;
-
-function readThreadStatusType(response: unknown): string | null {
-  if (typeof response !== "object" || response === null || !("thread" in response)) {
-    return null;
-  }
-
-  const thread = response.thread;
-  if (typeof thread !== "object" || thread === null || !("status" in thread)) {
-    return null;
-  }
-
-  const status = thread.status;
-  if (typeof status !== "object" || status === null || !("type" in status)) {
-    return null;
-  }
-
-  return typeof status.type === "string" ? status.type : null;
-}
 
 describeIf("system GitHub webhook automation thread resume", () => {
   it(
@@ -60,15 +42,16 @@ describeIf("system GitHub webhook automation thread resume", () => {
         await conversation.reconnectRpcClient();
 
         await waitForCondition({
-          description: `Codex thread '${conversation.providerConversationId}' to become notLoaded`,
+          description: `Codex thread '${conversation.providerConversationId}' to leave the loaded thread list`,
           timeoutMs: ThreadReadTimeoutMs,
           evaluate: async () => {
-            const threadRead = await readCodexThread({
+            const loadedThreads = await listLoadedCodexThreads({
               rpcClient: conversation.rpcClient,
-              threadId: conversation.providerConversationId,
             });
 
-            return readThreadStatusType(threadRead.response) === "notLoaded" ? threadRead : null;
+            return loadedThreads.threadIds.includes(conversation.providerConversationId)
+              ? null
+              : loadedThreads;
           },
         });
 

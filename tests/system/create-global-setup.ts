@@ -157,6 +157,21 @@ function resolveSharedControlPlaneTunnel():
   };
 }
 
+function resolveTokenizerProxyEnvironment(input: {
+  telemetryEnvironmentOverrides: Record<string, string>;
+}): Record<string, string> {
+  const controlPlaneTunnel = resolveSharedControlPlaneTunnel();
+
+  return {
+    ...input.telemetryEnvironmentOverrides,
+    ...(controlPlaneTunnel === undefined
+      ? {}
+      : {
+          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL: `https://${controlPlaneTunnel.publicHostname}`,
+        }),
+  };
+}
+
 function createTelemetryEnvironmentOverrides(input: {
   tracesEndpoint: string;
   logsEndpoint: string;
@@ -236,7 +251,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
         ...telemetryEnvironmentOverrides,
         [SANDBOXD_TEST_FAULTS_ENABLED_ENV]: "true",
       },
-      tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
+      tokenizerProxyEnvironment: resolveTokenizerProxyEnvironment({
+        telemetryEnvironmentOverrides,
+      }),
     });
     let sharedControlPlaneTunnel: StartedCloudflaredTunnel | null = null;
 
