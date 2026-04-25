@@ -211,13 +211,6 @@ export function createAvailableCardsOverview(): readonly OrganizationIntegration
 }
 
 export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): React.JSX.Element {
-  return <IntegrationSettingsAddFlowStoryContent spec={spec} />;
-}
-
-function IntegrationSettingsAddFlowStoryContent(input: {
-  spec: StoryIntegrationSpec;
-}): React.JSX.Element {
-  const spec = input.spec;
   const initialEditorInput = createEditorInput(spec);
   const defaultMethodId =
     spec.initialMethodId ??
