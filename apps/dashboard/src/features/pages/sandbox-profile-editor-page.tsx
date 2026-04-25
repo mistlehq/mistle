@@ -552,7 +552,6 @@ function LoadedSandboxProfileEditorPage(
 
   return (
     <ReadySandboxProfileEditorPage
-      createDraftIsPending={createDraftMutation.isPending}
       mode={resolvedMode.mode}
       navigate={input.navigate}
       onMakeChanges={() => {
@@ -574,8 +573,6 @@ function LoadedSandboxProfileEditorPage(
       }}
       profile={input.profile}
       profileId={input.profileId}
-      publishIsPending={publishMutation.isPending}
-      discardChangesIsPending={discardChangesMutation.isPending}
       deleteProfileAutomationUsages={automationUsagesQuery.data ?? []}
       deleteProfileAutomationUsagesError={
         automationUsagesQuery.isError
@@ -607,6 +604,11 @@ function LoadedSandboxProfileEditorPage(
         setIsDeleteProfileDialogOpen(open);
       }}
       versionActionError={versionActionError}
+      versionActionIsPending={
+        publishMutation.isPending ||
+        createDraftMutation.isPending ||
+        discardChangesMutation.isPending
+      }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
       invalidateVersionBindings={input.invalidateVersionBindings}
@@ -621,9 +623,7 @@ function ReadySandboxProfileEditorPage(input: {
   profile: SandboxProfile;
   mode: SandboxProfileEditorVersionMode;
   versionActionError: string | null;
-  publishIsPending: boolean;
-  createDraftIsPending: boolean;
-  discardChangesIsPending: boolean;
+  versionActionIsPending: boolean;
   deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
   deleteProfileAutomationUsagesError: string | null;
   deleteProfileAutomationUsagesIsPending: boolean;
@@ -683,9 +683,7 @@ function ReadySandboxProfileEditorPage(input: {
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
       versionActionError={input.versionActionError}
-      versionActionIsPending={
-        input.publishIsPending || input.createDraftIsPending || input.discardChangesIsPending
-      }
+      versionActionIsPending={input.versionActionIsPending}
       isCancelDraftDialogOpen={input.isCancelDraftDialogOpen}
       isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
       renderSectionPanel={(sectionId) => {
