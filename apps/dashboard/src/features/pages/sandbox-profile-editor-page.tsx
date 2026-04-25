@@ -467,11 +467,7 @@ function LoadedSandboxProfileEditorPage(
     },
   });
   const discardChangesMutation = useMutation({
-    mutationFn: async (inputValue: {
-      draftVersion: number;
-      activeVersion: number;
-      leaveDraftMode: boolean;
-    }) =>
+    mutationFn: async (inputValue: { draftVersion: number; activeVersion: number }) =>
       discardSandboxProfileDraftChanges({
         profileId: input.profileId,
         draftVersion: inputValue.draftVersion,
@@ -489,10 +485,8 @@ function LoadedSandboxProfileEditorPage(
           version: variables.draftVersion,
         }),
       ]);
-      if (variables.leaveDraftMode) {
-        setIsCancelDraftDialogOpen(false);
-        setViewedVersionKind("active");
-      }
+      setIsCancelDraftDialogOpen(false);
+      setViewedVersionKind("active");
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -565,10 +559,7 @@ function LoadedSandboxProfileEditorPage(
         createDraftMutation.mutate();
       }}
       onDiscardChangesAndLeaveDraft={(inputValue) => {
-        discardChangesMutation.mutate({
-          ...inputValue,
-          leaveDraftMode: true,
-        });
+        discardChangesMutation.mutate(inputValue);
       }}
       onPublish={(version) => {
         publishMutation.mutate(version);
