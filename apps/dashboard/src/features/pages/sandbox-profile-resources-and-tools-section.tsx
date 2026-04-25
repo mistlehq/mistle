@@ -16,6 +16,7 @@ import {
   type ResponsiveFieldListColumn,
   ResponsiveFieldListRow,
 } from "../shared/responsive-field-list.js";
+import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -118,7 +119,7 @@ function RepositoryResourcesPicker(input: {
           queryKey: ["integration-connections", input.connection.id, "resources", "repository"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["sandbox-profiles", "integration-directory"],
+          queryKey: sandboxProfileIntegrationDirectoryQueryKey(),
         }),
       ]);
     },

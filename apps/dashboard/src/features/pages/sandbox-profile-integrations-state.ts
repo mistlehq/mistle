@@ -5,7 +5,10 @@ import { z } from "zod";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
-import { sandboxProfileVersionIntegrationBindingsQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import {
+  sandboxProfileIntegrationDirectoryQueryKey,
+  sandboxProfileVersionIntegrationBindingsQueryKey,
+} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   getSandboxProfileVersionIntegrationBindings,
   putSandboxProfileVersionIntegrationBindings,
@@ -127,7 +130,7 @@ export function useSandboxProfileIntegrationsLoader(input: {
     retry: false,
   });
   const integrationDirectoryQuery = useQuery({
-    queryKey: ["sandbox-profiles", "integration-directory"],
+    queryKey: sandboxProfileIntegrationDirectoryQueryKey(),
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
     retry: false,
   });

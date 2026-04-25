@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
 import {
   sandboxProfileDetailQueryKey,
+  sandboxProfileIntegrationDirectoryQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -122,7 +123,7 @@ function renderSandboxProfileEditor(input?: {
       },
     );
   }
-  queryClient.setQueryData(["sandbox-profiles", "integration-directory"], {
+  queryClient.setQueryData(sandboxProfileIntegrationDirectoryQueryKey(), {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
   });
