@@ -59,6 +59,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   draftValue: string;
   errorMessage: string | null;
   saveStatus: AutoSaveStatus;
+  hasUnsavedChanges: boolean;
   isSaving: boolean;
   onChange: (nextValue: string) => void;
   onBlur: () => void;
@@ -199,6 +200,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     draftValue,
     errorMessage,
     saveStatus,
+    hasUnsavedChanges: draftValue !== persistedValue,
     isSaving: saveMutation.isPending,
     onChange,
     onBlur,

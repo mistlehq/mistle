@@ -176,6 +176,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   integrationRowErrorsByClientId: Readonly<Record<string, string>>;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  hasUnsavedChanges: boolean;
   onAddIntegrationBindingRow: (input: {
     kind: SandboxIntegrationBindingKind;
     connectionId: string;
@@ -190,6 +191,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 } {
   const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
@@ -210,6 +212,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   }
 
   function markIntegrationDirty(inputValue?: { clientId: string }): void {
+    setHasUnsavedChanges(true);
     setIntegrationSaveError(null);
     if (inputValue === undefined) {
       setIntegrationRowErrorsByClientId({});
@@ -240,6 +243,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     onSuccess: async (updatedBindings) => {
       setIntegrationRows(mapBindingsToEditorRows(updatedBindings.bindings));
       setIntegrationSaveError(null);
+      setHasUnsavedChanges(false);
       setIntegrationRowErrorsByClientId({});
       await input.invalidateVersionBindings({
         profileId: input.profileId,
@@ -389,6 +393,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     integrationRowErrorsByClientId,
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
+    hasUnsavedChanges,
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,

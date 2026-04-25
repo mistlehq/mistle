@@ -244,7 +244,7 @@ function DeleteProfileDialogHarness(input: {
   );
 }
 
-function DraftActionsHarness(): JSX.Element {
+function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
 
   return (
@@ -254,7 +254,7 @@ function DraftActionsHarness(): JSX.Element {
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      hasUnsavedIntegrationChanges={false}
+      hasUnsavedIntegrationChanges={input.hasUnsavedIntegrationChanges ?? false}
       isDeleteProfileDialogOpen={false}
       mode={{
         kind: "draft",
@@ -304,9 +304,9 @@ function renderDeleteProfileDialogHarness(input: {
   render(<RouterProvider router={router} />);
 }
 
-function renderDraftActionsHarness(): void {
+function renderDraftActionsHarness(input?: { hasUnsavedIntegrationChanges?: boolean }): void {
   const router = createMemoryRouter(
-    createRoutesFromElements(<Route element={<DraftActionsHarness />} path="/" />),
+    createRoutesFromElements(<Route element={<DraftActionsHarness {...input} />} path="/" />),
   );
 
   render(<RouterProvider router={router} />);
@@ -523,7 +523,7 @@ describe("SandboxProfileEditorPage", () => {
       ],
     });
 
-    expect(screen.getByText("Published")).toBeDefined();
+    expect(screen.getByText("Viewing: Published")).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(screen.getByRole("combobox", { name: "agent harness connection" })).toHaveProperty(
       "disabled",
@@ -536,15 +536,24 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published-with-draft",
     });
 
-    expect(screen.getByText("Published")).toBeDefined();
+    expect(screen.getByText("Viewing: Published")).toBeDefined();
     expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
   });
 
   it("renders draft profiles with publish action", () => {
     renderSandboxProfileEditor();
 
-    expect(screen.getByText("Draft")).toBeDefined();
+    expect(screen.getByText("Viewing: Draft")).toBeDefined();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
+  });
+
+  it("blocks draft version actions while draft changes are saving", () => {
+    renderDraftActionsHarness({
+      hasUnsavedIntegrationChanges: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Saving..." })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "More actions" })).toHaveProperty("disabled", true);
   });
 
   it("shows draft actions for draft profiles with a published version", () => {

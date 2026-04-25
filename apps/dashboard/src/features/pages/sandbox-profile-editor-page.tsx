@@ -21,7 +21,7 @@ import {
 } from "@mistle/ui";
 import { CheckCircleIcon, InfoIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type SyntheticEvent } from "react";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -641,6 +641,7 @@ function ReadySandboxProfileEditorPage(input: {
     version: input.mode.version,
   });
   const [hasUnsavedIntegrationChanges, setHasUnsavedIntegrationChanges] = useState(false);
+  const [hasUnsavedSetupScriptChanges, setHasUnsavedSetupScriptChanges] = useState(false);
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -652,6 +653,7 @@ function ReadySandboxProfileEditorPage(input: {
   return (
     <SandboxProfileEditorView
       hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
+      hasUnsavedSetupScriptChanges={hasUnsavedSetupScriptChanges}
       isSavingProfileName={metaState.isUpdating}
       mode={input.mode}
       deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
@@ -681,6 +683,7 @@ function ReadySandboxProfileEditorPage(input: {
               loader={setupScriptLoader}
               profileId={input.profileId}
               invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+              onHasUnsavedChangesChange={setHasUnsavedSetupScriptChanges}
               version={input.mode.version}
             />
           );
@@ -821,8 +824,14 @@ export function SandboxProfileEditorView(input: {
   sections: readonly SandboxProfileEditorSection[];
   renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
+  hasUnsavedSetupScriptChanges?: boolean;
   isSavingProfileName?: boolean;
 }): React.JSX.Element {
+  const hasUnsavedDraftChanges =
+    input.mode.kind === "draft" &&
+    ((input.hasUnsavedIntegrationChanges ?? false) ||
+      (input.hasUnsavedSetupScriptChanges ?? false));
+  const versionActionIsDisabled = input.versionActionIsPending || hasUnsavedDraftChanges;
   const discardChangesInput =
     input.mode.kind === "draft" && input.mode.activeVersion !== null
       ? {
@@ -857,8 +866,8 @@ export function SandboxProfileEditorView(input: {
   return (
     <div className="gap-4 flex flex-col">
       <UnsavedChangesGuard
-        description="You have unsaved integration changes. If you leave this page, your changes will be discarded."
-        when={input.hasUnsavedIntegrationChanges ?? false}
+        description="You have unsaved draft changes. If you leave this page, your changes will be discarded."
+        when={hasUnsavedDraftChanges}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -880,21 +889,21 @@ export function SandboxProfileEditorView(input: {
                 : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
             }
           >
-            {input.mode.kind === "draft" ? "Draft" : "Published"}
+            {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
           </span>
           {input.mode.kind === "draft" ? (
             <ButtonGroup>
               <Button
-                disabled={input.versionActionIsPending}
+                disabled={versionActionIsDisabled}
                 onClick={() => {
                   input.onPublish(input.mode.version);
                 }}
                 type="button"
               >
-                Publish
+                {hasUnsavedDraftChanges ? "Saving..." : "Publish"}
               </Button>
               <MoreActionsMenu
-                disabled={input.versionActionIsPending}
+                disabled={versionActionIsDisabled}
                 triggerIconVariant="chevron-down"
                 triggerLabel="More actions"
                 triggerVariant="default"
@@ -1067,6 +1076,17 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     availableTargets: input.availableTargets,
     invalidateVersionBindings: input.invalidateVersionBindings,
   });
+  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+
+  useEffect(() => {
+    onHasUnsavedChangesChange?.(
+      integrationsState.hasUnsavedChanges || integrationsState.isSubmittingIntegrationBindings,
+    );
+  }, [
+    onHasUnsavedChangesChange,
+    integrationsState.hasUnsavedChanges,
+    integrationsState.isSubmittingIntegrationBindings,
+  ]);
 
   return input.activeSectionId === "resources-and-tools" ? (
     <SandboxProfileResourcesAndToolsSection
@@ -1102,6 +1122,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
   if (input.loader.setupScriptQuery.isPending) {
     return <SandboxProfileSetupScriptPanel disabled={true} value="" />;
@@ -1128,6 +1149,9 @@ function LoadedSandboxProfileSetupScriptSection(input: {
       disabled={input.disabled}
       setupScript={input.loader.setupScript}
       version={input.version}
+      {...(input.onHasUnsavedChangesChange === undefined
+        ? {}
+        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
     />
   );
 }
@@ -1138,6 +1162,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
   const setupScriptState = useLoadedSandboxProfileSetupScriptState({
     profileId: input.profileId,
@@ -1145,6 +1170,11 @@ function ReadySandboxProfileSetupScriptSection(input: {
     setupScript: input.setupScript,
     invalidateVersionSetupScript: input.invalidateVersionSetupScript,
   });
+  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+
+  useEffect(() => {
+    onHasUnsavedChangesChange?.(setupScriptState.hasUnsavedChanges || setupScriptState.isSaving);
+  }, [onHasUnsavedChangesChange, setupScriptState.hasUnsavedChanges, setupScriptState.isSaving]);
 
   return (
     <SandboxProfileSetupScriptPanel
