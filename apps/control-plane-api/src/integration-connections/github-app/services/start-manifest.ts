@@ -60,10 +60,6 @@ function buildGitHubAppManifestSubmissionUrl(input: {
   return submissionUrl.toString();
 }
 
-function buildCallbackUrl(controlPlaneBaseUrl: string, path: string): string {
-  return new URL(path, controlPlaneBaseUrl).toString();
-}
-
 function buildGitHubAppManifest(input: {
   manifest: Record<string, unknown>;
   controlPlaneBaseUrl: string;
@@ -75,17 +71,17 @@ function buildGitHubAppManifest(input: {
       active: true,
       url: input.webhookCallbackUrl,
     },
-    redirect_url: buildCallbackUrl(
-      input.controlPlaneBaseUrl,
+    redirect_url: new URL(
       "/p/integration/callbacks/github-app-manifest",
-    ),
-    callback_urls: [
-      buildCallbackUrl(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
-    ],
-    setup_url: buildCallbackUrl(
       input.controlPlaneBaseUrl,
+    ).toString(),
+    callback_urls: [
+      new URL("/p/identity-linking/callbacks/github", input.controlPlaneBaseUrl).toString(),
+    ],
+    setup_url: new URL(
       "/p/integration/callbacks/github-app-installation",
-    ),
+      input.controlPlaneBaseUrl,
+    ).toString(),
   };
 }
 
