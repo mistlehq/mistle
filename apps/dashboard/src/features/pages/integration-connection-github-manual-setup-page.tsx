@@ -937,9 +937,6 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
         key={connection.id}
         connection={connection}
         manifestCreationSucceeded={searchParams.get("githubAppManifest") === "created"}
-        onBack={() => {
-          void navigate("/integrations");
-        }}
       />
     </FormPageFrame>
   );
@@ -948,7 +945,6 @@ export function IntegrationConnectionGitHubManualSetupPage(): React.JSX.Element 
 export function GitHubAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestCreationSucceeded?: boolean;
-  onBack?: () => void;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState(() => createInitialDraft(input.connection));
