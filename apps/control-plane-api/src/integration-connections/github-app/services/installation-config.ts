@@ -12,6 +12,11 @@ type InvalidGitHubAppInstallationConfigCode =
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT;
 
+type InvalidGitHubTargetConfigCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT;
+
 function toUnknownRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
@@ -70,7 +75,7 @@ export function parseGitHubAppInstallationConnectionConfigOrThrow(input: {
 export function parseGitHubTargetConfigOrThrow(input: {
   config: unknown;
   targetKey: string;
-  invalidInputCode: string;
+  invalidInputCode: InvalidGitHubTargetConfigCode;
 }): z.output<typeof GitHubTargetConfigSchema> {
   try {
     return GitHubTargetConfigSchema.parse(input.config);
