@@ -17,6 +17,11 @@ type RedirectStateBadRequestCode =
   | typeof IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED
   | typeof IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED;
 
+type RequiredRedirectQueryParamBadRequestCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT;
+
 export function createRedirectState(): string {
   return randomBytes(REDIRECT_STATE_BYTE_LENGTH).toString("base64url");
 }
@@ -121,6 +126,20 @@ export function createRedirectQueryParams(query: Record<string, string>): URLSea
   }
 
   return params;
+}
+
+export function resolveRequiredRedirectQueryParamOrThrow(input: {
+  params: URLSearchParams;
+  name: string;
+  invalidInputCode: RequiredRedirectQueryParamBadRequestCode;
+  missingMessage: string;
+}): string {
+  const value = input.params.get(input.name);
+  if (value === null || value.length === 0) {
+    throw new BadRequestError(input.invalidInputCode, input.missingMessage);
+  }
+
+  return value;
 }
 
 export async function resolveActiveRedirectSessionOrThrow(input: {

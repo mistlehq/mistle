@@ -31,6 +31,7 @@ import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
   resolveGitHubAppManifestConnectionId,
+  resolveRequiredRedirectQueryParamOrThrow,
 } from "../../services/redirect-flow.js";
 import { buildUrlWithPath } from "../../services/url-path.js";
 import {
@@ -65,27 +66,23 @@ const GitHubAppManifestConversionResponseSchema = z
 type GitHubAppManifestConversion = z.output<typeof GitHubAppManifestConversionResponseSchema>;
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
-  const state = params.get("state");
-  if (state === null || state.length === 0) {
-    throw new BadRequestError(
+  return resolveRequiredRedirectQueryParamOrThrow({
+    params,
+    name: "state",
+    invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-      "GitHub App manifest callback query must include `state`.",
-    );
-  }
-
-  return state;
+    missingMessage: "GitHub App manifest callback query must include `state`.",
+  });
 }
 
 function resolveManifestCodeOrThrow(params: URLSearchParams): string {
-  const code = params.get("code");
-  if (code === null || code.length === 0) {
-    throw new BadRequestError(
+  return resolveRequiredRedirectQueryParamOrThrow({
+    params,
+    name: "code",
+    invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-      "GitHub App manifest callback query must include `code`.",
-    );
-  }
-
-  return code;
+    missingMessage: "GitHub App manifest callback query must include `code`.",
+  });
 }
 
 function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {

@@ -18,6 +18,7 @@ import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
   resolveGitHubAppInstallationConnectionId,
+  resolveRequiredRedirectQueryParamOrThrow,
 } from "../../services/redirect-flow.js";
 import {
   ensureImplicitConnectionWebhookSource,
@@ -35,27 +36,23 @@ type CompletedConnection = {
 };
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
-  const state = params.get("state");
-  if (state === null || state.length === 0) {
-    throw new BadRequestError(
+  return resolveRequiredRedirectQueryParamOrThrow({
+    params,
+    name: "state",
+    invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
-      "GitHub App installation callback query must include `state`.",
-    );
-  }
-
-  return state;
+    missingMessage: "GitHub App installation callback query must include `state`.",
+  });
 }
 
 function resolveInstallationIdOrThrow(params: URLSearchParams): string {
-  const installationId = params.get("installation_id");
-  if (installationId === null || installationId.length === 0) {
-    throw new BadRequestError(
+  return resolveRequiredRedirectQueryParamOrThrow({
+    params,
+    name: "installation_id",
+    invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
-      "GitHub App installation callback query must include `installation_id`.",
-    );
-  }
-
-  return installationId;
+    missingMessage: "GitHub App installation callback query must include `installation_id`.",
+  });
 }
 
 function resolveGitHubAppInstallationConnectionIdOrThrow(state: string): string {

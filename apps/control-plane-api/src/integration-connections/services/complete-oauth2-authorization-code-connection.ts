@@ -25,6 +25,7 @@ import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
+  resolveRequiredRedirectQueryParamOrThrow,
   resolveRedirectDisplayName,
 } from "./redirect-flow.js";
 import { resolveOAuth2AuthorizationCodeCapabilityTargetOrThrow } from "./resolve-oauth2-authorization-code-capability-target.js";
@@ -58,15 +59,12 @@ function buildOAuth2AuthorizationCodeCompleteUrl(input: {
 }
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
-  const state = params.get("state");
-  if (state === null || state.length === 0) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
-      "OAuth 2.0 (Authorization Code) callback query must include `state`.",
-    );
-  }
-
-  return state;
+  return resolveRequiredRedirectQueryParamOrThrow({
+    params,
+    name: "state",
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
+    missingMessage: "OAuth 2.0 (Authorization Code) callback query must include `state`.",
+  });
 }
 
 function resolvePkceVerifier(input: {
