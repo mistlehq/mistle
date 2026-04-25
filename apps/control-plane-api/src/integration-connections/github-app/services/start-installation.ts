@@ -3,14 +3,8 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import {
-  IntegrationConnectionMethodIds,
-  type IntegrationRegistry,
-} from "@mistle/integrations-core";
-import {
-  GitHubTargetConfigSchema,
-  parseGitHubAppInstallationConnectionConfig,
-} from "@mistle/integrations-definitions";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { GitHubTargetConfigSchema } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
 import {
@@ -28,6 +22,7 @@ import {
   resolveConnectionSecretsOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
+import { parseGitHubAppInstallationConnectionConfigOrThrow } from "./installation-config.js";
 
 export type StartGitHubAppInstallationConnectionInput = {
   organizationId: string;
@@ -37,49 +32,6 @@ export type StartGitHubAppInstallationConnectionInput = {
 type StartedGitHubAppInstallationConnection = {
   authorizationUrl: string;
 };
-
-function toUnknownRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
-function resolveGitHubAppInstallationConnectionConfigOrThrow(input: {
-  config: unknown;
-  connectionId: string;
-}) {
-  const configRecord = toUnknownRecord(input.config);
-
-  if (
-    configRecord !== null &&
-    configRecord["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
-    );
-  }
-
-  try {
-    return parseGitHubAppInstallationConnectionConfig(input.config);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
-        `Integration connection '${input.connectionId}' has invalid GitHub App configuration.`,
-      );
-    }
-
-    throw error;
-  }
-}
 
 async function persistRedirectSession(input: {
   db: ControlPlaneDatabase;
@@ -150,9 +102,11 @@ export async function startGitHubAppInstallationConnection(
     );
   }
 
-  const parsedConnectionConfig = resolveGitHubAppInstallationConnectionConfigOrThrow({
+  const parsedConnectionConfig = parseGitHubAppInstallationConnectionConfigOrThrow({
     config: connection.config,
     connectionId: input.connectionId,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
   });
   try {
     await resolveConnectionSecretsOrThrow({

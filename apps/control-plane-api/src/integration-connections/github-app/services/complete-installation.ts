@@ -5,24 +5,24 @@ import {
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
-  IntegrationConnectionMethodIds,
+  IntegrationWebhookSourceLifecycles,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
-import { parseGitHubAppInstallationConnectionConfig } from "@mistle/integrations-definitions";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { z } from "zod";
 
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../../constants.js";
-import { createRedirectQueryParams } from "../../services/redirect-flow.js";
-import { resolveGitHubAppInstallationConnectionId } from "../../services/redirect-flow.js";
+import {
+  createRedirectQueryParams,
+  resolveGitHubAppInstallationConnectionId,
+} from "../../services/redirect-flow.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
+import { parseGitHubAppInstallationConnectionConfigOrThrow } from "./installation-config.js";
 
 type CompleteGitHubAppInstallationConnectionInput = {
   query: Record<string, string>;
@@ -32,19 +32,6 @@ type CompletedConnection = {
   id: string;
   targetKey: string;
 };
-
-function toUnknownRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
@@ -78,36 +65,6 @@ function resolveGitHubAppInstallationConnectionIdOrThrow(state: string): string 
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       "Redirect state is invalid.",
     );
-  }
-}
-
-function resolveGitHubAppInstallationConnectionConfigOrThrow(input: {
-  config: unknown;
-  connectionId: string;
-}) {
-  const configRecord = toUnknownRecord(input.config);
-
-  if (
-    configRecord !== null &&
-    configRecord["connection_method"] !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
-      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
-    );
-  }
-
-  try {
-    return parseGitHubAppInstallationConnectionConfig(input.config);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
-        `Integration connection '${input.connectionId}' has invalid GitHub App configuration.`,
-      );
-    }
-
-    throw error;
   }
 }
 
@@ -183,9 +140,11 @@ export async function completeGitHubAppInstallationConnection(
     );
   }
 
-  const parsedConnectionConfig = resolveGitHubAppInstallationConnectionConfigOrThrow({
+  const parsedConnectionConfig = parseGitHubAppInstallationConnectionConfigOrThrow({
     config: connection.config,
     connectionId: connection.id,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
   });
 
   return db.transaction(async (tx) => {
