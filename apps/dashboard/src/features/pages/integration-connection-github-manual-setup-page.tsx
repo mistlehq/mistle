@@ -1447,11 +1447,3 @@ export function GitHubAppSetupPane(input: {
     </FormPageStack>
   );
 }
-
-export function GitHubManualSetupPane(input: {
-  connection: IntegrationConnection;
-  manifestCreationSucceeded?: boolean;
-  onBack?: () => void;
-}): React.JSX.Element {
-  return <GitHubAppSetupPane {...input} />;
-}

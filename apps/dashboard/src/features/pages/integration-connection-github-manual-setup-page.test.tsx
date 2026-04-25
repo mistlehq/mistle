@@ -12,7 +12,7 @@ import type {
 } from "../integrations/integrations-service.js";
 import {
   formatGitHubManifestJson,
-  GitHubManualSetupPane,
+  GitHubAppSetupPane,
   validateGitHubManifestJson,
 } from "./integration-connection-github-manual-setup-page.js";
 
@@ -56,7 +56,7 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
   };
 }
 
-function renderGitHubManualSetupPane(input?: {
+function renderGitHubAppSetupPane(input?: {
   connection?: IntegrationConnection;
   manifestCreationSucceeded?: boolean;
   webhookSources?: readonly IntegrationWebhookSource[];
@@ -87,19 +87,19 @@ function renderGitHubManualSetupPane(input?: {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <GitHubManualSetupPane {...paneProps} />
+      <GitHubAppSetupPane {...paneProps} />
     </QueryClientProvider>,
   );
 }
 
-describe("GitHubManualSetupPane", () => {
+describe("GitHubAppSetupPane", () => {
   afterEach(() => {
     globalThis.__MISTLE_RUNTIME_CONFIG__ = undefined;
     resetDashboardConfigForTest();
   });
 
   it("defaults a blank draft connection to the manifest setup mode", () => {
-    renderGitHubManualSetupPane({
+    renderGitHubAppSetupPane({
       connection: {
         ...createGitHubManualSetupConnection(),
         config: {
@@ -133,7 +133,7 @@ describe("GitHubManualSetupPane", () => {
   });
 
   it("defaults a prefilled connection to the manual setup mode", () => {
-    const { container } = renderGitHubManualSetupPane();
+    const { container } = renderGitHubAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
     expect(screen.getByDisplayValue("12345")).toBeTruthy();
@@ -159,7 +159,7 @@ describe("GitHubManualSetupPane", () => {
   });
 
   it("keeps installation available when required secrets are already configured on the server", () => {
-    renderGitHubManualSetupPane({
+    renderGitHubAppSetupPane({
       connection: createGitHubManualSetupConnection({
         configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
       }),
@@ -175,7 +175,7 @@ describe("GitHubManualSetupPane", () => {
       configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
     });
 
-    renderGitHubManualSetupPane({
+    renderGitHubAppSetupPane({
       connection: {
         ...connection,
         config: {
@@ -191,7 +191,7 @@ describe("GitHubManualSetupPane", () => {
   });
 
   it("shows a GitHub App creation success view with an install app action", () => {
-    renderGitHubManualSetupPane({
+    renderGitHubAppSetupPane({
       connection: createGitHubManualSetupConnection({
         configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
       }),
