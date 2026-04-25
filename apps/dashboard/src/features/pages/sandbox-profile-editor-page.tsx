@@ -735,6 +735,85 @@ const SandboxProfileEditorTabs = [
   },
 ] as const satisfies readonly SandboxProfileEditorSection[];
 
+function DeleteSandboxProfileDialog(input: {
+  automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  automationUsagesError: string | null;
+  automationUsagesIsPending: boolean;
+  deleteError: string | null;
+  isOpen: boolean;
+  isPending: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  profileName: string;
+}): React.JSX.Element {
+  const isBlocked =
+    input.isPending || input.automationUsagesIsPending || input.automationUsagesError !== null;
+
+  return (
+    <Dialog
+      isBusy={input.isPending}
+      isDismissible={!input.isPending}
+      onOpenChange={input.onOpenChange}
+      open={input.isOpen}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Delete profile?</DialogTitle>
+          <DialogDescription>This removes {input.profileName}.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {input.automationUsagesIsPending ? (
+            <p className="text-muted-foreground text-sm">Loading automations...</p>
+          ) : null}
+
+          {input.automationUsagesError === null ? null : (
+            <Notice title="Could not load automations" variant="alert">
+              {input.automationUsagesError}
+            </Notice>
+          )}
+
+          {input.automationUsages.length === 0 ||
+          input.automationUsagesIsPending ||
+          input.automationUsagesError !== null ? null : (
+            <div className="space-y-2">
+              <p className="text-sm">These automations use this profile and will be removed:</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {input.automationUsages.map((automation) => (
+                  <li key={automation.id}>{automation.name}</li>
+                ))}
+              </ul>
+              <p className="text-sm">All of these automations will be removed.</p>
+            </div>
+          )}
+
+          {input.deleteError === null ? null : (
+            <Notice title="Delete failed" variant="alert">
+              {input.deleteError}
+            </Notice>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            disabled={input.isPending}
+            onClick={() => {
+              input.onOpenChange(false);
+            }}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button disabled={isBlocked} onClick={input.onConfirm} type="button">
+            {input.isPending ? "Deleting..." : "Delete profile"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SandboxProfileEditorView(input: {
   profileName: string | null;
   profileNameFallback: string;
@@ -769,10 +848,6 @@ export function SandboxProfileEditorView(input: {
           activeVersion: input.mode.activeVersion,
         }
       : null;
-  const deleteProfileIsBlocked =
-    input.deleteProfileIsPending ||
-    input.deleteProfileAutomationUsagesIsPending ||
-    input.deleteProfileAutomationUsagesError !== null;
   const deleteProfileMenuItem = (
     <DropdownMenuItem
       onClick={() => {
@@ -906,73 +981,17 @@ export function SandboxProfileEditorView(input: {
         </Dialog>
       )}
 
-      <Dialog
-        isBusy={input.deleteProfileIsPending}
-        isDismissible={!input.deleteProfileIsPending}
+      <DeleteSandboxProfileDialog
+        automationUsages={input.deleteProfileAutomationUsages}
+        automationUsagesError={input.deleteProfileAutomationUsagesError}
+        automationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+        deleteError={input.deleteProfileError}
+        isOpen={input.isDeleteProfileDialogOpen}
+        isPending={input.deleteProfileIsPending}
+        onConfirm={input.onConfirmDeleteProfile}
         onOpenChange={input.onDeleteProfileDialogOpenChange}
-        open={input.isDeleteProfileDialogOpen}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Delete profile?</DialogTitle>
-            <DialogDescription>
-              This removes {input.profileName ?? input.profileNameFallback}.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {input.deleteProfileAutomationUsagesIsPending ? (
-              <p className="text-muted-foreground text-sm">Loading automations...</p>
-            ) : null}
-
-            {input.deleteProfileAutomationUsagesError === null ? null : (
-              <Notice title="Could not load automations" variant="alert">
-                {input.deleteProfileAutomationUsagesError}
-              </Notice>
-            )}
-
-            {input.deleteProfileAutomationUsages.length === 0 ||
-            input.deleteProfileAutomationUsagesIsPending ||
-            input.deleteProfileAutomationUsagesError !== null ? null : (
-              <div className="space-y-2">
-                <p className="text-sm">These automations use this profile and will be removed:</p>
-                <ul className="list-disc space-y-1 pl-5 text-sm">
-                  {input.deleteProfileAutomationUsages.map((automation) => (
-                    <li key={automation.id}>{automation.name}</li>
-                  ))}
-                </ul>
-                <p className="text-sm">All of these automations will be removed.</p>
-              </div>
-            )}
-
-            {input.deleteProfileError === null ? null : (
-              <Notice title="Delete failed" variant="alert">
-                {input.deleteProfileError}
-              </Notice>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button
-              disabled={input.deleteProfileIsPending}
-              onClick={() => {
-                input.onDeleteProfileDialogOpenChange(false);
-              }}
-              type="button"
-              variant="outline"
-            >
-              Cancel
-            </Button>
-            <Button
-              disabled={deleteProfileIsBlocked}
-              onClick={input.onConfirmDeleteProfile}
-              type="button"
-            >
-              {input.deleteProfileIsPending ? "Deleting..." : "Delete profile"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        profileName={input.profileName ?? input.profileNameFallback}
+      />
 
       <SandboxProfileEditorSections
         renderPanel={input.renderSectionPanel}
