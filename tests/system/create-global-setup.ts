@@ -36,6 +36,7 @@ const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
 const CloudflareTunnelIdEnvVar = "CLOUDFLARE_TUNNEL_ID";
 const CloudflareTunnelCredentialsJsonEnvVar = "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON";
 const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
+const TokenizerProxyTunnelHostnameEnvVar = "TOKENIZER_PROXY_TUNNEL_HOSTNAME";
 const ControlPlaneApiTunnelHostnameEnvVar = "CONTROL_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
 const SystemSandboxProvider = {
@@ -110,6 +111,24 @@ function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvi
     tunnelId: readRequiredEnvVar(CloudflareTunnelIdEnvVar),
     tunnelCredentialsJson: readRequiredEnvVar(CloudflareTunnelCredentialsJsonEnvVar),
     publicHostname: readRequiredEnvVar(DataPlaneGatewayTunnelHostnameEnvVar),
+  };
+}
+
+function resolveSandboxPublicTokenizerProxyTunnel(input: { provider: SystemSandboxProvider }):
+  | {
+      tunnelId: string;
+      tunnelCredentialsJson: string;
+      publicHostname: string;
+    }
+  | undefined {
+  if (input.provider !== SystemSandboxProvider.E2B) {
+    return undefined;
+  }
+
+  return {
+    tunnelId: readRequiredEnvVar(CloudflareTunnelIdEnvVar),
+    tunnelCredentialsJson: readRequiredEnvVar(CloudflareTunnelCredentialsJsonEnvVar),
+    publicHostname: readRequiredEnvVar(TokenizerProxyTunnelHostnameEnvVar),
   };
 }
 
@@ -224,6 +243,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       configPathInContainer: resolveConfigPathInContainer(sandboxProvider),
       sandboxProvider,
       sandboxPublicGatewayTunnel: resolveSandboxPublicGatewayTunnel({
+        provider: sandboxProvider,
+      }),
+      sandboxPublicTokenizerProxyTunnel: resolveSandboxPublicTokenizerProxyTunnel({
         provider: sandboxProvider,
       }),
       startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
