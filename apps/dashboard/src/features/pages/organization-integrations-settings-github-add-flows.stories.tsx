@@ -398,13 +398,13 @@ function GitHubCreatePageStory(): React.JSX.Element {
 function GitHubAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
-  webhookSources: readonly IntegrationWebhookSource[];
+  webhookSources?: readonly IntegrationWebhookSource[];
 }): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [input.connection],
-      webhookSources: input.webhookSources,
+      webhookSources: input.webhookSources ?? [createWebhookSourceFixture()],
     }),
   );
   const [router] = useState(() =>
@@ -483,12 +483,7 @@ export const AddConnection: PageStory = {
 
 export const SetupDraftWithManifest: PageStory = {
   render: function RenderStory() {
-    return (
-      <GitHubAppSetupPageStory
-        connection={createDraftGitHubConnection()}
-        webhookSources={[createWebhookSourceFixture()]}
-      />
-    );
+    return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
   },
 };
 
@@ -503,7 +498,6 @@ export const SetupDraftWithExistingApp: PageStory = {
             client_id: "Iv1.prefilledstorybook",
           },
         })}
-        webhookSources={[createWebhookSourceFixture()]}
       />
     );
   },
@@ -521,7 +515,6 @@ export const SetupDraftReadyToInstall: PageStory = {
           },
           configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
         })}
-        webhookSources={[createWebhookSourceFixture()]}
       />
     );
   },
@@ -540,7 +533,6 @@ export const ManifestCreationSuccess: PageStory = {
           configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
         })}
         initialEntry="/integrations/github-cloud/icn_github_story_draft/github-app/setup?githubAppManifest=created"
-        webhookSources={[createWebhookSourceFixture()]}
       />
     );
   },
