@@ -71,8 +71,6 @@ type GitHubManifestValidation =
       status: "invalid";
     };
 
-type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
-
 const GitHubManualSetupRequiredFieldLabels = {
   appId: "App ID",
   appSlug: "App slug",
@@ -82,38 +80,42 @@ const GitHubManualSetupRequiredFieldLabels = {
   webhookSecret: "Webhook secret",
 } as const;
 
-const GitHubManualSetupFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+const GitHubManualSetupFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-];
+] as const satisfies readonly GitHubManualSetupFieldKey[];
 
-const GitHubManualSetupConfigFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+const GitHubManualSetupConfigFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
-];
+] as const satisfies readonly GitHubManualSetupFieldKey[];
 
-const GitHubManualSetupRequiredConfigFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+type GitHubManualSetupConfigFieldKey = (typeof GitHubManualSetupConfigFieldKeys)[number];
+
+const GitHubManualSetupRequiredConfigFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
-];
+] as const satisfies readonly GitHubManualSetupConfigFieldKey[];
 
-const GitHubManualSetupSecretFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+const GitHubManualSetupSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-];
+] as const satisfies readonly GitHubManualSetupFieldKey[];
 
-const GitHubManualSetupRequiredSecretFieldKeys: readonly GitHubManualSetupFieldKey[] = [
+type GitHubManualSetupSecretFieldKey = (typeof GitHubManualSetupSecretFieldKeys)[number];
+
+const GitHubManualSetupRequiredSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-];
+] as const satisfies readonly GitHubManualSetupSecretFieldKey[];
 
 const GitHubDraftManifest = JSON.stringify(
   {
@@ -165,8 +167,10 @@ function isGitHubManualSetupSecretFieldKey(
   );
 }
 
-function isGitHubManualSetupConfigFieldKey(fieldKey: GitHubManualSetupFieldKey): boolean {
-  return GitHubManualSetupConfigFieldKeys.includes(fieldKey);
+function isGitHubManualSetupConfigFieldKey(
+  fieldKey: GitHubManualSetupFieldKey,
+): fieldKey is GitHubManualSetupConfigFieldKey {
+  return fieldKey === "appId" || fieldKey === "appSlug" || fieldKey === "clientId";
 }
 
 function createInitialDraft(connection: IntegrationConnection): GitHubManualSetupDraft {
@@ -1296,9 +1300,6 @@ export function GitHubAppSetupPane(input: {
       draft,
       savedDraft,
       fieldState: fieldStates[fieldKey],
-      ...(isGitHubManualSetupSecretFieldKey(fieldKey)
-        ? { isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey) }
-        : {}),
     }),
   );
   const requiredSecretsReady = GitHubManualSetupRequiredSecretFieldKeys.every((fieldKey) =>
