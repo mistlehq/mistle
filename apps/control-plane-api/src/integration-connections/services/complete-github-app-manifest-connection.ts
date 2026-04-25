@@ -58,6 +58,8 @@ const GitHubAppManifestConversionResponseSchema = z
   })
   .loose();
 
+type GitHubAppManifestConversion = z.output<typeof GitHubAppManifestConversionResponseSchema>;
+
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
@@ -114,10 +116,27 @@ function buildGitHubAppManifestConversionUrl(input: { apiBaseUrl: string; code: 
   );
 }
 
+export function parseGitHubAppManifestConversionResponse(
+  value: unknown,
+): GitHubAppManifestConversion {
+  try {
+    return GitHubAppManifestConversionResponseSchema.parse(value);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+        "GitHub App manifest conversion response is invalid.",
+      );
+    }
+
+    throw error;
+  }
+}
+
 async function convertGitHubAppManifest(input: {
   apiBaseUrl: string;
   code: string;
-}): Promise<z.output<typeof GitHubAppManifestConversionResponseSchema>> {
+}): Promise<GitHubAppManifestConversion> {
   const response = await fetch(
     buildGitHubAppManifestConversionUrl({
       apiBaseUrl: input.apiBaseUrl,
@@ -140,22 +159,22 @@ async function convertGitHubAppManifest(input: {
   }
 
   const responseJson: unknown = await response.json();
-  try {
-    return GitHubAppManifestConversionResponseSchema.parse(responseJson);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-        "GitHub App manifest conversion response is invalid.",
-      );
-    }
-
-    throw error;
-  }
+  return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
-function buildConvertedConnectionSecrets(input: {
-  conversion: z.output<typeof GitHubAppManifestConversionResponseSchema>;
+export function buildConvertedGitHubAppConnectionConfig(input: {
+  conversion: GitHubAppManifestConversion;
+}): Record<string, string> {
+  return {
+    connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    app_id: input.conversion.id.toString(),
+    app_slug: input.conversion.slug,
+    client_id: input.conversion.client_id,
+  };
+}
+
+export function buildConvertedConnectionSecrets(input: {
+  conversion: GitHubAppManifestConversion;
   supportsClientSecret: boolean;
 }): Record<string, string> {
   if (!input.supportsClientSecret) {
@@ -380,12 +399,7 @@ export async function completeGitHubAppManifestConnection(
       const [updatedConnection] = await tx
         .update(integrationConnections)
         .set({
-          config: {
-            connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-            app_id: conversion.id.toString(),
-            app_slug: conversion.slug,
-            client_id: conversion.client_id,
-          },
+          config: buildConvertedGitHubAppConnectionConfig({ conversion }),
           updatedAt: sql`now()`,
         })
         .where(

@@ -1,6 +1,3 @@
-import { once } from "node:events";
-import { createServer } from "node:http";
-
 import {
   integrationConnectionCredentials,
   integrationConnections,
@@ -9,7 +6,6 @@ import {
   organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
 } from "@mistle/db/control-plane";
-import { reserveAvailablePort } from "@mistle/test-harness";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -18,7 +14,6 @@ import {
   CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "../src/integration-connections/complete-github-app-installation-connection/schema.js";
-import { CompleteGitHubAppManifestConnectionQuerySchema } from "../src/integration-connections/complete-github-app-manifest-connection/schema.js";
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
@@ -31,16 +26,7 @@ import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
-async function ensureGithubCloudTarget(
-  fixture: ControlPlaneApiIntegrationFixture,
-  input?: {
-    apiBaseUrl?: string;
-    webBaseUrl?: string;
-  },
-): Promise<void> {
-  const apiBaseUrl = input?.apiBaseUrl ?? "https://api.github.com";
-  const webBaseUrl = input?.webBaseUrl ?? "https://github.com";
-
+async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
   await fixture.db
     .insert(integrationTargets)
     .values({
@@ -49,8 +35,8 @@ async function ensureGithubCloudTarget(
       variantId: "github-cloud",
       enabled: true,
       config: {
-        api_base_url: apiBaseUrl,
-        web_base_url: webBaseUrl,
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
       },
     })
     .onConflictDoUpdate({
@@ -60,8 +46,8 @@ async function ensureGithubCloudTarget(
         variantId: "github-cloud",
         enabled: true,
         config: {
-          api_base_url: apiBaseUrl,
-          web_base_url: webBaseUrl,
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
         },
       },
     });
@@ -106,12 +92,6 @@ describe("integration connections GitHub App installation integration", () => {
     const query = CompleteGitHubAppInstallationConnectionQuerySchema.parse(input.query);
     const searchParams = new URLSearchParams(query);
     return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
-  }
-
-  function createGitHubAppManifestCompletePath(input: { query: Record<string, string> }): string {
-    const query = CompleteGitHubAppManifestConnectionQuerySchema.parse(input.query);
-    const searchParams = new URLSearchParams(query);
-    return `/p/integration/callbacks/github-app-manifest?${searchParams.toString()}`;
   }
 
   it("creates a GitHub App installation authorization URL for an existing connection and persists redirect session state", async ({
@@ -271,118 +251,6 @@ describe("integration connections GitHub App installation integration", () => {
         ),
     });
     expect(redirectSession).toBeDefined();
-  });
-
-  it("completes GitHub App manifest creation by converting the code and storing app credentials", async ({
-    fixture,
-  }) => {
-    const host = "127.0.0.1";
-    const port = await reserveAvailablePort({ host });
-    const seenRequests: Array<{
-      method: string;
-      pathname: string;
-    }> = [];
-    const server = createServer((request, response) => {
-      const requestUrl = new URL(request.url ?? "/", `http://${host}:${port.toString()}`);
-      seenRequests.push({
-        method: request.method ?? "GET",
-        pathname: requestUrl.pathname,
-      });
-      response.setHeader("content-type", "application/json");
-
-      if (
-        request.method === "POST" &&
-        requestUrl.pathname === "/app-manifests/code_123/conversions"
-      ) {
-        response.end(
-          JSON.stringify({
-            id: 123,
-            slug: "mistle-github-app",
-            client_id: "Iv1.manifestclientid",
-            client_secret: "manifest-client-secret",
-            pem: "-----BEGIN PRIVATE KEY-----\nmanifest\n-----END PRIVATE KEY-----",
-            webhook_secret: "manifest-webhook-secret",
-          }),
-        );
-        return;
-      }
-
-      response.statusCode = 404;
-      response.end(JSON.stringify({ message: "Not found." }));
-    });
-    server.listen(port, host);
-    await once(server, "listening");
-
-    try {
-      const githubBaseUrl = `http://${host}:${port.toString()}`;
-      await ensureGithubCloudTarget(fixture, {
-        apiBaseUrl: githubBaseUrl,
-        webBaseUrl: githubBaseUrl,
-      });
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-connections-github-app-manifest-complete@example.com",
-      });
-      const connectionId = await createGitHubAppDraftConnection(fixture, {
-        authenticatedSession,
-        displayName: "Draft GitHub",
-      });
-      const { state } = await startGitHubAppManifestConnection(fixture, {
-        authenticatedSession,
-        connectionId,
-      });
-
-      const completeResponse = await fixture.request(
-        createGitHubAppManifestCompletePath({
-          query: {
-            state,
-            code: "code_123",
-          },
-        }),
-        {
-          method: "GET",
-          redirect: "manual",
-        },
-      );
-
-      expect(completeResponse.status).toBe(302);
-      expect(completeResponse.headers.get("location")).toBe(
-        buildDashboardUrl(
-          fixture.config.dashboard.baseUrl,
-          `/integrations/github-cloud/${connectionId}/github-app/setup?githubAppManifest=created`,
-        ),
-      );
-      expect(seenRequests).toEqual([
-        {
-          method: "POST",
-          pathname: "/app-manifests/code_123/conversions",
-        },
-      ]);
-
-      const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, authenticatedSession.organizationId),
-            eq(table.id, connectionId),
-          ),
-      });
-      expect(persistedConnection?.config).toEqual({
-        connection_method: "github-app-installation",
-        app_id: "123",
-        app_slug: "mistle-github-app",
-        client_id: "Iv1.manifestclientid",
-      });
-
-      const linkedCredentials = await fixture.db
-        .select({
-          connectionId: integrationConnectionCredentials.connectionId,
-        })
-        .from(integrationConnectionCredentials)
-        .where(eq(integrationConnectionCredentials.connectionId, connectionId));
-      expect(linkedCredentials).toHaveLength(3);
-    } finally {
-      server.close();
-      await once(server, "close");
-    }
   });
 
   it("fails to start installation when a draft connection is still missing required GitHub App credentials", async ({
@@ -992,41 +860,6 @@ async function startGitHubAppInstallationConnection(
   return {
     authorizationUrl,
     state,
-  };
-}
-
-async function startGitHubAppManifestConnection(
-  fixture: ControlPlaneApiIntegrationFixture,
-  input: {
-    authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
-    connectionId: string;
-  },
-): Promise<{ state: string }> {
-  const response = await fixture.request(
-    `/v1/integration/connections/${input.connectionId}/github-app-manifest/start`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: input.authenticatedSession.cookie,
-      },
-      body: JSON.stringify({
-        manifest: {
-          name: "Mistle GitHub App",
-        },
-        owner: {
-          kind: "personal",
-        },
-      }),
-    },
-  );
-
-  expect(response.status).toBe(200);
-  const responseBody = StartGitHubAppManifestConnectionResponseSchema.parse(await response.json());
-  const submissionUrl = new URL(responseBody.submissionUrl);
-
-  return {
-    state: resolveGitHubAppManifestSubmissionState(submissionUrl),
   };
 }
 
