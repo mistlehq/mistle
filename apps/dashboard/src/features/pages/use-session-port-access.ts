@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 
 import { HttpApiError } from "../api/http-api-error.js";
 import { createSandboxInstancePortAccess } from "../sessions/sessions-service.js";
+import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { createProcessKey, resolvePrimaryProcessListener } from "./session-port-access-model.js";
 import { useSessionProcesses } from "./use-session-processes.js";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
@@ -21,18 +22,6 @@ type SessionPortAccessState = {
   processes: ProcessEntry[];
   setPanelOpen: (open: boolean) => void;
 };
-
-function openPortAccessLoadingWindow(): Window | null {
-  const openedWindow = window.open("about:blank", "_blank");
-  if (openedWindow === null) {
-    return null;
-  }
-
-  openedWindow.document.title = "Opening sandbox port…";
-  openedWindow.document.body.innerHTML =
-    '<p style="font-family: sans-serif; padding: 24px;">Opening sandbox port…</p>';
-  return openedWindow;
-}
 
 function createPortsAuthorizeRequest(port: number): {
   requestId: string;
@@ -165,7 +154,10 @@ export function useSessionPortAccess(input: {
         return;
       }
 
-      const openedWindow = openPortAccessLoadingWindow();
+      const openedWindow = openDeferredExternalWindow({
+        loadingMessage: "Opening sandbox port…",
+        title: "Opening sandbox port…",
+      });
       if (openedWindow === null) {
         setErrorMessage("Browser blocked opening a new tab.");
         return;
@@ -189,7 +181,7 @@ export function useSessionPortAccess(input: {
           instanceId: sandboxInstanceId,
           port: primaryListener.port,
         });
-        openedWindow.location.replace(access.bootstrapUrl);
+        openedWindow.navigate(access.bootstrapUrl);
       } catch (error) {
         openedWindow.close();
         setErrorMessage(normalizePortAccessError(error));

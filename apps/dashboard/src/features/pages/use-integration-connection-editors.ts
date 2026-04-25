@@ -9,7 +9,7 @@ import {
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { openExternalAuthorizationWindow } from "./external-authorization-window.js";
+import { openDeferredExternalWindow } from "../shared/external-window.js";
 
 export function useIntegrationConnectionEditors(input: {
   connections: readonly IntegrationConnection[];
@@ -175,7 +175,7 @@ export function useIntegrationConnectionEditors(input: {
           [connectionId]: undefined,
         }));
 
-        const authorizationWindow = openExternalAuthorizationWindow({
+        const authorizationWindow = openDeferredExternalWindow({
           loadingMessage: "Opening GitHub App installation...",
           title: "Opening GitHub App installation...",
         });

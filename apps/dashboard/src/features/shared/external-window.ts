@@ -1,12 +1,12 @@
-type ExternalAuthorizationWindow = {
+type DeferredExternalWindow = {
   close: () => void;
   navigate: (url: string) => void;
 };
 
-export function openExternalAuthorizationWindow(input: {
+export function openDeferredExternalWindow(input: {
   loadingMessage: string;
   title: string;
-}): ExternalAuthorizationWindow | null {
+}): DeferredExternalWindow | null {
   const openedWindow = window.open("about:blank", "_blank");
   if (openedWindow === null) {
     return null;
@@ -14,7 +14,12 @@ export function openExternalAuthorizationWindow(input: {
 
   openedWindow.opener = null;
   openedWindow.document.title = input.title;
-  openedWindow.document.body.innerHTML = `<p style="font-family: sans-serif; padding: 24px;">${input.loadingMessage}</p>`;
+
+  const message = openedWindow.document.createElement("p");
+  message.style.fontFamily = "sans-serif";
+  message.style.padding = "24px";
+  message.textContent = input.loadingMessage;
+  openedWindow.document.body.replaceChildren(message);
 
   return {
     close: () => {

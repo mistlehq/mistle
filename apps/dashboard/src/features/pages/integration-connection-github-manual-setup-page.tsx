@@ -45,9 +45,9 @@ import {
   clearPendingStatusTimeouts,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
+import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { openExternalAuthorizationWindow } from "./external-authorization-window.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubManualSetupDraft = {
@@ -1052,7 +1052,7 @@ export function GitHubAppSetupPane(input: {
 
   async function startGitHubAppInstallationManagementInNewWindow(): Promise<void> {
     setActionErrorMessage(null);
-    const authorizationWindow = openExternalAuthorizationWindow({
+    const authorizationWindow = openDeferredExternalWindow({
       loadingMessage: "Opening GitHub App installation...",
       title: "Opening GitHub App installation...",
     });
