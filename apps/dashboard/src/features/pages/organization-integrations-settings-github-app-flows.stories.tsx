@@ -44,14 +44,6 @@ function getGitHubDefinitionOrThrow(): AnyIntegrationDefinition {
 
 const GitHubDefinition = getGitHubDefinitionOrThrow();
 const StoryControlPlaneApiOrigin = "https://control-plane.example.com";
-const StoryIntegrationCreateHandle = {
-  ...ROUTE_HANDLES.integrationCreate,
-  description: "",
-} as const;
-const StoryIntegrationGitHubAppSetupHandle = {
-  ...ROUTE_HANDLES.integrationGitHubAppSetup,
-  description: "",
-} as const;
 
 function configureDashboardRuntimeForStory(): void {
   globalThis.__MISTLE_RUNTIME_CONFIG__ = {
@@ -366,7 +358,10 @@ function GitHubCreatePageStory(): React.JSX.Element {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionCreatePage />}
-                handle={StoryIntegrationCreateHandle}
+                handle={{
+                  ...ROUTE_HANDLES.integrationCreate,
+                  description: "",
+                }}
                 path="add"
               />
             </Route>
@@ -405,7 +400,10 @@ function GitHubAppSetupPageStory(input: {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionGitHubAppSetupPage />}
-                handle={StoryIntegrationGitHubAppSetupHandle}
+                handle={{
+                  ...ROUTE_HANDLES.integrationGitHubAppSetup,
+                  description: "",
+                }}
                 path=":connectionId/github-app/setup"
               />
             </Route>
