@@ -385,10 +385,6 @@ function hasInstalledGitHubApp(connection: IntegrationConnection): boolean {
   );
 }
 
-function isGitHubAppInstallationConnection(connection: IntegrationConnection): boolean {
-  return connection.connectionMethodId === "github-app-installation";
-}
-
 function buildGitHubAppSetupCallbackUrl(): string {
   return new URL(
     "/p/integration/callbacks/github-app-installation",
@@ -877,7 +873,7 @@ export function IntegrationConnectionGitHubAppSetupPage(): React.JSX.Element {
     );
   }
 
-  if (!isGitHubAppInstallationConnection(connection)) {
+  if (connection.connectionMethodId !== "github-app-installation") {
     throw new Error(`Integration connection '${connectionId}' is not a GitHub App connection.`);
   }
 
