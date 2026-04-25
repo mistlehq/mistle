@@ -126,4 +126,12 @@ export type SandboxProfilesService = {
     };
     activeVersion: number;
   }>;
+  discardProfileVersionDraft: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  }) => Promise<{
+    discardedVersion: number;
+    hasDraft: boolean;
+  }>;
 };

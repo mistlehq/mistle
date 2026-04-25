@@ -314,6 +314,13 @@ const PublishSandboxProfileVersionResultSchema = z
   })
   .strict();
 
+const DiscardSandboxProfileVersionDraftResultSchema = z
+  .object({
+    discardedVersion: z.number().int().min(1),
+    hasDraft: z.boolean(),
+  })
+  .strict();
+
 function normalizeSandboxProfileVersionPublishability(
   input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
 ): SandboxProfileVersionPublishability {
@@ -523,37 +530,41 @@ export async function publishSandboxProfileVersion(input: {
   }
 }
 
-export async function discardSandboxProfileDraftChanges(input: {
+export async function discardSandboxProfileVersionDraft(input: {
   profileId: string;
-  draftVersion: number;
-  activeVersion: number;
-}): Promise<void> {
-  const [activeBindings, activeSetupScript] = await Promise.all([
-    getSandboxProfileVersionIntegrationBindings({
-      profileId: input.profileId,
-      version: input.activeVersion,
-    }),
-    getSandboxProfileVersionSetupScript({
-      profileId: input.profileId,
-      version: input.activeVersion,
-    }),
-  ]);
+  version: number;
+}): Promise<z.infer<typeof DiscardSandboxProfileVersionDraftResultSchema>> {
+  try {
+    const response = await requestControlPlane({
+      operation: "discardSandboxProfileVersionDraft",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/discard`,
+      fallbackMessage: "Could not discard sandbox profile draft.",
+    });
 
-  await putSandboxProfileVersionIntegrationBindings({
-    profileId: input.profileId,
-    version: input.draftVersion,
-    bindings: activeBindings.bindings.map((binding) => ({
-      connectionId: binding.connectionId,
-      kind: binding.kind,
-      config: binding.config,
-    })),
-  });
+    const responseBody = await response.json();
+    const parsedResponse = DiscardSandboxProfileVersionDraftResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "discardSandboxProfileVersionDraft",
+        status: 500,
+        body: responseBody,
+        message: "Discard sandbox profile draft response payload is invalid.",
+      });
+    }
 
-  await putSandboxProfileVersionSetupScript({
-    profileId: input.profileId,
-    version: input.draftVersion,
-    setupScript: activeSetupScript.setupScript,
-  });
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "discardSandboxProfileVersionDraft",
+        error,
+        fallbackMessage: "Could not discard sandbox profile draft.",
+      }),
+    );
+  }
 }
 
 export async function getSandboxProfileVersionIntegrationBindings(input: {

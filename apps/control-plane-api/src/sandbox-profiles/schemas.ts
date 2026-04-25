@@ -130,6 +130,13 @@ export const publishSandboxProfileVersionResponseSchema = z
   })
   .strict();
 
+export const discardSandboxProfileVersionDraftResponseSchema = z
+  .object({
+    discardedVersion: z.number().int().min(1),
+    hasDraft: z.boolean(),
+  })
+  .strict();
+
 export const putSandboxProfileVersionIntegrationBindingsBodySchema = z
   .object({
     bindings: z.array(
