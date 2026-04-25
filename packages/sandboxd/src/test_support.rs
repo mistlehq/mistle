@@ -1,4 +1,5 @@
 use std::ffi::OsString;
+use std::fs;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 
@@ -8,11 +9,16 @@ static ENV_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 static ATTACHMENT_ROOT_OVERRIDE: LazyLock<Mutex<Option<PathBuf>>> =
     LazyLock::new(|| Mutex::new(None));
 static LOCAL_SANDBOX_BASE_IMAGE_REFS: LazyLock<LocalSandboxBaseImageRefs> = LazyLock::new(|| {
-    serde_json::from_str(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../config/sandbox-base-images.json"
-    )))
-    .expect("sandbox base images manifest should be valid JSON")
+    let manifest_path = sandbox_base_images_manifest_path();
+    let manifest_contents = fs::read_to_string(&manifest_path).unwrap_or_else(|error| {
+        panic!(
+            "sandbox base images manifest should be readable at {}: {error}",
+            manifest_path.display()
+        )
+    });
+
+    serde_json::from_str(&manifest_contents)
+        .expect("sandbox base images manifest should be valid JSON")
 });
 
 #[derive(Deserialize)]
@@ -25,6 +31,14 @@ struct LocalSandboxBaseImageRefs {
 #[serde(rename_all = "camelCase")]
 struct LocalDevSandboxBaseImageRefs {
     prepared_runtime: String,
+}
+
+fn sandbox_base_images_manifest_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("config")
+        .join("sandbox-base-images.json")
 }
 
 pub struct TestEnvVarGuard {
