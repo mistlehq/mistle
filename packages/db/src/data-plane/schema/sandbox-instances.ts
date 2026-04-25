@@ -33,10 +33,19 @@ export type SandboxInstanceStarterKind =
 export const SandboxInstanceSources = {
   DASHBOARD: "dashboard",
   WEBHOOK: "webhook",
+  SYSTEM: "system",
 } as const;
 
 export type SandboxInstanceSource =
   (typeof SandboxInstanceSources)[keyof typeof SandboxInstanceSources];
+
+export const SandboxInstancePurposes = {
+  SESSION: "session",
+  SNAPSHOT: "snapshot",
+} as const;
+
+export type SandboxInstancePurpose =
+  (typeof SandboxInstancePurposes)[keyof typeof SandboxInstancePurposes];
 
 export const SandboxStopReasons = {
   IDLE: "idle",
@@ -75,6 +84,10 @@ export const sandboxInstances = dataPlaneSchema.table(
     startedByKind: text("started_by_kind").notNull().$type<SandboxInstanceStarterKind>(),
     startedById: text("started_by_id").notNull(),
     source: text("source").notNull().$type<SandboxInstanceSource>(),
+    purpose: text("purpose")
+      .notNull()
+      .$type<SandboxInstancePurpose>()
+      .default(SandboxInstancePurposes.SESSION),
     title: text("title"),
     persistenceMode: text("persistence_mode")
       .notNull()

@@ -1,0 +1,1 @@
+ALTER TABLE "data_plane"."sandbox_instances" ADD COLUMN "purpose" text DEFAULT 'session' NOT NULL;

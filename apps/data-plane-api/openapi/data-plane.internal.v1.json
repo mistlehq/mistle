@@ -1273,7 +1273,7 @@
                   },
                   "source": {
                     "type": "string",
-                    "enum": ["dashboard", "webhook"]
+                    "enum": ["dashboard", "webhook", "system"]
                   },
                   "image": {
                     "type": "object",
@@ -1488,7 +1488,7 @@
                           },
                           "source": {
                             "type": "string",
-                            "enum": ["dashboard", "webhook"]
+                            "enum": ["dashboard", "webhook", "system"]
                           },
                           "createdAt": {
                             "type": "string",

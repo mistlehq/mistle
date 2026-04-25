@@ -9,6 +9,16 @@ import { resolveUserDisplayName } from "../../lib/user-display-name.js";
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "../errors.js";
 import type { ListSandboxInstancesResult } from "./types.js";
 
+function assertUserVisibleSandboxSource(
+  source: ListSandboxInstancesResponse["items"][number]["source"],
+): "dashboard" | "webhook" {
+  if (source === "system") {
+    throw new Error("Internal snapshot sandbox instances must not be exposed to control-plane.");
+  }
+
+  return source;
+}
+
 async function resolveStartedByNames(
   db: ControlPlaneDatabase,
   input: {
@@ -154,6 +164,7 @@ export async function listInstances(
       ...sandboxInstances,
       items: sandboxInstances.items.map((item) => ({
         ...item,
+        source: assertUserVisibleSandboxSource(item.source),
         title: item.title,
         keepaliveActive: item.keepaliveActive,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,

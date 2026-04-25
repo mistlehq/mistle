@@ -177,6 +177,17 @@ export type {
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {
+  sandboxProfileVersionSnapshotJobs,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
+} from "./sandbox-profile-version-snapshot-jobs.js";
+export type {
+  InsertSandboxProfileVersionSnapshotJob,
+  SandboxProfileVersionSnapshotJob,
+  SandboxProfileVersionSnapshotJobState,
+  SandboxProfileVersionSnapshotJobTrigger,
+} from "./sandbox-profile-version-snapshot-jobs.js";
+export {
   sandboxProfileVersionIntegrationBindings,
   IntegrationBindingKinds,
   type InsertSandboxProfileVersionIntegrationBinding,

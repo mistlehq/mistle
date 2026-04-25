@@ -25,7 +25,7 @@ export const SandboxInstanceStartedBySchema = z
   })
   .strict();
 
-export const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
+export const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook", "system"]);
 
 export const GetSandboxInstanceResponseSchema = z
   .object({

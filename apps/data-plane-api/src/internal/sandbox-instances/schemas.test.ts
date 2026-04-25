@@ -152,6 +152,26 @@ describe("StartSandboxInstanceInputSchema", () => {
     expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
+  it("accepts system-origin start requests", () => {
+    const input = {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      sandboxProfileVersion: 1,
+      runtimePlan: createRuntimePlan(),
+      startedBy: {
+        kind: "system",
+        id: "job_123",
+      },
+      source: "system",
+      image: {
+        imageId: "img_123",
+        createdAt: "2026-03-10T00:00:00.000Z",
+      },
+    };
+
+    expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
+  });
+
   it("reports nested runtime plan validation issues", () => {
     const result = StartSandboxInstanceInputSchema.safeParse({
       organizationId: "org_123",

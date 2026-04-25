@@ -50,6 +50,13 @@
       "when": 1776362455781,
       "tag": "0006_add-sandbox-instance-compute-generation",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1777141452774,
+      "tag": "0007_add-sandbox-instance-purpose",
+      "breakpoints": true
     }
   ]
 }
