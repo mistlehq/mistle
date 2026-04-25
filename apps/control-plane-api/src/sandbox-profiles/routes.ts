@@ -18,6 +18,7 @@ import * as listSandboxProfiles from "./list-sandbox-profiles/index.js";
 import * as publishSandboxProfileVersion from "./publish-sandbox-profile-version/index.js";
 import * as putSandboxProfileVersionIntegrationBindings from "./put-sandbox-profile-version-integration-bindings/index.js";
 import * as putSandboxProfileVersionSetupScript from "./put-sandbox-profile-version-setup-script/index.js";
+import * as refreshSandboxProfileVersion from "./refresh-sandbox-profile-version/index.js";
 import * as startSandboxProfileInstance from "./start-sandbox-profile-instance/index.js";
 import * as updateSandboxProfile from "./update-sandbox-profile/index.js";
 
@@ -63,6 +64,7 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
     discardSandboxProfileVersionDraft.handler,
   );
   routes.openapi(publishSandboxProfileVersion.route, publishSandboxProfileVersion.handler);
+  routes.openapi(refreshSandboxProfileVersion.route, refreshSandboxProfileVersion.handler);
   routes.openapi(startSandboxProfileInstance.route, startSandboxProfileInstance.handler);
 
   return {

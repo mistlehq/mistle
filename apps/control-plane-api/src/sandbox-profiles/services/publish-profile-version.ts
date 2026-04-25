@@ -14,6 +14,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
 import { getProfileVersionPublishability } from "./get-profile-version-publishability.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -53,30 +54,6 @@ type PublishProfileVersionOutput = {
     finishedAt: string | null;
   };
 };
-
-async function markQueuedSnapshotJobFailedToEnqueue(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: {
-    snapshotJobId: string;
-    message: string;
-  },
-): Promise<void> {
-  await db
-    .update(sandboxProfileVersionSnapshotJobs)
-    .set({
-      state: SandboxProfileVersionSnapshotJobStates.FAILED,
-      finishedAt: sql`now()`,
-      errorCode: "snapshot_materialization_enqueue_failed",
-      errorMessage: input.message,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
-        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
-      ),
-    );
-}
 
 export async function publishProfileVersion(
   {
@@ -208,31 +185,20 @@ export async function publishProfileVersion(
     };
   });
 
-  try {
-    await dataPlaneClient.materializeSandboxProfileVersionSnapshotJob({
+  await enqueueSnapshotMaterializationJob(
+    {
+      db,
+      dataPlaneClient,
+      defaultBaseImage,
+    },
+    {
       snapshotJobId: publishedResult.snapshotJob.id,
       sandboxInstanceId,
       organizationId: input.organizationId,
-      sandboxProfileId: input.profileId,
-      sandboxProfileVersion: input.profileVersion,
-      image: {
-        imageId: defaultBaseImage,
-        createdAt: new Date().toISOString(),
-        kind: "base",
-      },
-    });
-  } catch (error) {
-    await markQueuedSnapshotJobFailedToEnqueue(
-      {
-        db,
-      },
-      {
-        snapshotJobId: publishedResult.snapshotJob.id,
-        message: `Failed to enqueue snapshot materialization for sandbox profile '${input.profileId}' version '${String(input.profileVersion)}'.`,
-      },
-    );
-    throw error;
-  }
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    },
+  );
 
   return publishedResult;
 }
