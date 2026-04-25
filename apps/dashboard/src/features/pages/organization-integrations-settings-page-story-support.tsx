@@ -215,7 +215,6 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
 }
 
 function IntegrationSettingsAddFlowStoryContent(input: {
-  afterEditor?: React.ReactNode;
   spec: StoryIntegrationSpec;
 }): React.JSX.Element {
   const spec = input.spec;
@@ -328,7 +327,6 @@ function IntegrationSettingsAddFlowStoryContent(input: {
           pending={spec.pending ?? false}
           secrets={draft.secrets}
         />
-        {input.afterEditor ?? null}
       </div>
     </FormPageFrame>
   );
