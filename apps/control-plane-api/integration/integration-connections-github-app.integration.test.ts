@@ -85,7 +85,7 @@ function parseJsonRecord(value: string): Record<string, unknown> {
   return record;
 }
 
-describe("integration connections GitHub App installation integration", () => {
+describe("integration connections GitHub App integration", () => {
   function createGitHubAppInstallationCompletePath(input: {
     query: Record<string, string>;
   }): string {
