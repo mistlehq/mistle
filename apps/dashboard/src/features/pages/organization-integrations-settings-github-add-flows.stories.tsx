@@ -389,13 +389,12 @@ function GitHubCreatePageStory(): React.JSX.Element {
 function GitHubAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
-  webhookSources?: readonly IntegrationWebhookSource[];
 }): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
       connections: [input.connection],
-      webhookSources: input.webhookSources ?? [createWebhookSourceFixture()],
+      webhookSources: [createWebhookSourceFixture()],
     }),
   );
   const [router] = useState(() =>
