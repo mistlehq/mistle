@@ -188,17 +188,14 @@ function resolveConfiguredSecretFieldKeys(
   return configuredSecretFieldKeys;
 }
 
-function hasConfiguredGitHubAppValues(connection: IntegrationConnection): boolean {
-  return (
+function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
+  const hasConfiguredValues =
     typeof connection.config?.["app_id"] === "string" ||
     typeof connection.config?.["app_slug"] === "string" ||
     typeof connection.config?.["client_id"] === "string" ||
-    (connection.configuredSecretNames?.length ?? 0) > 0
-  );
-}
+    (connection.configuredSecretNames?.length ?? 0) > 0;
 
-function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
-  return hasConfiguredGitHubAppValues(connection) ? "existing-app" : "manifest";
+  return hasConfiguredValues ? "existing-app" : "manifest";
 }
 
 function createInitialFieldStates(): Record<GitHubExistingAppSetupFieldKey, SavingFieldState> {
