@@ -742,9 +742,6 @@ function GitHubAppSetupActions(input: {
   onStartInstallation: () => void;
   startInstallationPending: boolean;
 }): React.JSX.Element {
-  const showInstallAction = input.isInstalled || !input.isManifestMode;
-  const installPending = input.startInstallationPending;
-
   return (
     <FormPageActionBar>
       {input.isManifestMode && !input.isInstalled ? (
@@ -756,18 +753,22 @@ function GitHubAppSetupActions(input: {
           Create app in GitHub
         </Button>
       ) : null}
-      {showInstallAction ? (
+      {input.isInstalled || !input.isManifestMode ? (
         <Button
-          disabled={!input.canInstall || installPending || input.isSecretReplacementDialogOpen}
+          disabled={
+            !input.canInstall ||
+            input.startInstallationPending ||
+            input.isSecretReplacementDialogOpen
+          }
           onClick={input.onStartInstallation}
           type="button"
         >
-          {installPending
+          {input.startInstallationPending
             ? "Starting install..."
             : input.isInstalled
               ? "Manage Installation"
               : "Install GitHub App"}
-          {!installPending && input.isInstalled ? (
+          {!input.startInstallationPending && input.isInstalled ? (
             <ArrowSquareOutIcon aria-hidden className="size-4" data-icon="inline-end" />
           ) : null}
         </Button>
