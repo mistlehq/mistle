@@ -335,9 +335,6 @@ function IntegrationSettingsAddFlowStoryContent(input: {
 }
 
 export const AddFlowStorySpecs = {
-  GitHubCloud: {
-    variantId: "github-cloud",
-  },
   GitHubEnterpriseServer: {
     variantId: "github-enterprise-server",
   },
