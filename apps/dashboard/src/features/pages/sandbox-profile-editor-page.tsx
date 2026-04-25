@@ -19,7 +19,7 @@ import {
   MoreActionsMenu,
   Notice,
 } from "@mistle/ui";
-import { CheckCircleIcon, InfoIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";

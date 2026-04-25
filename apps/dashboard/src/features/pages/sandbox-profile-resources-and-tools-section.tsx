@@ -10,13 +10,13 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   ResponsiveFieldList,
   ResponsiveFieldListCell,
   type ResponsiveFieldListColumn,
   ResponsiveFieldListRow,
 } from "../shared/responsive-field-list.js";
-import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
