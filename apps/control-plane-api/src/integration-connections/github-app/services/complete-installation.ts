@@ -16,6 +16,7 @@ import {
 } from "../../constants.js";
 import {
   createRedirectQueryParams,
+  resolveActiveRedirectSessionOrThrow,
   resolveGitHubAppInstallationConnectionId,
 } from "../../services/redirect-flow.js";
 import {
@@ -80,36 +81,13 @@ export async function completeGitHubAppInstallationConnection(
   const queryParams = createRedirectQueryParams(input.query);
   const state = resolveRedirectStateOrThrow(queryParams);
 
-  const redirectSession = await db.query.integrationConnectionRedirectSessions.findFirst({
-    where: (table, { eq }) => eq(table.state, state),
+  const redirectSession = await resolveActiveRedirectSessionOrThrow({
+    db,
+    state,
+    invalidStateCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+    alreadyUsedCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+    expiredCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
   });
-
-  if (redirectSession === undefined) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
-      "Redirect state is invalid.",
-    );
-  }
-
-  if (redirectSession.usedAt !== null) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
-      "Redirect state has already been used.",
-    );
-  }
-
-  const now = Date.now();
-  const expiresAt = Date.parse(redirectSession.expiresAt);
-  if (Number.isNaN(expiresAt)) {
-    throw new Error(`Redirect session '${redirectSession.id}' has an invalid expiry timestamp.`);
-  }
-
-  if (expiresAt <= now) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
-      "Redirect state has expired.",
-    );
-  }
 
   const connectionId = resolveGitHubAppInstallationConnectionIdOrThrow(state);
   const installationId = resolveInstallationIdOrThrow(queryParams);

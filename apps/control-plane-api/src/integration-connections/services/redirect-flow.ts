@@ -1,5 +1,11 @@
 import { randomBytes } from "node:crypto";
 
+import {
+  type ControlPlaneDatabase,
+  type IntegrationConnectionRedirectSession,
+} from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
+
 const REDIRECT_STATE_BYTE_LENGTH = 32;
 const REDIRECT_SESSION_TTL_MS = 10 * 60 * 1000;
 
@@ -71,4 +77,36 @@ export function createRedirectQueryParams(query: Record<string, string>): URLSea
   }
 
   return params;
+}
+
+export async function resolveActiveRedirectSessionOrThrow(input: {
+  db: ControlPlaneDatabase;
+  state: string;
+  invalidStateCode: string;
+  alreadyUsedCode: string;
+  expiredCode: string;
+}): Promise<IntegrationConnectionRedirectSession> {
+  const redirectSession = await input.db.query.integrationConnectionRedirectSessions.findFirst({
+    where: (table, { eq }) => eq(table.state, input.state),
+  });
+
+  if (redirectSession === undefined) {
+    throw new BadRequestError(input.invalidStateCode, "Redirect state is invalid.");
+  }
+
+  if (redirectSession.usedAt !== null) {
+    throw new BadRequestError(input.alreadyUsedCode, "Redirect state has already been used.");
+  }
+
+  const now = Date.now();
+  const expiresAt = Date.parse(redirectSession.expiresAt);
+  if (Number.isNaN(expiresAt)) {
+    throw new Error(`Redirect session '${redirectSession.id}' has an invalid expiry timestamp.`);
+  }
+
+  if (expiresAt <= now) {
+    throw new BadRequestError(input.expiredCode, "Redirect state has expired.");
+  }
+
+  return redirectSession;
 }
