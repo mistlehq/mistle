@@ -58,17 +58,6 @@ function isDeviceAuthorizationMethod(
   return method?.kind === "device-authorization";
 }
 
-function shouldCreateGitHubAppDraftConnection(input: {
-  editor: IntegrationConnectionEditorState;
-  methodId: IntegrationConnectionMethodId;
-}): boolean {
-  return (
-    input.editor.mode === "create" &&
-    input.editor.targetFamilyId === "github" &&
-    input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  );
-}
-
 function resolveEditableConfigValue(input: {
   configValue: Record<string, unknown>;
   configForm: ReturnType<typeof resolveConnectionMethodFormUiModel>;
@@ -357,10 +346,8 @@ export function useIntegrationConnectionEditorState(
         return;
       } else {
         if (
-          shouldCreateGitHubAppDraftConnection({
-            editor,
-            methodId: draft.methodId,
-          })
+          editor.targetFamilyId === "github" &&
+          draft.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
         ) {
           const createdConnection = await createGitHubAppDraftMutation.mutateAsync({
             targetKey: editor.targetKey,
