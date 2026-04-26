@@ -23,7 +23,9 @@ import {
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   resolveSandboxProfileEditorVersionMode,
+  SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
+  SandboxProfileEditorShell,
   SandboxProfileEditorView,
 } from "./sandbox-profile-editor-page.js";
 
@@ -58,6 +60,7 @@ function renderSandboxProfileEditor(input?: {
     };
   }[];
   integrationsLoading?: boolean;
+  view?: "published" | "draft" | "default";
   versionState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
 }): void {
   const queryClient = createTestQueryClient({
@@ -74,6 +77,11 @@ function renderSandboxProfileEditor(input?: {
         ? version - 1
         : null;
   const resolvedVersionState = input?.versionState ?? "draft";
+  const resolvedRouteView =
+    input?.view ??
+    (resolvedVersionState === "published" || resolvedVersionState === "published-with-draft"
+      ? "published"
+      : "draft");
   const singleVersionState: SandboxProfileVersion["state"] =
     resolvedVersionState === "published" ? "published" : "draft";
   const versions: SandboxProfileVersion[] =
@@ -178,14 +186,22 @@ function renderSandboxProfileEditor(input?: {
   const router = createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
-        <Route
-          element={<SandboxProfileEditorPage mode="edit" />}
-          path="sandbox-profiles/:profileId"
-        />
+        <Route element={<SandboxProfileEditorShell />} path="sandbox-profiles/:profileId">
+          <Route element={<SandboxProfileDefaultRedirect />} index />
+          <Route
+            element={<SandboxProfileEditorPage mode="edit" view="published" />}
+            path="published"
+          />
+          <Route element={<SandboxProfileEditorPage mode="edit" view="draft" />} path="draft" />
+        </Route>
       </Route>,
     ),
     {
-      initialEntries: [`/sandbox-profiles/${profileId}`],
+      initialEntries: [
+        resolvedRouteView === "default"
+          ? `/sandbox-profiles/${profileId}`
+          : `/sandbox-profiles/${profileId}/${resolvedRouteView}`,
+      ],
     },
   );
 
@@ -366,10 +382,10 @@ function renderPublishedWithDraftActionsHarness(): void {
 }
 
 describe("SandboxProfileEditorPage", () => {
-  it("defaults to the active version when draft and published versions both exist", () => {
+  it("resolves the active version for the published route when draft and published versions both exist", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: 1,
-      viewedVersionKind: null,
+      view: "published",
       versions: [
         {
           sandboxProfileId: "sbp_test",
@@ -398,10 +414,10 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
-  it("defaults to draft when the profile has not been published yet", () => {
+  it("resolves the draft version for the draft route when the profile has not been published yet", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: null,
-      viewedVersionKind: null,
+      view: "draft",
       versions: [
         {
           sandboxProfileId: "sbp_test",
@@ -423,10 +439,30 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
+  it("returns an explicit unavailable state when the published resolver has no published version", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: null,
+      view: "published",
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: "Sandbox profile published version could not be loaded.",
+    });
+  });
+
   it("can resolve the published version while a draft exists", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: 1,
-      viewedVersionKind: "active",
+      view: "published",
       versions: [
         {
           sandboxProfileId: "sbp_test",
@@ -644,7 +680,6 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "draft-with-published",
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Resume editing" }));
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
     expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
@@ -652,6 +687,42 @@ describe("SandboxProfileEditorPage", () => {
       "Discard draft",
       "Delete profile",
     ]);
+  });
+
+  it("redirects the profile default route to published when a published version exists", async () => {
+    renderSandboxProfileEditor({
+      view: "default",
+      versionState: "published",
+    });
+
+    expect(await screen.findByText("Viewing: Published")).toBeDefined();
+  });
+
+  it("redirects the profile default route to draft when only a draft exists", async () => {
+    renderSandboxProfileEditor({
+      view: "default",
+      versionState: "draft",
+    });
+
+    expect(await screen.findByText("Viewing: Draft")).toBeDefined();
+  });
+
+  it("redirects the published route to draft when the profile has no published version", async () => {
+    renderSandboxProfileEditor({
+      view: "published",
+      versionState: "draft",
+    });
+
+    expect(await screen.findByText("Viewing: Draft")).toBeDefined();
+  });
+
+  it("shows an explicit unavailable state when the draft route has no draft", () => {
+    renderSandboxProfileEditor({
+      view: "draft",
+      versionState: "published",
+    });
+
+    expect(screen.getByText("Sandbox profile draft version could not be loaded.")).toBeDefined();
   });
 
   it("discards draft changes directly from the draft actions menu", () => {

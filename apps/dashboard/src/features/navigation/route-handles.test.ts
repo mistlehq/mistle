@@ -45,6 +45,16 @@ describe("route handles", () => {
       "Edit sandbox profile configuration.",
     );
     expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfilePublished.title).toBe("Edit profile");
+    expect(ROUTE_HANDLES.sandboxProfilePublished.description).toBe(
+      "Edit sandbox profile configuration.",
+    );
+    expect(ROUTE_HANDLES.sandboxProfilePublished.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfileDraft.title).toBe("Edit profile");
+    expect(ROUTE_HANDLES.sandboxProfileDraft.description).toBe(
+      "Edit sandbox profile configuration.",
+    );
+    expect(ROUTE_HANDLES.sandboxProfileDraft.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
     expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
@@ -164,16 +174,12 @@ describe("route handles", () => {
     expect(detailDescription({ params: {} })).toBe("");
   });
 
-  it("resolves sandbox profile detail breadcrumb with edit fallback", () => {
-    const detailBreadcrumb = ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb;
-    expect(typeof detailBreadcrumb).toBe("function");
-
-    if (typeof detailBreadcrumb !== "function") {
-      throw new Error("sandboxProfilesDetail breadcrumb must be a function");
-    }
-
-    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("Edit");
-    expect(detailBreadcrumb({ params: {} })).toBe("Edit");
+  it("defines sandbox profile published and draft breadcrumbs", () => {
+    expect(ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb).toBe("Profile");
+    expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
+    expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
+    expect(typeof ROUTE_HANDLES.sandboxProfilePublished.header?.leading).toBe("function");
+    expect(typeof ROUTE_HANDLES.sandboxProfileDraft.header?.leading).toBe("function");
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {

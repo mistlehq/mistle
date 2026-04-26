@@ -27,7 +27,11 @@ import { OrganizationIntegrationsSettingsPage } from "./features/pages/organizat
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
 import { OrganizationSandboxStorageSettingsPage } from "./features/pages/organization-sandbox-storage-settings-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
-import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
+import {
+  SandboxProfileDefaultRedirect,
+  SandboxProfileEditorPage,
+  SandboxProfileEditorShell,
+} from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
@@ -74,10 +78,22 @@ export const APP_ROUTES = createRoutesFromElements(
             path="new"
           />
           <Route
-            element={<SandboxProfileEditorPage mode="edit" />}
+            element={<SandboxProfileEditorShell />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
             path=":profileId"
-          />
+          >
+            <Route element={<SandboxProfileDefaultRedirect />} index />
+            <Route
+              element={<SandboxProfileEditorPage mode="edit" view="published" />}
+              handle={ROUTE_HANDLES.sandboxProfilePublished}
+              path="published"
+            />
+            <Route
+              element={<SandboxProfileEditorPage mode="edit" view="draft" />}
+              handle={ROUTE_HANDLES.sandboxProfileDraft}
+              path="draft"
+            />
+          </Route>
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
           <Route element={<AutomationsPage />} index />

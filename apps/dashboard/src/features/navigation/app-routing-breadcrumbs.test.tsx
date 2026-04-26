@@ -10,6 +10,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
+import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
@@ -59,9 +60,10 @@ function PageHarness(): React.JSX.Element {
   );
 }
 
-function renderRoutingMarkup(router: ReturnType<typeof createMemoryRouter>): string {
-  const queryClient = createTestQueryClient();
-
+function renderRoutingMarkup(
+  router: ReturnType<typeof createMemoryRouter>,
+  queryClient = createTestQueryClient(),
+): string {
   return renderToStaticMarkup(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -122,11 +124,19 @@ describe("app routing breadcrumb integration", () => {
       <Route element={<Outlet />} handle={ROUTE_HANDLES.sandboxProfiles} path="sandbox-profiles">
         <Route element={<PageHarness />} index />
         <Route element={<PageHarness />} handle={ROUTE_HANDLES.sandboxProfilesNew} path="new" />
-        <Route
-          element={<PageHarness />}
-          handle={ROUTE_HANDLES.sandboxProfilesDetail}
-          path=":profileId"
-        />
+        <Route element={<Outlet />} handle={ROUTE_HANDLES.sandboxProfilesDetail} path=":profileId">
+          <Route element={<PageHarness />} index />
+          <Route
+            element={<PageHarness />}
+            handle={ROUTE_HANDLES.sandboxProfilePublished}
+            path="published"
+          />
+          <Route
+            element={<PageHarness />}
+            handle={ROUTE_HANDLES.sandboxProfileDraft}
+            path="draft"
+          />
+        </Route>
       </Route>
     </Route>,
   );
@@ -275,14 +285,43 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainMetaTitle(markup, "Create");
     expectMarkupToContainMetaDescription(markup, "Create a sandbox profile.");
 
-    await router.navigate("/sandbox-profiles/sbp_abc");
-    markup = renderRoutingMarkup(router);
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(sandboxProfileDetailQueryKey("sbp_abc"), {
+      id: "sbp_abc",
+      displayName: "Customer Support Sandbox",
+      activeVersion: 2,
+      status: "active",
+      latestVersion: 3,
+      createdAt: "2026-04-23T00:00:00.000Z",
+      updatedAt: "2026-04-23T00:00:00.000Z",
+    });
+
+    await router.navigate("/sandbox-profiles/sbp_abc/published");
+    markup = renderRoutingMarkup(router, queryClient);
 
     expectMarkupToContainHref(markup, "/sandbox-profiles");
-    expectMarkupToContainCurrentPageLabel(markup, "Edit");
-    expect(markup).not.toContain("sbp_abc");
+    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/published");
+    expect(markup).toContain("Customer Support Sandbox");
+    expectMarkupToContainCurrentPageLabel(markup, "Published");
     expectMarkupToContainMetaTitle(markup, "Edit profile");
     expectMarkupToContainMetaDescription(markup, "Edit sandbox profile configuration.");
+
+    queryClient.setQueryData(sandboxProfileDetailQueryKey("sbp_draft"), {
+      id: "sbp_draft",
+      displayName: "Draft Only Sandbox",
+      activeVersion: null,
+      status: "active",
+      latestVersion: 1,
+      createdAt: "2026-04-23T00:00:00.000Z",
+      updatedAt: "2026-04-23T00:00:00.000Z",
+    });
+
+    await router.navigate("/sandbox-profiles/sbp_draft/draft");
+    markup = renderRoutingMarkup(router, queryClient);
+
+    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_draft/draft");
+    expect(markup).toContain("Draft Only Sandbox");
+    expectMarkupToContainCurrentPageLabel(markup, "Draft");
   });
 
   it("renders home and sessions breadcrumbs", async () => {

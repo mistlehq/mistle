@@ -4,6 +4,10 @@ import { createElement } from "react";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
+import {
+  SandboxProfileBreadcrumbs,
+  type SandboxProfileBreadcrumbView,
+} from "./sandbox-profile-breadcrumbs.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
   breadcrumb: RouteTextValue;
@@ -141,12 +145,23 @@ function resolveSessionDetailHeaderLeading(input: RouteTextResolverInput): React
   });
 }
 
-function resolveSandboxProfileDetailBreadcrumb(_input: RouteTextResolverInput): string {
+function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
   return "Edit";
 }
 
-function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
-  return "Edit";
+function resolveSandboxProfileHeaderLeading(
+  input: RouteTextResolverInput,
+  view: SandboxProfileBreadcrumbView,
+): React.ReactNode | null {
+  const profileId = input.params["profileId"];
+  if (profileId === undefined || profileId.trim().length === 0) {
+    return null;
+  }
+
+  return createElement(SandboxProfileBreadcrumbs, {
+    profileId,
+    view,
+  });
 }
 
 export const ROUTE_HANDLES = {
@@ -235,9 +250,27 @@ export const ROUTE_HANDLES = {
   },
   sandboxProfilesDetail: {
     appShellInsetOwner: "child",
-    breadcrumb: resolveSandboxProfileDetailBreadcrumb,
+    breadcrumb: "Profile",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
+  },
+  sandboxProfilePublished: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Published",
+    title: "Edit profile",
+    description: "Edit sandbox profile configuration.",
+    header: {
+      leading: (input) => resolveSandboxProfileHeaderLeading(input, "published"),
+    },
+  },
+  sandboxProfileDraft: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Draft",
+    title: "Edit profile",
+    description: "Edit sandbox profile configuration.",
+    header: {
+      leading: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
+    },
   },
   automations: {
     breadcrumb: "Automations",

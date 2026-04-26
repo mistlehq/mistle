@@ -22,7 +22,7 @@ import {
 import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type SyntheticEvent } from "react";
-import { useNavigate, useParams } from "react-router";
+import { Navigate, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
@@ -77,9 +77,14 @@ import {
 } from "./sandbox-profile-setup-script-state.js";
 import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 
-type SandboxProfileEditorPageProps = {
-  mode: "create" | "edit";
-};
+type SandboxProfileEditorPageProps =
+  | {
+      mode: "create";
+    }
+  | {
+      mode: "edit";
+      view: SandboxProfileRouteView;
+    };
 
 type SandboxProfileEditorVersionMode =
   | {
@@ -96,7 +101,7 @@ type SandboxProfileEditorVersionMode =
       draftVersion: number | null;
     };
 
-type ViewedVersionKind = "draft" | "active";
+type SandboxProfileRouteView = "published" | "draft";
 
 type ResolveEditorVersionModeResult =
   | {
@@ -111,7 +116,7 @@ type ResolveEditorVersionModeResult =
 export function resolveSandboxProfileEditorVersionMode(input: {
   activeVersion: number | null;
   versions: readonly SandboxProfileVersion[];
-  viewedVersionKind: ViewedVersionKind | null;
+  view: SandboxProfileRouteView;
 }): ResolveEditorVersionModeResult {
   const draftVersions = input.versions.filter((version) => version.state === "draft");
   if (draftVersions.length > 1) {
@@ -134,9 +139,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     };
   }
 
-  const preferredView = input.viewedVersionKind ?? (activeVersion === null ? "draft" : "active");
-
-  if (preferredView === "draft") {
+  if (input.view === "draft") {
     if (draftVersion === null) {
       return {
         ok: false,
@@ -185,7 +188,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     return <CreateSandboxProfileEditorPage />;
   }
 
-  return <EditSandboxProfileEditorPage />;
+  return <EditSandboxProfileEditorPage view={props.view} />;
 }
 
 function CreateSandboxProfileEditorPage(): React.JSX.Element {
@@ -259,7 +262,19 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
   );
 }
 
-function EditSandboxProfileEditorPage(): React.JSX.Element {
+type SandboxProfileEditorShellContext = {
+  profileId: string;
+  profile: SandboxProfile;
+  versions: readonly SandboxProfileVersion[];
+  navigate: ReturnType<typeof useNavigate>;
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+};
+
+export function SandboxProfileEditorShell(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const params = useParams();
@@ -274,8 +289,17 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
     queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
     retry: false,
   });
+  const profileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(profileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId,
+        signal,
+      }),
+    retry: false,
+  });
 
-  if (profileQuery.isPending) {
+  if (profileQuery.isPending || profileVersionsQuery.isPending) {
     return (
       <PageFrame maxWidthClassName="max-w-5xl" title="">
         {null}
@@ -322,45 +346,93 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
     );
   }
 
+  if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
+    return (
+      <PageFrame maxWidthClassName="max-w-5xl" title="">
+        <Notice title="Could not load profile versions" variant="alert">
+          {resolveApiErrorMessage({
+            error: profileVersionsQuery.error,
+            fallbackMessage: "Could not load sandbox profile versions.",
+          })}
+        </Notice>
+      </PageFrame>
+    );
+  }
+
   return (
     <PageFrame maxWidthClassName="max-w-5xl" title="">
-      <LoadedSandboxProfileEditorPage
-        navigate={navigate}
-        profileId={profileId}
-        profile={profileQuery.data}
-        invalidateSandboxProfiles={async () => {
-          await queryClient.invalidateQueries({
-            queryKey: ["sandbox-profiles"],
-          });
-        }}
-        invalidateProfileDetail={async (invalidateProfileId) => {
-          await queryClient.invalidateQueries({
-            queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
-          });
-        }}
-        invalidateProfileVersions={async (invalidateProfileId) => {
-          await queryClient.invalidateQueries({
-            queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
-          });
-        }}
-        invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
-          await queryClient.invalidateQueries({
-            queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-              profileId: invalidateProfileId,
-              version,
-            }),
-          });
-        }}
-        invalidateVersionSetupScript={async ({ profileId: invalidateProfileId, version }) => {
-          await queryClient.invalidateQueries({
-            queryKey: sandboxProfileVersionSetupScriptQueryKey({
-              profileId: invalidateProfileId,
-              version,
-            }),
-          });
-        }}
+      <Outlet
+        context={
+          {
+            profileId,
+            profile: profileQuery.data,
+            versions: profileVersionsQuery.data.versions,
+            navigate,
+            invalidateSandboxProfiles: async () => {
+              await queryClient.invalidateQueries({
+                queryKey: ["sandbox-profiles"],
+              });
+            },
+            invalidateProfileDetail: async (invalidateProfileId) => {
+              await queryClient.invalidateQueries({
+                queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+              });
+            },
+            invalidateProfileVersions: async (invalidateProfileId) => {
+              await queryClient.invalidateQueries({
+                queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
+              });
+            },
+            invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
+              await queryClient.invalidateQueries({
+                queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+                  profileId: invalidateProfileId,
+                  version,
+                }),
+              });
+            },
+            invalidateVersionSetupScript: async ({ profileId: invalidateProfileId, version }) => {
+              await queryClient.invalidateQueries({
+                queryKey: sandboxProfileVersionSetupScriptQueryKey({
+                  profileId: invalidateProfileId,
+                  version,
+                }),
+              });
+            },
+          } satisfies SandboxProfileEditorShellContext
+        }
       />
     </PageFrame>
+  );
+}
+
+export function SandboxProfileDefaultRedirect(): React.JSX.Element {
+  const shellContext = useSandboxProfileEditorShellContext();
+  const defaultView = shellContext.profile.activeVersion === null ? "draft" : "published";
+
+  return <Navigate replace to={`/sandbox-profiles/${shellContext.profileId}/${defaultView}`} />;
+}
+
+function useSandboxProfileEditorShellContext(): SandboxProfileEditorShellContext {
+  return useOutletContext<SandboxProfileEditorShellContext>();
+}
+
+function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }): React.JSX.Element {
+  const shellContext = useSandboxProfileEditorShellContext();
+
+  return (
+    <LoadedSandboxProfileEditorPage
+      view={input.view}
+      navigate={shellContext.navigate}
+      profileId={shellContext.profileId}
+      profile={shellContext.profile}
+      versions={shellContext.versions}
+      invalidateSandboxProfiles={shellContext.invalidateSandboxProfiles}
+      invalidateProfileDetail={shellContext.invalidateProfileDetail}
+      invalidateProfileVersions={shellContext.invalidateProfileVersions}
+      invalidateVersionBindings={shellContext.invalidateVersionBindings}
+      invalidateVersionSetupScript={shellContext.invalidateVersionSetupScript}
+    />
   );
 }
 
@@ -368,6 +440,8 @@ type LoadedSandboxProfileEditorPageInput = {
   navigate: ReturnType<typeof useNavigate>;
   profileId: string;
   profile: SandboxProfile;
+  versions: readonly SandboxProfileVersion[];
+  view: SandboxProfileRouteView;
   invalidateSandboxProfiles: () => Promise<void>;
   invalidateProfileDetail: (profileId: string) => Promise<void>;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
@@ -378,19 +452,9 @@ type LoadedSandboxProfileEditorPageInput = {
 function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
-  const [viewedVersionKind, setViewedVersionKind] = useState<ViewedVersionKind | null>(null);
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
-  const profileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
-    queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
-        profileId: input.profileId,
-        signal,
-      }),
-    retry: false,
-  });
   const automationUsagesQuery = useQuery({
     queryKey: sandboxProfileAutomationUsagesQueryKey(input.profileId),
     queryFn: async ({ signal }) =>
@@ -413,7 +477,7 @@ function LoadedSandboxProfileEditorPage(
         input.invalidateSandboxProfiles(),
         input.invalidateProfileDetail(input.profileId),
       ]);
-      setViewedVersionKind("draft");
+      void input.navigate(`/sandbox-profiles/${input.profileId}/draft`);
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -456,7 +520,7 @@ function LoadedSandboxProfileEditorPage(
           version: result.activeVersion,
         }),
       ]);
-      setViewedVersionKind("active");
+      void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -480,7 +544,7 @@ function LoadedSandboxProfileEditorPage(
         input.invalidateSandboxProfiles(),
         input.invalidateProfileDetail(input.profileId),
       ]);
-      setViewedVersionKind("active");
+      void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -515,25 +579,18 @@ function LoadedSandboxProfileEditorPage(
     },
   });
 
-  if (profileVersionsQuery.isPending) {
-    return <></>;
-  }
-
-  if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
-    return (
-      <Notice title="Could not load profile versions" variant="alert">
-        {resolveApiErrorMessage({
-          error: profileVersionsQuery.error,
-          fallbackMessage: "Could not load sandbox profile versions.",
-        })}
-      </Notice>
-    );
+  if (
+    input.view === "published" &&
+    input.profile.activeVersion === null &&
+    input.versions.some((version) => version.state === "draft")
+  ) {
+    return <Navigate replace to={`/sandbox-profiles/${input.profileId}/draft`} />;
   }
 
   const resolvedMode = resolveSandboxProfileEditorVersionMode({
     activeVersion: input.profile.activeVersion,
-    versions: profileVersionsQuery.data.versions,
-    viewedVersionKind,
+    versions: input.versions,
+    view: input.view,
   });
 
   if (!resolvedMode.ok) {
@@ -559,11 +616,11 @@ function LoadedSandboxProfileEditorPage(
       }}
       onViewActive={() => {
         setVersionActionError(null);
-        setViewedVersionKind("active");
+        void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
       }}
       onViewDraft={() => {
         setVersionActionError(null);
-        setViewedVersionKind("draft");
+        void input.navigate(`/sandbox-profiles/${input.profileId}/draft`);
       }}
       profile={input.profile}
       profileId={input.profileId}
