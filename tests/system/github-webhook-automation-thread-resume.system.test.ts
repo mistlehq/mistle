@@ -88,13 +88,13 @@ function hasPersistedUserMessageText(input: {
     throw new Error("thread/read result must be an object.");
   }
 
-  const thread = input.threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
-    throw new Error("thread/read result.thread.turns must be an array.");
+  const turns = input.threadReadResult.turns;
+  if (!Array.isArray(turns)) {
+    throw new Error("thread/read result.turns must be an array.");
   }
 
-  for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
-    const turn = thread.turns[turnIndex];
+  for (let turnIndex = turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = turns[turnIndex];
     if (!isRecord(turn) || !Array.isArray(turn.items)) {
       continue;
     }
