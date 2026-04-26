@@ -297,7 +297,10 @@ export async function listSandboxInstances(
           })
           .from(sandboxInstances)
           .where(
-            sql`${sandboxInstances.organizationId} = ${input.organizationId} and ${sandboxInstances.purpose} = ${SandboxInstancePurposes.SESSION}`,
+            and(
+              eq(sandboxInstances.organizationId, input.organizationId),
+              eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+            ),
           );
 
         return result?.totalResults ?? 0;

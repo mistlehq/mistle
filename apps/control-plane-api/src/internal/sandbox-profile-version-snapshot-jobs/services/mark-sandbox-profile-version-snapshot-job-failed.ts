@@ -23,34 +23,25 @@ export async function markSandboxProfileVersionSnapshotJobFailed(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
-    const lockedRows = await tx.execute(sql<{
-      state: string;
-      workflow_run_id: string | null;
-      error_code: string | null;
-      error_message: string | null;
-    }>`
-      select state, workflow_run_id, error_code, error_message
-      from "control_plane"."sandbox_profile_version_snapshot_jobs"
-      where id = ${input.snapshotJobId}
-      for update
-    `);
+    const [lockedRow] = await tx
+      .select({
+        state: sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
+        errorCode: sandboxProfileVersionSnapshotJobs.errorCode,
+        errorMessage: sandboxProfileVersionSnapshotJobs.errorMessage,
+      })
+      .from(sandboxProfileVersionSnapshotJobs)
+      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .for("update");
 
-    const lockedRow = lockedRows.rows[0];
     if (lockedRow === undefined) {
       throw createSnapshotJobNotFoundError(input.snapshotJobId);
     }
 
-    const actualState =
-      typeof lockedRow.state === "string"
-        ? lockedRow.state
-        : (() => {
-            throw new Error("Expected snapshot job state to be a string.");
-          })();
-    const workflowRunId =
-      typeof lockedRow.workflow_run_id === "string" ? lockedRow.workflow_run_id : null;
-    const errorCode = typeof lockedRow.error_code === "string" ? lockedRow.error_code : null;
-    const errorMessage =
-      typeof lockedRow.error_message === "string" ? lockedRow.error_message : null;
+    const actualState = lockedRow.state;
+    const workflowRunId = lockedRow.workflowRunId;
+    const errorCode = lockedRow.errorCode;
+    const errorMessage = lockedRow.errorMessage;
 
     if (workflowRunId !== input.workflowRunId) {
       throw createSnapshotJobOwnershipMismatchError({

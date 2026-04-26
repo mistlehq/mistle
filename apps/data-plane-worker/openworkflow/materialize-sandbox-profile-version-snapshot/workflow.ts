@@ -106,20 +106,6 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     | "mark_stopped"
     | "mark_succeeded" = "claim";
 
-  async function markSnapshotJobFailedStep(input: {
-    failureCode: string;
-    failureMessage: string;
-  }): Promise<void> {
-    await step.run({ name: "mark-snapshot-job-failed" }, async () => {
-      await ctx.controlPlaneInternalClient.markSandboxProfileVersionSnapshotJobFailed({
-        snapshotJobId: workflowInput.snapshotJobId,
-        workflowRunId,
-        errorCode: input.failureCode,
-        errorMessage: input.failureMessage,
-      });
-    });
-  }
-
   async function handleSnapshotFailure(input: {
     failureCode: string;
     summary: string;
@@ -203,9 +189,13 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     let markSnapshotJobFailedError: unknown;
     if (currentPhase !== "mark_succeeded") {
       try {
-        await markSnapshotJobFailedStep({
-          failureCode: input.failureCode,
-          failureMessage,
+        await step.run({ name: "mark-snapshot-job-failed" }, async () => {
+          await ctx.controlPlaneInternalClient.markSandboxProfileVersionSnapshotJobFailed({
+            snapshotJobId: workflowInput.snapshotJobId,
+            workflowRunId,
+            errorCode: input.failureCode,
+            errorMessage: failureMessage,
+          });
         });
       } catch (error) {
         logger.error(

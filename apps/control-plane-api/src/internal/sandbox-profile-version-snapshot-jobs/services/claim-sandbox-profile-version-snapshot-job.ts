@@ -21,29 +21,21 @@ export async function claimSandboxProfileVersionSnapshotJob(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
-    const lockedRows = await tx.execute(sql<{
-      state: string;
-      workflow_run_id: string | null;
-    }>`
-      select state, workflow_run_id
-      from "control_plane"."sandbox_profile_version_snapshot_jobs"
-      where id = ${input.snapshotJobId}
-      for update
-    `);
+    const [lockedRow] = await tx
+      .select({
+        state: sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
+      })
+      .from(sandboxProfileVersionSnapshotJobs)
+      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .for("update");
 
-    const lockedRow = lockedRows.rows[0];
     if (lockedRow === undefined) {
       throw createSnapshotJobNotFoundError(input.snapshotJobId);
     }
 
-    const actualState =
-      typeof lockedRow.state === "string"
-        ? lockedRow.state
-        : (() => {
-            throw new Error("Expected snapshot job state to be a string.");
-          })();
-    const workflowRunId =
-      typeof lockedRow.workflow_run_id === "string" ? lockedRow.workflow_run_id : null;
+    const actualState = lockedRow.state;
+    const workflowRunId = lockedRow.workflowRunId;
 
     if (
       actualState === SandboxProfileVersionSnapshotJobStates.RUNNING &&

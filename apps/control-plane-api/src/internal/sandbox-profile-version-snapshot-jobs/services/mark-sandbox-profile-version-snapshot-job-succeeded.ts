@@ -25,37 +25,25 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
-    const lockedRows = await tx.execute(sql<{
-      state: string;
-      workflow_run_id: string | null;
-      candidate_image_provider: string | null;
-      candidate_image_id: string | null;
-    }>`
-      select state, workflow_run_id, candidate_image_provider, candidate_image_id
-      from "control_plane"."sandbox_profile_version_snapshot_jobs"
-      where id = ${input.snapshotJobId}
-      for update
-    `);
+    const [lockedRow] = await tx
+      .select({
+        state: sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
+        candidateImageProvider: sandboxProfileVersionSnapshotJobs.candidateImageProvider,
+        candidateImageId: sandboxProfileVersionSnapshotJobs.candidateImageId,
+      })
+      .from(sandboxProfileVersionSnapshotJobs)
+      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .for("update");
 
-    const lockedRow = lockedRows.rows[0];
     if (lockedRow === undefined) {
       throw createSnapshotJobNotFoundError(input.snapshotJobId);
     }
 
-    const actualState =
-      typeof lockedRow.state === "string"
-        ? lockedRow.state
-        : (() => {
-            throw new Error("Expected snapshot job state to be a string.");
-          })();
-    const workflowRunId =
-      typeof lockedRow.workflow_run_id === "string" ? lockedRow.workflow_run_id : null;
-    const candidateImageProvider =
-      typeof lockedRow.candidate_image_provider === "string"
-        ? lockedRow.candidate_image_provider
-        : null;
-    const candidateImageId =
-      typeof lockedRow.candidate_image_id === "string" ? lockedRow.candidate_image_id : null;
+    const actualState = lockedRow.state;
+    const workflowRunId = lockedRow.workflowRunId;
+    const candidateImageProvider = lockedRow.candidateImageProvider;
+    const candidateImageId = lockedRow.candidateImageId;
 
     if (workflowRunId !== input.workflowRunId) {
       throw createSnapshotJobOwnershipMismatchError({
