@@ -520,9 +520,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
             providerSandboxId: startedSandbox.providerSandboxId,
             startupMode: SandboxStartupModes.NEW,
-            ...(workflowInput.image.kind === "snapshot"
-              ? { executionMode: SandboxExecutionModes.SNAPSHOT_LAUNCH }
-              : {}),
+            executionMode: SandboxExecutionModes.SESSION,
             runtimePlan: workflowInput.runtimePlan,
             ...(workflowInput.actingUserId === undefined
               ? {}
