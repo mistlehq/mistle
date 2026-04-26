@@ -866,7 +866,7 @@ export function SlackAppSetupPane(input: {
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-medium">Continue with Slack</h2>
+              <h2 className="text-lg font-medium">Slack app is connected</h2>
               <p className="text-muted-foreground text-sm">
                 Mistle has saved the Slack app credentials and webhook configuration for this
                 connection.
@@ -881,7 +881,7 @@ export function SlackAppSetupPane(input: {
                 }}
                 type="button"
               >
-                Continue
+                View connection
               </Button>
             </FormPageActionBar>
           </div>
@@ -957,7 +957,7 @@ export function SlackAppSetupPane(input: {
                   }}
                   type="button"
                 >
-                  Create Slack App
+                  Create and connect Slack app
                 </Button>
               </FormPageActionBar>
             ) : null}

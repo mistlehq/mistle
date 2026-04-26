@@ -87,9 +87,9 @@ describe("SlackAppSetupPane", () => {
         "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Create Slack App" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(
+      screen.getByRole("button", { name: "Create and connect Slack app" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("includes the Slack app permissions and event subscriptions in the default manifest", () => {
@@ -166,8 +166,8 @@ describe("SlackAppSetupPane", () => {
     });
 
     expect(screen.getByText("Slack app installed")).toBeTruthy();
-    expect(screen.getByText("Continue with Slack")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeTruthy();
+    expect(screen.getByText("Slack app is connected")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "View connection" })).toBeTruthy();
     expect(screen.queryByText("Choose a setup method")).toBeNull();
     expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
   });
