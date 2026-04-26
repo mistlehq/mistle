@@ -113,8 +113,6 @@ export const SlackDraftManifest = JSON.stringify(
   2,
 );
 
-const SlackManifestEditorExtensions = [json(), linter(jsonParseLinter()), EditorView.lineWrapping];
-
 function normalizeInputValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -156,12 +154,27 @@ function parseManifestObject(value: string): Record<string, unknown> {
   return Object.fromEntries(Object.entries(parsed));
 }
 
-function formatManifestOnBlur(input: { value: string; onChange: (value: string) => void }): void {
-  if (validateManifestJson(input.value).status !== "valid") {
-    return;
-  }
+function formatSlackManifestJson(value: string): string {
+  return JSON.stringify(parseManifestObject(value), null, 2);
+}
 
-  input.onChange(JSON.stringify(parseManifestObject(input.value), null, 2));
+function createSlackManifestFormatOnBlurExtension(input: {
+  onManifestChange: (value: string) => void;
+}): ReturnType<typeof EditorView.domEventHandlers> {
+  return EditorView.domEventHandlers({
+    blur: (_event, view) => {
+      const currentValue = view.state.doc.toString();
+      const validation = validateManifestJson(currentValue);
+      if (validation.status === "invalid") {
+        return;
+      }
+
+      const formattedValue = formatSlackManifestJson(currentValue);
+      if (formattedValue !== currentValue) {
+        input.onManifestChange(formattedValue);
+      }
+    },
+  });
 }
 
 function hasConfiguredSecret(connection: IntegrationConnection, fieldName: string): boolean {
@@ -230,21 +243,21 @@ function SlackManifestSetupPanel(input: {
         </div>
         <div className="overflow-hidden rounded-md border">
           <CodeMirror
-            aria-label="Slack app manifest JSON"
             basicSetup={{
               foldGutter: false,
               highlightActiveLine: false,
               highlightActiveLineGutter: false,
               lineNumbers: false,
             }}
-            extensions={SlackManifestEditorExtensions}
-            height="360px"
-            onBlur={() => {
-              formatManifestOnBlur({
-                value: input.manifestValue,
-                onChange: input.onManifestChange,
-              });
-            }}
+            className="text-sm"
+            extensions={[
+              json(),
+              linter(jsonParseLinter()),
+              createSlackManifestFormatOnBlurExtension({
+                onManifestChange: input.onManifestChange,
+              }),
+            ]}
+            id="slack-app-manifest-editor"
             onChange={input.onManifestChange}
             value={input.manifestValue}
           />
