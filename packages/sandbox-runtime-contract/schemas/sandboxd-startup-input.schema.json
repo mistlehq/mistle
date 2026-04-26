@@ -8,7 +8,7 @@
     },
     "executionMode": {
       "type": "string",
-      "enum": ["session", "snapshot_materialization"]
+      "enum": ["session", "snapshot"]
     },
     "bootstrapToken": {
       "type": "string",
@@ -66,6 +66,21 @@
                 "source": {
                   "type": "string",
                   "const": "base"
+                },
+                "imageRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["source", "imageRef"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "const": "snapshot"
                 },
                 "imageRef": {
                   "type": "string",

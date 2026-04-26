@@ -79,15 +79,15 @@ describe("startup contracts", () => {
     });
   });
 
-  it("accepts startup input with optional snapshot materialization execution mode", () => {
+  it("accepts startup input with optional snapshot execution mode", () => {
     expect(
       SandboxdStartupInputSchema.parse({
         ...startupInputFixture,
-        executionMode: SandboxdExecutionModes.SNAPSHOT_MATERIALIZATION,
+        executionMode: SandboxdExecutionModes.SNAPSHOT,
       }),
     ).toEqual({
       ...startupInputFixture,
-      executionMode: SandboxdExecutionModes.SNAPSHOT_MATERIALIZATION,
+      executionMode: SandboxdExecutionModes.SNAPSHOT,
     });
   });
 

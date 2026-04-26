@@ -16,12 +16,12 @@ export type SandboxdStartupMode = z.infer<typeof SandboxdStartupModeSchema>;
 
 export const SandboxdExecutionModes = {
   SESSION: "session",
-  SNAPSHOT_MATERIALIZATION: "snapshot_materialization",
+  SNAPSHOT: "snapshot",
 } as const;
 
 export const SandboxdExecutionModeSchema = z.enum([
   SandboxdExecutionModes.SESSION,
-  SandboxdExecutionModes.SNAPSHOT_MATERIALIZATION,
+  SandboxdExecutionModes.SNAPSHOT,
 ]);
 
 export type SandboxdExecutionMode = z.infer<typeof SandboxdExecutionModeSchema>;
