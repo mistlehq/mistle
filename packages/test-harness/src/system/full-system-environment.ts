@@ -105,6 +105,13 @@ export type StartFullSystemEnvironmentInput = {
         publicHostname: string;
       }
     | undefined;
+  sandboxPublicTokenizerProxyTunnel?:
+    | {
+        tunnelId: string;
+        tunnelCredentialsJson: string;
+        publicHostname: string;
+      }
+    | undefined;
 };
 
 export type StartedFullSystemEnvironment = {
@@ -255,7 +262,7 @@ async function readCloudflaredLogs(containerName: string): Promise<string> {
   }
 }
 
-async function startCloudflaredGatewayTunnel(input: {
+async function startCloudflaredServiceTunnel(input: {
   networkName: string;
   tunnelId: string;
   tunnelCredentialsJson: string;
@@ -263,7 +270,7 @@ async function startCloudflaredGatewayTunnel(input: {
   targetHost: string;
   targetPort: number;
 }): Promise<{
-  gatewayWsUrl: string;
+  publicBaseUrl: string;
   stop: () => Promise<void>;
 }> {
   const configDirectory = await mkdtemp(join(tmpdir(), "mistle-cloudflared-"));
@@ -321,7 +328,7 @@ async function startCloudflaredGatewayTunnel(input: {
     });
 
     return {
-      gatewayWsUrl: `wss://${input.publicHostname}/tunnel/sandbox`,
+      publicBaseUrl,
       stop: async () => {
         if (started) {
           await execFileAsync("docker", ["stop", containerName], {
@@ -629,7 +636,7 @@ export async function startFullSystemEnvironment(
     if (input.sandboxPublicGatewayTunnel !== undefined) {
       const publicGatewayTunnel = input.sandboxPublicGatewayTunnel;
       const startedGatewayTunnel = await withStepTiming("start public gateway tunnel", async () => {
-        return startCloudflaredGatewayTunnel({
+        return startCloudflaredServiceTunnel({
           networkName: activeNetwork.getName(),
           tunnelId: publicGatewayTunnel.tunnelId,
           tunnelCredentialsJson: publicGatewayTunnel.tunnelCredentialsJson,
@@ -641,7 +648,7 @@ export async function startFullSystemEnvironment(
       cleanupTasks.unshift(async () => {
         await startedGatewayTunnel.stop();
       });
-      gatewayWsUrl = startedGatewayTunnel.gatewayWsUrl;
+      gatewayWsUrl = `${startedGatewayTunnel.publicBaseUrl.replace("https://", "wss://")}/tunnel/sandbox`;
     }
     const controlPlaneApi = await withStepTiming("start control-plane-api", async () => {
       return startControlPlaneApi({
@@ -744,6 +751,27 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await withStepTiming("stop tokenizer-proxy", async () => tokenizerProxy.stop());
     });
+    let tokenizerProxyEgressBaseUrl = TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL;
+    if (input.sandboxPublicTokenizerProxyTunnel !== undefined) {
+      const publicTokenizerProxyTunnel = input.sandboxPublicTokenizerProxyTunnel;
+      const startedTokenizerProxyTunnel = await withStepTiming(
+        "start public tokenizer-proxy tunnel",
+        async () => {
+          return startCloudflaredServiceTunnel({
+            networkName: activeNetwork.getName(),
+            tunnelId: publicTokenizerProxyTunnel.tunnelId,
+            tunnelCredentialsJson: publicTokenizerProxyTunnel.tunnelCredentialsJson,
+            publicHostname: publicTokenizerProxyTunnel.publicHostname,
+            targetHost: "tokenizer-proxy",
+            targetPort: 5205,
+          });
+        },
+      );
+      cleanupTasks.unshift(async () => {
+        await startedTokenizerProxyTunnel.stop();
+      });
+      tokenizerProxyEgressBaseUrl = `${startedTokenizerProxyTunnel.publicBaseUrl}/tokenizer-proxy/egress`;
+    }
     const dataPlaneWorker = await withStepTiming("start data-plane-worker", async () => {
       return startDataPlaneWorker({
         buildContextHostPath: input.buildContextHostPath,
@@ -778,7 +806,7 @@ export async function startFullSystemEnvironment(
           MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: gatewayWsUrl,
           MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: gatewayWsUrl,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
-            TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL,
+            tokenizerProxyEgressBaseUrl,
         },
       });
     });

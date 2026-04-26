@@ -10,6 +10,7 @@ import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
+import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 import { buildIntegrationResourcePickerViewModel } from "./integration-resource-picker-view-model.js";
 import { IntegrationResourcePickerView } from "./integration-resource-picker-view.js";
@@ -124,7 +125,7 @@ export function IntegrationResourcePickerWidget(
           queryKey: ["integration-connections", options.connectionId, "resources", options.kind],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["sandbox-profiles", "integration-directory"],
+          queryKey: sandboxProfileIntegrationDirectoryQueryKey(),
         }),
       ]);
     },

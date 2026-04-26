@@ -2,16 +2,11 @@ import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time"
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
-import {
-  sandboxProfileVersionSetupScriptQueryKey,
-  sandboxProfileVersionsQueryKey,
-} from "../sandbox-profiles/sandbox-profiles-query-keys.js";
+import { sandboxProfileVersionSetupScriptQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   getSandboxProfileVersionSetupScript,
-  listSandboxProfileVersions,
   putSandboxProfileVersionSetupScript,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   clearPendingStatusTimeouts,
   getErrorMessage,
@@ -20,85 +15,35 @@ import {
 
 type AutoSaveStatus = "idle" | "saving" | "saved" | "saved-fading";
 
-export function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
-  if (versions.length === 0) {
-    return null;
-  }
-
-  let latestVersion = versions[0]?.version;
-  if (latestVersion === undefined) {
-    return null;
-  }
-
-  for (const candidate of versions) {
-    if (candidate.version > latestVersion) {
-      latestVersion = candidate.version;
-    }
-  }
-
-  return latestVersion;
-}
-
-export function useSandboxProfileSetupScriptLoader(input: { profileId: string }): {
+export function useSandboxProfileSetupScriptLoader(input: { profileId: string; version: number }): {
   setupScriptQuery: {
     isError: boolean;
     error: unknown;
     isPending: boolean;
   };
   setupScript: string | null;
-  version: number | null;
 } {
-  const profileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+  const setupScriptQuery = useQuery({
+    queryKey: sandboxProfileVersionSetupScriptQueryKey({
+      profileId: input.profileId,
+      version: input.version,
+    }),
     queryFn: async ({ signal }) =>
-      listSandboxProfileVersions({
+      getSandboxProfileVersionSetupScript({
         profileId: input.profileId,
+        version: input.version,
         signal,
       }),
-    retry: false,
-  });
-  const version = resolveLatestVersion(profileVersionsQuery.data?.versions ?? []);
-  const setupScriptQuery = useQuery({
-    queryKey:
-      version === null
-        ? sandboxProfileVersionSetupScriptQueryKey({
-            profileId: input.profileId,
-            version: 0,
-          })
-        : sandboxProfileVersionSetupScriptQueryKey({
-            profileId: input.profileId,
-            version,
-          }),
-    queryFn: async ({ signal }) => {
-      if (version === null) {
-        throw new Error("No sandbox profile version is available for this profile.");
-      }
-
-      return getSandboxProfileVersionSetupScript({
-        profileId: input.profileId,
-        version,
-        signal,
-      });
-    },
-    enabled: version !== null && !profileVersionsQuery.isPending,
     retry: false,
   });
 
   return {
     setupScriptQuery: {
-      isError:
-        profileVersionsQuery.isError ||
-        (!profileVersionsQuery.isPending && version === null) ||
-        setupScriptQuery.isError,
-      error:
-        profileVersionsQuery.error ??
-        (!profileVersionsQuery.isPending && version === null
-          ? new Error("No sandbox profile version is available for this profile.")
-          : setupScriptQuery.error),
-      isPending: profileVersionsQuery.isPending || setupScriptQuery.isPending,
+      isError: setupScriptQuery.isError,
+      error: setupScriptQuery.error,
+      isPending: setupScriptQuery.isPending,
     },
     setupScript: setupScriptQuery.data?.setupScript ?? null,
-    version,
   };
 }
 
@@ -114,6 +59,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   draftValue: string;
   errorMessage: string | null;
   saveStatus: AutoSaveStatus;
+  hasUnsavedChanges: boolean;
   isSaving: boolean;
   onChange: (nextValue: string) => void;
   onBlur: () => void;
@@ -254,6 +200,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     draftValue,
     errorMessage,
     saveStatus,
+    hasUnsavedChanges: draftValue !== persistedValue,
     isSaving: saveMutation.isPending,
     onChange,
     onBlur,

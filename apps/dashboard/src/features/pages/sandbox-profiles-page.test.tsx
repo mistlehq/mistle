@@ -104,13 +104,13 @@ describe("SandboxProfilesPage", () => {
 
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
     expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[32rem]"',
+      'data-slot="table" class="w-full caption-bottom text-sm min-w-[40rem]"',
     );
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
 
-  it("renders the seeded profile without pagination when there is only one page", () => {
+  it("renders profile publication status without pagination when there is only one page", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
@@ -120,8 +120,17 @@ describe("SandboxProfilesPage", () => {
         {
           activeVersion: null,
           createdAt: "2026-03-05T00:00:00.000Z",
-          displayName: "Single profile",
+          displayName: "Draft profile",
           id: "sbp_123",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+        {
+          activeVersion: 1,
+          createdAt: "2026-03-05T00:00:00.000Z",
+          displayName: "Published profile",
+          id: "sbp_456",
           organizationId: "org_123",
           status: "active",
           updatedAt: "2026-03-05T00:00:00.000Z",
@@ -129,7 +138,7 @@ describe("SandboxProfilesPage", () => {
       ],
       nextPage: null,
       previousPage: null,
-      totalResults: 1,
+      totalResults: 2,
     };
 
     queryClient.setQueryData(
@@ -149,7 +158,10 @@ describe("SandboxProfilesPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("button", { name: "Single profile" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Draft profile" })).toBeDefined();
+    expect(screen.getByText("Not published")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Published profile" })).toBeDefined();
+    expect(screen.getByText("Published")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });

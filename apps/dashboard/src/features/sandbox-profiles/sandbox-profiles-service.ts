@@ -6,14 +6,17 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
   CreateSandboxProfileInput,
+  DeleteSandboxProfileResult,
   LaunchableSandboxProfilesResult,
-  SandboxProfileRepositoryOption,
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
+  SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
+  SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionSetupScript,
   SandboxProfilesListResult,
+  PublishSandboxProfileVersionResult,
   UpdateSandboxProfileInput,
 } from "./sandbox-profiles-types.js";
 
@@ -230,6 +233,42 @@ export async function updateSandboxProfile(input: {
   }
 }
 
+export async function deleteSandboxProfile(input: {
+  profileId: string;
+}): Promise<DeleteSandboxProfileResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.DELETE("/v1/sandbox/profiles/{profileId}", {
+      credentials: "include",
+      params: {
+        path: {
+          profileId: input.profileId,
+        },
+      },
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "deleteSandboxProfile",
+        status: 500,
+        body: null,
+        message: "Delete sandbox profile response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "deleteSandboxProfile",
+        error,
+        fallbackMessage: "Could not delete sandbox profile.",
+      }),
+    );
+  }
+}
+
 const SandboxProfileVersionSchema = z
   .object({
     isActive: z.boolean(),
@@ -244,6 +283,60 @@ const ListSandboxProfileVersionsResponseSchema = z
     versions: z.array(SandboxProfileVersionSchema),
   })
   .strict();
+
+const SandboxProfileVersionPublishabilitySchema = z
+  .object({
+    publishable: z.boolean(),
+    issues: z.array(
+      z
+        .object({
+          code: z.enum([
+            "PROFILE_VERSION_NOT_DRAFT",
+            "AGENT_BINDING_REQUIRED",
+            "INVALID_BINDING_CONNECTION_REFERENCE",
+            "CONNECTION_NOT_ACTIVE",
+            "TARGET_DISABLED",
+          ]),
+          message: z.string().min(1),
+          bindingId: z.string().min(1).optional(),
+          connectionId: z.string().min(1).optional(),
+          targetKey: z.string().min(1).optional(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const PublishSandboxProfileVersionResultSchema = z
+  .object({
+    activeVersion: z.number().int().min(1),
+    version: SandboxProfileVersionSchema,
+  })
+  .strict();
+
+const DiscardSandboxProfileVersionDraftResultSchema = z
+  .object({
+    discardedVersion: z.number().int().min(1),
+    hasDraft: z.boolean(),
+  })
+  .strict();
+
+function normalizeSandboxProfileVersionPublishability(
+  input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
+): SandboxProfileVersionPublishability {
+  const issues: SandboxProfileVersionPublishability["issues"] = input.issues.map((issue) => ({
+    code: issue.code,
+    message: issue.message,
+    ...(issue.bindingId === undefined ? {} : { bindingId: issue.bindingId }),
+    ...(issue.connectionId === undefined ? {} : { connectionId: issue.connectionId }),
+    ...(issue.targetKey === undefined ? {} : { targetKey: issue.targetKey }),
+  }));
+
+  return {
+    publishable: input.publishable,
+    issues,
+  };
+}
 
 const IntegrationBindingKindSchema = z.enum(["agent", "git", "connector"]);
 
@@ -292,9 +385,7 @@ const SandboxProfileVersionSetupScriptResponseSchema = z
 export async function listSandboxProfileVersions(input: {
   profileId: string;
   signal?: AbortSignal;
-}): Promise<{
-  versions: SandboxProfileVersion[];
-}> {
+}): Promise<{ versions: SandboxProfileVersion[] }> {
   try {
     const response = await requestControlPlane({
       operation: "listSandboxProfileVersions",
@@ -327,13 +418,158 @@ export async function listSandboxProfileVersions(input: {
   }
 }
 
+export async function createSandboxProfileVersionDraft(input: {
+  profileId: string;
+}): Promise<SandboxProfileVersion> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createSandboxProfileVersionDraft",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions`,
+      fallbackMessage: "Could not create sandbox profile draft.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "createSandboxProfileVersionDraft",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile version response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "createSandboxProfileVersionDraft",
+        error,
+        fallbackMessage: "Could not create sandbox profile draft.",
+      }),
+    );
+  }
+}
+
+export async function getSandboxProfileVersionPublishability(input: {
+  profileId: string;
+  version: number;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileVersionPublishability> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxProfileVersionPublishability",
+      method: "GET",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/publishability`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not load sandbox profile publishability.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileVersionPublishabilitySchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxProfileVersionPublishability",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile publishability response payload is invalid.",
+      });
+    }
+
+    return normalizeSandboxProfileVersionPublishability(parsedResponse.data);
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxProfileVersionPublishability",
+        error,
+        fallbackMessage: "Could not load sandbox profile publishability.",
+      }),
+    );
+  }
+}
+
+export async function publishSandboxProfileVersion(input: {
+  profileId: string;
+  version: number;
+}): Promise<PublishSandboxProfileVersionResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "publishSandboxProfileVersion",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/publish`,
+      fallbackMessage: "Could not publish sandbox profile version.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "publishSandboxProfileVersion",
+        status: 500,
+        body: responseBody,
+        message: "Publish sandbox profile version response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "publishSandboxProfileVersion",
+        error,
+        fallbackMessage: "Could not publish sandbox profile version.",
+      }),
+    );
+  }
+}
+
+export async function discardSandboxProfileVersionDraft(input: {
+  profileId: string;
+  version: number;
+}): Promise<z.infer<typeof DiscardSandboxProfileVersionDraftResultSchema>> {
+  try {
+    const response = await requestControlPlane({
+      operation: "discardSandboxProfileVersionDraft",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/discard`,
+      fallbackMessage: "Could not discard sandbox profile draft.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = DiscardSandboxProfileVersionDraftResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "discardSandboxProfileVersionDraft",
+        status: 500,
+        body: responseBody,
+        message: "Discard sandbox profile draft response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "discardSandboxProfileVersionDraft",
+        error,
+        fallbackMessage: "Could not discard sandbox profile draft.",
+      }),
+    );
+  }
+}
+
 export async function getSandboxProfileVersionIntegrationBindings(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-}> {
+}): Promise<{ bindings: SandboxProfileVersionIntegrationBinding[] }> {
   try {
     const response = await requestControlPlane({
       operation: "getSandboxProfileVersionIntegrationBindings",
@@ -373,10 +609,7 @@ export async function getSandboxProfileVersionAutomationConfig(input: {
   profileId: string;
   version: number;
   signal?: AbortSignal;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-  repositoryOptions: SandboxProfileRepositoryOption[];
-}> {
+}): Promise<SandboxProfileVersionAutomationConfig> {
   try {
     const response = await requestControlPlane({
       operation: "getSandboxProfileVersionAutomationConfig",
@@ -461,9 +694,7 @@ export async function putSandboxProfileVersionIntegrationBindings(input: {
     kind: SandboxIntegrationBindingKind;
     config: Record<string, unknown>;
   }>;
-}): Promise<{
-  bindings: SandboxProfileVersionIntegrationBinding[];
-}> {
+}): Promise<{ bindings: SandboxProfileVersionIntegrationBinding[] }> {
   try {
     const response = await requestControlPlane({
       operation: "putSandboxProfileVersionIntegrationBindings",

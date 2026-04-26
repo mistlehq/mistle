@@ -10,6 +10,7 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
+import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
   ResponsiveFieldList,
   ResponsiveFieldListCell,
@@ -78,6 +79,7 @@ function RepositoryResourcesPicker(input: {
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
+  disabled?: boolean | undefined;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -117,7 +119,7 @@ function RepositoryResourcesPicker(input: {
           queryKey: ["integration-connections", input.connection.id, "resources", "repository"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["sandbox-profiles", "integration-directory"],
+          queryKey: sandboxProfileIntegrationDirectoryQueryKey(),
         }),
       ]);
     },
@@ -144,6 +146,10 @@ function RepositoryResourcesPicker(input: {
       });
 
   function updateSelectedHandles(nextValue: readonly string[]): void {
+    if (input.disabled === true) {
+      return;
+    }
+
     input.onRowChange(input.row.clientId, {
       config: {
         ...input.row.config,
@@ -153,6 +159,10 @@ function RepositoryResourcesPicker(input: {
   }
 
   function toggleAll(): void {
+    if (input.disabled === true) {
+      return;
+    }
+
     const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
     const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
 
@@ -166,6 +176,23 @@ function RepositoryResourcesPicker(input: {
       .filter((item) => !selectedSet.has(item.handle))
       .map((item) => item.handle);
     updateSelectedHandles([...selectedHandles, ...handlesToAdd]);
+  }
+
+  if (input.disabled === true) {
+    return selectedHandles.length === 0 ? (
+      <p className="text-muted-foreground text-sm">No repositories selected.</p>
+    ) : (
+      <div className="flex flex-wrap gap-1.5">
+        {selectedHandles.map((handle) => (
+          <span
+            className="bg-muted text-foreground inline-flex max-w-full rounded-sm px-1.5 py-1 text-xs font-medium"
+            key={handle}
+          >
+            <span className="truncate">{handle}</span>
+          </span>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -222,6 +249,7 @@ function ToolBindingsSection(input: {
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
+  disabled?: boolean | undefined;
 }): React.JSX.Element {
   const toolRows = input.rows.filter((row) => {
     const toolToggleModel = resolveBindingToolToggleModel({
@@ -299,7 +327,12 @@ function ToolBindingsSection(input: {
                     <Checkbox
                       aria-label={option.label}
                       checked={option.checked}
+                      disabled={input.disabled === true}
                       onCheckedChange={(checked) => {
+                        if (input.disabled === true) {
+                          return;
+                        }
+
                         input.onRowChange(row.clientId, {
                           config: {
                             ...toolToggleModel.config,
@@ -342,6 +375,7 @@ export function SandboxProfileResourcesAndToolsSection(input: {
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
+  disabled?: boolean | undefined;
 }): React.JSX.Element {
   const gitRow = resolveGitBindingRow(input.rows);
   const gitConnection =
@@ -386,6 +420,7 @@ export function SandboxProfileResourcesAndToolsSection(input: {
           <div className="flex flex-col gap-3">
             <RepositoryResourcesPicker
               connection={gitConnection}
+              disabled={input.disabled}
               onRowChange={input.onRowChange}
               row={gitRow}
             />
@@ -407,6 +442,7 @@ export function SandboxProfileResourcesAndToolsSection(input: {
         <ToolBindingsSection
           availableConnections={input.availableConnections}
           availableTargets={input.availableTargets}
+          disabled={input.disabled}
           onRowChange={input.onRowChange}
           rows={input.rows}
         />

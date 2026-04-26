@@ -13,6 +13,7 @@ export {
   createSandboxProfileVersionResponseSchema as CreateSandboxProfileVersionResponseSchema,
   getSandboxProfileVersionPublishabilityResponseSchema as GetSandboxProfileVersionPublishabilityResponseSchema,
   publishSandboxProfileVersionResponseSchema as PublishSandboxProfileVersionResponseSchema,
+  discardSandboxProfileVersionDraftResponseSchema as DiscardSandboxProfileVersionDraftResponseSchema,
   putSandboxProfileVersionIntegrationBindingsBodySchema as PutSandboxProfileVersionIntegrationBindingsBodySchema,
   putSandboxProfileVersionIntegrationBindingsResponseSchema as PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   getSandboxProfileVersionIntegrationBindingsResponseSchema as GetSandboxProfileVersionIntegrationBindingsResponseSchema,
@@ -44,6 +45,7 @@ export { route as getSandboxProfileVersionAutomationConfigRoute } from "./get-sa
 export { route as getSandboxProfileVersionSetupScriptRoute } from "./get-sandbox-profile-version-setup-script/route.js";
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
 export { route as publishSandboxProfileVersionRoute } from "./publish-sandbox-profile-version/route.js";
+export { route as discardSandboxProfileVersionDraftRoute } from "./discard-sandbox-profile-version-draft/route.js";
 export { route as putSandboxProfileVersionIntegrationBindingsRoute } from "./put-sandbox-profile-version-integration-bindings/route.js";
 export { route as putSandboxProfileVersionSetupScriptRoute } from "./put-sandbox-profile-version-setup-script/route.js";
 export { route as startSandboxProfileInstanceRoute } from "./start-sandbox-profile-instance/route.js";
@@ -64,6 +66,10 @@ export {
   conflictResponseSchema as PublishSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as PublishSandboxProfileVersionNotFoundResponseSchema,
 } from "./publish-sandbox-profile-version/schema.js";
+export {
+  conflictResponseSchema as DiscardSandboxProfileVersionDraftConflictResponseSchema,
+  notFoundResponseSchema as DiscardSandboxProfileVersionDraftNotFoundResponseSchema,
+} from "./discard-sandbox-profile-version-draft/schema.js";
 export {
   badRequestResponseSchema as StartSandboxProfileInstanceBadRequestResponseSchema,
   notFoundResponseSchema as StartSandboxProfileInstanceNotFoundResponseSchema,

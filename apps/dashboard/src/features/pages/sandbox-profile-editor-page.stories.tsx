@@ -43,6 +43,7 @@ type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   availableConnections?: readonly IntegrationConnectionSummary[];
   availableTargets?: readonly IntegrationTargetSummary[];
+  lifecycleState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
     directoryErrorMessage?: string;
@@ -225,12 +226,48 @@ function SandboxProfileEditorPageStoryView(
     });
   }
 
+  const isEditable =
+    input.lifecycleState === undefined ||
+    input.lifecycleState === "draft" ||
+    input.lifecycleState === "draft-with-published";
+  const mode =
+    input.lifecycleState === "published" || input.lifecycleState === "published-with-draft"
+      ? {
+          kind: "active" as const,
+          version: 1,
+          activeVersion: 1,
+          hasDraft: input.lifecycleState === "published-with-draft",
+          draftVersion: input.lifecycleState === "published-with-draft" ? 2 : null,
+        }
+      : {
+          kind: "draft" as const,
+          version: input.lifecycleState === "draft-with-published" ? 2 : 1,
+          activeVersion: input.lifecycleState === "draft-with-published" ? 1 : null,
+          hasDraft: true as const,
+        };
+
   return (
     <QueryClientProvider client={queryClient}>
       <SandboxProfileEditorView
+        deleteProfileAutomationUsages={[]}
+        deleteProfileAutomationUsagesError={null}
+        deleteProfileAutomationUsagesIsPending={false}
+        deleteProfileError={null}
+        deleteProfileIsPending={false}
+        isDeleteProfileDialogOpen={false}
+        mode={mode}
+        onConfirmDeleteProfile={() => {}}
+        onDeleteProfileDialogOpenChange={() => {}}
+        onMakeChanges={() => {}}
+        onDiscardChangesAndLeaveDraft={() => {}}
+        onPublish={() => {}}
         onSaveProfileName={handleProfileNameSave}
+        onViewActive={() => {}}
+        onViewDraft={() => {}}
         profileName={profileName}
         profileNameFallback={profileName}
+        versionActionError={null}
+        versionActionIsPending={false}
         renderSectionPanel={(sectionId) => {
           if (
             input.integrationsSectionState !== undefined &&
@@ -259,6 +296,7 @@ function SandboxProfileEditorPageStoryView(
                 }}
                 integrationRows={integrationRows}
                 integrationSaveError={null}
+                disabled={!isEditable}
                 onAddIntegrationBindingRow={async (nextBinding) => {
                   setIntegrationRows((currentRows) => [
                     ...currentRows,
@@ -292,6 +330,7 @@ function SandboxProfileEditorPageStoryView(
               <SandboxProfileResourcesAndToolsSection
                 availableConnections={input.availableConnections ?? StoryIntegrationConnections}
                 availableTargets={input.availableTargets ?? StoryIntegrationTargets}
+                disabled={!isEditable}
                 onRowChange={(clientId, changes) => {
                   setIntegrationRows((currentRows) =>
                     currentRows.map((row) =>
@@ -308,6 +347,7 @@ function SandboxProfileEditorPageStoryView(
             <SandboxProfileSetupScriptPanel
               onBlur={handleSetupScriptBlur}
               onChange={setSetupScriptDraft}
+              disabled={!isEditable}
               saveStatus={setupScriptSaveStatus}
               value={setupScriptDraft}
             />
@@ -358,6 +398,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const Published: Story = {
+  args: {
+    lifecycleState: "published",
+  },
+};
+
+export const DraftWithPublishedVersion: Story = {
+  args: {
+    lifecycleState: "draft-with-published",
+  },
+};
 
 export const EmptySetupScript: Story = {
   args: {

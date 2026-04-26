@@ -2,6 +2,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { useState, type JSX } from "react";
 import {
   createMemoryRouter,
   createRoutesFromElements,
@@ -14,11 +15,17 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
 import {
   sandboxProfileDetailQueryKey,
+  sandboxProfileIntegrationDirectoryQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { SandboxProfileEditorPage } from "./sandbox-profile-editor-page.js";
+import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  resolveSandboxProfileEditorVersionMode,
+  SandboxProfileEditorPage,
+  SandboxProfileEditorView,
+} from "./sandbox-profile-editor-page.js";
 
 afterEach(() => {
   cleanup();
@@ -51,6 +58,7 @@ function renderSandboxProfileEditor(input?: {
     };
   }[];
   integrationsLoading?: boolean;
+  versionState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
 }): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
@@ -59,31 +67,87 @@ function renderSandboxProfileEditor(input?: {
   const profileId = "sbp_test";
   const version = 3;
 
+  const activeVersion =
+    input?.versionState === "published" || input?.versionState === "published-with-draft"
+      ? version
+      : input?.versionState === "draft-with-published"
+        ? version - 1
+        : null;
+  const resolvedVersionState = input?.versionState ?? "draft";
+  const singleVersionState: SandboxProfileVersion["state"] =
+    resolvedVersionState === "published" ? "published" : "draft";
+  const versions: SandboxProfileVersion[] =
+    resolvedVersionState === "draft-with-published"
+      ? [
+          {
+            sandboxProfileId: profileId,
+            version: version - 1,
+            state: "published",
+            isActive: true,
+          },
+          {
+            sandboxProfileId: profileId,
+            version,
+            state: "draft",
+            isActive: false,
+          },
+        ]
+      : resolvedVersionState === "published-with-draft"
+        ? [
+            {
+              sandboxProfileId: profileId,
+              version,
+              state: "published",
+              isActive: true,
+            },
+            {
+              sandboxProfileId: profileId,
+              version: version + 1,
+              state: "draft",
+              isActive: false,
+            },
+          ]
+        : [
+            {
+              sandboxProfileId: profileId,
+              version,
+              state: singleVersionState,
+              isActive: resolvedVersionState === "published",
+            },
+          ];
+
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
     displayName: "Prototype Profile",
+    activeVersion,
     status: "active",
     latestVersion: version,
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   });
   if (input?.integrationsLoading === true) {
-    const versionsQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: sandboxProfileVersionsQueryKey(profileId),
+    queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
+      versions,
+    });
+    const bindingsQuery = queryClient.getQueryCache().build(queryClient, {
+      queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+        profileId,
+        version,
+      }),
       queryFn: async () => ({
-        versions: [{ sandboxProfileId: profileId, version }],
+        bindings: [],
       }),
     });
 
-    versionsQuery.setState({
-      ...versionsQuery.state,
+    bindingsQuery.setState({
+      ...bindingsQuery.state,
       data: undefined,
       fetchStatus: "fetching",
       status: "pending",
     });
   } else {
     queryClient.setQueryData(sandboxProfileVersionsQueryKey(profileId), {
-      versions: [{ sandboxProfileId: profileId, version }],
+      versions,
     });
     queryClient.setQueryData(
       sandboxProfileVersionIntegrationBindingsQueryKey({
@@ -95,7 +159,7 @@ function renderSandboxProfileEditor(input?: {
       },
     );
   }
-  queryClient.setQueryData(["sandbox-profiles", "integration-directory"], {
+  queryClient.setQueryData(sandboxProfileIntegrationDirectoryQueryKey(), {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
   });
@@ -132,7 +196,265 @@ function renderSandboxProfileEditor(input?: {
   );
 }
 
+function DeleteProfileDialogHarness(input: {
+  automationUsages?: readonly {
+    id: string;
+    name: string;
+  }[];
+  automationUsagesError?: string | null;
+  automationUsagesIsPending?: boolean;
+}): JSX.Element {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      deleteProfileAutomationUsages={input.automationUsages ?? []}
+      deleteProfileAutomationUsagesError={input.automationUsagesError ?? null}
+      deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      hasUnsavedIntegrationChanges={false}
+      isDeleteProfileDialogOpen={isOpen}
+      mode={{
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: false,
+        draftVersion: null,
+      }}
+      onConfirmDeleteProfile={() => {}}
+      onDeleteProfileDialogOpenChange={setIsOpen}
+      onDiscardChangesAndLeaveDraft={() => {}}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Production profile"
+      profileNameFallback="Production profile"
+      renderSectionPanel={() => <div>Section panel</div>}
+      sections={[
+        {
+          id: "integrations",
+          label: "Integrations",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
+function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }): JSX.Element {
+  const [discarded, setDiscarded] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      deleteProfileAutomationUsages={[]}
+      deleteProfileAutomationUsagesError={null}
+      deleteProfileAutomationUsagesIsPending={false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      hasUnsavedIntegrationChanges={input.hasUnsavedIntegrationChanges ?? false}
+      isDeleteProfileDialogOpen={false}
+      mode={{
+        kind: "draft",
+        version: 2,
+        activeVersion: 1,
+        hasDraft: true,
+      }}
+      onConfirmDeleteProfile={() => {}}
+      onDeleteProfileDialogOpenChange={() => {}}
+      onDiscardChangesAndLeaveDraft={() => {
+        setDiscarded(true);
+      }}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Draft profile"
+      profileNameFallback="Draft profile"
+      renderSectionPanel={() => <div>{discarded ? "Discarded" : "Not discarded"}</div>}
+      sections={[
+        {
+          id: "integrations",
+          label: "Integrations",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
+function PublishedWithDraftActionsHarness(): JSX.Element {
+  const [discarded, setDiscarded] = useState(false);
+
+  return (
+    <SandboxProfileEditorView
+      deleteProfileAutomationUsages={[]}
+      deleteProfileAutomationUsagesError={null}
+      deleteProfileAutomationUsagesIsPending={false}
+      deleteProfileError={null}
+      deleteProfileIsPending={false}
+      hasUnsavedIntegrationChanges={false}
+      isDeleteProfileDialogOpen={false}
+      mode={{
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: true,
+        draftVersion: 2,
+      }}
+      onConfirmDeleteProfile={() => {}}
+      onDeleteProfileDialogOpenChange={() => {}}
+      onDiscardChangesAndLeaveDraft={() => {
+        setDiscarded(true);
+      }}
+      onMakeChanges={() => {}}
+      onPublish={() => {}}
+      onSaveProfileName={async () => {}}
+      onViewActive={() => {}}
+      onViewDraft={() => {}}
+      profileName="Published profile"
+      profileNameFallback="Published profile"
+      renderSectionPanel={() => <div>{discarded ? "Discarded" : "Not discarded"}</div>}
+      sections={[
+        {
+          id: "integrations",
+          label: "Integrations",
+        },
+      ]}
+      versionActionError={null}
+      versionActionIsPending={false}
+    />
+  );
+}
+
+function renderDeleteProfileDialogHarness(input: {
+  automationUsages?: readonly {
+    id: string;
+    name: string;
+  }[];
+  automationUsagesError?: string | null;
+  automationUsagesIsPending?: boolean;
+}): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(
+      <Route element={<DeleteProfileDialogHarness {...input} />} path="/" />,
+    ),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
+function renderDraftActionsHarness(input?: { hasUnsavedIntegrationChanges?: boolean }): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(<Route element={<DraftActionsHarness {...input} />} path="/" />),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
+function renderPublishedWithDraftActionsHarness(): void {
+  const router = createMemoryRouter(
+    createRoutesFromElements(<Route element={<PublishedWithDraftActionsHarness />} path="/" />),
+  );
+
+  render(<RouterProvider router={router} />);
+}
+
 describe("SandboxProfileEditorPage", () => {
+  it("defaults to the active version when draft and published versions both exist", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: 1,
+      viewedVersionKind: null,
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: true,
+        },
+        {
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: true,
+        draftVersion: 2,
+      },
+    });
+  });
+
+  it("defaults to draft when the profile has not been published yet", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: null,
+      viewedVersionKind: null,
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: 1,
+        activeVersion: null,
+        hasDraft: true,
+      },
+    });
+  });
+
+  it("can resolve the published version while a draft exists", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: 1,
+      viewedVersionKind: "active",
+      versions: [
+        {
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: true,
+        },
+        {
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "draft",
+          isActive: false,
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "active",
+        version: 1,
+        activeVersion: 1,
+        hasDraft: true,
+        draftVersion: 2,
+      },
+    });
+  });
+
   it("renders the setup-flow sections in the editor rail", () => {
     renderSandboxProfileEditor();
 
@@ -221,5 +543,163 @@ describe("SandboxProfileEditorPage", () => {
     const editorRoot = editor.closest('[data-slot="sandbox-setup-script-editor"]');
 
     expect(editorRoot?.getAttribute("data-editor-state")).toBe("empty");
+  });
+
+  it("renders published profiles as read-only", () => {
+    renderSandboxProfileEditor({
+      versionState: "published",
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {},
+        },
+      ],
+      connections: [
+        {
+          id: "connection-agent",
+          displayName: "Codex connection",
+          targetKey: "codex",
+          status: "active",
+        },
+      ],
+      targets: [
+        {
+          targetKey: "codex",
+          displayName: "Codex",
+          familyId: "agent",
+          variantId: "default",
+          config: {},
+          targetHealth: {
+            configStatus: "valid",
+          },
+        },
+      ],
+    });
+
+    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "agent harness connection" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("renders published profiles with existing drafts as resumable", () => {
+    renderSandboxProfileEditor({
+      versionState: "published-with-draft",
+    });
+
+    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Resume editing" })).toBeDefined();
+  });
+
+  it("shows discard draft in the published actions menu when a draft exists", () => {
+    renderPublishedWithDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getByRole("menuitem", { name: "Discard draft" })).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Delete profile" })).toBeDefined();
+  });
+
+  it("discards an existing draft from the published actions menu", () => {
+    renderPublishedWithDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Discard draft" }));
+
+    expect(screen.getByText("Discarded")).toBeDefined();
+  });
+
+  it("renders draft profiles with publish action", () => {
+    renderSandboxProfileEditor();
+
+    expect(screen.getByText("Viewing: Draft")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
+  });
+
+  it("does not offer discard for draft-only profiles", () => {
+    renderSandboxProfileEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
+      "Delete profile",
+    ]);
+  });
+
+  it("blocks draft version actions while draft changes are saving", () => {
+    renderDraftActionsHarness({
+      hasUnsavedIntegrationChanges: true,
+    });
+
+    expect(screen.getByRole("button", { name: "Saving..." })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "More actions" })).toHaveProperty("disabled", true);
+  });
+
+  it("shows draft actions for draft profiles with a published version", () => {
+    renderSandboxProfileEditor({
+      versionState: "draft-with-published",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Resume editing" }));
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getAllByRole("menuitem").map((menuItem) => menuItem.textContent)).toEqual([
+      "View published",
+      "Discard draft",
+      "Delete profile",
+    ]);
+  });
+
+  it("discards draft changes directly from the draft actions menu", () => {
+    renderDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Discard draft" }));
+
+    expect(screen.getByText("Discarded")).toBeDefined();
+  });
+
+  it("confirms profile deletion with automation usage context", () => {
+    renderDeleteProfileDialogHarness({
+      automationUsages: [
+        {
+          id: "atm_triage",
+          name: "Repository triage",
+        },
+        {
+          id: "atm_release",
+          name: "Release notes",
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete profile" }));
+
+    expect(screen.getByRole("heading", { name: "Delete profile?" })).toBeDefined();
+    expect(screen.getByText("Repository triage")).toBeDefined();
+    expect(screen.getByText("Release notes")).toBeDefined();
+    expect(screen.getByText("These automations use this profile and will break:")).toBeDefined();
+    expect(
+      screen.getByText("They will stop working until you delete or retarget them."),
+    ).toBeDefined();
+  });
+
+  it("blocks profile deletion while automation usage context is loading", () => {
+    renderDeleteProfileDialogHarness({
+      automationUsagesIsPending: true,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete profile" }));
+
+    expect(screen.getByText("Loading automations...")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Delete profile" }).hasAttribute("disabled")).toBe(
+      true,
+    );
   });
 });

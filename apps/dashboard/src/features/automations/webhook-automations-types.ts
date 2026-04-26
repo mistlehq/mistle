@@ -89,6 +89,7 @@ export const DeleteWebhookAutomationResultSchema = z
   .strict();
 
 export type WebhookAutomation = z.infer<typeof WebhookAutomationSchema>;
+export type WebhookAutomationSandboxProfileUsage = Pick<WebhookAutomation, "id" | "name">;
 export type WebhookAutomationListEvent = z.infer<typeof WebhookAutomationListEventSchema>;
 export type WebhookAutomationListIssue = z.infer<typeof WebhookAutomationListIssueSchema>;
 export type WebhookAutomationListItem = z.infer<typeof WebhookAutomationListItemSchema>;

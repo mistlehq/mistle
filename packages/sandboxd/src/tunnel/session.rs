@@ -2283,7 +2283,7 @@ async fn connect_bootstrap_websocket(
         )));
     }
 
-    let mut last_connect_error = None;
+    let mut attempted_connect_errors = Vec::new();
     for address in resolved_addresses {
         let socket = match timeout(
             DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT,
@@ -2293,11 +2293,11 @@ async fn connect_bootstrap_websocket(
         {
             Ok(Ok(socket)) => socket,
             Ok(Err(error)) => {
-                last_connect_error = Some(format!("{address}: {error}"));
+                attempted_connect_errors.push(format!("{address}: {error}"));
                 continue;
             }
             Err(_) => {
-                last_connect_error = Some(format!(
+                attempted_connect_errors.push(format!(
                     "{address}: tcp connect timed out after {}ms",
                     DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT.as_millis()
                 ));
@@ -2313,10 +2313,10 @@ async fn connect_bootstrap_websocket(
         {
             Ok(Ok(result)) => return Ok(result),
             Ok(Err(error)) => {
-                last_connect_error = Some(format!("{address}: {error}"));
+                attempted_connect_errors.push(format!("{address}: {error}"));
             }
             Err(_) => {
-                last_connect_error = Some(format!(
+                attempted_connect_errors.push(format!(
                     "{address}: websocket handshake timed out after {}ms",
                     DEFAULT_BOOTSTRAP_TUNNEL_HANDSHAKE_TIMEOUT.as_millis()
                 ));
@@ -2325,8 +2325,14 @@ async fn connect_bootstrap_websocket(
     }
 
     Err(TunnelSessionError::ConfigureTunnelSocket(
-        last_connect_error
-            .unwrap_or_else(|| format!("bootstrap websocket connect failed for {connected_url}")),
+        if attempted_connect_errors.is_empty() {
+            format!("bootstrap websocket connect failed for {connected_url}")
+        } else {
+            format!(
+                "bootstrap websocket failed to connect to any resolved address for {host}:{port}; attempts: {}",
+                attempted_connect_errors.join("; ")
+            )
+        },
     ))
 }
 
@@ -5986,7 +5992,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -6340,7 +6346,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -6579,7 +6585,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -6688,7 +6694,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -6806,7 +6812,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -6929,7 +6935,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -7016,7 +7022,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -7046,7 +7052,7 @@ mod tests {
         assert!(
             error
                 .to_string()
-                .contains("failed to configure bootstrap tunnel socket"),
+                .contains("failed to configure bootstrap tunnel socket: bootstrap websocket failed to connect to any resolved address"),
             "start() should surface the initial websocket establishment failure"
         );
         gateway_thread
@@ -7212,7 +7218,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -7463,7 +7469,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -7570,7 +7576,7 @@ mod tests {
                     "version": 1,
                     "image": {
                         "source": "base",
-                        "imageRef": "mistle/sandbox-base:dev"
+                        "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                     },
                     "egressRoutes": [],
                     "artifacts": [],
@@ -7776,7 +7782,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -7918,7 +7924,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8070,7 +8076,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8272,7 +8278,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8397,7 +8403,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8598,7 +8604,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8736,7 +8742,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -8884,7 +8890,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -9087,7 +9093,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -9254,7 +9260,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -9394,7 +9400,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],
@@ -9530,7 +9536,7 @@ mod tests {
                 "version": 1,
                 "image": {
                     "source": "base",
-                    "imageRef": "mistle/sandbox-base:dev"
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
                 },
                 "egressRoutes": [],
                 "artifacts": [],

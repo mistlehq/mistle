@@ -424,7 +424,7 @@ fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str
             "version": 1,
             "image": {
                 "source": "base",
-                "imageRef": "mistle/sandbox-base:dev"
+                "imageRef": sandboxd::test_support::local_prepared_runtime_sandbox_base_image_ref()
             },
             "egressRoutes": [],
             "artifacts": [],

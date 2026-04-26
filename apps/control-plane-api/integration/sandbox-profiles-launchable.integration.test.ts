@@ -78,6 +78,20 @@ describe("sandbox profiles launchable integration", () => {
         activeVersion: 1,
         createdAt: "2025-12-29T00:00:00.000Z",
       }),
+      createSandboxProfileFixture({
+        id: "sbp_launchable_draft_only",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Draft Only Profile",
+        activeVersion: null,
+        createdAt: "2025-12-28T00:00:00.000Z",
+      }),
+      createSandboxProfileFixture({
+        id: "sbp_launchable_active_draft",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Active Draft Profile",
+        activeVersion: 1,
+        createdAt: "2025-12-27T00:00:00.000Z",
+      }),
     ]);
     await fixture.db.insert(sandboxProfileVersions).values([
       createSandboxProfileVersionFixture({
@@ -116,6 +130,16 @@ describe("sandbox profiles launchable integration", () => {
       createSandboxProfileVersionFixture({
         sandboxProfileId: "sbp_launchable_mixed_bindings",
         version: 1,
+      }),
+      createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_launchable_draft_only",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+      createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_launchable_active_draft",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
       }),
     ]);
     await fixture.db.insert(integrationTargets).values([
@@ -313,6 +337,40 @@ describe("sandbox profiles launchable integration", () => {
         sandboxProfileVersion: 1,
         connectionId: "icn_sandbox_profiles_launchable_inactive",
         kind: IntegrationBindingKinds.GIT,
+      }),
+      createSandboxProfileVersionIntegrationBindingFixture({
+        id: "ibd_launchable_draft_only_v1",
+        sandboxProfileId: "sbp_launchable_draft_only",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_sandbox_profiles_launchable",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
+      }),
+      createSandboxProfileVersionIntegrationBindingFixture({
+        id: "ibd_launchable_active_draft_v1",
+        sandboxProfileId: "sbp_launchable_active_draft",
+        sandboxProfileVersion: 1,
+        connectionId: "icn_sandbox_profiles_launchable",
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+          model: {
+            defaultModel: "gpt-5.3-codex",
+            options: {},
+          },
+        },
       }),
     ]);
 

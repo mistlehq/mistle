@@ -36,6 +36,7 @@ const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
 const CloudflareTunnelIdEnvVar = "CLOUDFLARE_TUNNEL_ID";
 const CloudflareTunnelCredentialsJsonEnvVar = "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON";
 const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
+const TokenizerProxyTunnelHostnameEnvVar = "TOKENIZER_PROXY_TUNNEL_HOSTNAME";
 const ControlPlaneApiTunnelHostnameEnvVar = "CONTROL_PLANE_API_TUNNEL_HOSTNAME";
 const TestContextId = "system";
 const SystemSandboxProvider = {
@@ -113,6 +114,24 @@ function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvi
   };
 }
 
+function resolveSandboxPublicTokenizerProxyTunnel(input: { provider: SystemSandboxProvider }):
+  | {
+      tunnelId: string;
+      tunnelCredentialsJson: string;
+      publicHostname: string;
+    }
+  | undefined {
+  if (input.provider !== SystemSandboxProvider.E2B) {
+    return undefined;
+  }
+
+  return {
+    tunnelId: readRequiredEnvVar(CloudflareTunnelIdEnvVar),
+    tunnelCredentialsJson: readRequiredEnvVar(CloudflareTunnelCredentialsJsonEnvVar),
+    publicHostname: readRequiredEnvVar(TokenizerProxyTunnelHostnameEnvVar),
+  };
+}
+
 function resolveSharedControlPlaneTunnel():
   | {
       tunnelId: string;
@@ -154,6 +173,21 @@ function resolveSharedControlPlaneTunnel():
     tunnelId,
     tunnelCredentialsJson,
     publicHostname,
+  };
+}
+
+function resolveTokenizerProxyEnvironment(input: {
+  telemetryEnvironmentOverrides: Record<string, string>;
+}): Record<string, string> {
+  const controlPlaneTunnel = resolveSharedControlPlaneTunnel();
+
+  return {
+    ...input.telemetryEnvironmentOverrides,
+    ...(controlPlaneTunnel === undefined
+      ? {}
+      : {
+          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL: `https://${controlPlaneTunnel.publicHostname}`,
+        }),
   };
 }
 
@@ -211,6 +245,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       sandboxPublicGatewayTunnel: resolveSandboxPublicGatewayTunnel({
         provider: sandboxProvider,
       }),
+      sandboxPublicTokenizerProxyTunnel: resolveSandboxPublicTokenizerProxyTunnel({
+        provider: sandboxProvider,
+      }),
       startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
       sharedInfraKey: DEFAULT_SHARED_SYSTEM_INFRA_KEY,
       postgres: {},
@@ -236,7 +273,9 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
         ...telemetryEnvironmentOverrides,
         [SANDBOXD_TEST_FAULTS_ENABLED_ENV]: "true",
       },
-      tokenizerProxyEnvironment: telemetryEnvironmentOverrides,
+      tokenizerProxyEnvironment: resolveTokenizerProxyEnvironment({
+        telemetryEnvironmentOverrides,
+      }),
     });
     let sharedControlPlaneTunnel: StartedCloudflaredTunnel | null = null;
 

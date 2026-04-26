@@ -1,4 +1,4 @@
-import { DotsThreeIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, DotsThreeIcon } from "@phosphor-icons/react";
 
 import { cn } from "../../lib/utils.js";
 import { Button } from "./button.js";
@@ -11,7 +11,9 @@ export type MoreActionsMenuProps = {
   align?: "start" | "center" | "end";
   sideOffset?: number;
   disabled?: boolean;
+  triggerIconVariant?: "dots" | "chevron-down";
   triggerSize?: "icon-xs" | "icon-sm" | "icon" | "icon-lg";
+  triggerVariant?: React.ComponentProps<typeof Button>["variant"];
 };
 
 export function MoreActionsMenu(input: MoreActionsMenuProps): React.JSX.Element {
@@ -23,11 +25,11 @@ export function MoreActionsMenu(input: MoreActionsMenuProps): React.JSX.Element 
             aria-label={input.triggerLabel}
             disabled={input.disabled}
             size={input.triggerSize ?? "icon"}
-            variant="ghost"
+            variant={input.triggerVariant ?? "ghost"}
           />
         }
       >
-        <DotsThreeIcon aria-hidden className="size-6 text-foreground" weight="bold" />
+        <MoreActionsMenuTriggerIcon variant={input.triggerIconVariant ?? "dots"} />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align={input.align ?? "end"}
@@ -38,4 +40,14 @@ export function MoreActionsMenu(input: MoreActionsMenuProps): React.JSX.Element 
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+function MoreActionsMenuTriggerIcon(input: {
+  variant: NonNullable<MoreActionsMenuProps["triggerIconVariant"]>;
+}): React.JSX.Element {
+  if (input.variant === "chevron-down") {
+    return <CaretDownIcon aria-hidden className="size-4" />;
+  }
+
+  return <DotsThreeIcon aria-hidden className="size-6" weight="bold" />;
 }

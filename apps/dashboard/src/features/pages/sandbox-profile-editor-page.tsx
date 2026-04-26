@@ -1,30 +1,55 @@
 import {
   Button,
+  ButtonGroup,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenuItem,
   Field,
   FieldContent,
   FieldHeader,
   FieldLabel,
   FieldLabelWithTooltip,
   Input,
+  MoreActionsMenu,
   Notice,
 } from "@mistle/ui";
 import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type SyntheticEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
+import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { UnsavedChangesGuard } from "../navigation/unsaved-changes-guard.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
+  sandboxProfileAutomationUsagesQueryKey,
   sandboxProfileDetailQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfileVersionSetupScriptQueryKey,
+  sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
+import {
+  createSandboxProfileVersionDraft,
+  deleteSandboxProfile,
+  discardSandboxProfileVersionDraft,
+  getSandboxProfile,
+  getSandboxProfileVersionPublishability,
+  listSandboxProfileVersions,
+  publishSandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-service.js";
+import type {
+  SandboxProfile,
+  SandboxProfileVersion,
+} from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type {
@@ -55,6 +80,99 @@ import { SandboxSetupScriptEditor } from "./sandbox-setup-script-editor.js";
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
 };
+
+type SandboxProfileEditorVersionMode =
+  | {
+      kind: "draft";
+      version: number;
+      activeVersion: number | null;
+      hasDraft: true;
+    }
+  | {
+      kind: "active";
+      version: number;
+      activeVersion: number;
+      hasDraft: boolean;
+      draftVersion: number | null;
+    };
+
+type ViewedVersionKind = "draft" | "active";
+
+type ResolveEditorVersionModeResult =
+  | {
+      ok: true;
+      mode: SandboxProfileEditorVersionMode;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export function resolveSandboxProfileEditorVersionMode(input: {
+  activeVersion: number | null;
+  versions: readonly SandboxProfileVersion[];
+  viewedVersionKind: ViewedVersionKind | null;
+}): ResolveEditorVersionModeResult {
+  const draftVersions = input.versions.filter((version) => version.state === "draft");
+  if (draftVersions.length > 1) {
+    return {
+      ok: false,
+      message: "Sandbox profile has multiple draft versions.",
+    };
+  }
+
+  const draftVersion = draftVersions[0] ?? null;
+  const activeVersion =
+    input.activeVersion === null
+      ? null
+      : (input.versions.find((version) => version.version === input.activeVersion) ?? null);
+
+  if (input.activeVersion !== null && activeVersion === null) {
+    return {
+      ok: false,
+      message: "Sandbox profile active version could not be loaded.",
+    };
+  }
+
+  const preferredView = input.viewedVersionKind ?? (activeVersion === null ? "draft" : "active");
+
+  if (preferredView === "draft") {
+    if (draftVersion === null) {
+      return {
+        ok: false,
+        message: "Sandbox profile draft version could not be loaded.",
+      };
+    }
+
+    return {
+      ok: true,
+      mode: {
+        kind: "draft",
+        version: draftVersion.version,
+        activeVersion: input.activeVersion,
+        hasDraft: true,
+      },
+    };
+  }
+
+  if (input.activeVersion === null || activeVersion === null) {
+    return {
+      ok: false,
+      message: "Sandbox profile published version could not be loaded.",
+    };
+  }
+
+  return {
+    ok: true,
+    mode: {
+      kind: "active",
+      version: activeVersion.version,
+      activeVersion: input.activeVersion,
+      hasDraft: draftVersion !== null,
+      draftVersion: draftVersion?.version ?? null,
+    },
+  };
+}
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
 set -euo pipefail
@@ -220,6 +338,11 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
             queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
           });
         }}
+        invalidateProfileVersions={async (invalidateProfileId) => {
+          await queryClient.invalidateQueries({
+            queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
+          });
+        }}
         invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
           await queryClient.invalidateQueries({
             queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
@@ -244,9 +367,10 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
 type LoadedSandboxProfileEditorPageInput = {
   navigate: ReturnType<typeof useNavigate>;
   profileId: string;
-  profile: { displayName: string };
+  profile: SandboxProfile;
   invalidateSandboxProfiles: () => Promise<void>;
   invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 };
@@ -254,13 +378,272 @@ type LoadedSandboxProfileEditorPageInput = {
 function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
+  const [viewedVersionKind, setViewedVersionKind] = useState<ViewedVersionKind | null>(null);
+  const [versionActionError, setVersionActionError] = useState<string | null>(null);
+  const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
+  const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
+  const profileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: input.profileId,
+        signal,
+      }),
+    retry: false,
+  });
+  const automationUsagesQuery = useQuery({
+    queryKey: sandboxProfileAutomationUsagesQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listWebhookAutomationsForSandboxProfile({
+        sandboxProfileId: input.profileId,
+        signal,
+      }),
+    enabled: isDeleteProfileDialogOpen,
+    retry: false,
+  });
+  const createDraftMutation = useMutation({
+    mutationFn: async () =>
+      createSandboxProfileVersionDraft({
+        profileId: input.profileId,
+      }),
+    onSuccess: async () => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+      setViewedVersionKind("draft");
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create sandbox profile draft.",
+        }),
+      );
+    },
+  });
+  const publishMutation = useMutation({
+    mutationFn: async (version: number) => {
+      const publishability = await getSandboxProfileVersionPublishability({
+        profileId: input.profileId,
+        version,
+      });
+
+      if (!publishability.publishable) {
+        const firstIssue = publishability.issues[0];
+        throw new Error(firstIssue?.message ?? "Sandbox profile draft cannot be published.");
+      }
+
+      return publishSandboxProfileVersion({
+        profileId: input.profileId,
+        version,
+      });
+    },
+    onSuccess: async (result) => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+        input.invalidateVersionBindings({
+          profileId: input.profileId,
+          version: result.activeVersion,
+        }),
+        input.invalidateVersionSetupScript({
+          profileId: input.profileId,
+          version: result.activeVersion,
+        }),
+      ]);
+      setViewedVersionKind("active");
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not publish sandbox profile draft.",
+        }),
+      );
+    },
+  });
+  const discardDraftMutation = useMutation({
+    mutationFn: async (inputValue: { draftVersion: number }) =>
+      discardSandboxProfileVersionDraft({
+        profileId: input.profileId,
+        version: inputValue.draftVersion,
+      }),
+    onSuccess: async () => {
+      setVersionActionError(null);
+      await Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+      setViewedVersionKind("active");
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not discard draft changes.",
+        }),
+      );
+    },
+  });
+  const deleteProfileMutation = useMutation({
+    mutationFn: async () =>
+      deleteSandboxProfile({
+        profileId: input.profileId,
+      }),
+    onSuccess: async () => {
+      setDeleteProfileError(null);
+      setIsDeleteProfileDialogOpen(false);
+      await Promise.all([
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+      void input.navigate("/sandbox-profiles");
+    },
+    onError: (error: unknown) => {
+      setDeleteProfileError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not delete sandbox profile.",
+        }),
+      );
+    },
+  });
+
+  if (profileVersionsQuery.isPending) {
+    return <></>;
+  }
+
+  if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
+    return (
+      <Notice title="Could not load profile versions" variant="alert">
+        {resolveApiErrorMessage({
+          error: profileVersionsQuery.error,
+          fallbackMessage: "Could not load sandbox profile versions.",
+        })}
+      </Notice>
+    );
+  }
+
+  const resolvedMode = resolveSandboxProfileEditorVersionMode({
+    activeVersion: input.profile.activeVersion,
+    versions: profileVersionsQuery.data.versions,
+    viewedVersionKind,
+  });
+
+  if (!resolvedMode.ok) {
+    return (
+      <Notice title="Could not load profile version" variant="alert">
+        {resolvedMode.message}
+      </Notice>
+    );
+  }
+
+  return (
+    <ReadySandboxProfileEditorPage
+      mode={resolvedMode.mode}
+      navigate={input.navigate}
+      onMakeChanges={() => {
+        createDraftMutation.mutate();
+      }}
+      onDiscardChangesAndLeaveDraft={(inputValue) => {
+        discardDraftMutation.mutate(inputValue);
+      }}
+      onPublish={(version) => {
+        publishMutation.mutate(version);
+      }}
+      onViewActive={() => {
+        setVersionActionError(null);
+        setViewedVersionKind("active");
+      }}
+      onViewDraft={() => {
+        setVersionActionError(null);
+        setViewedVersionKind("draft");
+      }}
+      profile={input.profile}
+      profileId={input.profileId}
+      deleteProfileAutomationUsages={automationUsagesQuery.data ?? []}
+      deleteProfileAutomationUsagesError={
+        automationUsagesQuery.isError
+          ? resolveApiErrorMessage({
+              error: automationUsagesQuery.error,
+              fallbackMessage: "Could not load automations.",
+            })
+          : null
+      }
+      deleteProfileAutomationUsagesIsPending={
+        isDeleteProfileDialogOpen && automationUsagesQuery.isPending
+      }
+      deleteProfileError={deleteProfileError}
+      deleteProfileIsPending={deleteProfileMutation.isPending}
+      isDeleteProfileDialogOpen={isDeleteProfileDialogOpen}
+      onConfirmDeleteProfile={() => {
+        if (automationUsagesQuery.isPending || automationUsagesQuery.isError) {
+          return;
+        }
+        deleteProfileMutation.mutate();
+      }}
+      onDeleteProfileDialogOpenChange={(open) => {
+        if (deleteProfileMutation.isPending) {
+          return;
+        }
+        setDeleteProfileError(null);
+        setIsDeleteProfileDialogOpen(open);
+      }}
+      versionActionError={versionActionError}
+      versionActionIsPending={
+        publishMutation.isPending || createDraftMutation.isPending || discardDraftMutation.isPending
+      }
+      invalidateSandboxProfiles={input.invalidateSandboxProfiles}
+      invalidateProfileDetail={input.invalidateProfileDetail}
+      invalidateProfileVersions={input.invalidateProfileVersions}
+      invalidateVersionBindings={input.invalidateVersionBindings}
+      invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+    />
+  );
+}
+
+function ReadySandboxProfileEditorPage(input: {
+  navigate: ReturnType<typeof useNavigate>;
+  profileId: string;
+  profile: SandboxProfile;
+  mode: SandboxProfileEditorVersionMode;
+  versionActionError: string | null;
+  versionActionIsPending: boolean;
+  deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  deleteProfileAutomationUsagesError: string | null;
+  deleteProfileAutomationUsagesIsPending: boolean;
+  deleteProfileError: string | null;
+  deleteProfileIsPending: boolean;
+  isDeleteProfileDialogOpen: boolean;
+  onPublish: (version: number) => void;
+  onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
+  onConfirmDeleteProfile: () => void;
+  onDeleteProfileDialogOpenChange: (open: boolean) => void;
+  onMakeChanges: () => void;
+  onViewActive: () => void;
+  onViewDraft: () => void;
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+}): React.JSX.Element {
   const integrationsLoader = useSandboxProfileIntegrationsLoader({
     profileId: input.profileId,
+    version: input.mode.version,
   });
   const setupScriptLoader = useSandboxProfileSetupScriptLoader({
     profileId: input.profileId,
+    version: input.mode.version,
   });
   const [hasUnsavedIntegrationChanges, setHasUnsavedIntegrationChanges] = useState(false);
+  const [hasUnsavedSetupScriptChanges, setHasUnsavedSetupScriptChanges] = useState(false);
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -272,22 +655,38 @@ function LoadedSandboxProfileEditorPage(
   return (
     <SandboxProfileEditorView
       hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
+      hasUnsavedSetupScriptChanges={hasUnsavedSetupScriptChanges}
       isSavingProfileName={metaState.isUpdating}
+      mode={input.mode}
+      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+      deleteProfileError={input.deleteProfileError}
+      deleteProfileIsPending={input.deleteProfileIsPending}
+      onMakeChanges={input.onMakeChanges}
+      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+      onPublish={input.onPublish}
       onSaveProfileName={metaState.onProfileNameSave}
+      onViewActive={input.onViewActive}
+      onViewDraft={input.onViewDraft}
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
+      versionActionError={input.versionActionError}
+      versionActionIsPending={input.versionActionIsPending}
+      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "configurations") {
           return (
             <LoadedSandboxProfileSetupScriptSection
-              key={
-                setupScriptLoader.version === null
-                  ? `unavailable:${input.profileId}`
-                  : `${input.profileId}:${String(setupScriptLoader.version)}`
-              }
+              disabled={input.mode.kind !== "draft"}
+              key={`${input.profileId}:${String(input.mode.version)}`}
               loader={setupScriptLoader}
               profileId={input.profileId}
               invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+              onHasUnsavedChangesChange={setHasUnsavedSetupScriptChanges}
+              version={input.mode.version}
             />
           );
         }
@@ -299,6 +698,8 @@ function LoadedSandboxProfileEditorPage(
             loader={integrationsLoader}
             onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
             profileId={input.profileId}
+            disabled={input.mode.kind !== "draft"}
+            version={input.mode.version}
             invalidateVersionBindings={input.invalidateVersionBindings}
           />
         );
@@ -323,34 +724,232 @@ const SandboxProfileEditorTabs = [
   },
 ] as const satisfies readonly SandboxProfileEditorSection[];
 
+function DeleteSandboxProfileDialog(input: {
+  automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  automationUsagesError: string | null;
+  automationUsagesIsPending: boolean;
+  deleteError: string | null;
+  isOpen: boolean;
+  isPending: boolean;
+  onConfirm: () => void;
+  onOpenChange: (open: boolean) => void;
+  profileName: string;
+}): React.JSX.Element {
+  const isBlocked =
+    input.isPending || input.automationUsagesIsPending || input.automationUsagesError !== null;
+
+  return (
+    <Dialog
+      isBusy={input.isPending}
+      isDismissible={!input.isPending}
+      onOpenChange={input.onOpenChange}
+      open={input.isOpen}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Delete profile?</DialogTitle>
+          <DialogDescription>This removes {input.profileName}.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {input.automationUsagesIsPending ? (
+            <p className="text-muted-foreground text-sm">Loading automations...</p>
+          ) : null}
+
+          {input.automationUsagesError === null ? null : (
+            <Notice title="Could not load automations" variant="alert">
+              {input.automationUsagesError}
+            </Notice>
+          )}
+
+          {input.automationUsages.length === 0 ||
+          input.automationUsagesIsPending ||
+          input.automationUsagesError !== null ? null : (
+            <div className="space-y-2">
+              <p className="text-sm">These automations use this profile and will break:</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {input.automationUsages.map((automation) => (
+                  <li key={automation.id}>{automation.name}</li>
+                ))}
+              </ul>
+              <p className="text-sm">They will stop working until you delete or retarget them.</p>
+            </div>
+          )}
+
+          {input.deleteError === null ? null : (
+            <Notice title="Delete failed" variant="alert">
+              {input.deleteError}
+            </Notice>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            disabled={input.isPending}
+            onClick={() => {
+              input.onOpenChange(false);
+            }}
+            type="button"
+            variant="outline"
+          >
+            Cancel
+          </Button>
+          <Button disabled={isBlocked} onClick={input.onConfirm} type="button">
+            {input.isPending ? "Deleting..." : "Delete profile"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function SandboxProfileEditorView(input: {
   profileName: string | null;
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
+  mode: SandboxProfileEditorVersionMode;
+  deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
+  deleteProfileAutomationUsagesError: string | null;
+  deleteProfileAutomationUsagesIsPending: boolean;
+  deleteProfileError: string | null;
+  deleteProfileIsPending: boolean;
+  versionActionError: string | null;
+  versionActionIsPending: boolean;
+  isDeleteProfileDialogOpen: boolean;
+  onPublish: (version: number) => void;
+  onConfirmDeleteProfile: () => void;
+  onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
+  onDeleteProfileDialogOpenChange: (open: boolean) => void;
+  onMakeChanges: () => void;
+  onViewActive: () => void;
+  onViewDraft: () => void;
   sections: readonly SandboxProfileEditorSection[];
   renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
+  hasUnsavedSetupScriptChanges?: boolean;
   isSavingProfileName?: boolean;
 }): React.JSX.Element {
+  const hasUnsavedDraftChanges =
+    input.mode.kind === "draft" &&
+    ((input.hasUnsavedIntegrationChanges ?? false) ||
+      (input.hasUnsavedSetupScriptChanges ?? false));
+  const versionActionIsDisabled = input.versionActionIsPending || hasUnsavedDraftChanges;
+  const discardChangesInput = resolveDiscardDraftInput(input.mode);
+  const discardChangesMenuItem =
+    discardChangesInput === null ? null : (
+      <DropdownMenuItem
+        onClick={() => {
+          input.onDiscardChangesAndLeaveDraft(discardChangesInput);
+        }}
+      >
+        Discard draft
+      </DropdownMenuItem>
+    );
+  const viewPublishedMenuItem =
+    input.mode.kind !== "draft" || input.mode.activeVersion === null ? null : (
+      <DropdownMenuItem onClick={input.onViewActive}>View published</DropdownMenuItem>
+    );
+  const deleteProfileMenuItem = (
+    <DropdownMenuItem
+      onClick={() => {
+        input.onDeleteProfileDialogOpenChange(true);
+      }}
+      variant="destructive"
+    >
+      Delete profile
+    </DropdownMenuItem>
+  );
+
   return (
     <div className="gap-4 flex flex-col">
       <UnsavedChangesGuard
-        description="You have unsaved integration changes. If you leave this page, your changes will be discarded."
-        when={input.hasUnsavedIntegrationChanges ?? false}
+        description="You have unsaved draft changes. If you leave this page, your changes will be discarded."
+        when={hasUnsavedDraftChanges}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <AutoSaveTitleHeading
-          ariaLabel="Profile name"
-          emptyDisplayText={input.profileNameFallback}
-          onSave={input.onSaveProfileName}
-          requiredLabel="Profile name"
-          value={input.profileName}
-          {...(input.isSavingProfileName === undefined
-            ? {}
-            : { disabled: input.isSavingProfileName })}
-        />
+        <div className="min-w-0">
+          <AutoSaveTitleHeading
+            ariaLabel="Profile name"
+            emptyDisplayText={input.profileNameFallback}
+            onSave={input.onSaveProfileName}
+            requiredLabel="Profile name"
+            value={input.profileName}
+            disabled={input.isSavingProfileName === true}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            className={
+              input.mode.kind === "draft"
+                ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
+                : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
+            }
+          >
+            {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
+          </span>
+          {input.mode.kind === "draft" ? (
+            <ButtonGroup>
+              <Button
+                disabled={versionActionIsDisabled}
+                onClick={() => {
+                  input.onPublish(input.mode.version);
+                }}
+                type="button"
+              >
+                {hasUnsavedDraftChanges ? "Saving..." : "Publish"}
+              </Button>
+              <MoreActionsMenu
+                disabled={versionActionIsDisabled}
+                triggerIconVariant="chevron-down"
+                triggerLabel="More actions"
+                triggerVariant="default"
+              >
+                {viewPublishedMenuItem}
+                {discardChangesMenuItem}
+                {deleteProfileMenuItem}
+              </MoreActionsMenu>
+            </ButtonGroup>
+          ) : (
+            <ButtonGroup>
+              <Button
+                disabled={input.versionActionIsPending}
+                onClick={input.mode.hasDraft ? input.onViewDraft : input.onMakeChanges}
+                type="button"
+              >
+                {input.mode.hasDraft ? "Resume editing" : "Edit"}
+              </Button>
+              <MoreActionsMenu
+                disabled={input.versionActionIsPending}
+                triggerIconVariant="chevron-down"
+                triggerLabel="More actions"
+                triggerVariant="default"
+              >
+                {discardChangesMenuItem}
+                {deleteProfileMenuItem}
+              </MoreActionsMenu>
+            </ButtonGroup>
+          )}
+        </div>
       </div>
+
+      {input.versionActionError === null ? null : (
+        <Notice title="Profile version action failed" variant="alert">
+          {input.versionActionError}
+        </Notice>
+      )}
+
+      <DeleteSandboxProfileDialog
+        automationUsages={input.deleteProfileAutomationUsages}
+        automationUsagesError={input.deleteProfileAutomationUsagesError}
+        automationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+        deleteError={input.deleteProfileError}
+        isOpen={input.isDeleteProfileDialogOpen}
+        isPending={input.deleteProfileIsPending}
+        onConfirm={input.onConfirmDeleteProfile}
+        onOpenChange={input.onDeleteProfileDialogOpenChange}
+        profileName={input.profileName ?? input.profileNameFallback}
+      />
 
       <SandboxProfileEditorSections
         renderPanel={input.renderSectionPanel}
@@ -360,23 +959,40 @@ export function SandboxProfileEditorView(input: {
   );
 }
 
+function resolveDiscardDraftInput(
+  mode: SandboxProfileEditorVersionMode,
+): { draftVersion: number } | null {
+  if (mode.kind === "draft" && mode.activeVersion !== null) {
+    return {
+      draftVersion: mode.version,
+    };
+  }
+
+  if (mode.kind === "active" && mode.draftVersion !== null) {
+    return {
+      draftVersion: mode.draftVersion,
+    };
+  }
+
+  return null;
+}
+
 function LoadedSandboxProfileIntegrationSetupSection(input: {
   activeSectionId: string;
   profileId: string;
+  version: number;
+  disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
-  const showBindingsUnavailableNotice =
-    input.loader.integrationBindingsQuery.isError ||
-    (!input.loader.integrationBindingsQuery.isPending && input.loader.version === null);
+  const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
 
   if (
     input.loader.integrationBindingsQuery.isPending ||
     input.loader.integrationDirectoryQuery.isPending ||
     input.loader.initialRows === null ||
-    input.loader.version === null ||
     input.loader.integrationBindingsQuery.isError ||
     input.loader.integrationDirectoryQuery.isError
   ) {
@@ -399,13 +1015,14 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 
   return (
     <ReadySandboxProfileIntegrationSetupSection
-      key={`${input.profileId}:${String(input.loader.version)}`}
+      key={`${input.profileId}:${String(input.version)}`}
       activeSectionId={input.activeSectionId}
       profileId={input.profileId}
-      version={input.loader.version}
+      version={input.version}
       initialRows={input.loader.initialRows}
       availableConnections={input.loader.availableConnections}
       availableTargets={input.loader.availableTargets}
+      disabled={input.disabled}
       invalidateVersionBindings={input.invalidateVersionBindings}
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       {...(input.onHasUnsavedChangesChange === undefined
@@ -460,6 +1077,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   initialRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  disabled: boolean;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
@@ -474,11 +1092,23 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     availableTargets: input.availableTargets,
     invalidateVersionBindings: input.invalidateVersionBindings,
   });
+  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+
+  useEffect(() => {
+    onHasUnsavedChangesChange?.(
+      integrationsState.hasUnsavedChanges || integrationsState.isSubmittingIntegrationBindings,
+    );
+  }, [
+    onHasUnsavedChangesChange,
+    integrationsState.hasUnsavedChanges,
+    integrationsState.isSubmittingIntegrationBindings,
+  ]);
 
   return input.activeSectionId === "resources-and-tools" ? (
     <SandboxProfileResourcesAndToolsSection
       availableConnections={integrationsState.availableConnections}
       availableTargets={integrationsState.availableTargets}
+      disabled={input.disabled}
       onRowChange={integrationsState.onIntegrationBindingRowChange}
       rows={integrationsState.integrationRows}
     />
@@ -494,6 +1124,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
       integrationDirectoryQuery={input.integrationDirectoryQuery}
       integrationRows={integrationsState.integrationRows}
       integrationSaveError={integrationsState.integrationSaveError}
+      disabled={input.disabled}
       onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
       onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
       onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
@@ -503,14 +1134,17 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
 
 function LoadedSandboxProfileSetupScriptSection(input: {
   profileId: string;
+  version: number;
+  disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
   if (input.loader.setupScriptQuery.isPending) {
     return <SandboxProfileSetupScriptPanel disabled={true} value="" />;
   }
 
-  if (input.loader.setupScriptQuery.isError || input.loader.version === null) {
+  if (input.loader.setupScriptQuery.isError) {
     return (
       <div className="gap-4 flex flex-col">
         <Notice title="Could not load setup script" variant="alert">
@@ -528,8 +1162,12 @@ function LoadedSandboxProfileSetupScriptSection(input: {
     <ReadySandboxProfileSetupScriptSection
       invalidateVersionSetupScript={input.invalidateVersionSetupScript}
       profileId={input.profileId}
+      disabled={input.disabled}
       setupScript={input.loader.setupScript}
-      version={input.loader.version}
+      version={input.version}
+      {...(input.onHasUnsavedChangesChange === undefined
+        ? {}
+        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
     />
   );
 }
@@ -537,8 +1175,10 @@ function LoadedSandboxProfileSetupScriptSection(input: {
 function ReadySandboxProfileSetupScriptSection(input: {
   profileId: string;
   version: number;
+  disabled: boolean;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
 }): React.JSX.Element {
   const setupScriptState = useLoadedSandboxProfileSetupScriptState({
     profileId: input.profileId,
@@ -546,6 +1186,11 @@ function ReadySandboxProfileSetupScriptSection(input: {
     setupScript: input.setupScript,
     invalidateVersionSetupScript: input.invalidateVersionSetupScript,
   });
+  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+
+  useEffect(() => {
+    onHasUnsavedChangesChange?.(setupScriptState.hasUnsavedChanges || setupScriptState.isSaving);
+  }, [onHasUnsavedChangesChange, setupScriptState.hasUnsavedChanges, setupScriptState.isSaving]);
 
   return (
     <SandboxProfileSetupScriptPanel
@@ -555,6 +1200,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
       onChange={setupScriptState.onChange}
       saveStatus={setupScriptState.saveStatus}
       value={setupScriptState.draftValue}
+      disabled={input.disabled}
     />
   );
 }

@@ -6,33 +6,28 @@ type ListLaunchableSandboxProfilesResponse =
   paths["/v1/sandbox/profiles/launchable"]["get"]["responses"][200]["content"]["application/json"];
 type GetSandboxProfileResponse =
   paths["/v1/sandbox/profiles/{profileId}"]["get"]["responses"][200]["content"]["application/json"];
+type ListSandboxProfileVersionsResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions"]["get"]["responses"][200]["content"]["application/json"];
 type CreateSandboxProfileRequest =
   paths["/v1/sandbox/profiles"]["post"]["requestBody"]["content"]["application/json"];
 type UpdateSandboxProfileRequest =
   paths["/v1/sandbox/profiles/{profileId}"]["patch"]["requestBody"]["content"]["application/json"];
+type DeleteSandboxProfileResponse =
+  paths["/v1/sandbox/profiles/{profileId}"]["delete"]["responses"][202]["content"]["application/json"];
+type SandboxProfileVersionIntegrationBindingsResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings"]["get"]["responses"][200]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
 export type SandboxProfilesListResult = ListSandboxProfilesResponse;
-export type LaunchableSandboxProfileRepositoryOption = {
-  id: string;
-  label: string;
-  path: string;
-};
 export type SandboxProfileRepositoryOption =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"]["repositoryOptions"][number];
-export type LaunchableSandboxProfile = ListLaunchableSandboxProfilesResponse["items"][number] & {
-  repositoryOptions: LaunchableSandboxProfileRepositoryOption[];
-};
-export type LaunchableSandboxProfilesResult = Omit<
-  ListLaunchableSandboxProfilesResponse,
-  "items"
-> & {
-  items: LaunchableSandboxProfile[];
-};
+export type LaunchableSandboxProfile = ListLaunchableSandboxProfilesResponse["items"][number];
+export type LaunchableSandboxProfilesResult = ListLaunchableSandboxProfilesResponse;
 export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
 export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
 export type CreateSandboxProfileInput = CreateSandboxProfileRequest;
+export type DeleteSandboxProfileResult = DeleteSandboxProfileResponse;
 export type UpdateSandboxProfileInput = UpdateSandboxProfileRequest & {
   profileId: string;
 };
@@ -46,23 +41,16 @@ export const SandboxIntegrationBindingKinds = {
 export type SandboxIntegrationBindingKind =
   (typeof SandboxIntegrationBindingKinds)[keyof typeof SandboxIntegrationBindingKinds];
 
-export type SandboxProfileVersion = {
-  sandboxProfileId: string;
-  version: number;
-  state: "draft" | "published";
-  isActive: boolean;
-};
+export type SandboxProfileVersion = ListSandboxProfileVersionsResponse["versions"][number];
 
-export type SandboxProfileVersionIntegrationBinding = {
-  id: string;
-  sandboxProfileId: string;
-  sandboxProfileVersion: number;
-  connectionId: string;
-  kind: SandboxIntegrationBindingKind;
-  config: Record<string, unknown>;
-  createdAt: string;
-  updatedAt: string;
-};
+export type SandboxProfileVersionPublishability =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
+
+export type PublishSandboxProfileVersionResult =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publish"]["post"]["responses"][200]["content"]["application/json"];
+
+export type SandboxProfileVersionIntegrationBinding =
+  SandboxProfileVersionIntegrationBindingsResponse["bindings"][number];
 export type SandboxProfileVersionSetupScript =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileVersionAutomationConfig =

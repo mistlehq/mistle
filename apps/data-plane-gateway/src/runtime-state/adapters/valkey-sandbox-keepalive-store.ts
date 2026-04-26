@@ -20,6 +20,23 @@ type SandboxKeepaliveStateRecord = {
   expiresAtMs: number;
 };
 
+function isDefined<T>(value: T | null): value is T {
+  return value !== null;
+}
+
+function parseIntegerReply(input: unknown): number {
+  if (typeof input === "number" && Number.isInteger(input)) {
+    return input;
+  }
+
+  const parsed = Number(input);
+  if (Number.isInteger(parsed)) {
+    return parsed;
+  }
+
+  throw new Error(`Unexpected Valkey integer reply: ${String(input)}`);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -138,26 +155,25 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     nowMs: number;
   }): Promise<void> {
     const expiresAtMs = input.nowMs + input.ttlMs;
+    const indexKey = buildSandboxKeepaliveIndexKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     const detailKey = buildSandboxKeepaliveDetailKey({
       keyPrefix: this.keyPrefix,
       sandboxInstanceId: input.sandboxInstanceId,
       keepaliveId: input.keepaliveId,
     });
 
-    await Promise.all([
-      this.client.zAdd(
-        buildSandboxKeepaliveIndexKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
-        [
-          {
-            score: expiresAtMs,
-            value: input.keepaliveId,
-          },
-        ],
-      ),
-      this.client.set(
+    await this.client
+      .multi()
+      .zAdd(indexKey, [
+        {
+          score: expiresAtMs,
+          value: input.keepaliveId,
+        },
+      ])
+      .set(
         detailKey,
         JSON.stringify({
           sandboxInstanceId: input.sandboxInstanceId,
@@ -173,8 +189,8 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
         {
           PX: input.ttlMs,
         },
-      ),
-    ]);
+      )
+      .exec();
 
     logger.debug(
       {
@@ -239,6 +255,10 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     ttlMs: number;
     nowMs: number;
   }): Promise<boolean> {
+    const indexKey = buildSandboxKeepaliveIndexKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     const detailKey = buildSandboxKeepaliveDetailKey({
       keyPrefix: this.keyPrefix,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -246,13 +266,7 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     });
     const serializedKeepalive = await this.client.get(detailKey);
     if (serializedKeepalive === null) {
-      await this.client.zRem(
-        buildSandboxKeepaliveIndexKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
-        input.keepaliveId,
-      );
+      await this.client.zRem(indexKey, input.keepaliveId);
       logger.debug(
         {
           event: "sandbox_keepalive_renew_rejected",
@@ -268,20 +282,15 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     const currentKeepalive = parseSandboxKeepaliveRecord(serializedKeepalive);
     const expiresAtMs = input.nowMs + input.ttlMs;
 
-    await Promise.all([
-      this.client.zAdd(
-        buildSandboxKeepaliveIndexKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
-        [
-          {
-            score: expiresAtMs,
-            value: input.keepaliveId,
-          },
-        ],
-      ),
-      this.client.set(
+    await this.client
+      .multi()
+      .zAdd(indexKey, [
+        {
+          score: expiresAtMs,
+          value: input.keepaliveId,
+        },
+      ])
+      .set(
         detailKey,
         JSON.stringify({
           ...currentKeepalive,
@@ -290,8 +299,8 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
         {
           PX: input.ttlMs,
         },
-      ),
-    ]);
+      )
+      .exec();
 
     logger.debug(
       {
@@ -316,21 +325,21 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     sandboxInstanceId: string;
     keepaliveId: string;
   }): Promise<boolean> {
-    const removedCount = await this.client.zRem(
-      buildSandboxKeepaliveIndexKey({
-        keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
-      }),
-      input.keepaliveId,
-    );
-
-    await this.client.del(
-      buildSandboxKeepaliveDetailKey({
-        keyPrefix: this.keyPrefix,
-        sandboxInstanceId: input.sandboxInstanceId,
-        keepaliveId: input.keepaliveId,
-      }),
-    );
+    const indexKey = buildSandboxKeepaliveIndexKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    const detailKey = buildSandboxKeepaliveDetailKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+      keepaliveId: input.keepaliveId,
+    });
+    const results = await this.client
+      .multi()
+      .zRem(indexKey, input.keepaliveId)
+      .del(detailKey)
+      .exec();
+    const removedCount = parseIntegerReply(results[0]);
 
     logger.debug(
       {
@@ -355,6 +364,29 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
     });
 
     await this.client.zRemRangeByScore(indexKey, "-inf", input.nowMs);
+
+    const activeKeepaliveIds = await this.client.zRange(indexKey, 0, -1);
+    if (activeKeepaliveIds.length > 0) {
+      const missingKeepaliveIds = (
+        await Promise.all(
+          activeKeepaliveIds.map(async (keepaliveId) => {
+            const detailExists = await this.client.exists(
+              buildSandboxKeepaliveDetailKey({
+                keyPrefix: this.keyPrefix,
+                sandboxInstanceId: input.sandboxInstanceId,
+                keepaliveId,
+              }),
+            );
+
+            return detailExists === 0 ? keepaliveId : null;
+          }),
+        )
+      ).filter(isDefined);
+
+      if (missingKeepaliveIds.length > 0) {
+        await this.client.zRem(indexKey, missingKeepaliveIds);
+      }
+    }
 
     const activeKeepaliveCount = await this.client.zCard(indexKey);
     if (activeKeepaliveCount > 0) {
