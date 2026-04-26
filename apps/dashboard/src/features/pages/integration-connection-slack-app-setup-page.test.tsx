@@ -143,6 +143,8 @@ describe("SlackAppSetupPane", () => {
     });
 
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
+    expect(screen.getByText("Existing Slack App")).toBeTruthy();
+    expect(screen.getByText("Secrets")).toBeTruthy();
     expect(screen.getByDisplayValue("123.456")).toBeTruthy();
     expect(screen.getAllByPlaceholderText("******")).toHaveLength(3);
     expect(screen.queryByText("Bot token is already configured.")).toBeNull();
@@ -155,9 +157,7 @@ describe("SlackAppSetupPane", () => {
         "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
       ),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Save Slack App" }).hasAttribute("disabled")).toBe(
-      true,
-    );
+    expect(screen.queryByRole("button", { name: "Save Slack App" })).toBeNull();
   });
 
   it("shows installed success after Slack OAuth returns", () => {

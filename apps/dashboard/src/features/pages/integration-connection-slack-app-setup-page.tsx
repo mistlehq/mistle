@@ -1,6 +1,7 @@
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
   CopyableValue,
@@ -19,11 +20,15 @@ import {
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { ConfiguredSecretField, type SavingFieldState } from "../forms/configured-secret-field.js";
+import {
+  ConfiguredSecretField,
+  SavingTextField,
+  type SavingFieldState,
+} from "../forms/configured-secret-field.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
@@ -33,6 +38,10 @@ import {
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
+import {
+  clearPendingStatusTimeouts,
+  scheduleSavedStateReset,
+} from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -46,6 +55,16 @@ type SlackExistingAppDraft = {
   clientSecret: string;
 };
 
+type SlackExistingAppFieldKey = keyof SlackExistingAppDraft;
+type SlackExistingAppSecretFieldKey = "botToken" | "signingSecret" | "clientSecret";
+type SlackExistingAppTimeoutRefs = Record<
+  SlackExistingAppFieldKey,
+  {
+    fadeStartTimeoutRef: { current: TimerHandle | null };
+    fadeEndTimeoutRef: { current: TimerHandle | null };
+  }
+>;
+
 type ManifestValidation =
   | {
       status: "valid";
@@ -56,10 +75,18 @@ type ManifestValidation =
     };
 
 const SlackConnectionMethodId = "slack-bot-token";
-const IdleSavingFieldState = {
-  status: "idle",
-  errorMessage: null,
-} as const satisfies SavingFieldState;
+const SlackExistingAppFieldKeys = [
+  "clientId",
+  "botToken",
+  "signingSecret",
+  "clientSecret",
+] as const satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppSecretFieldKeys = [
+  "botToken",
+  "signingSecret",
+  "clientSecret",
+] as const satisfies readonly SlackExistingAppSecretFieldKey[];
 
 const SlackDraftBotScopes = [
   "app_mentions:read",
@@ -128,6 +155,60 @@ function createInitialExistingAppDraft(connection: IntegrationConnection): Slack
   };
 }
 
+function isSlackExistingAppSecretFieldKey(
+  fieldKey: SlackExistingAppFieldKey,
+): fieldKey is SlackExistingAppSecretFieldKey {
+  return SlackExistingAppSecretFieldKeys.includes(fieldKey as SlackExistingAppSecretFieldKey);
+}
+
+function createInitialFieldStates(): Record<SlackExistingAppFieldKey, SavingFieldState> {
+  return {
+    clientId: { status: "idle", errorMessage: null },
+    botToken: { status: "idle", errorMessage: null },
+    signingSecret: { status: "idle", errorMessage: null },
+    clientSecret: { status: "idle", errorMessage: null },
+  };
+}
+
+function createFieldTimeoutRefs(): SlackExistingAppTimeoutRefs {
+  return {
+    clientId: {
+      fadeStartTimeoutRef: { current: null },
+      fadeEndTimeoutRef: { current: null },
+    },
+    botToken: {
+      fadeStartTimeoutRef: { current: null },
+      fadeEndTimeoutRef: { current: null },
+    },
+    signingSecret: {
+      fadeStartTimeoutRef: { current: null },
+      fadeEndTimeoutRef: { current: null },
+    },
+    clientSecret: {
+      fadeStartTimeoutRef: { current: null },
+      fadeEndTimeoutRef: { current: null },
+    },
+  };
+}
+
+function resolveConfiguredSecretFieldKeys(
+  connection: IntegrationConnection,
+): ReadonlySet<SlackExistingAppSecretFieldKey> {
+  const configuredSecretFieldKeys = new Set<SlackExistingAppSecretFieldKey>();
+
+  for (const configuredSecretName of connection.configuredSecretNames ?? []) {
+    if (
+      configuredSecretName === "botToken" ||
+      configuredSecretName === "signingSecret" ||
+      configuredSecretName === "clientSecret"
+    ) {
+      configuredSecretFieldKeys.add(configuredSecretName);
+    }
+  }
+
+  return configuredSecretFieldKeys;
+}
+
 function validateManifestJson(value: string): ManifestValidation {
   try {
     const parsed: unknown = JSON.parse(value);
@@ -191,14 +272,54 @@ function isSlackAppInstalled(connection: IntegrationConnection): boolean {
   );
 }
 
-function buildSlackExistingAppSecrets(draft: SlackExistingAppDraft): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries({
-      botToken: draft.botToken.trim(),
-      signingSecret: draft.signingSecret.trim(),
-      clientSecret: draft.clientSecret.trim(),
-    }).filter((entry) => entry[1].length > 0),
+function normalizeSlackExistingAppSetupValue(value: string): string {
+  return value.trim();
+}
+
+function buildSlackExistingAppSetupConfig(draft: SlackExistingAppDraft): Record<string, string> {
+  const clientId = normalizeSlackExistingAppSetupValue(draft.clientId);
+
+  return {
+    connection_method: SlackConnectionMethodId,
+    ...(clientId.length === 0 ? {} : { client_id: clientId }),
+  };
+}
+
+function buildSlackExistingAppSetupSecrets(input: {
+  draft: SlackExistingAppDraft;
+  fieldKey: SlackExistingAppFieldKey;
+}): Record<string, string> | undefined {
+  if (!isSlackExistingAppSecretFieldKey(input.fieldKey)) {
+    return undefined;
+  }
+
+  const value = normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]);
+  return value.length === 0 ? undefined : { [input.fieldKey]: value };
+}
+
+function isSlackExistingAppSetupFieldDirty(input: {
+  fieldKey: SlackExistingAppFieldKey;
+  draft: SlackExistingAppDraft;
+  savedDraft: SlackExistingAppDraft;
+}): boolean {
+  return (
+    normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]) !==
+    normalizeSlackExistingAppSetupValue(input.savedDraft[input.fieldKey])
   );
+}
+
+function buildDraftWithSavedFieldValues(input: {
+  baseDraft: SlackExistingAppDraft;
+  draft: SlackExistingAppDraft;
+  fieldKey: SlackExistingAppFieldKey;
+}): SlackExistingAppDraft {
+  return {
+    ...input.baseDraft,
+    clientId: normalizeSlackExistingAppSetupValue(input.draft.clientId),
+    ...(isSlackExistingAppSecretFieldKey(input.fieldKey)
+      ? { [input.fieldKey]: normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]) }
+      : {}),
+  };
 }
 
 function SlackManifestSetupPanel(input: {
@@ -273,74 +394,96 @@ function SlackManifestSetupPanel(input: {
 }
 
 function SlackExistingAppSetupPanel(input: {
-  configuredSecretNames: readonly string[];
+  configuredSecretFieldKeys: ReadonlySet<SlackExistingAppSecretFieldKey>;
   draft: SlackExistingAppDraft;
-  onDraftChange: (draft: SlackExistingAppDraft) => void;
+  fieldStates: Record<SlackExistingAppFieldKey, SavingFieldState>;
+  onCommitField: (fieldKey: SlackExistingAppFieldKey) => void;
+  onRevertSecretReplacement: (fieldKey: SlackExistingAppSecretFieldKey) => void;
+  onUpdateFieldDraft: (fieldKey: SlackExistingAppFieldKey, nextValue: string) => void;
 }): React.JSX.Element {
-  function updateDraft(field: keyof SlackExistingAppDraft, value: string): void {
-    input.onDraftChange({
-      ...input.draft,
-      [field]: value,
-    });
-  }
-
-  function isConfigured(fieldName: "botToken" | "signingSecret" | "clientSecret"): boolean {
-    return input.configuredSecretNames.includes(fieldName);
-  }
-
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="slack-client-id">Client ID</FieldLabel>
-        </FieldHeader>
-        <FieldContent>
-          <Input
-            id="slack-client-id"
-            onChange={(event) => updateDraft("clientId", event.target.value)}
-            value={input.draft.clientId}
-          />
-        </FieldContent>
-      </Field>
-      <ConfiguredSecretField
-        configured={isConfigured("clientSecret")}
-        fieldState={IdleSavingFieldState}
-        id="slack-client-secret"
-        label="Client secret"
-        onCancelReplace={() => updateDraft("clientSecret", "")}
-        onChange={(nextValue) => updateDraft("clientSecret", nextValue)}
-        onCommit={() => {}}
-        secretLabel="client secret"
-        type="password"
-        value={input.draft.clientSecret}
-      />
-      <ConfiguredSecretField
-        configured={isConfigured("botToken")}
-        fieldState={IdleSavingFieldState}
-        id="slack-bot-token"
-        label="Bot token"
-        onCancelReplace={() => updateDraft("botToken", "")}
-        onChange={(nextValue) => updateDraft("botToken", nextValue)}
-        onCommit={() => {}}
-        placeholder="xoxb-..."
-        required={!isConfigured("botToken")}
-        secretLabel="bot token"
-        type="password"
-        value={input.draft.botToken}
-      />
-      <ConfiguredSecretField
-        configured={isConfigured("signingSecret")}
-        fieldState={IdleSavingFieldState}
-        id="slack-signing-secret"
-        label="Signing secret"
-        onCancelReplace={() => updateDraft("signingSecret", "")}
-        onChange={(nextValue) => updateDraft("signingSecret", nextValue)}
-        onCommit={() => {}}
-        required={!isConfigured("signingSecret")}
-        secretLabel="signing secret"
-        type="password"
-        value={input.draft.signingSecret}
-      />
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-medium">Existing Slack App</h2>
+          <p className="text-muted-foreground text-sm">
+            Paste values from a Slack app you already created or configured in Slack.
+          </p>
+        </div>
+        <SavingTextField
+          fieldState={input.fieldStates.clientId}
+          id="slack-client-id"
+          label="Client ID"
+          onBlur={() => {
+            input.onCommitField("clientId");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("clientId", nextValue);
+          }}
+          value={input.draft.clientId}
+        />
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <h2 className="text-base font-medium">Secrets</h2>
+        <ConfiguredSecretField
+          configured={input.configuredSecretFieldKeys.has("botToken")}
+          fieldState={input.fieldStates.botToken}
+          id="slack-bot-token"
+          label="Bot token"
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("botToken");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("botToken", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("botToken");
+          }}
+          placeholder="xoxb-..."
+          required={!input.configuredSecretFieldKeys.has("botToken")}
+          secretLabel="bot token"
+          type="password"
+          value={input.draft.botToken}
+        />
+        <ConfiguredSecretField
+          configured={input.configuredSecretFieldKeys.has("signingSecret")}
+          fieldState={input.fieldStates.signingSecret}
+          id="slack-signing-secret"
+          label="Signing secret"
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("signingSecret");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("signingSecret", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("signingSecret");
+          }}
+          required={!input.configuredSecretFieldKeys.has("signingSecret")}
+          secretLabel="signing secret"
+          type="password"
+          value={input.draft.signingSecret}
+        />
+        <ConfiguredSecretField
+          configured={input.configuredSecretFieldKeys.has("clientSecret")}
+          fieldState={input.fieldStates.clientSecret}
+          id="slack-client-secret"
+          label="Client secret"
+          onCancelReplace={() => {
+            input.onRevertSecretReplacement("clientSecret");
+          }}
+          onChange={(nextValue) => {
+            input.onUpdateFieldDraft("clientSecret", nextValue);
+          }}
+          onCommit={() => {
+            input.onCommitField("clientSecret");
+          }}
+          secretLabel="client secret"
+          type="password"
+          value={input.draft.clientSecret}
+        />
+      </div>
     </div>
   );
 }
@@ -460,11 +603,18 @@ export function SlackAppSetupPane(input: {
   );
   const [manifestValue, setManifestValue] = useState(SlackDraftManifest);
   const [appConfigToken, setAppConfigToken] = useState("");
-  const [initialExistingAppDraft] = useState(() => createInitialExistingAppDraft(input.connection));
   const [existingAppDraft, setExistingAppDraft] = useState(() =>
     createInitialExistingAppDraft(input.connection),
   );
+  const [savedExistingAppDraft, setSavedExistingAppDraft] = useState(() =>
+    createInitialExistingAppDraft(input.connection),
+  );
+  const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
+    resolveConfiguredSecretFieldKeys(input.connection),
+  );
+  const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
   const webhookSourcesQuery = useQuery({
     enabled: setupMode === "existing-app",
     queryKey: ["integration-webhook-sources", input.connection.id],
@@ -485,21 +635,6 @@ export function SlackAppSetupPane(input: {
       }),
   });
 
-  const updateExistingAppMutation = useMutation({
-    mutationFn: async () =>
-      updateFormIntegrationConnection({
-        connectionId: input.connection.id,
-        displayName: input.connection.displayName,
-        config: {
-          connection_method: SlackConnectionMethodId,
-          ...(existingAppDraft.clientId.trim().length === 0
-            ? {}
-            : { client_id: existingAppDraft.clientId.trim() }),
-        },
-        secrets: buildSlackExistingAppSecrets(existingAppDraft),
-      }),
-  });
-
   async function createSlackApp(): Promise<void> {
     setActionErrorMessage(null);
     try {
@@ -515,31 +650,183 @@ export function SlackAppSetupPane(input: {
     }
   }
 
-  async function saveExistingApp(): Promise<void> {
+  useEffect(() => {
+    return () => {
+      for (const fieldKey of SlackExistingAppFieldKeys) {
+        clearPendingStatusTimeouts({
+          fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
+          fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+          scheduler: systemScheduler,
+        });
+      }
+    };
+  }, []);
+
+  function resetFieldFeedback(fieldKey: SlackExistingAppFieldKey): void {
+    clearPendingStatusTimeouts({
+      fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
+      fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+      scheduler: systemScheduler,
+    });
+    setFieldStates((currentFieldStates) => ({
+      ...currentFieldStates,
+      [fieldKey]: {
+        status: "idle",
+        errorMessage: null,
+      },
+    }));
+  }
+
+  function updateExistingAppFieldDraft(
+    fieldKey: SlackExistingAppFieldKey,
+    nextValue: string,
+  ): void {
+    setExistingAppDraft((currentDraft) => ({
+      ...currentDraft,
+      [fieldKey]: nextValue,
+    }));
     setActionErrorMessage(null);
+    if (fieldStates[fieldKey].status !== "idle" || fieldStates[fieldKey].errorMessage !== null) {
+      resetFieldFeedback(fieldKey);
+    }
+  }
+
+  async function persistExistingAppField(fieldKey: SlackExistingAppFieldKey): Promise<void> {
+    if (fieldStates[fieldKey].status === "saving") {
+      return;
+    }
+
+    if (
+      !isSlackExistingAppSetupFieldDirty({
+        fieldKey,
+        draft: existingAppDraft,
+        savedDraft: savedExistingAppDraft,
+      })
+    ) {
+      setExistingAppDraft((currentDraft) => ({
+        ...currentDraft,
+        [fieldKey]: savedExistingAppDraft[fieldKey],
+      }));
+      resetFieldFeedback(fieldKey);
+      return;
+    }
+
+    const normalizedValue = normalizeSlackExistingAppSetupValue(existingAppDraft[fieldKey]);
+    if (isSlackExistingAppSecretFieldKey(fieldKey) && normalizedValue.length === 0) {
+      if (fieldKey === "clientSecret") {
+        resetFieldFeedback(fieldKey);
+        return;
+      }
+
+      setFieldStates((currentFieldStates) => ({
+        ...currentFieldStates,
+        [fieldKey]: {
+          status: "idle",
+          errorMessage: `${fieldKey === "botToken" ? "Bot token" : "Signing secret"} is required.`,
+        },
+      }));
+      return;
+    }
+
+    setFieldStates((currentFieldStates) => ({
+      ...currentFieldStates,
+      [fieldKey]: {
+        status: "saving",
+        errorMessage: null,
+      },
+    }));
+
     try {
-      await updateExistingAppMutation.mutateAsync();
+      const secrets = buildSlackExistingAppSetupSecrets({
+        draft: existingAppDraft,
+        fieldKey,
+      });
+      const updatedConnection = await updateFormIntegrationConnection({
+        connectionId: input.connection.id,
+        displayName: input.connection.displayName,
+        config: buildSlackExistingAppSetupConfig(existingAppDraft),
+        ...(secrets === undefined ? {} : { secrets }),
+      });
+
       await queryClient.invalidateQueries({
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
       });
+
+      const nextSavedDraft = buildDraftWithSavedFieldValues({
+        baseDraft: savedExistingAppDraft,
+        draft: existingAppDraft,
+        fieldKey,
+      });
+      const nextDraft = buildDraftWithSavedFieldValues({
+        baseDraft: existingAppDraft,
+        draft: existingAppDraft,
+        fieldKey,
+      });
+
+      setSavedExistingAppDraft(nextSavedDraft);
+      setExistingAppDraft(nextDraft);
+      if (isSlackExistingAppSecretFieldKey(fieldKey)) {
+        setConfiguredSecretFieldKeys(resolveConfiguredSecretFieldKeys(updatedConnection));
+      }
+      setActionErrorMessage(null);
+      setFieldStates((currentFieldStates) => ({
+        ...currentFieldStates,
+        [fieldKey]: {
+          status: "saved",
+          errorMessage: null,
+        },
+      }));
+
+      scheduleSavedStateReset({
+        fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
+        fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+        onFadeEnd: () => {
+          setFieldStates((currentFieldStates) => ({
+            ...currentFieldStates,
+            [fieldKey]: {
+              status: "idle",
+              errorMessage: null,
+            },
+          }));
+        },
+        onFadeStart: () => {
+          setFieldStates((currentFieldStates) => ({
+            ...currentFieldStates,
+            [fieldKey]: {
+              status: "saved-fading",
+              errorMessage: null,
+            },
+          }));
+        },
+        scheduler: systemScheduler,
+        successFadeDurationMs: 700,
+        successVisibleDurationMs: 2200,
+      });
     } catch (error) {
-      setActionErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not save Slack app setup.",
-        }),
-      );
+      setFieldStates((currentFieldStates) => ({
+        ...currentFieldStates,
+        [fieldKey]: {
+          status: "idle",
+          errorMessage: resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not save Slack app setup.",
+          }),
+        },
+      }));
     }
+  }
+
+  function revertSecretReplacement(fieldKey: SlackExistingAppSecretFieldKey): void {
+    setExistingAppDraft((currentDraft) => ({
+      ...currentDraft,
+      [fieldKey]: "",
+    }));
+    resetFieldFeedback(fieldKey);
   }
 
   const manifestValidation = validateManifestJson(manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" && appConfigToken.trim().length > 0;
-  const canSaveExistingApp =
-    existingAppDraft.botToken.trim().length > 0 ||
-    existingAppDraft.signingSecret.trim().length > 0 ||
-    existingAppDraft.clientSecret.trim().length > 0 ||
-    existingAppDraft.clientId.trim() !== initialExistingAppDraft.clientId.trim();
   const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
   const webhookCallbackState:
     | {
@@ -646,9 +933,14 @@ export function SlackAppSetupPane(input: {
 
             <TabsContent value="existing-app">
               <SlackExistingAppSetupPanel
-                configuredSecretNames={input.connection.configuredSecretNames ?? []}
+                configuredSecretFieldKeys={configuredSecretFieldKeys}
                 draft={existingAppDraft}
-                onDraftChange={setExistingAppDraft}
+                fieldStates={fieldStates}
+                onCommitField={(fieldKey) => {
+                  void persistExistingAppField(fieldKey);
+                }}
+                onRevertSecretReplacement={revertSecretReplacement}
+                onUpdateFieldDraft={updateExistingAppFieldDraft}
               />
             </TabsContent>
 
@@ -656,8 +948,8 @@ export function SlackAppSetupPane(input: {
               <SlackSetupUrls webhookCallbackState={webhookCallbackState} />
             ) : null}
 
-            <FormPageActionBar>
-              {setupMode === "manifest" ? (
+            {setupMode === "manifest" ? (
+              <FormPageActionBar>
                 <Button
                   disabled={!canCreateManifest || startManifestMutation.isPending}
                   onClick={() => {
@@ -667,18 +959,8 @@ export function SlackAppSetupPane(input: {
                 >
                   Create Slack App
                 </Button>
-              ) : (
-                <Button
-                  disabled={!canSaveExistingApp || updateExistingAppMutation.isPending}
-                  onClick={() => {
-                    void saveExistingApp();
-                  }}
-                  type="button"
-                >
-                  Save Slack App
-                </Button>
-              )}
-            </FormPageActionBar>
+              </FormPageActionBar>
+            ) : null}
           </div>
         </FormPageSection>
       </Tabs>
