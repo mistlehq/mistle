@@ -238,6 +238,78 @@ describe("runtime state route integration", () => {
   );
 
   it(
+    "keeps the active bootstrap attached when a replacement owner lease is claimed before replacement attach",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+        testId: "runtime_state_route_owner_heartbeat_it",
+      });
+
+      const bootstrapSocket = await connectBootstrapSocket({
+        fixture,
+        sandboxInstanceId,
+        token: await mintValidBootstrapToken({
+          fixture,
+          sandboxInstanceId,
+        }),
+      });
+
+      const initialSnapshot = await waitForRuntimeState({
+        fixture,
+        sandboxInstanceId,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
+      });
+      const initialOwnerLeaseId = initialSnapshot.ownerLeaseId;
+      if (initialOwnerLeaseId === null) {
+        throw new Error("Expected the bootstrap connection to establish an owner lease.");
+      }
+
+      const { client, store } = createOwnerStoreFixture({
+        fixture,
+      });
+      await client.connect();
+
+      try {
+        await store.claimOwner({
+          sandboxInstanceId,
+          nodeId: "dpg_replacement",
+          sessionId: "dts_replacement",
+          ttlMs: 30_000,
+        });
+
+        const closePromise = waitForWebSocketClose(bootstrapSocket);
+        await systemSleeper.sleep(12_000);
+
+        const closeResult = await Promise.race([
+          closePromise.then((event) => ({ kind: "closed" as const, event })),
+          systemSleeper.sleep(50).then(() => ({ kind: "still-open" as const })),
+        ]);
+        expect(closeResult).toEqual({
+          kind: "still-open",
+        });
+
+        const postClaimSnapshot = await waitForRuntimeState({
+          fixture,
+          sandboxInstanceId,
+          predicate: (currentSnapshot) =>
+            currentSnapshot.ownerLeaseId === initialOwnerLeaseId &&
+            currentSnapshot.attachment?.ownerLeaseId === initialOwnerLeaseId,
+        });
+
+        expect(postClaimSnapshot.ownerLeaseId).toBe(initialOwnerLeaseId);
+        expect(postClaimSnapshot.attachment?.ownerLeaseId).toBe(initialOwnerLeaseId);
+      } finally {
+        await closeValkeyClient(client);
+        await closeWebSocket(bootstrapSocket);
+      }
+    },
+    RuntimeStateRouteTestTimeoutMs,
+  );
+
+  it(
     "keeps a healthy bootstrap websocket attached across the first ping cycle",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();

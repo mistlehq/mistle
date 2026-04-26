@@ -25,7 +25,6 @@ import { ValkeySandboxKeepaliveStore } from "../runtime-state/adapters/valkey-sa
 import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
-import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/durations.js";
 import {
   connectValkeyClient,
   createValkeyClient,
@@ -40,7 +39,6 @@ import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { ValkeySandboxOwnerStore } from "../tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
-import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
 import { SandboxSigningRequestService } from "../tunnel/signing/sandbox-signing-request-service.js";
@@ -160,11 +158,6 @@ export function createDataPlaneGatewayRuntime(
       internalAuthServiceToken: config.internalAuth.serviceToken,
     }),
   });
-  const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
-    sandboxOwnerStore,
-    systemScheduler,
-    OWNER_LEASE_RENEW_INTERVAL_MS,
-  );
   const telemetryIngressSink = createSandboxTelemetryIngressSink({
     clock: systemClock,
     gatewayNodeId: nodeId,
@@ -213,11 +206,11 @@ export function createDataPlaneGatewayRuntime(
     tunnelSessionRegistry,
     sandboxOwnerStore,
     sandboxOwnerResolver,
-    sandboxOwnerLeaseHeartbeat,
     sandboxKeepaliveStore,
     sandboxRuntimeReadinessStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
+    activeBootstrapSessionStore,
     sandboxInstanceDeadlineService,
     telemetryIngressService,
     clock: systemClock,

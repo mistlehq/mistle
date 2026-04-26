@@ -1,5 +1,7 @@
 import type { RuntimeReadyControlMessage } from "@mistle/sandbox-session-protocol";
+import type { Clock } from "@mistle/time";
 
+import type { ActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runtime-readiness-store.js";
 
 /**
@@ -8,6 +10,8 @@ import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runt
 export class SandboxRuntimeReadinessRepository {
   public constructor(
     private readonly runtimeReadinessStore: SandboxRuntimeReadinessStore,
+    private readonly activeBootstrapSessionStore: ActiveBootstrapSessionStore,
+    private readonly clock: Clock,
     private readonly gatewayNodeId: string,
   ) {}
 
@@ -16,6 +20,14 @@ export class SandboxRuntimeReadinessRepository {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   }): Promise<void> {
+    const activeSession = await this.activeBootstrapSessionStore.getActiveSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      nowMs: this.clock.nowMs(),
+    });
+    if (activeSession === null || activeSession.ownerLeaseId !== input.ownerLeaseId) {
+      return;
+    }
+
     await this.runtimeReadinessStore.replaceStateForOwner({
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.ownerLeaseId,

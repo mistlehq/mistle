@@ -2,14 +2,14 @@ import type { KeepaliveControlMessage } from "@mistle/sandbox-session-protocol";
 import type { Clock } from "@mistle/time";
 
 import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
+import type { ActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
-import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 
 export class SandboxKeepaliveRepository {
   public constructor(
     private readonly keepaliveStore: SandboxKeepaliveStore,
     private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
-    private readonly sandboxOwnerStore: SandboxOwnerStore,
+    private readonly activeBootstrapSessionStore: ActiveBootstrapSessionStore,
     private readonly clock: Clock,
     private readonly gatewayNodeId: string,
   ) {}
@@ -20,6 +20,13 @@ export class SandboxKeepaliveRepository {
     ownerLeaseId: string;
   }): Promise<void> {
     const nowMs = this.clock.nowMs();
+    const activeSession = await this.activeBootstrapSessionStore.getActiveSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      nowMs,
+    });
+    if (activeSession === null || activeSession.ownerLeaseId !== input.ownerLeaseId) {
+      return;
+    }
 
     await this.keepaliveStore.replaceStateForOwner({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -34,18 +41,9 @@ export class SandboxKeepaliveRepository {
       return;
     }
 
-    const owner = await this.sandboxOwnerStore.getOwner({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (owner === undefined) {
-      throw new Error(
-        `Expected active owner lease for sandbox '${input.sandboxInstanceId}' before applying keepalive activity.`,
-      );
-    }
-
     await this.sandboxInstanceDeadlineService.touchIdleDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
-      ownerLeaseId: owner.leaseId,
+      ownerLeaseId: activeSession.ownerLeaseId,
     });
   }
 }

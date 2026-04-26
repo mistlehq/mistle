@@ -8,6 +8,7 @@ import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instan
 import { logger } from "../logger.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
+import type { ActiveBootstrapSessionStore } from "../runtime-state/active-bootstrap-session-store.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
@@ -16,7 +17,6 @@ import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runt
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
-import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
@@ -52,11 +52,11 @@ type RegisterSandboxTunnelRouteInput = {
   tunnelSessionRegistry: TunnelSessionRegistry;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
-  sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
   sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
+  activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
   telemetryIngressService: SandboxTelemetryIngressService;
   clock: Clock;
@@ -94,12 +94,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const sandboxKeepaliveRepository = new SandboxKeepaliveRepository(
     input.sandboxKeepaliveStore,
     input.sandboxInstanceDeadlineService,
-    input.sandboxOwnerStore,
+    input.activeBootstrapSessionStore,
     input.clock,
     input.gatewayNodeId,
   );
   const sandboxRuntimeReadinessRepository = new SandboxRuntimeReadinessRepository(
     input.sandboxRuntimeReadinessStore,
+    input.activeBootstrapSessionStore,
+    input.clock,
     input.gatewayNodeId,
   );
   const tunnelSessionService = new TunnelSessionService(
@@ -108,7 +110,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.relayCoordinator,
     input.tunnelSessionRegistry,
     input.sandboxOwnerStore,
-    input.sandboxOwnerLeaseHeartbeat,
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxInstanceDeadlineService,

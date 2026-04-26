@@ -17,7 +17,6 @@ import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapt
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
 import { InMemoryLocalPeerRegistryAdapter } from "../local-peer-registry/adapters/in-memory-local-peer-registry-adapter.js";
 import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
-import { SandboxOwnerLeaseHeartbeat } from "../ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../ownership/store-backed-sandbox-owner-resolver.js";
 import { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import { InMemoryRelayTransportAdapter } from "../relay-transport/adapters/in-memory-relay-transport-adapter.js";
@@ -262,7 +261,6 @@ async function createDisconnectTestHarness() {
     relayCoordinator,
     tunnelSessionRegistry,
     ownerStore,
-    new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
     new InMemorySandboxPresenceStore(clock),
     new InMemorySandboxRuntimeAttachmentStore(clock),
     new SandboxInstanceDeadlineService(
@@ -355,7 +353,6 @@ describe("TunnelSessionService", () => {
       relayCoordinator,
       tunnelSessionRegistry,
       ownerStore,
-      new SandboxOwnerLeaseHeartbeat(ownerStore, scheduler, 5_000),
       new InMemorySandboxPresenceStore(clock),
       new InMemorySandboxRuntimeAttachmentStore(clock),
       new SandboxInstanceDeadlineService(
