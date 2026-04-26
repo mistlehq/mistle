@@ -11,13 +11,6 @@ const SlackBotScopes = [
 
 const SlackBotEvents = [
   "app_mention",
-  "channel_archive",
-  "channel_created",
-  "channel_rename",
-  "channel_unarchive",
-  "group_archive",
-  "group_rename",
-  "group_unarchive",
   "message.channels",
   "message.groups",
   "reaction_added",

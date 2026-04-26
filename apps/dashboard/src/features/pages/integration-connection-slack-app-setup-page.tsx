@@ -59,7 +59,26 @@ const IdleSavingFieldState = {
   errorMessage: null,
 } as const satisfies SavingFieldState;
 
-const SlackDraftManifest = JSON.stringify(
+const SlackDraftBotScopes = [
+  "app_mentions:read",
+  "channels:history",
+  "channels:read",
+  "chat:write",
+  "groups:history",
+  "groups:read",
+  "reactions:read",
+  "users:read",
+] as const;
+
+const SlackDraftBotEvents = [
+  "app_mention",
+  "message.channels",
+  "message.groups",
+  "reaction_added",
+  "reaction_removed",
+] as const;
+
+export const SlackDraftManifest = JSON.stringify(
   {
     display_information: {
       name: "Mistle",
@@ -73,8 +92,21 @@ const SlackDraftManifest = JSON.stringify(
       },
     },
     settings: {
+      event_subscriptions: {
+        request_url: "https://mistle.example.com/api/integrations/slack/webhook",
+        bot_events: SlackDraftBotEvents,
+      },
       socket_mode_enabled: false,
       token_rotation_enabled: false,
+    },
+    oauth_config: {
+      redirect_urls: [
+        "https://mistle.example.com/api/integrations/slack/install/callback",
+        "https://mistle.example.com/api/identity-linking/slack/callback",
+      ],
+      scopes: {
+        bot: SlackDraftBotScopes,
+      },
     },
   },
   null,

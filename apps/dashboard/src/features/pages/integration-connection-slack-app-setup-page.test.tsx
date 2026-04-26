@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
+import {
+  SlackAppSetupPane,
+  SlackDraftManifest,
+} from "./integration-connection-slack-app-setup-page.js";
 
 function createSlackConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -70,6 +73,48 @@ describe("SlackAppSetupPane", () => {
     expect(screen.getByRole("button", { name: "Create Slack App" }).hasAttribute("disabled")).toBe(
       true,
     );
+  });
+
+  it("includes the Slack app permissions and event subscriptions in the default manifest", () => {
+    const manifest = JSON.parse(SlackDraftManifest) as {
+      settings: {
+        event_subscriptions: {
+          request_url: string;
+          bot_events: readonly string[];
+        };
+      };
+      oauth_config: {
+        redirect_urls: readonly string[];
+        scopes: {
+          bot: readonly string[];
+        };
+      };
+    };
+
+    expect(manifest.settings.event_subscriptions.request_url).toBe(
+      "https://mistle.example.com/api/integrations/slack/webhook",
+    );
+    expect(manifest.settings.event_subscriptions.bot_events).toEqual([
+      "app_mention",
+      "message.channels",
+      "message.groups",
+      "reaction_added",
+      "reaction_removed",
+    ]);
+    expect(manifest.oauth_config.redirect_urls).toEqual([
+      "https://mistle.example.com/api/integrations/slack/install/callback",
+      "https://mistle.example.com/api/identity-linking/slack/callback",
+    ]);
+    expect(manifest.oauth_config.scopes.bot).toEqual([
+      "app_mentions:read",
+      "channels:history",
+      "channels:read",
+      "chat:write",
+      "groups:history",
+      "groups:read",
+      "reactions:read",
+      "users:read",
+    ]);
   });
 
   it("defaults a configured Slack connection to the existing app setup", () => {

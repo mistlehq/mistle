@@ -31,13 +31,13 @@ describe("buildSlackAppManifest", () => {
         event_subscriptions: {
           request_url:
             "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
-          bot_events: expect.arrayContaining([
+          bot_events: [
             "app_mention",
             "message.channels",
             "message.groups",
             "reaction_added",
             "reaction_removed",
-          ]),
+          ],
         },
       },
       oauth_config: {
