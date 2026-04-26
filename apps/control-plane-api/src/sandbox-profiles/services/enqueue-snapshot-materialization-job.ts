@@ -2,7 +2,7 @@ import {
   sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
 } from "@mistle/db/control-plane";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -23,8 +23,10 @@ async function markQueuedSnapshotJobFailedToEnqueue(
       updatedAt: sql`now()`,
     })
     .where(
-      sql`${sandboxProfileVersionSnapshotJobs.id} = ${input.snapshotJobId}
-        and ${sandboxProfileVersionSnapshotJobs.state} = ${SandboxProfileVersionSnapshotJobStates.QUEUED}`,
+      and(
+        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
+      ),
     );
 }
 

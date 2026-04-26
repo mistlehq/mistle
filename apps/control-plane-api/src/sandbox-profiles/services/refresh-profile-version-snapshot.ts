@@ -1,11 +1,14 @@
 import {
   ControlPlaneConstraintIds,
   isControlPlaneUniqueViolation,
+  sandboxProfiles,
   sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
+  sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { and, eq } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
 import {
@@ -68,39 +71,49 @@ export async function refreshProfileVersionSnapshot(
 
   try {
     const refreshResult = await db.transaction(async (tx) => {
-      const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
-        columns: {
-          id: true,
-          activeVersion: true,
-        },
-        where: (table, { and, eq }) =>
-          and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
-      });
+      const [sandboxProfileVersion] = await tx
+        .select({
+          profileId: sandboxProfiles.id,
+          activeVersion: sandboxProfiles.activeVersion,
+          sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
+          version: sandboxProfileVersions.version,
+          state: sandboxProfileVersions.state,
+          snapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
+          snapshotImageId: sandboxProfileVersions.snapshotImageId,
+        })
+        .from(sandboxProfiles)
+        .leftJoin(
+          sandboxProfileVersions,
+          and(
+            eq(sandboxProfileVersions.sandboxProfileId, sandboxProfiles.id),
+            eq(sandboxProfileVersions.version, input.profileVersion),
+          ),
+        )
+        .where(
+          and(
+            eq(sandboxProfiles.id, input.profileId),
+            eq(sandboxProfiles.organizationId, input.organizationId),
+          ),
+        );
 
-      if (sandboxProfile === undefined) {
+      if (sandboxProfileVersion === undefined) {
         throw new SandboxProfilesNotFoundError(
           SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
           "Sandbox profile was not found.",
         );
       }
 
-      const sandboxProfileVersion = await tx.query.sandboxProfileVersions.findFirst({
-        columns: {
-          sandboxProfileId: true,
-          version: true,
-          state: true,
-          snapshotImageProvider: true,
-          snapshotImageId: true,
-        },
-        where: (table, { and, eq }) =>
-          and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
-      });
-
-      if (sandboxProfileVersion === undefined) {
+      if (sandboxProfileVersion.state === null) {
         throw new SandboxProfilesNotFoundError(
           SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
           "Sandbox profile version was not found.",
         );
+      }
+
+      const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
+      const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
+      if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
+        throw new Error("Expected joined sandbox profile version metadata to be present.");
       }
 
       if (
@@ -141,14 +154,14 @@ export async function refreshProfileVersionSnapshot(
 
       return {
         version: {
-          sandboxProfileId: sandboxProfileVersion.sandboxProfileId,
-          version: sandboxProfileVersion.version,
+          sandboxProfileId: resolvedSandboxProfileId,
+          version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
-          isActive: sandboxProfile.activeVersion === input.profileVersion,
+          isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable: true,
           latestSnapshotJob: snapshotJob,
         },
-        activeVersion: sandboxProfile.activeVersion,
+        activeVersion: sandboxProfileVersion.activeVersion,
         snapshotJob,
       };
     });
