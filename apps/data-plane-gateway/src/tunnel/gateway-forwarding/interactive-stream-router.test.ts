@@ -1,7 +1,10 @@
 import { systemClock } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
+import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
+import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
+import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
 import { StoreBackedSandboxOwnerResolver } from "../ownership/store-backed-sandbox-owner-resolver.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
@@ -54,6 +57,69 @@ describe("InteractiveStreamRouter", () => {
         channelKind: "agent",
         clientSessionId: "conn_1",
         clientStreamId: 7,
+        tunnelStreamId: 1,
+      },
+    });
+  });
+
+  it("routes using the active attached bootstrap session even when a separate owner lease was replaced", async () => {
+    const ownerStore = new InMemorySandboxOwnerStore(systemClock);
+    const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+    await ownerStore.claimOwner({
+      sandboxInstanceId: "sbi_test",
+      nodeId: "dpg_replacement",
+      sessionId: "sess_replacement",
+      ttlMs: 60_000,
+    });
+    await attachmentStore.upsertAttachment({
+      sandboxInstanceId: "sbi_test",
+      ownerLeaseId: "dtl_attached",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+      attachedAtMs: systemClock.nowMs(),
+      ttlMs: 60_000,
+      nowMs: systemClock.nowMs(),
+    });
+
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
+    registry.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+    const forwardingClient = new LocalGatewayForwardingClientAdapter(
+      "dpg_test",
+      new LocalGatewayForwardingServerAdapter(registry),
+    );
+    const router = new InteractiveStreamRouter(
+      "dpg_test",
+      new AttachmentBackedSandboxOwnerResolver(
+        "dpg_test",
+        createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+        systemClock,
+      ),
+      forwardingClient,
+    );
+
+    await expect(
+      router.openInteractiveStream({
+        sandboxInstanceId: "sbi_test",
+        channelKind: "agent",
+        clientSessionId: "conn_1",
+        clientStreamId: 8,
+      }),
+    ).resolves.toEqual({
+      bootstrapTarget: {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      binding: {
+        channelKind: "agent",
+        clientSessionId: "conn_1",
+        clientStreamId: 8,
         tunnelStreamId: 1,
       },
     });

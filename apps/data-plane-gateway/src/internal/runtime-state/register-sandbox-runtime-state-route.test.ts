@@ -2,6 +2,7 @@ import { systemClock } from "@mistle/time";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxKeepaliveStore } from "../../runtime-state/adapters/in-memory-sandbox-keepalive-store.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
@@ -31,11 +32,12 @@ function createTestApp(): {
     app,
     clock: systemClock,
     internalAuthServiceToken: InternalServiceToken,
+    activeBootstrapSessionStore: createAttachmentBackedActiveBootstrapSessionStore(
+      sandboxRuntimeAttachmentStore,
+    ),
     sandboxKeepaliveStore,
     sandboxPresenceStore,
     sandboxRuntimeReadinessStore,
-    sandboxRuntimeAttachmentStore,
-    sandboxOwnerStore,
   });
 
   return {
@@ -61,7 +63,7 @@ describe("registerSandboxRuntimeStateRoute", () => {
     });
   });
 
-  it("returns an empty runtime-state snapshot when no owner lease exists", async () => {
+  it("returns an empty runtime-state snapshot when no active bootstrap session exists", async () => {
     const { app } = createTestApp();
 
     const response = await app.request("/internal/sandbox-instances/sbi_test/runtime-state", {
@@ -86,18 +88,12 @@ describe("registerSandboxRuntimeStateRoute", () => {
     });
   });
 
-  it("returns the current owner lease id when one exists", async () => {
-    const { app, sandboxOwnerStore, sandboxRuntimeAttachmentStore } = createTestApp();
-    const owner = await sandboxOwnerStore.claimOwner({
-      sandboxInstanceId: "sbi_test",
-      nodeId: "dpg_test",
-      sessionId: "relay_test",
-      ttlMs: 30_000,
-    });
+  it("returns the active bootstrap session as both owner and attachment", async () => {
+    const { app, sandboxRuntimeAttachmentStore } = createTestApp();
     const attachedAtMs = systemClock.nowMs();
     await sandboxRuntimeAttachmentStore.upsertAttachment({
       sandboxInstanceId: "sbi_test",
-      ownerLeaseId: owner.leaseId,
+      ownerLeaseId: "dtl_active",
       nodeId: "dpg_test",
       sessionId: "relay_test",
       attachedAtMs,
@@ -113,10 +109,10 @@ describe("registerSandboxRuntimeStateRoute", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      ownerLeaseId: owner.leaseId,
+      ownerLeaseId: "dtl_active",
       attachment: {
         sandboxInstanceId: "sbi_test",
-        ownerLeaseId: owner.leaseId,
+        ownerLeaseId: "dtl_active",
         nodeId: "dpg_test",
         sessionId: "relay_test",
         attachedAtMs,
@@ -183,17 +179,20 @@ describe("registerSandboxRuntimeStateRoute", () => {
     });
   });
 
-  it("returns runtime readiness fenced to the current owner lease", async () => {
-    const { app, sandboxOwnerStore, sandboxRuntimeReadinessStore } = createTestApp();
-    const owner = await sandboxOwnerStore.claimOwner({
+  it("returns runtime readiness fenced to the active bootstrap session lease", async () => {
+    const { app, sandboxRuntimeAttachmentStore, sandboxRuntimeReadinessStore } = createTestApp();
+    await sandboxRuntimeAttachmentStore.upsertAttachment({
       sandboxInstanceId: "sbi_test",
+      ownerLeaseId: "dtl_active",
       nodeId: "dpg_test",
       sessionId: "relay_test",
+      attachedAtMs: systemClock.nowMs(),
       ttlMs: 30_000,
+      nowMs: systemClock.nowMs(),
     });
     await sandboxRuntimeReadinessStore.replaceStateForOwner({
       sandboxInstanceId: "sbi_test",
-      ownerLeaseId: owner.leaseId,
+      ownerLeaseId: "dtl_active",
       nodeId: "dpg_test",
       ready: true,
     });
@@ -206,8 +205,14 @@ describe("registerSandboxRuntimeStateRoute", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      ownerLeaseId: owner.leaseId,
-      attachment: null,
+      ownerLeaseId: "dtl_active",
+      attachment: {
+        sandboxInstanceId: "sbi_test",
+        ownerLeaseId: "dtl_active",
+        nodeId: "dpg_test",
+        sessionId: "relay_test",
+        attachedAtMs: expect.any(Number),
+      },
       presence: {
         activeCount: 0,
       },

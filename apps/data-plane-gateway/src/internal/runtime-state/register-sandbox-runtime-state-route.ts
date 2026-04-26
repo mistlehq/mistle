@@ -1,10 +1,9 @@
 import type { Clock } from "@mistle/time";
 
+import type { ActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
 import type { SandboxKeepaliveStore } from "../../runtime-state/sandbox-keepalive-store.js";
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
-import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxRuntimeReadinessStore } from "../../runtime-state/sandbox-runtime-readiness-store.js";
-import type { SandboxOwnerStore } from "../../tunnel/ownership/sandbox-owner-store.js";
 import type { DataPlaneGatewayApp } from "../../types.js";
 
 const DataPlaneInternalAuthHeader = "x-mistle-service-token";
@@ -14,11 +13,10 @@ type RegisterSandboxRuntimeStateRouteInput = {
   app: DataPlaneGatewayApp;
   clock: Clock;
   internalAuthServiceToken: string;
+  activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
-  sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
-  sandboxOwnerStore: SandboxOwnerStore;
 };
 
 /**
@@ -27,8 +25,7 @@ type RegisterSandboxRuntimeStateRouteInput = {
  * This route is authenticated with the shared internal service token and
  * The gateway remains the sole owner of runtime-state backend selection, so
  * workers read owner, attachment, presence, keepalive, and runtime-readiness summaries through
- * this route regardless of
- * whether the gateway is running in `memory` or `valkey` mode.
+ * this route regardless of whether the gateway is running in `memory` or `valkey` mode.
  */
 export function registerSandboxRuntimeStateRoute(
   input: RegisterSandboxRuntimeStateRouteInput,
@@ -60,14 +57,11 @@ export function registerSandboxRuntimeStateRoute(
     }
 
     const nowMs = input.clock.nowMs();
-    const owner = await input.sandboxOwnerStore.getOwner({
+    const activeSession = await input.activeBootstrapSessionStore.getActiveSession({
       sandboxInstanceId,
+      nowMs,
     });
-    const [attachment, activePresenceCount, keepaliveSummary, runtimeSummary] = await Promise.all([
-      input.sandboxRuntimeAttachmentStore.getAttachment({
-        sandboxInstanceId,
-        nowMs,
-      }),
+    const [activePresenceCount, keepaliveSummary, runtimeSummary] = await Promise.all([
       input.sandboxPresenceStore.countActiveLeases({
         sandboxInstanceId,
         nowMs,
@@ -78,14 +72,14 @@ export function registerSandboxRuntimeStateRoute(
       }),
       input.sandboxRuntimeReadinessStore.summarize({
         sandboxInstanceId,
-        ownerLeaseId: owner?.leaseId ?? null,
+        ownerLeaseId: activeSession?.ownerLeaseId ?? null,
       }),
     ]);
 
     return ctx.json(
       {
-        ownerLeaseId: owner?.leaseId ?? null,
-        attachment,
+        ownerLeaseId: activeSession?.ownerLeaseId ?? null,
+        attachment: activeSession,
         presence: {
           activeCount: activePresenceCount,
         },
