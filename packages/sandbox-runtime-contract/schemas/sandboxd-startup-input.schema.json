@@ -50,6 +50,21 @@
               },
               "required": ["source", "imageRef"],
               "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "const": "snapshot"
+                },
+                "imageRef": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": ["source", "imageRef"],
+              "additionalProperties": false
             }
           ]
         },

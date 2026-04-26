@@ -1120,13 +1120,6 @@ export interface paths {
                 image:
                   | {
                       imageRef: string;
-                      sandboxProfileId: string;
-                      /** @enum {string} */
-                      source: "profile-base";
-                      version: number;
-                    }
-                  | {
-                      imageRef: string;
                       /** @enum {string} */
                       source: "base";
                     }

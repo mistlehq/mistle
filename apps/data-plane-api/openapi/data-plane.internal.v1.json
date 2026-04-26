@@ -195,29 +195,6 @@
                             "properties": {
                               "source": {
                                 "type": "string",
-                                "enum": ["profile-base"]
-                              },
-                              "imageRef": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "sandboxProfileId": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "version": {
-                                "type": "integer",
-                                "minimum": 1
-                              }
-                            },
-                            "required": ["source", "imageRef", "sandboxProfileId", "version"],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "source": {
-                                "type": "string",
                                 "enum": ["base"]
                               },
                               "imageRef": {
@@ -1871,29 +1848,6 @@
                         },
                         "image": {
                           "oneOf": [
-                            {
-                              "type": "object",
-                              "properties": {
-                                "source": {
-                                  "type": "string",
-                                  "enum": ["profile-base"]
-                                },
-                                "imageRef": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "sandboxProfileId": {
-                                  "type": "string",
-                                  "minLength": 1
-                                },
-                                "version": {
-                                  "type": "integer",
-                                  "minimum": 1
-                                }
-                              },
-                              "required": ["source", "imageRef", "sandboxProfileId", "version"],
-                              "additionalProperties": false
-                            },
                             {
                               "type": "object",
                               "properties": {
