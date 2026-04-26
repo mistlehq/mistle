@@ -13,6 +13,7 @@ import {
 import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../../runtime-state/durations.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
@@ -334,6 +335,127 @@ async function createDisconnectTestHarness() {
 }
 
 describe("TunnelSessionService", () => {
+  it("renews the active owner lease while the bootstrap attachment remains healthy", async () => {
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    const ownerStore = new InMemorySandboxOwnerStore(clock);
+    const relayCoordinator = new TunnelRelayCoordinator(
+      GatewayNodeId,
+      new InMemoryLocalPeerRegistryAdapter(),
+      new InMemoryRelayTransportAdapter(GatewayNodeId),
+    );
+    const tunnelSessionRegistry = new TunnelSessionRegistry(
+      new InMemoryTunnelSessionRegistryAdapter(),
+    );
+    const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
+    const interactiveStreamRouter = new InteractiveStreamRouter(
+      GatewayNodeId,
+      new AttachmentBackedSandboxOwnerResolver(
+        GatewayNodeId,
+        createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+        clock,
+      ),
+      new LocalGatewayForwardingClientAdapter(
+        GatewayNodeId,
+        new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+      ),
+    );
+    const service = new TunnelSessionService(
+      GatewayNodeId,
+      interactiveStreamRouter,
+      relayCoordinator,
+      tunnelSessionRegistry,
+      ownerStore,
+      new InMemorySandboxPresenceStore(clock),
+      attachmentStore,
+      new SandboxInstanceDeadlineService(
+        {
+          async putSandboxInstanceDeadline(input) {
+            return {
+              status: "accepted",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+              generation: 1,
+              workflowRunId: "owfr_test",
+            } satisfies PutSandboxInstanceDeadlineAcceptedResponse;
+          },
+          async deleteSandboxInstanceDeadline(input) {
+            return {
+              status: "ok",
+              sandboxInstanceId: input.sandboxInstanceId,
+              kind: input.kind,
+            };
+          },
+        },
+        clock,
+        DefaultDataPlaneGatewayLifecycleDurations,
+      ),
+      clock,
+      scheduler,
+    );
+
+    const bootstrapPair = await createWebSocketPair();
+    openPairs.add(bootstrapPair);
+
+    const attachedPeer = service.attachBootstrapPeer({
+      leaseId: OwnerLeaseId,
+      onFatalError: () => {
+        throw new Error("Bootstrap attach should not fail in this test.");
+      },
+      onLeaseLost: () => {
+        throw new Error("Bootstrap lease should not be lost in this test.");
+      },
+      onTransportUnhealthy: () => {
+        throw new Error("Bootstrap transport should remain healthy in this test.");
+      },
+      ownerLeaseTtlMs: 60_000,
+      relaySessionId: BootstrapSessionId,
+      sandboxInstanceId: SandboxInstanceId,
+      socket: bootstrapPair.peerSocket,
+    });
+
+    let owner = await ownerStore.getOwner({
+      sandboxInstanceId: SandboxInstanceId,
+    });
+    let attachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    for (
+      let attempt = 0;
+      (owner?.leaseId !== OwnerLeaseId ||
+        attachment?.ownerLeaseId !== OwnerLeaseId ||
+        attachedPeer.leaseHeartbeatHandle === undefined) &&
+      attempt < 10;
+      attempt += 1
+    ) {
+      await Promise.resolve();
+      owner = await ownerStore.getOwner({
+        sandboxInstanceId: SandboxInstanceId,
+      });
+      attachment = await attachmentStore.getAttachment({
+        sandboxInstanceId: SandboxInstanceId,
+        nowMs: clock.nowMs(),
+      });
+    }
+    expect(owner?.leaseId).toBe(OwnerLeaseId);
+    expect(attachment?.ownerLeaseId).toBe(OwnerLeaseId);
+    expect(attachedPeer.leaseHeartbeatHandle).toBeDefined();
+    expect(owner?.expiresAt.toISOString()).toBe(new Date(61_000).toISOString());
+
+    clock.advanceMs(OWNER_LEASE_RENEW_INTERVAL_MS);
+    scheduler.runDue();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    const renewedOwner = await ownerStore.getOwner({
+      sandboxInstanceId: SandboxInstanceId,
+    });
+    expect(renewedOwner?.leaseId).toBe(OwnerLeaseId);
+    expect(renewedOwner?.expiresAt.toISOString()).toBe(new Date(71_000).toISOString());
+  });
+
   it("closes only the bootstrap peer when presence deadline persistence fails", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);

@@ -1,9 +1,10 @@
 /**
- * A worker-readable record of the current bootstrap attachment for a sandbox.
+ * A worker-readable record of the current active bootstrap session for a sandbox.
  *
- * This record is derived from an active bootstrap connection. It is not a
- * second source of truth for ownership and must remain fenced by the owner
- * lease that established it.
+ * This record is derived from a live bootstrap attachment and is the
+ * authoritative visible runtime session for routing and runtime-state reads.
+ * Implementations must fence writes and clears by the owner lease that
+ * established it so stale sessions cannot overwrite newer ones.
  */
 export type SandboxRuntimeAttachment = {
   sandboxInstanceId: string;

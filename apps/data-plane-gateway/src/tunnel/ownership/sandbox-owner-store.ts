@@ -1,11 +1,13 @@
 import type { SandboxOwner } from "./types.js";
 
 /**
- * Stores the authoritative owner lease for a sandbox instance.
+ * Stores the fenced owner lease used to coordinate bootstrap activation and
+ * exclusivity across gateway nodes.
  *
- * Ownership is exclusive: at most one gateway node may hold the active lease
- * for a given sandbox instance at a time. Implementations must fence renew and
- * release operations by `leaseId` so a stale owner cannot mutate a newer lease.
+ * The visible active bootstrap session lives in runtime attachment state. This
+ * lease store exists to prevent concurrent bootstrap activation races and must
+ * fence renew and release operations by `leaseId` so a stale owner cannot
+ * mutate a newer lease.
  */
 export interface SandboxOwnerStore {
   /**

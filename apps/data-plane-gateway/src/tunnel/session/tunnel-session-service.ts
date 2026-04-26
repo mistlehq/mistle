@@ -494,6 +494,18 @@ export class TunnelSessionService {
     });
   }
 
+  private async renewActiveOwnerLease(input: {
+    leaseId: string;
+    sandboxInstanceId: string;
+    ttlMs: number;
+  }): Promise<boolean> {
+    return this.sandboxOwnerStore.renewOwnerLease({
+      sandboxInstanceId: input.sandboxInstanceId,
+      leaseId: input.leaseId,
+      ttlMs: input.ttlMs,
+    });
+  }
+
   private async activateBootstrapAttachment(input: {
     attachedAtMs: number;
     attachedPeer: AttachedTunnelPeer;
@@ -669,6 +681,18 @@ export class TunnelSessionService {
         }
 
         if (input.websocketHealthHandle?.isHealthy() === true || currentAttachment === null) {
+          const renewed = await this.renewActiveOwnerLease({
+            leaseId: input.leaseId,
+            sandboxInstanceId: input.sandboxInstanceId,
+            ttlMs: input.ttlMs,
+          });
+          if (!renewed) {
+            stopped = true;
+            scheduledHandle = undefined;
+            input.onLeaseLost();
+            return;
+          }
+
           await this.refreshRuntimeAttachment({
             attachedAtMs: input.attachedAtMs,
             leaseId: input.leaseId,
