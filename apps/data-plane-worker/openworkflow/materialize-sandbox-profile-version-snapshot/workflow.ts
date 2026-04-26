@@ -28,6 +28,7 @@ import { startSandbox } from "../start-sandbox-instance/start-sandbox.js";
 import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 
 const SnapshotMaterializationFailureCodes = {
+  RUNTIME_PLAN_COMPILE_FAILED: "snapshot_runtime_plan_compile_failed",
   SANDBOX_START_FAILED: "snapshot_sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "snapshot_persist_provisioning_metadata_failed",
   SANDBOX_INIT_FAILED: "snapshot_sandbox_init_failed",
@@ -96,6 +97,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
   let sandboxDestroyed = false;
   let currentPhase:
     | "claim"
+    | "compile"
     | "ensure"
     | "start"
     | "persist"
@@ -260,6 +262,25 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
   }
 
   try {
+    currentPhase = "compile";
+    const compiledRuntimePlan = await step.run(
+      { name: "compile-snapshot-runtime-plan" },
+      async () => {
+        const compileResult =
+          await ctx.controlPlaneInternalClient.compileSandboxProfileVersionRuntimePlan({
+            organizationId: workflowInput.organizationId,
+            profileId: workflowInput.sandboxProfileId,
+            profileVersion: workflowInput.sandboxProfileVersion,
+            image: {
+              imageId: workflowInput.image.imageId,
+              kind: workflowInput.image.kind,
+            },
+          });
+
+        return compileResult.runtimePlan;
+      },
+    );
+
     currentPhase = "ensure";
     await step.run({ name: "ensure-snapshot-sandbox-instance" }, async () => {
       await ensureSandboxInstance(
@@ -308,7 +329,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
-          runtimePlan: workflowInput.runtimePlan,
+          runtimePlan: compiledRuntimePlan,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
           providerSandboxId: startedSandbox.providerSandboxId,
@@ -329,7 +350,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           providerSandboxId: startedSandbox.providerSandboxId,
           startupMode: SandboxStartupModes.NEW,
           executionMode: SandboxExecutionModes.SNAPSHOT,
-          runtimePlan: workflowInput.runtimePlan,
+          runtimePlan: compiledRuntimePlan,
         },
       );
     });
@@ -420,6 +441,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
 function mapSnapshotFailure(input: {
   phase:
     | "claim"
+    | "compile"
     | "ensure"
     | "start"
     | "persist"
@@ -433,6 +455,13 @@ function mapSnapshotFailure(input: {
   failureCode: string;
   summary: string;
 } {
+  if (input.phase === "compile") {
+    return {
+      failureCode: SnapshotMaterializationFailureCodes.RUNTIME_PLAN_COMPILE_FAILED,
+      summary: "Failed to compile snapshot runtime plan.",
+    };
+  }
+
   if (input.phase === "start") {
     return {
       failureCode: SnapshotMaterializationFailureCodes.SANDBOX_START_FAILED,
