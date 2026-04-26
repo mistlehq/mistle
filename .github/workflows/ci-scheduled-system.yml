@@ -84,6 +84,7 @@ jobs:
     name: Scheduled System (e2b)
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    if: ${{ always() && !cancelled() }}
     needs:
       - system-docker
     env:
