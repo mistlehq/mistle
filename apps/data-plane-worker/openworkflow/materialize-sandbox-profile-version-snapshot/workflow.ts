@@ -338,7 +338,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
           providerSandboxId: startedSandbox.providerSandboxId,
           startupMode: SandboxStartupModes.NEW,
-          executionMode: SandboxExecutionModes.SNAPSHOT_MATERIALIZATION,
+          executionMode: SandboxExecutionModes.SNAPSHOT,
           runtimePlan: workflowInput.runtimePlan,
         },
       );
