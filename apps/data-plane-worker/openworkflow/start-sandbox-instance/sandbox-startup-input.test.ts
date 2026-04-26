@@ -13,18 +13,10 @@ const Decoder = new TextDecoder();
 const RuntimePlanSchema = z.object({
   sandboxProfileId: z.string().min(1),
   version: z.number().int(),
-  image: z.discriminatedUnion("source", [
-    z.object({
-      source: z.literal("profile-base"),
-      imageRef: z.string().min(1),
-      sandboxProfileId: z.string().min(1),
-      version: z.number().int(),
-    }),
-    z.object({
-      source: z.literal("base"),
-      imageRef: z.string().min(1),
-    }),
-  ]),
+  image: z.object({
+    source: z.literal("base"),
+    imageRef: z.string().min(1),
+  }),
   setupScript: z.string().min(1).optional(),
   egressRoutes: z.array(
     z.object({

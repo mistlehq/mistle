@@ -6,22 +6,12 @@ import {
   type CompiledRuntimePlan,
 } from "../types/index.js";
 
-const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
-  z
-    .object({
-      source: z.literal(SandboxImageSources.PROFILE_BASE),
-      imageRef: z.string().min(1),
-      sandboxProfileId: z.string().min(1),
-      version: z.number().int().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      source: z.literal(SandboxImageSources.BASE),
-      imageRef: z.string().min(1),
-    })
-    .strict(),
-]);
+const ResolvedSandboxImageSchema = z
+  .object({
+    source: z.literal(SandboxImageSources.BASE),
+    imageRef: z.string().min(1),
+  })
+  .strict();
 
 const EgressCredentialResolverSchema = z.discriminatedUnion("kind", [
   z

@@ -41,46 +41,7 @@
               "properties": {
                 "source": {
                   "type": "string",
-                  "const": "profile-base"
-                },
-                "imageRef": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "sandboxProfileId": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "version": {
-                  "type": "integer",
-                  "minimum": 1,
-                  "maximum": 9007199254740991
-                }
-              },
-              "required": ["source", "imageRef", "sandboxProfileId", "version"],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "source": {
-                  "type": "string",
                   "const": "base"
-                },
-                "imageRef": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              },
-              "required": ["source", "imageRef"],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "source": {
-                  "type": "string",
-                  "const": "snapshot"
                 },
                 "imageRef": {
                   "type": "string",
