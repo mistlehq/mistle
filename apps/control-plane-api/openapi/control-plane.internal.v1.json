@@ -993,9 +993,20 @@
         }
       }
     },
-    "/internal/snapshot-jobs/mark-succeeded": {
+    "/internal/snapshot-jobs/{jobId}/succeed": {
       "post": {
         "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1003,10 +1014,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "snapshotJobId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
                   "workflowRunId": {
                     "type": "string",
                     "minLength": 1
@@ -1027,7 +1034,7 @@
                     "additionalProperties": false
                   }
                 },
-                "required": ["snapshotJobId", "workflowRunId", "image"],
+                "required": ["workflowRunId", "image"],
                 "additionalProperties": false
               }
             }
@@ -1154,9 +1161,20 @@
         }
       }
     },
-    "/internal/snapshot-jobs/mark-failed": {
+    "/internal/snapshot-jobs/{jobId}/fail": {
       "post": {
         "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1164,10 +1182,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "snapshotJobId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
                   "workflowRunId": {
                     "type": "string",
                     "minLength": 1
@@ -1181,7 +1195,7 @@
                     "minLength": 1
                   }
                 },
-                "required": ["snapshotJobId", "workflowRunId", "errorCode", "errorMessage"],
+                "required": ["workflowRunId", "errorCode", "errorMessage"],
                 "additionalProperties": false
               }
             }

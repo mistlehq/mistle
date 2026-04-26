@@ -10,6 +10,12 @@ export const ClaimSandboxProfileVersionSnapshotJobParamsSchema = z
   })
   .strict();
 
+export const SandboxProfileVersionSnapshotJobParamsSchema = z
+  .object({
+    jobId: z.string().min(1),
+  })
+  .strict();
+
 export const ClaimSandboxProfileVersionSnapshotJobRequestSchema = z
   .object({
     workflowRunId: z.string().min(1),
@@ -25,7 +31,6 @@ export const SandboxProfileVersionSnapshotJobCandidateImageSchema = z
 
 export const MarkSandboxProfileVersionSnapshotJobSucceededRequestSchema = z
   .object({
-    snapshotJobId: z.string().min(1),
     workflowRunId: z.string().min(1),
     image: SandboxProfileVersionSnapshotJobCandidateImageSchema,
   })
@@ -33,7 +38,6 @@ export const MarkSandboxProfileVersionSnapshotJobSucceededRequestSchema = z
 
 export const MarkSandboxProfileVersionSnapshotJobFailedRequestSchema = z
   .object({
-    snapshotJobId: z.string().min(1),
     workflowRunId: z.string().min(1),
     errorCode: z.string().min(1),
     errorMessage: z.string().min(1),

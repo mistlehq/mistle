@@ -6,14 +6,16 @@ import {
   InternalSandboxProfileVersionSnapshotJobNotFoundResponseSchema,
   InternalSandboxProfileVersionSnapshotJobsBadRequestResponseSchema,
   MarkSandboxProfileVersionSnapshotJobFailedRequestSchema,
+  SandboxProfileVersionSnapshotJobParamsSchema,
   SandboxProfileVersionSnapshotJobOkResponseSchema,
 } from "../schemas.js";
 
 export const route = createRoute({
   method: "post",
-  path: "/mark-failed",
+  path: "/:jobId/fail",
   tags: ["Internal"],
   request: {
+    params: SandboxProfileVersionSnapshotJobParamsSchema,
     body: {
       required: true,
       content: {

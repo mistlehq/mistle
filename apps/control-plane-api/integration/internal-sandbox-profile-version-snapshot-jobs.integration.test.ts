@@ -120,7 +120,7 @@ describe("internal sandbox profile version snapshot jobs integration", () => {
     });
 
     const response = await fixture.request(
-      `${INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH}/mark-succeeded`,
+      `${INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH}/ssj_internal_snapshot_success/succeed`,
       {
         method: "POST",
         headers: {
@@ -128,7 +128,6 @@ describe("internal sandbox profile version snapshot jobs integration", () => {
           [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
         },
         body: JSON.stringify({
-          snapshotJobId: "ssj_internal_snapshot_success",
           workflowRunId: "wf_internal_snapshot_success",
           image: {
             provider: "docker",
@@ -189,7 +188,7 @@ describe("internal sandbox profile version snapshot jobs integration", () => {
     });
 
     const response = await fixture.request(
-      `${INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH}/mark-failed`,
+      `${INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH}/ssj_internal_snapshot_failure/fail`,
       {
         method: "POST",
         headers: {
@@ -197,7 +196,6 @@ describe("internal sandbox profile version snapshot jobs integration", () => {
           [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
         },
         body: JSON.stringify({
-          snapshotJobId: "ssj_internal_snapshot_failure",
           workflowRunId: "wf_internal_snapshot_failure",
           errorCode: "snapshot_capture_failed",
           errorMessage: "Failed to capture snapshot image.",

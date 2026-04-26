@@ -81,14 +81,21 @@ export type ClaimSandboxProfileVersionSnapshotJobInput = {
 };
 export type ClaimSandboxProfileVersionSnapshotJobOutput =
   paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["responses"]["200"]["content"]["application/json"];
-export type MarkSandboxProfileVersionSnapshotJobSucceededInput =
-  paths["/internal/snapshot-jobs/mark-succeeded"]["post"]["requestBody"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobSucceededInput = {
+  snapshotJobId: string;
+  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+  image: paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["requestBody"]["content"]["application/json"]["image"];
+};
 export type MarkSandboxProfileVersionSnapshotJobSucceededOutput =
-  paths["/internal/snapshot-jobs/mark-succeeded"]["post"]["responses"]["200"]["content"]["application/json"];
-export type MarkSandboxProfileVersionSnapshotJobFailedInput =
-  paths["/internal/snapshot-jobs/mark-failed"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["responses"]["200"]["content"]["application/json"];
+export type MarkSandboxProfileVersionSnapshotJobFailedInput = {
+  snapshotJobId: string;
+  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+  errorCode: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["errorCode"];
+  errorMessage: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["errorMessage"];
+};
 export type MarkSandboxProfileVersionSnapshotJobFailedOutput =
-  paths["/internal/snapshot-jobs/mark-failed"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["responses"]["200"]["content"]["application/json"];
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -432,8 +439,16 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobSucceeded(
     input: MarkSandboxProfileVersionSnapshotJobSucceededInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobSucceededOutput> {
-    const result = await this.#client.POST("/internal/snapshot-jobs/mark-succeeded", {
-      body: input,
+    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/succeed", {
+      params: {
+        path: {
+          jobId: input.snapshotJobId,
+        },
+      },
+      body: {
+        workflowRunId: input.workflowRunId,
+        image: input.image,
+      },
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -451,8 +466,17 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobFailed(
     input: MarkSandboxProfileVersionSnapshotJobFailedInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobFailedOutput> {
-    const result = await this.#client.POST("/internal/snapshot-jobs/mark-failed", {
-      body: input,
+    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/fail", {
+      params: {
+        path: {
+          jobId: input.snapshotJobId,
+        },
+      },
+      body: {
+        workflowRunId: input.workflowRunId,
+        errorCode: input.errorCode,
+        errorMessage: input.errorMessage,
+      },
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 

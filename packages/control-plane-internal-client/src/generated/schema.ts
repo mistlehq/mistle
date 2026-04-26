@@ -621,11 +621,13 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/snapshot-jobs/mark-failed": {
+  "/internal/snapshot-jobs/{jobId}/fail": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        jobId: string;
+      };
       cookie?: never;
     };
     get?: never;
@@ -634,7 +636,9 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          jobId: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -642,7 +646,6 @@ export interface paths {
           "application/json": {
             errorCode: string;
             errorMessage: string;
-            snapshotJobId: string;
             workflowRunId: string;
           };
         };
@@ -729,11 +732,13 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/snapshot-jobs/mark-succeeded": {
+  "/internal/snapshot-jobs/{jobId}/succeed": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        jobId: string;
+      };
       cookie?: never;
     };
     get?: never;
@@ -742,7 +747,9 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          jobId: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -752,7 +759,6 @@ export interface paths {
               imageId: string;
               provider: string;
             };
-            snapshotJobId: string;
             workflowRunId: string;
           };
         };
