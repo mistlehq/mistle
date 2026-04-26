@@ -4,20 +4,13 @@ import {
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
 
+import { buildIntegrationWebhookCallbackUrl } from "../../shared/webhook-callback-url.server.js";
 import type { GitHubConnectionConfig } from "./auth.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
 function isGitHubAppInstallationConnection(connection: GitHubConnectionConfig): boolean {
   return connection.connection_method === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
-}
-
-export function buildGitHubWebhookCallbackUrl(input: {
-  controlPlaneBaseUrl: string;
-  targetKey: string;
-  endpointKey: string;
-}): string {
-  return `${input.controlPlaneBaseUrl}/p/integration/webhooks/${input.targetKey}/${input.endpointKey}`;
 }
 
 export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
@@ -37,7 +30,7 @@ export const GitHubWebhookSourceCapability: IntegrationWebhookSourceCapability<
 
     return {
       displayName: input.source.displayName ?? "GitHub App webhook",
-      callbackUrl: buildGitHubWebhookCallbackUrl({
+      callbackUrl: buildIntegrationWebhookCallbackUrl({
         controlPlaneBaseUrl: input.controlPlaneBaseUrl,
         targetKey: input.targetKey,
         endpointKey,

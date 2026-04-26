@@ -2,23 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { JiraConnectionMethodIds } from "./auth.js";
 import {
-  buildJiraWebhookCallbackUrl,
   JiraWebhookSourceCapability,
   resolveJiraAdminWebhookIdFromSelf,
   resolveJiraAdminWebhookRegistrationOrThrow,
 } from "./webhook-source.server.js";
 
 describe("jira webhook source helpers", () => {
-  it("builds a source-keyed control-plane callback URL", () => {
-    expect(
-      buildJiraWebhookCallbackUrl({
-        controlPlaneBaseUrl: "https://control-plane.mistle.test",
-        targetKey: "jira-default",
-        endpointKey: "ep_jira_123",
-      }),
-    ).toBe("https://control-plane.mistle.test/p/integration/webhooks/jira-default/ep_jira_123");
-  });
-
   it("extracts Jira registration credentials from personal-token connections", () => {
     expect(
       resolveJiraAdminWebhookRegistrationOrThrow({

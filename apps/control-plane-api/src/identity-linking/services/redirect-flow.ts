@@ -1,4 +1,5 @@
 import { identityLinkRedirectSessions, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
@@ -19,10 +20,10 @@ export function buildIdentityLinkCallbackUrl(input: {
   controlPlaneBaseUrl: string;
   providerFamily: string;
 }): string {
-  return new URL(
-    `/p/identity-linking/callbacks/${encodeURIComponent(input.providerFamily)}`,
+  return buildUrlWithPath(
     input.controlPlaneBaseUrl,
-  ).toString();
+    `/p/identity-linking/callbacks/${encodeURIComponent(input.providerFamily)}`,
+  );
 }
 
 export function buildIdentityLinkResultDashboardUrl(input: {

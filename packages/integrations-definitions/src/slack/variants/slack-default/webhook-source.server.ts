@@ -3,17 +3,10 @@ import {
   type IntegrationWebhookSourceCapability,
 } from "@mistle/integrations-core";
 
+import { buildIntegrationWebhookCallbackUrl } from "../../../shared/webhook-callback-url.server.js";
 import type { SlackConnectionConfig } from "./auth.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 import type { SlackTargetSecrets } from "./target-secret-schema.js";
-
-export function buildSlackWebhookCallbackUrl(input: {
-  controlPlaneBaseUrl: string;
-  targetKey: string;
-  endpointKey: string;
-}): string {
-  return `${input.controlPlaneBaseUrl}/p/integration/webhooks/${input.targetKey}/${input.endpointKey}`;
-}
 
 export const SlackWebhookSourceCapability: IntegrationWebhookSourceCapability<
   SlackTargetConfig,
@@ -29,7 +22,7 @@ export const SlackWebhookSourceCapability: IntegrationWebhookSourceCapability<
 
     return {
       displayName: input.source.displayName ?? "Slack Events API webhook",
-      callbackUrl: buildSlackWebhookCallbackUrl({
+      callbackUrl: buildIntegrationWebhookCallbackUrl({
         controlPlaneBaseUrl: input.controlPlaneBaseUrl,
         targetKey: input.targetKey,
         endpointKey,

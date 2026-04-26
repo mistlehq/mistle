@@ -3,6 +3,7 @@ import type { IntegrationWebhookSourceCapability } from "@mistle/integrations-co
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import { buildIntegrationWebhookCallbackUrl } from "../../../shared/webhook-callback-url.server.js";
 import {
   type JiraConnectionConfig,
   JiraPersonalApiTokenConnectionConfigSchema,
@@ -22,14 +23,6 @@ const JiraAdminWebhookResponseSchema = z
     lastUpdated: z.number().optional(),
   })
   .loose();
-
-export function buildJiraWebhookCallbackUrl(input: {
-  controlPlaneBaseUrl: string;
-  targetKey: string;
-  endpointKey: string;
-}): string {
-  return `${input.controlPlaneBaseUrl}/p/integration/webhooks/${input.targetKey}/${input.endpointKey}`;
-}
 
 export function resolveJiraAdminWebhookRegistrationOrThrow(input: {
   connectionConfig: Record<string, unknown>;
@@ -143,7 +136,7 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
 
     return {
       displayName: input.source.displayName ?? "Webhook",
-      callbackUrl: buildJiraWebhookCallbackUrl({
+      callbackUrl: buildIntegrationWebhookCallbackUrl({
         controlPlaneBaseUrl: input.controlPlaneBaseUrl,
         targetKey: input.targetKey,
         endpointKey,
@@ -176,7 +169,7 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
       connectionConfig: connection.config,
       connectionSecrets,
     });
-    const callbackUrl = buildJiraWebhookCallbackUrl({
+    const callbackUrl = buildIntegrationWebhookCallbackUrl({
       controlPlaneBaseUrl: input.controlPlaneBaseUrl,
       targetKey: input.targetKey,
       endpointKey,

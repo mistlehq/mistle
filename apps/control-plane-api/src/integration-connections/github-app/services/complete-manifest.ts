@@ -5,6 +5,7 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
@@ -33,7 +34,6 @@ import {
   resolveGitHubAppManifestConnectionId,
   resolveRequiredRedirectQueryParamOrThrow,
 } from "../../services/redirect-flow.js";
-import { buildUrlWithPath } from "../../services/url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionWithTargetOrThrow,

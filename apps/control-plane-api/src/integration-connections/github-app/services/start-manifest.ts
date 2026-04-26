@@ -1,4 +1,5 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 
@@ -10,7 +11,6 @@ import {
   encodeGitHubAppManifestStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
-import { buildUrlWithPath } from "../../services/url-path.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
@@ -71,17 +71,17 @@ function buildGitHubAppManifest(input: {
       active: true,
       url: input.webhookCallbackUrl,
     },
-    redirect_url: new URL(
+    redirect_url: buildUrlWithPath(
+      input.controlPlaneBaseUrl,
       "/p/integration/callbacks/github-app-manifest",
-      input.controlPlaneBaseUrl,
-    ).toString(),
+    ),
     callback_urls: [
-      new URL("/p/identity-linking/callbacks/github", input.controlPlaneBaseUrl).toString(),
+      buildUrlWithPath(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
     ],
-    setup_url: new URL(
-      "/p/integration/callbacks/github-app-installation",
+    setup_url: buildUrlWithPath(
       input.controlPlaneBaseUrl,
-    ).toString(),
+      "/p/integration/callbacks/github-app-installation",
+    ),
   };
 }
 

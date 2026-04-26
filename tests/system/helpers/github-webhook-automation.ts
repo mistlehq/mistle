@@ -7,6 +7,7 @@ import {
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
+import { buildIntegrationWebhookCallbackUrl } from "@mistle/integrations-definitions/server";
 import { readTestContext, writeTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
@@ -269,18 +270,6 @@ export function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string):
 function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
   return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
-}
-
-function buildGitHubWebhookCallbackUrl(input: {
-  publicHostname: string;
-  targetKey: string;
-  endpointKey: string;
-}): string {
-  const url = new URL(`https://${input.publicHostname}`);
-  url.pathname = `/p/integration/webhooks/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.endpointKey)}`;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
 }
 
 export function buildSandboxSessionLinkUrl(input: {
@@ -1463,8 +1452,8 @@ async function createSharedGitHubWebhookAutomationHarness(
     });
 
     originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
-    const expectedWebhookCallbackUrl = buildGitHubWebhookCallbackUrl({
-      publicHostname,
+    const expectedWebhookCallbackUrl = buildIntegrationWebhookCallbackUrl({
+      controlPlaneBaseUrl: `https://${publicHostname}`,
       targetKey: GitHubTargetKey,
       endpointKey: githubWebhookSource.endpointKey,
     });
