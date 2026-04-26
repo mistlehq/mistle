@@ -28,6 +28,7 @@ const HopByHopHeaderNames = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
+const BootstrapDisconnectedCloseReason = "Sandbox bootstrap tunnel disconnected.";
 
 type RepeatedHeaderValues = Record<string, string[]>;
 
@@ -525,26 +526,24 @@ export class PortAccessTransportService {
 
   public rejectPendingStreamsForSandbox(input: { sandboxInstanceId: string }): void {
     const activeStreams = this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
-    if (activeStreams === undefined) {
-      return;
-    }
-
-    this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
-    for (const [streamId, stream] of activeStreams) {
-      const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
-        input.sandboxInstanceId,
-      );
-      if (!stream.responseStarted) {
-        stream.rejectResponseStart(disconnectError);
+    if (activeStreams !== undefined) {
+      this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+      for (const [streamId, stream] of activeStreams) {
+        const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
+          input.sandboxInstanceId,
+        );
+        if (!stream.responseStarted) {
+          stream.rejectResponseStart(disconnectError);
+        }
+        void stream.responseBodyWriter.abort(disconnectError);
+        void this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          payload: JSON.stringify({
+            type: "ports.stream.close",
+            streamId,
+          }),
+        }).catch(() => undefined);
       }
-      void stream.responseBodyWriter.abort(disconnectError);
-      void this.forwardMessage({
-        sandboxInstanceId: input.sandboxInstanceId,
-        payload: JSON.stringify({
-          type: "ports.stream.close",
-          streamId,
-        }),
-      }).catch(() => undefined);
     }
 
     const activeWebSocketStreams = this.#activeWebSocketStreamsBySandboxInstanceId.get(
@@ -567,7 +566,7 @@ export class PortAccessTransportService {
       if (stream.socket !== undefined) {
         closeBrowserWebSocket(stream.socket, {
           code: 1011,
-          reason: disconnectError.message,
+          reason: BootstrapDisconnectedCloseReason,
         });
       }
       void this.forwardMessage({

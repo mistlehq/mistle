@@ -561,6 +561,88 @@ describe("port access websocket integration", () => {
     }
   });
 
+  it("closes accepted port access websockets when the bootstrap disconnects without any active HTTP streams", async ({
+    fixture,
+  }) => {
+    const sandboxInstanceId = "sbi_port_access_websocket_bootstrap_disconnect";
+    const port = 5173;
+    await insertSandboxInstanceRow({
+      fixture,
+      sandboxInstanceId,
+      testId: "port_access_websocket_bootstrap_disconnect",
+    });
+    const bootstrapSocket = await connectBootstrapSocket({
+      fixture,
+      sandboxInstanceId,
+      token: await mintValidBootstrapToken({
+        fixture,
+        sandboxInstanceId,
+      }),
+    });
+    const host = deriveAccessHost({
+      fixture,
+      sandboxInstanceId,
+      port,
+    });
+    const sessionToken = await mintSessionToken({
+      fixture,
+      sandboxInstanceId,
+      port,
+      host,
+    });
+    const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+    let accessSocket: WebSocket | undefined;
+
+    try {
+      const accessSocketPromise = connectPortAccessWebSocket({
+        cookieHeader: createCookieHeader(sessionToken),
+        fixture,
+        host,
+        path: "/socket/disconnect",
+      });
+
+      const openMessage = await withTimeout({
+        label: "waiting for ports.ws.open",
+        promise: messageQueue.next(),
+      });
+      if (openMessage.type !== "ports.ws.open") {
+        throw new Error("Expected ports.ws.open message.");
+      }
+
+      await sendWebSocketMessage(
+        bootstrapSocket,
+        JSON.stringify({
+          type: "ports.ws.accept",
+          streamId: openMessage.streamId,
+          headers: {},
+        }),
+      );
+
+      accessSocket = await withTimeout({
+        label: "waiting for browser websocket upgrade",
+        promise: accessSocketPromise,
+      });
+
+      const browserClosePromise = waitForWebSocketClose(accessSocket);
+      await closeWebSocket(bootstrapSocket);
+
+      await expect(
+        withTimeout({
+          label: "waiting for browser websocket close after bootstrap disconnect",
+          promise: browserClosePromise,
+        }),
+      ).resolves.toEqual({
+        code: 1011,
+        reason: "Sandbox bootstrap tunnel disconnected.",
+      });
+      accessSocket = undefined;
+    } finally {
+      messageQueue.close();
+      await closeWebSocketIfOpen(accessSocket);
+      await closeWebSocketIfOpen(bootstrapSocket);
+    }
+  });
+
   it("rejects the websocket upgrade with 401 when the port access session cookie is missing", async ({
     fixture,
   }) => {
