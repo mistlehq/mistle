@@ -840,7 +840,7 @@
         }
       }
     },
-    "/internal/snapshot-jobs/:jobId/claim": {
+    "/internal/snapshot-jobs/{jobId}/claim": {
       "post": {
         "tags": ["Internal"],
         "parameters": [
@@ -993,7 +993,7 @@
         }
       }
     },
-    "/internal/snapshot-jobs/:jobId/succeed": {
+    "/internal/snapshot-jobs/{jobId}/succeed": {
       "post": {
         "tags": ["Internal"],
         "parameters": [
@@ -1161,7 +1161,7 @@
         }
       }
     },
-    "/internal/snapshot-jobs/:jobId/fail": {
+    "/internal/snapshot-jobs/{jobId}/fail": {
       "post": {
         "tags": ["Internal"],
         "parameters": [

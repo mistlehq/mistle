@@ -12,7 +12,7 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/:jobId/claim",
+  path: "/{jobId}/claim",
   tags: ["Internal"],
   request: {
     params: ClaimSandboxProfileVersionSnapshotJobParamsSchema,

@@ -12,7 +12,7 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/:jobId/fail",
+  path: "/{jobId}/fail",
   tags: ["Internal"],
   request: {
     params: SandboxProfileVersionSnapshotJobParamsSchema,

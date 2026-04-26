@@ -81,25 +81,25 @@ export type RequestIntegrationConnectionResourceRefreshOutput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
 export type ClaimSandboxProfileVersionSnapshotJobInput = {
   snapshotJobId: string;
-  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+  workflowRunId: paths["/internal/snapshot-jobs/:jobId/claim"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
 };
 export type ClaimSandboxProfileVersionSnapshotJobOutput =
-  paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/:jobId/claim"]["post"]["responses"]["200"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobSucceededInput = {
   snapshotJobId: string;
-  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
-  image: paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["requestBody"]["content"]["application/json"]["image"];
+  workflowRunId: paths["/internal/snapshot-jobs/:jobId/succeed"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+  image: paths["/internal/snapshot-jobs/:jobId/succeed"]["post"]["requestBody"]["content"]["application/json"]["image"];
 };
 export type MarkSandboxProfileVersionSnapshotJobSucceededOutput =
-  paths["/internal/snapshot-jobs/{jobId}/succeed"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/:jobId/succeed"]["post"]["responses"]["200"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobFailedInput = {
   snapshotJobId: string;
-  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
-  errorCode: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["errorCode"];
-  errorMessage: paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["requestBody"]["content"]["application/json"]["errorMessage"];
+  workflowRunId: paths["/internal/snapshot-jobs/:jobId/fail"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+  errorCode: paths["/internal/snapshot-jobs/:jobId/fail"]["post"]["requestBody"]["content"]["application/json"]["errorCode"];
+  errorMessage: paths["/internal/snapshot-jobs/:jobId/fail"]["post"]["requestBody"]["content"]["application/json"]["errorMessage"];
 };
 export type MarkSandboxProfileVersionSnapshotJobFailedOutput =
-  paths["/internal/snapshot-jobs/{jobId}/fail"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/:jobId/fail"]["post"]["responses"]["200"]["content"]["application/json"];
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -436,7 +436,7 @@ export class ControlPlaneInternalClient {
   async claimSandboxProfileVersionSnapshotJob(
     input: ClaimSandboxProfileVersionSnapshotJobInput,
   ): Promise<ClaimSandboxProfileVersionSnapshotJobOutput> {
-    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/claim", {
+    const result = await this.#client.POST("/internal/snapshot-jobs/:jobId/claim", {
       params: {
         path: {
           jobId: input.snapshotJobId,
@@ -462,7 +462,7 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobSucceeded(
     input: MarkSandboxProfileVersionSnapshotJobSucceededInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobSucceededOutput> {
-    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/succeed", {
+    const result = await this.#client.POST("/internal/snapshot-jobs/:jobId/succeed", {
       params: {
         path: {
           jobId: input.snapshotJobId,
@@ -489,7 +489,7 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobFailed(
     input: MarkSandboxProfileVersionSnapshotJobFailedInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobFailedOutput> {
-    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/fail", {
+    const result = await this.#client.POST("/internal/snapshot-jobs/:jobId/fail", {
       params: {
         path: {
           jobId: input.snapshotJobId,

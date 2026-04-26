@@ -1649,7 +1649,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/snapshot-jobs/{jobId}/claim": {
+  "/internal/snapshot-jobs/:jobId/claim": {
     parameters: {
       query?: never;
       header?: never;
@@ -1756,7 +1756,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/snapshot-jobs/{jobId}/fail": {
+  "/internal/snapshot-jobs/:jobId/fail": {
     parameters: {
       query?: never;
       header?: never;
@@ -1865,7 +1865,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/snapshot-jobs/{jobId}/succeed": {
+  "/internal/snapshot-jobs/:jobId/succeed": {
     parameters: {
       query?: never;
       header?: never;
