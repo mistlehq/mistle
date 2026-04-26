@@ -6,7 +6,10 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import type {
+  IntegrationConnection,
+  IntegrationWebhookSource,
+} from "../integrations/integrations-service.js";
 import {
   SlackAppSetupPane,
   SlackDraftManifest,
@@ -48,6 +51,20 @@ function renderSlackAppSetupPane(input?: {
     input?.installSucceeded === undefined
       ? { connection }
       : { connection, installSucceeded: input.installSucceeded };
+  const webhookSource = {
+    id: "iws_slack_app_setup",
+    targetKey: connection.targetKey,
+    integrationConnectionId: connection.id,
+    displayName: "Slack Events API webhook",
+    endpointKey: "eps_slack_app_setup",
+    callbackUrl:
+      "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+    status: "active",
+    providerMetadata: {},
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  } satisfies IntegrationWebhookSource;
+  queryClient.setQueryData(["integration-webhook-sources", connection.id], [webhookSource]);
 
   return render(
     <MemoryRouter>
@@ -131,6 +148,13 @@ describe("SlackAppSetupPane", () => {
     expect(screen.queryByText("Bot token is already configured.")).toBeNull();
     expect(screen.queryByText("Signing secret is already configured.")).toBeNull();
     expect(screen.queryByText("Client secret is already configured.")).toBeNull();
+    expect(screen.getByText("Slack app URLs")).toBeTruthy();
+    expect(screen.getByText("Events API Request URL")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+      ),
+    ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Save Slack App" }).hasAttribute("disabled")).toBe(
       true,
     );

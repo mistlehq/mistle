@@ -3,6 +3,7 @@ import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import {
   Button,
+  CopyableValue,
   Field,
   FieldContent,
   FieldDescription,
@@ -26,6 +27,7 @@ import { ConfiguredSecretField, type SavingFieldState } from "../forms/configure
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
+  listIntegrationWebhookSources,
   startSlackAppManifestCreation,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -343,6 +345,51 @@ function SlackExistingAppSetupPanel(input: {
   );
 }
 
+function SlackSetupUrls(input: {
+  webhookCallbackState:
+    | {
+        kind: "loading";
+      }
+    | {
+        kind: "error";
+        message: string;
+      }
+    | {
+        kind: "ready";
+        value: string;
+      }
+    | {
+        kind: "missing";
+      };
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-medium">Slack app URLs</h2>
+        <p className="text-muted-foreground text-sm">
+          Copy this URL into Slack Event Subscriptions so Mistle can receive app events.
+        </p>
+      </div>
+      <div className="flex flex-col gap-4">
+        {input.webhookCallbackState.kind === "loading" ? (
+          <CopyableValue label="Events API Request URL" loading />
+        ) : input.webhookCallbackState.kind === "error" ? (
+          <Notice title="Could not load Events API Request URL" variant="alert">
+            {input.webhookCallbackState.message}
+          </Notice>
+        ) : input.webhookCallbackState.kind === "missing" ? (
+          <Notice title="Events API Request URL is not available yet" variant="alert">
+            Slack setup requires an Events API Request URL, but this connection does not have one
+            yet.
+          </Notice>
+        ) : (
+          <CopyableValue label="Events API Request URL" value={input.webhookCallbackState.value} />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function IntegrationConnectionSlackAppSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const params = useParams();
@@ -418,6 +465,16 @@ export function SlackAppSetupPane(input: {
     createInitialExistingAppDraft(input.connection),
   );
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const webhookSourcesQuery = useQuery({
+    enabled: setupMode === "existing-app",
+    queryKey: ["integration-webhook-sources", input.connection.id],
+    queryFn: async ({ signal }) =>
+      listIntegrationWebhookSources({
+        connectionId: input.connection.id,
+        signal,
+      }),
+    retry: false,
+  });
 
   const startManifestMutation = useMutation({
     mutationFn: async () =>
@@ -483,6 +540,34 @@ export function SlackAppSetupPane(input: {
     existingAppDraft.signingSecret.trim().length > 0 ||
     existingAppDraft.clientSecret.trim().length > 0 ||
     existingAppDraft.clientId.trim() !== initialExistingAppDraft.clientId.trim();
+  const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
+  const webhookCallbackState:
+    | {
+        kind: "loading";
+      }
+    | {
+        kind: "error";
+        message: string;
+      }
+    | {
+        kind: "ready";
+        value: string;
+      }
+    | {
+        kind: "missing";
+      } = webhookSourcesQuery.isPending
+    ? { kind: "loading" }
+    : webhookSourcesQuery.isError
+      ? {
+          kind: "error",
+          message: resolveApiErrorMessage({
+            error: webhookSourcesQuery.error,
+            fallbackMessage: "Could not load integration webhook sources.",
+          }),
+        }
+      : webhookCallbackUrl === undefined
+        ? { kind: "missing" }
+        : { kind: "ready", value: webhookCallbackUrl };
 
   if (input.installSucceeded === true) {
     return (
@@ -566,6 +651,10 @@ export function SlackAppSetupPane(input: {
                 onDraftChange={setExistingAppDraft}
               />
             </TabsContent>
+
+            {setupMode === "existing-app" ? (
+              <SlackSetupUrls webhookCallbackState={webhookCallbackState} />
+            ) : null}
 
             <FormPageActionBar>
               {setupMode === "manifest" ? (
