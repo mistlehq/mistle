@@ -98,7 +98,7 @@
   "pnpm": {
     "overrides": {
       "axios": "1.15.0",
-      "@aws-sdk/xml-builder>fast-xml-parser": "5.7.1",
+      "@aws-sdk/xml-builder": "3.972.19",
       "dockerode>protobufjs": "7.5.5",
       "mermaid>dompurify": "3.4.0"
     }
