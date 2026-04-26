@@ -444,6 +444,7 @@ describe("runtime-state store integrations", () => {
         store.summarize({
           sandboxInstanceId,
           nowMs: Date.now(),
+          ownerLeaseId: null,
         }),
       ).resolves.toEqual({ active: false });
       await expect(client.zCard(indexKey)).resolves.toBe(0);
@@ -481,8 +482,16 @@ describe("runtime-state store integrations", () => {
         store.summarize({
           sandboxInstanceId,
           nowMs: Date.now(),
+          ownerLeaseId: "dtl_owner",
         }),
       ).resolves.toEqual({ active: true });
+      await expect(
+        store.summarize({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+          ownerLeaseId: "dtl_other",
+        }),
+      ).resolves.toEqual({ active: false });
 
       await store.replaceStateForOwner({
         sandboxInstanceId,
@@ -497,6 +506,7 @@ describe("runtime-state store integrations", () => {
         store.summarize({
           sandboxInstanceId,
           nowMs: Date.now(),
+          ownerLeaseId: "dtl_owner_next",
         }),
       ).resolves.toEqual({ active: false });
     } finally {

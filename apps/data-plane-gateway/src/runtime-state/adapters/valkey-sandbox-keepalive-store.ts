@@ -357,6 +357,7 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
   async summarize(input: {
     sandboxInstanceId: string;
     nowMs: number;
+    ownerLeaseId: string | null;
   }): Promise<{ active: boolean }> {
     const indexKey = buildSandboxKeepaliveIndexKey({
       keyPrefix: this.keyPrefix,
@@ -409,7 +410,10 @@ export class ValkeySandboxKeepaliveStore implements SandboxKeepaliveStore {
 
     const parsedState = parseSandboxKeepaliveStateRecord(serializedState);
     return {
-      active: parsedState.active,
+      active:
+        input.ownerLeaseId !== null &&
+        parsedState.ownerLeaseId === input.ownerLeaseId &&
+        parsedState.active,
     };
   }
 }

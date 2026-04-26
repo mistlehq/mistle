@@ -91,6 +91,7 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
   ) {}
 
   async claimOwner(input: {
+    leaseId?: string;
     sandboxInstanceId: string;
     nodeId: string;
     sessionId: string;
@@ -100,7 +101,7 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       sandboxInstanceId: input.sandboxInstanceId,
       nodeId: input.nodeId,
       sessionId: input.sessionId,
-      leaseId: typeid("dtl").toString(),
+      leaseId: input.leaseId ?? typeid("dtl").toString(),
       expiresAtMs: Date.now() + input.ttlMs,
     };
 

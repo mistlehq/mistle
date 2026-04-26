@@ -15,6 +15,7 @@ export class InMemorySandboxOwnerStore implements SandboxOwnerStore {
   public constructor(private readonly clock: Clock) {}
 
   public async claimOwner(input: {
+    leaseId?: string;
     sandboxInstanceId: string;
     nodeId: string;
     sessionId: string;
@@ -24,7 +25,7 @@ export class InMemorySandboxOwnerStore implements SandboxOwnerStore {
       sandboxInstanceId: input.sandboxInstanceId,
       nodeId: input.nodeId,
       sessionId: input.sessionId,
-      leaseId: typeid("dtl").toString(),
+      leaseId: input.leaseId ?? typeid("dtl").toString(),
       expiresAt: new Date(this.clock.nowMs() + input.ttlMs),
     };
 

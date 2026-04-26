@@ -359,12 +359,6 @@ describe("TunnelSessionService", () => {
         new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
       ),
     );
-    await ownerStore.claimOwner({
-      sandboxInstanceId: SandboxInstanceId,
-      nodeId: GatewayNodeId,
-      sessionId: BootstrapSessionId,
-      ttlMs: 60_000,
-    });
     let idlePutCount = 0;
 
     const service = new TunnelSessionService(
@@ -429,8 +423,23 @@ describe("TunnelSessionService", () => {
       sandboxInstanceId: SandboxInstanceId,
       socket: bootstrapPair.peerSocket,
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    let activeAttachment = await attachmentStore.getAttachment({
+      sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
+    });
+    for (
+      let attempt = 0;
+      (activeAttachment?.ownerLeaseId !== OwnerLeaseId || idlePutCount !== 1) && attempt < 10;
+      attempt += 1
+    ) {
+      await Promise.resolve();
+      activeAttachment = await attachmentStore.getAttachment({
+        sandboxInstanceId: SandboxInstanceId,
+        nowMs: clock.nowMs(),
+      });
+    }
+    expect(activeAttachment?.ownerLeaseId).toBe(OwnerLeaseId);
+    expect(idlePutCount).toBe(1);
 
     let connectionFatalErrorMessage: string | undefined;
     service.attachConnectionPeer({

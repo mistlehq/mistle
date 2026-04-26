@@ -12,6 +12,7 @@ export interface SandboxOwnerStore {
    * Claims ownership for a sandbox instance and returns the new fenced lease.
    */
   claimOwner(input: {
+    leaseId?: string;
     sandboxInstanceId: string;
     nodeId: string;
     sessionId: string;

@@ -182,6 +182,7 @@ export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
   async summarize(input: {
     sandboxInstanceId: string;
     nowMs: number;
+    ownerLeaseId: string | null;
   }): Promise<{ active: boolean }> {
     this.pruneExpiredKeepalives(input.sandboxInstanceId, input.nowMs);
     this.pruneExpiredState(input.sandboxInstanceId, input.nowMs);
@@ -190,7 +191,9 @@ export class InMemorySandboxKeepaliveStore implements SandboxKeepaliveStore {
     return {
       active:
         (currentKeepalives !== undefined && currentKeepalives.size > 0) ||
-        currentState?.active === true,
+        (input.ownerLeaseId !== null &&
+          currentState?.active === true &&
+          currentState.ownerLeaseId === input.ownerLeaseId),
     };
   }
 

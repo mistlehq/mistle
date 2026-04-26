@@ -69,6 +69,7 @@ export function registerSandboxRuntimeStateRoute(
       input.sandboxKeepaliveStore.summarize({
         sandboxInstanceId,
         nowMs,
+        ownerLeaseId: activeSession?.ownerLeaseId ?? null,
       }),
       input.sandboxRuntimeReadinessStore.summarize({
         sandboxInstanceId,

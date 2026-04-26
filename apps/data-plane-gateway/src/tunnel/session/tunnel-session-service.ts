@@ -120,6 +120,10 @@ export class TunnelSessionService {
         }
       | undefined;
 
+    const attachedPeer: AttachedTunnelPeer = {
+      relayTarget,
+    };
+
     try {
       websocketHealthHandle = startWebSocketHealthMonitor({
         clock: this.clock,
@@ -171,52 +175,18 @@ export class TunnelSessionService {
       });
     }
 
-    void this.refreshRuntimeAttachment({
+    void this.activateBootstrapAttachment({
       attachedAtMs: runtimeAttachmentAttachedAtMs,
+      attachedPeer,
       leaseId: input.leaseId,
+      onFatalError: input.onFatalError,
+      onLeaseLost: input.onLeaseLost,
+      ownerLeaseTtlMs: input.ownerLeaseTtlMs,
       relaySessionId: input.relaySessionId,
+      relayTarget,
       sandboxInstanceId: input.sandboxInstanceId,
-    }).catch((error: unknown) => {
-      logger.error(
-        {
-          err: error,
-          sandboxInstanceId: input.sandboxInstanceId,
-        },
-        "Failed to persist sandbox runtime attachment",
-      );
-      input.onFatalError({
-        closeReason: "Failed to persist sandbox runtime attachment.",
-        error,
-        statusMessage: "Failed to persist sandbox runtime attachment.",
-      });
-    });
-
-    void this.enqueueBootstrapLifecycleTransition({
-      sandboxInstanceId: input.sandboxInstanceId,
-      operation: async () => {
-        if (!this.relayCoordinator.isCurrentPeer(relayTarget)) {
-          return;
-        }
-
-        await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
-          sandboxInstanceId: input.sandboxInstanceId,
-          ownerLeaseId: input.leaseId,
-        });
-      },
-    }).catch((error: unknown) => {
-      logger.error(
-        {
-          err: error,
-          sandboxInstanceId: input.sandboxInstanceId,
-          ownerLeaseId: input.leaseId,
-        },
-        "Failed to persist sandbox deadlines for attached bootstrap tunnel",
-      );
-      input.onFatalError({
-        closeReason: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
-        error,
-        statusMessage: "Failed to persist sandbox deadlines for attached bootstrap tunnel.",
-      });
+      socket: input.socket,
+      websocketHealthHandle,
     });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
@@ -238,48 +208,11 @@ export class TunnelSessionService {
       });
     });
 
-    const leaseHeartbeatHandle = this.startRuntimeAttachmentRenewal({
-      attachedAtMs: runtimeAttachmentAttachedAtMs,
-      leaseId: input.leaseId,
-      onLeaseLost: () => {
-        logger.error(
-          {
-            sandboxInstanceId: input.sandboxInstanceId,
-            leaseId: input.leaseId,
-          },
-          "Lost sandbox active attachment while bootstrap websocket was still connected",
-        );
-        input.onLeaseLost({
-          closeReason: "Sandbox active attachment was replaced.",
-          statusMessage: "Sandbox active attachment was replaced.",
-        });
-      },
-      onRefreshFailed: (error) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to refresh sandbox runtime attachment",
-        );
-        input.onFatalError({
-          closeReason: "Failed to refresh sandbox runtime attachment.",
-          error,
-          statusMessage: "Failed to refresh sandbox runtime attachment.",
-        });
-      },
-      relaySessionId: input.relaySessionId,
-      sandboxInstanceId: input.sandboxInstanceId,
-      socket: input.socket,
-      ttlMs: input.ownerLeaseTtlMs,
-      websocketHealthHandle,
-    });
+    if (websocketHealthHandle !== undefined) {
+      attachedPeer.websocketHealthHandle = websocketHealthHandle;
+    }
 
-    return {
-      leaseHeartbeatHandle,
-      relayTarget,
-      ...(websocketHealthHandle === undefined ? {} : { websocketHealthHandle }),
-    };
+    return attachedPeer;
   }
 
   /**
@@ -559,6 +492,123 @@ export class TunnelSessionService {
       ttlMs: ATTACHMENT_TTL_MS,
       nowMs: this.clock.nowMs(),
     });
+  }
+
+  private async activateBootstrapAttachment(input: {
+    attachedAtMs: number;
+    attachedPeer: AttachedTunnelPeer;
+    leaseId: string;
+    onFatalError: (failure: TunnelSessionFatalError) => void;
+    onLeaseLost: (failure: TunnelSessionLeaseLost) => void;
+    ownerLeaseTtlMs: number;
+    relaySessionId: string;
+    relayTarget: RelayTarget;
+    sandboxInstanceId: string;
+    socket: RelayPeerSocket;
+    websocketHealthHandle?:
+      | {
+          stop: () => void;
+          isHealthy: () => boolean;
+        }
+      | undefined;
+  }): Promise<void> {
+    try {
+      const owner = await this.sandboxOwnerStore.claimOwner({
+        leaseId: input.leaseId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        nodeId: this.gatewayNodeId,
+        sessionId: input.relaySessionId,
+        ttlMs: input.ownerLeaseTtlMs,
+      });
+      if (owner.leaseId !== input.leaseId) {
+        throw new Error(
+          `Expected claimed owner lease '${input.leaseId}' for sandbox '${input.sandboxInstanceId}', received '${owner.leaseId}' instead.`,
+        );
+      }
+
+      if (
+        input.socket.readyState !== WebSocket.OPEN ||
+        !this.relayCoordinator.isCurrentPeer(input.relayTarget)
+      ) {
+        await this.sandboxOwnerStore.releaseOwner({
+          sandboxInstanceId: input.sandboxInstanceId,
+          leaseId: owner.leaseId,
+        });
+        return;
+      }
+
+      await this.refreshRuntimeAttachment({
+        attachedAtMs: input.attachedAtMs,
+        leaseId: owner.leaseId,
+        relaySessionId: input.relaySessionId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+
+      await this.enqueueBootstrapLifecycleTransition({
+        sandboxInstanceId: input.sandboxInstanceId,
+        operation: async () => {
+          if (!this.relayCoordinator.isCurrentPeer(input.relayTarget)) {
+            return;
+          }
+
+          await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
+            sandboxInstanceId: input.sandboxInstanceId,
+            ownerLeaseId: owner.leaseId,
+          });
+        },
+      });
+
+      input.attachedPeer.leaseHeartbeatHandle = this.startRuntimeAttachmentRenewal({
+        attachedAtMs: input.attachedAtMs,
+        leaseId: owner.leaseId,
+        onLeaseLost: () => {
+          logger.error(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: owner.leaseId,
+            },
+            "Lost sandbox active attachment while bootstrap websocket was still connected",
+          );
+          input.onLeaseLost({
+            closeReason: "Sandbox active attachment was replaced.",
+            statusMessage: "Sandbox active attachment was replaced.",
+          });
+        },
+        onRefreshFailed: (error) => {
+          logger.error(
+            {
+              err: error,
+              sandboxInstanceId: input.sandboxInstanceId,
+            },
+            "Failed to refresh sandbox runtime attachment",
+          );
+          input.onFatalError({
+            closeReason: "Failed to refresh sandbox runtime attachment.",
+            error,
+            statusMessage: "Failed to refresh sandbox runtime attachment.",
+          });
+        },
+        relaySessionId: input.relaySessionId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        socket: input.socket,
+        ttlMs: input.ownerLeaseTtlMs,
+        websocketHealthHandle: input.websocketHealthHandle,
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        },
+        "Failed to activate sandbox ownership for attached bootstrap tunnel",
+      );
+      input.onFatalError({
+        closeReason: "Failed to activate sandbox ownership for attached bootstrap tunnel.",
+        error,
+        statusMessage: "Failed to activate sandbox ownership for attached bootstrap tunnel.",
+      });
+    }
   }
 
   private startRuntimeAttachmentRenewal(input: {

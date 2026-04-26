@@ -19,6 +19,7 @@ import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import { closeWebSocket, waitForWebSocketClose } from "./websocket-test-helpers.js";
 
 const BootstrapHealthObservationWindowMs = 12_000;
+const UnresponsiveBootstrapCloseTimeoutMs = 80_000;
 
 function createOwnerStoreFixture(input: { fixture: DataPlaneGatewayIntegrationFixture }): {
   client: ReturnType<typeof createValkeyClient>;
@@ -238,6 +239,85 @@ describe("runtime state route integration", () => {
   );
 
   it(
+    "does not expose replaced bootstrap keepalive state after a replacement bootstrap attaches",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+        testId: "runtime_state_route_keepalive_owner_fence_it",
+      });
+
+      const firstSocket = await connectBootstrapSocket({
+        fixture,
+        sandboxInstanceId,
+        token: await mintValidBootstrapToken({
+          fixture,
+          sandboxInstanceId,
+        }),
+      });
+      const firstSnapshot = await waitForRuntimeState({
+        fixture,
+        sandboxInstanceId,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
+      });
+      const firstOwnerLeaseId = firstSnapshot.ownerLeaseId;
+      if (firstOwnerLeaseId === null) {
+        throw new Error("Expected the first bootstrap connection to establish an owner lease.");
+      }
+
+      firstSocket.send(
+        JSON.stringify({
+          type: "keepalive.state",
+          ttlMs: 30_000,
+          active: true,
+        }),
+      );
+
+      const activeKeepaliveSnapshot = await waitForRuntimeState({
+        fixture,
+        sandboxInstanceId,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId === firstOwnerLeaseId &&
+          currentSnapshot.attachment?.ownerLeaseId === firstOwnerLeaseId &&
+          currentSnapshot.keepalive.active,
+      });
+      expect(activeKeepaliveSnapshot.keepalive.active).toBe(true);
+
+      const firstSocketClosePromise = waitForWebSocketClose(firstSocket);
+      const secondSocket = await connectBootstrapSocket({
+        fixture,
+        sandboxInstanceId,
+        token: await mintValidBootstrapToken({
+          fixture,
+          sandboxInstanceId,
+        }),
+      });
+
+      const secondSnapshot = await waitForRuntimeState({
+        fixture,
+        sandboxInstanceId,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null &&
+          currentSnapshot.ownerLeaseId !== firstOwnerLeaseId &&
+          currentSnapshot.attachment?.ownerLeaseId === currentSnapshot.ownerLeaseId &&
+          currentSnapshot.keepalive.active === false,
+      });
+
+      expect(secondSnapshot.ownerLeaseId).not.toBe(firstOwnerLeaseId);
+      expect(secondSnapshot.keepalive.active).toBe(false);
+
+      await expect(firstSocketClosePromise).resolves.toEqual({
+        code: 1012,
+        reason: "Replaced by newer sandbox tunnel connection.",
+      });
+      await closeWebSocket(secondSocket);
+    },
+    RuntimeStateRouteTestTimeoutMs,
+  );
+
+  it(
     "keeps the active bootstrap attached when a replacement owner lease is claimed before replacement attach",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
@@ -409,6 +489,6 @@ describe("runtime state route integration", () => {
         },
       });
     },
-    RuntimeStateRouteTestTimeoutMs,
+    UnresponsiveBootstrapCloseTimeoutMs,
   );
 });

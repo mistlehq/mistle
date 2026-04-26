@@ -82,9 +82,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const tunnelWebSocketAdmission = new SandboxTunnelWebSocketAdmission({
     bootstrapTokenConfig: input.bootstrapTokenConfig,
     connectionTokenConfig: input.connectionTokenConfig,
-    gatewayNodeId: input.gatewayNodeId,
     sandboxOwnerResolver: input.sandboxOwnerResolver,
-    sandboxOwnerStore: input.sandboxOwnerStore,
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(
     input.interactiveStreamRouter,

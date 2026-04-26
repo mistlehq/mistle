@@ -12,9 +12,7 @@ import {
 import { typeid } from "typeid-js";
 
 import { logger } from "../../logger.js";
-import { OWNER_LEASE_TTL_MS } from "../../runtime-state/durations.js";
 import type { SandboxOwnerResolver } from "../ownership/sandbox-owner-resolver.js";
-import type { SandboxOwnerStore } from "../ownership/sandbox-owner-store.js";
 import { recordSandboxTunnelTokenRedemption } from "../token-redemption-store.js";
 import {
   readRequestedSandboxTunnelToken,
@@ -59,9 +57,7 @@ type SandboxTunnelAdmissionResult =
 type SandboxTunnelWebSocketAdmissionConfig = {
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
-  gatewayNodeId: string;
   sandboxOwnerResolver: SandboxOwnerResolver;
-  sandboxOwnerStore: SandboxOwnerStore;
 };
 
 export class SandboxTunnelWebSocketAdmission {
@@ -69,7 +65,7 @@ export class SandboxTunnelWebSocketAdmission {
 
   /**
    * Verifies tunnel websocket request tokens, enforces single-use redemption, and
-   * claims bootstrap ownership before the websocket upgrade proceeds.
+   * reserves bootstrap session identity before the websocket upgrade proceeds.
    */
   public async admitRequest(input: {
     db: DataPlaneDatabase;
@@ -175,39 +171,15 @@ export class SandboxTunnelWebSocketAdmission {
     }
 
     const relaySessionId = typeid("dts").toString();
-    try {
-      const owner = await this.config.sandboxOwnerStore.claimOwner({
+    return {
+      kind: "admitted",
+      request: {
+        kind: "bootstrap",
+        ownerLeaseId: typeid("dtl").toString(),
+        relaySessionId,
         sandboxInstanceId: input.requestedInstanceId,
-        nodeId: this.config.gatewayNodeId,
-        sessionId: relaySessionId,
-        ttlMs: OWNER_LEASE_TTL_MS,
-      });
-
-      return {
-        kind: "admitted",
-        request: {
-          kind: "bootstrap",
-          ownerLeaseId: owner.leaseId,
-          relaySessionId,
-          sandboxInstanceId: input.requestedInstanceId,
-        },
-      };
-    } catch (error) {
-      logger.error(
-        {
-          err: error,
-          sandboxInstanceId: input.requestedInstanceId,
-        },
-        "Failed to claim sandbox ownership for bootstrap websocket",
-      );
-      return {
-        kind: "rejected",
-        rejection: {
-          error: "Failed to claim sandbox ownership.",
-          status: 500,
-        },
-      };
-    }
+      },
+    };
   }
 
   private async verifyRequestedToken(input: {

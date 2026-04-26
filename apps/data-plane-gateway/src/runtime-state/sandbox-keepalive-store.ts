@@ -55,7 +55,11 @@ export interface SandboxKeepaliveStore {
   /**
    * Returns the current coarse keepalive summary for one sandbox instance.
    */
-  summarize(input: { sandboxInstanceId: string; nowMs: number }): Promise<{
+  summarize(input: {
+    sandboxInstanceId: string;
+    nowMs: number;
+    ownerLeaseId: string | null;
+  }): Promise<{
     active: boolean;
   }>;
 }

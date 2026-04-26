@@ -25,6 +25,7 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: null,
       }),
     ).resolves.toEqual({ active: true });
     await expect(
@@ -37,6 +38,7 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: null,
       }),
     ).resolves.toEqual({ active: false });
   });
@@ -71,6 +73,7 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: null,
       }),
     ).resolves.toEqual({ active: true });
     await expect(
@@ -102,6 +105,7 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: null,
       }),
     ).resolves.toEqual({ active: false });
   });
@@ -123,8 +127,16 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: "dtl_owner",
       }),
     ).resolves.toEqual({ active: true });
+    await expect(
+      store.summarize({
+        sandboxInstanceId: "sbi_abc",
+        nowMs: clock.nowMs(),
+        ownerLeaseId: "dtl_other",
+      }),
+    ).resolves.toEqual({ active: false });
 
     await store.replaceStateForOwner({
       sandboxInstanceId: "sbi_abc",
@@ -139,6 +151,7 @@ describe("InMemorySandboxKeepaliveStore", () => {
       store.summarize({
         sandboxInstanceId: "sbi_abc",
         nowMs: clock.nowMs(),
+        ownerLeaseId: "dtl_owner_next",
       }),
     ).resolves.toEqual({ active: false });
   });
