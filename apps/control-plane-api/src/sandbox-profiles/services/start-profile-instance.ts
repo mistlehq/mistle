@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  sandboxProfiles,
+  sandboxProfileVersions,
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import { type CompiledRuntimePlan, type ResolvedSandboxImage } from "@mistle/integrations-core";
-import { SandboxProvider, type SandboxProvider as SandboxProviderType } from "@mistle/sandbox";
+import { SandboxProvider } from "@mistle/sandbox";
+import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
+import { and, eq } from "drizzle-orm";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
@@ -47,12 +51,7 @@ type StartProfileInstanceOutput = {
 type ResolvedLaunchImage = {
   versionState: SandboxProfileVersionState;
   compileImage: ResolvedSandboxImage;
-  workflowImage: {
-    imageId: string;
-    createdAt?: string;
-    kind: "base" | "snapshot";
-    provider?: SandboxProviderType;
-  };
+  workflowImage: StartSandboxInstanceWorkflowImageInput;
 };
 
 const LaunchImageKinds = {
@@ -60,7 +59,9 @@ const LaunchImageKinds = {
   SNAPSHOT: "snapshot",
 } as const;
 
-function assertSnapshotImageProvider(provider: string): SandboxProviderType {
+function assertSnapshotImageProvider(
+  provider: string,
+): NonNullable<StartSandboxInstanceWorkflowImageInput["provider"]> {
   if (provider === SandboxProvider.DOCKER || provider === SandboxProvider.E2B) {
     return provider;
   }
@@ -131,32 +132,36 @@ async function resolveLaunchImage(
     profileVersion: number;
   },
 ): Promise<ResolvedLaunchImage> {
-  const sandboxProfile = await db.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
-  });
+  const [sandboxProfileVersion] = await db
+    .select({
+      profileId: sandboxProfiles.id,
+      state: sandboxProfileVersions.state,
+      snapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
+      snapshotImageId: sandboxProfileVersions.snapshotImageId,
+    })
+    .from(sandboxProfiles)
+    .leftJoin(
+      sandboxProfileVersions,
+      and(
+        eq(sandboxProfileVersions.sandboxProfileId, sandboxProfiles.id),
+        eq(sandboxProfileVersions.version, input.profileVersion),
+      ),
+    )
+    .where(
+      and(
+        eq(sandboxProfiles.id, input.profileId),
+        eq(sandboxProfiles.organizationId, input.organizationId),
+      ),
+    );
 
-  if (sandboxProfile === undefined) {
+  if (sandboxProfileVersion === undefined) {
     throw new SandboxProfilesNotFoundError(
       SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
       "Sandbox profile was not found.",
     );
   }
 
-  const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      state: true,
-      snapshotImageProvider: true,
-      snapshotImageId: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
-  });
-
-  if (sandboxProfileVersion === undefined) {
+  if (sandboxProfileVersion.state === null) {
     throw new SandboxProfilesNotFoundError(
       SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
       "Sandbox profile version was not found.",

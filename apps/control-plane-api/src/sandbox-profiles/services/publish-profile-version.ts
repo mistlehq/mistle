@@ -5,7 +5,7 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
 import {
@@ -55,8 +55,10 @@ async function markQueuedSnapshotJobFailedToEnqueue(
       updatedAt: sql`now()`,
     })
     .where(
-      sql`${sandboxProfileVersionSnapshotJobs.id} = ${input.snapshotJobId}
-        and ${sandboxProfileVersionSnapshotJobs.state} = ${SandboxProfileVersionSnapshotJobStates.QUEUED}`,
+      and(
+        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
+      ),
     );
 }
 
@@ -134,9 +136,11 @@ export async function publishProfileVersion(
         publishedAt: sql`now()`,
       })
       .where(
-        sql`${sandboxProfileVersions.sandboxProfileId} = ${input.profileId}
-          and ${sandboxProfileVersions.version} = ${input.profileVersion}
-          and ${sandboxProfileVersions.state} = ${SandboxProfileVersionStates.DRAFT}`,
+        and(
+          eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(sandboxProfileVersions.version, input.profileVersion),
+          eq(sandboxProfileVersions.state, SandboxProfileVersionStates.DRAFT),
+        ),
       )
       .returning({
         sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
