@@ -187,8 +187,8 @@ function SlackManifestSetupPanel(input: {
         <div className="flex flex-col gap-1">
           <h3 className="text-base font-medium">Slack app manifest</h3>
           <p className="text-muted-foreground text-sm">
-            Create a Slack app from Mistle&apos;s default manifest. Mistle adds the request URLs,
-            event subscriptions, OAuth redirects, and scopes before creating the app in Slack.
+            Create a Slack app from a basic manifest. You can still change the settings later in
+            Slack.
           </p>
         </div>
         <div className="overflow-hidden rounded-md border">
