@@ -23,9 +23,10 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
-use crate::protocol::startup::{StartupExecutionMode, StartupInput};
+use crate::protocol::startup::{StartupExecutionMode, StartupInput, StartupMode};
 use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
+use crate::runtime::CompiledRuntimePlanImageSource;
 use crate::runtime::RuntimePlanApplyError;
 use crate::runtime::adapters::{RuntimeAdapterRegistry, RuntimeAdapters};
 use crate::runtime::readiness::{
@@ -155,6 +156,9 @@ impl SandboxdState {
             startup_input,
             &tokenizer_proxy_egress_base_url,
         )?;
+        let uses_pre_materialized_snapshot = startup_input.startup_mode == StartupMode::New
+            && startup_input.execution_mode == StartupExecutionMode::Session
+            && runtime_plan.image.source == CompiledRuntimePlanImageSource::Snapshot;
         let sandbox_instance_id = derive_sandbox_instance_id(&startup_input.tunnel_gateway_ws_url)
             .map_err(|error| SandboxdStateError::StartTunnelSession(error.to_string()))?;
         let supervisor_handle = SandboxdSupervisorHandle::new(
@@ -164,7 +168,7 @@ impl SandboxdState {
         );
         let execution_mode = startup_input.execution_mode;
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
-        if !startup_input.is_snapshot_materialization() {
+        if !startup_input.is_snapshot() {
             runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
                 record_operation_phase_failure(
                     &diagnostics_logger,
@@ -178,12 +182,14 @@ impl SandboxdState {
             })?;
         }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
-        record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-        runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
-            record_runtime_plan_apply_failure(&diagnostics_logger, &error);
-            SandboxdStateError::ApplyRuntimePlan(error.to_string())
-        })?;
-        record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+        if !uses_pre_materialized_snapshot {
+            record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
+            runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
+                record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+                SandboxdStateError::ApplyRuntimePlan(error.to_string())
+            })?;
+            record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+        }
         record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
         let mut egress_proxy = EgressProxy::start(
             &runtime_plan,
@@ -208,19 +214,21 @@ impl SandboxdState {
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
-        record_operation_phase_started(&diagnostics_logger, "run_setup_script");
-        run_setup_script(
-            &runtime_plan,
-            &runtime_env,
-            clock.as_ref(),
-            sleeper.as_ref(),
-        )
-        .map_err(|error| {
-            record_setup_script_failure(&diagnostics_logger, &error);
-            SandboxdStateError::RunSetupScript(error.message)
-        })?;
-        record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
-        if startup_input.is_snapshot_materialization() {
+        if !uses_pre_materialized_snapshot {
+            record_operation_phase_started(&diagnostics_logger, "run_setup_script");
+            run_setup_script(
+                &runtime_plan,
+                &runtime_env,
+                clock.as_ref(),
+                sleeper.as_ref(),
+            )
+            .map_err(|error| {
+                record_setup_script_failure(&diagnostics_logger, &error);
+                SandboxdStateError::RunSetupScript(error.message)
+            })?;
+            record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
+        }
+        if startup_input.is_snapshot() {
             // Snapshot materialization captures image-layer state only. Later session launches may
             // mount persistent storage at paths like /root and /etc/codex, which would shadow any
             // image contents there, so snapshot workflows must stop here and run on ephemeral
@@ -429,9 +437,7 @@ impl SandboxdState {
         startup_input: &StartupInput,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
-        if self.execution_mode == StartupExecutionMode::SnapshotMaterialization
-            || startup_input.is_snapshot_materialization()
-        {
+        if self.execution_mode == StartupExecutionMode::Snapshot || startup_input.is_snapshot() {
             return Err(SandboxdStateError::StartTunnelSession(
                 "snapshot materialization sandboxes do not support resume".to_string(),
             ));
@@ -537,7 +543,7 @@ impl SandboxdState {
             .map(EgressProxy::close)
             .transpose()
             .map_err(|error| SandboxdStateError::StopEgressProxy(error.to_string()))?;
-        if self.execution_mode == StartupExecutionMode::SnapshotMaterialization {
+        if self.execution_mode == StartupExecutionMode::Snapshot {
             scrub_snapshot_runtime_artifacts().map_err(SandboxdStateError::StopEgressProxy)?;
         }
 
@@ -1405,6 +1411,7 @@ mod tests {
     #[test]
     fn preserves_codex_runtime_client_config_while_rewriting_workspace_sources() {
         let mut runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: vec![
                 crate::runtime::CompiledEgressRoute {
@@ -1707,6 +1714,7 @@ supports_websockets = false
     #[test]
     fn collects_runtime_environment_from_artifacts() {
         let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),
             artifacts: vec![
@@ -1756,6 +1764,7 @@ supports_websockets = false
     #[test]
     fn rejects_conflicting_runtime_environment_values() {
         let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),
             artifacts: vec![
@@ -1845,6 +1854,7 @@ supports_websockets = false
     fn run_setup_script_skips_missing_or_blank_scripts() {
         let runtime_env = BTreeMap::new();
         let missing_setup_script_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: None,
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
@@ -1861,6 +1871,7 @@ supports_websockets = false
         .expect("missing setup script should be a no-op");
 
         let blank_setup_script_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: Some("   \n\t  ".to_string()),
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
@@ -1896,6 +1907,7 @@ supports_websockets = false
                 .as_nanos()
         ));
         let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: Some(format!(
                 "printf '%s\\n' \"$TERM\" > {path}; printf '%s\\n' \"$MISTLE_TEST_ENV\" >> {path}; pwd >> {path}",
                 path = output_path.display()
@@ -1939,6 +1951,7 @@ supports_websockets = false
     #[test]
     fn run_setup_script_captures_stdout_and_stderr_on_failure() {
         let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: Some(
                 "printf 'stdout-line'; printf 'stderr-line' >&2; exit 17".to_string(),
             ),
@@ -2025,9 +2038,13 @@ supports_websockets = false
         let state = SandboxdState::initialize(
             &build_startup_input(
                 StartupMode::New,
-                StartupExecutionMode::SnapshotMaterialization,
+                StartupExecutionMode::Snapshot,
                 "ws://127.0.0.1:9/bootstrap",
                 serde_json::json!({
+                    "image": {
+                        "source": "base",
+                        "imageRef": "registry.example.test/base:latest"
+                    },
                     "egressRoutes": [],
                     "artifacts": [
                         {
@@ -2105,10 +2122,7 @@ supports_websockets = false
         )
         .expect("snapshot materialization init should succeed after static runtime-plan setup");
 
-        assert_eq!(
-            state.execution_mode,
-            StartupExecutionMode::SnapshotMaterialization
-        );
+        assert_eq!(state.execution_mode, StartupExecutionMode::Snapshot);
         assert!(state.process_manager.is_none());
         assert!(state.runtime_adapters.adapters().is_empty());
         assert!(state.tunnel_session.is_none());
@@ -2127,7 +2141,7 @@ supports_websockets = false
         let mut state = SandboxdState::initialize(
             &build_startup_input(
                 StartupMode::New,
-                StartupExecutionMode::SnapshotMaterialization,
+                StartupExecutionMode::Snapshot,
                 "ws://127.0.0.1:9/bootstrap",
                 minimal_runtime_plan_json(),
                 None,
@@ -2159,12 +2173,25 @@ supports_websockets = false
 
     fn minimal_runtime_plan_json() -> serde_json::Value {
         serde_json::json!({
+            "image": {
+                "source": "base",
+                "imageRef": "registry.example.test/base:latest"
+            },
             "egressRoutes": [],
             "artifacts": [],
             "workspaceSources": [],
             "runtimeClients": [],
             "agentRuntimes": []
         })
+    }
+
+    fn test_runtime_plan_image(
+        source: crate::runtime::CompiledRuntimePlanImageSource,
+    ) -> crate::runtime::CompiledRuntimePlanImage {
+        crate::runtime::CompiledRuntimePlanImage {
+            source,
+            image_ref: "registry.example.test/base:latest".to_string(),
+        }
     }
 
     fn build_startup_input(

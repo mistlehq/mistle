@@ -14,7 +14,7 @@ pub enum StartupMode {
 pub enum StartupExecutionMode {
     #[default]
     Session,
-    SnapshotMaterialization,
+    Snapshot,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,11 +52,8 @@ pub struct StartupInput {
 }
 
 impl StartupInput {
-    pub fn is_snapshot_materialization(&self) -> bool {
-        matches!(
-            self.execution_mode,
-            StartupExecutionMode::SnapshotMaterialization
-        )
+    pub fn is_snapshot(&self) -> bool {
+        matches!(self.execution_mode, StartupExecutionMode::Snapshot)
     }
 }
 
@@ -110,14 +107,14 @@ mod tests {
 
         assert_eq!(startup_input.startup_mode, StartupMode::New);
         assert_eq!(startup_input.execution_mode, StartupExecutionMode::Session);
-        assert!(!startup_input.is_snapshot_materialization());
+        assert!(!startup_input.is_snapshot());
     }
 
     #[test]
-    fn parses_snapshot_materialization_execution_mode() {
+    fn parses_snapshot_execution_mode() {
         let startup_input: StartupInput = serde_json::from_value(serde_json::json!({
             "startupMode": "new",
-            "executionMode": "snapshot_materialization",
+            "executionMode": "snapshot",
             "bootstrapToken": "bootstrap-token",
             "tunnelExchangeToken": "exchange-token",
             "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox/sbi_123",
@@ -138,10 +135,7 @@ mod tests {
         }))
         .expect("startup input should deserialize");
 
-        assert_eq!(
-            startup_input.execution_mode,
-            StartupExecutionMode::SnapshotMaterialization
-        );
-        assert!(startup_input.is_snapshot_materialization());
+        assert_eq!(startup_input.execution_mode, StartupExecutionMode::Snapshot);
+        assert!(startup_input.is_snapshot());
     }
 }

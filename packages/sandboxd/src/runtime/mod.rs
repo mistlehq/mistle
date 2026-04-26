@@ -20,12 +20,12 @@ pub use plan::{
     CompiledAgentRuntime, CompiledEgressRoute, CompiledEgressRouteAuthInjection,
     CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialHeaderInjection,
     CompiledEgressRouteCredentialResolver, CompiledEgressRouteMatch, CompiledEgressRouteUpstream,
-    CompiledRuntimeArtifact, CompiledRuntimePlan, CompiledWorkspaceSource,
-    RuntimeArtifactInstallStep, RuntimeArtifactLifecycle, RuntimeClient,
-    RuntimeClientConnectionMode, RuntimeClientEndpoint, RuntimeClientEndpointTransport,
-    RuntimeClientProcess, RuntimeClientProcessReadiness, RuntimeClientProcessStopPolicy,
-    RuntimeClientProcessStopSignal, RuntimeClientSetup, RuntimeClientSetupFile, RuntimeExecCommand,
-    WorkspaceSourceResourceKind,
+    CompiledRuntimeArtifact, CompiledRuntimePlan, CompiledRuntimePlanImage,
+    CompiledRuntimePlanImageSource, CompiledWorkspaceSource, RuntimeArtifactInstallStep,
+    RuntimeArtifactLifecycle, RuntimeClient, RuntimeClientConnectionMode, RuntimeClientEndpoint,
+    RuntimeClientEndpointTransport, RuntimeClientProcess, RuntimeClientProcessReadiness,
+    RuntimeClientProcessStopPolicy, RuntimeClientProcessStopSignal, RuntimeClientSetup,
+    RuntimeClientSetupFile, RuntimeExecCommand, WorkspaceSourceResourceKind,
 };
 
 /// Describes why one runtime-plan setup step failed while applying startup input.

@@ -2362,6 +2362,10 @@ mod tests {
 
     fn sample_runtime_plan() -> CompiledRuntimePlan {
         CompiledRuntimePlan {
+            image: crate::runtime::CompiledRuntimePlanImage {
+                source: crate::runtime::CompiledRuntimePlanImageSource::Base,
+                image_ref: "registry.example.test/base:latest".to_string(),
+            },
             setup_script: None,
             egress_routes: vec![CompiledEgressRoute {
                 egress_rule_id: "egress-rule-1".to_string(),

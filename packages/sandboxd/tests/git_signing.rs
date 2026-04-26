@@ -193,8 +193,7 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
         "ws://127.0.0.1:9/bootstrap",
         "/opt/mistle/bin/mistle-ssh-sign",
     );
-    startup_input.execution_mode =
-        sandboxd::protocol::startup::StartupExecutionMode::SnapshotMaterialization;
+    startup_input.execution_mode = sandboxd::protocol::startup::StartupExecutionMode::Snapshot;
 
     control::submit_init(&control_socket_path, &startup_input)
         .expect("snapshot materialization init submission should succeed");

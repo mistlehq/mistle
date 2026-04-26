@@ -12,12 +12,28 @@ use serde::{Deserialize, Deserializer};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompiledRuntimePlan {
+    pub image: CompiledRuntimePlanImage,
     pub setup_script: Option<String>,
     pub egress_routes: Vec<CompiledEgressRoute>,
     pub artifacts: Vec<CompiledRuntimeArtifact>,
     pub workspace_sources: Vec<CompiledWorkspaceSource>,
     pub runtime_clients: Vec<RuntimeClient>,
     pub agent_runtimes: Vec<CompiledAgentRuntime>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompiledRuntimePlanImage {
+    pub source: CompiledRuntimePlanImageSource,
+    pub image_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompiledRuntimePlanImageSource {
+    ProfileBase,
+    Base,
+    Snapshot,
 }
 
 /// One outbound route that the sandbox runtime may mediate through tokenizer-proxy.

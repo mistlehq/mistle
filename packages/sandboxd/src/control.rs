@@ -949,7 +949,7 @@ fn begin_init(
                 let mut state_guard = state_for_thread
                     .lock()
                     .expect("control server state lock should not be poisoned");
-                state_guard.shutdown_after_init = startup_input.is_snapshot_materialization();
+                state_guard.shutdown_after_init = startup_input.is_snapshot();
                 state_guard.sandboxd_state = Some(sandboxd_state);
                 state_guard.init_phase = InitPhase::Initialized;
                 Ok(())
@@ -1584,7 +1584,7 @@ mod tests {
         let server = start_test_control_server(&socket_path, ThreadSleeper);
         let startup_input = StartupInput {
             startup_mode: StartupMode::New,
-            execution_mode: StartupExecutionMode::SnapshotMaterialization,
+            execution_mode: StartupExecutionMode::Snapshot,
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:9/bootstrap".to_string(),
