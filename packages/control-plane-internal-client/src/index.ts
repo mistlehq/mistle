@@ -43,9 +43,9 @@ export type StartSandboxProfileInstanceInput =
 export type StartSandboxProfileInstanceOutput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["responses"]["200"]["content"]["application/json"];
 export type CompileSandboxProfileVersionRuntimePlanInput =
-  paths["/internal/sandbox-runtime/compile-profile-version-runtime-plan"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/sandbox-runtime/compile-plan"]["post"]["requestBody"]["content"]["application/json"];
 export type CompileSandboxProfileVersionRuntimePlanOutput =
-  paths["/internal/sandbox-runtime/compile-profile-version-runtime-plan"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/sandbox-runtime/compile-plan"]["post"]["responses"]["200"]["content"]["application/json"];
 export type GetSandboxInstanceInput =
   paths["/internal/sandbox-runtime/get-sandbox-instance"]["post"]["requestBody"]["content"]["application/json"];
 export type GetSandboxInstanceOutput =
@@ -247,13 +247,10 @@ export class ControlPlaneInternalClient {
   async compileSandboxProfileVersionRuntimePlan(
     input: CompileSandboxProfileVersionRuntimePlanInput,
   ): Promise<CompileSandboxProfileVersionRuntimePlanOutput> {
-    const result = await this.#client.POST(
-      "/internal/sandbox-runtime/compile-profile-version-runtime-plan",
-      {
-        body: input,
-        signal: AbortSignal.timeout(this.#requestTimeoutMs),
-      },
-    );
+    const result = await this.#client.POST("/internal/sandbox-runtime/compile-plan", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
 
     if (result.response.status === 200 && result.data !== undefined) {
       return result.data;

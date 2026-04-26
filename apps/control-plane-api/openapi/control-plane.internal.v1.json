@@ -1907,7 +1907,7 @@
         }
       }
     },
-    "/internal/sandbox-runtime/compile-profile-version-runtime-plan": {
+    "/internal/sandbox-runtime/compile-plan": {
       "post": {
         "tags": ["Internal"],
         "requestBody": {

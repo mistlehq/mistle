@@ -845,7 +845,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/sandbox-runtime/compile-profile-version-runtime-plan": {
+  "/internal/sandbox-runtime/compile-plan": {
     parameters: {
       query?: never;
       header?: never;

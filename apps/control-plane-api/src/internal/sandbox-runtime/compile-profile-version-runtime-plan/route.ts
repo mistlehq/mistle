@@ -12,7 +12,7 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/compile-profile-version-runtime-plan",
+  path: "/compile-plan",
   tags: ["Internal"],
   request: {
     body: {
