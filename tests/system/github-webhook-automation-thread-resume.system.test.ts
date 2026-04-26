@@ -31,8 +31,6 @@ describeIf("system GitHub webhook automation thread resume", () => {
       });
 
       try {
-        const initialTurnCount = conversation.initialThreadRead.turns.length;
-
         const unsubscribeResult = await unsubscribeCodexThread({
           rpcClient: conversation.rpcClient,
           threadId: conversation.providerConversationId,
@@ -50,6 +48,12 @@ describeIf("system GitHub webhook automation thread resume", () => {
         expect(followUp.conversationId).toBe(conversation.conversationId);
         expect(followUp.providerConversationId).toBe(conversation.providerConversationId);
         expect(followUp.sandboxInstanceId).toBe(conversation.sandboxInstanceId);
+        expect(
+          hasPersistedUserMessageText({
+            threadReadResult: conversation.initialThreadRead,
+            expectedSubstring: followUp.expectedInputSubstring,
+          }),
+        ).toBe(false);
 
         await resumeCodexThread({
           rpcClient: conversation.rpcClient,
@@ -64,7 +68,6 @@ describeIf("system GitHub webhook automation thread resume", () => {
         });
 
         expect(resumedThread.threadId).toBe(conversation.providerConversationId);
-        expect(resumedThread.turns.length).toBeGreaterThan(initialTurnCount);
       } finally {
         await conversation.cleanup();
       }
@@ -72,3 +75,51 @@ describeIf("system GitHub webhook automation thread resume", () => {
     TestTimeoutMs,
   );
 });
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function hasPersistedUserMessageText(input: {
+  threadReadResult: unknown;
+  expectedSubstring: string;
+}): boolean {
+  if (!isRecord(input.threadReadResult)) {
+    throw new Error("thread/read result must be an object.");
+  }
+
+  const thread = input.threadReadResult.thread;
+  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+    throw new Error("thread/read result.thread.turns must be an array.");
+  }
+
+  for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
+    const turn = thread.turns[turnIndex];
+    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+      continue;
+    }
+
+    for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
+      const item = turn.items[itemIndex];
+      if (!isRecord(item) || item.type !== "userMessage" || !Array.isArray(item.content)) {
+        continue;
+      }
+
+      for (const contentItem of item.content) {
+        if (!isRecord(contentItem)) {
+          continue;
+        }
+
+        if (contentItem.type !== "text" || typeof contentItem.text !== "string") {
+          continue;
+        }
+
+        if (contentItem.text.includes(input.expectedSubstring)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  return false;
+}
