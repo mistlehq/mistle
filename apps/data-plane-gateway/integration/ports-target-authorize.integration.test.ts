@@ -33,6 +33,7 @@ import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
+  waitForNoWebSocketMessage,
   waitForWebSocketMessage,
 } from "./websocket-test-helpers.js";
 
@@ -512,19 +513,21 @@ describe("ports target authorize integration", () => {
 
       const outboundMessage = await waitForWebSocketMessage(bootstrapSocket);
       expect(outboundMessage.isBinary).toBe(false);
-      expect(JSON.parse(String(outboundMessage.data))).toEqual({
+      const bootstrapAuthorizeRequest = JSON.parse(String(outboundMessage.data));
+      expect(bootstrapAuthorizeRequest).toEqual({
         type: "ports.target.authorize",
-        requestId: "req_connection_1",
+        requestId: expect.any(String),
         target: {
           kind: "port",
           port: 5173,
         },
       });
+      expect(bootstrapAuthorizeRequest.requestId).not.toBe("req_connection_1");
 
       bootstrapSocket.send(
         JSON.stringify({
           type: "ports.target.authorize.result",
-          requestId: "req_connection_1",
+          requestId: bootstrapAuthorizeRequest.requestId,
           authorized: true,
           upstreamProtocol: "http",
           websocketCapable: true,
@@ -539,6 +542,252 @@ describe("ports target authorize integration", () => {
         authorized: true,
         upstreamProtocol: "http",
         websocketCapable: true,
+      });
+    } finally {
+      if (connectionSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(connectionSocket);
+      }
+      if (bootstrapSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(bootstrapSocket);
+      }
+    }
+  });
+
+  it("keeps connection-side authorize requests isolated even when two clients reuse the same request id", async ({
+    fixture,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      fixture,
+      sandboxInstanceId,
+    });
+    const bootstrapToken = await mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const firstConnectionToken = await mintConnectionToken({
+      config: {
+        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const secondConnectionToken = await mintConnectionToken({
+      config: {
+        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const bootstrapSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "bootstrap",
+      token: bootstrapToken,
+    });
+    const firstConnectionSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "connect",
+      token: firstConnectionToken,
+    });
+    const secondConnectionSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "connect",
+      token: secondConnectionToken,
+    });
+
+    try {
+      firstConnectionSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_shared",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+      );
+
+      const firstBootstrapAuthorizeRequest = JSON.parse(
+        String((await waitForWebSocketMessage(bootstrapSocket)).data),
+      );
+      expect(firstBootstrapAuthorizeRequest).toEqual({
+        type: "ports.target.authorize",
+        requestId: expect.any(String),
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      });
+      expect(firstBootstrapAuthorizeRequest.requestId).not.toBe("req_shared");
+
+      secondConnectionSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_shared",
+          target: {
+            kind: "port",
+            port: 8080,
+          },
+        }),
+      );
+
+      const secondBootstrapAuthorizeRequest = JSON.parse(
+        String((await waitForWebSocketMessage(bootstrapSocket)).data),
+      );
+      expect(secondBootstrapAuthorizeRequest).toEqual({
+        type: "ports.target.authorize",
+        requestId: expect.any(String),
+        target: {
+          kind: "port",
+          port: 8080,
+        },
+      });
+      expect(secondBootstrapAuthorizeRequest.requestId).not.toBe("req_shared");
+      expect(secondBootstrapAuthorizeRequest.requestId).not.toBe(
+        firstBootstrapAuthorizeRequest.requestId,
+      );
+
+      bootstrapSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: firstBootstrapAuthorizeRequest.requestId,
+          authorized: false,
+          reason: "unsupported_protocol",
+        }),
+      );
+
+      const firstConnectionMessage = await waitForWebSocketMessage(firstConnectionSocket);
+      expect(firstConnectionMessage.isBinary).toBe(false);
+      expect(JSON.parse(String(firstConnectionMessage.data))).toEqual({
+        type: "ports.target.authorize.result",
+        requestId: "req_shared",
+        authorized: false,
+        reason: "unsupported_protocol",
+      });
+      await waitForNoWebSocketMessage(secondConnectionSocket);
+
+      bootstrapSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: secondBootstrapAuthorizeRequest.requestId,
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        }),
+      );
+
+      const secondConnectionMessage = await waitForWebSocketMessage(secondConnectionSocket);
+      expect(secondConnectionMessage.isBinary).toBe(false);
+      expect(JSON.parse(String(secondConnectionMessage.data))).toEqual({
+        type: "ports.target.authorize.result",
+        requestId: "req_shared",
+        authorized: true,
+        upstreamProtocol: "http",
+        websocketCapable: true,
+      });
+    } finally {
+      if (secondConnectionSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(secondConnectionSocket);
+      }
+      if (firstConnectionSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(firstConnectionSocket);
+      }
+      if (bootstrapSocket.readyState === WebSocket.OPEN) {
+        await closeWebSocket(bootstrapSocket);
+      }
+    }
+  });
+
+  it("returns an explicit authorize failure to the connection when the bootstrap disconnects", async ({
+    fixture,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      fixture,
+      sandboxInstanceId,
+    });
+    const bootstrapToken = await mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const connectionToken = await mintConnectionToken({
+      config: {
+        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const bootstrapSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "bootstrap",
+      token: bootstrapToken,
+    });
+    const connectionSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "connect",
+      token: connectionToken,
+    });
+
+    try {
+      connectionSocket.send(
+        JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_disconnect",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+      );
+
+      const bootstrapAuthorizeRequest = JSON.parse(
+        String((await waitForWebSocketMessage(bootstrapSocket)).data),
+      );
+      expect(bootstrapAuthorizeRequest).toEqual({
+        type: "ports.target.authorize",
+        requestId: expect.any(String),
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      });
+      expect(bootstrapAuthorizeRequest.requestId).not.toBe("req_disconnect");
+
+      await closeWebSocket(bootstrapSocket);
+
+      const connectionMessage = await waitForWebSocketMessage(connectionSocket);
+      expect(connectionMessage.isBinary).toBe(false);
+      expect(JSON.parse(String(connectionMessage.data))).toEqual({
+        type: "ports.target.authorize.result",
+        requestId: "req_disconnect",
+        authorized: false,
+        reason: "bootstrap_disconnected",
       });
     } finally {
       if (connectionSocket.readyState === WebSocket.OPEN) {

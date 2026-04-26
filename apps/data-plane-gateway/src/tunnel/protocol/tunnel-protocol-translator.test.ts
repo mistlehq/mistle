@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+
 import {
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
@@ -6,7 +8,9 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { systemClock } from "@mistle/time";
 import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
+import { WSContext } from "hono/ws";
 import { describe, expect, it } from "vitest";
+import WebSocket, { type RawData, WebSocketServer } from "ws";
 
 import { PortAccessTransportService } from "../../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../../publishing/ports-target-authorize-service.js";
@@ -19,6 +23,7 @@ import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-strea
 import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
+import type { RelayPeerSocket } from "../types.js";
 import {
   TunnelProtocolTranslator,
   TunnelProtocolViolationError,
@@ -32,6 +37,163 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
   return buffer;
+}
+
+function toBuffer(data: RawData): Buffer {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  return Buffer.concat(data);
+}
+
+function waitForWebSocketOpen(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onOpen = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("open", onOpen);
+      socket.off("error", onError);
+    };
+
+    socket.once("open", onOpen);
+    socket.once("error", onError);
+  });
+}
+
+function waitForWebSocketPairMessage(socket: WebSocket): Promise<{
+  data: string | Buffer;
+  isBinary: boolean;
+}> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (data: RawData, isBinary: boolean): void => {
+      cleanup();
+      resolve({
+        data: isBinary ? toBuffer(data) : toBuffer(data).toString("utf8"),
+        isBinary,
+      });
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+
+    socket.once("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
+function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
+  if (input === 0 || input === 1 || input === 2 || input === 3) {
+    return input;
+  }
+
+  throw new Error(`Unexpected websocket ready state: ${String(input)}`);
+}
+
+function toPeerSocket(socket: WebSocket): RelayPeerSocket {
+  return new WSContext<WebSocket>({
+    send: (data, options) => {
+      socket.send(data, {
+        compress: options.compress,
+      });
+    },
+    close: (code, reason) => {
+      socket.close(code, reason);
+    },
+    get readyState() {
+      return toWsReadyState(socket.readyState);
+    },
+    raw: socket,
+  });
+}
+
+async function createWebSocketPair(): Promise<{
+  clientSocket: WebSocket;
+  closeAll: () => Promise<void>;
+  peerSocket: RelayPeerSocket;
+}> {
+  const server = createServer();
+  const webSocketServer = new WebSocketServer({
+    server,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address to be available.");
+  }
+
+  const serverSocketPromise = new Promise<WebSocket>((resolve, reject) => {
+    webSocketServer.once("connection", (socket) => {
+      resolve(socket);
+    });
+    webSocketServer.once("error", reject);
+  });
+  const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
+
+  await waitForWebSocketOpen(clientSocket);
+  const serverSocket = await serverSocketPromise;
+
+  return {
+    clientSocket,
+    peerSocket: toPeerSocket(serverSocket),
+    closeAll: async () => {
+      if (clientSocket.readyState === WebSocket.OPEN) {
+        await new Promise<void>((resolve) => {
+          clientSocket.once("close", () => {
+            resolve();
+          });
+          clientSocket.close();
+        });
+      }
+
+      if (serverSocket.readyState === WebSocket.OPEN) {
+        await new Promise<void>((resolve) => {
+          serverSocket.once("close", () => {
+            resolve();
+          });
+          serverSocket.close();
+        });
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        webSocketServer.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          server.close((serverError) => {
+            if (serverError !== undefined) {
+              reject(serverError);
+              return;
+            }
+            resolve();
+          });
+        });
+      });
+    },
+  };
 }
 
 async function createTranslatorHarness() {
@@ -72,6 +234,7 @@ async function createTranslatorHarness() {
   const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
 
   return {
+    relayCoordinator,
     router,
     translator: new TunnelProtocolTranslator(
       router,
@@ -1107,47 +1270,72 @@ describe("TunnelProtocolTranslator", () => {
   });
 
   it("forwards bootstrap ports.target.authorize.result messages back to the requesting connection", async () => {
-    const { translator } = await createTranslatorHarness();
+    const { relayCoordinator, translator } = await createTranslatorHarness();
+    const websocketPair = await createWebSocketPair();
 
-    await translator.translateInboundMessage({
-      clientSessionId: "conn_1",
-      payload: JSON.stringify({
+    relayCoordinator.attachPeer({
+      sandboxInstanceId: SandboxInstanceId,
+      side: "bootstrap",
+      socket: websocketPair.peerSocket,
+      sessionId: BootstrapSessionId,
+    });
+
+    try {
+      await translator.translateInboundMessage({
+        clientSessionId: "conn_1",
+        payload: JSON.stringify({
+          type: "ports.target.authorize",
+          requestId: "req_port_access_1",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "connection",
+      });
+
+      const outboundMessage = await waitForWebSocketPairMessage(websocketPair.clientSocket);
+      expect(outboundMessage.isBinary).toBe(false);
+      const bootstrapAuthorizeRequest = JSON.parse(String(outboundMessage.data));
+      expect(bootstrapAuthorizeRequest).toEqual({
         type: "ports.target.authorize",
-        requestId: "req_port_access_1",
+        requestId: expect.any(String),
         target: {
           kind: "port",
           port: 5173,
         },
-      }),
-      sandboxInstanceId: SandboxInstanceId,
-      sourcePeerSide: "connection",
-    });
+      });
+      expect(bootstrapAuthorizeRequest.requestId).not.toBe("req_port_access_1");
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: BootstrapSessionId,
-        payload: JSON.stringify({
-          type: "ports.target.authorize.result",
-          requestId: "req_port_access_1",
-          authorized: true,
-          upstreamProtocol: "http",
-          websocketCapable: true,
+      await expect(
+        translator.translateInboundMessage({
+          clientSessionId: BootstrapSessionId,
+          payload: JSON.stringify({
+            type: "ports.target.authorize.result",
+            requestId: bootstrapAuthorizeRequest.requestId,
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: true,
+          }),
+          sandboxInstanceId: SandboxInstanceId,
+          sourcePeerSide: "bootstrap",
         }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "bootstrap",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "forward",
-        payload: JSON.stringify({
-          type: "ports.target.authorize.result",
-          requestId: "req_port_access_1",
-          authorized: true,
-          upstreamProtocol: "http",
-          websocketCapable: true,
-        }),
-        targetConnectionSessionId: "conn_1",
-      },
-    });
+      ).resolves.toEqual({
+        delivery: {
+          kind: "forward",
+          payload: JSON.stringify({
+            type: "ports.target.authorize.result",
+            requestId: "req_port_access_1",
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: true,
+          }),
+          targetConnectionSessionId: "conn_1",
+        },
+      });
+    } finally {
+      await websocketPair.closeAll();
+    }
   });
 });

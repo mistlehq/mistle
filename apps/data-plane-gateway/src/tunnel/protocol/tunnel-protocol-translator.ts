@@ -653,7 +653,7 @@ export class TunnelProtocolTranslator {
       if (resolution?.kind === "forward") {
         return createTranslation({
           delivery: createForwardDelivery({
-            payload: input.payload,
+            payload: JSON.stringify(resolution.result),
             targetConnectionSessionId: resolution.targetConnectionSessionId,
           }),
         });

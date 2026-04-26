@@ -152,7 +152,7 @@ const PortsTargetAuthorizeFailureResultSchema = z.object({
   type: z.literal("ports.target.authorize.result"),
   requestId: NonEmptyStringSchema,
   authorized: z.literal(false),
-  reason: z.enum(["port_unreachable", "unsupported_protocol"]),
+  reason: z.enum(["port_unreachable", "unsupported_protocol", "bootstrap_disconnected"]),
 });
 
 const PortsTargetAuthorizeResultSchema = z.union([

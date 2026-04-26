@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  type PortAccessTarget,
   type PortsTargetAuthorize,
+  type PortsTargetAuthorizeFailureResult,
+  type PortAccessTarget,
   type PortsTargetAuthorizeResult,
 } from "@mistle/sandbox-session-protocol";
 import type { Scheduler, TimerHandle } from "@mistle/time";
@@ -23,8 +24,20 @@ type PendingPortsTargetAuthorizeRequest = {
   | {
       kind: "connection";
       clientSessionId: string;
+      originalRequestId: string;
     }
 );
+
+type PendingConnectionTargetAuthorizeResolution = {
+  kind: "forward";
+  result: PortsTargetAuthorizeResult;
+  targetConnectionSessionId: string;
+};
+
+type RejectedPendingConnectionTargetAuthorizeRequest = {
+  result: PortsTargetAuthorizeFailureResult;
+  targetConnectionSessionId: string;
+};
 
 export class PortsTargetAuthorizeTimedOutError extends Error {
   public constructor(sandboxInstanceId: string, port: number) {
@@ -119,19 +132,21 @@ export class PortsTargetAuthorizeService {
     clientSessionId: string;
     request: PortsTargetAuthorize;
   }): Promise<void> {
+    const forwardedRequestId = randomUUID();
     const timeoutHandle = this.scheduler.schedule(() => {
       this.deletePendingRequest({
         sandboxInstanceId: input.sandboxInstanceId,
-        requestId: input.request.requestId,
+        requestId: forwardedRequestId,
       });
     }, PortsTargetAuthorizeTimeoutMs);
 
     this.setPendingRequest({
       sandboxInstanceId: input.sandboxInstanceId,
-      requestId: input.request.requestId,
+      requestId: forwardedRequestId,
       pendingRequest: {
         kind: "connection",
         clientSessionId: input.clientSessionId,
+        originalRequestId: input.request.requestId,
         timeoutHandle,
       },
     });
@@ -140,12 +155,15 @@ export class PortsTargetAuthorizeService {
       await this.relayCoordinator.forwardPeerMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "connection",
-        payload: JSON.stringify(input.request),
+        payload: JSON.stringify({
+          ...input.request,
+          requestId: forwardedRequestId,
+        } satisfies PortsTargetAuthorize),
       });
     } catch (error) {
       this.deletePendingRequest({
         sandboxInstanceId: input.sandboxInstanceId,
-        requestId: input.request.requestId,
+        requestId: forwardedRequestId,
       });
       throw error;
     }
@@ -158,10 +176,7 @@ export class PortsTargetAuthorizeService {
     | {
         kind: "drop";
       }
-    | {
-        kind: "forward";
-        targetConnectionSessionId: string;
-      }
+    | PendingConnectionTargetAuthorizeResolution
     | undefined {
     const pendingRequest = this.getPendingRequest({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -186,16 +201,23 @@ export class PortsTargetAuthorizeService {
 
     return {
       kind: "forward",
+      result: {
+        ...input.result,
+        requestId: pendingRequest.originalRequestId,
+      },
       targetConnectionSessionId: pendingRequest.clientSessionId,
     };
   }
 
-  public rejectPendingRequestsForSandbox(input: { sandboxInstanceId: string }): void {
+  public rejectPendingRequestsForSandbox(input: {
+    sandboxInstanceId: string;
+  }): RejectedPendingConnectionTargetAuthorizeRequest[] {
     const pendingRequests = this.#pendingRequestsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (pendingRequests === undefined) {
-      return;
+      return [];
     }
 
+    const rejectedConnectionRequests: RejectedPendingConnectionTargetAuthorizeRequest[] = [];
     this.#pendingRequestsBySandboxInstanceId.delete(input.sandboxInstanceId);
     for (const pendingRequest of pendingRequests.values()) {
       this.scheduler.cancel(pendingRequest.timeoutHandle);
@@ -203,8 +225,21 @@ export class PortsTargetAuthorizeService {
         pendingRequest.reject(
           new PortsTargetAuthorizeBootstrapDisconnectedError(input.sandboxInstanceId),
         );
+        continue;
       }
+
+      rejectedConnectionRequests.push({
+        result: {
+          type: "ports.target.authorize.result",
+          requestId: pendingRequest.originalRequestId,
+          authorized: false,
+          reason: "bootstrap_disconnected",
+        },
+        targetConnectionSessionId: pendingRequest.clientSessionId,
+      });
     }
+
+    return rejectedConnectionRequests;
   }
 
   private setPendingRequest(input: {

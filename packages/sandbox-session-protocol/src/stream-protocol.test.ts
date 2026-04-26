@@ -742,6 +742,24 @@ describe("ports control message parser", () => {
     });
   });
 
+  it("parses bootstrap-disconnected target authorize failures", () => {
+    expect(
+      parsePortsControlMessage(
+        JSON.stringify({
+          type: "ports.target.authorize.result",
+          requestId: "req_port_access_4",
+          authorized: false,
+          reason: "bootstrap_disconnected",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.target.authorize.result",
+      requestId: "req_port_access_4",
+      authorized: false,
+      reason: "bootstrap_disconnected",
+    });
+  });
+
   it("rejects malformed target authorize messages", () => {
     expect(
       parsePortsControlMessage(

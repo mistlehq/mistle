@@ -105,6 +105,8 @@ function resolveAuthorizeFailureMessage(
       return "That port is no longer reachable in the sandbox.";
     case "unsupported_protocol":
       return "That process is not serving HTTP or HTTPS on its selected port.";
+    case "bootstrap_disconnected":
+      return "The sandbox tunnel disconnected before port access could be authorized.";
   }
 
   throw new Error("Unknown port access authorize failure reason.");

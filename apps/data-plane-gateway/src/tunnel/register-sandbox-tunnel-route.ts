@@ -352,9 +352,32 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 input.portAccessTransportService.rejectPendingStreamsForSandbox({
                   sandboxInstanceId,
                 });
-                input.portsTargetAuthorizeService.rejectPendingRequestsForSandbox({
-                  sandboxInstanceId,
-                });
+                const rejectedPendingAuthorizeRequests =
+                  input.portsTargetAuthorizeService.rejectPendingRequestsForSandbox({
+                    sandboxInstanceId,
+                  });
+                if (rejectedPendingAuthorizeRequests.length > 0) {
+                  void Promise.all(
+                    rejectedPendingAuthorizeRequests.map(async (pendingRequest) => {
+                      await input.relayCoordinator.forwardPeerMessage({
+                        sandboxInstanceId,
+                        fromSide: "bootstrap",
+                        payload: JSON.stringify(pendingRequest.result),
+                        targetSessionId: pendingRequest.targetConnectionSessionId,
+                      });
+                    }),
+                  ).catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        relaySessionId,
+                        sandboxInstanceId,
+                        tokenKind: sourceTokenKind,
+                      },
+                      "Failed rejecting pending ports target authorize requests",
+                    );
+                  });
+                }
                 void input.telemetryIngressService
                   .detachBootstrapSession({
                     relaySessionId,
