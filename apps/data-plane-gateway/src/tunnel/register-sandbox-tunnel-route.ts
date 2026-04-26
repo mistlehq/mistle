@@ -282,39 +282,52 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            void handleTunnelWebSocketMessage({
-              ...(admittedRequest.kind === "bootstrap"
-                ? { bootstrapOwnerLeaseId: admittedRequest.ownerLeaseId }
-                : {}),
-              clientSessionId: relaySessionId,
-              currentSocket: ws,
-              handleSigningDelivery: async (delivery) => {
-                const result =
-                  await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
-                    liveSandboxInstanceId: sandboxInstanceId,
-                    request: delivery.message,
+            void (async () => {
+              if (attachedPeer?.activationPromise !== undefined) {
+                await attachedPeer.activationPromise;
+
+                if (ws.readyState !== 1) {
+                  return;
+                }
+                if (!input.relayCoordinator.isCurrentPeer(relayTarget)) {
+                  return;
+                }
+              }
+
+              await handleTunnelWebSocketMessage({
+                ...(admittedRequest.kind === "bootstrap"
+                  ? { bootstrapOwnerLeaseId: admittedRequest.ownerLeaseId }
+                  : {}),
+                clientSessionId: relaySessionId,
+                currentSocket: ws,
+                handleSigningDelivery: async (delivery) => {
+                  const result =
+                    await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
+                      liveSandboxInstanceId: sandboxInstanceId,
+                      request: delivery.message,
+                    });
+                  ws.send(JSON.stringify(result));
+                },
+                sandboxKeepaliveRepository,
+                sandboxRuntimeReadinessRepository,
+                handleTelemetryDelivery: async (delivery) => {
+                  await input.telemetryIngressService.handleDelivery({
+                    delivery,
+                    relaySessionId,
+                    sandboxInstanceId,
+                    sendControlMessage: (message) => {
+                      ws.send(JSON.stringify(message));
+                    },
                   });
-                ws.send(JSON.stringify(result));
-              },
-              sandboxKeepaliveRepository,
-              sandboxRuntimeReadinessRepository,
-              handleTelemetryDelivery: async (delivery) => {
-                await input.telemetryIngressService.handleDelivery({
-                  delivery,
-                  relaySessionId,
-                  sandboxInstanceId,
-                  sendControlMessage: (message) => {
-                    ws.send(JSON.stringify(message));
-                  },
-                });
-              },
-              interactiveStreamRouter: input.interactiveStreamRouter,
-              payload,
-              relayCoordinator: input.relayCoordinator,
-              sandboxInstanceId,
-              sourcePeerSide,
-              tunnelProtocolTranslator,
-            }).catch((error: unknown) => {
+                },
+                interactiveStreamRouter: input.interactiveStreamRouter,
+                payload,
+                relayCoordinator: input.relayCoordinator,
+                sandboxInstanceId,
+                sourcePeerSide,
+                tunnelProtocolTranslator,
+              });
+            })().catch((error: unknown) => {
               if (error instanceof TunnelProtocolViolationError) {
                 logger.info(
                   {

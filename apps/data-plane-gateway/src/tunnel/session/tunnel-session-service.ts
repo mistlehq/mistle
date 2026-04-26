@@ -37,6 +37,7 @@ type LeaseRenewalHandle = {
  * teardown handle that must be stopped when the peer disconnects.
  */
 export type AttachedTunnelPeer = {
+  activationPromise?: Promise<void>;
   relayTarget: RelayTarget;
   leaseHeartbeatHandle?: LeaseRenewalHandle;
   presenceLeaseRenewalHandle?: {
@@ -175,7 +176,7 @@ export class TunnelSessionService {
       });
     }
 
-    void this.activateBootstrapAttachment({
+    attachedPeer.activationPromise = this.activateBootstrapAttachment({
       attachedAtMs: runtimeAttachmentAttachedAtMs,
       attachedPeer,
       leaseId: input.leaseId,
