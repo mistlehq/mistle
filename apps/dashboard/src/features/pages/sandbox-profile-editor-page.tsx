@@ -45,8 +45,10 @@ import {
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
+  refreshSandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
+  PublishSandboxProfileVersionResult,
   SandboxProfile,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -96,12 +98,20 @@ type SandboxProfileEditorVersionMode =
   | {
       kind: "active";
       version: number;
-      activeVersion: number;
+      activeVersion: number | null;
       hasDraft: boolean;
       draftVersion: number | null;
     };
 
 type SandboxProfileRouteView = "published" | "draft";
+type SandboxProfileSnapshotPreparationStatus =
+  | {
+      kind: "pending";
+    }
+  | {
+      kind: "failed";
+      message: string;
+    };
 
 type ResolveEditorVersionModeResult =
   | {
@@ -119,6 +129,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
   view: SandboxProfileRouteView;
 }): ResolveEditorVersionModeResult {
   const draftVersions = input.versions.filter((version) => version.state === "draft");
+  const publishedVersions = input.versions.filter((version) => version.state === "published");
   if (draftVersions.length > 1) {
     return {
       ok: false,
@@ -131,6 +142,12 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     input.activeVersion === null
       ? null
       : (input.versions.find((version) => version.version === input.activeVersion) ?? null);
+  const latestPublishedVersion =
+    publishedVersions.length === 0
+      ? null
+      : publishedVersions.reduce((latestVersion, currentVersion) =>
+          currentVersion.version > latestVersion.version ? currentVersion : latestVersion,
+        );
 
   if (input.activeVersion !== null && activeVersion === null) {
     return {
@@ -158,7 +175,20 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     };
   }
 
-  if (input.activeVersion === null || activeVersion === null) {
+  if (input.activeVersion !== null && activeVersion !== null) {
+    return {
+      ok: true,
+      mode: {
+        kind: "active",
+        version: activeVersion.version,
+        activeVersion: input.activeVersion,
+        hasDraft: draftVersion !== null,
+        draftVersion: draftVersion?.version ?? null,
+      },
+    };
+  }
+
+  if (latestPublishedVersion === null) {
     return {
       ok: false,
       message: "Sandbox profile published version could not be loaded.",
@@ -169,7 +199,7 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     ok: true,
     mode: {
       kind: "active",
-      version: activeVersion.version,
+      version: latestPublishedVersion.version,
       activeVersion: input.activeVersion,
       hasDraft: draftVersion !== null,
       draftVersion: draftVersion?.version ?? null,
@@ -182,6 +212,110 @@ set -euo pipefail
 
 pnpm install
 pnpm dev:bootstrap`;
+
+export function shouldPollSandboxProfileSnapshotPreparation(input: {
+  profile: SandboxProfile | undefined;
+  versions: readonly SandboxProfileVersion[] | undefined;
+}): boolean {
+  if (input.profile?.activeVersion !== null || input.versions === undefined) {
+    return false;
+  }
+
+  return input.versions.some(
+    (version) =>
+      version.state === "published" &&
+      version.usable === false &&
+      (version.latestSnapshotJob?.state === "queued" ||
+        version.latestSnapshotJob?.state === "running"),
+  );
+}
+
+function shouldRedirectPublishedSandboxProfileViewToDraft(input: {
+  activeVersion: number | null;
+  versions: readonly SandboxProfileVersion[];
+}): boolean {
+  return (
+    input.activeVersion === null && input.versions.some((version) => version.state === "draft")
+  );
+}
+
+export function shouldRedirectDraftSandboxProfileViewToPublished(input: {
+  versions: readonly SandboxProfileVersion[];
+}): boolean {
+  const hasDraftVersion = input.versions.some((version) => version.state === "draft");
+  const hasPublishedVersion = input.versions.some((version) => version.state === "published");
+
+  return !hasDraftVersion && hasPublishedVersion;
+}
+
+export function applyPublishedSandboxProfileVersionToProfile(input: {
+  profile: SandboxProfile | undefined;
+  result: PublishSandboxProfileVersionResult;
+}): SandboxProfile | undefined {
+  if (input.profile === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...input.profile,
+    activeVersion: input.result.activeVersion,
+  };
+}
+
+export function applyPublishedSandboxProfileVersionToVersions(input: {
+  versions: readonly SandboxProfileVersion[] | undefined;
+  result: PublishSandboxProfileVersionResult;
+}): readonly SandboxProfileVersion[] | undefined {
+  if (input.versions === undefined) {
+    return undefined;
+  }
+
+  const remainingVersions = input.versions.filter(
+    (version) => version.version !== input.result.version.version,
+  );
+  return [...remainingVersions, input.result.version].sort(
+    (left, right) => left.version - right.version,
+  );
+}
+
+function resolveSnapshotPreparationStatus(input: {
+  mode: SandboxProfileEditorVersionMode;
+  version: SandboxProfileVersion | null;
+}): SandboxProfileSnapshotPreparationStatus | null {
+  if (input.mode.kind !== "active" || input.mode.activeVersion !== null || input.version === null) {
+    return null;
+  }
+
+  if (input.version.usable) {
+    return null;
+  }
+
+  const latestSnapshotJob = input.version.latestSnapshotJob;
+  if (latestSnapshotJob === null) {
+    return null;
+  }
+
+  if (latestSnapshotJob.state === "queued") {
+    return {
+      kind: "pending",
+    };
+  }
+
+  if (latestSnapshotJob.state === "running") {
+    return {
+      kind: "pending",
+    };
+  }
+
+  if (latestSnapshotJob.state === "failed") {
+    return {
+      kind: "failed",
+      message: latestSnapshotJob.errorMessage ?? "Snapshot materialization failed.",
+    };
+  }
+
+  return null;
+}
 
 export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): React.JSX.Element {
   if (props.mode === "create") {
@@ -284,18 +418,39 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
     throw new Error("profileId is required.");
   }
 
+  const profileDetailKey = sandboxProfileDetailQueryKey(profileId);
+  const profileVersionsKey = sandboxProfileVersionsQueryKey(profileId);
+
   const profileQuery = useQuery({
-    queryKey: sandboxProfileDetailQueryKey(profileId),
+    queryKey: profileDetailKey,
     queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
+    refetchInterval: () =>
+      shouldPollSandboxProfileSnapshotPreparation({
+        profile: queryClient.getQueryData<SandboxProfile>(profileDetailKey),
+        versions: queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(
+          profileVersionsKey,
+        )?.versions,
+      })
+        ? 3_000
+        : false,
     retry: false,
   });
   const profileVersionsQuery = useQuery({
-    queryKey: sandboxProfileVersionsQueryKey(profileId),
+    queryKey: profileVersionsKey,
     queryFn: async ({ signal }) =>
       listSandboxProfileVersions({
         profileId,
         signal,
       }),
+    refetchInterval: () =>
+      shouldPollSandboxProfileSnapshotPreparation({
+        profile: queryClient.getQueryData<SandboxProfile>(profileDetailKey),
+        versions: queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(
+          profileVersionsKey,
+        )?.versions,
+      })
+        ? 3_000
+        : false,
     retry: false,
   });
 
@@ -452,6 +607,7 @@ type LoadedSandboxProfileEditorPageInput = {
 function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
+  const queryClient = useQueryClient();
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
@@ -507,6 +663,27 @@ function LoadedSandboxProfileEditorPage(
     },
     onSuccess: async (result) => {
       setVersionActionError(null);
+      queryClient.setQueryData<SandboxProfile | undefined>(
+        sandboxProfileDetailQueryKey(input.profileId),
+        (currentProfile) =>
+          applyPublishedSandboxProfileVersionToProfile({
+            profile: currentProfile,
+            result,
+          }),
+      );
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => {
+          const nextVersions = applyPublishedSandboxProfileVersionToVersions({
+            versions: currentVersions?.versions,
+            result,
+          });
+
+          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
+        },
+      );
+      void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
+
       const invalidationPromises = [
         input.invalidateProfileVersions(input.profileId),
         input.invalidateSandboxProfiles(),
@@ -524,8 +701,7 @@ function LoadedSandboxProfileEditorPage(
           }),
         );
       }
-      await Promise.all(invalidationPromises);
-      void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
+      void Promise.all(invalidationPromises);
     },
     onError: (error: unknown) => {
       setVersionActionError(
@@ -560,6 +736,48 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
+  const refreshSnapshotMutation = useMutation({
+    mutationFn: async (version: number) =>
+      refreshSandboxProfileVersion({
+        profileId: input.profileId,
+        version,
+      }),
+    onSuccess: async (result) => {
+      setVersionActionError(null);
+      queryClient.setQueryData<SandboxProfile | undefined>(
+        sandboxProfileDetailQueryKey(input.profileId),
+        (currentProfile) =>
+          applyPublishedSandboxProfileVersionToProfile({
+            profile: currentProfile,
+            result,
+          }),
+      );
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => {
+          const nextVersions = applyPublishedSandboxProfileVersionToVersions({
+            versions: currentVersions?.versions,
+            result,
+          });
+
+          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
+        },
+      );
+      void Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not refresh sandbox profile snapshot.",
+        }),
+      );
+    },
+  });
   const deleteProfileMutation = useMutation({
     mutationFn: async () =>
       deleteSandboxProfile({
@@ -586,10 +804,21 @@ function LoadedSandboxProfileEditorPage(
 
   if (
     input.view === "published" &&
-    input.profile.activeVersion === null &&
-    input.versions.some((version) => version.state === "draft")
+    shouldRedirectPublishedSandboxProfileViewToDraft({
+      activeVersion: input.profile.activeVersion,
+      versions: input.versions,
+    })
   ) {
     return <Navigate replace to={`/sandbox-profiles/${input.profileId}/draft`} />;
+  }
+
+  if (
+    input.view === "draft" &&
+    shouldRedirectDraftSandboxProfileViewToPublished({
+      versions: input.versions,
+    })
+  ) {
+    return <Navigate replace to={`/sandbox-profiles/${input.profileId}/published`} />;
   }
 
   const resolvedMode = resolveSandboxProfileEditorVersionMode({
@@ -608,6 +837,9 @@ function LoadedSandboxProfileEditorPage(
 
   return (
     <ReadySandboxProfileEditorPage
+      currentVersion={
+        input.versions.find((version) => version.version === resolvedMode.mode.version) ?? null
+      }
       mode={resolvedMode.mode}
       navigate={input.navigate}
       onMakeChanges={() => {
@@ -618,6 +850,9 @@ function LoadedSandboxProfileEditorPage(
       }}
       onPublish={(version) => {
         publishMutation.mutate(version);
+      }}
+      onRefreshSnapshot={(version) => {
+        refreshSnapshotMutation.mutate(version);
       }}
       onViewActive={() => {
         setVersionActionError(null);
@@ -659,7 +894,10 @@ function LoadedSandboxProfileEditorPage(
       }}
       versionActionError={versionActionError}
       versionActionIsPending={
-        publishMutation.isPending || createDraftMutation.isPending || discardDraftMutation.isPending
+        publishMutation.isPending ||
+        createDraftMutation.isPending ||
+        discardDraftMutation.isPending ||
+        refreshSnapshotMutation.isPending
       }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -675,6 +913,7 @@ function ReadySandboxProfileEditorPage(input: {
   profileId: string;
   profile: SandboxProfile;
   mode: SandboxProfileEditorVersionMode;
+  currentVersion: SandboxProfileVersion | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
   deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -684,6 +923,7 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
+  onRefreshSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -716,6 +956,10 @@ function ReadySandboxProfileEditorPage(input: {
 
   return (
     <SandboxProfileEditorView
+      snapshotPreparationStatus={resolveSnapshotPreparationStatus({
+        mode: input.mode,
+        version: input.currentVersion,
+      })}
       hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
       hasUnsavedSetupScriptChanges={hasUnsavedSetupScriptChanges}
       isSavingProfileName={metaState.isUpdating}
@@ -730,6 +974,7 @@ function ReadySandboxProfileEditorPage(input: {
       onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
       onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
       onPublish={input.onPublish}
+      onRefreshSnapshot={input.onRefreshSnapshot}
       onSaveProfileName={metaState.onProfileNameSave}
       onViewActive={input.onViewActive}
       onViewDraft={input.onViewDraft}
@@ -870,6 +1115,7 @@ export function SandboxProfileEditorView(input: {
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
+  snapshotPreparationStatus: SandboxProfileSnapshotPreparationStatus | null;
   deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
   deleteProfileAutomationUsagesError: string | null;
   deleteProfileAutomationUsagesIsPending: boolean;
@@ -879,6 +1125,7 @@ export function SandboxProfileEditorView(input: {
   versionActionIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
+  onRefreshSnapshot: (version: number) => void;
   onConfirmDeleteProfile: () => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -921,6 +1168,30 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
+  const refreshSnapshotMenuItem =
+    input.mode.kind !== "active" ? null : (
+      <DropdownMenuItem
+        onClick={() => {
+          input.onRefreshSnapshot(input.mode.version);
+        }}
+      >
+        Refresh snapshot
+      </DropdownMenuItem>
+    );
+  const snapshotPreparationBadge =
+    input.snapshotPreparationStatus === null
+      ? null
+      : input.snapshotPreparationStatus.kind === "failed"
+        ? {
+            className:
+              "inline-flex h-6 items-center rounded-sm border border-red-200 bg-red-50 px-2 text-xs font-medium text-red-700",
+            label: "Snapshot failed",
+          }
+        : {
+            className:
+              "inline-flex h-6 items-center rounded-sm border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-700",
+            label: "Preparing snapshot",
+          };
 
   return (
     <div className="gap-4 flex flex-col">
@@ -943,12 +1214,18 @@ export function SandboxProfileEditorView(input: {
         <div className="flex items-center gap-2">
           <span
             className={
-              input.mode.kind === "draft"
-                ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
-                : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
+              snapshotPreparationBadge !== null
+                ? snapshotPreparationBadge.className
+                : input.mode.kind === "draft"
+                  ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
+                  : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
             }
           >
-            {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
+            {snapshotPreparationBadge?.label === "Preparing snapshot" ? (
+              <SpinnerGapIcon aria-hidden="true" className="mr-1 size-3.5 animate-spin" />
+            ) : null}
+            {snapshotPreparationBadge?.label ??
+              (input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published")}
           </span>
           {input.mode.kind === "draft" ? (
             <ButtonGroup>
@@ -987,6 +1264,7 @@ export function SandboxProfileEditorView(input: {
                 triggerLabel="More actions"
                 triggerVariant="default"
               >
+                {refreshSnapshotMenuItem}
                 {discardChangesMenuItem}
                 {deleteProfileMenuItem}
               </MoreActionsMenu>
@@ -994,6 +1272,12 @@ export function SandboxProfileEditorView(input: {
           )}
         </div>
       </div>
+
+      {input.snapshotPreparationStatus?.kind === "failed" ? (
+        <Notice title="Snapshot preparation failed" variant="alert">
+          {input.snapshotPreparationStatus.message}
+        </Notice>
+      ) : null}
 
       {input.versionActionError === null ? null : (
         <Notice title="Profile version action failed" variant="alert">

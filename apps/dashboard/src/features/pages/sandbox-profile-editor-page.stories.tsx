@@ -256,11 +256,13 @@ function SandboxProfileEditorPageStoryView(
         deleteProfileIsPending={false}
         isDeleteProfileDialogOpen={false}
         mode={mode}
+        snapshotPreparationStatus={null}
         onConfirmDeleteProfile={() => {}}
         onDeleteProfileDialogOpenChange={() => {}}
         onMakeChanges={() => {}}
         onDiscardChangesAndLeaveDraft={() => {}}
         onPublish={() => {}}
+        onRefreshSnapshot={() => {}}
         onSaveProfileName={handleProfileNameSave}
         onViewActive={() => {}}
         onViewDraft={() => {}}

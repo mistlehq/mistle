@@ -199,31 +199,125 @@ describe("sandbox profile versions refresh integration", () => {
     }
   }, 60_000);
 
-  it("returns 409 when the version is not yet usable", async ({ fixture }) => {
+  it("queues manual materialization when the published version does not have a snapshot yet", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_refresh_snapshot_job_without_snapshot",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-refresh-not-usable@example.com",
+      });
+
+      await fixture.db.insert(sandboxProfiles).values({
+        ...createSandboxProfileFixture({
+          id: "sbp_version_refresh_not_usable_001",
+          organizationId: authenticatedSession.organizationId,
+          displayName: "Refresh Not Usable Profile",
+          activeVersion: null,
+          createdAt: "2026-04-25T00:00:00.000Z",
+        }),
+      });
+      await fixture.db.insert(sandboxProfileVersions).values(
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_version_refresh_not_usable_001",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          publishedAt: "2026-04-25T00:01:00.000Z",
+        }),
+      );
+
+      const response = await fixture.request(
+        "/v1/sandbox/profiles/sbp_version_refresh_not_usable_001/versions/1/refresh",
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      const responseBody = PublishSandboxProfileVersionResponseSchema.parse(await response.json());
+      expect(responseBody).toEqual({
+        version: {
+          sandboxProfileId: "sbp_version_refresh_not_usable_001",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          isActive: false,
+          usable: false,
+          latestSnapshotJob: {
+            id: expect.any(String),
+            trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+            state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+            errorCode: null,
+            errorMessage: null,
+            createdAt: expect.any(String),
+            startedAt: null,
+            finishedAt: null,
+          },
+        },
+        activeVersion: null,
+        snapshotJob: {
+          id: expect.any(String),
+          trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+          state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+          errorCode: null,
+          errorMessage: null,
+          createdAt: expect.any(String),
+          startedAt: null,
+          finishedAt: null,
+        },
+      });
+
+      const queuedWorkflowInput = await waitForQueuedMaterializeWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        snapshotJobId: responseBody.snapshotJob.id,
+      });
+      expect(queuedWorkflowInput).toMatchObject({
+        snapshotJobId: responseBody.snapshotJob.id,
+        sandboxProfileId: "sbp_version_refresh_not_usable_001",
+        sandboxProfileVersion: 1,
+        image: {
+          kind: "base",
+        },
+      });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
+  it("returns 409 when the version is not published", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-refresh-not-usable@example.com",
+      email: "integration-sandbox-profile-version-refresh-not-published@example.com",
     });
 
     await fixture.db.insert(sandboxProfiles).values({
       ...createSandboxProfileFixture({
-        id: "sbp_version_refresh_not_usable_001",
+        id: "sbp_version_refresh_not_published_001",
         organizationId: authenticatedSession.organizationId,
-        displayName: "Refresh Not Usable Profile",
+        displayName: "Refresh Not Published Profile",
         activeVersion: null,
         createdAt: "2026-04-25T00:00:00.000Z",
       }),
     });
     await fixture.db.insert(sandboxProfileVersions).values(
       createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_version_refresh_not_usable_001",
+        sandboxProfileId: "sbp_version_refresh_not_published_001",
         version: 1,
-        state: SandboxProfileVersionStates.PUBLISHED,
-        publishedAt: "2026-04-25T00:01:00.000Z",
+        state: SandboxProfileVersionStates.DRAFT,
       }),
     );
 
     const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_version_refresh_not_usable_001/versions/1/refresh",
+      "/v1/sandbox/profiles/sbp_version_refresh_not_published_001/versions/1/refresh",
       {
         method: "POST",
         headers: {

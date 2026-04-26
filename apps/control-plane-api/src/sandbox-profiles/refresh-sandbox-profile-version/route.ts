@@ -21,7 +21,7 @@ export const route = createRoute({
   responses: {
     200: {
       description:
-        "Queue manual snapshot refresh for the specified usable sandbox profile version.",
+        "Queue manual snapshot materialization or refresh for the specified published sandbox profile version.",
       content: {
         "application/json": {
           schema: publishSandboxProfileVersionResponseSchema,

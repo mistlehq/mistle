@@ -554,6 +554,43 @@ export async function publishSandboxProfileVersion(input: {
   }
 }
 
+export async function refreshSandboxProfileVersion(input: {
+  profileId: string;
+  version: number;
+}): Promise<PublishSandboxProfileVersionResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "refreshSandboxProfileVersion",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/refresh`,
+      fallbackMessage: "Could not refresh sandbox profile snapshot.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = PublishSandboxProfileVersionResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "refreshSandboxProfileVersion",
+        status: 500,
+        body: responseBody,
+        message: "Refresh sandbox profile version response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "refreshSandboxProfileVersion",
+        error,
+        fallbackMessage: "Could not refresh sandbox profile snapshot.",
+      }),
+    );
+  }
+}
+
 export async function discardSandboxProfileVersionDraft(input: {
   profileId: string;
   version: number;

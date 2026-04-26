@@ -22,11 +22,15 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
+  applyPublishedSandboxProfileVersionToProfile,
+  applyPublishedSandboxProfileVersionToVersions,
   resolveSandboxProfileEditorVersionMode,
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
+  shouldRedirectDraftSandboxProfileViewToPublished,
+  shouldPollSandboxProfileSnapshotPreparation,
 } from "./sandbox-profile-editor-page.js";
 
 afterEach(() => {
@@ -79,7 +83,13 @@ function renderSandboxProfileEditor(input?: {
   }[];
   integrationsLoading?: boolean;
   view?: "published" | "draft" | "default";
-  versionState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
+  versionState?:
+    | "draft"
+    | "draft-with-published"
+    | "published"
+    | "published-with-draft"
+    | "published-pending"
+    | "published-failed";
 }): void {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
@@ -97,7 +107,10 @@ function renderSandboxProfileEditor(input?: {
   const resolvedVersionState = input?.versionState ?? "draft";
   const resolvedRouteView =
     input?.view ??
-    (resolvedVersionState === "published" || resolvedVersionState === "published-with-draft"
+    (resolvedVersionState === "published" ||
+    resolvedVersionState === "published-with-draft" ||
+    resolvedVersionState === "published-pending" ||
+    resolvedVersionState === "published-failed"
       ? "published"
       : "draft");
   const singleVersionState: SandboxProfileVersion["state"] =
@@ -133,14 +146,54 @@ function renderSandboxProfileEditor(input?: {
               isActive: false,
             }),
           ]
-        : [
-            createSandboxProfileVersionFixture({
-              sandboxProfileId: profileId,
-              version,
-              state: singleVersionState,
-              isActive: resolvedVersionState === "published",
-            }),
-          ];
+        : resolvedVersionState === "published-pending"
+          ? [
+              createSandboxProfileVersionFixture({
+                sandboxProfileId: profileId,
+                version,
+                state: "published",
+                isActive: false,
+                usable: false,
+                latestSnapshotJob: {
+                  id: "ssj_pending_initial_materialization",
+                  trigger: "publish",
+                  state: "running",
+                  errorCode: null,
+                  errorMessage: null,
+                  createdAt: "2026-04-23T00:01:00.000Z",
+                  startedAt: "2026-04-23T00:01:05.000Z",
+                  finishedAt: null,
+                },
+              }),
+            ]
+          : resolvedVersionState === "published-failed"
+            ? [
+                createSandboxProfileVersionFixture({
+                  sandboxProfileId: profileId,
+                  version,
+                  state: "published",
+                  isActive: false,
+                  usable: false,
+                  latestSnapshotJob: {
+                    id: "ssj_failed_initial_materialization",
+                    trigger: "publish",
+                    state: "failed",
+                    errorCode: "snapshot_materialization_failed",
+                    errorMessage: "Snapshot materialization failed.",
+                    createdAt: "2026-04-23T00:01:00.000Z",
+                    startedAt: "2026-04-23T00:01:05.000Z",
+                    finishedAt: "2026-04-23T00:01:30.000Z",
+                  },
+                }),
+              ]
+            : [
+                createSandboxProfileVersionFixture({
+                  sandboxProfileId: profileId,
+                  version,
+                  state: singleVersionState,
+                  isActive: resolvedVersionState === "published",
+                }),
+              ];
 
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
@@ -256,11 +309,13 @@ function DeleteProfileDialogHarness(input: {
         hasDraft: false,
         draftVersion: null,
       }}
+      snapshotPreparationStatus={null}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={setIsOpen}
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -297,6 +352,7 @@ function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }):
         activeVersion: 1,
         hasDraft: true,
       }}
+      snapshotPreparationStatus={null}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={() => {}}
       onDiscardChangesAndLeaveDraft={() => {
@@ -304,6 +360,7 @@ function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }):
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -341,6 +398,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
         hasDraft: true,
         draftVersion: 2,
       }}
+      snapshotPreparationStatus={null}
       onConfirmDeleteProfile={() => {}}
       onDeleteProfileDialogOpenChange={() => {}}
       onDiscardChangesAndLeaveDraft={() => {
@@ -348,6 +406,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -477,6 +536,43 @@ describe("SandboxProfileEditorPage", () => {
     });
   });
 
+  it("resolves the latest published version when initial snapshot materialization is still pending", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: null,
+      view: "published",
+      versions: [
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: false,
+          usable: false,
+          latestSnapshotJob: {
+            id: "ssj_pending_initial_materialization",
+            trigger: "publish",
+            state: "running",
+            errorCode: null,
+            errorMessage: null,
+            createdAt: "2026-04-23T00:01:00.000Z",
+            startedAt: "2026-04-23T00:01:05.000Z",
+            finishedAt: null,
+          },
+        }),
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "active",
+        version: 1,
+        activeVersion: null,
+        hasDraft: false,
+        draftVersion: null,
+      },
+    });
+  });
+
   it("can resolve the published version while a draft exists", () => {
     const result = resolveSandboxProfileEditorVersionMode({
       activeVersion: 1,
@@ -515,6 +611,232 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tab", { name: "Integrations" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Resources & Tools" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Configurations" })).toBeDefined();
+  });
+
+  it("shows snapshot preparation feedback while initial materialization is running", () => {
+    renderSandboxProfileEditor({
+      versionState: "published-pending",
+    });
+
+    expect(screen.getByText("Preparing snapshot")).toBeDefined();
+  });
+
+  it("shows snapshot failure feedback when initial materialization fails", () => {
+    renderSandboxProfileEditor({
+      versionState: "published-failed",
+    });
+
+    expect(screen.getByText("Snapshot failed")).toBeDefined();
+    expect(screen.getByText("Snapshot preparation failed")).toBeDefined();
+    expect(screen.getByText("Snapshot materialization failed.")).toBeDefined();
+  });
+
+  it("shows a refresh snapshot action for published versions", () => {
+    renderPublishedWithDraftActionsHarness();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+
+    expect(screen.getByRole("menuitem", { name: "Refresh snapshot" })).toBeDefined();
+  });
+
+  it("polls while a published version is waiting on initial snapshot materialization", () => {
+    expect(
+      shouldPollSandboxProfileSnapshotPreparation({
+        profile: {
+          id: "sbp_test",
+          organizationId: "org_test",
+          displayName: "Prototype Profile",
+          activeVersion: null,
+          status: "active",
+          createdAt: "2026-04-23T00:00:00.000Z",
+          updatedAt: "2026-04-23T00:00:00.000Z",
+        },
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: false,
+            usable: false,
+            latestSnapshotJob: {
+              id: "ssj_pending_initial_materialization",
+              trigger: "publish",
+              state: "running",
+              errorCode: null,
+              errorMessage: null,
+              createdAt: "2026-04-23T00:01:00.000Z",
+              startedAt: "2026-04-23T00:01:05.000Z",
+              finishedAt: null,
+            },
+          }),
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("does not poll once a published version has become active", () => {
+    expect(
+      shouldPollSandboxProfileSnapshotPreparation({
+        profile: {
+          id: "sbp_test",
+          organizationId: "org_test",
+          displayName: "Prototype Profile",
+          activeVersion: 1,
+          status: "active",
+          createdAt: "2026-04-23T00:00:00.000Z",
+          updatedAt: "2026-04-23T00:00:00.000Z",
+        },
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: true,
+          }),
+        ],
+      }),
+    ).toBe(false);
+  });
+
+  it("redirects the draft route to published when the draft is gone but a published version exists", () => {
+    expect(
+      shouldRedirectDraftSandboxProfileViewToPublished({
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "published",
+            isActive: false,
+            usable: false,
+            latestSnapshotJob: {
+              id: "ssj_pending_initial_materialization",
+              trigger: "publish",
+              state: "queued",
+              errorCode: null,
+              errorMessage: null,
+              createdAt: "2026-04-23T00:01:00.000Z",
+              startedAt: null,
+              finishedAt: null,
+            },
+          }),
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("applies the publish response to the cached profile detail immediately", () => {
+    expect(
+      applyPublishedSandboxProfileVersionToProfile({
+        profile: {
+          id: "sbp_test",
+          organizationId: "org_test",
+          displayName: "Prototype Profile",
+          activeVersion: null,
+          status: "active",
+          createdAt: "2026-04-23T00:00:00.000Z",
+          updatedAt: "2026-04-23T00:00:00.000Z",
+        },
+        result: {
+          activeVersion: null,
+          snapshotJob: {
+            id: "ssj_pending_initial_materialization",
+            trigger: "publish",
+            state: "queued",
+            errorCode: null,
+            errorMessage: null,
+            createdAt: "2026-04-23T00:01:00.000Z",
+            startedAt: null,
+            finishedAt: null,
+          },
+          version: createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 2,
+            state: "published",
+            isActive: false,
+            usable: false,
+            latestSnapshotJob: {
+              id: "ssj_pending_initial_materialization",
+              trigger: "publish",
+              state: "queued",
+              errorCode: null,
+              errorMessage: null,
+              createdAt: "2026-04-23T00:01:00.000Z",
+              startedAt: null,
+              finishedAt: null,
+            },
+          }),
+        },
+      }),
+    ).toEqual({
+      id: "sbp_test",
+      organizationId: "org_test",
+      displayName: "Prototype Profile",
+      activeVersion: null,
+      status: "active",
+      createdAt: "2026-04-23T00:00:00.000Z",
+      updatedAt: "2026-04-23T00:00:00.000Z",
+    });
+  });
+
+  it("applies the publish response to the cached versions immediately", () => {
+    const publishedVersion = createSandboxProfileVersionFixture({
+      sandboxProfileId: "sbp_test",
+      version: 2,
+      state: "published",
+      isActive: false,
+      usable: false,
+      latestSnapshotJob: {
+        id: "ssj_pending_initial_materialization",
+        trigger: "publish",
+        state: "queued",
+        errorCode: null,
+        errorMessage: null,
+        createdAt: "2026-04-23T00:01:00.000Z",
+        startedAt: null,
+        finishedAt: null,
+      },
+    });
+
+    expect(
+      applyPublishedSandboxProfileVersionToVersions({
+        versions: [
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 1,
+            state: "draft",
+            isActive: false,
+          }),
+          createSandboxProfileVersionFixture({
+            sandboxProfileId: "sbp_test",
+            version: 2,
+            state: "draft",
+            isActive: false,
+          }),
+        ],
+        result: {
+          activeVersion: null,
+          snapshotJob: {
+            id: "ssj_pending_initial_materialization",
+            trigger: "publish",
+            state: "queued",
+            errorCode: null,
+            errorMessage: null,
+            createdAt: "2026-04-23T00:01:00.000Z",
+            startedAt: null,
+            finishedAt: null,
+          },
+          version: publishedVersion,
+        },
+      }),
+    ).toEqual([
+      createSandboxProfileVersionFixture({
+        sandboxProfileId: "sbp_test",
+        version: 1,
+        state: "draft",
+        isActive: false,
+      }),
+      publishedVersion,
+    ]);
   });
 
   it("shows resources guidance when no git provider is configured", () => {
@@ -734,13 +1056,13 @@ describe("SandboxProfileEditorPage", () => {
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
   });
 
-  it("shows an explicit unavailable state when the draft route has no draft", () => {
+  it("redirects the draft route to published when the profile has no draft but does have a published version", async () => {
     renderSandboxProfileEditor({
       view: "draft",
       versionState: "published",
     });
 
-    expect(screen.getByText("Sandbox profile draft version could not be loaded.")).toBeDefined();
+    expect(await screen.findByText("Viewing: Published")).toBeDefined();
   });
 
   it("discards draft changes directly from the draft actions menu", () => {

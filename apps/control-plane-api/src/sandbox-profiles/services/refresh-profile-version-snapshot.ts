@@ -116,14 +116,10 @@ export async function refreshProfileVersionSnapshot(
         throw new Error("Expected joined sandbox profile version metadata to be present.");
       }
 
-      if (
-        sandboxProfileVersion.state !== SandboxProfileVersionStates.PUBLISHED ||
-        sandboxProfileVersion.snapshotImageProvider === null ||
-        sandboxProfileVersion.snapshotImageId === null
-      ) {
+      if (sandboxProfileVersion.state !== SandboxProfileVersionStates.PUBLISHED) {
         throw new SandboxProfilesConflictError(
           SandboxProfilesConflictCodes.PROFILE_VERSION_NOT_USABLE,
-          `Sandbox profile version '${String(input.profileVersion)}' is not refreshable because it is not a usable published version.`,
+          `Sandbox profile version '${String(input.profileVersion)}' is not refreshable because it is not a published version.`,
         );
       }
 
@@ -158,7 +154,9 @@ export async function refreshProfileVersionSnapshot(
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
-          usable: true,
+          usable:
+            sandboxProfileVersion.snapshotImageProvider !== null &&
+            sandboxProfileVersion.snapshotImageId !== null,
           latestSnapshotJob: snapshotJob,
         },
         activeVersion: sandboxProfileVersion.activeVersion,

@@ -8109,7 +8109,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Queue manual snapshot refresh for the specified usable sandbox profile version. */
+        /** @description Queue manual snapshot materialization or refresh for the specified published sandbox profile version. */
         200: {
           headers: {
             [name: string]: unknown;
