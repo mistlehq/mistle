@@ -462,12 +462,12 @@ describe("SandboxProfileEditorPage", () => {
       activeVersion: null,
       view: "published",
       versions: [
-        {
+        createSandboxProfileVersionFixture({
           sandboxProfileId: "sbp_test",
           version: 1,
           state: "draft",
           isActive: false,
-        },
+        }),
       ],
     });
 
