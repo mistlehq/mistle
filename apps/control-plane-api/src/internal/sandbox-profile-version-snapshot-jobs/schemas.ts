@@ -4,9 +4,14 @@ import {
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
 
+export const ClaimSandboxProfileVersionSnapshotJobParamsSchema = z
+  .object({
+    jobId: z.string().min(1),
+  })
+  .strict();
+
 export const ClaimSandboxProfileVersionSnapshotJobRequestSchema = z
   .object({
-    snapshotJobId: z.string().min(1),
     workflowRunId: z.string().min(1),
   })
   .strict();

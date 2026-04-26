@@ -512,11 +512,13 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/sandbox-profile-version-snapshot-jobs/claim": {
+  "/internal/snapshot-jobs/{jobId}/claim": {
     parameters: {
       query?: never;
       header?: never;
-      path?: never;
+      path: {
+        jobId: string;
+      };
       cookie?: never;
     };
     get?: never;
@@ -525,13 +527,14 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          jobId: string;
+        };
         cookie?: never;
       };
       requestBody: {
         content: {
           "application/json": {
-            snapshotJobId: string;
             workflowRunId: string;
           };
         };
@@ -618,7 +621,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/sandbox-profile-version-snapshot-jobs/mark-failed": {
+  "/internal/snapshot-jobs/mark-failed": {
     parameters: {
       query?: never;
       header?: never;
@@ -726,7 +729,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded": {
+  "/internal/snapshot-jobs/mark-succeeded": {
     parameters: {
       query?: never;
       header?: never;

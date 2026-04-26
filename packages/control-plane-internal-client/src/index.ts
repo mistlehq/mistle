@@ -75,18 +75,20 @@ export type RequestIntegrationConnectionResourceRefreshInput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
 export type RequestIntegrationConnectionResourceRefreshOutput =
   paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
-export type ClaimSandboxProfileVersionSnapshotJobInput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/claim"]["post"]["requestBody"]["content"]["application/json"];
+export type ClaimSandboxProfileVersionSnapshotJobInput = {
+  snapshotJobId: string;
+  workflowRunId: paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["requestBody"]["content"]["application/json"]["workflowRunId"];
+};
 export type ClaimSandboxProfileVersionSnapshotJobOutput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/claim"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/{jobId}/claim"]["post"]["responses"]["200"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobSucceededInput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/mark-succeeded"]["post"]["requestBody"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobSucceededOutput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/mark-succeeded"]["post"]["responses"]["200"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobFailedInput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-failed"]["post"]["requestBody"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/mark-failed"]["post"]["requestBody"]["content"]["application/json"];
 export type MarkSandboxProfileVersionSnapshotJobFailedOutput =
-  paths["/internal/sandbox-profile-version-snapshot-jobs/mark-failed"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/internal/snapshot-jobs/mark-failed"]["post"]["responses"]["200"]["content"]["application/json"];
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -404,13 +406,17 @@ export class ControlPlaneInternalClient {
   async claimSandboxProfileVersionSnapshotJob(
     input: ClaimSandboxProfileVersionSnapshotJobInput,
   ): Promise<ClaimSandboxProfileVersionSnapshotJobOutput> {
-    const result = await this.#client.POST(
-      "/internal/sandbox-profile-version-snapshot-jobs/claim",
-      {
-        body: input,
-        signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/claim", {
+      params: {
+        path: {
+          jobId: input.snapshotJobId,
+        },
       },
-    );
+      body: {
+        workflowRunId: input.workflowRunId,
+      },
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
 
     if (result.response.status === 200 && result.data !== undefined) {
       return result.data;
@@ -426,13 +432,10 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobSucceeded(
     input: MarkSandboxProfileVersionSnapshotJobSucceededInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobSucceededOutput> {
-    const result = await this.#client.POST(
-      "/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded",
-      {
-        body: input,
-        signal: AbortSignal.timeout(this.#requestTimeoutMs),
-      },
-    );
+    const result = await this.#client.POST("/internal/snapshot-jobs/mark-succeeded", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
 
     if (result.response.status === 200 && result.data !== undefined) {
       return result.data;
@@ -448,13 +451,10 @@ export class ControlPlaneInternalClient {
   async markSandboxProfileVersionSnapshotJobFailed(
     input: MarkSandboxProfileVersionSnapshotJobFailedInput,
   ): Promise<MarkSandboxProfileVersionSnapshotJobFailedOutput> {
-    const result = await this.#client.POST(
-      "/internal/sandbox-profile-version-snapshot-jobs/mark-failed",
-      {
-        body: input,
-        signal: AbortSignal.timeout(this.#requestTimeoutMs),
-      },
-    );
+    const result = await this.#client.POST("/internal/snapshot-jobs/mark-failed", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
 
     if (result.response.status === 200 && result.data !== undefined) {
       return result.data;

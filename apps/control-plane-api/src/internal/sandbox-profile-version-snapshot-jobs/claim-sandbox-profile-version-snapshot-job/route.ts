@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
+  ClaimSandboxProfileVersionSnapshotJobParamsSchema,
   ClaimSandboxProfileVersionSnapshotJobRequestSchema,
   InternalSandboxProfileVersionSnapshotJobConflictResponseSchema,
   InternalSandboxProfileVersionSnapshotJobNotFoundResponseSchema,
@@ -11,9 +12,10 @@ import {
 
 export const route = createRoute({
   method: "post",
-  path: "/claim",
+  path: "/:jobId/claim",
   tags: ["Internal"],
   request: {
+    params: ClaimSandboxProfileVersionSnapshotJobParamsSchema,
     body: {
       required: true,
       content: {

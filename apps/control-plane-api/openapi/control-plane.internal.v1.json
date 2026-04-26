@@ -840,9 +840,20 @@
         }
       }
     },
-    "/internal/sandbox-profile-version-snapshot-jobs/claim": {
+    "/internal/snapshot-jobs/{jobId}/claim": {
       "post": {
         "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "jobId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -850,16 +861,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "snapshotJobId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
                   "workflowRunId": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": ["snapshotJobId", "workflowRunId"],
+                "required": ["workflowRunId"],
                 "additionalProperties": false
               }
             }
@@ -986,7 +993,7 @@
         }
       }
     },
-    "/internal/sandbox-profile-version-snapshot-jobs/mark-succeeded": {
+    "/internal/snapshot-jobs/mark-succeeded": {
       "post": {
         "tags": ["Internal"],
         "requestBody": {
@@ -1147,7 +1154,7 @@
         }
       }
     },
-    "/internal/sandbox-profile-version-snapshot-jobs/mark-failed": {
+    "/internal/snapshot-jobs/mark-failed": {
       "post": {
         "tags": ["Internal"],
         "requestBody": {

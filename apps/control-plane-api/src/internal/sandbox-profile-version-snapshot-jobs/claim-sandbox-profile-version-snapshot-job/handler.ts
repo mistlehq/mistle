@@ -6,6 +6,7 @@ import { claimSandboxProfileVersionSnapshotJob } from "../services/claim-sandbox
 import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
+  const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   return ctx.json(
@@ -13,7 +14,10 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
       {
         db: ctx.get("db"),
       },
-      body,
+      {
+        snapshotJobId: params.jobId,
+        workflowRunId: body.workflowRunId,
+      },
     ),
     200,
   );

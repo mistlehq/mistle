@@ -1,2 +1,2 @@
 export const INTERNAL_SANDBOX_PROFILE_VERSION_SNAPSHOT_JOBS_ROUTE_BASE_PATH =
-  "/internal/sandbox-profile-version-snapshot-jobs";
+  "/internal/snapshot-jobs";
