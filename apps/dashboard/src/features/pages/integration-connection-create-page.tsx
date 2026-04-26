@@ -126,6 +126,17 @@ function LoadedIntegrationConnectionCreatePage(input: {
         return;
       }
 
+      if (
+        connectionId !== null &&
+        editor.targetFamilyId === "slack" &&
+        methodId === "slack-bot-token"
+      ) {
+        await navigate(
+          `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/slack-app/setup`,
+        );
+        return;
+      }
+
       if (input.returnPath !== undefined && connectionId !== null) {
         await navigate(
           appendIntegrationConnectionReturnParams({

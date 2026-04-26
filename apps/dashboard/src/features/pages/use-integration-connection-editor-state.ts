@@ -15,6 +15,7 @@ import {
   cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
   createGitHubAppDraftIntegrationConnection,
+  createSlackAppDraftIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
@@ -108,6 +109,11 @@ export function useIntegrationConnectionEditorState(
       createGitHubAppDraftIntegrationConnection(mutationInput),
   });
 
+  const createSlackAppDraftMutation = useMutation({
+    mutationFn: async (mutationInput: { targetKey: string; displayName: string }) =>
+      createSlackAppDraftIntegrationConnection(mutationInput),
+  });
+
   const startRedirectMutation = useMutation({
     mutationFn: async (mutationInput: {
       targetKey: string;
@@ -155,6 +161,7 @@ export function useIntegrationConnectionEditorState(
   const submitPending =
     createFormMutation.isPending ||
     createGitHubAppDraftMutation.isPending ||
+    createSlackAppDraftMutation.isPending ||
     startDeviceAuthorizationMutation.isPending ||
     startRedirectMutation.isPending ||
     updateConnectionMutation.isPending ||
@@ -350,6 +357,24 @@ export function useIntegrationConnectionEditorState(
           draft.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
         ) {
           const createdConnection = await createGitHubAppDraftMutation.mutateAsync({
+            targetKey: editor.targetKey,
+            displayName: normalizedConnectionDisplayName,
+          });
+
+          await queryClient.invalidateQueries({
+            queryKey: input.queryKey,
+          });
+
+          await handleSubmitSuccess({
+            connectionId: createdConnection.id,
+            editor,
+            methodId: draft.methodId,
+          });
+          return;
+        }
+
+        if (editor.targetFamilyId === "slack" && draft.methodId === "slack-bot-token") {
+          const createdConnection = await createSlackAppDraftMutation.mutateAsync({
             targetKey: editor.targetKey,
             displayName: normalizedConnectionDisplayName,
           });

@@ -8,6 +8,7 @@ import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-c
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
+import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -37,6 +38,17 @@ function isUninstalledGitHubAppConnection(input: {
         : null;
 
   return installationId === null;
+}
+
+function isIncompleteSlackAppConnection(input: {
+  connectionMethodId: string | undefined;
+  configuredSecretNames: readonly string[] | undefined;
+}): boolean {
+  return (
+    input.connectionMethodId === "slack-bot-token" &&
+    (!(input.configuredSecretNames?.includes("botToken") ?? false) ||
+      !(input.configuredSecretNames?.includes("signingSecret") ?? false))
+  );
 }
 
 export function IntegrationsPage() {
@@ -159,6 +171,15 @@ export function IntegrationsPage() {
             externalSubjectId: selectedDetailConnection.externalSubjectId,
           }) ? (
             <GitHubAppSetupPane
+              connection={selectedDetailConnection}
+              key={selectedDetailConnection.id}
+            />
+          ) : selectedDetailConnection !== undefined &&
+            isIncompleteSlackAppConnection({
+              connectionMethodId: selectedDetailConnection.connectionMethodId,
+              configuredSecretNames: selectedDetailConnection.configuredSecretNames,
+            }) ? (
+            <SlackAppSetupPane
               connection={selectedDetailConnection}
               key={selectedDetailConnection.id}
             />

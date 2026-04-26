@@ -19,6 +19,7 @@ import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
 import { IntegrationConnectionEditPage } from "./features/pages/integration-connection-edit-page.js";
 import { IntegrationConnectionGitHubAppSetupPage } from "./features/pages/integration-connection-github-app-setup-page.js";
+import { IntegrationConnectionSlackAppSetupPage } from "./features/pages/integration-connection-slack-app-setup-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { NewSessionPage } from "./features/pages/new-session-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
@@ -126,6 +127,11 @@ export const APP_ROUTES = createRoutesFromElements(
               element={<IntegrationConnectionGitHubAppSetupPage />}
               handle={ROUTE_HANDLES.integrationGitHubAppSetup}
               path=":connectionId/github-app/setup"
+            />
+            <Route
+              element={<IntegrationConnectionSlackAppSetupPage />}
+              handle={ROUTE_HANDLES.integrationEdit}
+              path=":connectionId/slack-app/setup"
             />
           </Route>
         </Route>

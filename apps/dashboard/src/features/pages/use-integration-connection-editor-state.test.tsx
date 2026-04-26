@@ -191,6 +191,38 @@ function gitHubAppCreateEditorInput() {
   };
 }
 
+function slackAppCreateEditorInput() {
+  return {
+    mode: "create" as const,
+    methods: [
+      {
+        id: "slack-bot-token",
+        label: "Slack app",
+        kind: "form" as const,
+        secretFields: [
+          {
+            name: "botToken",
+            label: "Bot token",
+            inputType: "password" as const,
+            slotKey: "slack.slack-default.slack-bot-token.bot-token",
+          },
+          {
+            name: "signingSecret",
+            label: "Signing secret",
+            inputType: "password" as const,
+            slotKey: "slack.slack-default.slack-bot-token.signing-secret",
+          },
+        ],
+      },
+    ],
+    targetConfig: {},
+    targetDisplayName: "Slack",
+    targetFamilyId: "slack",
+    targetKey: "slack-default",
+    targetVariantId: "slack-default",
+  };
+}
+
 function signozRedirectUpdateEditorInput() {
   return {
     mode: "update" as const,
@@ -533,6 +565,71 @@ describe("useIntegrationConnectionEditorState", () => {
         pathname: "/v1/integration/connections/github-cloud/github-app-installation/draft",
         body: {
           displayName: "Engineering GitHub",
+        },
+      },
+    ]);
+  });
+
+  it("creates a Slack app draft connection without requiring create-time secrets", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname === "/v1/integration/connections/slack-default/slack-app/draft"
+      ) {
+        return {
+          status: 201,
+          body: {
+            id: "icn_slack_draft",
+            targetKey: "slack-default",
+            displayName: "Engineering Slack",
+            status: "active",
+            config: {
+              connection_method: "slack-bot-token",
+            },
+            connectionMethodId: "slack-bot-token",
+            connectionMethodLabel: "Slack app",
+            createdAt: "2026-04-26T00:00:00.000Z",
+            updatedAt: "2026-04-26T00:00:00.000Z",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    let submittedConnectionId: string | null = null;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: slackAppCreateEditorInput(),
+          onSubmitSuccess: ({ connectionId }) => {
+            submittedConnectionId = connectionId;
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("Engineering Slack");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(submittedConnectionId).toBe("icn_slack_draft");
+    });
+
+    expect(server.requests).toEqual([
+      {
+        method: "POST",
+        pathname: "/v1/integration/connections/slack-default/slack-app/draft",
+        body: {
+          displayName: "Engineering Slack",
         },
       },
     ]);

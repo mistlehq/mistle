@@ -6,6 +6,7 @@ import { INTEGRATION_CALLBACKS_ROUTE_BASE_PATH } from "../integration-connection
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import * as completeGitHubAppInstallationConnection from "./github-app/complete-installation/index.js";
 import * as completeGitHubAppManifestConnection from "./github-app/complete-manifest/index.js";
+import * as completeSlackAppInstallationConnection from "./slack-app/complete-installation/index.js";
 
 export function createIntegrationCallbacksRoutes(): AppRoutes<
   typeof INTEGRATION_CALLBACKS_ROUTE_BASE_PATH
@@ -21,6 +22,10 @@ export function createIntegrationCallbacksRoutes(): AppRoutes<
   routes.openapi(
     completeGitHubAppManifestConnection.route,
     completeGitHubAppManifestConnection.handler,
+  );
+  routes.openapi(
+    completeSlackAppInstallationConnection.route,
+    completeSlackAppInstallationConnection.handler,
   );
   routes.openapi(
     completeOAuth2AuthorizationCodeConnection.route,

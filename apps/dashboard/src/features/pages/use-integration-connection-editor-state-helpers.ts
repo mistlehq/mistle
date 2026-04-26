@@ -458,6 +458,10 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
       return null;
     }
 
+    if (input.editor.targetFamilyId === "slack" && input.methodId === "slack-bot-token") {
+      return null;
+    }
+
     const missingSecretField = selectedMethod.secretFields.find(
       (secretField) =>
         secretField.optional !== true &&

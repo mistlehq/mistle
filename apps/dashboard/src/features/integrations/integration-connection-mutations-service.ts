@@ -83,6 +83,35 @@ export async function createGitHubAppDraftIntegrationConnection(input: {
   }
 }
 
+export async function createSlackAppDraftIntegrationConnection(input: {
+  targetKey: string;
+  displayName: string;
+}): Promise<CreatedIntegrationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "createSlackAppDraftIntegrationConnection",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/slack-app/draft`,
+      body: {
+        displayName: input.displayName,
+      },
+      fallbackMessage: "Could not create Slack app connection.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: IntegrationConnectionSchema,
+      operation: "createSlackAppDraftIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "createSlackAppDraftIntegrationConnection",
+      error,
+      fallbackMessage: "Could not create Slack app connection.",
+    });
+  }
+}
+
 export async function createApiKeyIntegrationConnection(input: {
   targetKey: string;
   displayName: string;
@@ -384,6 +413,37 @@ export async function startGitHubAppManifestCreation(input: {
       operation: "startGitHubAppManifestCreation",
       error,
       fallbackMessage: "Could not create GitHub App manifest.",
+    });
+  }
+}
+
+export async function startSlackAppManifestCreation(input: {
+  connectionId: string;
+  manifest: Record<string, unknown>;
+  appConfigToken: string;
+}): Promise<StartedRedirectConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startSlackAppManifestCreation",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/slack-app-manifest/start`,
+      body: {
+        manifest: input.manifest,
+        appConfigToken: input.appConfigToken,
+      },
+      fallbackMessage: "Could not create Slack app manifest.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: StartedRedirectConnectionSchema,
+      operation: "startSlackAppManifestCreation",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "startSlackAppManifestCreation",
+      error,
+      fallbackMessage: "Could not create Slack app manifest.",
     });
   }
 }
