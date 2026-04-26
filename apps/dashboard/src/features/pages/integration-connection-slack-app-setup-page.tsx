@@ -22,6 +22,7 @@ import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { ConfiguredSecretField, type SavingFieldState } from "../forms/configured-secret-field.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
@@ -53,6 +54,10 @@ type ManifestValidation =
     };
 
 const SlackConnectionMethodId = "slack-bot-token";
+const IdleSavingFieldState = {
+  status: "idle",
+  errorMessage: null,
+} as const satisfies SavingFieldState;
 
 const SlackDraftManifest = JSON.stringify(
   {
@@ -250,61 +255,45 @@ function SlackExistingAppSetupPanel(input: {
           />
         </FieldContent>
       </Field>
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="slack-client-secret">Client secret</FieldLabel>
-          {isConfigured("clientSecret") ? (
-            <FieldDescription>Client secret is already configured.</FieldDescription>
-          ) : null}
-        </FieldHeader>
-        <FieldContent>
-          <Input
-            id="slack-client-secret"
-            onChange={(event) => updateDraft("clientSecret", event.target.value)}
-            placeholder={isConfigured("clientSecret") ? "******" : undefined}
-            type="password"
-            value={input.draft.clientSecret}
-          />
-        </FieldContent>
-      </Field>
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="slack-bot-token" required={!isConfigured("botToken")}>
-            Bot token
-          </FieldLabel>
-          {isConfigured("botToken") ? (
-            <FieldDescription>Bot token is already configured.</FieldDescription>
-          ) : null}
-        </FieldHeader>
-        <FieldContent>
-          <Input
-            id="slack-bot-token"
-            onChange={(event) => updateDraft("botToken", event.target.value)}
-            placeholder={isConfigured("botToken") ? "******" : "xoxb-..."}
-            type="password"
-            value={input.draft.botToken}
-          />
-        </FieldContent>
-      </Field>
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="slack-signing-secret" required={!isConfigured("signingSecret")}>
-            Signing secret
-          </FieldLabel>
-          {isConfigured("signingSecret") ? (
-            <FieldDescription>Signing secret is already configured.</FieldDescription>
-          ) : null}
-        </FieldHeader>
-        <FieldContent>
-          <Input
-            id="slack-signing-secret"
-            onChange={(event) => updateDraft("signingSecret", event.target.value)}
-            placeholder={isConfigured("signingSecret") ? "******" : undefined}
-            type="password"
-            value={input.draft.signingSecret}
-          />
-        </FieldContent>
-      </Field>
+      <ConfiguredSecretField
+        configured={isConfigured("clientSecret")}
+        fieldState={IdleSavingFieldState}
+        id="slack-client-secret"
+        label="Client secret"
+        onCancelReplace={() => updateDraft("clientSecret", "")}
+        onChange={(nextValue) => updateDraft("clientSecret", nextValue)}
+        onCommit={() => {}}
+        secretLabel="client secret"
+        type="password"
+        value={input.draft.clientSecret}
+      />
+      <ConfiguredSecretField
+        configured={isConfigured("botToken")}
+        fieldState={IdleSavingFieldState}
+        id="slack-bot-token"
+        label="Bot token"
+        onCancelReplace={() => updateDraft("botToken", "")}
+        onChange={(nextValue) => updateDraft("botToken", nextValue)}
+        onCommit={() => {}}
+        placeholder="xoxb-..."
+        required={!isConfigured("botToken")}
+        secretLabel="bot token"
+        type="password"
+        value={input.draft.botToken}
+      />
+      <ConfiguredSecretField
+        configured={isConfigured("signingSecret")}
+        fieldState={IdleSavingFieldState}
+        id="slack-signing-secret"
+        label="Signing secret"
+        onCancelReplace={() => updateDraft("signingSecret", "")}
+        onChange={(nextValue) => updateDraft("signingSecret", nextValue)}
+        onCommit={() => {}}
+        required={!isConfigured("signingSecret")}
+        secretLabel="signing secret"
+        type="password"
+        value={input.draft.signingSecret}
+      />
     </div>
   );
 }

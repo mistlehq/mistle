@@ -82,9 +82,10 @@ describe("SlackAppSetupPane", () => {
 
     expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
     expect(screen.getByDisplayValue("123.456")).toBeTruthy();
-    expect(screen.getByText("Bot token is already configured.")).toBeTruthy();
-    expect(screen.getByText("Signing secret is already configured.")).toBeTruthy();
-    expect(screen.getByText("Client secret is already configured.")).toBeTruthy();
+    expect(screen.getAllByPlaceholderText("******")).toHaveLength(3);
+    expect(screen.queryByText("Bot token is already configured.")).toBeNull();
+    expect(screen.queryByText("Signing secret is already configured.")).toBeNull();
+    expect(screen.queryByText("Client secret is already configured.")).toBeNull();
     expect(screen.getByRole("button", { name: "Save Slack App" }).hasAttribute("disabled")).toBe(
       true,
     );
