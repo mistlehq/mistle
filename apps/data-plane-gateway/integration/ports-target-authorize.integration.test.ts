@@ -17,13 +17,14 @@ import {
   PortsTargetAuthorizeService,
   PortsTargetAuthorizeTimedOutError,
 } from "../src/publishing/ports-target-authorize-service.js";
+import { createAttachmentBackedActiveBootstrapSessionStore } from "../src/runtime-state/active-bootstrap-session-store.js";
+import { InMemorySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { BootstrapTunnelNotConnectedError } from "../src/tunnel/bootstrap-tunnel-not-connected-error.js";
 import { createInMemoryTunnelRelayCoordinator } from "../src/tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../src/tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../src/tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../src/tunnel/gateway-forwarding/interactive-stream-router.js";
-import { InMemorySandboxOwnerStore } from "../src/tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
-import { StoreBackedSandboxOwnerResolver } from "../src/tunnel/ownership/store-backed-sandbox-owner-resolver.js";
+import { AttachmentBackedSandboxOwnerResolver } from "../src/tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { TunnelProtocolTranslator } from "../src/tunnel/protocol/tunnel-protocol-translator.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../src/tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../src/tunnel/tunnel-session/index.js";
@@ -215,12 +216,15 @@ async function createTranslator(input: {
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   sandboxInstanceId: string;
 }): Promise<TunnelProtocolTranslator> {
-  const ownerStore = new InMemorySandboxOwnerStore(systemClock);
-  await ownerStore.claimOwner({
+  const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+  await attachmentStore.upsertAttachment({
     sandboxInstanceId: input.sandboxInstanceId,
+    ownerLeaseId: "dtl_attached",
     nodeId: LocalNodeId,
     sessionId: BootstrapSessionId,
+    attachedAtMs: systemClock.nowMs(),
     ttlMs: 60_000,
+    nowMs: systemClock.nowMs(),
   });
 
   const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
@@ -235,7 +239,11 @@ async function createTranslator(input: {
   const forwardingClient = new LocalGatewayForwardingClientAdapter(LocalNodeId, forwardingServer);
   const router = new InteractiveStreamRouter(
     LocalNodeId,
-    new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
+    new AttachmentBackedSandboxOwnerResolver(
+      LocalNodeId,
+      createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+      systemClock,
+    ),
     forwardingClient,
   );
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);

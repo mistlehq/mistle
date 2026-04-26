@@ -15,7 +15,6 @@ import {
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
-import type { SandboxOwnerLeaseHeartbeatHandle } from "../ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerStore } from "../ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import {
@@ -29,13 +28,17 @@ import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
 
 const ConnectionPresenceLeaseSource = "dashboard";
 
+type LeaseRenewalHandle = {
+  stop: () => void;
+};
+
 /**
  * Captures the live relay target for an attached websocket peer plus any
  * teardown handle that must be stopped when the peer disconnects.
  */
 export type AttachedTunnelPeer = {
   relayTarget: RelayTarget;
-  leaseHeartbeatHandle?: SandboxOwnerLeaseHeartbeatHandle;
+  leaseHeartbeatHandle?: LeaseRenewalHandle;
   presenceLeaseRenewalHandle?: {
     stop: () => void;
   };
@@ -573,7 +576,7 @@ export class TunnelSessionService {
           isHealthy: () => boolean;
         }
       | undefined;
-  }): SandboxOwnerLeaseHeartbeatHandle {
+  }): LeaseRenewalHandle {
     let stopped = false;
     let scheduledHandle: TimerHandle | undefined;
 

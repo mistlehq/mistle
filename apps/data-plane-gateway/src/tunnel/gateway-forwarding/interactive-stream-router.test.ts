@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
-import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
-import { StoreBackedSandboxOwnerResolver } from "../ownership/store-backed-sandbox-owner-resolver.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import { LocalGatewayForwardingClientAdapter } from "./adapters/local-gateway-forwarding-client-adapter.js";
@@ -14,12 +12,15 @@ import { InteractiveStreamRouter } from "./interactive-stream-router.js";
 
 describe("InteractiveStreamRouter", () => {
   it("routes interactive stream operations to the resolved owner node", async () => {
-    const ownerStore = new InMemorySandboxOwnerStore(systemClock);
-    await ownerStore.claimOwner({
+    const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+    await attachmentStore.upsertAttachment({
       sandboxInstanceId: "sbi_test",
+      ownerLeaseId: "dtl_attached",
       nodeId: "dpg_test",
       sessionId: "sess_bootstrap",
+      attachedAtMs: systemClock.nowMs(),
       ttlMs: 60_000,
+      nowMs: systemClock.nowMs(),
     });
 
     const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
@@ -35,7 +36,11 @@ describe("InteractiveStreamRouter", () => {
     );
     const router = new InteractiveStreamRouter(
       "dpg_test",
-      new StoreBackedSandboxOwnerResolver("dpg_test", ownerStore),
+      new AttachmentBackedSandboxOwnerResolver(
+        "dpg_test",
+        createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+        systemClock,
+      ),
       forwardingClient,
     );
 
@@ -63,14 +68,7 @@ describe("InteractiveStreamRouter", () => {
   });
 
   it("routes using the active attached bootstrap session even when a separate owner lease was replaced", async () => {
-    const ownerStore = new InMemorySandboxOwnerStore(systemClock);
     const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
-    await ownerStore.claimOwner({
-      sandboxInstanceId: "sbi_test",
-      nodeId: "dpg_replacement",
-      sessionId: "sess_replacement",
-      ttlMs: 60_000,
-    });
     await attachmentStore.upsertAttachment({
       sandboxInstanceId: "sbi_test",
       ownerLeaseId: "dtl_attached",
@@ -134,7 +132,13 @@ describe("InteractiveStreamRouter", () => {
     );
     const router = new InteractiveStreamRouter(
       "dpg_test",
-      new StoreBackedSandboxOwnerResolver("dpg_test", new InMemorySandboxOwnerStore(systemClock)),
+      new AttachmentBackedSandboxOwnerResolver(
+        "dpg_test",
+        createAttachmentBackedActiveBootstrapSessionStore(
+          new InMemorySandboxRuntimeAttachmentStore(systemClock),
+        ),
+        systemClock,
+      ),
       forwardingClient,
     );
 
@@ -157,7 +161,13 @@ describe("InteractiveStreamRouter", () => {
     );
     const router = new InteractiveStreamRouter(
       "dpg_test",
-      new StoreBackedSandboxOwnerResolver("dpg_test", new InMemorySandboxOwnerStore(systemClock)),
+      new AttachmentBackedSandboxOwnerResolver(
+        "dpg_test",
+        createAttachmentBackedActiveBootstrapSessionStore(
+          new InMemorySandboxRuntimeAttachmentStore(systemClock),
+        ),
+        systemClock,
+      ),
       forwardingClient,
     );
 

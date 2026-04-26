@@ -10,12 +10,13 @@ import { describe, expect, it } from "vitest";
 
 import { PortAccessTransportService } from "../../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../../publishing/ports-target-authorize-service.js";
+import { createAttachmentBackedActiveBootstrapSessionStore } from "../../runtime-state/active-bootstrap-session-store.js";
+import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { createInMemoryTunnelRelayCoordinator } from "../create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
-import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
-import { StoreBackedSandboxOwnerResolver } from "../ownership/store-backed-sandbox-owner-resolver.js";
+import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import {
@@ -36,12 +37,15 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 async function createTranslatorHarness() {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
-  const ownerStore = new InMemorySandboxOwnerStore(systemClock);
-  await ownerStore.claimOwner({
+  const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+  await attachmentStore.upsertAttachment({
     sandboxInstanceId: SandboxInstanceId,
+    ownerLeaseId: "dtl_attached",
     nodeId: LocalNodeId,
     sessionId: BootstrapSessionId,
+    attachedAtMs: systemClock.nowMs(),
     ttlMs: 60_000,
+    nowMs: systemClock.nowMs(),
   });
 
   const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
@@ -56,7 +60,11 @@ async function createTranslatorHarness() {
   const forwardingClient = new LocalGatewayForwardingClientAdapter(LocalNodeId, forwardingServer);
   const router = new InteractiveStreamRouter(
     LocalNodeId,
-    new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
+    new AttachmentBackedSandboxOwnerResolver(
+      LocalNodeId,
+      createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
+      systemClock,
+    ),
     forwardingClient,
   );
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
