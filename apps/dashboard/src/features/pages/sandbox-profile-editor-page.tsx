@@ -1,4 +1,11 @@
 import {
+  systemClock,
+  systemScheduler,
+  type Clock,
+  type Scheduler,
+  type TimerHandle,
+} from "@mistle/time";
+import {
   Button,
   ButtonGroup,
   Card,
@@ -9,6 +16,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DefinitionList,
   DropdownMenuItem,
   Field,
   FieldContent,
@@ -18,11 +26,19 @@ import {
   Input,
   MoreActionsMenu,
   Notice,
+  NoticeAutoHideDurationsMs,
 } from "@mistle/ui";
-import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
+import { CheckCircleIcon, SpinnerGapIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type SyntheticEvent } from "react";
-import { Navigate, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
+import { useEffect, useMemo, useRef, useState, type Key, type SyntheticEvent } from "react";
+import {
+  Navigate,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useOutletContext,
+  useParams,
+} from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
@@ -45,6 +61,7 @@ import {
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
+  refreshSandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
   PublishSandboxProfileVersionResult,
@@ -53,6 +70,8 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { ActivityStatus } from "./activity-status.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -103,14 +122,38 @@ type SandboxProfileEditorVersionMode =
     };
 
 type SandboxProfileRouteView = "published" | "draft";
-type SandboxProfileSnapshotPreparationStatus =
+type SandboxProfileEditorSectionId =
+  | "integrations"
+  | "resources-and-tools"
+  | "configurations"
+  | "snapshot";
+type SnapshotPanelState =
   | {
-      kind: "pending";
+      kind: "draft-unavailable";
     }
   | {
-      kind: "failed";
+      kind: "no-snapshot";
+    }
+  | {
+      kind: "creating";
+    }
+  | {
+      kind: "ready";
+      latestSnapshotCreatedAt: string | null;
+    }
+  | {
+      kind: "snapshot-error";
+      message: string;
+    }
+  | {
+      kind: "refresh-error";
+      latestSnapshotCreatedAt: string | null;
       message: string;
     };
+type SandboxProfileEditorNavigationState = {
+  initialSectionId: SandboxProfileEditorSectionId | null;
+  notice: "publish-success" | null;
+};
 type SandboxProfileDraftSectionState = {
   flushDraftChanges: () => Promise<boolean>;
   hasUnsavedChanges: boolean;
@@ -225,20 +268,109 @@ set -euo pipefail
 pnpm install
 pnpm dev:bootstrap`;
 
-export function shouldPollSandboxProfileSnapshotPreparation(input: {
-  profile: SandboxProfile | undefined;
-  versions: readonly SandboxProfileVersion[] | undefined;
-}): boolean {
-  if (input.profile?.activeVersion !== null || input.versions === undefined) {
+const SandboxProfileEditorSectionIds = {
+  INTEGRATIONS: "integrations",
+  RESOURCES_AND_TOOLS: "resources-and-tools",
+  CONFIGURATIONS: "configurations",
+  SNAPSHOT: "snapshot",
+} satisfies Record<string, SandboxProfileEditorSectionId>;
+
+const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
+  initialSectionId: SandboxProfileEditorSectionIds.SNAPSHOT,
+  notice: "publish-success",
+};
+
+export function shouldPollSandboxProfileSnapshotJobs(
+  versions: readonly SandboxProfileVersion[] | undefined,
+): boolean {
+  if (versions === undefined) {
     return false;
   }
 
-  return input.versions.some(
+  return versions.some(
     (version) =>
       version.state === "published" &&
-      version.usable === false &&
       (version.latestSnapshotJob?.state === "queued" ||
         version.latestSnapshotJob?.state === "running"),
+  );
+}
+
+function resolveSnapshotPanelState(input: {
+  mode: SandboxProfileEditorVersionMode;
+  version: SandboxProfileVersion | null;
+}): SnapshotPanelState {
+  if (input.mode.kind === "draft" || input.version === null) {
+    return {
+      kind: "draft-unavailable",
+    };
+  }
+
+  const latestSnapshotJob = input.version.latestSnapshotJob;
+  if (latestSnapshotJob?.state === "queued" || latestSnapshotJob?.state === "running") {
+    return {
+      kind: "creating",
+    };
+  }
+
+  if (latestSnapshotJob?.state === "failed") {
+    const message = latestSnapshotJob.errorMessage ?? "Snapshot materialization failed.";
+    return input.version.usable
+      ? {
+          kind: "refresh-error",
+          latestSnapshotCreatedAt: null,
+          message,
+        }
+      : {
+          kind: "snapshot-error",
+          message,
+        };
+  }
+
+  if (!input.version.usable) {
+    return {
+      kind: "no-snapshot",
+    };
+  }
+
+  return {
+    kind: "ready",
+    latestSnapshotCreatedAt:
+      latestSnapshotJob?.state === "succeeded" ? latestSnapshotJob.finishedAt : null,
+  };
+}
+
+function shouldShowMissingSnapshotAlert(input: {
+  mode: SandboxProfileEditorVersionMode;
+  snapshotState: SnapshotPanelState;
+}): boolean {
+  return input.mode.kind === "active" && input.snapshotState.kind === "no-snapshot";
+}
+
+function readSandboxProfileEditorNavigationState(
+  value: unknown,
+): SandboxProfileEditorNavigationState {
+  if (typeof value !== "object" || value === null) {
+    return {
+      initialSectionId: null,
+      notice: null,
+    };
+  }
+
+  const initialSectionId = Reflect.get(value, "initialSectionId");
+  const notice = Reflect.get(value, "notice");
+
+  return {
+    initialSectionId: isSandboxProfileEditorSectionId(initialSectionId) ? initialSectionId : null,
+    notice: notice === "publish-success" ? notice : null,
+  };
+}
+
+function isSandboxProfileEditorSectionId(value: unknown): value is SandboxProfileEditorSectionId {
+  return (
+    value === SandboxProfileEditorSectionIds.INTEGRATIONS ||
+    value === SandboxProfileEditorSectionIds.RESOURCES_AND_TOOLS ||
+    value === SandboxProfileEditorSectionIds.CONFIGURATIONS ||
+    value === SandboxProfileEditorSectionIds.SNAPSHOT
   );
 }
 
@@ -288,45 +420,6 @@ export function applyPublishedSandboxProfileVersionToVersions(input: {
   return [...remainingVersions, input.result.version].sort(
     (left, right) => left.version - right.version,
   );
-}
-
-function resolveSnapshotPreparationStatus(input: {
-  mode: SandboxProfileEditorVersionMode;
-  version: SandboxProfileVersion | null;
-}): SandboxProfileSnapshotPreparationStatus | null {
-  if (input.mode.kind !== "active" || input.mode.activeVersion !== null || input.version === null) {
-    return null;
-  }
-
-  if (input.version.usable) {
-    return null;
-  }
-
-  const latestSnapshotJob = input.version.latestSnapshotJob;
-  if (latestSnapshotJob === null) {
-    return null;
-  }
-
-  if (latestSnapshotJob.state === "queued") {
-    return {
-      kind: "pending",
-    };
-  }
-
-  if (latestSnapshotJob.state === "running") {
-    return {
-      kind: "pending",
-    };
-  }
-
-  if (latestSnapshotJob.state === "failed") {
-    return {
-      kind: "failed",
-      message: latestSnapshotJob.errorMessage ?? "Snapshot materialization failed.",
-    };
-  }
-
-  return null;
 }
 
 export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): React.JSX.Element {
@@ -432,19 +525,18 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
   const profileDetailKey = sandboxProfileDetailQueryKey(profileId);
   const profileVersionsKey = sandboxProfileVersionsQueryKey(profileId);
+  const shouldPollCachedSnapshotJobs = (): false | number =>
+    shouldPollSandboxProfileSnapshotJobs(
+      queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(profileVersionsKey)
+        ?.versions,
+    )
+      ? 3_000
+      : false;
 
   const profileQuery = useQuery({
     queryKey: profileDetailKey,
     queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
-    refetchInterval: () =>
-      shouldPollSandboxProfileSnapshotPreparation({
-        profile: queryClient.getQueryData<SandboxProfile>(profileDetailKey),
-        versions: queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(
-          profileVersionsKey,
-        )?.versions,
-      })
-        ? 3_000
-        : false,
+    refetchInterval: shouldPollCachedSnapshotJobs,
     retry: false,
   });
   const profileVersionsQuery = useQuery({
@@ -454,15 +546,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
         profileId,
         signal,
       }),
-    refetchInterval: () =>
-      shouldPollSandboxProfileSnapshotPreparation({
-        profile: queryClient.getQueryData<SandboxProfile>(profileDetailKey),
-        versions: queryClient.getQueryData<{ versions: readonly SandboxProfileVersion[] }>(
-          profileVersionsKey,
-        )?.versions,
-      })
-        ? 3_000
-        : false,
+    refetchInterval: shouldPollCachedSnapshotJobs,
     retry: false,
   });
 
@@ -586,9 +670,26 @@ function useSandboxProfileEditorShellContext(): SandboxProfileEditorShellContext
 
 function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }): React.JSX.Element {
   const shellContext = useSandboxProfileEditorShellContext();
+  const location = useLocation();
+  const navigate = shellContext.navigate;
+  const navigationState = readSandboxProfileEditorNavigationState(location.state);
+  const publishSuccessMessage = navigationState.notice === "publish-success";
+
+  useEffect(() => {
+    if (navigationState.notice !== "publish-success") {
+      return;
+    }
+
+    void navigate(location.pathname + location.search, {
+      replace: true,
+      state: null,
+    });
+  }, [location.pathname, location.search, navigate, navigationState.notice]);
 
   return (
     <LoadedSandboxProfileEditorPage
+      initialSectionId={navigationState.initialSectionId}
+      publishSuccessMessage={publishSuccessMessage}
       view={input.view}
       navigate={shellContext.navigate}
       profileId={shellContext.profileId}
@@ -605,6 +706,8 @@ function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }):
 
 type LoadedSandboxProfileEditorPageInput = {
   navigate: ReturnType<typeof useNavigate>;
+  initialSectionId: SandboxProfileEditorSectionId | null;
+  publishSuccessMessage: boolean;
   profileId: string;
   profile: SandboxProfile;
   versions: readonly SandboxProfileVersion[];
@@ -694,7 +797,9 @@ function LoadedSandboxProfileEditorPage(
           return nextVersions === undefined ? currentVersions : { versions: nextVersions };
         },
       );
-      void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
+      void input.navigate(`/sandbox-profiles/${input.profileId}/published`, {
+        state: PublishSuccessNavigationState,
+      });
 
       const invalidationPromises = [
         input.invalidateProfileVersions(input.profileId),
@@ -744,6 +849,48 @@ function LoadedSandboxProfileEditorPage(
         resolveApiErrorMessage({
           error,
           fallbackMessage: "Could not discard draft changes.",
+        }),
+      );
+    },
+  });
+  const refreshSnapshotMutation = useMutation({
+    mutationFn: async (version: number) =>
+      refreshSandboxProfileVersion({
+        profileId: input.profileId,
+        version,
+      }),
+    onSuccess: async (result) => {
+      setVersionActionError(null);
+      queryClient.setQueryData<SandboxProfile | undefined>(
+        sandboxProfileDetailQueryKey(input.profileId),
+        (currentProfile) =>
+          applyPublishedSandboxProfileVersionToProfile({
+            profile: currentProfile,
+            result,
+          }),
+      );
+      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentVersions) => {
+          const nextVersions = applyPublishedSandboxProfileVersionToVersions({
+            versions: currentVersions?.versions,
+            result,
+          });
+
+          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
+        },
+      );
+      void Promise.all([
+        input.invalidateProfileVersions(input.profileId),
+        input.invalidateSandboxProfiles(),
+        input.invalidateProfileDetail(input.profileId),
+      ]);
+    },
+    onError: (error: unknown) => {
+      setVersionActionError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not refresh sandbox profile snapshot.",
         }),
       );
     },
@@ -821,6 +968,11 @@ function LoadedSandboxProfileEditorPage(
       onPublish={async (version) => {
         await publishMutation.mutateAsync(version);
       }}
+      onRefreshSnapshot={(version) => {
+        refreshSnapshotMutation.mutate(version);
+      }}
+      initialSectionId={input.initialSectionId}
+      publishSuccessMessage={input.publishSuccessMessage}
       onViewActive={() => {
         setVersionActionError(null);
         void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
@@ -861,7 +1013,10 @@ function LoadedSandboxProfileEditorPage(
       }}
       versionActionError={versionActionError}
       versionActionIsPending={
-        publishMutation.isPending || createDraftMutation.isPending || discardDraftMutation.isPending
+        publishMutation.isPending ||
+        createDraftMutation.isPending ||
+        discardDraftMutation.isPending ||
+        refreshSnapshotMutation.isPending
       }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -878,6 +1033,8 @@ function ReadySandboxProfileEditorPage(input: {
   profile: SandboxProfile;
   mode: SandboxProfileEditorVersionMode;
   currentVersion: SandboxProfileVersion | null;
+  initialSectionId: SandboxProfileEditorSectionId | null;
+  publishSuccessMessage: boolean;
   versionActionError: string | null;
   versionActionIsPending: boolean;
   deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -887,6 +1044,7 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => Promise<void>;
+  onRefreshSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -916,8 +1074,23 @@ function ReadySandboxProfileEditorPage(input: {
   const isSavingDraftChanges = integrationDraftState.isSaving || setupScriptDraftState.isSaving;
   const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
   const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
+  const [publishSuccessNoticeKey, setPublishSuccessNoticeKey] = useState(0);
+  const [showPublishSuccessMessage, setShowPublishSuccessMessage] = useState(
+    input.publishSuccessMessage,
+  );
+  const [activeSectionId, setActiveSectionId] = useState<SandboxProfileEditorSectionId>(
+    input.initialSectionId ?? SandboxProfileEditorSectionIds.INTEGRATIONS,
+  );
   const draftFieldsAreDisabled =
     input.mode.kind !== "draft" || isSavingDraftChanges || publishRequestIsPending;
+  const snapshotPanelState = resolveSnapshotPanelState({
+    mode: input.mode,
+    version: input.currentVersion,
+  });
+  const editorSections = createSandboxProfileEditorSections({
+    mode: input.mode,
+    snapshotState: snapshotPanelState,
+  });
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -925,6 +1098,16 @@ function ReadySandboxProfileEditorPage(input: {
     invalidateSandboxProfiles: input.invalidateSandboxProfiles,
     invalidateProfileDetail: input.invalidateProfileDetail,
   });
+
+  useEffect(() => {
+    if (
+      input.mode.kind === "draft" &&
+      activeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT
+    ) {
+      setActiveSectionId(SandboxProfileEditorSectionIds.INTEGRATIONS);
+    }
+  }, [activeSectionId, input.mode.kind]);
+
   async function handlePublish(version: number): Promise<void> {
     setPublishFlushError(null);
     const shouldFlushDraft =
@@ -948,6 +1131,9 @@ function ReadySandboxProfileEditorPage(input: {
       }
 
       await input.onPublish(version);
+      setPublishSuccessNoticeKey((currentKey) => currentKey + 1);
+      setShowPublishSuccessMessage(true);
+      setActiveSectionId(SandboxProfileEditorSectionIds.SNAPSHOT);
     } catch {
       return;
     } finally {
@@ -961,10 +1147,7 @@ function ReadySandboxProfileEditorPage(input: {
         isSavingDraftChanges={input.mode.kind === "draft" && isSavingDraftChanges}
       />
       <SandboxProfileEditorView
-        snapshotPreparationStatus={resolveSnapshotPreparationStatus({
-          mode: input.mode,
-          version: input.currentVersion,
-        })}
+        activeSectionId={activeSectionId}
         hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
         hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
         isSavingProfileName={metaState.isUpdating}
@@ -974,17 +1157,27 @@ function ReadySandboxProfileEditorPage(input: {
         deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
         deleteProfileError={input.deleteProfileError}
         deleteProfileIsPending={input.deleteProfileIsPending}
-        onMakeChanges={input.onMakeChanges}
+        onMakeChanges={() => {
+          setActiveSectionId(SandboxProfileEditorSectionIds.INTEGRATIONS);
+          input.onMakeChanges();
+        }}
         onConfirmDeleteProfile={input.onConfirmDeleteProfile}
         onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
         onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
         onPublish={(version) => {
           void handlePublish(version);
         }}
-        onRefreshSnapshot={input.onRefreshSnapshot}
+        onActiveSectionIdChange={(sectionId) => {
+          if (isSandboxProfileEditorSectionId(sectionId)) {
+            setActiveSectionId(sectionId);
+          }
+        }}
         onSaveProfileName={metaState.onProfileNameSave}
         onViewActive={input.onViewActive}
-        onViewDraft={input.onViewDraft}
+        onViewDraft={() => {
+          setActiveSectionId(SandboxProfileEditorSectionIds.INTEGRATIONS);
+          input.onViewDraft();
+        }}
         profileName={metaState.formState.displayName}
         profileNameFallback={metaState.pageTitle}
         publishRequestIsPending={publishRequestIsPending}
@@ -992,6 +1185,23 @@ function ReadySandboxProfileEditorPage(input: {
         versionActionIsPending={input.versionActionIsPending}
         isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
         renderSectionPanel={(sectionId) => {
+          if (sectionId === SandboxProfileEditorSectionIds.SNAPSHOT) {
+            return (
+              <SandboxProfileSnapshotPanel
+                isActionPending={input.versionActionIsPending}
+                onRefreshSnapshot={() => {
+                  input.onRefreshSnapshot(input.mode.version);
+                }}
+                onPublishSuccessMessageDismiss={() => {
+                  setShowPublishSuccessMessage(false);
+                }}
+                publishSuccessMessageKey={publishSuccessNoticeKey}
+                publishSuccessMessage={showPublishSuccessMessage}
+                state={snapshotPanelState}
+              />
+            );
+          }
+
           if (sectionId === "configurations") {
             return (
               <LoadedSandboxProfileSetupScriptSection
@@ -1019,7 +1229,7 @@ function ReadySandboxProfileEditorPage(input: {
             />
           );
         }}
-        sections={SandboxProfileEditorTabs}
+        sections={editorSections}
       />
     </>
   );
@@ -1027,21 +1237,270 @@ function ReadySandboxProfileEditorPage(input: {
 
 const SandboxProfileEditorTabs = [
   {
-    id: "integrations",
+    id: SandboxProfileEditorSectionIds.INTEGRATIONS,
     label: "Integrations",
   },
   {
-    id: "resources-and-tools",
+    id: SandboxProfileEditorSectionIds.RESOURCES_AND_TOOLS,
     label: "Resources & Tools",
   },
   {
-    id: "configurations",
+    id: SandboxProfileEditorSectionIds.CONFIGURATIONS,
     label: "Configurations",
+  },
+  {
+    id: SandboxProfileEditorSectionIds.SNAPSHOT,
+    label: "Snapshot",
   },
 ] as const satisfies readonly SandboxProfileEditorSection[];
 
+function createSandboxProfileEditorSections(input: {
+  mode: SandboxProfileEditorVersionMode;
+  snapshotState: SnapshotPanelState;
+}): readonly SandboxProfileEditorSection[] {
+  return SandboxProfileEditorTabs.map((section) =>
+    section.id === SandboxProfileEditorSectionIds.SNAPSHOT
+      ? {
+          ...section,
+          disabled: input.mode.kind === "draft",
+          sideLabel: (
+            <span className="inline-flex items-center gap-1.5">
+              <span>Snapshot</span>
+              {shouldShowMissingSnapshotAlert({
+                mode: input.mode,
+                snapshotState: input.snapshotState,
+              }) ? (
+                <WarningCircleIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-destructive"
+                />
+              ) : null}
+            </span>
+          ),
+        }
+      : section,
+  );
+}
+
+function SandboxProfileSnapshotPanel(input: {
+  isActionPending: boolean;
+  onPublishSuccessMessageDismiss: () => void;
+  onRefreshSnapshot: () => void;
+  publishSuccessMessageKey: Key;
+  publishSuccessMessage: boolean;
+  state: SnapshotPanelState;
+}): React.JSX.Element {
+  const actionLabel = resolveSnapshotActionLabel(input.state);
+  const activityLabel = resolveSnapshotActivityLabel(input.state);
+  const latestSnapshotCreatedAt = resolveLatestSnapshotCreatedAt(input.state);
+
+  return (
+    <div className="flex max-w-3xl flex-col gap-4">
+      <PublishSuccessSnapshotNotice
+        onDismiss={input.onPublishSuccessMessageDismiss}
+        noticeKey={input.publishSuccessMessageKey}
+        visible={input.publishSuccessMessage}
+      />
+
+      {input.state.kind === "no-snapshot" ? (
+        <Notice title="Create a snapshot to start sessions from this profile." variant="alert" />
+      ) : null}
+
+      {input.state.kind === "snapshot-error" ? (
+        <Notice title="Snapshot failed" variant="alert">
+          {input.state.message}
+        </Notice>
+      ) : null}
+
+      {input.state.kind === "refresh-error" ? (
+        <Notice title="Refresh failed" variant="alert">
+          {input.state.message}
+        </Notice>
+      ) : null}
+
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold leading-6">About snapshots</h2>
+        <p className="text-sm text-muted-foreground">
+          A snapshot is the prepared sandbox image created from this published profile version and
+          its setup script. New sessions can only start after a snapshot is ready.
+        </p>
+      </div>
+
+      {actionLabel === null ? null : (
+        <div>
+          <Button disabled={input.isActionPending} onClick={input.onRefreshSnapshot} type="button">
+            {actionLabel}
+          </Button>
+        </div>
+      )}
+
+      {activityLabel === null ? null : (
+        <ActivityStatus
+          className="justify-start text-muted-foreground"
+          label={activityLabel}
+          labelKey={input.state.kind}
+        />
+      )}
+
+      {latestSnapshotCreatedAt === null ? null : (
+        <DefinitionList
+          items={[
+            {
+              id: "snapshot-created",
+              label: "Latest snapshot",
+              value: latestSnapshotCreatedAt,
+            },
+          ]}
+        />
+      )}
+    </div>
+  );
+}
+
+function PublishSuccessSnapshotNotice(input: {
+  noticeKey: Key;
+  onDismiss: () => void;
+  visible: boolean;
+}): React.JSX.Element | null {
+  const [presentedNoticeKey, setPresentedNoticeKey] = useState<Key | null>(
+    input.visible ? input.noticeKey : null,
+  );
+
+  useEffect(() => {
+    if (input.visible) {
+      setPresentedNoticeKey(input.noticeKey);
+    }
+  }, [input.noticeKey, input.visible]);
+
+  if (presentedNoticeKey === null) {
+    return null;
+  }
+
+  return (
+    <Notice
+      autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
+      dismissible
+      onDismiss={input.onDismiss}
+      resetKey={presentedNoticeKey}
+      title="Publish successful, creating a new snapshot"
+      variant="success"
+    />
+  );
+}
+
+function resolveSnapshotActionLabel(state: SnapshotPanelState): string | null {
+  if (state.kind === "no-snapshot" || state.kind === "snapshot-error") {
+    return "Create snapshot";
+  }
+
+  if (state.kind === "ready" || state.kind === "refresh-error") {
+    return "Refresh snapshot";
+  }
+
+  return null;
+}
+
+function resolveSnapshotActivityLabel(state: SnapshotPanelState): string | null {
+  if (state.kind === "creating") {
+    return "Creating snapshot";
+  }
+
+  return null;
+}
+
+function resolveLatestSnapshotCreatedAt(state: SnapshotPanelState): string | null {
+  if (state.kind === "ready" || state.kind === "refresh-error") {
+    return state.latestSnapshotCreatedAt;
+  }
+
+  return null;
+}
+
+const DraftSavingIndicatorShowDelayMs = 200;
+const DraftSavingIndicatorMinimumVisibleMs = 500;
 const DraftFlushBeforePublishErrorMessage =
   "Could not save draft changes before publishing. Check your draft changes and try again.";
+
+export function SandboxProfileEditorHeaderActions(input: {
+  isSavingDraftChanges: boolean;
+  minimumVisibleMs?: number;
+  scheduler?: Scheduler;
+  showDelayMs?: number;
+}): null {
+  const showSavingIndicator = useDelayedMinimumVisibleFlag({
+    active: input.isSavingDraftChanges,
+    clock: systemClock,
+    minimumVisibleMs: input.minimumVisibleMs ?? DraftSavingIndicatorMinimumVisibleMs,
+    scheduler: input.scheduler ?? systemScheduler,
+    showDelayMs: input.showDelayMs ?? DraftSavingIndicatorShowDelayMs,
+  });
+  const headerActions = useMemo(
+    () =>
+      showSavingIndicator ? (
+        <div
+          aria-live="polite"
+          className="text-muted-foreground inline-flex h-6 items-center gap-1.5 text-xs"
+          role="status"
+        >
+          <SpinnerGapIcon aria-hidden="true" className="size-3.5 animate-spin" />
+          <span>Saving</span>
+        </div>
+      ) : null,
+    [showSavingIndicator],
+  );
+  useAppShellHeaderActions(headerActions);
+
+  return null;
+}
+
+function useDelayedMinimumVisibleFlag(input: {
+  active: boolean;
+  clock: Clock;
+  minimumVisibleMs: number;
+  scheduler: Scheduler;
+  showDelayMs: number;
+}): boolean {
+  const [visible, setVisible] = useState(false);
+  const visibleSinceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let timeoutId: TimerHandle | null = null;
+
+    if (input.active && !visible) {
+      timeoutId = input.scheduler.schedule(() => {
+        visibleSinceRef.current = input.clock.nowMs();
+        setVisible(true);
+      }, input.showDelayMs);
+    } else if (!input.active && visible) {
+      const visibleSince = visibleSinceRef.current;
+      const elapsedVisibleMs =
+        visibleSince === null ? input.minimumVisibleMs : input.clock.nowMs() - visibleSince;
+      const remainingVisibleMs = Math.max(input.minimumVisibleMs - elapsedVisibleMs, 0);
+
+      timeoutId = input.scheduler.schedule(() => {
+        visibleSinceRef.current = null;
+        setVisible(false);
+      }, remainingVisibleMs);
+    } else if (!input.active && !visible) {
+      visibleSinceRef.current = null;
+    }
+
+    return () => {
+      if (timeoutId !== null) {
+        input.scheduler.cancel(timeoutId);
+      }
+    };
+  }, [
+    input.active,
+    input.clock,
+    input.minimumVisibleMs,
+    input.scheduler,
+    input.showDelayMs,
+    visible,
+  ]);
+
+  return visible;
+}
 
 function DeleteSandboxProfileDialog(input: {
   automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -1127,7 +1586,6 @@ export function SandboxProfileEditorView(input: {
   profileNameFallback: string;
   onSaveProfileName: (nextValue: string) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
-  snapshotPreparationStatus: SandboxProfileSnapshotPreparationStatus | null;
   deleteProfileAutomationUsages: readonly WebhookAutomationSandboxProfileUsage[];
   deleteProfileAutomationUsagesError: string | null;
   deleteProfileAutomationUsagesIsPending: boolean;
@@ -1186,20 +1644,6 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
-  const snapshotPreparationBadge =
-    input.snapshotPreparationStatus === null
-      ? null
-      : input.snapshotPreparationStatus.kind === "failed"
-        ? {
-            className:
-              "inline-flex h-6 items-center rounded-sm border border-red-200 bg-red-50 px-2 text-xs font-medium text-red-700",
-            label: "Snapshot failed",
-          }
-        : {
-            className:
-              "inline-flex h-6 items-center rounded-sm border border-zinc-200 bg-zinc-50 px-2 text-xs font-medium text-zinc-700",
-            label: "Preparing snapshot",
-          };
 
   return (
     <div className="gap-4 flex flex-col">
@@ -1223,18 +1667,12 @@ export function SandboxProfileEditorView(input: {
           {input.versionStatusBadge ?? (
             <span
               className={
-                snapshotPreparationBadge !== null
-                  ? snapshotPreparationBadge.className
-                  : input.mode.kind === "draft"
-                    ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
-                    : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
+                input.mode.kind === "draft"
+                  ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
+                  : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
               }
             >
-              {snapshotPreparationBadge?.label === "Preparing snapshot" ? (
-                <SpinnerGapIcon aria-hidden="true" className="mr-1 size-3.5 animate-spin" />
-              ) : null}
-              {snapshotPreparationBadge?.label ??
-                (input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published")}
+              {input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published"}
             </span>
           )}
           {input.versionActions ??
@@ -1282,12 +1720,6 @@ export function SandboxProfileEditorView(input: {
             ))}
         </div>
       </div>
-
-      {input.snapshotPreparationStatus?.kind === "failed" ? (
-        <Notice title="Snapshot preparation failed" variant="alert">
-          {input.snapshotPreparationStatus.message}
-        </Notice>
-      ) : null}
 
       {input.versionActionError === null ? null : (
         <Notice title="Profile version action failed" variant="alert">

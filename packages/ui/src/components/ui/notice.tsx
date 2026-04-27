@@ -83,6 +83,7 @@ const NoticeAutoHideDurationsMs = Object.freeze({
   MEDIUM: 5000,
   LONG: 8000,
 });
+const NoticeDismissAnimationMs = 200;
 
 type NoticeOwnProps = {
   action?: React.ReactNode;
@@ -172,21 +173,27 @@ function Notice({
 
   const [, rerenderAfterDismissal] = React.useReducer(incrementDismissalCount, 0);
   const dismissedLifecycleKeyRef = React.useRef<NoticeLifecycleKey | null>(null);
+  const [exitingLifecycleKey, setExitingLifecycleKey] = React.useState<NoticeLifecycleKey | null>(
+    null,
+  );
   const lifecycleKey = resetKey ?? NoticeDefaultLifecycleKey;
   const isDismissed = Object.is(dismissedLifecycleKeyRef.current, lifecycleKey);
+  const isExiting = Object.is(exitingLifecycleKey, lifecycleKey);
 
   const dismissNotice = React.useCallback(() => {
-    if (Object.is(dismissedLifecycleKeyRef.current, lifecycleKey)) {
+    if (
+      Object.is(dismissedLifecycleKeyRef.current, lifecycleKey) ||
+      Object.is(exitingLifecycleKey, lifecycleKey)
+    ) {
       return;
     }
 
-    dismissedLifecycleKeyRef.current = lifecycleKey;
-    rerenderAfterDismissal();
+    setExitingLifecycleKey(lifecycleKey);
     onDismiss?.();
-  }, [lifecycleKey, onDismiss]);
+  }, [exitingLifecycleKey, lifecycleKey, onDismiss]);
 
   React.useEffect(() => {
-    if (autoHideAfterMs === undefined || isDismissed) {
+    if (autoHideAfterMs === undefined || isDismissed || isExiting) {
       return undefined;
     }
 
@@ -195,7 +202,23 @@ function Notice({
     return () => {
       scheduler.cancel(timeoutId);
     };
-  }, [autoHideAfterMs, dismissNotice, isDismissed, lifecycleKey, scheduler]);
+  }, [autoHideAfterMs, dismissNotice, isDismissed, isExiting, lifecycleKey, scheduler]);
+
+  React.useEffect(() => {
+    if (!isExiting) {
+      return undefined;
+    }
+
+    const timeoutId = scheduler.schedule(() => {
+      dismissedLifecycleKeyRef.current = lifecycleKey;
+      setExitingLifecycleKey(null);
+      rerenderAfterDismissal();
+    }, NoticeDismissAnimationMs);
+
+    return () => {
+      scheduler.cancel(timeoutId);
+    };
+  }, [isExiting, lifecycleKey, scheduler]);
 
   const layoutState = resolveLayoutState({
     action,
@@ -218,23 +241,30 @@ function Notice({
   return (
     <div
       aria-live={urgencyProps["aria-live"]}
-      className={cn(noticeVariants({ variant, appearance }), className)}
+      className={cn(
+        noticeVariants({ variant, appearance }),
+        "grid grid-rows-[1fr] overflow-hidden transition-[opacity,grid-template-rows,padding,border-width] duration-200 ease-out data-[state=closing]:grid-rows-[0fr] data-[state=closing]:border-y-0 data-[state=closing]:py-0 data-[state=closing]:opacity-0",
+        className,
+      )}
       data-slot="notice"
+      data-state={isExiting ? "closing" : "open"}
       role={urgencyProps.role}
       {...props}
     >
-      {shouldRenderStructuredContent ? (
-        <NoticeStructuredContent
-          action={action}
-          closeButton={dismissible ? <NoticeCloseButton onClick={dismissNotice} /> : undefined}
-          icon={icon}
-          title={title}
-        >
-          {children}
-        </NoticeStructuredContent>
-      ) : (
-        children
-      )}
+      <div className="min-h-0 overflow-hidden">
+        {shouldRenderStructuredContent ? (
+          <NoticeStructuredContent
+            action={action}
+            closeButton={dismissible ? <NoticeCloseButton onClick={dismissNotice} /> : undefined}
+            icon={icon}
+            title={title}
+          >
+            {children}
+          </NoticeStructuredContent>
+        ) : (
+          children
+        )}
+      </div>
     </div>
   );
 }
@@ -377,7 +407,7 @@ function NoticeCloseButton({ onClick }: { onClick: React.MouseEventHandler<HTMLB
   return (
     <Button
       aria-label="Dismiss notice"
-      className="-mt-0.5 -mr-1 text-current opacity-80 hover:opacity-100"
+      className="-my-1 -mr-1 text-current opacity-75 hover:bg-current/10 hover:text-current hover:opacity-100"
       size="icon-xs"
       type="button"
       variant="ghost"
@@ -392,6 +422,7 @@ export {
   Notice,
   NoticeAction,
   NoticeAutoHideDurationsMs,
+  NoticeDismissAnimationMs,
   NoticeDescription,
   NoticeIcon,
   NoticeTitle,

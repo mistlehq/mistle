@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Notice, NoticeAutoHideDurationsMs } from "./notice.js";
+import { Notice, NoticeAutoHideDurationsMs, NoticeDismissAnimationMs } from "./notice.js";
 
 describe("Notice", () => {
   afterEach(() => {
@@ -65,13 +65,24 @@ describe("Notice", () => {
   });
 
   it("hides the notice when the dismiss button is pressed", () => {
+    const clock = createMutableClock(0);
+    const scheduler = createManualScheduler(clock);
+
     render(
-      <Notice dismissible variant="success">
+      <Notice dismissible scheduler={scheduler} variant="success">
         GitHub linked successfully.
       </Notice>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+
+    const notice = screen.getByText("GitHub linked successfully.").closest('[data-slot="notice"]');
+
+    expect(notice?.getAttribute("data-state")).toBe("closing");
+    clock.advanceMs(NoticeDismissAnimationMs);
+    act(() => {
+      expect(scheduler.runDue()).toBe(1);
+    });
 
     expect(screen.queryByText("GitHub linked successfully.")).toBeNull();
   });
@@ -93,6 +104,14 @@ describe("Notice", () => {
     expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
 
     clock.advanceMs(1);
+    act(() => {
+      expect(scheduler.runDue()).toBe(1);
+    });
+
+    const notice = screen.getByText("GitHub linked successfully.").closest('[data-slot="notice"]');
+
+    expect(notice?.getAttribute("data-state")).toBe("closing");
+    clock.advanceMs(NoticeDismissAnimationMs);
     act(() => {
       expect(scheduler.runDue()).toBe(1);
     });
@@ -119,14 +138,15 @@ describe("Notice", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
 
-    expect(screen.queryByText("GitHub linked successfully.")).toBeNull();
+    expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
     expect(dismissEvents).toEqual(["dismissed"]);
 
     clock.advanceMs(1_000);
     act(() => {
-      expect(scheduler.runDue()).toBe(0);
+      expect(scheduler.runDue()).toBe(1);
     });
 
+    expect(screen.queryByText("GitHub linked successfully.")).toBeNull();
     expect(dismissEvents).toEqual(["dismissed"]);
   });
 
@@ -139,7 +159,7 @@ describe("Notice", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
 
-    expect(screen.queryByText("GitHub linked successfully.")).toBeNull();
+    expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
 
     rerender(
       <Notice dismissible resetKey="request-failed" title="Request failed" variant="alert">
@@ -152,18 +172,36 @@ describe("Notice", () => {
   });
 
   it("keeps a JSX notice dismissed across ordinary rerenders with the same reset key", () => {
+    const clock = createMutableClock(0);
+    const scheduler = createManualScheduler(clock);
     const { rerender } = render(
-      <Notice dismissible resetKey="saved" title={<span>Saved</span>} variant="success">
+      <Notice
+        dismissible
+        resetKey="saved"
+        scheduler={scheduler}
+        title={<span>Saved</span>}
+        variant="success"
+      >
         <span>GitHub linked successfully.</span>
       </Notice>,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    clock.advanceMs(NoticeDismissAnimationMs);
+    act(() => {
+      expect(scheduler.runDue()).toBe(1);
+    });
 
     expect(screen.queryByText("GitHub linked successfully.")).toBeNull();
 
     rerender(
-      <Notice dismissible resetKey="saved" title={<span>Saved</span>} variant="success">
+      <Notice
+        dismissible
+        resetKey="saved"
+        scheduler={scheduler}
+        title={<span>Saved</span>}
+        variant="success"
+      >
         <span>GitHub linked successfully.</span>
       </Notice>,
     );
@@ -207,6 +245,12 @@ describe("Notice", () => {
     expect(screen.getByText("Second message.")).toBeTruthy();
 
     clock.advanceMs(4_000);
+    act(() => {
+      expect(scheduler.runDue()).toBe(1);
+    });
+
+    expect(screen.getByText("Second message.")).toBeTruthy();
+    clock.advanceMs(NoticeDismissAnimationMs);
     act(() => {
       expect(scheduler.runDue()).toBe(1);
     });

@@ -304,9 +304,14 @@ function SandboxProfileSnapshotStoryPanel(input: {
       {input.publishSuccessMessage ? (
         <Notice
           autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
+          dismissible
           title="Publish successful, creating a new snapshot"
           variant="success"
         />
+      ) : null}
+
+      {input.status === "no-snapshot" ? (
+        <Notice title="Create a snapshot to start sessions from this profile." variant="alert" />
       ) : null}
 
       {state.notice === null ? null : (
@@ -484,7 +489,6 @@ function SandboxProfileEditorPageStoryView(
         deleteProfileIsPending={false}
         isDeleteProfileDialogOpen={false}
         mode={mode}
-        snapshotPreparationStatus={null}
         onConfirmDeleteProfile={() => {}}
         onDeleteProfileDialogOpenChange={() => {}}
         onMakeChanges={() => {}}
