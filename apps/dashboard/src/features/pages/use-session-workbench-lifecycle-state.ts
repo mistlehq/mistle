@@ -10,7 +10,10 @@ import {
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import { TopLoadingBarQueryMeta } from "../shell/top-loading-bar-query-meta.js";
+import {
+  AppShellLoadingIndicatorMeta,
+  AppShellLoadingIndicators,
+} from "../shell/app-shell-loading-indicator-meta.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
@@ -116,7 +119,7 @@ export function useSessionWorkbenchLifecycleState(input: {
         ? (["sandbox-instance-status", null] as const)
         : sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
     meta: {
-      [TopLoadingBarQueryMeta.SUPPRESS]: true,
+      [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicators.NONE,
     },
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {

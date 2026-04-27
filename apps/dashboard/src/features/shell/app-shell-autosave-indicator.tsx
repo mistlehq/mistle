@@ -9,7 +9,10 @@ import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useIsMutating } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { AppShellAutosaveIndicatorMeta } from "./app-shell-autosave-indicator-meta.js";
+import {
+  AppShellLoadingIndicators,
+  resolveAppShellLoadingIndicator,
+} from "./app-shell-loading-indicator-meta.js";
 
 const AutosaveIndicatorShowDelayMs = 200;
 const AutosaveIndicatorMinimumVisibleMs = 500;
@@ -33,7 +36,8 @@ export function useAppShellAutosaveIndicator(input?: {
   showDelayMs?: number;
 }): React.ReactNode | null {
   const activeAutosaveMutationCount = useIsMutating({
-    predicate: (mutation) => mutation.options.meta?.[AppShellAutosaveIndicatorMeta.SHOW] === true,
+    predicate: (mutation) =>
+      resolveAppShellLoadingIndicator(mutation.options.meta) === AppShellLoadingIndicators.AUTOSAVE,
   });
   const showSavingIndicator = useDelayedMinimumVisibleFlag({
     active: activeAutosaveMutationCount > 0,

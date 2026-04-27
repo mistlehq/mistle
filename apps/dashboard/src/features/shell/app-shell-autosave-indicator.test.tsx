@@ -5,8 +5,11 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { AppShellAutosaveIndicatorMeta } from "./app-shell-autosave-indicator-meta.js";
 import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
+import {
+  AppShellLoadingIndicatorMeta,
+  AppShellLoadingIndicators,
+} from "./app-shell-loading-indicator-meta.js";
 
 function createDeferredPromise<T>() {
   let resolve: (value: T) => void = () => {};
@@ -42,7 +45,7 @@ function MutationHarness(input: {
     ...(input.autosave
       ? {
           meta: {
-            [AppShellAutosaveIndicatorMeta.SHOW]: true,
+            [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicators.AUTOSAVE,
           },
         }
       : {}),
