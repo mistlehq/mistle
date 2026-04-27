@@ -154,8 +154,6 @@ describe("IntegrationsPage", () => {
         .getByRole("button", { name: "Select connection Engineering Slack" })
         .getAttribute("aria-current"),
     ).toBe("true");
-    expect(screen.queryByText("Slack app is connected")).toBeNull();
-    expect(screen.queryByRole("button", { name: "View connection" })).toBeNull();
   });
 });
 

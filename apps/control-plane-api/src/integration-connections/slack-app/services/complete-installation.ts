@@ -39,6 +39,7 @@ import {
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
+import { buildSlackAppInstallationCompleteUrl } from "./manifest-builder.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -79,13 +80,6 @@ const SlackOAuthAccessErrorResponseSchema = z
   .loose();
 
 type SlackOAuthAccessSuccessResponse = z.output<typeof SlackOAuthAccessSuccessResponseSchema>;
-
-function buildSlackAppInstallationCompleteUrl(input: { controlPlaneBaseUrl: string }): string {
-  return buildUrlWithPath(
-    input.controlPlaneBaseUrl,
-    "/p/integration/callbacks/slack-app-installation",
-  );
-}
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return resolveRequiredRedirectQueryParamOrThrow({
