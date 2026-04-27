@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
@@ -38,13 +38,21 @@ function createSlackConnection(input?: {
   };
 }
 
-function renderSlackAppSetupPane(input?: { connection?: IntegrationConnection }) {
+function CurrentPath(): React.JSX.Element {
+  const location = useLocation();
+  return <div data-testid="current-path">{location.pathname}</div>;
+}
+
+function renderSlackAppSetupPane(input?: {
+  connection?: IntegrationConnection;
+  webhookSource?: IntegrationWebhookSource | null;
+}) {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
   const connection = input?.connection ?? createSlackConnection();
-  const webhookSource = {
+  const defaultWebhookSource = {
     id: "iws_slack_app_setup",
     targetKey: connection.targetKey,
     integrationConnectionId: connection.id,
@@ -57,12 +65,20 @@ function renderSlackAppSetupPane(input?: { connection?: IntegrationConnection })
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
   } satisfies IntegrationWebhookSource;
-  queryClient.setQueryData(["integration-webhook-sources", connection.id], [webhookSource]);
+  const webhookSource =
+    input?.webhookSource === undefined ? defaultWebhookSource : input.webhookSource;
+  queryClient.setQueryData(
+    ["integration-webhook-sources", connection.id],
+    webhookSource === null ? [] : [webhookSource],
+  );
 
   return render(
-    <MemoryRouter>
+    <MemoryRouter
+      initialEntries={[`/integrations/${connection.targetKey}/${connection.id}/slack-app/setup`]}
+    >
       <QueryClientProvider client={queryClient}>
         <SlackAppSetupPane connection={connection} />
+        <CurrentPath />
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -151,5 +167,40 @@ describe("SlackAppSetupPane", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save Slack App" })).toBeNull();
+    const connectButton = screen.getByRole("button", { name: "Connect Slack to Mistle" });
+    expect(connectButton.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(connectButton);
+    expect(screen.getByTestId("current-path").textContent).toBe("/integrations/slack-default");
+  });
+
+  it("keeps the existing Slack app completion action disabled until required local setup is ready", () => {
+    renderSlackAppSetupPane({
+      connection: createSlackConnection({
+        clientId: "123.456",
+        configuredSecretNames: ["botToken"],
+      }),
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Use existing app" }));
+
+    expect(screen.getByText("Slack app URLs")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Connect Slack to Mistle" }).hasAttribute("disabled"),
+    ).toBe(true);
+  });
+
+  it("keeps the existing Slack app completion action disabled when the Events API URL is unavailable", () => {
+    renderSlackAppSetupPane({
+      connection: createSlackConnection({
+        clientId: "123.456",
+        configuredSecretNames: ["botToken", "signingSecret"],
+      }),
+      webhookSource: null,
+    });
+
+    expect(screen.getByText("Events API Request URL is not available yet")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Connect Slack to Mistle" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 });

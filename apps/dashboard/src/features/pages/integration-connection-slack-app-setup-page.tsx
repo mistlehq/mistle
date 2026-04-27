@@ -22,7 +22,7 @@ import {
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -81,6 +81,11 @@ const SlackExistingAppFieldKeys = [
   "signingSecret",
   "clientSecret",
 ] as const satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackRequiredExistingAppSecretFieldKeys = [
+  "botToken",
+  "signingSecret",
+] as const satisfies readonly SlackExistingAppSecretFieldKey[];
 
 export const SlackDraftManifest = JSON.stringify(
   {
@@ -232,6 +237,45 @@ function isSlackExistingAppSetupFieldDirty(input: {
   );
 }
 
+function isSlackExistingAppFieldStable(input: {
+  fieldKey: SlackExistingAppFieldKey;
+  draft: SlackExistingAppDraft;
+  savedDraft: SlackExistingAppDraft;
+  fieldState: SavingFieldState;
+}): boolean {
+  return (
+    input.fieldState.status !== "saving" &&
+    input.fieldState.errorMessage === null &&
+    !isSlackExistingAppSetupFieldDirty({
+      fieldKey: input.fieldKey,
+      draft: input.draft,
+      savedDraft: input.savedDraft,
+    })
+  );
+}
+
+function isSlackExistingAppRequiredSecretReady(input: {
+  fieldKey: SlackExistingAppSecretFieldKey;
+  draft: SlackExistingAppDraft;
+  savedDraft: SlackExistingAppDraft;
+  fieldState: SavingFieldState;
+  isConfiguredOnServer: boolean;
+}): boolean {
+  if (
+    input.isConfiguredOnServer &&
+    normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]).length === 0 &&
+    normalizeSlackExistingAppSetupValue(input.savedDraft[input.fieldKey]).length === 0 &&
+    isSlackExistingAppFieldStable(input)
+  ) {
+    return true;
+  }
+
+  return (
+    normalizeSlackExistingAppSetupValue(input.savedDraft[input.fieldKey]).length > 0 &&
+    isSlackExistingAppFieldStable(input)
+  );
+}
+
 function buildDraftWithSavedFieldValues(input: {
   baseDraft: SlackExistingAppDraft;
   draft: SlackExistingAppDraft;
@@ -304,6 +348,7 @@ function SlackExistingAppSetupPanel(input: {
   draft: SlackExistingAppDraft;
   fieldStates: Record<SlackExistingAppFieldKey, SavingFieldState>;
   onCommitField: (fieldKey: SlackExistingAppFieldKey) => void;
+  onReplacementDialogOpenChange: (open: boolean) => void;
   onRevertSecretReplacement: (fieldKey: SlackExistingAppSecretFieldKey) => void;
   onUpdateFieldDraft: (fieldKey: SlackExistingAppFieldKey, nextValue: string) => void;
 }): React.JSX.Element {
@@ -346,6 +391,7 @@ function SlackExistingAppSetupPanel(input: {
           onCommit={() => {
             input.onCommitField("botToken");
           }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
           placeholder="xoxb-..."
           required={!input.configuredSecretFieldKeys.has("botToken")}
           secretLabel="bot token"
@@ -366,6 +412,7 @@ function SlackExistingAppSetupPanel(input: {
           onCommit={() => {
             input.onCommitField("signingSecret");
           }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
           required={!input.configuredSecretFieldKeys.has("signingSecret")}
           secretLabel="signing secret"
           type="password"
@@ -385,6 +432,7 @@ function SlackExistingAppSetupPanel(input: {
           onCommit={() => {
             input.onCommitField("clientSecret");
           }}
+          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
           secretLabel="client secret"
           type="password"
           value={input.draft.clientSecret}
@@ -402,7 +450,7 @@ function SlackSetupUrls(input: {
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-medium">Slack app URLs</h2>
         <p className="text-muted-foreground text-sm">
-          Copy this URL into Slack Event Subscriptions so Mistle can receive app events.
+          Copy this URL into Slack Event Subscriptions, then return here to connect Slack to Mistle.
         </p>
       </div>
       <div className="flex flex-col gap-4">
@@ -481,6 +529,7 @@ export function IntegrationConnectionSlackAppSetupPage(): React.JSX.Element {
 
 export function SlackAppSetupPane(input: { connection: IntegrationConnection }): React.JSX.Element {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [setupMode, setSetupMode] = useState<SlackSetupMode>(() =>
     isSlackAppInstalled(input.connection) ? "existing-app" : "manifest",
   );
@@ -495,6 +544,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSecretFieldKeys(input.connection),
   );
+  const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
@@ -704,6 +754,28 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const manifestValidation = validateManifestJsonObject(manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" && appConfigToken.trim().length > 0;
+  const requiredSecretsReady = SlackRequiredExistingAppSecretFieldKeys.every((fieldKey) =>
+    isSlackExistingAppRequiredSecretReady({
+      fieldKey,
+      draft: existingAppDraft,
+      savedDraft: savedExistingAppDraft,
+      fieldState: fieldStates[fieldKey],
+      isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey),
+    }),
+  );
+  const allFieldsStable = SlackExistingAppFieldKeys.every((fieldKey) =>
+    isSlackExistingAppFieldStable({
+      fieldKey,
+      draft: existingAppDraft,
+      savedDraft: savedExistingAppDraft,
+      fieldState: fieldStates[fieldKey],
+    }),
+  );
+  const canConnectExistingApp =
+    requiredSecretsReady &&
+    allFieldsStable &&
+    !isSecretReplacementDialogOpen &&
+    webhookCallbackState.kind === "ready";
 
   return (
     <FormPageStack>
@@ -754,6 +826,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
                 onCommitField={(fieldKey) => {
                   void persistExistingAppField(fieldKey);
                 }}
+                onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
                 onRevertSecretReplacement={revertSecretReplacement}
                 onUpdateFieldDraft={updateExistingAppFieldDraft}
               />
@@ -763,7 +836,19 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
               <SlackSetupUrls webhookCallbackState={webhookCallbackState} />
             ) : null}
 
-            {setupMode === "manifest" ? (
+            {setupMode === "existing-app" ? (
+              <FormPageActionBar>
+                <Button
+                  disabled={!canConnectExistingApp}
+                  onClick={() => {
+                    void navigate(`/integrations/${input.connection.targetKey}`);
+                  }}
+                  type="button"
+                >
+                  Connect Slack to Mistle
+                </Button>
+              </FormPageActionBar>
+            ) : setupMode === "manifest" ? (
               <FormPageActionBar>
                 <Button
                   disabled={!canCreateManifest || startManifestMutation.isPending}
