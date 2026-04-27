@@ -47,6 +47,7 @@ const GitHubAppInstallationConnectionMethodId = "github-app-installation";
 const InternalMintConnectionTokenResponseSchema = z
   .object({
     instanceId: z.string().min(1),
+    tokenJti: z.string().min(1),
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),

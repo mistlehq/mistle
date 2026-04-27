@@ -1111,6 +1111,7 @@ async function startSandboxInstanceInternally(input: {
       image: {
         imageId: systemSandboxBaseImage,
         createdAt: "2026-04-17T00:00:00.000Z",
+        kind: "base",
       },
     }),
   });

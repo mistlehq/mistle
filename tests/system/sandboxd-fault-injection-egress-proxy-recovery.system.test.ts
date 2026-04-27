@@ -19,6 +19,13 @@ import { it } from "./system-test-context.js";
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
 const OPENAI_API_KEY = "sk-system-sandbox-restart";
+const SystemSandboxProvider = {
+  DOCKER: "docker",
+  E2B: "e2b",
+} as const;
+const requestedSystemSandboxProvider =
+  process.env.MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER ?? SystemSandboxProvider.DOCKER;
+const itForDocker = requestedSystemSandboxProvider === SystemSandboxProvider.DOCKER ? it : it.skip;
 
 function findComponentOrThrow(input: {
   response: Awaited<ReturnType<typeof readSandboxHealthz>>;
@@ -68,7 +75,7 @@ async function runOpenAiProxyProbe(input: {
 }
 
 describe("system sandboxd fault injection egress proxy recovery", () => {
-  it(
+  itForDocker(
     "recovers a real sandbox from a deterministic egress proxy fault",
     async ({ fixture }) => {
       const { authenticatedSession, sandboxInstanceId } = await prepareCodexSandbox({
