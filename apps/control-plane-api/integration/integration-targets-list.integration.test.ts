@@ -179,7 +179,7 @@ describe("integration targets discovery integration", () => {
             },
             {
               name: "clientSecret",
-              label: "Client secret (Linked User Auth)",
+              label: "Client secret",
               placeholder: "Enter client secret",
               inputType: "password",
               slotKey: "github.github-cloud.github-app-installation.client-secret",
@@ -447,7 +447,7 @@ describe("integration targets discovery integration", () => {
             },
             {
               name: "clientSecret",
-              label: "Client secret (Linked User Auth)",
+              label: "Client secret",
               inputType: "password",
               slotKey: "github.github-cloud.github-app-installation.client-secret",
             },

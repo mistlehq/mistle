@@ -118,10 +118,12 @@ describe("sandbox instance title patch integration", () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      const responseBody = await response.json();
+      expect(responseBody).toMatchObject({
         id: "sbi_cp_patch_title",
         title: "Updated from control plane",
       });
+      expect(responseBody.updatedAt).toEqual(expect.any(String));
 
       const patchedSandboxInstance = await dataPlaneFixture.db.query.sandboxInstances.findFirst({
         columns: {

@@ -1295,10 +1295,13 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const activeResults = prepareResults.filter((result) => !result.finalized);
 
         expect(finalizedResults).toHaveLength(1);
-        expect(finalizedResults[0]).toEqual({
+        expect(finalizedResults[0]).toMatchObject({
           automationRunIds: [],
+          externalDeliveryId: "delivery_prepare_race",
           finalized: true,
+          integrationConnectionId: connectionId,
           resourceSyncRequests: [],
+          targetKey,
           webhookEventId,
         });
         expect(activeResults).toHaveLength(1);

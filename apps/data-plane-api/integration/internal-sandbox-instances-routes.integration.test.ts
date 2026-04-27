@@ -122,6 +122,7 @@ describe("internal sandbox instances routes integration", () => {
           source: "dashboard",
           image: {
             imageId: "im_dp_api_conventional_start",
+            kind: "base",
             createdAt: "2026-03-27T00:00:00.000Z",
           },
         }),

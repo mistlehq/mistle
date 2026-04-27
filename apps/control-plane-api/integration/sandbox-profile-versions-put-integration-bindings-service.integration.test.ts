@@ -6,6 +6,7 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
   IntegrationBindingKinds,
+  SandboxProfileVersionStates,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
@@ -77,6 +78,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_service_001",
+      state: SandboxProfileVersionStates.DRAFT,
       version: 2,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
@@ -308,6 +310,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_connection_reference_001",
+      state: SandboxProfileVersionStates.DRAFT,
       version: 1,
     });
 
@@ -389,6 +392,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_invalid_binding_reference_001",
+      state: SandboxProfileVersionStates.DRAFT,
       version: 1,
     });
 
@@ -875,6 +879,7 @@ async function insertGitHubBindingValidationFixture(input: {
     .insert(sandboxProfileVersions)
     .values({
       sandboxProfileId: input.profileId,
+      state: SandboxProfileVersionStates.DRAFT,
       version: input.profileVersion,
     })
     .onConflictDoNothing();
@@ -921,6 +926,7 @@ async function insertJiraBindingValidationFixture(input: {
     .insert(sandboxProfileVersions)
     .values({
       sandboxProfileId: input.profileId,
+      state: SandboxProfileVersionStates.DRAFT,
       version: input.profileVersion,
     })
     .onConflictDoNothing();
