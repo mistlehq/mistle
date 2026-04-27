@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   decodeDataFrame,
   encodeDataFrame,
@@ -18,6 +19,7 @@ import {
 } from "@mistle/sandbox-session-protocol";
 import { createMailpitInbox, readTestContext } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
+import { Sandbox, type ConnectionOpts } from "e2b";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
@@ -805,6 +807,74 @@ async function removeSandboxContainersOnNetwork(input: { networkName: string }):
   });
 }
 
+function readOptionalEnvVar(name: string): string | undefined {
+  const value = process.env[name];
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
+function resolveE2BConnectionOptions(): ConnectionOpts {
+  const apiKey =
+    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY") ??
+    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY") ??
+    readOptionalEnvVar("E2B_API_KEY");
+  if (apiKey === undefined) {
+    throw new Error(
+      "E2B_API_KEY or a provider-specific Mistle E2B API key env var is required to clean up E2B-backed system test sandboxes.",
+    );
+  }
+
+  const domain =
+    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN") ??
+    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN");
+
+  return {
+    apiKey,
+    ...(domain === undefined ? {} : { domain }),
+  };
+}
+
+async function listProviderSandboxIds(input: {
+  dataPlaneDb: DataPlaneDatabase;
+}): Promise<Set<string>> {
+  const sandboxInstances = await input.dataPlaneDb.query.sandboxInstances.findMany({
+    columns: {
+      providerSandboxId: true,
+    },
+  });
+  return new Set(
+    sandboxInstances
+      .map((sandboxInstance) => sandboxInstance.providerSandboxId)
+      .filter((providerSandboxId): providerSandboxId is string => providerSandboxId !== null),
+  );
+}
+
+async function destroyE2BProviderSandboxesCreatedByTest(input: {
+  dataPlaneDb: DataPlaneDatabase;
+  baselineProviderSandboxIds: ReadonlySet<string>;
+}): Promise<void> {
+  const currentProviderSandboxIds = await listProviderSandboxIds({
+    dataPlaneDb: input.dataPlaneDb,
+  });
+  const providerSandboxIds = [...currentProviderSandboxIds].filter(
+    (providerSandboxId) => !input.baselineProviderSandboxIds.has(providerSandboxId),
+  );
+  if (providerSandboxIds.length === 0) {
+    return;
+  }
+
+  const connectionOptions = resolveE2BConnectionOptions();
+  await Promise.all(
+    providerSandboxIds.map(async (providerSandboxId) => {
+      await Sandbox.kill(providerSandboxId, connectionOptions);
+    }),
+  );
+}
+
 async function readContainerLogsTail(input: {
   containerId: string;
   tail: number;
@@ -926,6 +996,13 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
         connectionString: systemTestContext.controlPlaneDatabaseUrl,
       });
       const db = createControlPlaneDatabase(databasePool);
+      const dataPlaneDb = createDataPlaneDatabase(databasePool);
+      const baselineProviderSandboxIds =
+        systemTestContext.sandboxProvider === "e2b"
+          ? await listProviderSandboxIds({
+              dataPlaneDb,
+            })
+          : new Set<string>();
       const mailpitInbox = createMailpitInbox({
         httpBaseUrl: systemTestContext.mailpitHttpBaseUrl,
       });
@@ -1691,6 +1768,12 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           resumeSandboxInstance,
         });
       } finally {
+        if (systemTestContext.sandboxProvider === "e2b") {
+          await destroyE2BProviderSandboxesCreatedByTest({
+            dataPlaneDb,
+            baselineProviderSandboxIds,
+          });
+        }
         await removeSandboxContainersOnNetwork({
           networkName: systemTestContext.sandboxNetworkName,
         });
@@ -1698,7 +1781,7 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
       }
     },
     {
-      scope: "file",
+      scope: "test",
     },
   ],
 });
