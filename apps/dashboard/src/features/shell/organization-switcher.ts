@@ -7,6 +7,10 @@ export type OrganizationSwitcherOption = {
 
 export const ORGANIZATION_SWITCHER_QUERY_KEY = ["auth", "organizations"] as const;
 
+const OrganizationSwitcherNameCollator = new Intl.Collator("en", {
+  sensitivity: "base",
+});
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -50,6 +54,23 @@ function resolveOrganizationSwitcherErrorMessage(error: unknown, fallback: strin
   return fallback;
 }
 
+export function sortOrganizationSwitcherOptions(
+  organizations: readonly OrganizationSwitcherOption[],
+): OrganizationSwitcherOption[] {
+  return [...organizations].sort((firstOrganization, secondOrganization) => {
+    const nameComparison = OrganizationSwitcherNameCollator.compare(
+      firstOrganization.name,
+      secondOrganization.name,
+    );
+
+    if (nameComparison !== 0) {
+      return nameComparison;
+    }
+
+    return firstOrganization.id.localeCompare(secondOrganization.id, "en");
+  });
+}
+
 export async function fetchOrganizationSwitcherOptions(): Promise<OrganizationSwitcherOption[]> {
   let response: unknown;
 
@@ -68,7 +89,7 @@ export async function fetchOrganizationSwitcherOptions(): Promise<OrganizationSw
     throw new Error("Organization list response must be an array.");
   }
 
-  return response.map((entry) => {
+  const organizations = response.map((entry) => {
     const organization = parseOrganizationSwitcherOption(entry);
     if (organization === null) {
       throw new Error("Organization list response included an invalid organization.");
@@ -76,6 +97,8 @@ export async function fetchOrganizationSwitcherOptions(): Promise<OrganizationSw
 
     return organization;
   });
+
+  return sortOrganizationSwitcherOptions(organizations);
 }
 
 export async function switchActiveOrganization(input: { organizationId: string }): Promise<void> {
