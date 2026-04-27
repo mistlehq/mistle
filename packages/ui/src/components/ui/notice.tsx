@@ -1,7 +1,10 @@
+import { systemScheduler, type Scheduler } from "@mistle/time";
+import { XIcon } from "@phosphor-icons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
+import { Button } from "./button.js";
 
 const noticeVariants = cva(
   [
@@ -72,9 +75,22 @@ const noticeVariants = cva(
   },
 );
 
+const NoticeDefaultLifecycleKey = Symbol("Notice default lifecycle key");
+
+type NoticeLifecycleKey = React.Key | typeof NoticeDefaultLifecycleKey;
+
 type NoticeOwnProps = {
   action?: React.ReactNode;
+  autoHideAfterMs?: number | undefined;
+  dismissible?: boolean;
   icon?: React.ReactNode;
+  onDismiss?: () => void;
+  /**
+   * Identifies the current logical notice message for dismiss/auto-hide lifecycle.
+   * Change this value when reusing the same Notice instance for a new message.
+   */
+  resetKey?: React.Key | undefined;
+  scheduler?: Scheduler | undefined;
   title?: React.ReactNode;
 };
 
@@ -101,7 +117,7 @@ function resolveLayoutState(input: {
   };
 }
 
-type NoticeProps = React.ComponentProps<"div"> &
+type NoticeProps = Omit<React.ComponentProps<"div">, keyof NoticeOwnProps> &
   NoticeOwnProps &
   VariantProps<typeof noticeVariants>;
 
@@ -133,15 +149,49 @@ function resolveUrgencyProps(input: {
 function Notice({
   action,
   "aria-live": ariaLive,
+  autoHideAfterMs,
   children,
   className,
+  dismissible = false,
   icon,
+  onDismiss,
+  resetKey,
   role,
+  scheduler = systemScheduler,
   title,
   variant,
   appearance,
   ...props
-}: NoticeProps) {
+}: NoticeProps): React.JSX.Element | null {
+  validateAutoHideAfterMs(autoHideAfterMs);
+
+  const [, rerenderAfterDismissal] = React.useReducer(incrementDismissalCount, 0);
+  const dismissedLifecycleKeyRef = React.useRef<NoticeLifecycleKey | null>(null);
+  const lifecycleKey = resetKey ?? NoticeDefaultLifecycleKey;
+  const isDismissed = Object.is(dismissedLifecycleKeyRef.current, lifecycleKey);
+
+  const dismissNotice = React.useCallback(() => {
+    if (Object.is(dismissedLifecycleKeyRef.current, lifecycleKey)) {
+      return;
+    }
+
+    dismissedLifecycleKeyRef.current = lifecycleKey;
+    rerenderAfterDismissal();
+    onDismiss?.();
+  }, [lifecycleKey, onDismiss]);
+
+  React.useEffect(() => {
+    if (autoHideAfterMs === undefined || isDismissed) {
+      return undefined;
+    }
+
+    const timeoutId = scheduler.schedule(dismissNotice, autoHideAfterMs);
+
+    return () => {
+      scheduler.cancel(timeoutId);
+    };
+  }, [autoHideAfterMs, dismissNotice, isDismissed, lifecycleKey, scheduler]);
+
   const layoutState = resolveLayoutState({
     action,
     children,
@@ -149,12 +199,16 @@ function Notice({
     title,
   });
   const shouldRenderStructuredContent =
-    layoutState.hasIcon || layoutState.hasTitle || layoutState.hasAction;
+    dismissible || layoutState.hasIcon || layoutState.hasTitle || layoutState.hasAction;
   const urgencyProps = resolveUrgencyProps({
     ariaLive,
     role,
     variant,
   });
+
+  if (isDismissed) {
+    return null;
+  }
 
   return (
     <div
@@ -165,7 +219,12 @@ function Notice({
       {...props}
     >
       {shouldRenderStructuredContent ? (
-        <NoticeStructuredContent action={action} icon={icon} title={title}>
+        <NoticeStructuredContent
+          action={action}
+          closeButton={dismissible ? <NoticeCloseButton onClick={dismissNotice} /> : undefined}
+          icon={icon}
+          title={title}
+        >
           {children}
         </NoticeStructuredContent>
       ) : (
@@ -175,18 +234,39 @@ function Notice({
   );
 }
 
+function incrementDismissalCount(dismissalCount: number): number {
+  return dismissalCount + 1;
+}
+
+function validateAutoHideAfterMs(autoHideAfterMs: number | undefined): void {
+  if (
+    autoHideAfterMs !== undefined &&
+    (!Number.isFinite(autoHideAfterMs) || autoHideAfterMs <= 0)
+  ) {
+    throw new Error("Notice autoHideAfterMs must be a positive finite number.");
+  }
+}
+
 function NoticeStructuredContent({
   action,
   children,
+  closeButton,
   icon,
   title,
-}: NoticeOwnProps & { children?: React.ReactNode }) {
+}: {
+  action?: React.ReactNode;
+  children?: React.ReactNode;
+  closeButton?: React.ReactNode;
+  icon?: React.ReactNode;
+  title?: React.ReactNode;
+}) {
   const layoutState = resolveLayoutState({
     action,
     children,
     icon,
     title,
   });
+  const hasCloseButton = hasVisibleContent(closeButton);
 
   return (
     <div className="flex items-center gap-3">
@@ -194,9 +274,22 @@ function NoticeStructuredContent({
         <div className="flex min-w-0 flex-1 items-center gap-2.5" data-slot="notice-main">
           {layoutState.hasIcon ? <NoticeIcon>{icon}</NoticeIcon> : null}
           {!layoutState.hasTitle && !layoutState.hasDescription ? null : (
-            <div className="my-auto flex min-w-0 flex-col gap-0.5" data-slot="notice-content">
-              {layoutState.hasTitle ? <NoticeTitle>{title}</NoticeTitle> : null}
-              {layoutState.hasDescription ? (
+            <div
+              className="my-auto flex min-w-0 flex-1 flex-col gap-0.5"
+              data-slot="notice-content"
+            >
+              {layoutState.hasTitle ? (
+                <NoticeHeaderRow closeButton={closeButton}>
+                  <NoticeTitle>{title}</NoticeTitle>
+                </NoticeHeaderRow>
+              ) : layoutState.hasDescription && hasCloseButton ? (
+                <NoticeHeaderRow closeButton={closeButton}>
+                  <NoticeDescription>{children}</NoticeDescription>
+                </NoticeHeaderRow>
+              ) : layoutState.hasDescription ? (
+                <NoticeDescription>{children}</NoticeDescription>
+              ) : null}
+              {layoutState.hasDescription && layoutState.hasTitle ? (
                 <NoticeDescription>{children}</NoticeDescription>
               ) : null}
             </div>
@@ -204,6 +297,24 @@ function NoticeStructuredContent({
         </div>
       )}
       {layoutState.hasAction ? <NoticeAction>{action}</NoticeAction> : null}
+      {!layoutState.hasTitle && !layoutState.hasDescription && hasCloseButton ? (
+        <NoticeAction>{closeButton}</NoticeAction>
+      ) : null}
+    </div>
+  );
+}
+
+function NoticeHeaderRow({
+  children,
+  closeButton,
+}: {
+  children: React.ReactNode;
+  closeButton?: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 items-start gap-2" data-slot="notice-header-row">
+      <div className="min-w-0 flex-1">{children}</div>
+      {hasVisibleContent(closeButton) ? <div className="shrink-0">{closeButton}</div> : null}
     </div>
   );
 }
@@ -254,6 +365,21 @@ function NoticeAction({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="notice-action"
       {...props}
     />
+  );
+}
+
+function NoticeCloseButton({ onClick }: { onClick: React.MouseEventHandler<HTMLButtonElement> }) {
+  return (
+    <Button
+      aria-label="Dismiss notice"
+      className="-mt-0.5 -mr-1 text-current opacity-80 hover:opacity-100"
+      size="icon-xs"
+      type="button"
+      variant="ghost"
+      onClick={onClick}
+    >
+      <XIcon aria-hidden="true" />
+    </Button>
   );
 }
 
