@@ -7,7 +7,6 @@ import { InMemorySandboxKeepaliveStore } from "../../runtime-state/adapters/in-m
 import { InMemorySandboxPresenceStore } from "../../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { InMemorySandboxRuntimeReadinessStore } from "../../runtime-state/adapters/in-memory-sandbox-runtime-readiness-store.js";
-import { InMemorySandboxOwnerStore } from "../../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import type { AppContextBindings, DataPlaneGatewayApp } from "../../types.js";
 import { registerSandboxRuntimeStateRoute } from "./register-sandbox-runtime-state-route.js";
 
@@ -19,14 +18,12 @@ function createTestApp(): {
   sandboxPresenceStore: InMemorySandboxPresenceStore;
   sandboxRuntimeReadinessStore: InMemorySandboxRuntimeReadinessStore;
   sandboxRuntimeAttachmentStore: InMemorySandboxRuntimeAttachmentStore;
-  sandboxOwnerStore: InMemorySandboxOwnerStore;
 } {
   const app = new Hono<AppContextBindings>();
   const sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
   const sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
   const sandboxRuntimeReadinessStore = new InMemorySandboxRuntimeReadinessStore();
   const sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
-  const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
 
   registerSandboxRuntimeStateRoute({
     app,
@@ -46,7 +43,6 @@ function createTestApp(): {
     sandboxPresenceStore,
     sandboxRuntimeReadinessStore,
     sandboxRuntimeAttachmentStore,
-    sandboxOwnerStore,
   };
 }
 

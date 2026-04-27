@@ -19,7 +19,6 @@ import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
-import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
@@ -54,7 +53,6 @@ type RegisterSandboxTunnelRouteInput = {
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
   tunnelSessionRegistry: TunnelSessionRegistry;
-  sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxKeepaliveStore: SandboxKeepaliveStore;
   sandboxRuntimeReadinessStore: SandboxRuntimeReadinessStore;
@@ -110,7 +108,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.interactiveStreamRouter,
     input.relayCoordinator,
     input.tunnelSessionRegistry,
-    input.sandboxOwnerStore,
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxInstanceDeadlineService,

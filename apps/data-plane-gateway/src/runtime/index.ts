@@ -36,8 +36,6 @@ import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
-import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
-import { ValkeySandboxOwnerStore } from "../tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
@@ -107,7 +105,6 @@ export function createDataPlaneGatewayRuntime(
   const sandboxTunnelTaskTracker = new AsyncTaskTracker();
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
-  let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
   let sandboxKeepaliveStore: InMemorySandboxKeepaliveStore | ValkeySandboxKeepaliveStore;
   let sandboxPresenceStore: InMemorySandboxPresenceStore | ValkeySandboxPresenceStore;
   let sandboxRuntimeReadinessStore:
@@ -118,7 +115,6 @@ export function createDataPlaneGatewayRuntime(
     | ValkeySandboxRuntimeAttachmentStore;
 
   if (config.app.runtimeState.backend === "memory") {
-    sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
     sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
     sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
     sandboxRuntimeReadinessStore = new InMemorySandboxRuntimeReadinessStore();
@@ -136,7 +132,6 @@ export function createDataPlaneGatewayRuntime(
     });
     hasValkeyClient = true;
 
-    sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxKeepaliveStore = new ValkeySandboxKeepaliveStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxPresenceStore = new ValkeySandboxPresenceStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxRuntimeReadinessStore = new ValkeySandboxRuntimeReadinessStore(
@@ -229,7 +224,6 @@ export function createDataPlaneGatewayRuntime(
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
-    sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxKeepaliveStore,
     sandboxRuntimeReadinessStore,

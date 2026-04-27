@@ -8,7 +8,6 @@ import { describe, expect } from "vitest";
 
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
-import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import {
   connectBootstrapSocket,
   insertSandboxInstanceRow,
@@ -21,7 +20,6 @@ import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 function createValkeyRuntimeStateStores(input: { fixture: DataPlaneGatewayIntegrationFixture }): {
   client: ReturnType<typeof createValkeyClient>;
   runtimeAttachmentStore: ValkeySandboxRuntimeAttachmentStore;
-  ownerStore: ValkeySandboxOwnerStore;
 } {
   if (input.fixture.config.app.runtimeState.backend !== "valkey") {
     throw new Error("Runtime shutdown integration tests require the valkey runtime-state backend.");
@@ -39,7 +37,6 @@ function createValkeyRuntimeStateStores(input: { fixture: DataPlaneGatewayIntegr
   return {
     client,
     runtimeAttachmentStore: new ValkeySandboxRuntimeAttachmentStore(client, valkeyConfig.keyPrefix),
-    ownerStore: new ValkeySandboxOwnerStore(client, valkeyConfig.keyPrefix),
   };
 }
 
@@ -69,7 +66,7 @@ describe("data plane gateway runtime shutdown", () => {
           currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
       });
 
-      const { client, ownerStore, runtimeAttachmentStore } = createValkeyRuntimeStateStores({
+      const { client, runtimeAttachmentStore } = createValkeyRuntimeStateStores({
         fixture,
       });
       await client.connect();
@@ -77,11 +74,6 @@ describe("data plane gateway runtime shutdown", () => {
       try {
         await fixture.runtime.stop();
 
-        await expect(
-          ownerStore.getOwner({
-            sandboxInstanceId,
-          }),
-        ).resolves.toBeUndefined();
         await expect(
           runtimeAttachmentStore.getAttachment({
             sandboxInstanceId,

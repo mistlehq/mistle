@@ -17,7 +17,6 @@ import {
   type ValkeyClient,
 } from "../src/runtime-state/valkey-client.js";
 import { SandboxTunnelWebSocketAdmission } from "../src/tunnel/admission/sandbox-tunnel-websocket-admission.js";
-import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../src/tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { insertSandboxInstanceRow, mintValidBootstrapToken } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
@@ -25,7 +24,6 @@ import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 function createValkeyRuntimeStateFixture(input: { fixture: DataPlaneGatewayIntegrationFixture }): {
   activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   client: ValkeyClient;
-  ownerStore: ValkeySandboxOwnerStore;
 } {
   if (input.fixture.config.app.runtimeState.backend !== "valkey") {
     throw new Error(
@@ -48,12 +46,11 @@ function createValkeyRuntimeStateFixture(input: { fixture: DataPlaneGatewayInteg
   return {
     activeBootstrapSessionStore: createAttachmentBackedActiveBootstrapSessionStore(attachmentStore),
     client,
-    ownerStore: new ValkeySandboxOwnerStore(client, valkeyConfig.keyPrefix),
   };
 }
 
 describe("sandbox tunnel websocket admission integration", () => {
-  it("does not activate bootstrap ownership before the websocket attaches", async ({ fixture }) => {
+  it("does not activate a bootstrap session before the websocket attaches", async ({ fixture }) => {
     const sandboxInstanceId = typeid("sbi").toString();
     await insertSandboxInstanceRow({
       fixture,
@@ -70,7 +67,7 @@ describe("sandbox tunnel websocket admission integration", () => {
       fixture.baseUrl,
     ).toString();
 
-    const { activeBootstrapSessionStore, client, ownerStore } = createValkeyRuntimeStateFixture({
+    const { activeBootstrapSessionStore, client } = createValkeyRuntimeStateFixture({
       fixture,
     });
     await client.connect();
@@ -110,10 +107,11 @@ describe("sandbox tunnel websocket admission integration", () => {
         }),
       });
 
-      const activeOwner = await ownerStore.getOwner({
+      const activeSession = await activeBootstrapSessionStore.getActiveSession({
         sandboxInstanceId,
+        nowMs: systemClock.nowMs(),
       });
-      expect(activeOwner).toBeUndefined();
+      expect(activeSession).toBeNull();
     } finally {
       await closeValkeyClient(client);
     }

@@ -11,8 +11,6 @@ import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
-import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import {
   connectBootstrapSocket,
   insertSandboxInstanceRow,
@@ -33,7 +31,6 @@ const WorkflowQueuePollIntervalMs = 100;
 const WorkflowQueueWaitTimeoutMs = 10_000;
 const DeadlinePollIntervalMs = 100;
 const DeadlineWaitTimeoutMs = 10_000;
-const NegativeAssertionWaitMs = 1_000;
 
 type WorkflowRunRow = {
   id: string;
@@ -99,40 +96,6 @@ async function waitForDeadlineRow(input: {
   );
 }
 
-async function expectNoDeadlineRow(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-  kind: "idle" | "disconnect";
-  predicate: (row: {
-    ownerLeaseId: string;
-    dueAt: string;
-    generation: number;
-    clearedAt: string | null;
-  }) => boolean;
-}): Promise<void> {
-  const deadlineMs = Date.now() + NegativeAssertionWaitMs;
-
-  while (Date.now() < deadlineMs) {
-    const row = await input.fixture.db.query.sandboxInstanceDeadlines.findFirst({
-      columns: {
-        ownerLeaseId: true,
-        dueAt: true,
-        generation: true,
-        clearedAt: true,
-      },
-      where: (table, { and, eq }) =>
-        and(eq(table.sandboxInstanceId, input.sandboxInstanceId), eq(table.kind, input.kind)),
-    });
-    if (row !== undefined && input.predicate(row)) {
-      throw new Error(
-        `Observed unexpected ${input.kind} deadline row for sandbox '${input.sandboxInstanceId}'.`,
-      );
-    }
-
-    await systemSleeper.sleep(DeadlinePollIntervalMs);
-  }
-}
-
 async function waitForWorkflowRuns(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
   sandboxInstanceId: string;
@@ -186,29 +149,6 @@ function expectWorkflowRunMatchesDeadline(input: {
   expect(input.workflowRun.idempotency_key).toBe(
     `deadline:${input.sandboxInstanceId}:${input.kind}:${input.ownerLeaseId}:${input.dueAt}:${String(input.generation)}`,
   );
-}
-
-function createOwnerStoreFixture(input: { fixture: DataPlaneGatewayIntegrationFixture }): {
-  client: ReturnType<typeof createValkeyClient>;
-  store: ValkeySandboxOwnerStore;
-} {
-  if (input.fixture.config.app.runtimeState.backend !== "valkey") {
-    throw new Error("Sandbox deadline integration tests require the valkey runtime-state backend.");
-  }
-
-  const valkeyConfig = input.fixture.config.app.runtimeState.valkey;
-  if (valkeyConfig === undefined) {
-    throw new Error("Expected runtime-state Valkey config for sandbox deadline integration tests.");
-  }
-
-  const client = createValkeyClient({
-    url: valkeyConfig.url,
-  });
-
-  return {
-    client,
-    store: new ValkeySandboxOwnerStore(client, valkeyConfig.keyPrefix),
-  };
 }
 
 describe("sandbox instance deadlines integration", () => {
@@ -380,117 +320,6 @@ describe("sandbox instance deadlines integration", () => {
   );
 
   it(
-    "does not reschedule idle under a replacement owner lease when a connection peer renews presence",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-        testId: "gateway_deadline_presence_active_session",
-      });
-
-      const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
-        sandboxInstanceId,
-        token: await mintValidBootstrapToken({
-          fixture,
-          sandboxInstanceId,
-        }),
-      });
-      const connectedRuntimeState = await waitForRuntimeState({
-        fixture,
-        sandboxInstanceId,
-        predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
-      });
-      if (connectedRuntimeState.ownerLeaseId === null) {
-        throw new Error("Expected an owner lease id after bootstrap attachment.");
-      }
-
-      const initialIdleDeadline = await waitForDeadlineRow({
-        fixture,
-        sandboxInstanceId,
-        kind: "idle",
-        predicate: (row) =>
-          row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
-          row.generation === 1 &&
-          row.clearedAt === null,
-      });
-
-      const { client, store } = createOwnerStoreFixture({
-        fixture,
-      });
-      await client.connect();
-
-      try {
-        const replacementOwner = await store.claimOwner({
-          sandboxInstanceId,
-          nodeId: "dpg_replacement",
-          sessionId: "dts_replacement",
-          ttlMs: 30_000,
-        });
-
-        const connectionToken = await mintConnectionToken({
-          config: {
-            connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-            tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-            tokenAudience: fixture.config.sandbox.connect.tokenAudience,
-          },
-          jti: randomUUID(),
-          sandboxInstanceId,
-          ttlSeconds: 120,
-        });
-        const connectionSocket = await connectSandboxTunnelWebSocket({
-          websocketBaseUrl: fixture.websocketBaseUrl,
-          sandboxInstanceId,
-          tokenKind: "connect",
-          token: connectionToken,
-        });
-
-        await expectNoDeadlineRow({
-          fixture,
-          sandboxInstanceId,
-          kind: "idle",
-          predicate: (row) =>
-            row.ownerLeaseId === replacementOwner.leaseId &&
-            row.generation === initialIdleDeadline.generation + 1 &&
-            row.clearedAt === null,
-        });
-
-        const unchangedIdleDeadline = await waitForDeadlineRow({
-          fixture,
-          sandboxInstanceId,
-          kind: "idle",
-          predicate: (row) =>
-            row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
-            row.generation === initialIdleDeadline.generation + 1 &&
-            row.clearedAt === null,
-        });
-        const workflowRuns = await waitForWorkflowRuns({
-          fixture,
-          sandboxInstanceId,
-          minimumCount: 2,
-        });
-
-        expect(unchangedIdleDeadline.ownerLeaseId).toBe(connectedRuntimeState.ownerLeaseId);
-        expectWorkflowRunMatchesDeadline({
-          workflowRun: workflowRuns[1]!,
-          sandboxInstanceId,
-          kind: "idle",
-          ownerLeaseId: connectedRuntimeState.ownerLeaseId,
-          generation: unchangedIdleDeadline.generation,
-          dueAt: canonicalizeIsoString(unchangedIdleDeadline.dueAt),
-        });
-
-        await closeWebSocket(connectionSocket);
-      } finally {
-        await closeValkeyClient(client);
-        await closeWebSocket(bootstrapSocket);
-      }
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it(
     "clears disconnect and replaces idle when the bootstrap peer reattaches",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
@@ -602,7 +431,7 @@ describe("sandbox instance deadlines integration", () => {
   );
 
   it(
-    "replaces the idle deadline row when bootstrap ownership changes",
+    "replaces the idle deadline row when the active bootstrap session changes",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -759,106 +588,6 @@ describe("sandbox instance deadlines integration", () => {
       });
 
       await closeWebSocket(bootstrapSocket);
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it(
-    "does not reschedule idle under a replacement owner lease before the replacement bootstrap attaches",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-        testId: "gateway_deadline_keepalive_active_session",
-      });
-
-      const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
-        sandboxInstanceId,
-        token: await mintValidBootstrapToken({
-          fixture,
-          sandboxInstanceId,
-        }),
-      });
-      const connectedRuntimeState = await waitForRuntimeState({
-        fixture,
-        sandboxInstanceId,
-        predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
-      });
-      if (connectedRuntimeState.ownerLeaseId === null) {
-        throw new Error("Expected an owner lease id after bootstrap attachment.");
-      }
-
-      const initialIdleDeadline = await waitForDeadlineRow({
-        fixture,
-        sandboxInstanceId,
-        kind: "idle",
-        predicate: (row) =>
-          row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
-          row.generation === 1 &&
-          row.clearedAt === null,
-      });
-
-      const { client, store } = createOwnerStoreFixture({
-        fixture,
-      });
-      await client.connect();
-
-      try {
-        const replacementOwner = await store.claimOwner({
-          sandboxInstanceId,
-          nodeId: "dpg_replacement",
-          sessionId: "dts_replacement",
-          ttlMs: 30_000,
-        });
-
-        bootstrapSocket.send(
-          JSON.stringify({
-            type: "keepalive.state",
-            ttlMs: 30_000,
-            active: true,
-          }),
-        );
-
-        await expectNoDeadlineRow({
-          fixture,
-          sandboxInstanceId,
-          kind: "idle",
-          predicate: (row) =>
-            row.ownerLeaseId === replacementOwner.leaseId &&
-            row.generation === initialIdleDeadline.generation + 1 &&
-            row.clearedAt === null,
-        });
-
-        const unchangedIdleDeadline = await waitForDeadlineRow({
-          fixture,
-          sandboxInstanceId,
-          kind: "idle",
-          predicate: (row) =>
-            row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
-            row.generation === initialIdleDeadline.generation + 1 &&
-            row.clearedAt === null,
-        });
-        const workflowRuns = await waitForWorkflowRuns({
-          fixture,
-          sandboxInstanceId,
-          minimumCount: 2,
-        });
-
-        expect(unchangedIdleDeadline.ownerLeaseId).toBe(connectedRuntimeState.ownerLeaseId);
-        expectWorkflowRunMatchesDeadline({
-          workflowRun: workflowRuns[1]!,
-          sandboxInstanceId,
-          kind: "idle",
-          ownerLeaseId: connectedRuntimeState.ownerLeaseId,
-          generation: unchangedIdleDeadline.generation,
-          dueAt: canonicalizeIsoString(unchangedIdleDeadline.dueAt),
-        });
-      } finally {
-        await closeValkeyClient(client);
-        await closeWebSocket(bootstrapSocket);
-      }
     },
     IntegrationTestTimeoutMs,
   );

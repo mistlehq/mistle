@@ -18,7 +18,6 @@ import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapt
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
 import { InMemoryLocalPeerRegistryAdapter } from "../local-peer-registry/adapters/in-memory-local-peer-registry-adapter.js";
-import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
 import { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import { InMemoryRelayTransportAdapter } from "../relay-transport/adapters/in-memory-relay-transport-adapter.js";
@@ -232,17 +231,10 @@ afterEach(async () => {
 async function createDisconnectTestHarness() {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
-  const ownerStore = new InMemorySandboxOwnerStore(clock);
   const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
-  const owner = await ownerStore.claimOwner({
-    sandboxInstanceId: SandboxInstanceId,
-    nodeId: GatewayNodeId,
-    sessionId: BootstrapSessionId,
-    ttlMs: 60_000,
-  });
   await attachmentStore.upsertAttachment({
     sandboxInstanceId: SandboxInstanceId,
-    ownerLeaseId: owner.leaseId,
+    ownerLeaseId: OwnerLeaseId,
     nodeId: GatewayNodeId,
     sessionId: BootstrapSessionId,
     attachedAtMs: clock.nowMs(),
@@ -276,7 +268,6 @@ async function createDisconnectTestHarness() {
     interactiveStreamRouter,
     relayCoordinator,
     tunnelSessionRegistry,
-    ownerStore,
     new InMemorySandboxPresenceStore(clock),
     attachmentStore,
     new SandboxInstanceDeadlineService(
@@ -331,6 +322,7 @@ async function createDisconnectTestHarness() {
     connectionPair,
     interactiveStreamRouter,
     service,
+    tunnelSessionRegistry,
   };
 }
 
@@ -338,7 +330,6 @@ describe("TunnelSessionService", () => {
   it("renews the active runtime attachment while the bootstrap attachment remains healthy", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
-    const ownerStore = new InMemorySandboxOwnerStore(clock);
     const relayCoordinator = new TunnelRelayCoordinator(
       GatewayNodeId,
       new InMemoryLocalPeerRegistryAdapter(),
@@ -365,7 +356,6 @@ describe("TunnelSessionService", () => {
       interactiveStreamRouter,
       relayCoordinator,
       tunnelSessionRegistry,
-      ownerStore,
       new InMemorySandboxPresenceStore(clock),
       attachmentStore,
       new SandboxInstanceDeadlineService(
@@ -414,34 +404,25 @@ describe("TunnelSessionService", () => {
       socket: bootstrapPair.peerSocket,
     });
 
-    let owner = await ownerStore.getOwner({
-      sandboxInstanceId: SandboxInstanceId,
-    });
     let attachment = await attachmentStore.getAttachment({
       sandboxInstanceId: SandboxInstanceId,
       nowMs: clock.nowMs(),
     });
     for (
       let attempt = 0;
-      (owner?.leaseId !== OwnerLeaseId ||
-        attachment?.ownerLeaseId !== OwnerLeaseId ||
+      (attachment?.ownerLeaseId !== OwnerLeaseId ||
         attachedPeer.leaseHeartbeatHandle === undefined) &&
       attempt < 10;
       attempt += 1
     ) {
       await Promise.resolve();
-      owner = await ownerStore.getOwner({
-        sandboxInstanceId: SandboxInstanceId,
-      });
       attachment = await attachmentStore.getAttachment({
         sandboxInstanceId: SandboxInstanceId,
         nowMs: clock.nowMs(),
       });
     }
-    expect(owner?.leaseId).toBe(OwnerLeaseId);
     expect(attachment?.ownerLeaseId).toBe(OwnerLeaseId);
     expect(attachedPeer.leaseHeartbeatHandle).toBeDefined();
-    expect(owner?.expiresAt.toISOString()).toBe(new Date(61_000).toISOString());
 
     clock.advanceMs(OWNER_LEASE_RENEW_INTERVAL_MS);
     scheduler.runDue();
@@ -460,7 +441,6 @@ describe("TunnelSessionService", () => {
   it("closes only the bootstrap peer when presence deadline persistence fails", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
-    const ownerStore = new InMemorySandboxOwnerStore(clock);
     const relayCoordinator = new TunnelRelayCoordinator(
       GatewayNodeId,
       new InMemoryLocalPeerRegistryAdapter(),
@@ -489,7 +469,6 @@ describe("TunnelSessionService", () => {
       interactiveStreamRouter,
       relayCoordinator,
       tunnelSessionRegistry,
-      ownerStore,
       new InMemorySandboxPresenceStore(clock),
       attachmentStore,
       new SandboxInstanceDeadlineService(
@@ -592,8 +571,13 @@ describe("TunnelSessionService", () => {
   });
 
   it("releases active file upload bindings and notifies the connection peer on bootstrap disconnect", async () => {
-    const { attachedBootstrapPeer, connectionPair, interactiveStreamRouter, service } =
-      await createDisconnectTestHarness();
+    const {
+      attachedBootstrapPeer,
+      connectionPair,
+      interactiveStreamRouter,
+      service,
+      tunnelSessionRegistry,
+    } = await createDisconnectTestHarness();
 
     await interactiveStreamRouter.openInteractiveStream({
       sandboxInstanceId: SandboxInstanceId,
@@ -610,13 +594,13 @@ describe("TunnelSessionService", () => {
       sandboxInstanceId: SandboxInstanceId,
     });
 
-    await expect(
-      interactiveStreamRouter.findInteractiveStreamByClient({
+    expect(
+      tunnelSessionRegistry.getBindingByClientStream({
         sandboxInstanceId: SandboxInstanceId,
         clientSessionId: ConnectionSessionId,
         clientStreamId: 42,
       }),
-    ).resolves.toBeUndefined();
+    ).toBeUndefined();
 
     await expect(disconnectNotificationPromise).resolves.toEqual({
       data: JSON.stringify({

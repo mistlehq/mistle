@@ -10,7 +10,6 @@ import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
 import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
-import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 
 const TestContextId = "data-plane-gateway.integration";
 
@@ -42,58 +41,7 @@ async function deleteKeysByPrefix(input: {
 }
 
 describe("runtime-state store integrations", () => {
-  it("rejects stale owner renewals and releases after a newer owner claim", async () => {
-    const keyPrefix = `mistle:runtime-state:owner-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
-    const client = createValkeyClient({
-      url: valkeyUrl,
-    });
-    await client.connect();
-
-    try {
-      const store = new ValkeySandboxOwnerStore(client, keyPrefix);
-      const sandboxInstanceId = "sbi_owner_it";
-      const firstOwner = await store.claimOwner({
-        sandboxInstanceId,
-        nodeId: "dpg_old",
-        sessionId: "dts_old",
-        ttlMs: 30_000,
-      });
-      const secondOwner = await store.claimOwner({
-        sandboxInstanceId,
-        nodeId: "dpg_new",
-        sessionId: "dts_new",
-        ttlMs: 30_000,
-      });
-
-      await expect(
-        store.renewOwnerLease({
-          sandboxInstanceId,
-          leaseId: firstOwner.leaseId,
-          ttlMs: 30_000,
-        }),
-      ).resolves.toBe(false);
-      await expect(
-        store.releaseOwner({
-          sandboxInstanceId,
-          leaseId: firstOwner.leaseId,
-        }),
-      ).resolves.toBe(false);
-      await expect(
-        store.getOwner({
-          sandboxInstanceId,
-        }),
-      ).resolves.toEqual(secondOwner);
-    } finally {
-      await deleteKeysByPrefix({
-        client,
-        keyPrefix,
-      });
-      await closeValkeyClient(client);
-    }
-  });
-
-  it("expires owner and attachment records when their TTL elapses", async () => {
+  it("expires attachment records when their TTL elapses", async () => {
     const keyPrefix = `mistle:runtime-state:expiry-it:${randomUUID()}`;
     const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
@@ -102,15 +50,8 @@ describe("runtime-state store integrations", () => {
     await client.connect();
 
     try {
-      const ownerStore = new ValkeySandboxOwnerStore(client, keyPrefix);
       const attachmentStore = new ValkeySandboxRuntimeAttachmentStore(client, keyPrefix);
 
-      await ownerStore.claimOwner({
-        sandboxInstanceId: "sbi_expiry",
-        nodeId: "dpg_expiry",
-        sessionId: "dts_expiry",
-        ttlMs: 50,
-      });
       await attachmentStore.upsertAttachment({
         sandboxInstanceId: "sbi_expiry",
         ownerLeaseId: "dtl_expiry",
@@ -123,11 +64,6 @@ describe("runtime-state store integrations", () => {
 
       await systemSleeper.sleep(100);
 
-      await expect(
-        ownerStore.getOwner({
-          sandboxInstanceId: "sbi_expiry",
-        }),
-      ).resolves.toBeUndefined();
       await expect(
         attachmentStore.getAttachment({
           sandboxInstanceId: "sbi_expiry",

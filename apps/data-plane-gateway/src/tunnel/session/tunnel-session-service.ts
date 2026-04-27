@@ -15,7 +15,6 @@ import {
 import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
-import type { SandboxOwnerStore } from "../ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import {
   notifyBootstrapPeerOfReleasedInteractiveStreams,
@@ -83,7 +82,6 @@ export class TunnelSessionService {
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
     private readonly relayCoordinator: TunnelRelayCoordinator,
     private readonly tunnelSessionRegistry: TunnelSessionRegistry,
-    private readonly sandboxOwnerStore: SandboxOwnerStore,
     private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
@@ -379,36 +377,20 @@ export class TunnelSessionService {
       },
     });
 
-    await Promise.all([
-      this.sandboxRuntimeAttachmentStore
-        .clearAttachment({
-          sandboxInstanceId: input.sandboxInstanceId,
-          ownerLeaseId: input.leaseId,
-        })
-        .catch((error: unknown) => {
-          logger.error(
-            {
-              err: error,
-              sandboxInstanceId: input.sandboxInstanceId,
-            },
-            "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
-          );
-        }),
-      this.sandboxOwnerStore
-        .releaseOwner({
-          sandboxInstanceId: input.sandboxInstanceId,
-          leaseId: input.leaseId,
-        })
-        .catch((error: unknown) => {
-          logger.error(
-            {
-              err: error,
-              sandboxInstanceId: input.sandboxInstanceId,
-            },
-            "Failed to release sandbox ownership for disconnected bootstrap tunnel",
-          );
-        }),
-    ]);
+    await this.sandboxRuntimeAttachmentStore
+      .clearAttachment({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.leaseId,
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
+        );
+      });
 
     const detachedBootstrapSession = this.tunnelSessionRegistry.detachBootstrapSession(
       input.attachedPeer.relayTarget,
@@ -518,33 +500,16 @@ export class TunnelSessionService {
     socket: RelayPeerSocket;
   }): Promise<void> {
     try {
-      const owner = await this.sandboxOwnerStore.claimOwner({
-        leaseId: input.leaseId,
-        sandboxInstanceId: input.sandboxInstanceId,
-        nodeId: this.gatewayNodeId,
-        sessionId: input.relaySessionId,
-        ttlMs: input.ownerLeaseTtlMs,
-      });
-      if (owner.leaseId !== input.leaseId) {
-        throw new Error(
-          `Expected claimed owner lease '${input.leaseId}' for sandbox '${input.sandboxInstanceId}', received '${owner.leaseId}' instead.`,
-        );
-      }
-
       if (
         input.socket.readyState !== WebSocket.OPEN ||
         !this.relayCoordinator.isCurrentPeer(input.relayTarget)
       ) {
-        await this.sandboxOwnerStore.releaseOwner({
-          sandboxInstanceId: input.sandboxInstanceId,
-          leaseId: owner.leaseId,
-        });
         return;
       }
 
       await this.refreshRuntimeAttachment({
         attachedAtMs: input.attachedAtMs,
-        leaseId: owner.leaseId,
+        leaseId: input.leaseId,
         relaySessionId: input.relaySessionId,
         sandboxInstanceId: input.sandboxInstanceId,
       });
@@ -558,19 +523,19 @@ export class TunnelSessionService {
 
           await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
             sandboxInstanceId: input.sandboxInstanceId,
-            ownerLeaseId: owner.leaseId,
+            ownerLeaseId: input.leaseId,
           });
         },
       });
 
       input.attachedPeer.leaseHeartbeatHandle = this.startRuntimeAttachmentRenewal({
         attachedAtMs: input.attachedAtMs,
-        leaseId: owner.leaseId,
+        leaseId: input.leaseId,
         onLeaseLost: () => {
           logger.error(
             {
               sandboxInstanceId: input.sandboxInstanceId,
-              leaseId: owner.leaseId,
+              leaseId: input.leaseId,
             },
             "Lost sandbox active attachment while bootstrap websocket was still connected",
           );
@@ -605,12 +570,13 @@ export class TunnelSessionService {
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: input.leaseId,
         },
-        "Failed to activate sandbox ownership for attached bootstrap tunnel",
+        "Failed to activate sandbox runtime attachment for attached bootstrap tunnel",
       );
       input.onFatalError({
-        closeReason: "Failed to activate sandbox ownership for attached bootstrap tunnel.",
+        closeReason: "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
         error,
-        statusMessage: "Failed to activate sandbox ownership for attached bootstrap tunnel.",
+        statusMessage:
+          "Failed to activate sandbox runtime attachment for attached bootstrap tunnel.",
       });
     }
   }
