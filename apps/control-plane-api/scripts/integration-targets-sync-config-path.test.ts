@@ -148,6 +148,25 @@ describe("integration-targets-sync-config-path", () => {
     }
   });
 
+  it("rejects unsupported config formats", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
+    const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
+    await mkdir(scriptDirectory, { recursive: true });
+
+    try {
+      expect(() =>
+        loadIntegrationTargetsSyncConfig({
+          environment: {
+            MISTLE_CONFIG_FORMAT: "legacy",
+          },
+          scriptDirectory,
+        }),
+      ).toThrow('MISTLE_CONFIG_FORMAT must be "next" when set.');
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
   it("lets environment values override TOML sync config", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
     const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");

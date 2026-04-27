@@ -5,8 +5,6 @@ import { fileURLToPath } from "node:url";
 import { parse as parseToml } from "smol-toml";
 import { z } from "zod";
 
-import { resolveConfigFormat } from "../../../packages/config/src/loader.js";
-
 type UnknownRecord = Record<string, unknown>;
 type TomlConfigFormat = "legacy" | "next";
 type PartialIntegrationTargetsSyncConfig = {
@@ -60,6 +58,19 @@ function asObjectRecord(value: unknown): UnknownRecord {
   }
 
   return value;
+}
+
+function resolveConfigFormat(environment: NodeJS.ProcessEnv): TomlConfigFormat {
+  const envFormat = environment.MISTLE_CONFIG_FORMAT?.trim();
+  if (envFormat === undefined || envFormat.length === 0) {
+    return "legacy";
+  }
+
+  if (envFormat === "next") {
+    return "next";
+  }
+
+  throw new Error('MISTLE_CONFIG_FORMAT must be "next" when set.');
 }
 
 function loadLegacyTomlConfig(parsedRoot: UnknownRecord): PartialIntegrationTargetsSyncConfig {
@@ -228,7 +239,7 @@ export function loadIntegrationTargetsSyncConfig(input: {
     input.environment,
     input.scriptDirectory,
   );
-  const configFormat = resolveConfigFormat({ env: input.environment }) ?? "legacy";
+  const configFormat = resolveConfigFormat(input.environment);
   const tomlConfig = configPath === undefined ? {} : loadTomlConfig(configPath, configFormat);
   const envConfig = loadEnvConfig(input.environment);
 
