@@ -1,26 +1,10 @@
-import { systemScheduler } from "@mistle/time";
-import { useEffect, useState } from "react";
-
-const BrailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const;
-const BrailleFrameStepMs = 80;
+import { BrailleSpinner } from "@mistle/ui";
 
 export function ActivityStatus(input: {
   className?: string;
   label: string;
   labelKey?: React.Key;
 }): React.JSX.Element {
-  const [spinnerIndex, setSpinnerIndex] = useState(0);
-
-  useEffect(() => {
-    const handle = systemScheduler.schedule(function tick() {
-      setSpinnerIndex((currentIndex) => (currentIndex + 1) % BrailleFrames.length);
-    }, BrailleFrameStepMs);
-
-    return () => {
-      systemScheduler.cancel(handle);
-    };
-  }, [spinnerIndex]);
-
   return (
     <div
       aria-label={input.label}
@@ -28,12 +12,7 @@ export function ActivityStatus(input: {
       className={`flex min-h-7 items-center justify-center gap-3 text-sm text-stone-500${input.className === undefined ? "" : ` ${input.className}`}`}
       role="status"
     >
-      <span
-        aria-hidden="true"
-        className="inline-flex w-[1.25rem] justify-center font-mono text-[1rem] text-stone-400"
-      >
-        {BrailleFrames[spinnerIndex]}
-      </span>
+      <BrailleSpinner className="text-stone-400" />
       <span className="relative block min-w-[14rem] overflow-hidden text-left">
         <span
           className="block whitespace-nowrap [animation:activity-status-enter_180ms_ease-out]"

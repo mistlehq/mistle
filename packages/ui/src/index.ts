@@ -5,6 +5,7 @@ export * from "./components/ui/aspect-ratio.js";
 export * from "./components/ui/avatar.js";
 export * from "./components/ui/badge.js";
 export * from "./components/ui/badge-list-field.js";
+export * from "./components/ui/braille-spinner.js";
 export * from "./components/ui/breadcrumb.js";
 export * from "./components/ui/button-group.js";
 export * from "./components/ui/button.js";
