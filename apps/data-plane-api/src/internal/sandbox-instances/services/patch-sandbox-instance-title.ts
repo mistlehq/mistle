@@ -46,6 +46,13 @@ export async function patchSandboxInstanceTitle(
     };
   }
 
+  if (input.onlyIfUnset !== true) {
+    throw new NotFoundError(
+      SandboxInstanceNotFoundErrorCode,
+      `Sandbox instance '${input.instanceId}' was not found.`,
+    );
+  }
+
   const existingSandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,

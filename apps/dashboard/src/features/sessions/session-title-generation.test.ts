@@ -8,9 +8,7 @@ import {
 
 describe("session title generation", () => {
   it("builds a prompt around the message payload", () => {
-    const prompt = buildSessionTitleGenerationPrompt({
-      messagePayload: "Fix the session startup error",
-    });
+    const prompt = buildSessionTitleGenerationPrompt("Fix the session startup error");
 
     expect(prompt).toContain("Return only a JSON object");
     expect(prompt).toContain("Interpret the message or payload");

@@ -104,7 +104,6 @@ function buildSandboxInstanceListItem(input: {
     sandboxProfileDisplayName: "Profile",
     sandboxProfileVersion: 1,
     status: "running",
-    keepaliveActive: false,
     startedBy: {
       kind: "user",
       id: "user_123",

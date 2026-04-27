@@ -269,14 +269,16 @@ export function useSessionWorkbenchController(input: {
   );
   const startTurn = useCallback(
     async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
+      const sandboxInstanceId = input.sandboxInstanceId;
+      const cachedTitle = sandboxStatus?.title;
       const shouldGenerateSessionTitle =
-        input.sandboxInstanceId !== null &&
+        sandboxInstanceId !== null &&
         chat.chatState.turnOrder.length === 0 &&
-        !(sandboxStatus?.title !== undefined && sandboxStatus.title !== null);
+        !(cachedTitle !== undefined && cachedTitle !== null);
 
       await chat.startTurn(turnInput);
 
-      if (!shouldGenerateSessionTitle || input.sandboxInstanceId === null) {
+      if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {
         return;
       }
 
@@ -284,7 +286,7 @@ export function useSessionWorkbenchController(input: {
         cwd: primaryRepositoryState.selectedRepositoryPath,
         ensureTransportConnected: transportManager.ensureTransportConnected,
         messagePayload: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
-        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxInstanceId,
       })
         .then((patchedTitle) => {
           applyPatchedSessionTitleToCache(queryClient, patchedTitle);

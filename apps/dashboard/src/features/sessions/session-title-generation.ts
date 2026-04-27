@@ -1,5 +1,4 @@
-import { ExecStreamClient } from "@mistle/sandbox-session-client";
-import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import { ExecStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { z } from "zod";
 
 import {
@@ -18,7 +17,7 @@ const SessionTitleGenerationOutputSchema = z
   })
   .strict();
 
-export function buildSessionTitleGenerationPrompt(input: { messagePayload: string }): string {
+export function buildSessionTitleGenerationPrompt(messagePayload: string): string {
   return [
     "You write concise titles for agent sessions.",
     "",
@@ -33,7 +32,7 @@ export function buildSessionTitleGenerationPrompt(input: { messagePayload: strin
     `- Max ${String(SessionTitleMaxLength)} characters.`,
     "",
     "Message or payload:",
-    input.messagePayload,
+    messagePayload,
   ].join("\n");
 }
 
@@ -93,9 +92,7 @@ export async function generateSessionTitleWithSandboxCodexExec(input: {
     idleTimeoutMs: SessionTitleGenerationResultWaitTimeoutMs,
     transport,
   });
-  const prompt = buildSessionTitleGenerationPrompt({
-    messagePayload: input.messagePayload,
-  });
+  const prompt = buildSessionTitleGenerationPrompt(input.messagePayload);
   const result = await exec.run({
     args: [
       "-euc",
