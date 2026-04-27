@@ -4,6 +4,7 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
@@ -34,7 +35,6 @@ import {
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
 import { buildSlackAppInstallationCompleteUrl, buildSlackAppManifest } from "./manifest-builder.js";
-import { buildSlackApiUrl } from "./slack-api-url.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -91,23 +91,17 @@ async function createSlackManifest(input: {
   appConfigToken: string;
   manifest: Record<string, unknown>;
 }): Promise<SlackManifestCreateSuccessResponse> {
-  const response = await fetch(
-    buildSlackApiUrl({
-      apiBaseUrl: input.apiBaseUrl,
-      path: "apps.manifest.create",
-    }),
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        authorization: `Bearer ${input.appConfigToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        manifest: JSON.stringify(input.manifest),
-      }),
+  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create"), {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      authorization: `Bearer ${input.appConfigToken}`,
+      "content-type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      manifest: JSON.stringify(input.manifest),
+    }),
+  });
 
   const responseJson: unknown = await response.json();
   if (!response.ok) {

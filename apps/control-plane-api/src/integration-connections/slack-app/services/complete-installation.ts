@@ -6,6 +6,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
+import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId, SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
@@ -38,7 +39,6 @@ import {
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
-import { buildSlackApiUrl } from "./slack-api-url.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -81,10 +81,10 @@ const SlackOAuthAccessErrorResponseSchema = z
 type SlackOAuthAccessSuccessResponse = z.output<typeof SlackOAuthAccessSuccessResponseSchema>;
 
 function buildSlackAppInstallationCompleteUrl(input: { controlPlaneBaseUrl: string }): string {
-  return new URL(
-    "/p/integration/callbacks/slack-app-installation",
+  return buildUrlWithPath(
     input.controlPlaneBaseUrl,
-  ).toString();
+    "/p/integration/callbacks/slack-app-installation",
+  );
 }
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
@@ -131,20 +131,14 @@ async function completeSlackOAuthAccess(input: {
   body.set("code", input.code);
   body.set("redirect_uri", input.redirectUrl);
 
-  const response = await fetch(
-    buildSlackApiUrl({
-      apiBaseUrl: input.apiBaseUrl,
-      path: "oauth.v2.access",
-    }),
-    {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/x-www-form-urlencoded",
-      },
-      body,
+  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access"), {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "content-type": "application/x-www-form-urlencoded",
     },
-  );
+    body,
+  });
 
   const responseJson: unknown = await response.json();
   if (!response.ok) {

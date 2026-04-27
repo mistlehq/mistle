@@ -1,3 +1,5 @@
+import { buildUrlWithPath } from "@mistle/http";
+
 const SlackBotScopes = [
   "app_mentions:read",
   "channels:history",
@@ -39,10 +41,10 @@ function toRecord(value: unknown): Record<string, unknown> {
 export function buildSlackAppInstallationCompleteUrl(input: {
   controlPlaneBaseUrl: string;
 }): string {
-  return new URL(
-    "/p/integration/callbacks/slack-app-installation",
+  return buildUrlWithPath(
     input.controlPlaneBaseUrl,
-  ).toString();
+    "/p/integration/callbacks/slack-app-installation",
+  );
 }
 
 export function buildSlackAppManifest(input: {
@@ -78,7 +80,7 @@ export function buildSlackAppManifest(input: {
         existing: oauthConfig["redirect_urls"],
         requiredValues: [
           redirectUrl,
-          new URL("/p/identity-linking/callbacks/slack", input.controlPlaneBaseUrl).toString(),
+          buildUrlWithPath(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/slack"),
         ],
       }),
       scopes: {
