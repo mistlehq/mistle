@@ -1,6 +1,3 @@
-import { json, jsonParseLinter } from "@codemirror/lang-json";
-import { linter } from "@codemirror/lint";
-import { EditorView } from "@codemirror/view";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
@@ -21,7 +18,6 @@ import {
 } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -41,6 +37,11 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  ManifestJsonEditor,
+  parseManifestJsonObject,
+  validateManifestJsonObject,
+} from "../integrations/manifest-json-editor.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   clearPendingStatusTimeouts,
@@ -63,14 +64,6 @@ type GitHubExistingAppSetupDraft = {
 type GitHubExistingAppSetupFieldKey = keyof GitHubExistingAppSetupDraft;
 type GitHubAppSetupMode = "manifest" | "existing-app";
 type GitHubManifestAppOwnerKind = "personal" | "organization";
-type GitHubManifestValidation =
-  | {
-      status: "valid";
-    }
-  | {
-      message: string;
-      status: "invalid";
-    };
 
 const GitHubExistingAppSetupRequiredFieldLabels = {
   appId: "App ID",
@@ -383,48 +376,6 @@ function hasInstalledGitHubApp(connection: IntegrationConnection): boolean {
   );
 }
 
-function resolveJsonParseErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return "Manifest must be valid JSON.";
-}
-
-export function validateGitHubManifestJson(value: string): GitHubManifestValidation {
-  try {
-    parseGitHubManifestObject(value);
-    return { status: "valid" };
-  } catch (error) {
-    return {
-      message: resolveJsonParseErrorMessage(error),
-      status: "invalid",
-    };
-  }
-}
-
-export function formatGitHubManifestJson(value: string): string {
-  const parsedManifest: unknown = JSON.parse(value);
-  return JSON.stringify(parsedManifest, null, 2);
-}
-
-function parseGitHubManifestObject(value: string): Record<string, unknown> {
-  const parsedManifest: unknown = JSON.parse(value);
-  if (
-    typeof parsedManifest !== "object" ||
-    parsedManifest === null ||
-    Array.isArray(parsedManifest)
-  ) {
-    throw new Error("Manifest must be a JSON object.");
-  }
-
-  const manifest: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(parsedManifest)) {
-    manifest[key] = entryValue;
-  }
-  return manifest;
-}
-
 function submitGitHubAppManifestForm(input: {
   submissionUrl: string;
   fields: Record<string, string>;
@@ -447,28 +398,10 @@ function submitGitHubAppManifestForm(input: {
   form.submit();
 }
 
-function createGitHubManifestFormatOnBlurExtension(input: {
-  onManifestChange: (value: string) => void;
-}): ReturnType<typeof EditorView.domEventHandlers> {
-  return EditorView.domEventHandlers({
-    blur: (_event, view) => {
-      const currentValue = view.state.doc.toString();
-      const validation = validateGitHubManifestJson(currentValue);
-      if (validation.status === "invalid") {
-        return;
-      }
-
-      const formattedValue = formatGitHubManifestJson(currentValue);
-      if (formattedValue !== currentValue) {
-        input.onManifestChange(formattedValue);
-      }
-    },
-  });
-}
-
 function GitHubManifestSetupPanel(input: {
   appOwnerKind: GitHubManifestAppOwnerKind | null;
   manifestValue: string;
+  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
   onAppOwnerKindChange: (value: GitHubManifestAppOwnerKind) => void;
   onManifestChange: (value: string) => void;
   onOrganizationSlugChange: (value: string) => void;
@@ -483,27 +416,12 @@ function GitHubManifestSetupPanel(input: {
           GitHub.
         </p>
       </div>
-      <div className="overflow-hidden rounded-md border">
-        <CodeMirror
-          basicSetup={{
-            foldGutter: false,
-            highlightActiveLine: false,
-            highlightActiveLineGutter: false,
-            lineNumbers: false,
-          }}
-          className="text-sm"
-          extensions={[
-            json(),
-            linter(jsonParseLinter()),
-            createGitHubManifestFormatOnBlurExtension({
-              onManifestChange: input.onManifestChange,
-            }),
-          ]}
-          id="github-app-manifest-editor"
-          onChange={input.onManifestChange}
-          value={input.manifestValue}
-        />
-      </div>
+      <ManifestJsonEditor
+        id="github-app-manifest-editor"
+        onChange={input.onManifestChange}
+        validation={input.manifestValidation}
+        value={input.manifestValue}
+      />
       <Field>
         <FieldHeader>
           <FieldLabel>Which account should the app be created in?</FieldLabel>
@@ -928,7 +846,7 @@ export function GitHubAppSetupPane(input: {
 
       return startGitHubAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseGitHubManifestObject(manifestValue),
+        manifest: parseManifestJsonObject(manifestValue),
         owner:
           manifestAppOwnerKind === "personal"
             ? { kind: "personal" }
@@ -1232,7 +1150,7 @@ export function GitHubAppSetupPane(input: {
     }),
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
-  const manifestValidation = validateGitHubManifestJson(manifestValue);
+  const manifestValidation = validateManifestJsonObject(manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     (manifestAppOwnerKind === "personal" ||
@@ -1309,6 +1227,7 @@ export function GitHubAppSetupPane(input: {
             <TabsContent value="manifest">
               <GitHubManifestSetupPanel
                 appOwnerKind={manifestAppOwnerKind}
+                manifestValidation={manifestValidation}
                 manifestValue={manifestValue}
                 onAppOwnerKindChange={setManifestAppOwnerKind}
                 onManifestChange={setManifestValue}

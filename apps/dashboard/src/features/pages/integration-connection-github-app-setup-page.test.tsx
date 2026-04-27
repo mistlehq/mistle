@@ -10,11 +10,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import {
-  formatGitHubManifestJson,
-  GitHubAppSetupPane,
-  validateGitHubManifestJson,
-} from "./integration-connection-github-app-setup-page.js";
+import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
 
 function createGitHubAppSetupConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -212,27 +208,5 @@ describe("GitHubAppSetupPane", () => {
     expect(installAppButton.hasAttribute("disabled")).toBe(false);
     expect(installAppButton.querySelector("svg")).toBeNull();
     expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
-  });
-
-  it("formats valid manifest JSON", () => {
-    expect(formatGitHubManifestJson('{"name":"Mistle","default_events":["issues"]}')).toBe(
-      '{\n  "name": "Mistle",\n  "default_events": [\n    "issues"\n  ]\n}',
-    );
-  });
-
-  it("validates manifest JSON syntax", () => {
-    expect(validateGitHubManifestJson('{"name":"Mistle"}')).toEqual({ status: "valid" });
-
-    const invalidResult = validateGitHubManifestJson('{"name":');
-    expect(invalidResult.status).toBe("invalid");
-    if (invalidResult.status !== "invalid") {
-      throw new Error("invalid manifest JSON must return an invalid validation result");
-    }
-    expect(invalidResult.message.length).toBeGreaterThan(0);
-
-    expect(validateGitHubManifestJson("[]")).toEqual({
-      message: "Manifest must be a JSON object.",
-      status: "invalid",
-    });
   });
 });

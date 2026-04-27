@@ -1,6 +1,3 @@
-import { json, jsonParseLinter } from "@codemirror/lang-json";
-import { linter } from "@codemirror/lint";
-import { EditorView } from "@codemirror/view";
 import {
   SlackAppManifestBotEvents,
   SlackAppManifestBotScopes,
@@ -24,7 +21,6 @@ import {
   TextLink,
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 
@@ -42,6 +38,11 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  ManifestJsonEditor,
+  parseManifestJsonObject,
+  validateManifestJsonObject,
+} from "../integrations/manifest-json-editor.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   clearPendingStatusTimeouts,
@@ -69,15 +70,6 @@ type SlackExistingAppTimeoutRefs = Record<
     fadeEndTimeoutRef: { current: TimerHandle | null };
   }
 >;
-
-type ManifestValidation =
-  | {
-      status: "valid";
-    }
-  | {
-      status: "invalid";
-      message: string;
-    };
 
 const SlackExistingAppFieldKeys = [
   "clientId",
@@ -188,57 +180,6 @@ function resolveConfiguredSecretFieldKeys(
   return configuredSecretFieldKeys;
 }
 
-function validateManifestJson(value: string): ManifestValidation {
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return {
-        status: "invalid",
-        message: "Manifest JSON must be an object.",
-      };
-    }
-
-    return { status: "valid" };
-  } catch (error) {
-    return {
-      status: "invalid",
-      message: error instanceof Error ? error.message : "Manifest JSON is invalid.",
-    };
-  }
-}
-
-function parseManifestObject(value: string): Record<string, unknown> {
-  const parsed: unknown = JSON.parse(value);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Manifest JSON must be an object.");
-  }
-
-  return Object.fromEntries(Object.entries(parsed));
-}
-
-function formatSlackManifestJson(value: string): string {
-  return JSON.stringify(parseManifestObject(value), null, 2);
-}
-
-function createSlackManifestFormatOnBlurExtension(input: {
-  onManifestChange: (value: string) => void;
-}): ReturnType<typeof EditorView.domEventHandlers> {
-  return EditorView.domEventHandlers({
-    blur: (_event, view) => {
-      const currentValue = view.state.doc.toString();
-      const validation = validateManifestJson(currentValue);
-      if (validation.status === "invalid") {
-        return;
-      }
-
-      const formattedValue = formatSlackManifestJson(currentValue);
-      if (formattedValue !== currentValue) {
-        input.onManifestChange(formattedValue);
-      }
-    },
-  });
-}
-
 function hasConfiguredSecret(connection: IntegrationConnection, fieldName: string): boolean {
   return connection.configuredSecretNames?.includes(fieldName) ?? false;
 }
@@ -304,7 +245,7 @@ function buildDraftWithSavedFieldValues(input: {
 function SlackManifestSetupPanel(input: {
   appConfigToken: string;
   manifestValue: string;
-  manifestValidation: ManifestValidation;
+  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
   onAppConfigTokenChange: (value: string) => void;
   onManifestChange: (value: string) => void;
 }): React.JSX.Element {
@@ -343,30 +284,12 @@ function SlackManifestSetupPanel(input: {
             Slack.
           </p>
         </div>
-        <div className="overflow-hidden rounded-md border">
-          <CodeMirror
-            basicSetup={{
-              foldGutter: false,
-              highlightActiveLine: false,
-              highlightActiveLineGutter: false,
-              lineNumbers: false,
-            }}
-            className="text-sm"
-            extensions={[
-              json(),
-              linter(jsonParseLinter()),
-              createSlackManifestFormatOnBlurExtension({
-                onManifestChange: input.onManifestChange,
-              }),
-            ]}
-            id="slack-app-manifest-editor"
-            onChange={input.onManifestChange}
-            value={input.manifestValue}
-          />
-        </div>
-        {input.manifestValidation.status === "invalid" ? (
-          <p className="text-destructive text-sm">{input.manifestValidation.message}</p>
-        ) : null}
+        <ManifestJsonEditor
+          id="slack-app-manifest-editor"
+          onChange={input.onManifestChange}
+          validation={input.manifestValidation}
+          value={input.manifestValue}
+        />
       </div>
     </div>
   );
@@ -600,7 +523,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
     mutationFn: async () =>
       startSlackAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseManifestObject(manifestValue),
+        manifest: parseManifestJsonObject(manifestValue),
         appConfigToken,
       }),
   });
@@ -794,7 +717,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
     resetFieldFeedback(fieldKey);
   }
 
-  const manifestValidation = validateManifestJson(manifestValue);
+  const manifestValidation = validateManifestJsonObject(manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" && appConfigToken.trim().length > 0;
   const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
