@@ -1,6 +1,7 @@
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
@@ -74,7 +75,6 @@ type ManifestValidation =
       message: string;
     };
 
-const SlackConnectionMethodId = "slack-bot-token";
 const SlackExistingAppFieldKeys = [
   "clientId",
   "botToken",

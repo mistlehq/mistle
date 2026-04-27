@@ -1,3 +1,4 @@
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router";
@@ -129,7 +130,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
       if (
         connectionId !== null &&
         editor.targetFamilyId === "slack" &&
-        methodId === "slack-bot-token"
+        methodId === SlackConnectionMethodId
       ) {
         await navigate(
           `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/slack-app/setup`,

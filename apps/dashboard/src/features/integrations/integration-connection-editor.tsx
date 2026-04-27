@@ -1,4 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import {
   Button,
   Field,
@@ -127,12 +128,8 @@ function shouldSkipCreateTimeSetupFields(input: {
   return (
     input.editor.mode === "create" &&
     input.editor.targetFamilyId === "slack" &&
-    input.method?.id === "slack-bot-token"
+    input.method?.id === SlackConnectionMethodId
   );
-}
-
-function renderCreateTimeSetupHelper(input: { method: IntegrationConnectionMethod | null }) {
-  return renderAuthCreateHelper(input.method);
 }
 
 function renderDeviceAuthorizationPending(input: {
@@ -335,9 +332,7 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
       ) : props.configForm.mode === "unsupported" ? (
         <p className="text-destructive text-sm">{props.configForm.message}</p>
       ) : !isUpdateMode ? (
-        renderCreateTimeSetupHelper({
-          method: selectedMethod,
-        })
+        renderAuthCreateHelper(selectedMethod)
       ) : (
         <p className="text-muted-foreground text-sm">Save to update this connection.</p>
       )}

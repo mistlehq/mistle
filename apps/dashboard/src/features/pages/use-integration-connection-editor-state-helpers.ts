@@ -1,6 +1,12 @@
-import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
+import {
+  applySchemaDefaultsToFormData,
+  IntegrationConnectionMethodIds,
+  resolveIntegrationForm,
+} from "@mistle/integrations-core";
+import {
+  createBrowserDefinitionsBundle,
+  SlackConnectionMethodId,
+} from "@mistle/integrations-definitions/browser";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 
@@ -458,7 +464,7 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
       return null;
     }
 
-    if (input.editor.targetFamilyId === "slack" && input.methodId === "slack-bot-token") {
+    if (input.editor.targetFamilyId === "slack" && input.methodId === SlackConnectionMethodId) {
       return null;
     }
 

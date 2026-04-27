@@ -1,4 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { Notice } from "@mistle/ui";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -46,7 +47,7 @@ function isIncompleteSlackAppConnection(input: {
   configuredSecretNames: readonly string[] | undefined;
 }): boolean {
   return (
-    input.connectionMethodId === "slack-bot-token" &&
+    input.connectionMethodId === SlackConnectionMethodId &&
     (!(input.configuredSecretNames?.includes("botToken") ?? false) ||
       !(input.configuredSecretNames?.includes("signingSecret") ?? false))
   );
@@ -116,7 +117,7 @@ export function IntegrationsPage() {
     searchParams.get("slackApp") === "installed" &&
     detailConnectionId !== null &&
     selectedDetailConnection?.id === detailConnectionId &&
-    selectedDetailConnection.connectionMethodId === "slack-bot-token";
+    selectedDetailConnection.connectionMethodId === SlackConnectionMethodId;
 
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (

@@ -56,3 +56,4 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 }
 
 export * from "./datadog/index.js";
+export * from "./slack/browser.js";

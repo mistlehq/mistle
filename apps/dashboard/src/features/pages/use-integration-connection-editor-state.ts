@@ -1,4 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -373,7 +374,7 @@ export function useIntegrationConnectionEditorState(
           return;
         }
 
-        if (editor.targetFamilyId === "slack" && draft.methodId === "slack-bot-token") {
+        if (editor.targetFamilyId === "slack" && draft.methodId === SlackConnectionMethodId) {
           const createdConnection = await createSlackAppDraftMutation.mutateAsync({
             targetKey: editor.targetKey,
             displayName: normalizedConnectionDisplayName,
