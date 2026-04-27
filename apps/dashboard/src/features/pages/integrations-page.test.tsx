@@ -139,7 +139,7 @@ describe("IntegrationsPage", () => {
     expect(screen.getByText("Slack app installed")).toBeTruthy();
     expect(
       screen.getByText(
-        "The Slack app has been installed and its bot token has been saved to this Mistle connection.",
+        "The Slack app was created in Slack and connected to this Mistle connection.",
       ),
     ).toBeTruthy();
     expect(

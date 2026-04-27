@@ -123,8 +123,7 @@ export function IntegrationsPage() {
       <div className="flex flex-col gap-4">
         {shouldShowSlackInstallSuccessNotice ? (
           <Notice title="Slack app installed" variant="success">
-            The Slack app has been installed and its bot token has been saved to this Mistle
-            connection.
+            The Slack app was created in Slack and connected to this Mistle connection.
           </Notice>
         ) : null}
         <IntegrationConnectionDetailView
