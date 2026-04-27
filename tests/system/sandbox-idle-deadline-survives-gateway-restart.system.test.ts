@@ -10,6 +10,7 @@ import { it } from "./system-test-context.js";
 const TestTimeoutMs = 10 * 60_000;
 const RuntimeStateSettleTimeoutMs = 15_000;
 const RuntimeStatePollIntervalMs = 250;
+const IdleStopWaitBufferMs = 2 * 60_000;
 
 describe("sandbox idle deadline survives gateway restart", () => {
   it(
@@ -54,6 +55,12 @@ describe("sandbox idle deadline survives gateway restart", () => {
         const stoppedSandboxStatus = await fixture.waitForSandboxStatus(
           sandboxInstanceId,
           "stopped",
+          {
+            timeoutMs:
+              fixture.dataPlaneGatewayIdleTimeoutMs +
+              fixture.dataPlaneGatewayBootstrapDisconnectGraceMs +
+              IdleStopWaitBufferMs,
+          },
         );
         expect(stoppedSandboxStatus.id).toBe(sandboxInstanceId);
         expect(stoppedSandboxStatus.status).toBe("stopped");

@@ -84,6 +84,7 @@ export type SystemTestFixture = {
   waitForSandboxStatus: (
     sandboxInstanceId: string,
     status: "pending" | "starting" | "running" | "stopped" | "failed",
+    options?: { timeoutMs?: number },
   ) => Promise<SystemSandboxInstanceStatus>;
   waitForSandboxConnectable: (
     sandboxInstanceId: string,
@@ -1271,12 +1272,13 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
       const waitForSandboxStatus = async (
         sandboxInstanceId: string,
         status: SystemSandboxInstanceStatus["status"],
+        options?: { timeoutMs?: number },
       ): Promise<SystemSandboxInstanceStatus> => {
         const sandboxContext = await ensureSandboxControlContext();
 
         return waitForCondition({
           description: `sandbox '${sandboxInstanceId}' to reach status '${status}'`,
-          timeoutMs: SandboxReadyTimeoutMs,
+          timeoutMs: options?.timeoutMs ?? SandboxReadyTimeoutMs,
           evaluate: async () => {
             const response = await request(
               `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}`,
