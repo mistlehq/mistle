@@ -154,11 +154,6 @@ base_url = "http://127.0.0.1:5300"
 
 [apps.data_plane_gateway.control_plane_api]
 base_url = "http://127.0.0.1:5100"
-
-[apps.data_plane_gateway.lifecycle]
-idle_timeout_ms = 300000
-bootstrap_disconnect_grace_ms = 60000
-
 [apps.data_plane_worker.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
@@ -167,11 +162,6 @@ database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"
 run_migrations = true
 concurrency = 2
-
-[apps.data_plane_worker.tunnel]
-bootstrap_token_ttl_seconds = 120
-exchange_token_ttl_seconds = 3600
-
 [apps.data_plane_worker.runtime_state]
 gateway_base_url = "http://127.0.0.1:5302"
 

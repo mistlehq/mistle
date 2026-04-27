@@ -138,10 +138,6 @@ namespace_id = "local"
 run_migrations = true
 concurrency = 1
 
-[apps.data_plane_worker.tunnel]
-bootstrap_token_ttl_seconds = 120
-exchange_token_ttl_seconds = 3600
-
 [apps.data_plane_worker.runtime_state]
 gateway_base_url = "http://data-plane-gateway:5202"
 

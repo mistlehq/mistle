@@ -91,10 +91,6 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       runMigrations: false,
       concurrency: 1,
     },
-    tunnel: {
-      bootstrapTokenTtlSeconds: 120,
-      exchangeTokenTtlSeconds: 3600,
-    },
     runtimeState: {
       gatewayBaseUrl: "http://127.0.0.1:5202",
     },
@@ -146,8 +142,6 @@ function createWorkerRuntimeConfig() {
     MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "integration",
     MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
     MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "1",
-    MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
-    MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
     MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
     MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:

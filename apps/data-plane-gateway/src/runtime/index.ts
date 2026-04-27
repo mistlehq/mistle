@@ -9,7 +9,7 @@ import WebSocket, { type WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
 import {
-  resolveDataPlaneGatewayLifecycleDurations,
+  DefaultDataPlaneGatewayLifecycleDurations,
   SandboxInstanceDeadlineService,
 } from "../deadlines/sandbox-instance-deadline-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
@@ -191,7 +191,7 @@ export function createDataPlaneGatewayRuntime(
   const sandboxInstanceDeadlineService = new SandboxInstanceDeadlineService(
     dataPlaneClient,
     systemClock,
-    resolveDataPlaneGatewayLifecycleDurations(config.app.lifecycle),
+    DefaultDataPlaneGatewayLifecycleDurations,
   );
 
   registerSandboxRuntimeStateRoute({

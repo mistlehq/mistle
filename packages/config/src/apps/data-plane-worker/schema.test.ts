@@ -76,10 +76,6 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
           runMigrations: true,
           concurrency: 1,
         },
-        tunnel: {
-          bootstrapTokenTtlSeconds: 120,
-          exchangeTokenTtlSeconds: 3600,
-        },
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
@@ -183,10 +179,6 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
           runMigrations: true,
           concurrency: 1,
         },
-        tunnel: {
-          bootstrapTokenTtlSeconds: 120,
-          exchangeTokenTtlSeconds: 3600,
-        },
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
@@ -220,10 +212,6 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
           namespaceId: "development",
           runMigrations: true,
           concurrency: 1,
-        },
-        tunnel: {
-          bootstrapTokenTtlSeconds: 120,
-          exchangeTokenTtlSeconds: 3600,
         },
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",

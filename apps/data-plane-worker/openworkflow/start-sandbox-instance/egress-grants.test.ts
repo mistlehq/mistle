@@ -29,10 +29,6 @@ describe("createEgressGrantByRuleId", () => {
             runMigrations: false,
             concurrency: 1,
           },
-          tunnel: {
-            bootstrapTokenTtlSeconds: 120,
-            exchangeTokenTtlSeconds: 3600,
-          },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5003",
           },
@@ -222,10 +218,6 @@ describe("createEgressGrantByRuleId", () => {
             runMigrations: false,
             concurrency: 1,
           },
-          tunnel: {
-            bootstrapTokenTtlSeconds: 120,
-            exchangeTokenTtlSeconds: 3600,
-          },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5003",
           },
@@ -361,10 +353,6 @@ describe("createEgressGrantByRuleId", () => {
             namespaceId: "development",
             runMigrations: false,
             concurrency: 1,
-          },
-          tunnel: {
-            bootstrapTokenTtlSeconds: 120,
-            exchangeTokenTtlSeconds: 3600,
           },
           runtimeState: {
             gatewayBaseUrl: "http://127.0.0.1:5003",

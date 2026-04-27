@@ -5,6 +5,7 @@ import type { SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import { DataPlaneWorkerTunnelTokenDurations } from "../core/tunnel-token-durations.js";
 import { createEgressGrantByRuleId } from "./egress-grants.js";
 import {
   createSandboxTunnelGatewayWsUrl,
@@ -40,7 +41,7 @@ export async function createSandboxStartupInput(input: {
         },
         jti: bootstrapTokenJti,
         sandboxInstanceId: input.sandboxInstanceId,
-        ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+        ttlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
       }),
       mintTunnelExchangeToken({
         config: {
@@ -50,9 +51,9 @@ export async function createSandboxStartupInput(input: {
         },
         jti: tunnelExchangeTokenJti,
         sandboxInstanceId: input.sandboxInstanceId,
-        bootstrapTokenTtlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
-        exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
-        ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+        bootstrapTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS,
+        exchangeTokenTtlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
+        ttlSeconds: DataPlaneWorkerTunnelTokenDurations.EXCHANGE_TOKEN_TTL_SECONDS,
       }),
       createEgressGrantByRuleId({
         config: input.config,

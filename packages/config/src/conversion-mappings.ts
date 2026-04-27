@@ -429,16 +429,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL",
   },
   {
-    configPath: ["apps", "data_plane_gateway", "lifecycle", "idleTimeoutMs"],
-    tomlPath: ["apps", "data_plane_gateway", "lifecycle", "idle_timeout_ms"],
-    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS",
-  },
-  {
-    configPath: ["apps", "data_plane_gateway", "lifecycle", "bootstrapDisconnectGraceMs"],
-    tomlPath: ["apps", "data_plane_gateway", "lifecycle", "bootstrap_disconnect_grace_ms"],
-    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "database", "url"],
     tomlPath: ["apps", "data_plane_worker", "database", "url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL",
@@ -464,16 +454,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
   },
   {
-    configPath: ["apps", "data_plane_worker", "tunnel", "bootstrapTokenTtlSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "tunnel", "bootstrap_token_ttl_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "tunnel", "exchangeTokenTtlSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "tunnel", "exchange_token_ttl_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "runtimeState", "gatewayBaseUrl"],
     tomlPath: ["apps", "data_plane_worker", "runtime_state", "gateway_base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",
@@ -487,11 +467,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_worker", "sandbox", "tokenizerProxyEgressBaseUrl"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "tokenizer_proxy_egress_base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "sandbox", "sandboxdTestFaultsEnabled"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "sandboxd_test_faults_enabled"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED",
   },
   {
     configPath: ["apps", "data_plane_worker", "sandbox", "docker", "socketPath"],

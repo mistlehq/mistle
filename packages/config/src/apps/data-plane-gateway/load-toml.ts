@@ -15,7 +15,6 @@ export function loadDataPlaneGatewayFromToml(
   const runtimeStateValkey = asObjectRecord(runtimeState.valkey);
   const dataPlaneApi = asObjectRecord(dataPlaneGateway.data_plane_api);
   const controlPlaneApi = asObjectRecord(dataPlaneGateway.control_plane_api);
-  const lifecycle = asObjectRecord(dataPlaneGateway.lifecycle);
 
   return PartialDataPlaneGatewayConfigSchema.parse({
     server: {
@@ -42,13 +41,5 @@ export function loadDataPlaneGatewayFromToml(
     controlPlaneApi: {
       baseUrl: controlPlaneApi.base_url,
     },
-    ...(Object.keys(lifecycle).length > 0
-      ? {
-          lifecycle: {
-            idleTimeoutMs: lifecycle.idle_timeout_ms,
-            bootstrapDisconnectGraceMs: lifecycle.bootstrap_disconnect_grace_ms,
-          },
-        }
-      : {}),
   });
 }

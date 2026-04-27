@@ -8,6 +8,9 @@ import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../src/sandbox-bas
 import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
+const configSamplePath = fileURLToPath(
+  new URL("../../../config/config.sample.toml", import.meta.url),
+);
 const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
   new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
 );
@@ -325,10 +328,6 @@ const dataPlaneGatewayEnvConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
   },
-  lifecycle: {
-    idleTimeoutMs: 300000,
-    bootstrapDisconnectGraceMs: 60000,
-  },
 } as const;
 
 const dataPlaneGatewayFixtureConfig = {
@@ -361,10 +360,6 @@ const dataPlaneWorkerEnvConfig = {
     namespaceId: "development",
     runMigrations: true,
     concurrency: 1,
-  },
-  tunnel: {
-    bootstrapTokenTtlSeconds: 120,
-    exchangeTokenTtlSeconds: 3600,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
@@ -422,10 +417,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     runMigrations: true,
     concurrency: 3,
   },
-  tunnel: {
-    bootstrapTokenTtlSeconds: 120,
-    exchangeTokenTtlSeconds: 3600,
-  },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
@@ -481,6 +472,17 @@ const tokenizerProxyFixtureConfig = {
 } as const;
 
 describe("loadConfig integrations", () => {
+  it("loads every app from config.sample.toml", () => {
+    expect(() => {
+      loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath: configSamplePath });
+      loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath });
+      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath });
+    }).not.toThrow();
+  });
+
   it("loads control-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
@@ -719,34 +721,10 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("loads data-plane-gateway lifecycle config from env when provided", () => {
-    const config = loadConfig({
-      app: AppIds.DATA_PLANE_GATEWAY,
-      env: createIntegrationEnv({
-        NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: "20000",
-        MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: "8000",
-      }),
-    });
-
-    expect(config).toEqual({
-      global: globalProductionConfig,
-      app: {
-        ...dataPlaneGatewayEnvConfig,
-        lifecycle: {
-          idleTimeoutMs: 20000,
-          bootstrapDisconnectGraceMs: 8000,
-        },
-      },
-    });
-  });
-
-  it("loads data-plane-gateway without lifecycle config when omitted from env", () => {
+  it("loads data-plane-gateway when lifecycle config is omitted from env", () => {
     const env = createIntegrationEnv({
       NODE_ENV: "production",
     });
-    delete env.MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS;
-    delete env.MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS;
 
     const config = loadConfig({
       app: AppIds.DATA_PLANE_GATEWAY,

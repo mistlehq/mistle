@@ -14,6 +14,7 @@ import {
   createSandboxRuntimeAdapter,
   createSandboxRuntimeControl,
 } from "./sandbox-runtime-adapter.js";
+import { DataPlaneWorkerTunnelTokenDurations } from "./tunnel-token-durations.js";
 
 export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
@@ -36,11 +37,11 @@ let workflowContextPromise: Promise<WorkflowContext> | undefined;
 let closeWorkflowContextPromise: Promise<void> | undefined;
 let shutdownHandlersRegistered = false;
 
-function createDefaultTunnelReadinessPolicy(config: DataPlaneWorkerRuntimeConfig): {
+function createDefaultTunnelReadinessPolicy(): {
   timeoutMs: number;
   pollIntervalMs: number;
 } {
-  const bootstrapTokenTtlSeconds = config.app.tunnel.bootstrapTokenTtlSeconds;
+  const bootstrapTokenTtlSeconds = DataPlaneWorkerTunnelTokenDurations.BOOTSTRAP_TOKEN_TTL_SECONDS;
   if (!Number.isFinite(bootstrapTokenTtlSeconds) || bootstrapTokenTtlSeconds <= 0) {
     throw new Error("Expected tunnel bootstrap token TTL seconds to be a positive number.");
   }
@@ -82,7 +83,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
         serviceToken: globalConfig.internalAuth.serviceToken,
       }),
       controlPlaneInternalClient,
-      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(config),
+      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),
       clock: systemClock,
       sleeper: systemSleeper,
     };

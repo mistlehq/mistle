@@ -51,9 +51,8 @@ const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
 const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
 const TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL = `${TOKENIZER_PROXY_CONTAINER_BASE_URL}/tokenizer-proxy/egress`;
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
-const GatewayIdleTimeoutEnvVar = "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS";
-const GatewayBootstrapDisconnectGraceEnvVar =
-  "MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS";
+const DataPlaneGatewayIdleTimeoutMs = 300_000;
+const DataPlaneGatewayBootstrapDisconnectGraceMs = 60_000;
 const DockerSocketPath = "/var/run/docker.sock";
 const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
@@ -139,56 +138,12 @@ export type StartedFullSystemEnvironment = {
   };
   containerHostGateway: string;
   sandboxNetworkName: string;
-  dataPlaneGatewayLifecycle?:
-    | {
-        idleTimeoutMs: number;
-        bootstrapDisconnectGraceMs: number;
-      }
-    | undefined;
+  dataPlaneGatewayLifecycle: {
+    idleTimeoutMs: number;
+    bootstrapDisconnectGraceMs: number;
+  };
   stop: () => Promise<void>;
 };
-
-function parsePositiveIntegerString(input: { value: string; envVar: string }): number {
-  const parsed = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`Expected ${input.envVar} to be a positive integer, got '${input.value}'.`);
-  }
-
-  return parsed;
-}
-
-function readGatewayLifecycle(input: {
-  dataPlaneGatewayEnvironment: Record<string, string> | undefined;
-}):
-  | {
-      idleTimeoutMs: number;
-      bootstrapDisconnectGraceMs: number;
-    }
-  | undefined {
-  const idleTimeoutValue = input.dataPlaneGatewayEnvironment?.[GatewayIdleTimeoutEnvVar];
-  const bootstrapDisconnectGraceValue =
-    input.dataPlaneGatewayEnvironment?.[GatewayBootstrapDisconnectGraceEnvVar];
-
-  if (idleTimeoutValue === undefined && bootstrapDisconnectGraceValue === undefined) {
-    return undefined;
-  }
-  if (idleTimeoutValue === undefined || bootstrapDisconnectGraceValue === undefined) {
-    throw new Error(
-      `Expected ${GatewayIdleTimeoutEnvVar} and ${GatewayBootstrapDisconnectGraceEnvVar} to be configured together for the full system environment.`,
-    );
-  }
-
-  return {
-    idleTimeoutMs: parsePositiveIntegerString({
-      value: idleTimeoutValue,
-      envVar: GatewayIdleTimeoutEnvVar,
-    }),
-    bootstrapDisconnectGraceMs: parsePositiveIntegerString({
-      value: bootstrapDisconnectGraceValue,
-      envVar: GatewayBootstrapDisconnectGraceEnvVar,
-    }),
-  };
-}
 
 function createDatabaseUrl(input: {
   username: string;
@@ -490,9 +445,6 @@ export async function startFullSystemEnvironment(
   const preparedRuntime = await readPreparedTestHarnessRuntime(input.buildContextHostPath);
 
   try {
-    const gatewayLifecycle = readGatewayLifecycle({
-      dataPlaneGatewayEnvironment: input.dataPlaneGatewayEnvironment,
-    });
     const sharedInfraLease = await withStepTiming(
       "acquire shared postgres/mailpit infra",
       async () => {
@@ -882,11 +834,10 @@ export async function startFullSystemEnvironment(
       },
       containerHostGateway: sharedInfraLease.infra.containerHostGateway,
       sandboxNetworkName: activeNetwork.getName(),
-      ...(gatewayLifecycle === undefined
-        ? {}
-        : {
-            dataPlaneGatewayLifecycle: gatewayLifecycle,
-          }),
+      dataPlaneGatewayLifecycle: {
+        idleTimeoutMs: DataPlaneGatewayIdleTimeoutMs,
+        bootstrapDisconnectGraceMs: DataPlaneGatewayBootstrapDisconnectGraceMs,
+      },
       stop: async () => {
         if (stopped) {
           throw new Error("Full system environment was already stopped.");

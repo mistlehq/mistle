@@ -25,13 +25,6 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerTunnelConfigSchema = z
-  .object({
-    bootstrapTokenTtlSeconds: z.number().int().min(1),
-    exchangeTokenTtlSeconds: z.number().int().min(1),
-  })
-  .strict();
-
 export const DataPlaneWorkerRuntimeStateConfigSchema = z
   .object({
     gatewayBaseUrl: HttpBaseUrlSchema,
@@ -164,7 +157,6 @@ export const DataPlaneWorkerConfigSchema = z
   .object({
     database: DataPlaneWorkerDatabaseConfigSchema,
     workflow: DataPlaneWorkerWorkflowConfigSchema,
-    tunnel: DataPlaneWorkerTunnelConfigSchema,
     runtimeState: DataPlaneWorkerRuntimeStateConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
     controlPlaneApi: DataPlaneWorkerControlPlaneApiConfigSchema,
@@ -176,7 +168,6 @@ export const PartialDataPlaneWorkerConfigSchema = z
   .object({
     database: DataPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
-    tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),
     runtimeState: PartialDataPlaneWorkerRuntimeStateConfigSchema.optional(),
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
     controlPlaneApi: PartialDataPlaneWorkerControlPlaneApiConfigSchema.optional(),

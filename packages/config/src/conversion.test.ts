@@ -62,10 +62,6 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: "20000",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: "8000",
-      MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
-      MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",
@@ -183,10 +179,6 @@ describe("convertEnvToTomlRecord", () => {
           },
         },
         data_plane_worker: {
-          tunnel: {
-            bootstrap_token_ttl_seconds: 120,
-            exchange_token_ttl_seconds: 3600,
-          },
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
           },
@@ -229,10 +221,6 @@ describe("convertEnvToTomlRecord", () => {
           },
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
-          },
-          lifecycle: {
-            idle_timeout_ms: 20000,
-            bootstrap_disconnect_grace_ms: 8000,
           },
         },
       },
@@ -339,10 +327,6 @@ describe("convertTomlToEnvRecord", () => {
           },
         },
         data_plane_worker: {
-          tunnel: {
-            bootstrap_token_ttl_seconds: 120,
-            exchange_token_ttl_seconds: 3600,
-          },
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
           },
@@ -385,10 +369,6 @@ describe("convertTomlToEnvRecord", () => {
           },
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
-          },
-          lifecycle: {
-            idle_timeout_ms: 20000,
-            bootstrap_disconnect_grace_ms: 8000,
           },
         },
       },
@@ -438,10 +418,6 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
       MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_IDLE_TIMEOUT_MS: "20000",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_LIFECYCLE_BOOTSTRAP_DISCONNECT_GRACE_MS: "8000",
-      MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
-      MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://control-plane-api:8080",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "test-data-plane-worker-key",

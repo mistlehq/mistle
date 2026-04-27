@@ -13,12 +13,6 @@ export const DefaultDataPlaneGatewayLifecycleDurations: DataPlaneGatewayLifecycl
   bootstrapDisconnectGraceMs: BOOTSTRAP_DISCONNECT_GRACE_MS,
 };
 
-export function resolveDataPlaneGatewayLifecycleDurations(
-  lifecycleDurations: DataPlaneGatewayLifecycleDurations | undefined,
-): DataPlaneGatewayLifecycleDurations {
-  return lifecycleDurations ?? DefaultDataPlaneGatewayLifecycleDurations;
-}
-
 export class SandboxInstanceDeadlineService {
   public constructor(
     private readonly dataPlaneClient: Pick<
