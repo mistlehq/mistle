@@ -172,6 +172,7 @@ describe("acquireAutomationConnection integration", () => {
           }),
         },
         {
+          deliveryTaskId: "cdt_test_001",
           preparedAutomationRun: {
             automationRunId: "aru_test_001",
             automationRunCreatedAt: "2026-04-23T00:00:00.000Z",
@@ -182,6 +183,8 @@ describe("acquireAutomationConnection integration", () => {
             sandboxProfileId: "sbp_test_001",
             sandboxProfileVersion: 1,
             primaryRepositoryId: null,
+            integrationConnectionId: "icn_test_001",
+            targetKey: "openai-agent-test",
             webhookEventId: "iwe_test_001",
             webhookEventType: "slack:app_mention",
             webhookProviderEventType: "app_mention",
@@ -200,6 +203,7 @@ describe("acquireAutomationConnection integration", () => {
             sandboxInstanceId: "sbi_test_001",
             startupWorkflowRunId: null,
           },
+          workflowRunId: "owfr_test_001",
         },
       );
 

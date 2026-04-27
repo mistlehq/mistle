@@ -89,8 +89,11 @@ export async function prepareIntegrationWebhookEvent(
       ) {
         return {
           automationRunIds: [],
+          externalDeliveryId: webhookEvent.externalDeliveryId,
           finalized: true,
+          integrationConnectionId: webhookEvent.integrationConnectionId,
           resourceSyncRequests: [],
+          targetKey: webhookEvent.targetKey,
           webhookEventId: input.webhookEventId,
         };
       }

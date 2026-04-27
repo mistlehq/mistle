@@ -282,10 +282,8 @@ mod tests {
 
     use serde_json::Value;
 
-    use super::{
-        INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation,
-        test_log_dir_override_lock,
-    };
+    use super::{INIT_LOG_PATH, RESUME_LOG_PATH, StartupDiagnosticsLogger, StartupOperation};
+    use crate::test_support::TestEnvVarGuard;
     use crate::time::Clock;
 
     #[derive(Debug)]
@@ -310,6 +308,8 @@ mod tests {
         ));
         let _ = fs::remove_dir_all(&temp_dir);
         fs::create_dir_all(&temp_dir).expect("temp dir should be creatable");
+        let _log_dir_guard =
+            TestEnvVarGuard::set(super::TEST_LOG_DIR_ENV, temp_dir.to_string_lossy().as_ref());
 
         let logger = StartupDiagnosticsLogger::initialize(
             StartupOperation::Init,

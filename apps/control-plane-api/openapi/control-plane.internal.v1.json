@@ -3637,6 +3637,9 @@
                     "minLength": 1
                   },
                   "actingUserId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "webhookEventId": {
                     "type": "string",
                     "minLength": 1

@@ -5,9 +5,7 @@ use std::time::Instant;
 
 use futures_util::{SinkExt, StreamExt};
 use opentelemetry::Context as OtelContext;
-use opentelemetry::propagation::{
-    Extractor, TextMapCompositePropagator, TextMapPropagator,
-};
+use opentelemetry::propagation::{Extractor, TextMapCompositePropagator, TextMapPropagator};
 use opentelemetry::trace::TraceContextExt as _;
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
 use serde_json::{Value, json};
@@ -216,7 +214,11 @@ fn read_interrupt_target_turn_id_from_request(value: &Value) -> Option<String> {
     value["params"]["turnId"]
         .as_str()
         .map(ToString::to_string)
-        .or_else(|| value["params"]["expectedTurnId"].as_str().map(ToString::to_string))
+        .or_else(|| {
+            value["params"]["expectedTurnId"]
+                .as_str()
+                .map(ToString::to_string)
+        })
 }
 
 fn interruption_source_for_client_kind(client_kind: ProxyClientKind) -> &'static str {
@@ -236,7 +238,10 @@ fn interruption_expected_for_source(source: &str) -> bool {
 
 fn interruption_source_for_transport_reason(reason: &str) -> &'static str {
     match reason {
-        "client_close" | "client_terminated" | "client_stream_ended" | "client_socket_error"
+        "client_close"
+        | "client_terminated"
+        | "client_stream_ended"
+        | "client_socket_error"
         | "client_write_error" => "proxy_disconnect",
         _ => "session_reset",
     }
@@ -380,9 +385,7 @@ fn log_turn_lifecycle_event(
     duration_ms: Option<u128>,
 ) {
     let _entered = active_turn.span.enter();
-    active_turn
-        .span
-        .record("outcome", field::display(outcome));
+    active_turn.span.record("outcome", field::display(outcome));
     if let Some(reason) = reason {
         active_turn.span.record("reason", field::display(reason));
     }
@@ -844,8 +847,7 @@ fn finalize_active_turns_for_transport_outcome(
                     Some(interruption_source_for_transport_reason(transport_reason).to_string());
                 active_turn.interruption_expected = Some(false);
             }
-            let reason = if active_turn.started_at.is_some()
-                && active_turn.first_item_at.is_none()
+            let reason = if active_turn.started_at.is_some() && active_turn.first_item_at.is_none()
             {
                 Some("started_but_no_output")
             } else {
@@ -1439,7 +1441,9 @@ fn should_forward_client_message(
         return Ok(true);
     };
     let thread_id = match method {
-        TURN_START_METHOD | TURN_STEER_METHOD | TURN_INTERRUPT_METHOD
+        TURN_START_METHOD
+        | TURN_STEER_METHOD
+        | TURN_INTERRUPT_METHOD
         | THREAD_COMPACT_START_METHOD => value["params"]["threadId"]
             .as_str()
             .map(ToString::to_string),
@@ -1469,11 +1473,14 @@ fn should_forward_client_message(
         _ => current_delivery_context.clone(),
     };
     let interruption_source = match method {
-        TURN_INTERRUPT_METHOD => Some(interruption_source_for_client_kind(*client_kind).to_string()),
+        TURN_INTERRUPT_METHOD => {
+            Some(interruption_source_for_client_kind(*client_kind).to_string())
+        }
         _ => None,
     };
-    let interruption_expected =
-        interruption_source.as_deref().map(interruption_expected_for_source);
+    let interruption_expected = interruption_source
+        .as_deref()
+        .map(interruption_expected_for_source);
     let compaction_trigger = match method {
         THREAD_COMPACT_START_METHOD => Some("manual".to_string()),
         _ => None,
@@ -1541,8 +1548,9 @@ fn should_forward_client_message(
 
     if method == THREAD_COMPACT_START_METHOD
         && let Some(thread_id) = thread_id.as_deref()
-        && let Some(pending_compaction_request) =
-            forward_context.pending_compaction_requests.remove(thread_id)
+        && let Some(pending_compaction_request) = forward_context
+            .pending_compaction_requests
+            .remove(thread_id)
     {
         log_pending_thread_compaction_unknown_terminal_outcome(
             pending_compaction_request.delivery_context.as_ref(),
@@ -1577,10 +1585,9 @@ fn matched_retention_target(
 
     let request_kind = request_kind_for_method(pending_request.method.as_str());
     if value.get("error").is_some() {
-        if let (Some(request_kind), Some(delivery_context)) = (
-            request_kind,
-            pending_request.delivery_context.as_ref(),
-        ) {
+        if let (Some(request_kind), Some(delivery_context)) =
+            (request_kind, pending_request.delivery_context.as_ref())
+        {
             log_turn_request_failure(
                 request_kind,
                 delivery_context,
@@ -1591,7 +1598,12 @@ fn matched_retention_target(
             );
         }
         if pending_request.method == TURN_INTERRUPT_METHOD
-            && let (Some(delivery_context), Some(thread_id), Some(turn_id), Some(interruption_source)) = (
+            && let (
+                Some(delivery_context),
+                Some(thread_id),
+                Some(turn_id),
+                Some(interruption_source),
+            ) = (
                 pending_request.delivery_context.as_ref(),
                 pending_request.thread_id.as_deref(),
                 pending_request.expected_turn_id.as_deref(),
@@ -1837,10 +1849,10 @@ mod tests {
     };
 
     use super::{
-        ActiveCompactionState, ActiveTurnState, ClientForwardContext,
-        PendingCompactionRequest, TurnRequestKind, finalize_active_compactions_for_transport_outcome,
-        finalize_unresolved_compactions_for_transport_outcome,
-        finalize_active_turns_for_transport_outcome, log_delivery_context_mapping,
+        ActiveCompactionState, ActiveTurnState, ClientForwardContext, PendingCompactionRequest,
+        TurnRequestKind, finalize_active_compactions_for_transport_outcome,
+        finalize_active_turns_for_transport_outcome,
+        finalize_unresolved_compactions_for_transport_outcome, log_delivery_context_mapping,
         matched_retention_target, observe_server_notification, should_forward_client_message,
         start_delivery_proxy_span, start_thread_compaction_span, start_turn_lifecycle_span,
         take_ready_buffered_success_responses,
@@ -1862,8 +1874,29 @@ mod tests {
                 .lock()
                 .expect("shared log buffer should not be poisoned")
                 .clone();
-            String::from_utf8(bytes).expect("shared log buffer should contain utf8")
+            strip_ansi_escape_codes(
+                &String::from_utf8(bytes).expect("shared log buffer should contain utf8"),
+            )
         }
+    }
+
+    fn strip_ansi_escape_codes(input: &str) -> String {
+        let mut output = String::with_capacity(input.len());
+        let mut chars = input.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '\u{1b}' && matches!(chars.peek(), Some('[')) {
+                let _ = chars.next();
+                for next in chars.by_ref() {
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            output.push(ch);
+        }
+        output
     }
 
     impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for SharedLogWriter {
@@ -1888,6 +1921,15 @@ mod tests {
         fn flush(&mut self) -> io::Result<()> {
             Ok(())
         }
+    }
+
+    fn assert_log_field(output: &str, key: &str, value: &str) {
+        let unquoted = format!("{key}={value}");
+        let quoted = format!("{key}=\"{value}\"");
+        assert!(
+            output.contains(&unquoted) || output.contains(&quoted),
+            "expected log output to contain '{unquoted}' or '{quoted}', got: {output}"
+        );
     }
 
     fn test_delivery_context() -> DeliveryContext {
@@ -2220,8 +2262,8 @@ mod tests {
         assert!(output.contains("codex_proxy.turn.first_item"));
         assert!(output.contains("contextCompaction"));
         assert!(output.contains("codex_proxy.turn.completed"));
-        assert!(output.contains("outcome=completed"));
-        assert!(output.contains("deliveryTaskId=cdt_123"));
+        assert_log_field(&output, "outcome", "completed");
+        assert_log_field(&output, "deliveryTaskId", "cdt_123");
     }
 
     #[test]
@@ -2270,9 +2312,9 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.completed"));
-        assert!(output.contains("outcome=failed"));
-        assert!(output.contains("reason=failed_before_first_item"));
-        assert!(output.contains("mistle.turn.request_kind=turn_steer"));
+        assert_log_field(&output, "outcome", "failed");
+        assert_log_field(&output, "reason", "failed_before_first_item");
+        assert_log_field(&output, "mistle.turn.request_kind", "turn_steer");
     }
 
     #[test]
@@ -2308,10 +2350,10 @@ mod tests {
         assert!(output.contains("codex_proxy.turn.transport_ended"));
         assert!(output.contains("codex_proxy.turn.interrupted"));
         assert!(output.contains("codex_proxy.turn.stalled"));
-        assert!(output.contains("outcome=reset"));
-        assert!(output.contains("outcome=stalled"));
-        assert!(output.contains("reason=raw_socket_error"));
-        assert!(output.contains("interruptionSource=session_reset"));
+        assert_log_field(&output, "outcome", "reset");
+        assert_log_field(&output, "outcome", "stalled");
+        assert_log_field(&output, "reason", "raw_socket_error");
+        assert_log_field(&output, "interruptionSource", "session_reset");
     }
 
     #[test]
@@ -2345,8 +2387,8 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.transport_ended"));
-        assert!(output.contains("reason=started_but_no_output"));
-        assert!(output.contains("interruptionSource=session_reset"));
+        assert_log_field(&output, "reason", "started_but_no_output");
+        assert_log_field(&output, "interruptionSource", "session_reset");
     }
 
     #[test]
@@ -2404,8 +2446,8 @@ mod tests {
         assert!(output.contains("codex_proxy.turn.request_failed"));
         assert!(output.contains("failed"));
         assert!(output.contains("turn rejected"));
-        assert!(output.contains("deliveryTaskId=cdt_123"));
-        assert!(output.contains("threadId=thr_123"));
+        assert_log_field(&output, "deliveryTaskId", "cdt_123");
+        assert_log_field(&output, "threadId", "thr_123");
     }
 
     #[test]
@@ -2465,7 +2507,7 @@ mod tests {
         let output = log_writer.contents();
         assert!(output.contains("codex.thread.compaction_requested"));
         assert!(output.contains("requested"));
-        assert!(output.contains("compactionTrigger=manual"));
+        assert_log_field(&output, "compactionTrigger", "manual");
         assert!(output.contains("accepted"));
     }
 
@@ -2544,7 +2586,7 @@ mod tests {
         let output = log_writer.contents();
         assert!(output.contains("codex.thread.compaction_started"));
         assert!(output.contains("codex.thread.compaction_completed"));
-        assert!(output.contains("compactionTrigger=automatic"));
+        assert_log_field(&output, "compactionTrigger", "automatic");
         assert!(output.contains("compacted"));
     }
 
@@ -2578,9 +2620,9 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex.thread.compaction_unknown_terminal_outcome"));
-        assert!(output.contains("compactionState=unknown_terminal_outcome"));
-        assert!(output.contains("compactionTrigger=manual"));
-        assert!(output.contains("reason=raw_socket_error"));
+        assert_log_field(&output, "compactionState", "unknown_terminal_outcome");
+        assert_log_field(&output, "compactionTrigger", "manual");
+        assert_log_field(&output, "reason", "raw_socket_error");
     }
 
     #[test]
@@ -2620,8 +2662,8 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex.thread.compaction_unknown_terminal_outcome"));
-        assert!(output.contains("compactionTrigger=manual"));
-        assert!(output.contains("reason=raw_socket_error"));
+        assert_log_field(&output, "compactionTrigger", "manual");
+        assert_log_field(&output, "reason", "raw_socket_error");
     }
 
     #[test]
@@ -2683,8 +2725,8 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex.thread.compaction_unknown_terminal_outcome"));
-        assert!(output.contains("reason=superseded_by_new_request"));
-        assert!(output.contains("compactionTrigger=manual"));
+        assert_log_field(&output, "reason", "superseded_by_new_request");
+        assert_log_field(&output, "compactionTrigger", "manual");
     }
 
     #[test]
@@ -2761,8 +2803,8 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.interrupt_requested"));
-        assert!(output.contains("interruptionSource=manual_user_interrupt"));
-        assert!(output.contains("interruptionExpected=true"));
+        assert_log_field(&output, "interruptionSource", "manual_user_interrupt");
+        assert_log_field(&output, "interruptionExpected", "true");
     }
 
     #[test]
@@ -2833,7 +2875,7 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.interrupt_requested"));
-        assert!(output.contains("interruptionSource=automation_interrupt"));
+        assert_log_field(&output, "interruptionSource", "automation_interrupt");
     }
 
     #[test]
@@ -2882,8 +2924,8 @@ mod tests {
 
         let output = log_writer.contents();
         assert!(output.contains("codex_proxy.turn.interrupted"));
-        assert!(output.contains("interruptionSource=unknown_interrupt"));
-        assert!(output.contains("interruptionExpected=false"));
+        assert_log_field(&output, "interruptionSource", "unknown_interrupt");
+        assert_log_field(&output, "interruptionExpected", "false");
     }
 
     #[test]
