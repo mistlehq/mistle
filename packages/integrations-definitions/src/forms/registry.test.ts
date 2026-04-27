@@ -50,7 +50,6 @@ function createAgentDefinition(): IntegrationDefinition<
         ui: {
           create: {
             submitLabel: "Start device authorization",
-            helperText: "Use ChatGPT device authorization to connect this account.",
           },
           pending: {
             title: "Finish sign-in",
@@ -148,7 +147,6 @@ describe("integration form registry", () => {
           ui: {
             create: {
               submitLabel: "Start device authorization",
-              helperText: "Use ChatGPT device authorization to connect this account.",
             },
             pending: {
               title: "Finish sign-in",
@@ -178,7 +176,6 @@ describe("integration form registry", () => {
           ui: {
             create: {
               submitLabel: "Continue",
-              helperText: "Sign in with ChatGPT in a separate browser window.",
             },
             pending: {
               title: "Waiting for approval",
@@ -214,7 +211,6 @@ describe("integration form registry", () => {
           ui: {
             create: {
               submitLabel: "Continue",
-              helperText: "Sign in with ChatGPT in a separate browser window.",
             },
             pending: {
               title: "Waiting for approval",

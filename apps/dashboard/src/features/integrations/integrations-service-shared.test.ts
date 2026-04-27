@@ -20,7 +20,6 @@ describe("IntegrationTargetSchema", () => {
           ui: {
             create: {
               submitLabel: "Continue",
-              helperText: "Continue to device authorization.",
             },
             pending: {
               title: "Waiting for approval",
@@ -42,7 +41,6 @@ describe("IntegrationTargetSchema", () => {
         ui: {
           create: {
             submitLabel: "Continue",
-            helperText: "Continue to device authorization.",
           },
           pending: {
             title: "Waiting for approval",

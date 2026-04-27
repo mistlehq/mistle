@@ -3706,7 +3706,6 @@ export interface paths {
                       label: string;
                       ui: {
                         create: {
-                          helperText: string;
                           submitLabel: string;
                         };
                         pending?: {

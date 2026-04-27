@@ -154,7 +154,6 @@ function createDeviceAuthorizationRefreshRegistry(input: {
         ui: {
           create: {
             submitLabel: "Connect",
-            helperText: "Connect with device authorization",
           },
         },
       },

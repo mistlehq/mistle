@@ -96,7 +96,6 @@ describe("resolveFormConnectionMethodOrThrow", () => {
             ui: {
               create: {
                 submitLabel: "Continue",
-                helperText: "Continue to device authorization.",
               },
               pending: {
                 title: "Waiting for approval",

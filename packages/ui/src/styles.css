@@ -118,3 +118,21 @@
     @apply bg-background font-sans text-foreground;
   }
 }
+
+@utility thin-scrollbar-x {
+  scrollbar-color: color-mix(in srgb, var(--foreground) 24%, transparent) transparent;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 0.375rem;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--foreground) 24%, transparent);
+    border-radius: 9999px;
+  }
+}

@@ -278,13 +278,11 @@ describe("integration targets discovery integration", () => {
           kind: "device-authorization",
           ui: {
             create: {
-              helperText: "Connect with your ChatGPT subscription using a device code.",
               submitLabel: "Connect",
             },
             pending: {
-              title: "Approve In ChatGPT",
-              description:
-                "Open the verification link, enter the device code, and approve access in ChatGPT.",
+              title: "Approve via ChatGPT",
+              description: "Open the link below and enter the code to approve access.",
             },
           },
         },
@@ -560,13 +558,11 @@ describe("integration targets discovery integration", () => {
         kind: "device-authorization",
         ui: {
           create: {
-            helperText: "Connect with your ChatGPT subscription using a device code.",
             submitLabel: "Connect",
           },
           pending: {
-            title: "Approve In ChatGPT",
-            description:
-              "Open the verification link, enter the device code, and approve access in ChatGPT.",
+            title: "Approve via ChatGPT",
+            description: "Open the link below and enter the code to approve access.",
           },
         },
       },

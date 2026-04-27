@@ -54,6 +54,7 @@ import {
 } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { SectionHeader } from "../shared/section-header.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type SlackSetupMode = "manifest" | "existing-app";
@@ -355,12 +356,10 @@ function SlackExistingAppSetupPanel(input: {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-medium">Existing Slack App</h2>
-          <p className="text-muted-foreground text-sm">
-            Paste values from a Slack app you already created or configured in Slack.
-          </p>
-        </div>
+        <SectionHeader
+          description="Paste values from a Slack app you already created or configured in Slack."
+          title="Existing Slack App"
+        />
         <SavingTextField
           fieldState={input.fieldStates.clientId}
           id="slack-client-id"
@@ -376,7 +375,7 @@ function SlackExistingAppSetupPanel(input: {
       </div>
 
       <div className="flex flex-col gap-4">
-        <h2 className="text-base font-medium">Secrets</h2>
+        <SectionHeader title="Secrets" />
         <ConfiguredSecretField
           configured={input.configuredSecretFieldKeys.has("botToken")}
           fieldState={input.fieldStates.botToken}
@@ -447,12 +446,10 @@ function SlackSetupUrls(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">Slack app URLs</h2>
-        <p className="text-muted-foreground text-sm">
-          Copy this URL into Slack Event Subscriptions, then return here to connect Slack to Mistle.
-        </p>
-      </div>
+      <SectionHeader
+        description="Copy this URL into Slack Event Subscriptions, then return here to connect Slack to Mistle."
+        title="Slack app URLs"
+      />
       <div className="flex flex-col gap-4">
         {input.webhookCallbackState.kind === "loading" ? (
           <CopyableValue label="Events API Request URL" loading />
@@ -787,13 +784,12 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
         }}
         value={setupMode}
       >
-        <div className="flex flex-col gap-1 px-1">
-          <h2 className="text-lg font-medium">Choose a setup method</h2>
-          <p className="text-muted-foreground text-sm">
-            Create a new Slack app with a manifest or connect an app you&apos;ve already configured
-            in Slack.
-          </p>
-        </div>
+        <SectionHeader
+          className="px-1"
+          description="Create a new Slack app with a manifest or connect an app you've already configured in Slack."
+          size="large"
+          title="Choose a setup method"
+        />
 
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">

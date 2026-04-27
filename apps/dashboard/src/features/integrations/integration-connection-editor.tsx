@@ -2,6 +2,7 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import {
   Button,
+  CopyableValue,
   Field,
   FieldContent,
   FieldHeader,
@@ -23,6 +24,7 @@ import { ConfiguredSecretField, type SavingFieldState } from "../forms/configure
 import { SchemaFormWithoutSubmit } from "../forms/schema-form.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { SectionHeader } from "../shared/section-header.js";
 import { resolveSelectedConnectionMethod } from "./integration-connection-method-selection.js";
 import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod } from "./integrations-service-shared.js";
 
@@ -113,11 +115,32 @@ function resolveCreateSubmitLabel(method: IntegrationConnectionMethod | null): s
 }
 
 function renderAuthCreateHelper(method: IntegrationConnectionMethod | null) {
-  if (method?.kind !== "redirect" && method?.kind !== "device-authorization") {
+  if (method?.kind !== "redirect") {
     return null;
   }
 
   return <Notice>{method.ui.create.helperText}</Notice>;
+}
+
+export function formatDeviceAuthorizationExpiry(input: { expiresAt: string; now: Date }): string {
+  const expiresAtDate = new Date(input.expiresAt);
+  const formattedExpiresAt = expiresAtDate.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const remainingMs = expiresAtDate.getTime() - input.now.getTime();
+
+  if (remainingMs <= 0) {
+    return `This code expired at ${formattedExpiresAt}.`;
+  }
+
+  if (remainingMs < 60_000) {
+    return `This code expires in less than 1 minute at ${formattedExpiresAt}.`;
+  }
+
+  const remainingMinutes = Math.ceil(remainingMs / 60_000);
+  const minutesLabel = remainingMinutes === 1 ? "minute" : "minutes";
+  return `This code expires in ${remainingMinutes} ${minutesLabel} at ${formattedExpiresAt}.`;
 }
 
 function shouldSkipCreateTimeSetupFields(input: {
@@ -144,17 +167,13 @@ function renderDeviceAuthorizationPending(input: {
 }) {
   return (
     <div className="space-y-4">
-      <Notice>
-        <div className="space-y-1">
-          <p className="font-medium">
-            {input.pending.method.ui.pending?.title ?? "Approve The Connection"}
-          </p>
-          <p>
-            {input.pending.method.ui.pending?.description ??
-              "Open the verification link, enter the device code, and approve access."}
-          </p>
-        </div>
-      </Notice>
+      <SectionHeader
+        description={
+          input.pending.method.ui.pending?.description ??
+          "Open the link below and enter the code to approve access."
+        }
+        title={input.pending.method.ui.pending?.title ?? "Approve the connection"}
+      />
 
       <Field contentWidth="fill" orientation="vertical">
         <FieldHeader>
@@ -171,18 +190,14 @@ function renderDeviceAuthorizationPending(input: {
         </FieldContent>
       </Field>
 
-      <Field contentWidth="fill" orientation="vertical">
-        <FieldHeader>
-          <FieldLabel>Code</FieldLabel>
-        </FieldHeader>
-        <FieldContent>
-          <Input readOnly type="text" value={input.pending.userCode} />
-        </FieldContent>
-      </Field>
+      <CopyableValue label="Code" value={input.pending.userCode} />
 
       {input.pending.expiresAt ? (
         <p className="text-muted-foreground text-sm">
-          This code expires at {new Date(input.pending.expiresAt).toLocaleString()}.
+          {formatDeviceAuthorizationExpiry({
+            expiresAt: input.pending.expiresAt,
+            now: new Date(),
+          })}
         </p>
       ) : null}
     </div>

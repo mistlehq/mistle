@@ -145,7 +145,6 @@ describe("integration connections device authorization integration", () => {
           ui: {
             create: {
               submitLabel: "Connect",
-              helperText: "Connect with device authorization",
             },
             pending: {
               title: "Waiting for approval",
@@ -452,7 +451,6 @@ describe("integration connections device authorization integration", () => {
           ui: {
             create: {
               submitLabel: "Connect",
-              helperText: "Connect with device authorization",
             },
             pending: {
               title: "Waiting for approval",

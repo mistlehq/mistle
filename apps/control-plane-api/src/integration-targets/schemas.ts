@@ -19,6 +19,12 @@ const IntegrationConnectionMethodCreateUiSchema = z
   })
   .strict();
 
+const IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema = z
+  .object({
+    submitLabel: z.string().min(1),
+  })
+  .strict();
+
 const IntegrationConnectionMethodPendingUiSchema = z
   .object({
     title: z.string().min(1).optional(),
@@ -54,7 +60,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       kind: z.literal("device-authorization"),
       ui: z
         .object({
-          create: IntegrationConnectionMethodCreateUiSchema,
+          create: IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema,
           pending: IntegrationConnectionMethodPendingUiSchema.optional(),
         })
         .strict(),

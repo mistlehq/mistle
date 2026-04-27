@@ -470,6 +470,10 @@ export type IntegrationConnectionMethodCreateUi = {
   helperText: string;
 };
 
+export type IntegrationDeviceAuthorizationConnectionMethodCreateUi = {
+  submitLabel: string;
+};
+
 export type IntegrationConnectionMethodPendingUi = {
   title?: string;
   description?: string;
@@ -490,9 +494,6 @@ type IntegrationConnectionMethodDefinitionBase<
     TBindingConfig,
     TConnectionConfig
   >;
-  ui?: {
-    create?: IntegrationConnectionMethodCreateUi;
-  };
 };
 
 export type IntegrationFormConnectionMethodDefinition<
@@ -508,6 +509,9 @@ export type IntegrationFormConnectionMethodDefinition<
 > & {
   kind: "form";
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
+  ui?: {
+    create?: IntegrationConnectionMethodCreateUi;
+  };
 };
 
 export type IntegrationRedirectConnectionMethodDefinition<
@@ -549,7 +553,7 @@ export type IntegrationDeviceAuthorizationConnectionMethodDefinition<
   kind: "device-authorization";
   secretFields?: never;
   ui: {
-    create: IntegrationConnectionMethodCreateUi;
+    create: IntegrationDeviceAuthorizationConnectionMethodCreateUi;
     pending?: IntegrationConnectionMethodPendingUi;
   };
 };

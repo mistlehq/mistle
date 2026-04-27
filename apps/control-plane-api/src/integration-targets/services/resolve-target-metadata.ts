@@ -110,7 +110,6 @@ export type ResolvedIntegrationTargetMetadata = {
         ui: {
           create: {
             submitLabel: string;
-            helperText: string;
           };
           pending?: {
             title?: string;

@@ -185,7 +185,7 @@ function normalizeStoryConnectionMethod(input: {
     };
   }
 
-  if (input.ui?.create?.helperText === undefined || input.ui.create.submitLabel === undefined) {
+  if (input.ui?.create?.submitLabel === undefined) {
     throw new Error(
       `Device authorization method '${input.id}' is missing create UI for Storybook.`,
     );
@@ -197,7 +197,6 @@ function normalizeStoryConnectionMethod(input: {
     label: input.label,
     ui: {
       create: {
-        helperText: input.ui.create.helperText,
         submitLabel: input.ui.create.submitLabel,
       },
       ...(input.ui.pending === undefined

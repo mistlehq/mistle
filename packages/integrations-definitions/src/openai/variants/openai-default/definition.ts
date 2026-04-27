@@ -90,12 +90,10 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
       ui: {
         create: {
           submitLabel: "Connect",
-          helperText: "Connect with your ChatGPT subscription using a device code.",
         },
         pending: {
-          title: "Approve In ChatGPT",
-          description:
-            "Open the verification link, enter the device code, and approve access in ChatGPT.",
+          title: "Approve via ChatGPT",
+          description: "Open the link below and enter the code to approve access.",
         },
       },
     },

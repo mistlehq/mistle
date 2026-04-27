@@ -54,6 +54,7 @@ import {
 import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { SectionHeader } from "../shared/section-header.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubExistingAppSetupDraft = {
@@ -414,13 +415,10 @@ function GitHubManifestSetupPanel(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">GitHub App Manifest</h2>
-        <p className="text-muted-foreground text-sm">
-          Create a GitHub App from a basic manifest. You can still change the settings later in
-          GitHub.
-        </p>
-      </div>
+      <SectionHeader
+        description="Create a GitHub App from a basic manifest. You can still change the settings later in GitHub."
+        title="GitHub App Manifest"
+      />
       <ManifestJsonEditor
         id="github-app-manifest-editor"
         onChange={input.onManifestChange}
@@ -488,12 +486,10 @@ function GitHubExistingAppSetupPanel(input: {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-medium">Existing GitHub App</h2>
-          <p className="text-muted-foreground text-sm">
-            Paste values from a GitHub App you already created or configured in GitHub.
-          </p>
-        </div>
+        <SectionHeader
+          description="Paste values from a GitHub App you already created or configured in GitHub."
+          title="Existing GitHub App"
+        />
         <SavingTextField
           fieldState={input.fieldStates.appId}
           id="github-app-id"
@@ -538,7 +534,7 @@ function GitHubExistingAppSetupPanel(input: {
       </div>
 
       <div className="flex flex-col gap-4">
-        <h2 className="text-base font-medium">Secrets</h2>
+        <SectionHeader title="Secrets" />
         <ConfiguredSecretField
           fieldState={input.fieldStates.appPrivateKeyPem}
           secretLabel="app private key"
@@ -614,13 +610,10 @@ function GitHubSetupUrls(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base font-medium">Hook URLs</h2>
-        <p className="text-muted-foreground text-sm">
-          Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks
-          and webhook events.
-        </p>
-      </div>
+      <SectionHeader
+        description="Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks and webhook events."
+        title="Hook URLs"
+      />
       <div className="flex flex-col gap-4">
         <CopyableValue label="Post-installation setup URL" value={input.setupCallbackUrl} />
         {input.webhookCallbackState.kind === "loading" ? (
@@ -1121,13 +1114,11 @@ export function GitHubAppSetupPane(input: {
         </Notice>
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-medium">Install GitHub App</h2>
-              <p className="text-muted-foreground text-sm">
-                Click Install App to open GitHub, choose the account and repositories Mistle can
-                access, and finish linking this connection.
-              </p>
-            </div>
+            <SectionHeader
+              description="Click Install App to open GitHub, choose the account and repositories Mistle can access, and finish linking this connection."
+              size="large"
+              title="Install GitHub App"
+            />
             {actionErrorMessage === null ? null : (
               <Notice title="Could not continue setup" variant="alert">
                 {actionErrorMessage}
@@ -1160,13 +1151,12 @@ export function GitHubAppSetupPane(input: {
         }}
         value={setupMode}
       >
-        <div className="flex flex-col gap-1 px-1">
-          <h2 className="text-lg font-medium">Choose a setup method</h2>
-          <p className="text-muted-foreground text-sm">
-            Create a new GitHub App with a manifest or connect an app you&apos;ve already configured
-            in GitHub
-          </p>
-        </div>
+        <SectionHeader
+          className="px-1"
+          description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
+          size="large"
+          title="Choose a setup method"
+        />
 
         <FormPageSection>
           <div className="flex flex-col gap-6 p-4">

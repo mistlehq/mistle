@@ -7,10 +7,28 @@ import { describe, expect, it } from "vitest";
 
 import { resolveConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import {
+  formatDeviceAuthorizationExpiry,
   IntegrationConnectionEditorPage,
+  type IntegrationConnectionMethod,
   IntegrationConnectionMethodIds,
   type IntegrationConnectionEditorState,
 } from "./integration-connection-editor.js";
+
+const ChatGptDeviceAuthorizationMethodId = "chatgpt-device-code";
+const ChatGptDeviceAuthorizationMethod = {
+  id: ChatGptDeviceAuthorizationMethodId,
+  label: "ChatGPT subscription",
+  kind: "device-authorization",
+  ui: {
+    create: {
+      submitLabel: "Connect",
+    },
+    pending: {
+      title: "Approve via ChatGPT",
+      description: "Open the link below and enter the code to approve access.",
+    },
+  },
+} satisfies Extract<IntegrationConnectionMethod, { kind: "device-authorization" }>;
 
 const createEditor: IntegrationConnectionEditorState = {
   methods: [
@@ -507,6 +525,26 @@ describe("IntegrationConnectionEditorPage", () => {
     });
   });
 
+  it("does not render device-authorization pending instructions before authorization starts", () => {
+    const editor: Extract<IntegrationConnectionEditorState, { mode: "create" }> = {
+      methods: [ChatGptDeviceAuthorizationMethod],
+      mode: "create",
+      targetConfig: {},
+      targetDisplayName: "OpenAI",
+      targetFamilyId: "openai",
+      targetKey: "openai-default",
+      targetVariantId: "openai-default",
+    };
+
+    renderEditorPage({
+      editor,
+      methodId: ChatGptDeviceAuthorizationMethodId,
+    });
+
+    expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
+    expect(screen.queryByText("Approve via ChatGPT")).toBeNull();
+  });
+
   it("renders device-authorization pending instructions and controls", () => {
     renderEditorPage({
       deviceAuthorizationPending: {
@@ -515,33 +553,66 @@ describe("IntegrationConnectionEditorPage", () => {
         verificationUrl: "https://auth.openai.com/codex/device",
         userCode: "ABCD-1234",
         expiresAt: "2099-04-01T00:00:00.000Z",
-        method: {
-          id: "chatgpt-device-code",
-          label: "ChatGPT subscription",
-          kind: "device-authorization",
-          ui: {
-            create: {
-              submitLabel: "Connect",
-              helperText: "Connect with device authorization",
-            },
-            pending: {
-              title: "Approve In ChatGPT",
-              description: "Open the verification link and enter the code.",
-            },
-          },
-        },
+        method: ChatGptDeviceAuthorizationMethod,
       },
     });
 
-    expect(screen.getByText("Approve In ChatGPT")).toBeTruthy();
-    expect(screen.getByText("Open the verification link and enter the code.")).toBeTruthy();
-    expect(screen.getByDisplayValue("ABCD-1234")).toBeTruthy();
+    expect(screen.getByText("Approve via ChatGPT")).toBeTruthy();
+    expect(
+      screen.getByText("Open the link below and enter the code to approve access."),
+    ).toBeTruthy();
+    expect(screen.getByText("ABCD-1234")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy Code" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "https://auth.openai.com/codex/device" })).toBeTruthy();
+    expect(screen.getByText(/^This code expires in .* at /u)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cancel authorization" })).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Cancel authorization" }).hasAttribute("disabled"),
     ).toBe(false);
     expect(screen.queryByRole("button", { name: "Add connection" })).toBeNull();
+  });
+
+  it("formats device-authorization expiry relative to the current time", () => {
+    expect(
+      formatDeviceAuthorizationExpiry({
+        expiresAt: "2026-04-27T08:10:01.000Z",
+        now: new Date("2026-04-27T08:00:00.000Z"),
+      }),
+    ).toBe(
+      `This code expires in 11 minutes at ${new Date("2026-04-27T08:10:01.000Z").toLocaleTimeString(
+        [],
+        {
+          hour: "numeric",
+          minute: "2-digit",
+        },
+      )}.`,
+    );
+
+    expect(
+      formatDeviceAuthorizationExpiry({
+        expiresAt: "2026-04-27T08:00:30.000Z",
+        now: new Date("2026-04-27T08:00:00.000Z"),
+      }),
+    ).toBe(
+      `This code expires in less than 1 minute at ${new Date(
+        "2026-04-27T08:00:30.000Z",
+      ).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`,
+    );
+
+    expect(
+      formatDeviceAuthorizationExpiry({
+        expiresAt: "2026-04-27T08:00:00.000Z",
+        now: new Date("2026-04-27T08:00:01.000Z"),
+      }),
+    ).toBe(
+      `This code expired at ${new Date("2026-04-27T08:00:00.000Z").toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}.`,
+    );
   });
 
   it("hides GitHub API key discriminator config and the nested rjsf submit button", () => {

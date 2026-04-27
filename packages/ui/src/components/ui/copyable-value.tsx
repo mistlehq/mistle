@@ -9,7 +9,9 @@ import { Spinner } from "./spinner.js";
 
 const COPY_SUCCESS_DISPLAY_MS = 1200;
 const singleLineValueClassName =
-  "min-w-0 flex-1 overflow-x-auto whitespace-nowrap px-1 font-mono text-xs";
+  "thin-scrollbar-x min-w-0 flex min-h-12 flex-1 items-start overflow-x-auto whitespace-nowrap px-3 pt-3 text-sm leading-6";
+const singleLineContainerClassName =
+  "bg-muted/30 flex items-stretch gap-2 rounded-md border pl-0 pr-2";
 
 type CopyFeedback =
   | { state: "idle" }
@@ -85,15 +87,15 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
     return (
       <div className="gap-1.5 flex flex-col">
         <DetailLabel as="p">{input.label}</DetailLabel>
-        <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
-          <div className="min-w-0 flex flex-1 items-center gap-2 px-1 font-mono text-xs">
+        <div className={singleLineContainerClassName}>
+          <div className="min-h-12 min-w-0 flex flex-1 items-center gap-2 px-3 text-sm">
             <Spinner
               aria-label={`Loading ${input.label}`}
               className="size-4 text-muted-foreground"
             />
             <p className="text-muted-foreground">{input.loadingLabel ?? "Loading…"}</p>
           </div>
-          <div aria-hidden className="size-8 shrink-0" />
+          <div aria-hidden className="my-2 size-8 shrink-0" />
         </div>
       </div>
     );
@@ -167,9 +169,9 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   if (readyInput.variant === "inline") {
     return (
       <div className="gap-1.5 flex flex-col">
-        <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
+        <div className={singleLineContainerClassName}>
           <p className={singleLineValueClassName}>{readyInput.value}</p>
-          {button}
+          <div className="my-2">{button}</div>
         </div>
         {visibleCopyState === "failed" ? (
           <p className="text-destructive text-xs">{failureMessage}</p>
@@ -181,9 +183,9 @@ export function CopyableValue(input: CopyableValueProps): React.JSX.Element {
   return (
     <div className="gap-1.5 flex flex-col">
       <DetailLabel as="p">{readyInput.labelContent ?? readyInput.label}</DetailLabel>
-      <div className="bg-muted/30 flex items-center gap-2 rounded-md border p-2">
+      <div className={singleLineContainerClassName}>
         <p className={singleLineValueClassName}>{readyInput.value}</p>
-        {button}
+        <div className="my-2">{button}</div>
       </div>
       {visibleCopyState === "failed" ? (
         <p className="text-destructive text-xs">{failureMessage}</p>

@@ -6,6 +6,7 @@ import type React from "react";
 
 import {
   IntegrationConnectionEditorPage,
+  type IntegrationConnectionDeviceAuthorizationPendingState,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
@@ -29,13 +30,17 @@ type BuiltInIntegrationVariantId =
   | "jira-default"
   | "linear-default"
   | "openai-default";
+type DeviceAuthorizationExpiryScenario = "active" | "expired" | "expiringSoon";
 
 type StoryIntegrationSpec = {
   connectError?: string | null;
+  deviceAuthorizationExpiryScenario?: DeviceAuthorizationExpiryScenario;
+  initialDeviceAuthorizationPending?: boolean;
   initialConnectionDisplayNameValue?: string;
   initialMethodId?: IntegrationConnectionMethodId;
   initialSecrets?: Record<string, string>;
   pending?: boolean;
+  startDeviceAuthorizationOnSubmit?: boolean;
   targetKey?: string;
   variantId: BuiltInIntegrationVariantId;
 };
@@ -93,13 +98,11 @@ function getStoryDefinitionOrThrow(
   });
 }
 
-function resolveConnectionMethodsOrThrow(
-  definition: AnyIntegrationDefinition,
-): readonly IntegrationConnectionMethod[] {
-  if (definition.connectionMethods === undefined || definition.connectionMethods.length === 0) {
-    throw new Error(
-      `Integration definition '${definition.familyId}/${definition.variantId}' has no connection methods.`,
-    );
+export function createStoryConnectionMethods(
+  definition: Pick<AnyIntegrationDefinition, "connectionMethods">,
+): IntegrationConnectionMethod[] | undefined {
+  if (definition.connectionMethods === undefined) {
+    return undefined;
   }
 
   return definition.connectionMethods.map((method) => {
@@ -118,13 +121,35 @@ function resolveConnectionMethodsOrThrow(
       };
     }
 
+    if (method.kind === "redirect") {
+      return {
+        id: method.id,
+        kind: "redirect",
+        label: method.label,
+        ui: method.ui,
+      };
+    }
+
     return {
       id: method.id,
-      kind: method.kind,
+      kind: "device-authorization",
       label: method.label,
       ui: method.ui,
     };
   });
+}
+
+function resolveConnectionMethodsOrThrow(
+  definition: AnyIntegrationDefinition,
+): readonly IntegrationConnectionMethod[] {
+  const connectionMethods = createStoryConnectionMethods(definition);
+  if (connectionMethods === undefined || connectionMethods.length === 0) {
+    throw new Error(
+      `Integration definition '${definition.familyId}/${definition.variantId}' has no connection methods.`,
+    );
+  }
+
+  return connectionMethods;
 }
 
 function resolveDescriptionOrThrow(definition: AnyIntegrationDefinition): string {
@@ -186,6 +211,49 @@ function createEditorInput(
   };
 }
 
+function isOpenAiDeviceAuthorizationMethod(
+  method: IntegrationConnectionMethod,
+): method is Extract<IntegrationConnectionMethod, { kind: "device-authorization" }> {
+  return method.id === "chatgpt-device-code" && method.kind === "device-authorization";
+}
+
+function createStoryDeviceAuthorizationExpiresAt(
+  scenario: DeviceAuthorizationExpiryScenario,
+): string {
+  const nowMs = Date.now();
+
+  if (scenario === "active") {
+    return new Date(nowMs + 11 * 60_000).toISOString();
+  }
+
+  if (scenario === "expiringSoon") {
+    return new Date(nowMs + 30_000).toISOString();
+  }
+
+  return new Date(nowMs - 60_000).toISOString();
+}
+
+function createOpenAiDeviceAuthorizationPendingState(input: {
+  expiryScenario: DeviceAuthorizationExpiryScenario;
+  methods: readonly IntegrationConnectionMethod[];
+}): IntegrationConnectionDeviceAuthorizationPendingState {
+  const { expiryScenario, methods } = input;
+  const method = methods.find(isOpenAiDeviceAuthorizationMethod);
+  if (method === undefined) {
+    throw new Error("OpenAI device authorization method is required for this story.");
+  }
+
+  return {
+    targetKey: "openai-default",
+    attemptId: "ida_storybook_openai",
+    verificationUrl: "https://auth.openai.com/codex/device",
+    userCode: "583Q-YMY3G",
+    expiresAt: createStoryDeviceAuthorizationExpiresAt(expiryScenario),
+    pollAfterMs: 2_000,
+    method,
+  };
+}
+
 export function createAvailableCardsOverview(): readonly OrganizationIntegrationsSettingsPageCard[] {
   const specs: readonly StoryIntegrationSpec[] = [
     { variantId: "jira-default" },
@@ -230,6 +298,15 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
     methodId: startsWithoutSelectedMethod ? "" : initialState.draft.methodId,
     secrets: spec.initialSecrets ?? initialState.draft.secrets,
   }));
+  const [deviceAuthorizationPending, setDeviceAuthorizationPending] =
+    useState<IntegrationConnectionDeviceAuthorizationPendingState | null>(() =>
+      spec.initialDeviceAuthorizationPending === true
+        ? createOpenAiDeviceAuthorizationPendingState({
+            expiryScenario: spec.deviceAuthorizationExpiryScenario ?? "active",
+            methods: initialEditorInput.methods,
+          })
+        : null,
+    );
 
   const editor = initialState.editor;
   const configForm =
@@ -244,7 +321,10 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
         });
 
   return (
-    <FormPageFrame title={`Add ${initialEditorInput.targetDisplayName} Connection`}>
+    <FormPageFrame
+      description={initialEditorInput.targetKey}
+      title={`Add ${initialEditorInput.targetDisplayName} Connection`}
+    >
       <div className="flex flex-col gap-4">
         <IntegrationConnectionEditorPage
           configForm={configForm}
@@ -253,6 +333,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
           connectionDisplayNamePlaceholder={draft.connectionDisplayNamePlaceholder}
           connectionDisplayNameValue={draft.connectionDisplayNameValue}
           connectError={draft.error}
+          deviceAuthorizationPending={deviceAuthorizationPending}
           editor={editor}
           hasChanges={hasIntegrationConnectionEditorChanges({
             changedSecretNames: [],
@@ -270,7 +351,9 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
           })}
           methodId={draft.methodId}
           changedSecretNames={[]}
-          onClose={() => {}}
+          onClose={() => {
+            setDeviceAuthorizationPending(null);
+          }}
           onConfigChange={(value) => {
             setDraft((currentDraft) => ({
               ...currentDraft,
@@ -286,6 +369,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
             }));
           }}
           onMethodChange={(methodId) => {
+            setDeviceAuthorizationPending(null);
             setDraft((currentDraft) =>
               resolveNextDraftForMethodChange({
                 editor,
@@ -305,17 +389,28 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
             }));
           }}
           onSubmit={() => {
+            const validationError =
+              draft.methodId.length === 0
+                ? "Authentication method is required."
+                : (resolveIntegrationConnectionEditorValidationError({
+                    editor,
+                    methodId: draft.methodId,
+                    connectionDisplayNameValue: draft.connectionDisplayNameValue,
+                    secrets: draft.secrets,
+                  }) ?? null);
+
+            if (validationError === null && spec.startDeviceAuthorizationOnSubmit === true) {
+              setDeviceAuthorizationPending(
+                createOpenAiDeviceAuthorizationPendingState({
+                  expiryScenario: spec.deviceAuthorizationExpiryScenario ?? "active",
+                  methods: initialEditorInput.methods,
+                }),
+              );
+            }
+
             setDraft((currentDraft) => ({
               ...currentDraft,
-              error:
-                currentDraft.methodId.length === 0
-                  ? "Authentication method is required."
-                  : (resolveIntegrationConnectionEditorValidationError({
-                      editor,
-                      methodId: currentDraft.methodId,
-                      connectionDisplayNameValue: currentDraft.connectionDisplayNameValue,
-                      secrets: currentDraft.secrets,
-                    }) ?? null),
+              error: validationError,
             }));
           }}
           pending={spec.pending ?? false}
@@ -337,6 +432,39 @@ export const AddFlowStorySpecs = {
     variantId: "linear-default",
   },
   OpenAI: {
+    variantId: "openai-default",
+  },
+  OpenAIDeviceAuthorizationFailed: {
+    connectError: "The device authorization attempt expired before approval completed.",
+    initialConnectionDisplayNameValue: "openai-default",
+    initialMethodId: "chatgpt-device-code",
+    variantId: "openai-default",
+  },
+  OpenAIDeviceAuthorizationExpired: {
+    deviceAuthorizationExpiryScenario: "expired",
+    initialConnectionDisplayNameValue: "openai-default",
+    initialDeviceAuthorizationPending: true,
+    initialMethodId: "chatgpt-device-code",
+    variantId: "openai-default",
+  },
+  OpenAIDeviceAuthorizationExpiringSoon: {
+    deviceAuthorizationExpiryScenario: "expiringSoon",
+    initialConnectionDisplayNameValue: "openai-default",
+    initialDeviceAuthorizationPending: true,
+    initialMethodId: "chatgpt-device-code",
+    variantId: "openai-default",
+  },
+  OpenAIDeviceAuthorizationPending: {
+    deviceAuthorizationExpiryScenario: "active",
+    initialConnectionDisplayNameValue: "openai-default",
+    initialDeviceAuthorizationPending: true,
+    initialMethodId: "chatgpt-device-code",
+    variantId: "openai-default",
+  },
+  OpenAIDeviceAuthorizationStart: {
+    initialConnectionDisplayNameValue: "openai-default",
+    initialMethodId: "chatgpt-device-code",
+    startDeviceAuthorizationOnSubmit: true,
     variantId: "openai-default",
   },
 } satisfies Record<string, StoryIntegrationSpec>;

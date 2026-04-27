@@ -39,6 +39,12 @@ describe("CopyableValue", () => {
 
     expect(screen.getByText(/github-cloud/).className).toContain("whitespace-nowrap");
     expect(screen.getByText(/github-cloud/).className).toContain("overflow-x-auto");
+    expect(screen.getByText(/github-cloud/).className).toContain("thin-scrollbar-x");
+    expect(screen.getByText(/github-cloud/).className).toContain("min-h-12");
+    expect(screen.getByText(/github-cloud/).className).toContain("items-start");
+    expect(screen.getByText(/github-cloud/).className).toContain("pt-3");
+    expect(screen.getByText(/github-cloud/).className).toContain("text-sm");
+    expect(screen.getByText(/github-cloud/).className).toContain("leading-6");
   });
 
   it("renders rich field label content while preserving copy accessibility text", () => {

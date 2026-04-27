@@ -6741,13 +6741,9 @@
                                             "submitLabel": {
                                               "type": "string",
                                               "minLength": 1
-                                            },
-                                            "helperText": {
-                                              "type": "string",
-                                              "minLength": 1
                                             }
                                           },
-                                          "required": ["submitLabel", "helperText"],
+                                          "required": ["submitLabel"],
                                           "additionalProperties": false
                                         },
                                         "pending": {

@@ -26,6 +26,7 @@ import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
 import { IntegrationConnectionGitHubAppSetupPage } from "./integration-connection-github-app-setup-page.js";
 import { IntegrationsPage } from "./integrations-page.js";
+import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -102,31 +103,7 @@ function createGitHubTargetFixture(): IntegrationTarget {
     displayName: GitHubDefinition.displayName,
     description: GitHubDefinition.description ?? "",
     ...(GitHubDefinition.logoKey === undefined ? {} : { logoKey: GitHubDefinition.logoKey }),
-    connectionMethods: GitHubDefinition.connectionMethods?.map((method) => {
-      if (method.kind === "form") {
-        return {
-          id: method.id,
-          label: method.label,
-          kind: method.kind,
-          secretFields: method.secretFields.map((field) => ({
-            name: field.name,
-            label: field.label,
-            ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
-            ...(field.description === undefined ? {} : { description: field.description }),
-            ...(field.optional === undefined ? {} : { optional: field.optional }),
-            inputType: field.inputType,
-            ...(field.slotKey === undefined ? {} : { slotKey: field.slotKey }),
-          })),
-        };
-      }
-
-      return {
-        id: method.id,
-        label: method.label,
-        kind: method.kind,
-        ui: method.ui,
-      };
-    }),
+    connectionMethods: createStoryConnectionMethods(GitHubDefinition),
     targetHealth: {
       configStatus: "valid",
     },

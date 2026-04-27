@@ -130,11 +130,10 @@ function openAiCreateEditorInput() {
         ui: {
           create: {
             submitLabel: "Connect",
-            helperText: "Connect with your ChatGPT subscription.",
           },
           pending: {
-            title: "Approve In ChatGPT",
-            description: "Open the verification link, enter the code, and approve access.",
+            title: "Approve via ChatGPT",
+            description: "Open the link below and enter the code to approve access.",
           },
         },
       },

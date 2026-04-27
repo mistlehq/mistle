@@ -38,10 +38,3 @@ export const Linear: Story = {
     return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.Linear} />;
   },
 };
-
-export const OpenAI: Story = {
-  name: "OpenAI",
-  render: function RenderStory() {
-    return <IntegrationSettingsAddFlowStory {...AddFlowStorySpecs.OpenAI} />;
-  },
-};

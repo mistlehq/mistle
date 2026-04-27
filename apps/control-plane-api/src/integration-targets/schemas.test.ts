@@ -20,7 +20,6 @@ describe("IntegrationTargetSchema", () => {
           ui: {
             create: {
               submitLabel: "Start device authorization",
-              helperText: "Use ChatGPT device authorization to connect this account.",
             },
             pending: {
               title: "Finish sign-in",
@@ -42,7 +41,6 @@ describe("IntegrationTargetSchema", () => {
         ui: {
           create: {
             submitLabel: "Start device authorization",
-            helperText: "Use ChatGPT device authorization to connect this account.",
           },
           pending: {
             title: "Finish sign-in",
