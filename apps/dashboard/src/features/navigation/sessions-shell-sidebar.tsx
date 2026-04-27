@@ -28,7 +28,6 @@ export function buildSessionsShellSidebarItems(
     status: item.status,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
-    keepaliveActive: item.keepaliveActive,
   }));
 
   return buildSessionsSidebarNavItems(sourceItems, {

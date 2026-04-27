@@ -10,7 +10,6 @@ export type SessionsSidebarSourceItem = {
   status: "pending" | "starting" | "running" | "stopped" | "failed";
   createdAt: string;
   updatedAt: string;
-  keepaliveActive: boolean;
 };
 
 export type SessionsSidebarNavItem = {

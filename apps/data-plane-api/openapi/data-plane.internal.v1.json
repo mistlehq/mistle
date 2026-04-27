@@ -1609,9 +1609,6 @@
                             "type": "string",
                             "enum": ["pending", "starting", "running", "stopped", "failed"]
                           },
-                          "keepaliveActive": {
-                            "type": "boolean"
-                          },
                           "startedBy": {
                             "type": "object",
                             "properties": {
@@ -1654,7 +1651,6 @@
                           "title",
                           "sandboxProfileVersion",
                           "status",
-                          "keepaliveActive",
                           "startedBy",
                           "source",
                           "createdAt",

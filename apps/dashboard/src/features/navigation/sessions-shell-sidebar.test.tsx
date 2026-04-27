@@ -23,7 +23,6 @@ function buildSandboxInstanceListItem(
     source: "dashboard",
     createdAt: "2026-04-08T00:00:00.000Z",
     updatedAt: "2026-04-08T00:00:00.000Z",
-    keepaliveActive: false,
     failureCode: null,
     failureMessage: null,
     ...restOverrides,
@@ -38,7 +37,6 @@ describe("buildSessionsShellSidebarItems", () => {
           buildSandboxInstanceListItem({
             id: "sbi_active",
             title: "Investigate flaky test run",
-            keepaliveActive: true,
           }),
           buildSandboxInstanceListItem({
             id: "sbi_setup",

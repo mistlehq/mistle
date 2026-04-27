@@ -19,7 +19,6 @@ function buildSourceItem(
     status: "running",
     createdAt: "2026-04-08T00:00:00.000Z",
     updatedAt: "2026-04-08T00:00:00.000Z",
-    keepaliveActive: false,
     ...restOverrides,
   };
 }
@@ -32,12 +31,10 @@ describe("buildSessionsSidebarNavItems", () => {
           buildSourceItem({
             id: "sbi_working",
             title: "Investigate flaky test run",
-            keepaliveActive: true,
           }),
           buildSourceItem({
             id: "sbi_ready",
             title: "Review migration draft",
-            keepaliveActive: false,
           }),
           buildSourceItem({
             id: "sbi_stopped",
@@ -116,7 +113,6 @@ describe("filterSessionsSidebarNavItems", () => {
         title: "Investigate flaky test run",
         sandboxProfileId: "sbp_repo",
         sandboxProfileDisplayName: "Repo Maintainer",
-        keepaliveActive: true,
       }),
       buildSourceItem({
         id: "sbi_repo_idle",

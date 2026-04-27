@@ -65,7 +65,6 @@ export function buildSandboxInstanceListItemFixture(
     sandboxProfileDisplayName: "Alpha Profile",
     sandboxProfileVersion: 3,
     status: "running",
-    keepaliveActive: false,
     startedBy: {
       kind: "user",
       id: "user-id",

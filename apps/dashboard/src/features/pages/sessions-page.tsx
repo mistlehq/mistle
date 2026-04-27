@@ -208,7 +208,6 @@ export function buildOptimisticSessions(input: {
       sandboxProfileDisplayName: session.profileDisplayName,
       sandboxProfileVersion: session.profileVersion,
       status: session.status,
-      keepaliveActive: false,
       startedBy: {
         kind: "user",
         id: input.currentUserId,

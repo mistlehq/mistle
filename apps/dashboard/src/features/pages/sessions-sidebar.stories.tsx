@@ -39,7 +39,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "running",
         createdAt: "2026-04-08T09:00:00.000Z",
         updatedAt: "2026-04-08T09:00:00.000Z",
-        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_recent_five_min",
@@ -49,7 +48,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "running",
         createdAt: "2026-04-08T08:50:00.000Z",
         updatedAt: "2026-04-08T08:55:00.000Z",
-        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_starting_docs",
@@ -60,7 +58,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "starting",
         createdAt: "2026-04-08T08:40:00.000Z",
         updatedAt: "2026-04-08T06:00:00.000Z",
-        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_failed_ops",
@@ -70,7 +67,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "failed",
         createdAt: "2026-04-08T08:20:00.000Z",
         updatedAt: "2026-04-08T08:15:00.000Z",
-        keepaliveActive: false,
         failureCode: "SANDBOX_BOOT_FAILED",
         failureMessage: "Sandbox boot failed while starting the runtime.",
       }),
@@ -82,7 +78,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "stopped",
         createdAt: "2026-04-07T09:00:00.000Z",
         updatedAt: "2026-04-07T09:00:00.000Z",
-        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_stopped_finance",
@@ -92,7 +87,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "stopped",
         createdAt: "2026-04-08T07:30:00.000Z",
         updatedAt: "2026-04-06T07:30:00.000Z",
-        keepaliveActive: false,
       }),
       buildSandboxInstanceListItemFixture({
         id: "sbi_stopped_ops",
@@ -102,7 +96,6 @@ function buildSidebarSessionsList(): SandboxInstancesListResult {
         status: "stopped",
         createdAt: "2026-04-04T06:30:00.000Z",
         updatedAt: "2026-04-04T06:30:00.000Z",
-        keepaliveActive: false,
       }),
     ],
     nextPage: null,
@@ -203,7 +196,6 @@ export const FailedSessionVisible: Story = {
           status: "running",
           createdAt: "2026-04-08T08:50:00.000Z",
           updatedAt: "2026-04-08T08:55:00.000Z",
-          keepaliveActive: false,
         }),
         buildSandboxInstanceListItemFixture({
           id: "sbi_failed_visible",
@@ -213,7 +205,6 @@ export const FailedSessionVisible: Story = {
           status: "failed",
           createdAt: "2026-04-08T08:20:00.000Z",
           updatedAt: "2026-04-08T08:15:00.000Z",
-          keepaliveActive: false,
           failureCode: "SANDBOX_BOOT_FAILED",
           failureMessage: "Sandbox boot failed while starting the runtime.",
         }),
@@ -225,7 +216,6 @@ export const FailedSessionVisible: Story = {
           status: "stopped",
           createdAt: "2026-04-07T09:00:00.000Z",
           updatedAt: "2026-04-07T09:00:00.000Z",
-          keepaliveActive: false,
         }),
       ],
       nextPage: null,

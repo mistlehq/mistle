@@ -163,14 +163,12 @@ describe("sandbox instances list integration", () => {
       "sbi_cp_list_a_002",
     ]);
     expect(firstPage.items[0]?.title).toBe("Investigate build failure");
-    expect(firstPage.items[0]?.keepaliveActive).toBe(false);
     expect(firstPage.items[1]).toMatchObject({
       title: null,
       sandboxProfileId: "sbp_cp_list",
       sandboxProfileDisplayName: "Control Plane Profile",
       sandboxProfileVersion: 2,
       status: "failed",
-      keepaliveActive: false,
       startedBy: {
         kind: "system",
         id: "aru_cp_list",
@@ -208,7 +206,6 @@ describe("sandbox instances list integration", () => {
       id: firstOrgSession.userId,
       name: expect.any(String),
     });
-    expect(secondPage.items[0]?.keepaliveActive).toBe(false);
     expect(secondPage.items[0]?.sandboxProfileDisplayName).toBe("Control Plane Profile");
     expect(secondPage.previousPage).not.toBeNull();
     expect(secondPage.nextPage).toBeNull();
@@ -222,7 +219,6 @@ describe("sandbox instances list integration", () => {
     const secondOrgList = ListSandboxInstancesResponseSchema.parse(await secondOrgResponse.json());
     expect(secondOrgList.totalResults).toBe(1);
     expect(secondOrgList.items.map((item) => item.id)).toEqual(["sbi_cp_list_b_001"]);
-    expect(secondOrgList.items[0]?.keepaliveActive).toBe(false);
     expect(secondOrgList.items[0]?.sandboxProfileDisplayName).toBe("Other Org Profile");
   });
 

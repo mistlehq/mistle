@@ -47,7 +47,6 @@ const meta = {
               id: args.sandboxInstanceId,
               title: args.sessionTitle,
               status: args.sandboxStatus,
-              keepaliveActive: args.sandboxStatus === "running",
             }),
           ],
           nextPage: null,

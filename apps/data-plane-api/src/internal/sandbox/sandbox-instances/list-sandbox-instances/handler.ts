@@ -7,17 +7,11 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
-  const runtimeStateReader = ctx.get("resources").runtimeStateReader;
-  const sandboxAdapter = ctx.get("resources").sandboxAdapter;
-  const sandboxProvider = ctx.get("sandboxProvider");
   const query = ctx.req.valid("query");
 
   const response = await listSandboxInstances(
     {
       db,
-      runtimeStateReader,
-      sandboxAdapter,
-      sandboxProvider,
     },
     {
       organizationId: query.organizationId,

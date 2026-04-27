@@ -2,7 +2,6 @@ import {
   SandboxInstancePurposes,
   sandboxInstances,
   type DataPlaneDatabase,
-  SandboxInstanceStatuses,
   type SandboxInstance,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -15,17 +14,9 @@ import {
   KeysetPaginationInputErrorReasons,
   paginateKeyset,
 } from "@mistle/http/pagination";
-import {
-  isSandboxResourceNotFoundError,
-  SandboxInspectStates,
-  type SandboxAdapter,
-} from "@mistle/sandbox";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppRuntimeResources } from "../../../resources.js";
-import type { DataPlaneApiGlobalConfig } from "../../../types.js";
-import { resolveEffectiveSandboxInstanceStatus } from "../effective-sandbox-instance-status.js";
 import type { ListSandboxInstancesInput } from "../list-sandbox-instances/schema.js";
 import type { ListSandboxInstancesResponse } from "../schemas.js";
 
@@ -55,143 +46,11 @@ type ListSandboxInstanceRow = Pick<
   | "updatedAt"
   | "failureCode"
   | "failureMessage"
-  | "runtimeProvider"
-  | "providerSandboxId"
 >;
 
 type ListSandboxInstancesContext = {
   db: DataPlaneDatabase;
-  runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
-  sandboxAdapter: SandboxAdapter;
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
 };
-
-async function resolveListedSandboxRuntimeState(
-  ctx: Pick<
-    ListSandboxInstancesContext,
-    "db" | "runtimeStateReader" | "sandboxAdapter" | "sandboxProvider"
-  >,
-  input: {
-    sandboxInstanceId: string;
-    persistedStatus: SandboxInstance["status"];
-    runtimeProvider: SandboxInstance["runtimeProvider"];
-    providerSandboxId: SandboxInstance["providerSandboxId"];
-    failureCode: SandboxInstance["failureCode"];
-    failureMessage: SandboxInstance["failureMessage"];
-  },
-): Promise<{
-  status: ListSandboxInstancesResponse["items"][number]["status"];
-  keepaliveActive: boolean;
-}> {
-  if (
-    input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
-    input.persistedStatus !== SandboxInstanceStatuses.RUNNING
-  ) {
-    return {
-      status: input.persistedStatus,
-      keepaliveActive: false,
-    };
-  }
-
-  const runtimeStateSnapshot = await ctx.runtimeStateReader.readSnapshot({
-    sandboxInstanceId: input.sandboxInstanceId,
-    nowMs: Date.now(),
-  });
-
-  const status = resolveEffectiveSandboxInstanceStatus({
-    persistedStatus: input.persistedStatus,
-    runtimeStateSnapshot,
-  });
-
-  if (input.persistedStatus === SandboxInstanceStatuses.STARTING || status === "running") {
-    return {
-      status,
-      keepaliveActive: status === "running" && runtimeStateSnapshot.keepalive.active,
-    };
-  }
-
-  if (input.runtimeProvider !== ctx.sandboxProvider) {
-    throw new Error(
-      `Sandbox instance '${input.sandboxInstanceId}' runtime provider '${input.runtimeProvider}' does not match configured provider '${ctx.sandboxProvider}'.`,
-    );
-  }
-
-  if (input.providerSandboxId === null) {
-    throw new Error(
-      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
-    );
-  }
-
-  const inspection = await inspectSandboxInstanceOrNull(ctx, input.providerSandboxId);
-  if (inspection === null) {
-    return {
-      status,
-      keepaliveActive: false,
-    };
-  }
-
-  if (inspection.state === SandboxInspectStates.RUNNING) {
-    return {
-      status,
-      keepaliveActive: false,
-    };
-  }
-
-  await markRunningSandboxInstanceStopped(ctx, {
-    sandboxInstanceId: input.sandboxInstanceId,
-  });
-  return {
-    status: SandboxInstanceStatuses.STOPPED,
-    keepaliveActive: false,
-  };
-}
-
-async function markRunningSandboxInstanceStopped(
-  ctx: Pick<ListSandboxInstancesContext, "db">,
-  input: {
-    sandboxInstanceId: string;
-  },
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(sandboxInstances)
-    .set({
-      status: SandboxInstanceStatuses.STOPPED,
-      stoppedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(sandboxInstances.id, input.sandboxInstanceId),
-        eq(sandboxInstances.status, SandboxInstanceStatuses.RUNNING),
-      ),
-    )
-    .returning({
-      status: sandboxInstances.status,
-    });
-
-  if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
-  }
-
-  throw new Error("Failed to transition sandbox instance status from running to stopped.");
-}
-
-async function inspectSandboxInstanceOrNull(
-  ctx: Pick<ListSandboxInstancesContext, "sandboxAdapter">,
-  providerSandboxId: string,
-) {
-  try {
-    return await ctx.sandboxAdapter.inspect({
-      id: providerSandboxId,
-    });
-  } catch (error) {
-    if (!isSandboxResourceNotFoundError(error)) {
-      throw error;
-    }
-
-    return null;
-  }
-}
 
 function createInvalidCursorErrorMessage(input: {
   cursorName: string;
@@ -246,8 +105,6 @@ export async function listSandboxInstances(
             title: true,
             sandboxProfileVersion: true,
             status: true,
-            runtimeProvider: true,
-            providerSandboxId: true,
             startedByKind: true,
             startedById: true,
             source: true,
@@ -307,36 +164,24 @@ export async function listSandboxInstances(
       },
     });
 
-    const items = await Promise.all(
-      response.items.map(async (item) => {
-        const runtimeState = await resolveListedSandboxRuntimeState(ctx, {
-          sandboxInstanceId: item.id,
-          persistedStatus: item.status,
-          runtimeProvider: item.runtimeProvider,
-          providerSandboxId: item.providerSandboxId,
-          failureCode: item.failureCode,
-          failureMessage: item.failureMessage,
-        });
-
-        return {
-          id: item.id,
-          sandboxProfileId: item.sandboxProfileId,
-          title: item.title,
-          sandboxProfileVersion: item.sandboxProfileVersion,
-          status: runtimeState.status,
-          keepaliveActive: runtimeState.keepaliveActive,
-          startedBy: {
-            kind: item.startedByKind,
-            id: item.startedById,
-          },
-          source: item.source,
-          createdAt: item.createdAt,
-          updatedAt: item.updatedAt,
-          failureCode: item.failureCode,
-          failureMessage: item.failureMessage,
-        };
-      }),
-    );
+    const items = response.items.map((item) => {
+      return {
+        id: item.id,
+        sandboxProfileId: item.sandboxProfileId,
+        title: item.title,
+        sandboxProfileVersion: item.sandboxProfileVersion,
+        status: item.status,
+        startedBy: {
+          kind: item.startedByKind,
+          id: item.startedById,
+        },
+        source: item.source,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+        failureCode: item.failureCode,
+        failureMessage: item.failureMessage,
+      };
+    });
 
     return {
       totalResults: response.totalResults,

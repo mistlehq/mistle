@@ -166,7 +166,6 @@ export async function listInstances(
         ...item,
         source: assertUserVisibleSandboxSource(item.source),
         title: item.title,
-        keepaliveActive: item.keepaliveActive,
         sandboxProfileDisplayName: sandboxProfileDisplayNames.get(item.sandboxProfileId) ?? null,
         startedBy: {
           ...item.startedBy,
