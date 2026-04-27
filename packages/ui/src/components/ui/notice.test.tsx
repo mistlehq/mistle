@@ -57,6 +57,19 @@ describe("Notice", () => {
     expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
   });
 
+  it("renders title-only notices as description text", () => {
+    render(<Notice title="GitHub App connected to Mistle successfully" variant="success" />);
+
+    const noticeText = screen.getByText("GitHub App connected to Mistle successfully");
+
+    expect(noticeText.getAttribute("data-slot")).toBe("notice-description");
+    expect(
+      screen.queryByText("GitHub App connected to Mistle successfully", {
+        selector: '[data-slot="notice-title"]',
+      }),
+    ).toBeNull();
+  });
+
   it("does not render a dismiss button by default", () => {
     render(<Notice variant="success">GitHub linked successfully.</Notice>);
 

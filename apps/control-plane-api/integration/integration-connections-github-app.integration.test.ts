@@ -61,11 +61,15 @@ function createDashboardOrganizationIntegrationsUrl(
   targetKey: string,
   options?: {
     connectionId?: string;
+    githubApp?: string;
   },
 ): string {
   const searchParams = new URLSearchParams();
   if (options?.connectionId !== undefined) {
     searchParams.set("connectionId", options.connectionId);
+  }
+  if (options?.githubApp !== undefined) {
+    searchParams.set("githubApp", options.githubApp);
   }
   const query = searchParams.size === 0 ? "" : `?${searchParams.toString()}`;
 
@@ -355,7 +359,10 @@ describe("integration connections GitHub App integration", () => {
 
     expect(completeResponse.status).toBe(302);
     expect(completeResponse.headers.get("location")).toBe(
-      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", { connectionId }),
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", {
+        connectionId,
+        githubApp: "installed",
+      }),
     );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({

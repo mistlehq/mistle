@@ -22,8 +22,10 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
+import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
 import { IntegrationConnectionGitHubAppSetupPage } from "./integration-connection-github-app-setup-page.js";
+import { IntegrationsPage } from "./integrations-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -70,6 +72,11 @@ function createStoryQueryClient(input: {
   queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
     targets: [createGitHubTargetFixture()],
     connections: [...(input.connections ?? [])],
+  });
+  queryClient.setQueryData(SESSION_QUERY_KEY, {
+    session: {
+      activeOrganizationId: "org_mistle",
+    },
   });
 
   for (const source of input.webhookSources ?? []) {
@@ -426,6 +433,53 @@ function GitHubAppSetupPageStory(input: {
   );
 }
 
+function GitHubInstalledDetailPageStory(): React.JSX.Element {
+  configureDashboardRuntimeForStory();
+  const [queryClient] = useState(() =>
+    createStoryQueryClient({
+      connections: [
+        createDraftGitHubConnection({
+          config: {
+            app_id: "12345",
+            app_slug: "mistle-github-app",
+            client_id: "Iv1.installedstorybook",
+            installation_id: "12345",
+          },
+          configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+          externalSubjectId: "12345",
+        }),
+      ],
+      webhookSources: [createWebhookSourceFixture()],
+    }),
+  );
+  const [router] = useState(() =>
+    createMemoryRouter(
+      createRoutesFromElements(
+        <Route element={<Outlet />}>
+          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
+            <Route
+              element={<IntegrationsPage />}
+              handle={ROUTE_HANDLES.integrationDetail}
+              path=":targetKey"
+            />
+          </Route>
+        </Route>,
+      ),
+      {
+        initialEntries: [
+          "/integrations/github-cloud?connectionId=icn_github_story_draft&githubApp=installed",
+        ],
+      },
+    ),
+  );
+
+  return (
+    <StoryQueryClientProvider queryClient={queryClient}>
+      <RouterProvider router={router} />
+    </StoryQueryClientProvider>
+  );
+}
+
 const pageMeta = {
   title: "Dashboard/Integrations/GitHub App Flows",
   decorators: [withDashboardPageStory],
@@ -495,6 +549,12 @@ export const ManifestCreationSuccess: PageStory = {
         initialEntry="/integrations/github-cloud/icn_github_story_draft/github-app/setup?githubAppManifest=created"
       />
     );
+  },
+};
+
+export const ManifestInstalledDetail: PageStory = {
+  render: function RenderStory() {
+    return <GitHubInstalledDetailPageStory />;
   },
 };
 

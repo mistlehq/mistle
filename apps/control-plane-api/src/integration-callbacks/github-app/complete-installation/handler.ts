@@ -25,7 +25,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   return ctx.redirect(
     buildDashboardUrl(
       config.dashboard.baseUrl,
-      `/integrations/${encodeURIComponent(completedConnection.targetKey)}?connectionId=${encodeURIComponent(completedConnection.id)}`,
+      `/integrations/${encodeURIComponent(completedConnection.targetKey)}?connectionId=${encodeURIComponent(completedConnection.id)}&githubApp=installed`,
     ),
     302,
   );

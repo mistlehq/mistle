@@ -315,7 +315,11 @@ function NoticeStructuredContent({
             >
               {layoutState.hasTitle ? (
                 <NoticeHeaderRow closeButton={closeButton}>
-                  <NoticeTitle>{title}</NoticeTitle>
+                  {layoutState.hasDescription ? (
+                    <NoticeTitle>{title}</NoticeTitle>
+                  ) : (
+                    <NoticeDescription>{title}</NoticeDescription>
+                  )}
                 </NoticeHeaderRow>
               ) : layoutState.hasDescription && hasCloseButton ? (
                 <NoticeHeaderRow closeButton={closeButton}>

@@ -243,6 +243,66 @@ describe("IntegrationsPage", () => {
     ).toBe("true");
   });
 
+  it("shows GitHub App install success on the selected connection detail route", () => {
+    globalThis.__MISTLE_RUNTIME_CONFIG__ = {
+      controlPlaneApiOrigin: "https://control-plane.example.com",
+    };
+    resetDashboardConfigForTest();
+
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SESSION_QUERY_KEY, {
+      session: {
+        activeOrganizationId: "org_mistle",
+      },
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [createGitHubTarget()],
+      connections: [
+        createGitHubConnection({
+          id: "icn_github_installed",
+          displayName: "Engineering GitHub",
+          installationId: "12345",
+        }),
+      ],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            "/integrations/github-cloud?connectionId=icn_github_installed&githubApp=installed",
+          ]}
+        >
+          <Routes>
+            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const successNoticeTitle = screen.getByText("GitHub App connected to Mistle successfully");
+    expect(successNoticeTitle).toBeTruthy();
+    expect(
+      screen.queryByText("Mistle is now connected to this GitHub App installation."),
+    ).toBeNull();
+    const successNoticeSection = successNoticeTitle.closest("section");
+    const selectedConnectionTitleSection = screen
+      .getByRole("textbox", { name: "Connection name" })
+      .closest("section");
+    if (successNoticeSection === null || selectedConnectionTitleSection === null) {
+      throw new Error("Expected GitHub success notice to render inside the selected detail pane.");
+    }
+    expect(successNoticeSection).toBe(selectedConnectionTitleSection);
+    expect(
+      screen
+        .getByRole("button", { name: "Select connection Engineering GitHub" })
+        .getAttribute("aria-current"),
+    ).toBe("true");
+  });
+
   it("starts a refresh-all resource sync when a newly connected route connection has no synced resources", async () => {
     const refreshResponseDeferred = createDeferred();
     const server = await startControlPlaneTestServer({

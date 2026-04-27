@@ -8,6 +8,7 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
@@ -60,6 +61,12 @@ type GitHubAppInstallationState = {
 
 type GitHubAppInstallationStateEntry = [string, GitHubAppInstallationState];
 
+type InstalledAppSuccessNotice = {
+  message?: string;
+  resetKey: string;
+  title: string;
+};
+
 function buildGitHubAppInstallationStateByConnectionId(input: {
   connections: readonly {
     id: string;
@@ -80,6 +87,43 @@ function buildGitHubAppInstallationStateByConnectionId(input: {
       ];
     }),
   );
+}
+
+function resolveInstalledAppSuccessNotice(input: {
+  detailConnectionId: string | null;
+  searchParams: URLSearchParams;
+  selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
+}): InstalledAppSuccessNotice | null {
+  if (
+    input.detailConnectionId === null ||
+    input.selectedConnection?.id !== input.detailConnectionId
+  ) {
+    return null;
+  }
+
+  if (
+    input.searchParams.get("slackApp") === "installed" &&
+    input.selectedConnection.connectionMethodId === SlackConnectionMethodId
+  ) {
+    return {
+      message: "The Slack app was created in Slack and connected to Mistle.",
+      resetKey: input.detailConnectionId,
+      title: "Slack app installed and connected",
+    };
+  }
+
+  if (
+    input.searchParams.get("githubApp") === "installed" &&
+    input.selectedConnection.connectionMethodId ===
+      IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    return {
+      resetKey: input.detailConnectionId,
+      title: "GitHub App connected to Mistle successfully",
+    };
+  }
+
+  return null;
 }
 
 function resolveManagedWebhookSetupMessage(state: unknown): string | null {
@@ -138,13 +182,11 @@ export function IntegrationsPage() {
     directoryState.selectedDetailConnections.find(
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
-  const slackInstallSuccessConnectionId =
-    searchParams.get("slackApp") === "installed" &&
-    detailConnectionId !== null &&
-    selectedDetailConnection?.id === detailConnectionId &&
-    selectedDetailConnection.connectionMethodId === SlackConnectionMethodId
-      ? detailConnectionId
-      : null;
+  const installedAppSuccessNotice = resolveInstalledAppSuccessNotice({
+    detailConnectionId,
+    searchParams,
+    selectedConnection: selectedDetailConnection,
+  });
   const managedWebhookSetupMessage = resolveManagedWebhookSetupMessage(location.state);
   const shouldShowManagedWebhookSetupFailureNotice =
     searchParams.get("managedWebhookSetup") === "failed" &&
@@ -231,15 +273,15 @@ export function IntegrationsPage() {
           ) : undefined
         }
         selectedConnectionNotice={
-          slackInstallSuccessConnectionId !== null ? (
+          installedAppSuccessNotice !== null ? (
             <Notice
               autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
               dismissible
-              resetKey={slackInstallSuccessConnectionId}
-              title="Slack app installed and connected"
+              resetKey={installedAppSuccessNotice.resetKey}
+              title={installedAppSuccessNotice.title}
               variant="success"
             >
-              The Slack app was created in Slack and connected to Mistle.
+              {installedAppSuccessNotice.message ?? null}
             </Notice>
           ) : shouldShowManagedWebhookSetupFailureNotice ? (
             <Notice title="Connection created, webhook setup failed" variant="alert">
