@@ -13,6 +13,7 @@ import { MemoryRouter, NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
+import { AppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -167,6 +168,10 @@ const meta = {
       control: false,
       description: "Optional header actions rendered on the right side of the sticky header.",
     },
+    autosaveIndicator: {
+      control: false,
+      description: "Optional shell-owned autosave indicator rendered after page header actions.",
+    },
     locationPathname: {
       control: "text",
       description: "Current in-app pathname used to resolve active sidebar item state.",
@@ -221,6 +226,7 @@ const meta = {
         "locationPathname",
         "headerLeadingContent",
         "headerActions",
+        "autosaveIndicator",
         "mainContent",
         "sidebarHeaderContent",
         "sidebarContent",
@@ -276,3 +282,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+export const WithAutosaveIndicator: Story = {
+  args: {
+    autosaveIndicator: <AppShellAutosaveIndicator />,
+  },
+};
