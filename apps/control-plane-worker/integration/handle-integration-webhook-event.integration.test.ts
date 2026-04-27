@@ -65,6 +65,14 @@ function findWorkerSpan(input: { name: string }) {
   return tracing.getFinishedSpans().find((span) => span.name === input.name);
 }
 
+function requireDefined<T>(value: T | undefined, message: string): T {
+  if (value === undefined) {
+    throw new Error(message);
+  }
+
+  return value;
+}
+
 async function createTestDatabase(input: { databaseUrl: string }) {
   await runControlPlaneMigrations({
     connectionString: input.databaseUrl,
@@ -649,29 +657,45 @@ describe("handleIntegrationWebhookEvent integration", () => {
           webhookWorkflowSpan?.events.some((event) => event.name === "automation_run.schedule"),
         ).toBe(true);
 
-        expect(prepareSpan, "expected webhook prepare span").toBeDefined();
-        expect(prepareSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(prepareSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
-        expect(prepareSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
-        expect(prepareSpan?.attributes["mistle.automation.run.count"]).toBe(1);
-        expect(prepareSpan?.attributes["mistle.webhook.event_status"]).toBe(
+        const requiredPrepareSpan = requireDefined(prepareSpan, "Expected webhook prepare span.");
+        expect(requiredPrepareSpan.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
+        expect(requiredPrepareSpan.attributes["mistle.integration.connection_id"]).toBe(
+          connectionId,
+        );
+        expect(requiredPrepareSpan.attributes["mistle.integration.target_key"]).toBe(targetKey);
+        expect(requiredPrepareSpan.attributes["mistle.automation.run.count"]).toBe(1);
+        expect(requiredPrepareSpan.attributes["mistle.webhook.event_status"]).toBe(
           IntegrationWebhookEventStatuses.PROCESSING,
         );
-        expect(prepareSpan?.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
-        expect(prepareSpan?.attributes["mistle.webhook.finalized"]).toBe(false);
+        expect(requiredPrepareSpan.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
+        expect(requiredPrepareSpan.attributes["mistle.webhook.finalized"]).toBe(false);
 
-        expect(automationScheduleSpan, "expected automation run scheduling span").toBeDefined();
-        expect(automationScheduleSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(automationScheduleSpan?.attributes["mistle.automation.run_id"]).toBe(
+        const requiredAutomationScheduleSpan = requireDefined(
+          automationScheduleSpan,
+          "Expected automation run scheduling span.",
+        );
+        expect(requiredAutomationScheduleSpan.attributes["mistle.webhook.event_id"]).toBe(
+          webhookEventId,
+        );
+        expect(requiredAutomationScheduleSpan.attributes["mistle.automation.run_id"]).toBe(
           queuedAutomationRun.id,
         );
         expect(
-          automationScheduleSpan?.events.some((event) => event.name === "automation_run.queued"),
+          requiredAutomationScheduleSpan.events.some(
+            (event) => event.name === "automation_run.queued",
+          ),
         ).toBe(true);
 
-        expect(markProcessedSpan, "expected webhook processed status span").toBeDefined();
-        expect(markProcessedSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(markProcessedSpan?.attributes["mistle.webhook.final_status"]).toBe("processed");
+        const requiredMarkProcessedSpan = requireDefined(
+          markProcessedSpan,
+          "Expected webhook processed status span.",
+        );
+        expect(requiredMarkProcessedSpan.attributes["mistle.webhook.event_id"]).toBe(
+          webhookEventId,
+        );
+        expect(requiredMarkProcessedSpan.attributes["mistle.webhook.final_status"]).toBe(
+          "processed",
+        );
 
         expect(automationRunWorkflowSpan).toBeDefined();
         expect(automationRunWorkflowSpan?.attributes["mistle.webhook.event_id"]).toBe(
