@@ -1,6 +1,6 @@
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { sandboxProfileVersionSetupScriptQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
@@ -60,6 +60,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   errorMessage: string | null;
   saveStatus: AutoSaveStatus;
   hasUnsavedChanges: boolean;
+  flushDraftChanges: () => Promise<boolean>;
   isSaving: boolean;
   onChange: (nextValue: string) => void;
   onBlur: () => void;
@@ -75,6 +76,11 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   const previousSetupScriptRef = useRef(input.setupScript);
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
+  const pendingSavePromiseRef = useRef<Promise<boolean> | null>(null);
+  const draftValueRef = useRef(draftValue);
+  const persistedValueRef = useRef(persistedValue);
+  draftValueRef.current = draftValue;
+  persistedValueRef.current = persistedValue;
 
   const saveMutation = useMutation({
     mutationFn: async (setupScript: string | null) =>
@@ -91,6 +97,8 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
       });
     },
   });
+  const saveMutationIsPending = saveMutation.isPending;
+  const saveMutationMutateAsync = saveMutation.mutateAsync;
 
   useEffect(() => {
     const previousSetupScript = previousSetupScriptRef.current;
@@ -141,17 +149,18 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     clearFeedback();
   }
 
-  function onBlur(): void {
-    if (saveMutation.isPending) {
-      return;
+  const saveCurrentDraft = useCallback((): Promise<boolean> => {
+    if (saveMutationIsPending) {
+      return pendingSavePromiseRef.current ?? Promise.resolve(false);
     }
 
-    if (draftValue === persistedValue) {
+    if (draftValueRef.current === persistedValueRef.current) {
       clearFeedback();
-      return;
+      return Promise.resolve(true);
     }
 
-    const nextSetupScript = draftValue.length === 0 ? null : draftValue;
+    const nextDraftValue = draftValueRef.current;
+    const nextSetupScript = nextDraftValue.length === 0 ? null : nextDraftValue;
     const currentSaveSequence = saveSequenceRef.current + 1;
     saveSequenceRef.current = currentSaveSequence;
     clearPendingStatusTimeouts({
@@ -162,11 +171,10 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     setErrorMessage(null);
     setSaveStatus("saving");
 
-    void saveMutation
-      .mutateAsync(nextSetupScript)
+    const savePromise = saveMutationMutateAsync(nextSetupScript)
       .then((response) => {
         if (saveSequenceRef.current !== currentSaveSequence) {
-          return;
+          return true;
         }
 
         setDraftValue(response.setupScript ?? "");
@@ -185,15 +193,34 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
           successFadeDurationMs,
           successVisibleDurationMs,
         });
+        return true;
       })
       .catch((error: unknown) => {
         if (saveSequenceRef.current !== currentSaveSequence) {
-          return;
+          return false;
         }
 
         setSaveStatus("idle");
         setErrorMessage(getErrorMessage(error));
+        return false;
+      })
+      .finally(() => {
+        if (pendingSavePromiseRef.current === savePromise) {
+          pendingSavePromiseRef.current = null;
+        }
       });
+    pendingSavePromiseRef.current = savePromise;
+    return savePromise;
+  }, [
+    saveMutationIsPending,
+    saveMutationMutateAsync,
+    scheduler,
+    successFadeDurationMs,
+    successVisibleDurationMs,
+  ]);
+
+  function onBlur(): void {
+    void saveCurrentDraft();
   }
 
   return {
@@ -201,6 +228,7 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     errorMessage,
     saveStatus,
     hasUnsavedChanges: draftValue !== persistedValue,
+    flushDraftChanges: saveCurrentDraft,
     isSaving: saveMutation.isPending,
     onChange,
     onBlur,

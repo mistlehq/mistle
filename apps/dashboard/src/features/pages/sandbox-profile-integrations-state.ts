@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -177,6 +177,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   hasUnsavedChanges: boolean;
+  flushDraftChanges: () => Promise<boolean>;
   onAddIntegrationBindingRow: (input: {
     kind: SandboxIntegrationBindingKind;
     connectionId: string;
@@ -195,6 +196,11 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
+  const pendingSavePromiseRef = useRef<Promise<boolean> | null>(null);
+  const integrationRowsRef = useRef(integrationRows);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  integrationRowsRef.current = integrationRows;
+  hasUnsavedChangesRef.current = hasUnsavedChanges;
 
   function clearIntegrationRowError(clientId: string): void {
     setIntegrationRowErrorsByClientId((currentErrors) => {
@@ -291,7 +297,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     rowsToPersist: readonly SandboxProfileBindingEditorRow[],
   ): Promise<boolean> {
     if (putIntegrationBindingsMutation.isPending) {
-      return false;
+      return pendingSavePromiseRef.current ?? false;
     }
 
     const parsedBindings: Array<{
@@ -334,15 +340,32 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 
     setNeutralSaveState();
 
-    try {
-      await putIntegrationBindingsMutation.mutateAsync({
+    const savePromise = putIntegrationBindingsMutation
+      .mutateAsync({
         bindings: parsedBindings,
+      })
+      .then(() => true)
+      .catch(() => false)
+      .finally(() => {
+        if (pendingSavePromiseRef.current === savePromise) {
+          pendingSavePromiseRef.current = null;
+        }
       });
-      return true;
-    } catch {
-      return false;
-    }
+    pendingSavePromiseRef.current = savePromise;
+    return savePromise;
   }
+
+  const flushDraftChanges = useCallback(async (): Promise<boolean> => {
+    if (putIntegrationBindingsMutation.isPending) {
+      return pendingSavePromiseRef.current ?? false;
+    }
+
+    if (!hasUnsavedChangesRef.current) {
+      return true;
+    }
+
+    return persistIntegrationRows(integrationRowsRef.current);
+  }, [putIntegrationBindingsMutation.isPending]);
 
   async function onAddIntegrationBindingRow(inputValue: {
     kind: SandboxIntegrationBindingKind;
@@ -394,6 +417,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
     hasUnsavedChanges,
+    flushDraftChanges,
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,

@@ -1,4 +1,11 @@
 import {
+  systemClock,
+  systemScheduler,
+  type Clock,
+  type Scheduler,
+  type TimerHandle,
+} from "@mistle/time";
+import {
   Button,
   ButtonGroup,
   Card,
@@ -21,7 +28,7 @@ import {
 } from "@mistle/ui";
 import { CheckCircleIcon, SpinnerGapIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from "react";
 import { Navigate, Outlet, useNavigate, useOutletContext, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -54,6 +61,7 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -112,6 +120,19 @@ type SandboxProfileSnapshotPreparationStatus =
       kind: "failed";
       message: string;
     };
+type SandboxProfileDraftSectionState = {
+  flushDraftChanges: () => Promise<boolean>;
+  hasUnsavedChanges: boolean;
+  isSaving: boolean;
+};
+
+function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
+  return {
+    flushDraftChanges: async () => true,
+    hasUnsavedChanges: false,
+    isSaving: false,
+  };
+}
 
 type ResolveEditorVersionModeResult =
   | {
@@ -848,8 +869,8 @@ function LoadedSandboxProfileEditorPage(
       onDiscardChangesAndLeaveDraft={(inputValue) => {
         discardDraftMutation.mutate(inputValue);
       }}
-      onPublish={(version) => {
-        publishMutation.mutate(version);
+      onPublish={async (version) => {
+        await publishMutation.mutateAsync(version);
       }}
       onRefreshSnapshot={(version) => {
         refreshSnapshotMutation.mutate(version);
@@ -922,7 +943,7 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileError: string | null;
   deleteProfileIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
-  onPublish: (version: number) => void;
+  onPublish: (version: number) => Promise<void>;
   onRefreshSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
@@ -944,8 +965,17 @@ function ReadySandboxProfileEditorPage(input: {
     profileId: input.profileId,
     version: input.mode.version,
   });
-  const [hasUnsavedIntegrationChanges, setHasUnsavedIntegrationChanges] = useState(false);
-  const [hasUnsavedSetupScriptChanges, setHasUnsavedSetupScriptChanges] = useState(false);
+  const [integrationDraftState, setIntegrationDraftState] = useState(
+    createIdleSandboxProfileDraftSectionState,
+  );
+  const [setupScriptDraftState, setSetupScriptDraftState] = useState(
+    createIdleSandboxProfileDraftSectionState,
+  );
+  const isSavingDraftChanges = integrationDraftState.isSaving || setupScriptDraftState.isSaving;
+  const [publishRequestIsPending, setPublishRequestIsPending] = useState(false);
+  const [publishFlushError, setPublishFlushError] = useState<string | null>(null);
+  const draftFieldsAreDisabled =
+    input.mode.kind !== "draft" || isSavingDraftChanges || publishRequestIsPending;
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -953,66 +983,103 @@ function ReadySandboxProfileEditorPage(input: {
     invalidateSandboxProfiles: input.invalidateSandboxProfiles,
     invalidateProfileDetail: input.invalidateProfileDetail,
   });
+  async function handlePublish(version: number): Promise<void> {
+    setPublishFlushError(null);
+    const shouldFlushDraft =
+      integrationDraftState.hasUnsavedChanges ||
+      integrationDraftState.isSaving ||
+      setupScriptDraftState.hasUnsavedChanges ||
+      setupScriptDraftState.isSaving;
+
+    setPublishRequestIsPending(true);
+    try {
+      if (shouldFlushDraft) {
+        const [integrationsSaved, setupScriptSaved] = await Promise.all([
+          integrationDraftState.flushDraftChanges(),
+          setupScriptDraftState.flushDraftChanges(),
+        ]);
+
+        if (!integrationsSaved || !setupScriptSaved) {
+          setPublishFlushError(DraftFlushBeforePublishErrorMessage);
+          return;
+        }
+      }
+
+      await input.onPublish(version);
+    } catch {
+      return;
+    } finally {
+      setPublishRequestIsPending(false);
+    }
+  }
 
   return (
-    <SandboxProfileEditorView
-      snapshotPreparationStatus={resolveSnapshotPreparationStatus({
-        mode: input.mode,
-        version: input.currentVersion,
-      })}
-      hasUnsavedIntegrationChanges={hasUnsavedIntegrationChanges}
-      hasUnsavedSetupScriptChanges={hasUnsavedSetupScriptChanges}
-      isSavingProfileName={metaState.isUpdating}
-      mode={input.mode}
-      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
-      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
-      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
-      deleteProfileError={input.deleteProfileError}
-      deleteProfileIsPending={input.deleteProfileIsPending}
-      onMakeChanges={input.onMakeChanges}
-      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
-      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
-      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
-      onPublish={input.onPublish}
-      onRefreshSnapshot={input.onRefreshSnapshot}
-      onSaveProfileName={metaState.onProfileNameSave}
-      onViewActive={input.onViewActive}
-      onViewDraft={input.onViewDraft}
-      profileName={metaState.formState.displayName}
-      profileNameFallback={metaState.pageTitle}
-      versionActionError={input.versionActionError}
-      versionActionIsPending={input.versionActionIsPending}
-      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
-      renderSectionPanel={(sectionId) => {
-        if (sectionId === "configurations") {
+    <>
+      <SandboxProfileEditorHeaderActions
+        isSavingDraftChanges={input.mode.kind === "draft" && isSavingDraftChanges}
+      />
+      <SandboxProfileEditorView
+        snapshotPreparationStatus={resolveSnapshotPreparationStatus({
+          mode: input.mode,
+          version: input.currentVersion,
+        })}
+        hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
+        hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
+        isSavingProfileName={metaState.isUpdating}
+        mode={input.mode}
+        deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+        deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+        deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+        deleteProfileError={input.deleteProfileError}
+        deleteProfileIsPending={input.deleteProfileIsPending}
+        onMakeChanges={input.onMakeChanges}
+        onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+        onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+        onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+        onPublish={(version) => {
+          void handlePublish(version);
+        }}
+        onRefreshSnapshot={input.onRefreshSnapshot}
+        onSaveProfileName={metaState.onProfileNameSave}
+        onViewActive={input.onViewActive}
+        onViewDraft={input.onViewDraft}
+        profileName={metaState.formState.displayName}
+        profileNameFallback={metaState.pageTitle}
+        publishRequestIsPending={publishRequestIsPending}
+        versionActionError={publishFlushError ?? input.versionActionError}
+        versionActionIsPending={input.versionActionIsPending}
+        isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
+        renderSectionPanel={(sectionId) => {
+          if (sectionId === "configurations") {
+            return (
+              <LoadedSandboxProfileSetupScriptSection
+                disabled={draftFieldsAreDisabled}
+                key={`${input.profileId}:${String(input.mode.version)}`}
+                loader={setupScriptLoader}
+                profileId={input.profileId}
+                invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+                onDraftStateChange={setSetupScriptDraftState}
+                version={input.mode.version}
+              />
+            );
+          }
+
           return (
-            <LoadedSandboxProfileSetupScriptSection
-              disabled={input.mode.kind !== "draft"}
-              key={`${input.profileId}:${String(input.mode.version)}`}
-              loader={setupScriptLoader}
+            <LoadedSandboxProfileIntegrationSetupSection
+              key={`${input.profileId}:integration-setup`}
+              activeSectionId={sectionId}
+              loader={integrationsLoader}
+              onDraftStateChange={setIntegrationDraftState}
               profileId={input.profileId}
-              invalidateVersionSetupScript={input.invalidateVersionSetupScript}
-              onHasUnsavedChangesChange={setHasUnsavedSetupScriptChanges}
+              disabled={draftFieldsAreDisabled}
               version={input.mode.version}
+              invalidateVersionBindings={input.invalidateVersionBindings}
             />
           );
-        }
-
-        return (
-          <LoadedSandboxProfileIntegrationSetupSection
-            key={`${input.profileId}:integration-setup`}
-            activeSectionId={sectionId}
-            loader={integrationsLoader}
-            onHasUnsavedChangesChange={setHasUnsavedIntegrationChanges}
-            profileId={input.profileId}
-            disabled={input.mode.kind !== "draft"}
-            version={input.mode.version}
-            invalidateVersionBindings={input.invalidateVersionBindings}
-          />
-        );
-      }}
-      sections={SandboxProfileEditorTabs}
-    />
+        }}
+        sections={SandboxProfileEditorTabs}
+      />
+    </>
   );
 }
 
@@ -1030,6 +1097,92 @@ const SandboxProfileEditorTabs = [
     label: "Configurations",
   },
 ] as const satisfies readonly SandboxProfileEditorSection[];
+
+const DraftSavingIndicatorShowDelayMs = 200;
+const DraftSavingIndicatorMinimumVisibleMs = 500;
+const DraftFlushBeforePublishErrorMessage =
+  "Could not save draft changes before publishing. Check your draft changes and try again.";
+
+export function SandboxProfileEditorHeaderActions(input: {
+  isSavingDraftChanges: boolean;
+  minimumVisibleMs?: number;
+  scheduler?: Scheduler;
+  showDelayMs?: number;
+}): null {
+  const showSavingIndicator = useDelayedMinimumVisibleFlag({
+    active: input.isSavingDraftChanges,
+    clock: systemClock,
+    minimumVisibleMs: input.minimumVisibleMs ?? DraftSavingIndicatorMinimumVisibleMs,
+    scheduler: input.scheduler ?? systemScheduler,
+    showDelayMs: input.showDelayMs ?? DraftSavingIndicatorShowDelayMs,
+  });
+  const headerActions = useMemo(
+    () =>
+      showSavingIndicator ? (
+        <div
+          aria-live="polite"
+          className="text-muted-foreground inline-flex h-6 items-center gap-1.5 text-xs"
+          role="status"
+        >
+          <SpinnerGapIcon aria-hidden="true" className="size-3.5 animate-spin" />
+          <span>Saving</span>
+        </div>
+      ) : null,
+    [showSavingIndicator],
+  );
+  useAppShellHeaderActions(headerActions);
+
+  return null;
+}
+
+function useDelayedMinimumVisibleFlag(input: {
+  active: boolean;
+  clock: Clock;
+  minimumVisibleMs: number;
+  scheduler: Scheduler;
+  showDelayMs: number;
+}): boolean {
+  const [visible, setVisible] = useState(false);
+  const visibleSinceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    let timeoutId: TimerHandle | null = null;
+
+    if (input.active && !visible) {
+      timeoutId = input.scheduler.schedule(() => {
+        visibleSinceRef.current = input.clock.nowMs();
+        setVisible(true);
+      }, input.showDelayMs);
+    } else if (!input.active && visible) {
+      const visibleSince = visibleSinceRef.current;
+      const elapsedVisibleMs =
+        visibleSince === null ? input.minimumVisibleMs : input.clock.nowMs() - visibleSince;
+      const remainingVisibleMs = Math.max(input.minimumVisibleMs - elapsedVisibleMs, 0);
+
+      timeoutId = input.scheduler.schedule(() => {
+        visibleSinceRef.current = null;
+        setVisible(false);
+      }, remainingVisibleMs);
+    } else if (!input.active && !visible) {
+      visibleSinceRef.current = null;
+    }
+
+    return () => {
+      if (timeoutId !== null) {
+        input.scheduler.cancel(timeoutId);
+      }
+    };
+  }, [
+    input.active,
+    input.clock,
+    input.minimumVisibleMs,
+    input.scheduler,
+    input.showDelayMs,
+    visible,
+  ]);
+
+  return visible;
+}
 
 function DeleteSandboxProfileDialog(input: {
   automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -1123,6 +1276,7 @@ export function SandboxProfileEditorView(input: {
   deleteProfileIsPending: boolean;
   versionActionError: string | null;
   versionActionIsPending: boolean;
+  publishRequestIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
   onRefreshSnapshot: (version: number) => void;
@@ -1142,11 +1296,13 @@ export function SandboxProfileEditorView(input: {
     input.mode.kind === "draft" &&
     ((input.hasUnsavedIntegrationChanges ?? false) ||
       (input.hasUnsavedSetupScriptChanges ?? false));
-  const versionActionIsDisabled = input.versionActionIsPending || hasUnsavedDraftChanges;
+  const publishRequestIsPending = input.publishRequestIsPending === true;
+  const versionActionIsDisabled = input.versionActionIsPending || publishRequestIsPending;
   const discardChangesInput = resolveDiscardDraftInput(input.mode);
   const discardChangesMenuItem =
     discardChangesInput === null ? null : (
       <DropdownMenuItem
+        disabled={hasUnsavedDraftChanges || versionActionIsDisabled}
         onClick={() => {
           input.onDiscardChangesAndLeaveDraft(discardChangesInput);
         }}
@@ -1236,7 +1392,7 @@ export function SandboxProfileEditorView(input: {
                 }}
                 type="button"
               >
-                {hasUnsavedDraftChanges ? "Saving..." : "Publish"}
+                {publishRequestIsPending ? "Publishing..." : "Publish"}
               </Button>
               <MoreActionsMenu
                 disabled={versionActionIsDisabled}
@@ -1330,7 +1486,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
-  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
   const showDirectoryUnavailableNotice = input.loader.integrationDirectoryQuery.isError;
@@ -1371,9 +1527,9 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       disabled={input.disabled}
       invalidateVersionBindings={input.invalidateVersionBindings}
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
-      {...(input.onHasUnsavedChangesChange === undefined
+      {...(input.onDraftStateChange === undefined
         ? {}
-        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
+        : { onDraftStateChange: input.onDraftStateChange })}
     />
   );
 }
@@ -1428,7 +1584,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
   >["integrationDirectoryQuery"];
-  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const integrationsState = useLoadedSandboxProfileIntegrationsState({
     profileId: input.profileId,
@@ -1438,14 +1594,17 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     availableTargets: input.availableTargets,
     invalidateVersionBindings: input.invalidateVersionBindings,
   });
-  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+  const onDraftStateChange = input.onDraftStateChange;
 
   useEffect(() => {
-    onHasUnsavedChangesChange?.(
-      integrationsState.hasUnsavedChanges || integrationsState.isSubmittingIntegrationBindings,
-    );
+    onDraftStateChange?.({
+      flushDraftChanges: integrationsState.flushDraftChanges,
+      hasUnsavedChanges: integrationsState.hasUnsavedChanges,
+      isSaving: integrationsState.isSubmittingIntegrationBindings,
+    });
   }, [
-    onHasUnsavedChangesChange,
+    onDraftStateChange,
+    integrationsState.flushDraftChanges,
     integrationsState.hasUnsavedChanges,
     integrationsState.isSubmittingIntegrationBindings,
   ]);
@@ -1484,7 +1643,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
-  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   if (input.loader.setupScriptQuery.isPending) {
     return <SandboxProfileSetupScriptPanel disabled={true} value="" />;
@@ -1511,9 +1670,9 @@ function LoadedSandboxProfileSetupScriptSection(input: {
       disabled={input.disabled}
       setupScript={input.loader.setupScript}
       version={input.version}
-      {...(input.onHasUnsavedChangesChange === undefined
+      {...(input.onDraftStateChange === undefined
         ? {}
-        : { onHasUnsavedChangesChange: input.onHasUnsavedChangesChange })}
+        : { onDraftStateChange: input.onDraftStateChange })}
     />
   );
 }
@@ -1524,7 +1683,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
-  onHasUnsavedChangesChange?: (hasUnsavedChanges: boolean) => void;
+  onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const setupScriptState = useLoadedSandboxProfileSetupScriptState({
     profileId: input.profileId,
@@ -1532,11 +1691,20 @@ function ReadySandboxProfileSetupScriptSection(input: {
     setupScript: input.setupScript,
     invalidateVersionSetupScript: input.invalidateVersionSetupScript,
   });
-  const onHasUnsavedChangesChange = input.onHasUnsavedChangesChange;
+  const onDraftStateChange = input.onDraftStateChange;
 
   useEffect(() => {
-    onHasUnsavedChangesChange?.(setupScriptState.hasUnsavedChanges || setupScriptState.isSaving);
-  }, [onHasUnsavedChangesChange, setupScriptState.hasUnsavedChanges, setupScriptState.isSaving]);
+    onDraftStateChange?.({
+      flushDraftChanges: setupScriptState.flushDraftChanges,
+      hasUnsavedChanges: setupScriptState.hasUnsavedChanges,
+      isSaving: setupScriptState.isSaving,
+    });
+  }, [
+    onDraftStateChange,
+    setupScriptState.flushDraftChanges,
+    setupScriptState.hasUnsavedChanges,
+    setupScriptState.isSaving,
+  ]);
 
   return (
     <SandboxProfileSetupScriptPanel
@@ -1563,11 +1731,9 @@ export function SandboxProfileSetupScriptPanel(input: {
   const liveMessage =
     input.errorMessage !== null && input.errorMessage !== undefined
       ? ""
-      : input.saveStatus === "saving"
-        ? "Saving"
-        : input.saveStatus === "saved" || input.saveStatus === "saved-fading"
-          ? "Saved"
-          : "";
+      : input.saveStatus === "saved" || input.saveStatus === "saved-fading"
+        ? "Saved"
+        : "";
 
   return (
     <div className="max-w-5xl">
@@ -1600,11 +1766,6 @@ export function SandboxProfileSetupScriptPanel(input: {
             {input.errorMessage ? (
               <div aria-live="polite" className="text-destructive text-xs" role="status">
                 {input.errorMessage}
-              </div>
-            ) : input.saveStatus === "saving" ? (
-              <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
-                <SpinnerGapIcon className="size-3.5 animate-spin" />
-                <span>Saving</span>
               </div>
             ) : input.saveStatus === "saved" || input.saveStatus === "saved-fading" ? (
               <div

@@ -2,7 +2,7 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { useState, type JSX } from "react";
+import { useState, type JSX, type ReactNode } from "react";
 import {
   createMemoryRouter,
   createRoutesFromElements,
@@ -21,11 +21,13 @@ import {
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import {
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
   resolveSandboxProfileEditorVersionMode,
   SandboxProfileDefaultRedirect,
+  SandboxProfileEditorHeaderActions,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
@@ -37,6 +39,17 @@ afterEach(() => {
   cleanup();
   void cleanupTestQueryClients();
 });
+
+function TestAppShellHeaderActionsProvider(input: { children: ReactNode }): JSX.Element {
+  const [headerActions, setHeaderActions] = useState<ReactNode | null>(null);
+
+  return (
+    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
+      <div aria-label="Header actions">{headerActions}</div>
+      {input.children}
+    </AppShellHeaderActionsContext.Provider>
+  );
+}
 
 function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
@@ -278,7 +291,9 @@ function renderSandboxProfileEditor(input?: {
 
   render(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <TestAppShellHeaderActionsProvider>
+        <RouterProvider router={router} />
+      </TestAppShellHeaderActionsProvider>
     </QueryClientProvider>,
   );
 }
@@ -334,7 +349,10 @@ function DeleteProfileDialogHarness(input: {
   );
 }
 
-function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }): JSX.Element {
+function DraftActionsHarness(input: {
+  hasUnsavedIntegrationChanges?: boolean;
+  versionActionError?: string | null;
+}): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
 
   return (
@@ -373,7 +391,7 @@ function DraftActionsHarness(input: { hasUnsavedIntegrationChanges?: boolean }):
           label: "Integrations",
         },
       ]}
-      versionActionError={null}
+      versionActionError={input.versionActionError ?? null}
       versionActionIsPending={false}
     />
   );
@@ -425,6 +443,18 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
   );
 }
 
+function HeaderActionsHarness(input: { isSavingDraftChanges: boolean }): JSX.Element {
+  return (
+    <TestAppShellHeaderActionsProvider>
+      <SandboxProfileEditorHeaderActions
+        isSavingDraftChanges={input.isSavingDraftChanges}
+        minimumVisibleMs={0}
+        showDelayMs={0}
+      />
+    </TestAppShellHeaderActionsProvider>
+  );
+}
+
 function renderDeleteProfileDialogHarness(input: {
   automationUsages?: readonly {
     id: string;
@@ -442,12 +472,19 @@ function renderDeleteProfileDialogHarness(input: {
   render(<RouterProvider router={router} />);
 }
 
-function renderDraftActionsHarness(input?: { hasUnsavedIntegrationChanges?: boolean }): void {
+function renderDraftActionsHarness(input?: {
+  hasUnsavedIntegrationChanges?: boolean;
+  versionActionError?: string | null;
+}): void {
   const router = createMemoryRouter(
     createRoutesFromElements(<Route element={<DraftActionsHarness {...input} />} path="/" />),
   );
 
   render(<RouterProvider router={router} />);
+}
+
+function renderHeaderActionsHarness(input: { isSavingDraftChanges: boolean }): void {
+  render(<HeaderActionsHarness isSavingDraftChanges={input.isSavingDraftChanges} />);
 }
 
 function renderPublishedWithDraftActionsHarness(): void {
@@ -1006,13 +1043,31 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
-  it("blocks draft version actions while draft changes are saving", () => {
+  it("keeps draft actions visually stable while draft changes are saving", () => {
     renderDraftActionsHarness({
       hasUnsavedIntegrationChanges: true,
     });
 
-    expect(screen.getByRole("button", { name: "Saving..." })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "More actions" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name: "More actions" })).toHaveProperty("disabled", false);
+    expect(screen.queryByText("Saving")).toBeNull();
+  });
+
+  it("renders draft save progress in the app shell header actions", async () => {
+    renderHeaderActionsHarness({
+      isSavingDraftChanges: true,
+    });
+
+    expect(await screen.findByText("Saving")).toBeDefined();
+  });
+
+  it("surfaces draft save failures before publishing as a page-level action error", () => {
+    renderDraftActionsHarness({
+      versionActionError: "Could not save draft changes before publishing.",
+    });
+
+    expect(screen.getByText("Profile version action failed")).toBeDefined();
+    expect(screen.getByText("Could not save draft changes before publishing.")).toBeDefined();
   });
 
   it("shows draft actions for draft profiles with a published version", () => {
