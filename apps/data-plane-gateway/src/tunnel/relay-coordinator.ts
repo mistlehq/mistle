@@ -120,8 +120,9 @@ export class TunnelRelayCoordinator {
   }): Promise<void> {
     const target =
       input.fromSide === "connection"
-        ? this.peerRegistry.getBootstrapPeer({
+        ? this.getTargetBootstrapPeer({
             sandboxInstanceId: input.sandboxInstanceId,
+            targetSessionId: input.targetSessionId,
           })
         : input.targetSessionId === undefined
           ? undefined
@@ -212,5 +213,22 @@ export class TunnelRelayCoordinator {
     return this.peerRegistry.getBootstrapPeer({
       sandboxInstanceId: input.sandboxInstanceId,
     });
+  }
+
+  private getTargetBootstrapPeer(input: {
+    sandboxInstanceId: string;
+    targetSessionId?: string | undefined;
+  }): RelayTarget | undefined {
+    const target = this.peerRegistry.getBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (target === undefined) {
+      return undefined;
+    }
+    if (input.targetSessionId !== undefined && target.sessionId !== input.targetSessionId) {
+      return undefined;
+    }
+
+    return target;
   }
 }

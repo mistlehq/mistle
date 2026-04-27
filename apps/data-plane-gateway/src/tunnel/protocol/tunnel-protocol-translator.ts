@@ -40,6 +40,7 @@ export type TunnelProtocolDelivery =
   | {
       kind: "forward";
       payload: RelayPayload;
+      targetBootstrapSessionId?: string;
       targetConnectionSessionId?: string;
     }
   | {
@@ -73,7 +74,10 @@ export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage;
   runtimeReadyControlMessage?: RuntimeReadyControlMessage;
-  notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
+  notifyBootstrapPeerOfReleasedStream?: {
+    binding: ClientStreamBinding;
+    targetBootstrapSessionId: string;
+  };
   releaseInteractiveStream?: ReleaseInteractiveStream;
 };
 
@@ -368,11 +372,17 @@ function toReleaseInteractiveStream(binding: ClientStreamBinding): ReleaseIntera
 
 function createForwardDelivery(input: {
   payload: RelayPayload;
+  targetBootstrapSessionId?: string;
   targetConnectionSessionId?: string;
 }): TunnelProtocolDelivery {
   return {
     kind: "forward",
     payload: input.payload,
+    ...(input.targetBootstrapSessionId === undefined
+      ? {}
+      : {
+          targetBootstrapSessionId: input.targetBootstrapSessionId,
+        }),
     ...(input.targetConnectionSessionId === undefined
       ? {}
       : {
@@ -392,7 +402,12 @@ function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
   keepaliveControlMessage?: KeepaliveControlMessage | undefined;
   runtimeReadyControlMessage?: RuntimeReadyControlMessage | undefined;
-  notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
+  notifyBootstrapPeerOfReleasedStream?:
+    | {
+        binding: ClientStreamBinding;
+        targetBootstrapSessionId: string;
+      }
+    | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
   return {
@@ -593,6 +608,7 @@ export class TunnelProtocolTranslator {
           message: controlMessage,
           streamId: route.binding.tunnelStreamId,
         }),
+        targetBootstrapSessionId: route.bootstrapTarget.sessionId,
       }),
       releaseInteractiveStream:
         controlMessage.type === "stream.close" &&
@@ -622,6 +638,7 @@ export class TunnelProtocolTranslator {
             message: input.message,
             streamId: route.binding.tunnelStreamId,
           }),
+          targetBootstrapSessionId: route.bootstrapTarget.sessionId,
         }),
       });
     } catch (error) {
@@ -818,7 +835,10 @@ export class TunnelProtocolTranslator {
             streamId: route.binding.clientStreamId,
           }),
         ),
-        notifyBootstrapPeerOfReleasedStream: route.binding,
+        notifyBootstrapPeerOfReleasedStream: {
+          binding: route.binding,
+          targetBootstrapSessionId: route.bootstrapTarget.sessionId,
+        },
         releaseInteractiveStream: toReleaseInteractiveStream(route.binding),
       });
     }
@@ -838,6 +858,7 @@ export class TunnelProtocolTranslator {
     return createTranslation({
       delivery: createForwardDelivery({
         payload: translatedPayload,
+        targetBootstrapSessionId: route.bootstrapTarget.sessionId,
       }),
     });
   }
@@ -892,7 +913,10 @@ export class TunnelProtocolTranslator {
           }),
           targetConnectionSessionId: route.binding.clientSessionId,
         }),
-        notifyBootstrapPeerOfReleasedStream: route.binding,
+        notifyBootstrapPeerOfReleasedStream: {
+          binding: route.binding,
+          targetBootstrapSessionId: route.bootstrapTarget.sessionId,
+        },
         releaseInteractiveStream: toReleaseInteractiveStream(route.binding),
       });
     }

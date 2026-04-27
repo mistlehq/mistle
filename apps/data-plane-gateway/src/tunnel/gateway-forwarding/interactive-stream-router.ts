@@ -24,53 +24,29 @@ export class InteractiveStreamRouter {
   public async openInteractiveStream(
     input: OpenInteractiveStreamInput,
   ): Promise<InteractiveStreamRoute> {
-    const targetNodeId = await this.resolveTargetNodeId(input.sandboxInstanceId);
-    return this.gatewayForwardingClient.openInteractiveStream(
-      {
-        sourceNodeId: this.sourceNodeId,
-        targetNodeId,
-      },
-      input,
-    );
+    const target = await this.resolveForwardingTarget(input.sandboxInstanceId);
+    return this.gatewayForwardingClient.openInteractiveStream(target, input);
   }
 
   public async findInteractiveStreamByClient(
     input: FindInteractiveStreamByClientInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const targetNodeId = await this.resolveTargetNodeId(input.sandboxInstanceId);
-    return this.gatewayForwardingClient.findInteractiveStreamByClient(
-      {
-        sourceNodeId: this.sourceNodeId,
-        targetNodeId,
-      },
-      input,
-    );
+    const target = await this.resolveForwardingTarget(input.sandboxInstanceId);
+    return this.gatewayForwardingClient.findInteractiveStreamByClient(target, input);
   }
 
   public async findInteractiveStreamByTunnel(
     input: FindInteractiveStreamByTunnelInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const targetNodeId = await this.resolveTargetNodeId(input.sandboxInstanceId);
-    return this.gatewayForwardingClient.findInteractiveStreamByTunnel(
-      {
-        sourceNodeId: this.sourceNodeId,
-        targetNodeId,
-      },
-      input,
-    );
+    const target = await this.resolveForwardingTarget(input.sandboxInstanceId);
+    return this.gatewayForwardingClient.findInteractiveStreamByTunnel(target, input);
   }
 
   public async closeInteractiveStream(
     input: CloseInteractiveStreamInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const targetNodeId = await this.resolveTargetNodeId(input.sandboxInstanceId);
-    return this.gatewayForwardingClient.closeInteractiveStream(
-      {
-        sourceNodeId: this.sourceNodeId,
-        targetNodeId,
-      },
-      input,
-    );
+    const target = await this.resolveForwardingTarget(input.sandboxInstanceId);
+    return this.gatewayForwardingClient.closeInteractiveStream(target, input);
   }
 
   public async releaseClientSessionStreams(
@@ -90,12 +66,13 @@ export class InteractiveStreamRouter {
       {
         sourceNodeId: this.sourceNodeId,
         targetNodeId: ownerResolution.owner.nodeId,
+        targetBootstrapSessionId: ownerResolution.owner.sessionId,
       },
       input,
     );
   }
 
-  private async resolveTargetNodeId(sandboxInstanceId: string): Promise<string> {
+  private async resolveForwardingTarget(sandboxInstanceId: string) {
     const ownerResolution = await this.sandboxOwnerResolver.resolveOwner({
       sandboxInstanceId,
     });
@@ -103,6 +80,10 @@ export class InteractiveStreamRouter {
       throw new BootstrapTunnelNotConnectedError(sandboxInstanceId);
     }
 
-    return ownerResolution.owner.nodeId;
+    return {
+      sourceNodeId: this.sourceNodeId,
+      targetNodeId: ownerResolution.owner.nodeId,
+      targetBootstrapSessionId: ownerResolution.owner.sessionId,
+    };
   }
 }

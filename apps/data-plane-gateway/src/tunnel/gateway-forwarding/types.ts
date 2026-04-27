@@ -35,6 +35,7 @@ export type ReleaseClientSessionStreamsInput = {
 export type GatewayForwardingTarget = {
   sourceNodeId: string;
   targetNodeId: string;
+  targetBootstrapSessionId: string;
 };
 
 export type InteractiveStreamRoute = {

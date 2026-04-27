@@ -19,10 +19,10 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   public constructor(private readonly tunnelSessionRegistry: TunnelSessionRegistry) {}
 
   public async openInteractiveStream(
-    _target: GatewayForwardingTarget,
+    target: GatewayForwardingTarget,
     input: OpenInteractiveStreamInput,
   ): Promise<InteractiveStreamRoute> {
-    const bootstrapTarget = this.requireBootstrapTarget(input.sandboxInstanceId);
+    const bootstrapTarget = this.requireBootstrapTarget(target, input.sandboxInstanceId);
     const binding = this.tunnelSessionRegistry.bindClientStream({
       sandboxInstanceId: input.sandboxInstanceId,
       clientSessionId: input.clientSessionId,
@@ -37,12 +37,10 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   }
 
   public async findInteractiveStreamByClient(
-    _target: GatewayForwardingTarget,
+    target: GatewayForwardingTarget,
     input: FindInteractiveStreamByClientInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
+    const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
     if (bootstrapTarget === undefined) {
       return undefined;
     }
@@ -59,12 +57,10 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   }
 
   public async findInteractiveStreamByTunnel(
-    _target: GatewayForwardingTarget,
+    target: GatewayForwardingTarget,
     input: FindInteractiveStreamByTunnelInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
+    const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
     if (bootstrapTarget === undefined) {
       return undefined;
     }
@@ -81,12 +77,10 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   }
 
   public async closeInteractiveStream(
-    _target: GatewayForwardingTarget,
+    target: GatewayForwardingTarget,
     input: CloseInteractiveStreamInput,
   ): Promise<InteractiveStreamRoute | undefined> {
-    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
+    const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
     if (bootstrapTarget === undefined) {
       return undefined;
     }
@@ -103,23 +97,44 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   }
 
   public async releaseClientSessionStreams(
-    _target: GatewayForwardingTarget,
+    target: GatewayForwardingTarget,
     input: ReleaseClientSessionStreamsInput,
   ): Promise<ReleaseClientSessionStreamsResult> {
+    const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
+    if (bootstrapTarget === undefined) {
+      return {
+        bootstrapTarget: undefined,
+        releasedBindings: [],
+      };
+    }
+
     return {
-      bootstrapTarget: this.tunnelSessionRegistry.getBootstrapTarget({
-        sandboxInstanceId: input.sandboxInstanceId,
-      }),
+      bootstrapTarget,
       releasedBindings: this.tunnelSessionRegistry.releaseClientSessionBindings(input),
     };
   }
 
-  private requireBootstrapTarget(sandboxInstanceId: string) {
-    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({
-      sandboxInstanceId,
-    });
+  private getMatchingBootstrapTarget(target: GatewayForwardingTarget, sandboxInstanceId: string) {
+    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({ sandboxInstanceId });
+    if (bootstrapTarget === undefined) {
+      return undefined;
+    }
+    if (bootstrapTarget.sessionId !== target.targetBootstrapSessionId) {
+      return undefined;
+    }
+
+    return bootstrapTarget;
+  }
+
+  private requireBootstrapTarget(target: GatewayForwardingTarget, sandboxInstanceId: string) {
+    const bootstrapTarget = this.tunnelSessionRegistry.getBootstrapTarget({ sandboxInstanceId });
     if (bootstrapTarget === undefined) {
       throw new BootstrapTunnelNotConnectedError(sandboxInstanceId);
+    }
+    if (bootstrapTarget.sessionId !== target.targetBootstrapSessionId) {
+      throw new Error(
+        `Resolved bootstrap session is no longer current for sandbox '${sandboxInstanceId}'.`,
+      );
     }
 
     return bootstrapTarget;

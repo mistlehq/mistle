@@ -366,6 +366,7 @@ describe("TunnelProtocolTranslator", () => {
             rows: 24,
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
   });
@@ -404,6 +405,7 @@ describe("TunnelProtocolTranslator", () => {
             rows: 24,
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
 
@@ -430,6 +432,7 @@ describe("TunnelProtocolTranslator", () => {
             kind: "agent",
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
   });
@@ -460,6 +463,7 @@ describe("TunnelProtocolTranslator", () => {
             kind: "processes",
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
   });
@@ -534,6 +538,7 @@ describe("TunnelProtocolTranslator", () => {
             sizeBytes: 128,
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
   });
@@ -731,6 +736,7 @@ describe("TunnelProtocolTranslator", () => {
           type: "stream.close",
           streamId: 1,
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
 
@@ -1042,10 +1048,13 @@ describe("TunnelProtocolTranslator", () => {
         }),
       },
       notifyBootstrapPeerOfReleasedStream: {
-        channelKind: "pty",
-        clientSessionId: "conn_1",
-        clientStreamId: 41,
-        tunnelStreamId: 1,
+        binding: {
+          channelKind: "pty",
+          clientSessionId: "conn_1",
+          clientStreamId: 41,
+          tunnelStreamId: 1,
+        },
+        targetBootstrapSessionId: BootstrapSessionId,
       },
       releaseInteractiveStream: {
         clientSessionId: "conn_1",
@@ -1088,10 +1097,13 @@ describe("TunnelProtocolTranslator", () => {
         }),
       },
       notifyBootstrapPeerOfReleasedStream: {
-        channelKind: "fileUpload",
-        clientSessionId: "conn_1",
-        clientStreamId: 42,
-        tunnelStreamId: 1,
+        binding: {
+          channelKind: "fileUpload",
+          clientSessionId: "conn_1",
+          clientStreamId: 42,
+          tunnelStreamId: 1,
+        },
+        targetBootstrapSessionId: BootstrapSessionId,
       },
       releaseInteractiveStream: {
         clientSessionId: "conn_1",
@@ -1129,10 +1141,13 @@ describe("TunnelProtocolTranslator", () => {
         }),
       },
       notifyBootstrapPeerOfReleasedStream: {
-        channelKind: "processes",
-        clientSessionId: "conn_1",
-        clientStreamId: 52,
-        tunnelStreamId: 1,
+        binding: {
+          channelKind: "processes",
+          clientSessionId: "conn_1",
+          clientStreamId: 52,
+          tunnelStreamId: 1,
+        },
+        targetBootstrapSessionId: BootstrapSessionId,
       },
       releaseInteractiveStream: {
         clientSessionId: "conn_1",
@@ -1171,6 +1186,7 @@ describe("TunnelProtocolTranslator", () => {
             stdin: "input",
           },
         }),
+        targetBootstrapSessionId: BootstrapSessionId,
       },
     });
   });

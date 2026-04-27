@@ -43,6 +43,7 @@ export async function notifyBootstrapPeerOfReleasedInteractiveStreams(input: {
   relayCoordinator: TunnelRelayCoordinator;
   releasedBindings: ClientStreamBinding[];
   sandboxInstanceId: string;
+  targetBootstrapSessionId?: string;
 }): Promise<void> {
   if (input.releasedBindings.length === 0) {
     return;
@@ -54,6 +55,7 @@ export async function notifyBootstrapPeerOfReleasedInteractiveStreams(input: {
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "connection",
         payload: createStreamClosePayload(binding),
+        targetSessionId: input.targetBootstrapSessionId,
       }),
     ),
   );

@@ -454,6 +454,9 @@ export class TunnelSessionService {
           relayCoordinator: this.relayCoordinator,
           releasedBindings: result.releasedBindings,
           sandboxInstanceId: input.sandboxInstanceId,
+          ...(result.bootstrapTarget === undefined
+            ? {}
+            : { targetBootstrapSessionId: result.bootstrapTarget.sessionId }),
         }),
       )
       .catch((error: unknown) => {

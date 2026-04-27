@@ -128,7 +128,10 @@ export async function handleTunnelWebSocketMessage(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       fromSide: input.sourcePeerSide,
       payload: translation.delivery.payload,
-      targetSessionId: translation.delivery.targetConnectionSessionId,
+      targetSessionId:
+        input.sourcePeerSide === "connection"
+          ? translation.delivery.targetBootstrapSessionId
+          : translation.delivery.targetConnectionSessionId,
     });
   }
 
@@ -142,8 +145,10 @@ export async function handleTunnelWebSocketMessage(input: {
   if (translation.notifyBootstrapPeerOfReleasedStream !== undefined) {
     await notifyBootstrapPeerOfReleasedInteractiveStreams({
       relayCoordinator: input.relayCoordinator,
-      releasedBindings: [translation.notifyBootstrapPeerOfReleasedStream],
+      releasedBindings: [translation.notifyBootstrapPeerOfReleasedStream.binding],
       sandboxInstanceId: input.sandboxInstanceId,
+      targetBootstrapSessionId:
+        translation.notifyBootstrapPeerOfReleasedStream.targetBootstrapSessionId,
     });
   }
 }
