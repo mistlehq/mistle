@@ -52,9 +52,8 @@ type SandboxProfileEditorPageStoryArgs = {
   snapshotState?:
     | "draft-unavailable"
     | "no-snapshot"
-    | "preparing-snapshot"
+    | "creating-snapshot"
     | "snapshot-ready"
-    | "refreshing-snapshot"
     | "snapshot-failed"
     | "refresh-failed";
   integrationsSectionState?: {
@@ -195,7 +194,6 @@ const StoryBindings = [
 type SnapshotStoryStatus = NonNullable<SandboxProfileEditorPageStoryArgs["snapshotState"]>;
 
 type SnapshotStoryState = {
-  actionIsDisabled: boolean;
   activityLabel: string | null;
   bodyActionLabel: string | null;
   latestSnapshotCreatedAt: string | null;
@@ -203,12 +201,10 @@ type SnapshotStoryState = {
     title: string;
     variant: React.ComponentProps<typeof Notice>["variant"];
   } | null;
-  statusLabel: string;
 };
 
 const SnapshotStoryStates: Record<SnapshotStoryStatus, SnapshotStoryState> = {
   "draft-unavailable": {
-    actionIsDisabled: true,
     activityLabel: null,
     bodyActionLabel: null,
     latestSnapshotCreatedAt: null,
@@ -216,42 +212,29 @@ const SnapshotStoryStates: Record<SnapshotStoryStatus, SnapshotStoryState> = {
       title: "Snapshots are available after publishing",
       variant: "default",
     },
-    statusLabel: "Draft only",
   },
   "no-snapshot": {
-    actionIsDisabled: false,
     activityLabel: null,
     bodyActionLabel: "Create snapshot",
     latestSnapshotCreatedAt: null,
-    notice: null,
-    statusLabel: "No snapshot",
+    notice: {
+      title: "Create a snapshot to start sessions from this profile.",
+      variant: "alert",
+    },
   },
-  "preparing-snapshot": {
-    actionIsDisabled: true,
+  "creating-snapshot": {
     activityLabel: "Creating snapshot",
     bodyActionLabel: null,
     latestSnapshotCreatedAt: null,
     notice: null,
-    statusLabel: "Creating",
   },
   "snapshot-ready": {
-    actionIsDisabled: false,
     activityLabel: null,
     bodyActionLabel: "Refresh snapshot",
     latestSnapshotCreatedAt: "Apr 27, 2026, 10:21 AM",
     notice: null,
-    statusLabel: "Ready",
-  },
-  "refreshing-snapshot": {
-    actionIsDisabled: true,
-    activityLabel: "Refreshing",
-    bodyActionLabel: null,
-    latestSnapshotCreatedAt: "Apr 27, 2026, 10:21 AM",
-    notice: null,
-    statusLabel: "Refreshing",
   },
   "snapshot-failed": {
-    actionIsDisabled: false,
     activityLabel: null,
     bodyActionLabel: "Create snapshot",
     latestSnapshotCreatedAt: null,
@@ -259,10 +242,8 @@ const SnapshotStoryStates: Record<SnapshotStoryStatus, SnapshotStoryState> = {
       title: "Snapshot failed",
       variant: "alert",
     },
-    statusLabel: "Error",
   },
   "refresh-failed": {
-    actionIsDisabled: false,
     activityLabel: null,
     bodyActionLabel: "Refresh snapshot",
     latestSnapshotCreatedAt: "Apr 27, 2026, 10:21 AM",
@@ -270,7 +251,6 @@ const SnapshotStoryStates: Record<SnapshotStoryStatus, SnapshotStoryState> = {
       title: "Refresh failed",
       variant: "alert",
     },
-    statusLabel: "Error",
   },
 };
 
@@ -310,10 +290,6 @@ function SandboxProfileSnapshotStoryPanel(input: {
         />
       ) : null}
 
-      {input.status === "no-snapshot" ? (
-        <Notice title="Create a snapshot to start sessions from this profile." variant="alert" />
-      ) : null}
-
       {state.notice === null ? null : (
         <Notice title={state.notice.title} variant={state.notice.variant} />
       )}
@@ -328,9 +304,7 @@ function SandboxProfileSnapshotStoryPanel(input: {
 
       {state.bodyActionLabel === null ? null : (
         <div>
-          <Button disabled={state.actionIsDisabled} type="button">
-            {state.bodyActionLabel}
-          </Button>
+          <Button type="button">{state.bodyActionLabel}</Button>
         </div>
       )}
 
@@ -656,11 +630,11 @@ export const SnapshotNoSnapshot: Story = {
   },
 };
 
-export const SnapshotPreparing: Story = {
+export const SnapshotCreating: Story = {
   args: {
     initialSectionId: "snapshot",
     lifecycleState: "published",
-    snapshotState: "preparing-snapshot",
+    snapshotState: "creating-snapshot",
   },
 };
 
@@ -669,7 +643,7 @@ export const PublishSuccessfulCreatingSnapshot: Story = {
     initialSectionId: "snapshot",
     lifecycleState: "published",
     publishSuccessMessage: true,
-    snapshotState: "preparing-snapshot",
+    snapshotState: "creating-snapshot",
   },
 };
 
@@ -678,14 +652,6 @@ export const SnapshotReady: Story = {
     initialSectionId: "snapshot",
     lifecycleState: "published",
     snapshotState: "snapshot-ready",
-  },
-};
-
-export const SnapshotRefreshing: Story = {
-  args: {
-    initialSectionId: "snapshot",
-    lifecycleState: "published",
-    snapshotState: "refreshing-snapshot",
   },
 };
 
