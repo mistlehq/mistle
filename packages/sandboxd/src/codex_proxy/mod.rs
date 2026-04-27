@@ -1308,8 +1308,8 @@ mod tests {
 
     #[test]
     fn restarts_the_codex_proxy_after_the_runtime_exits() {
-        let raw_server_address = reserve_test_listener_address();
-        let raw_server = start_test_raw_codex_server(raw_server_address);
+        let raw_server = start_test_raw_codex_server();
+        let raw_server_address = raw_server.listener_address;
         let proxy_listener_address = reserve_test_listener_address();
         let supervisor_handle = SandboxdSupervisorHandle::new(
             "sandbox-123",
@@ -1365,6 +1365,7 @@ mod tests {
     }
 
     struct TestRawCodexServer {
+        listener_address: SocketAddr,
         shutdown_sender: Option<oneshot::Sender<()>>,
         thread: Option<thread::JoinHandle<()>>,
     }
@@ -1380,7 +1381,15 @@ mod tests {
         }
     }
 
-    fn start_test_raw_codex_server(listener_address: SocketAddr) -> TestRawCodexServer {
+    fn start_test_raw_codex_server() -> TestRawCodexServer {
+        let listener = StdTcpListener::bind(("127.0.0.1", 0))
+            .expect("test raw Codex listener should bind to an ephemeral loopback port");
+        let listener_address = listener
+            .local_addr()
+            .expect("test raw Codex listener should expose its bound address");
+        listener
+            .set_nonblocking(true)
+            .expect("test raw Codex listener should switch to nonblocking mode");
         let (shutdown_sender, shutdown_receiver) = oneshot::channel();
         let thread = thread::spawn(move || {
             let runtime = Builder::new_multi_thread()
@@ -1389,23 +1398,23 @@ mod tests {
                 .build()
                 .expect("test raw Codex server runtime should build");
             runtime.block_on(async move {
-                run_test_raw_codex_server(listener_address, shutdown_receiver).await;
+                run_test_raw_codex_server(listener, shutdown_receiver).await;
             });
         });
         wait_for_tcp_server(listener_address, Duration::from_secs(5));
         TestRawCodexServer {
+            listener_address,
             shutdown_sender: Some(shutdown_sender),
             thread: Some(thread),
         }
     }
 
     async fn run_test_raw_codex_server(
-        listener_address: SocketAddr,
+        std_listener: StdTcpListener,
         mut shutdown_receiver: oneshot::Receiver<()>,
     ) {
-        let listener = TcpListener::bind(listener_address)
-            .await
-            .expect("test raw Codex listener should bind");
+        let listener = TcpListener::from_std(std_listener)
+            .expect("test raw Codex listener should be accepted by Tokio");
         let mut connection_tasks = JoinSet::<()>::new();
 
         loop {

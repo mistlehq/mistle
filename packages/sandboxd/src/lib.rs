@@ -12,6 +12,8 @@ use std::sync::{Once, OnceLock};
 
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_sdk::trace::SdkTracerProvider;
+use tracing_subscriber::Layer as _;
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -51,7 +53,8 @@ fn initialize_sandboxd_tracing() {
         let fmt_layer = tracing_subscriber::fmt::layer()
             .with_ansi(false)
             .with_target(false)
-            .with_writer(std::io::stderr);
+            .with_writer(std::io::stderr)
+            .with_filter(LevelFilter::INFO);
         let otel_layer = tracing_opentelemetry::layer().with_tracer(tracer);
 
         let _ = tracing_subscriber::registry()
