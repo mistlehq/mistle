@@ -20,9 +20,9 @@ export function isExistingSandboxSessionPath(pathname: string): boolean {
 
 export function resolveSessionsSidebarModeEnabled(input: {
   pathname: string;
-  persistedEnabled: boolean;
+  enabled: boolean;
 }): boolean {
-  return input.persistedEnabled && isSessionsPath(input.pathname);
+  return input.enabled && isSessionsPath(input.pathname);
 }
 
 export function resolveSessionsNavHref(showSessionsSidebar: boolean): string {

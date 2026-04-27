@@ -84,23 +84,23 @@ describe("app shell sessions sidebar mode routing", () => {
     expect(resolveSessionsNavHref(true)).toBe(SessionsRoutes.NEW);
   });
 
-  it("keeps the persisted sessions sidebar mode scoped to sessions routes", () => {
+  it("keeps the sessions sidebar mode scoped to sessions routes", () => {
     expect(
       resolveSessionsSidebarModeEnabled({
         pathname: SessionsRoutes.NEW,
-        persistedEnabled: true,
+        enabled: true,
       }),
     ).toBe(true);
     expect(
       resolveSessionsSidebarModeEnabled({
         pathname: "/",
-        persistedEnabled: true,
+        enabled: true,
       }),
     ).toBe(false);
     expect(
       resolveSessionsSidebarModeEnabled({
         pathname: SessionsRoutes.INDEX,
-        persistedEnabled: false,
+        enabled: false,
       }),
     ).toBe(false);
   });

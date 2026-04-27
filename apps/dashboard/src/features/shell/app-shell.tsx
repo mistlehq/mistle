@@ -10,12 +10,6 @@ import { useAppHeaderLeadingModel, useAppPageMeta } from "../navigation/route-me
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
 import {
-  getBestEffortBrowserStorage,
-  removeBrowserStorageItem,
-  readBrowserStorageItem,
-  writeBrowserStorageItem,
-} from "../shared/browser-storage.js";
-import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
 } from "../shared/singleton-image.js";
@@ -39,8 +33,6 @@ import {
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { useOrganizationSummary } from "./use-organization-summary.js";
 
-const SESSIONS_SIDEBAR_MODE_STORAGE_KEY = "dashboard.sessions-sidebar.enabled";
-
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
@@ -58,13 +50,11 @@ export function AppShell(): React.JSX.Element {
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [switchOrganizationError, setSwitchOrganizationError] = useState<string | null>(null);
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
-  const [sessionsSidebarPreferenceEnabled, setSessionsSidebarPreferenceEnabled] = useState(() =>
-    readSessionsSidebarEnabledPreference(),
-  );
+  const [sessionsSidebarModeEnabled, setSessionsSidebarModeEnabled] = useState(false);
   const routeState = resolveAppShellRouteState(location.pathname);
   const showSessionsSidebar = resolveSessionsSidebarModeEnabled({
     pathname: location.pathname,
-    persistedEnabled: sessionsSidebarPreferenceEnabled,
+    enabled: sessionsSidebarModeEnabled,
   });
 
   useEffect(() => {
@@ -74,10 +64,6 @@ export function AppShell(): React.JSX.Element {
   }, [location.pathname, routeState.inSettings]);
 
   useEffect(() => {
-    persistSessionsSidebarEnabledPreference(sessionsSidebarPreferenceEnabled);
-  }, [sessionsSidebarPreferenceEnabled]);
-
-  useEffect(() => {
     const currentLocationHref = resolveLocationHref({
       pathname: location.pathname,
       search: location.search,
@@ -85,7 +71,7 @@ export function AppShell(): React.JSX.Element {
     });
 
     if (
-      sessionsSidebarPreferenceEnabled &&
+      sessionsSidebarModeEnabled &&
       !routeState.inSessions &&
       previousSessionsSidebarToggleUrlRef.current !== null &&
       previousSessionsSidebarToggleUrlRef.current !== currentLocationHref
@@ -98,7 +84,7 @@ export function AppShell(): React.JSX.Element {
     location.pathname,
     location.search,
     routeState.inSessions,
-    sessionsSidebarPreferenceEnabled,
+    sessionsSidebarModeEnabled,
   ]);
 
   const organizationOptionsQuery = useQuery({
@@ -169,7 +155,7 @@ export function AppShell(): React.JSX.Element {
       hash: location.hash,
     });
 
-    setSessionsSidebarPreferenceEnabled(nextChecked);
+    setSessionsSidebarModeEnabled(nextChecked);
 
     if (!nextChecked) {
       if (isExistingSandboxSessionPath(location.pathname)) {
@@ -263,31 +249,4 @@ export function AppShell(): React.JSX.Element {
       />
     </AppShellHeaderActionsContext.Provider>
   );
-}
-
-function readSessionsSidebarEnabledPreference(): boolean {
-  const storage = getBestEffortBrowserStorage("local");
-  const storedValue = readBrowserStorageItem({
-    key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-    storage,
-  });
-
-  return storedValue === "true";
-}
-
-function persistSessionsSidebarEnabledPreference(enabled: boolean): void {
-  const storage = getBestEffortBrowserStorage("local");
-  if (!enabled) {
-    removeBrowserStorageItem({
-      key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-      storage,
-    });
-    return;
-  }
-
-  writeBrowserStorageItem({
-    key: SESSIONS_SIDEBAR_MODE_STORAGE_KEY,
-    value: "true",
-    storage,
-  });
 }
