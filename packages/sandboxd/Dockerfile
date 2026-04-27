@@ -36,6 +36,18 @@ RUN apt-get update \
     unzip \
   && rm -rf /var/lib/apt/lists/*
 
+# Login shells source /etc/profile, which resets PATH on Debian. Re-add
+# sandbox tool locations so commands like `nix` remain discoverable.
+RUN cat > /etc/profile.d/mistle-path.sh <<'EOF'
+for p in /opt/mistle/bin /root/.nix-profile/bin /nix/var/nix/profiles/default/bin; do
+  case ":$PATH:" in
+    *":$p:"*) ;;
+    *) PATH="$p:$PATH" ;;
+  esac
+done
+export PATH
+EOF
+
 RUN mkdir -p /opt/mistle/bin
 
 COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir
