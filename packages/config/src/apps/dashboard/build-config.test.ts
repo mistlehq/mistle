@@ -149,6 +149,9 @@ describe("loadDashboardBuildConfig", () => {
   it("loads dashboard origin from next config shape", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createNextDashboardConfigFile(),
+      env: {
+        MISTLE_CONFIG_FORMAT: "next",
+      },
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
@@ -168,6 +171,9 @@ describe("loadDashboardBuildConfig", () => {
 
     const config = loadDashboardBuildConfigForTest({
       configPath,
+      env: {
+        MISTLE_CONFIG_FORMAT: "next",
+      },
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
@@ -202,6 +208,9 @@ describe("loadDashboardBuildConfig", () => {
           'client_secret = "google-client-secret"',
         ].join("\n"),
       }),
+      env: {
+        MISTLE_CONFIG_FORMAT: "next",
+      },
     });
 
     expect(config.authMethods).toEqual({
@@ -215,6 +224,9 @@ describe("loadDashboardBuildConfig", () => {
         configPath: createNextDashboardConfigFile({
           enabledMethods: ["otp", "google"],
         }),
+        env: {
+          MISTLE_CONFIG_FORMAT: "next",
+        },
       }),
     ).toThrow("services.control_plane_api.auth.google is required when google auth is enabled.");
   });
@@ -274,6 +286,9 @@ describe("loadDashboardBuildConfig", () => {
         configPath: createNextDashboardConfigFile({
           dashboardOrigin: "localhost:5100",
         }),
+        env: {
+          MISTLE_CONFIG_FORMAT: "next",
+        },
         environment: "production",
       }),
     ).toThrow("services.dashboard.control_plane_api_origin must use http:// or https://.");

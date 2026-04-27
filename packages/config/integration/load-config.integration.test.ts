@@ -626,12 +626,77 @@ describe("loadConfig integrations", () => {
     ).toThrow(/Invalid input/);
   });
 
+  it("loads the next config file fixture when MISTLE_CONFIG_FORMAT opts in", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: nextConfigFixturePath,
+      env: {
+        MISTLE_CONFIG_FORMAT: "next",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: controlPlaneApiNextFixtureConfig,
+    });
+  });
+
+  it("lets an explicit format option override MISTLE_CONFIG_FORMAT", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: nextConfigFixturePath,
+      format: "next",
+      env: {
+        MISTLE_CONFIG_FORMAT: "legacy",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: controlPlaneApiNextFixtureConfig,
+    });
+  });
+
+  it("rejects an unsupported MISTLE_CONFIG_FORMAT value", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        configPath: configFixturePath,
+        env: {
+          MISTLE_CONFIG_FORMAT: "legacy",
+        },
+      }),
+    ).toThrow('MISTLE_CONFIG_FORMAT must be "next" when set.');
+  });
+
   it("applies env overrides after loading the next config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       configPath: nextConfigFixturePath,
       format: "next",
       env: {
+        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: {
+        ...controlPlaneApiNextFixtureConfig,
+        server: {
+          host: "localhost",
+          port: 5100,
+        },
+      },
+    });
+  });
+
+  it("applies env overrides after MISTLE_CONFIG_FORMAT opts into next TOML", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: nextConfigFixturePath,
+      env: {
+        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
       },
     });
@@ -1126,7 +1191,7 @@ describe("loadConfig integrations", () => {
     expect(config.app.controlPlaneApi).toEqual({
       baseUrl: "http://127.0.0.1:5000",
     });
-    expect(config.app.sandboxStorage).toEqual({});
+    expect(config.app.sandboxStorage).toBeUndefined();
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

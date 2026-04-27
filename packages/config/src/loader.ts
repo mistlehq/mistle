@@ -28,7 +28,7 @@ import * as nextConfig from "./next/index.js";
 import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
 import { type AppConfig, ConfigSchema } from "./schema.js";
 
-type LoadConfigSourceOptions = {
+export type LoadConfigSourceOptions = {
   configPath?: string;
   env?: NodeJS.ProcessEnv;
   format?: "next";
@@ -47,6 +47,23 @@ export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKe
 
 function resolveConfigPath(options: LoadConfigSourceOptions): string | undefined {
   return options.configPath ?? options.env?.MISTLE_CONFIG_PATH;
+}
+
+export function resolveConfigFormat(options: LoadConfigSourceOptions): "next" | undefined {
+  if (options.format !== undefined) {
+    return options.format;
+  }
+
+  const envFormat = options.env?.MISTLE_CONFIG_FORMAT?.trim();
+  if (envFormat === undefined || envFormat.length === 0) {
+    return undefined;
+  }
+
+  if (envFormat === "next") {
+    return "next";
+  }
+
+  throw new Error('MISTLE_CONFIG_FORMAT must be "next" when set.');
 }
 
 function resolveLoadInputs(options: LoadConfigSourceOptions): {
@@ -81,14 +98,17 @@ function loadValidatedRoot(
   options: LoadConfigSourceOptions,
 ): Record<string, unknown> {
   const { configPath, env } = resolveLoadInputs(options);
+  const format = resolveConfigFormat(options);
 
   const parsedTomlRoot =
     configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
 
   const tomlLoadedRoot =
-    configPath === undefined || options.format === undefined
-      ? loadFromToml(modules, parsedTomlRoot)
-      : nextConfig.loadFromToml(parsedTomlRoot);
+    configPath === undefined
+      ? {}
+      : format === undefined
+        ? loadFromToml(modules, parsedTomlRoot)
+        : nextConfig.loadFromToml(parsedTomlRoot);
   const envLoadedRoot = loadFromEnv(modules, env);
   const mergedRoot = mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
   return validateModules(modules, mergedRoot);

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseToml } from "smol-toml";
 
+import { resolveConfigFormat } from "../../packages/config/src/loader.ts";
 import {
   getLocalDevDockerRegistrySandboxBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
@@ -57,7 +58,7 @@ type RunInput = {
 };
 
 type SandboxProvider = "docker" | "e2b";
-type TomlConfigShape = "legacy" | "next";
+type TomlConfigFormat = "legacy" | "next";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -87,15 +88,8 @@ function readTomlConfigRoot(configPath: string): Record<string, unknown> {
   return parsed;
 }
 
-function resolveTomlConfigShape(configPath: string): TomlConfigShape {
-  const parsed = readTomlConfigRoot(configPath);
-  const services = parsed.services;
-
-  if (isRecord(services)) {
-    return "next";
-  }
-
-  return "legacy";
+function resolveDevTomlConfigFormat(): TomlConfigFormat {
+  return resolveConfigFormat({ env: process.env }) ?? "legacy";
 }
 
 function readRequiredIntegerTomlValue(
@@ -114,8 +108,8 @@ function readRequiredIntegerTomlValue(
 }
 
 function readControlPlaneApiLocalPort(configPath: string): number {
-  const configShape = resolveTomlConfigShape(configPath);
-  if (configShape === "next") {
+  const configFormat = resolveDevTomlConfigFormat();
+  if (configFormat === "next") {
     return readRequiredIntegerTomlValue(
       configPath,
       ["services", "control_plane_api", "port"],
@@ -131,8 +125,8 @@ function readControlPlaneApiLocalPort(configPath: string): number {
 }
 
 function readDataPlaneGatewayLocalPort(configPath: string): number {
-  const configShape = resolveTomlConfigShape(configPath);
-  if (configShape === "next") {
+  const configFormat = resolveDevTomlConfigFormat();
+  if (configFormat === "next") {
     return readRequiredIntegerTomlValue(
       configPath,
       ["services", "data_plane_gateway", "port"],
@@ -148,8 +142,8 @@ function readDataPlaneGatewayLocalPort(configPath: string): number {
 }
 
 function readTokenizerProxyLocalPort(configPath: string): number {
-  const configShape = resolveTomlConfigShape(configPath);
-  if (configShape === "next") {
+  const configFormat = resolveDevTomlConfigFormat();
+  if (configFormat === "next") {
     return readRequiredIntegerTomlValue(
       configPath,
       ["services", "tokenizer_proxy", "port"],
@@ -178,16 +172,16 @@ function readSandboxProvider(configPath: string): SandboxProvider {
   }
 
   const parsed = readTomlConfigRoot(configPath);
-  const configShape = resolveTomlConfigShape(configPath);
+  const configFormat = resolveDevTomlConfigFormat();
   const sandboxProviderPath =
-    configShape === "next" ? ["sandbox", "provider"] : ["global", "sandbox", "provider"];
+    configFormat === "next" ? ["sandbox", "provider"] : ["global", "sandbox", "provider"];
   const resolvedValue = getValueAtPath(parsed, sandboxProviderPath);
 
   if (resolvedValue === "docker" || resolvedValue === "e2b") {
     return resolvedValue;
   }
 
-  const pathLabel = configShape === "next" ? "sandbox.provider" : "global.sandbox.provider";
+  const pathLabel = configFormat === "next" ? "sandbox.provider" : "global.sandbox.provider";
   throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
 }
 
@@ -431,6 +425,7 @@ function dockerImageExists(imageTag: string): boolean {
 }
 
 async function start(): Promise<void> {
+  const configFormat = resolveDevTomlConfigFormat();
   const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
   const infraSummary =
     sandboxProvider === "docker"
@@ -456,6 +451,7 @@ async function start(): Promise<void> {
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
+    ...(configFormat === "next" ? { MISTLE_CONFIG_FORMAT: configFormat } : {}),
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,

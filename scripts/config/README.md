@@ -48,6 +48,9 @@ Notes:
 
 - Conversion currently covers `@mistle/config` managed runtime modules (global plus control/data plane apps).
 - Unknown keys are ignored.
+- Next TOML files must be loaded with `MISTLE_CONFIG_FORMAT=next` when they are
+  supplied through `MISTLE_CONFIG_PATH`. Legacy TOML remains the default until
+  the migration is complete.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
 - Generated integration configs omit `global.sandbox.storage` unless a provider-specific durable storage backend is enabled.
 - If integration config generation explicitly enables Archil storage, provider

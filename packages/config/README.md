@@ -47,6 +47,15 @@ Currently supported `app` values are exposed in `AppIds`.
 `configPath` can come from either `options.configPath` or `options.env.MISTLE_CONFIG_PATH`.
 There is no implicit fallback to process env.
 
+Next TOML is explicitly opt-in during the migration period:
+
+- pass `format: "next"` to `loadConfig(...)`, or
+- set `MISTLE_CONFIG_FORMAT=next` alongside `MISTLE_CONFIG_PATH`.
+
+Any other non-empty `MISTLE_CONFIG_FORMAT` value is rejected. Env overrides are
+still applied after TOML projection, so the existing `MISTLE_GLOBAL_*` and
+`MISTLE_APPS_*` env variables keep their current override behavior.
+
 `includeGlobal` defaults to `true`.
 
 Return shape:

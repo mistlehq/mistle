@@ -25,7 +25,8 @@ Minimal dashboard scaffold using Vite + React.
 - Override config file path by setting:
   - `MISTLE_CONFIG_PATH`
 - Required key:
-  - `apps.dashboard.control_plane_api_origin`
+  - legacy TOML: `apps.dashboard.control_plane_api_origin`
+  - next TOML with `MISTLE_CONFIG_FORMAT=next`: `services.dashboard.control_plane_api_origin`
 
 ## Control Plane OpenAPI Client
 

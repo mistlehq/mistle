@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
+import { resolveConfigFormat } from "../../loader.js";
 import { deriveDashboardAuthMethods } from "../control-plane-api/dashboard-auth-methods.js";
 
 export type DashboardBuildEnvironment = "development" | "production";
@@ -168,15 +169,6 @@ function normalizeOrigin(value: string, key: string): string {
   return parsed.origin;
 }
 
-function hasNextDashboardConfig(parsedRoot: UnknownRecord): boolean {
-  const services = parsedRoot.services;
-  if (!isRecord(services)) {
-    return false;
-  }
-
-  return isRecord(services.dashboard);
-}
-
 function resolveConfigPath(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
@@ -210,7 +202,7 @@ export function loadDashboardBuildConfig(
   const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
   const parsedRoot = parseTomlFile(configPath);
 
-  if (hasNextDashboardConfig(parsedRoot)) {
+  if (resolveConfigFormat({ env: environment }) === "next") {
     const parsedConfig = NextDashboardBuildConfigSchema.parse(parsedRoot);
     const controlPlaneApiOrigin = normalizeOrigin(
       parsedConfig.services.dashboard.control_plane_api_origin,
