@@ -72,6 +72,36 @@ function createDashboardConfigFile(input?: {
   return configPath;
 }
 
+function createNextDashboardConfigFile(input?: {
+  dashboardOrigin?: string;
+  enabledMethods?: readonly string[];
+  googleTomlBlock?: string;
+}): string {
+  const directory = createTempDirectory();
+  const configPath = join(directory, "config.next.toml");
+  const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
+  const enabledMethods = input?.enabledMethods ?? ["otp"];
+  const googleTomlBlock = input?.googleTomlBlock ?? "";
+
+  writeFileSync(
+    configPath,
+    [
+      "[services.dashboard]",
+      `control_plane_api_origin = "${dashboardOrigin}"`,
+      "",
+      "[services.control_plane_api.auth]",
+      `enabled_methods = [${enabledMethods.map((method) => `"${method}"`).join(", ")}]`,
+      "",
+      googleTomlBlock,
+    ]
+      .filter((line) => line.length > 0)
+      .join("\n"),
+    "utf8",
+  );
+
+  return configPath;
+}
+
 function loadDashboardBuildConfigForTest(input?: {
   env?: NodeJS.ProcessEnv;
   configPath?: string;
@@ -116,6 +146,36 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
+  it("loads dashboard origin from next config shape", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createNextDashboardConfigFile(),
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      google: false,
+    });
+  });
+
+  it("loads dashboard origin from dashboard-only next config shape", () => {
+    const directory = createTempDirectory();
+    const configPath = join(directory, "config.next.toml");
+    writeFileSync(
+      configPath,
+      '[services.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+      "utf8",
+    );
+
+    const config = loadDashboardBuildConfigForTest({
+      configPath,
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
+    expect(config.authMethods).toEqual({
+      google: false,
+    });
+  });
+
   it("derives google auth availability from control-plane auth config", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createDashboardConfigFile({
@@ -130,6 +190,33 @@ describe("loadDashboardBuildConfig", () => {
     expect(config.authMethods).toEqual({
       google: true,
     });
+  });
+
+  it("derives google auth availability from next control-plane auth config", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createNextDashboardConfigFile({
+        enabledMethods: ["otp", "google"],
+        googleTomlBlock: [
+          "[services.control_plane_api.auth.google]",
+          'client_id = "google-client-id"',
+          'client_secret = "google-client-secret"',
+        ].join("\n"),
+      }),
+    });
+
+    expect(config.authMethods).toEqual({
+      google: true,
+    });
+  });
+
+  it("fails when next google auth is enabled without provider config", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath: createNextDashboardConfigFile({
+          enabledMethods: ["otp", "google"],
+        }),
+      }),
+    ).toThrow("services.control_plane_api.auth.google is required when google auth is enabled.");
   });
 
   it("derives google auth availability from env-only control-plane auth config", () => {
@@ -179,5 +266,16 @@ describe("loadDashboardBuildConfig", () => {
         environment: "production",
       }),
     ).toThrow("apps.dashboard.control_plane_api_origin must use http:// or https://.");
+  });
+
+  it("fails when services.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        configPath: createNextDashboardConfigFile({
+          dashboardOrigin: "localhost:5100",
+        }),
+        environment: "production",
+      }),
+    ).toThrow("services.dashboard.control_plane_api_origin must use http:// or https://.");
   });
 });

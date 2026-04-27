@@ -57,6 +57,7 @@ type RunInput = {
 };
 
 type SandboxProvider = "docker" | "e2b";
+type TomlConfigShape = "legacy" | "next";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -76,12 +77,33 @@ function getValueAtPath(root: unknown, path: readonly string[]): unknown {
   return current;
 }
 
+function readTomlConfigRoot(configPath: string): Record<string, unknown> {
+  const parsed = parseToml(readFileSync(configPath, "utf8"));
+
+  if (!isRecord(parsed)) {
+    throw new Error(`Missing or invalid TOML object in ${configPath}.`);
+  }
+
+  return parsed;
+}
+
+function resolveTomlConfigShape(configPath: string): TomlConfigShape {
+  const parsed = readTomlConfigRoot(configPath);
+  const services = parsed.services;
+
+  if (isRecord(services)) {
+    return "next";
+  }
+
+  return "legacy";
+}
+
 function readRequiredIntegerTomlValue(
   configPath: string,
   path: readonly string[],
   pathLabel: string,
 ): number {
-  const parsed = parseToml(readFileSync(configPath, "utf8"));
+  const parsed = readTomlConfigRoot(configPath);
   const resolvedValue = getValueAtPath(parsed, path);
 
   if (typeof resolvedValue !== "number" || Number.isInteger(resolvedValue) === false) {
@@ -92,6 +114,15 @@ function readRequiredIntegerTomlValue(
 }
 
 function readControlPlaneApiLocalPort(configPath: string): number {
+  const configShape = resolveTomlConfigShape(configPath);
+  if (configShape === "next") {
+    return readRequiredIntegerTomlValue(
+      configPath,
+      ["services", "control_plane_api", "port"],
+      "services.control_plane_api.port",
+    );
+  }
+
   return readRequiredIntegerTomlValue(
     configPath,
     ["apps", "control_plane_api", "server", "port"],
@@ -100,6 +131,15 @@ function readControlPlaneApiLocalPort(configPath: string): number {
 }
 
 function readDataPlaneGatewayLocalPort(configPath: string): number {
+  const configShape = resolveTomlConfigShape(configPath);
+  if (configShape === "next") {
+    return readRequiredIntegerTomlValue(
+      configPath,
+      ["services", "data_plane_gateway", "port"],
+      "services.data_plane_gateway.port",
+    );
+  }
+
   return readRequiredIntegerTomlValue(
     configPath,
     ["apps", "data_plane_gateway", "server", "port"],
@@ -108,6 +148,15 @@ function readDataPlaneGatewayLocalPort(configPath: string): number {
 }
 
 function readTokenizerProxyLocalPort(configPath: string): number {
+  const configShape = resolveTomlConfigShape(configPath);
+  if (configShape === "next") {
+    return readRequiredIntegerTomlValue(
+      configPath,
+      ["services", "tokenizer_proxy", "port"],
+      "services.tokenizer_proxy.port",
+    );
+  }
+
   return readRequiredIntegerTomlValue(
     configPath,
     ["apps", "tokenizer_proxy", "server", "port"],
@@ -128,14 +177,18 @@ function readSandboxProvider(configPath: string): SandboxProvider {
     );
   }
 
-  const parsed = parseToml(readFileSync(configPath, "utf8"));
-  const resolvedValue = getValueAtPath(parsed, ["global", "sandbox", "provider"]);
+  const parsed = readTomlConfigRoot(configPath);
+  const configShape = resolveTomlConfigShape(configPath);
+  const sandboxProviderPath =
+    configShape === "next" ? ["sandbox", "provider"] : ["global", "sandbox", "provider"];
+  const resolvedValue = getValueAtPath(parsed, sandboxProviderPath);
 
   if (resolvedValue === "docker" || resolvedValue === "e2b") {
     return resolvedValue;
   }
 
-  throw new Error("Missing or invalid global.sandbox.provider in config/config.development.toml.");
+  const pathLabel = configShape === "next" ? "sandbox.provider" : "global.sandbox.provider";
+  throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
 }
 
 function readRequiredEnv(envVarName: string): string {

@@ -4,7 +4,7 @@ import { type Config } from "./schema.js";
 function buildArchilMount(
   config: Config,
 ): AppConfig["apps"]["data_plane_worker"]["sandboxStorage"] {
-  const archilConfig = config.sandbox.storage_backends?.archil;
+  const archilConfig = config.sandbox.storage?.archil;
 
   if (archilConfig === undefined) {
     return {};
@@ -24,7 +24,7 @@ function buildArchilMount(
 
   if (sandboxObjectStore === undefined) {
     throw new Error(
-      "object_store.sandbox_storage is required when sandbox.storage_backends.archil.mount_object_store is 'sandbox_storage'.",
+      "object_store.sandbox_storage is required when sandbox.storage.archil.mount_object_store is 'sandbox_storage'.",
     );
   }
 
@@ -55,7 +55,7 @@ function buildArchilMount(
 function buildSandboxStorage(
   config: Config,
 ): AppConfig["apps"]["data_plane_worker"]["sandboxStorage"] {
-  const dockerVolumeConfig = config.sandbox.storage_backends?.docker_volume;
+  const dockerVolumeConfig = config.sandbox.storage?.docker_volume;
 
   return {
     ...buildArchilMount(config),
@@ -98,6 +98,12 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
   const dataPlaneApiInternalUrl = config.services.data_plane_api.internal_url;
   const dataPlaneGatewayInternalUrl = config.services.data_plane_gateway.internal_url;
   const tokenizerProxyEgressUrl = config.services.tokenizer_proxy.egress_url;
+  const sandboxStorage =
+    config.sandbox.storage === undefined
+      ? undefined
+      : {
+          backend: config.sandbox.storage.backend,
+        };
 
   const runtimeConfig: AppConfig = {
     global: {
@@ -108,35 +114,35 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
       },
       sandbox: {
         provider: config.sandbox.provider,
-        storage: config.sandbox.storage,
+        storage: sandboxStorage,
         defaultBaseImage: config.sandbox.default_base_image,
         gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
         internalGatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_internal_url,
         publish: {
           baseDomain: config.sandbox.publish_base_domain,
           access: {
-            tokenSecret: config.sandbox.publish.access_token.token_secret,
-            tokenIssuer: config.sandbox.publish.access_token.token_issuer,
-            tokenAudience: config.sandbox.publish.access_token.token_audience,
+            tokenSecret: config.sandbox.publish.access_token.secret,
+            tokenIssuer: config.sandbox.publish.access_token.issuer,
+            tokenAudience: config.sandbox.publish.access_token.audience,
           },
           session: {
             cookieSigningSecret: config.sandbox.publish.session.cookie_signing_secret,
           },
         },
         connect: {
-          tokenSecret: config.sandbox.tokens.connect.token_secret,
-          tokenIssuer: config.sandbox.tokens.connect.token_issuer,
-          tokenAudience: config.sandbox.tokens.connect.token_audience,
+          tokenSecret: config.sandbox.tokens.connect.secret,
+          tokenIssuer: config.sandbox.tokens.connect.issuer,
+          tokenAudience: config.sandbox.tokens.connect.audience,
         },
         bootstrap: {
-          tokenSecret: config.sandbox.tokens.bootstrap.token_secret,
-          tokenIssuer: config.sandbox.tokens.bootstrap.token_issuer,
-          tokenAudience: config.sandbox.tokens.bootstrap.token_audience,
+          tokenSecret: config.sandbox.tokens.bootstrap.secret,
+          tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
+          tokenAudience: config.sandbox.tokens.bootstrap.audience,
         },
         egress: {
-          tokenSecret: config.sandbox.tokens.egress.token_secret,
-          tokenIssuer: config.sandbox.tokens.egress.token_issuer,
-          tokenAudience: config.sandbox.tokens.egress.token_audience,
+          tokenSecret: config.sandbox.tokens.egress.secret,
+          tokenIssuer: config.sandbox.tokens.egress.issuer,
+          tokenAudience: config.sandbox.tokens.egress.audience,
         },
       },
     },

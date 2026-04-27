@@ -13,9 +13,9 @@ const ServiceEndpointSchema = z
 
 const TokenConfigSchema = z
   .object({
-    token_secret: z.string().trim().min(1),
-    token_issuer: z.string().trim().min(1),
-    token_audience: z.string().trim().min(1),
+    secret: z.string().trim().min(1),
+    issuer: z.string().trim().min(1),
+    audience: z.string().trim().min(1),
   })
   .strict();
 
@@ -31,6 +31,29 @@ const ObjectStoreSchema = z
   .strict();
 
 const AuthMethodSchema = z.enum(["otp", "google"]);
+
+const KvSchema = z
+  .object({
+    backend: z.enum(["valkey"]),
+    url: z.string().trim().min(1),
+    key_prefix: z.string().trim().min(1),
+  })
+  .strict();
+
+const SandboxStorageArchilSchema = z
+  .object({
+    api_key: z.string().trim().min(1),
+    region: z.string().trim().min(1),
+    name_prefix: z.string().trim().min(1).optional(),
+    mount_object_store: z.enum(["sandbox_storage"]).optional(),
+  })
+  .strict();
+
+const SandboxStorageDockerVolumeSchema = z
+  .object({
+    name_prefix: z.string().trim().min(1).optional(),
+  })
+  .strict();
 
 const ControlPlaneApiAuthSchema = z
   .object({
@@ -146,13 +169,11 @@ export const ConfigSchema = z
         control_plane: z
           .object({
             namespace_id: z.string().trim().min(1),
-            run_migrations: z.boolean(),
           })
           .strict(),
         data_plane: z
           .object({
             namespace_id: z.string().trim().min(1),
-            run_migrations: z.boolean(),
           })
           .strict(),
       })
@@ -175,13 +196,8 @@ export const ConfigSchema = z
       .strict(),
     kv: z
       .object({
-        data_plane: z
-          .object({
-            backend: z.enum(["valkey"]),
-            url: z.string().trim().min(1),
-            key_prefix: z.string().trim().min(1),
-          })
-          .strict(),
+        control_plane: KvSchema,
+        data_plane: KvSchema,
       })
       .strict(),
     object_store: z
@@ -224,10 +240,30 @@ export const ConfigSchema = z
         publish_base_domain: z.string().trim().min(1),
         storage: z
           .object({
-            backend: z.enum(["archil", "docker_volume"]).optional(),
+            backend: z.enum(["archil", "docker_volume"]),
+            archil: SandboxStorageArchilSchema.optional(),
+            docker_volume: SandboxStorageDockerVolumeSchema.optional(),
           })
           .strict()
-          .optional(),
+          .superRefine((value, ctx) => {
+            if (value.backend === "archil" && value.archil === undefined) {
+              ctx.addIssue({
+                code: "custom",
+                path: ["archil"],
+                message:
+                  "sandbox.storage.archil is required when sandbox.storage.backend is 'archil'.",
+              });
+            }
+
+            if (value.backend === "docker_volume" && value.docker_volume === undefined) {
+              ctx.addIssue({
+                code: "custom",
+                path: ["docker_volume"],
+                message:
+                  "sandbox.storage.docker_volume is required when sandbox.storage.backend is 'docker_volume'.",
+              });
+            }
+          }),
         tokens: z
           .object({
             connect: TokenConfigSchema,
@@ -258,26 +294,6 @@ export const ConfigSchema = z
             domain: z.string().trim().min(1),
             cpu_count: z.number().int().min(1),
             memory_mb: z.number().int().min(1),
-          })
-          .strict()
-          .optional(),
-        storage_backends: z
-          .object({
-            archil: z
-              .object({
-                api_key: z.string().trim().min(1),
-                region: z.string().trim().min(1),
-                name_prefix: z.string().trim().min(1).optional(),
-                mount_object_store: z.enum(["sandbox_storage"]).optional(),
-              })
-              .strict()
-              .optional(),
-            docker_volume: z
-              .object({
-                name_prefix: z.string().trim().min(1).optional(),
-              })
-              .strict()
-              .optional(),
           })
           .strict()
           .optional(),

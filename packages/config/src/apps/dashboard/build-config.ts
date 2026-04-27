@@ -11,7 +11,7 @@ export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
 
-const DashboardBuildConfigSchema = z.object({
+const LegacyDashboardBuildConfigSchema = z.object({
   apps: z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
@@ -20,6 +20,29 @@ const DashboardBuildConfigSchema = z.object({
       .object({
         auth: z
           .object({
+            google: z
+              .object({
+                client_id: z.string().min(1),
+                client_secret: z.string().min(1),
+              })
+              .optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+  }),
+});
+
+const NextDashboardBuildConfigSchema = z.object({
+  services: z.object({
+    dashboard: z.object({
+      control_plane_api_origin: z.string().min(1),
+    }),
+    control_plane_api: z
+      .object({
+        auth: z
+          .object({
+            enabled_methods: z.array(z.enum(["otp", "google"])).min(1),
             google: z
               .object({
                 client_id: z.string().min(1),
@@ -42,7 +65,7 @@ export type DashboardBuildConfig = {
 
 function resolveGoogleAuthConfig(
   environment: NodeJS.ProcessEnv,
-  parsedConfig: z.infer<typeof DashboardBuildConfigSchema>,
+  parsedConfig: z.infer<typeof LegacyDashboardBuildConfigSchema>,
 ): { clientId: string; clientSecret: string } | undefined {
   const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
   const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
@@ -67,6 +90,43 @@ function resolveGoogleAuthConfig(
   return {
     clientId: parsedConfig.apps.control_plane_api.auth.google.client_id,
     clientSecret: parsedConfig.apps.control_plane_api.auth.google.client_secret,
+  };
+}
+
+function resolveNextGoogleAuthConfig(
+  environment: NodeJS.ProcessEnv,
+  parsedConfig: z.infer<typeof NextDashboardBuildConfigSchema>,
+): { clientId: string; clientSecret: string } | undefined {
+  const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
+  const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
+
+  if (googleClientId !== undefined || googleClientSecret !== undefined) {
+    if (googleClientId === undefined || googleClientSecret === undefined) {
+      throw new Error(
+        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+      );
+    }
+
+    return {
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
+    };
+  }
+
+  const authConfig = parsedConfig.services.control_plane_api?.auth;
+  if (authConfig === undefined || !authConfig.enabled_methods.includes("google")) {
+    return undefined;
+  }
+
+  if (authConfig.google === undefined) {
+    throw new Error(
+      "services.control_plane_api.auth.google is required when google auth is enabled.",
+    );
+  }
+
+  return {
+    clientId: authConfig.google.client_id,
+    clientSecret: authConfig.google.client_secret,
   };
 }
 
@@ -108,6 +168,15 @@ function normalizeOrigin(value: string, key: string): string {
   return parsed.origin;
 }
 
+function hasNextDashboardConfig(parsedRoot: UnknownRecord): boolean {
+  const services = parsedRoot.services;
+  if (!isRecord(services)) {
+    return false;
+  }
+
+  return isRecord(services.dashboard);
+}
+
 function resolveConfigPath(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
@@ -141,7 +210,23 @@ export function loadDashboardBuildConfig(
   const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
   const parsedRoot = parseTomlFile(configPath);
 
-  const parsedConfig = DashboardBuildConfigSchema.parse(parsedRoot);
+  if (hasNextDashboardConfig(parsedRoot)) {
+    const parsedConfig = NextDashboardBuildConfigSchema.parse(parsedRoot);
+    const controlPlaneApiOrigin = normalizeOrigin(
+      parsedConfig.services.dashboard.control_plane_api_origin,
+      "services.dashboard.control_plane_api_origin",
+    );
+    const authMethods = deriveDashboardAuthMethods({
+      google: resolveNextGoogleAuthConfig(environment, parsedConfig),
+    });
+
+    return {
+      controlPlaneApiOrigin,
+      authMethods,
+    };
+  }
+
+  const parsedConfig = LegacyDashboardBuildConfigSchema.parse(parsedRoot);
   const controlPlaneApiOrigin = normalizeOrigin(
     parsedConfig.apps.dashboard.control_plane_api_origin,
     "apps.dashboard.control_plane_api_origin",
