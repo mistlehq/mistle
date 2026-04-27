@@ -29,6 +29,7 @@
     "@mistle/time": "workspace:*",
     "@mistle/webhooks": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
     "@openworkflow/cli": "^0.4.3",
     "drizzle-orm": "^0.45.2",
     "liquidjs": "^10.25.6",
@@ -40,7 +41,6 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/context-async-hooks": "^2.6.1",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1"
