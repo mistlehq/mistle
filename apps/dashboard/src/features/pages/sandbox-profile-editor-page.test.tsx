@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
+import { EditorView } from "@codemirror/view";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState, type JSX, type ReactNode } from "react";
 import {
   createMemoryRouter,
@@ -29,6 +30,7 @@ import {
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
+  SandboxProfileSectionDefaultRedirect,
   SandboxProfileEditorView,
   shouldRedirectDraftSandboxProfileViewToPublished,
   shouldPollSandboxProfileSnapshotJobs,
@@ -79,6 +81,13 @@ type SandboxProfileEditorTestVersionState =
   | "published-failed";
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
+type SandboxProfileEditorTestRouteSection =
+  | "integrations"
+  | "resources-and-tools"
+  | "configurations"
+  | "snapshot"
+  | "unknown-section"
+  | null;
 
 function createRunningSnapshotJobFixture(input: {
   id: string;
@@ -262,9 +271,10 @@ function renderSandboxProfileEditor(input?: {
   }[];
   integrationsLoading?: boolean;
   routeState?: unknown;
+  routeSection?: SandboxProfileEditorTestRouteSection;
   view?: SandboxProfileEditorTestRouteView;
   versionState?: SandboxProfileEditorTestVersionState;
-}): void {
+}) {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -348,20 +358,33 @@ function renderSandboxProfileEditor(input?: {
         input?.setupScript === undefined ? "pnpm install\npnpm dev:bootstrap" : input.setupScript,
     },
   );
+  const resolvedRouteSection =
+    input?.routeSection === undefined ? "integrations" : input.routeSection;
+  const sectionPath = resolvedRouteSection === null ? "" : `/${resolvedRouteSection}`;
   const initialPath =
     resolvedRouteView === "default"
       ? `/sandbox-profiles/${profileId}`
-      : `/sandbox-profiles/${profileId}/${resolvedRouteView}`;
+      : `/sandbox-profiles/${profileId}/${resolvedRouteView}${sectionPath}`;
   const router = createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
+        <Route element={<div>Outside page</div>} path="outside" />
         <Route element={<SandboxProfileEditorShell />} path="sandbox-profiles/:profileId">
           <Route element={<SandboxProfileDefaultRedirect />} index />
-          <Route
-            element={<SandboxProfileEditorPage mode="edit" view="published" />}
-            path="published"
-          />
-          <Route element={<SandboxProfileEditorPage mode="edit" view="draft" />} path="draft" />
+          <Route path="published">
+            <Route
+              element={<SandboxProfileEditorPage mode="edit" view="published" />}
+              path=":sectionId"
+            />
+            <Route element={<SandboxProfileSectionDefaultRedirect view="published" />} index />
+          </Route>
+          <Route path="draft">
+            <Route
+              element={<SandboxProfileEditorPage mode="edit" view="draft" />}
+              path=":sectionId"
+            />
+            <Route element={<SandboxProfileSectionDefaultRedirect view="draft" />} index />
+          </Route>
         </Route>
       </Route>,
     ),
@@ -385,6 +408,13 @@ function renderSandboxProfileEditor(input?: {
       </TestAppShellHeaderActionsProvider>
     </QueryClientProvider>,
   );
+
+  return {
+    profileId,
+    queryClient,
+    router,
+    version,
+  };
 }
 
 function DeleteProfileDialogHarness(input: {
@@ -404,7 +434,7 @@ function DeleteProfileDialogHarness(input: {
       deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      hasUnsavedIntegrationChanges={false}
+      hasUnpersistedIntegrationChanges={false}
       isDeleteProfileDialogOpen={isOpen}
       mode={{
         kind: "active",
@@ -437,7 +467,7 @@ function DeleteProfileDialogHarness(input: {
 }
 
 function DraftActionsHarness(input: {
-  hasUnsavedIntegrationChanges?: boolean;
+  hasUnpersistedIntegrationChanges?: boolean;
   versionActionError?: string | null;
 }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
@@ -449,7 +479,7 @@ function DraftActionsHarness(input: {
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      hasUnsavedIntegrationChanges={input.hasUnsavedIntegrationChanges ?? false}
+      hasUnpersistedIntegrationChanges={input.hasUnpersistedIntegrationChanges ?? false}
       isDeleteProfileDialogOpen={false}
       mode={{
         kind: "draft",
@@ -492,7 +522,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
-      hasUnsavedIntegrationChanges={false}
+      hasUnpersistedIntegrationChanges={false}
       isDeleteProfileDialogOpen={false}
       mode={{
         kind: "active",
@@ -544,7 +574,7 @@ function renderDeleteProfileDialogHarness(input: {
 }
 
 function renderDraftActionsHarness(input?: {
-  hasUnsavedIntegrationChanges?: boolean;
+  hasUnpersistedIntegrationChanges?: boolean;
   versionActionError?: string | null;
 }): void {
   const router = createMemoryRouter(
@@ -560,6 +590,26 @@ function renderPublishedWithDraftActionsHarness(): void {
   );
 
   render(<RouterProvider router={router} />);
+}
+
+function updateSetupScriptEditor(input: { editor: HTMLElement; value: string }): void {
+  const editorElement = input.editor.closest(".cm-editor");
+  if (!(editorElement instanceof HTMLElement)) {
+    throw new Error("CodeMirror editor element was not found.");
+  }
+
+  const editorView = EditorView.findFromDOM(editorElement);
+  if (editorView === null) {
+    throw new Error("CodeMirror editor view was not found.");
+  }
+
+  editorView.dispatch({
+    changes: {
+      from: 0,
+      to: editorView.state.doc.length,
+      insert: input.value,
+    },
+  });
 }
 
 describe("SandboxProfileEditorPage", () => {
@@ -772,7 +822,7 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("returns to integrations when leaving the snapshot tab for an existing draft", () => {
-    renderSandboxProfileEditor({
+    const { profileId, router } = renderSandboxProfileEditor({
       versionState: "published-with-draft",
     });
 
@@ -780,24 +830,30 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tab", { name: "Snapshot" }).getAttribute("aria-selected")).toBe(
       "true",
     );
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/snapshot`,
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Resume editing" }));
 
     expect(screen.getByRole("tab", { name: "Integrations" }).getAttribute("aria-selected")).toBe(
       "true",
     );
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/draft/integrations`,
+    );
   });
 
   it("does not show the publish success notice again after it is dismissed and the panel remounts", () => {
     renderSandboxProfileEditor({
       routeState: {
-        initialSectionId: "snapshot",
         notice: "publish-success",
       },
+      routeSection: "snapshot",
       versionState: "published-pending",
     });
 
-    expect(screen.getByText("Publish successful, creating a new snapshot")).toBeDefined();
+    expect(screen.getByText("Publish successful, creating a snapshot")).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
@@ -806,7 +862,142 @@ describe("SandboxProfileEditorPage", () => {
     );
     fireEvent.click(screen.getByRole("tab", { name: "Snapshot" }));
 
-    expect(screen.queryByText("Publish successful, creating a new snapshot")).toBeNull();
+    expect(screen.queryByText("Publish successful, creating a snapshot")).toBeNull();
+  });
+
+  it("opens the snapshot tab from the section route segment", () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published-pending",
+    });
+
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/snapshot`,
+    );
+    expect(screen.getByRole("tab", { name: "Snapshot" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(screen.getByText("Creating snapshot")).toBeDefined();
+  });
+
+  it("pushes a history entry when changing editor sections", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      versionState: "published-pending",
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Resources & Tools" }));
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/resources-and-tools`,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Configurations" }));
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/configurations`,
+    );
+
+    await router.navigate(-1);
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/resources-and-tools`,
+    );
+  });
+
+  it("keeps draft setup script edits across section route changes", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "configurations",
+      versionState: "draft",
+    });
+    const nextSetupScript = "pnpm install\npnpm test";
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Configurations",
+      hidden: false,
+    });
+    const editor = within(configurationsPanel).getByRole("textbox", {
+      name: "Setup script",
+    });
+    updateSetupScriptEditor({ editor, value: nextSetupScript });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Leave before draft changes are saved?")).toBeNull();
+      expect(router.state.location.pathname).toBe(
+        `/sandbox-profiles/${profileId}/draft/integrations`,
+      );
+    });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Configurations" }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(
+        `/sandbox-profiles/${profileId}/draft/configurations`,
+      );
+    });
+
+    const restoredPanel = screen.getByRole("tabpanel", {
+      name: "Configurations",
+      hidden: false,
+    });
+    const restoredEditorText =
+      within(restoredPanel).getByRole("textbox", { name: "Setup script" }).textContent ?? "";
+    expect(restoredEditorText).toContain("pnpm install");
+    expect(restoredEditorText).toContain("pnpm test");
+    expect(restoredEditorText).not.toContain("pnpm dev:bootstrap");
+  });
+
+  it("blocks true page exits while draft setup script edits are unpersisted", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "configurations",
+      versionState: "draft",
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Configurations",
+      hidden: false,
+    });
+    updateSetupScriptEditor({
+      editor: within(configurationsPanel).getByRole("textbox", {
+        name: "Setup script",
+      }),
+      value: "pnpm install\npnpm test",
+    });
+    await waitFor(() => {
+      const event = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+    });
+
+    void router.navigate("/outside");
+
+    expect(await screen.findByText("Leave before draft changes are saved?")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/draft/configurations`,
+    );
+  });
+
+  it("opens the snapshot tab when publish success navigation changes an already mounted editor", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      versionState: "published-pending",
+    });
+
+    expect(screen.getByRole("tab", { name: "Integrations" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+
+    await router.navigate(`/sandbox-profiles/${profileId}/published/snapshot`, {
+      state: {
+        notice: "publish-success",
+      },
+    });
+
+    expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Snapshot" }).getAttribute("aria-selected")).toBe(
+        "true",
+      );
+    });
+    expect(screen.getByText("Publish successful, creating a snapshot")).toBeDefined();
+    expect(screen.getByText("Creating snapshot")).toBeDefined();
   });
 
   it("polls while a published version is waiting on initial snapshot materialization", () => {
@@ -1168,7 +1359,7 @@ describe("SandboxProfileEditorPage", () => {
 
   it("keeps draft actions visually stable while draft changes are saving", () => {
     renderDraftActionsHarness({
-      hasUnsavedIntegrationChanges: true,
+      hasUnpersistedIntegrationChanges: true,
     });
 
     expect(screen.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
@@ -1200,39 +1391,76 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("redirects the profile default route to published when a published version exists", async () => {
-    renderSandboxProfileEditor({
+    const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
       versionState: "published",
     });
 
     expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/integrations`,
+    );
   });
 
   it("redirects the profile default route to draft when only a draft exists", async () => {
-    renderSandboxProfileEditor({
+    const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
       versionState: "draft",
     });
 
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/draft/integrations`,
+    );
   });
 
   it("redirects the published route to draft when the profile has no published version", async () => {
-    renderSandboxProfileEditor({
+    const { profileId, router } = renderSandboxProfileEditor({
       view: "published",
       versionState: "draft",
     });
 
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/draft/integrations`,
+    );
   });
 
   it("redirects the draft route to published when the profile has no draft but does have a published version", async () => {
-    renderSandboxProfileEditor({
+    const { profileId, router } = renderSandboxProfileEditor({
       view: "draft",
       versionState: "published",
     });
 
     expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/integrations`,
+    );
+  });
+
+  it("redirects the draft snapshot route to draft integrations", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      view: "draft",
+      versionState: "draft",
+    });
+
+    expect(await screen.findByText("Viewing: Draft")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/draft/integrations`,
+    );
+  });
+
+  it("redirects an unknown section route to integrations", async () => {
+    const { profileId, router } = renderSandboxProfileEditor({
+      routeSection: "unknown-section",
+      versionState: "published",
+    });
+
+    expect(await screen.findByText("Viewing: Published")).toBeDefined();
+    expect(router.state.location.pathname).toBe(
+      `/sandbox-profiles/${profileId}/published/integrations`,
+    );
   });
 
   it("discards draft changes directly from the draft actions menu", () => {

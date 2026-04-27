@@ -5,7 +5,7 @@ import { useState } from "react";
 import { createMemoryRouter, RouterProvider, useLocation, useNavigate } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { UnsavedChangesGuard } from "./unsaved-changes-guard.js";
+import { NavigationBlockerDialog } from "./navigation-blocker-dialog.js";
 
 afterEach(() => {
   cleanup();
@@ -18,7 +18,7 @@ function GuardHarness(): React.JSX.Element {
 
   return (
     <div>
-      <UnsavedChangesGuard when={isDirty} />
+      <NavigationBlockerDialog enabled={isDirty} />
       <p>Current route: {location.pathname}</p>
       <button
         onClick={() => {
@@ -52,7 +52,7 @@ function NextPage(): React.JSX.Element {
   return <p>Next page</p>;
 }
 
-describe("UnsavedChangesGuard", () => {
+describe("NavigationBlockerDialog", () => {
   it("blocks in-app navigation until the user confirms discarding changes", async () => {
     const router = createMemoryRouter(
       [
@@ -93,7 +93,7 @@ describe("UnsavedChangesGuard", () => {
     });
   });
 
-  it("registers a browser unload prompt only while there are unsaved changes", () => {
+  it("registers a browser unload prompt only while navigation blocking is enabled", () => {
     const router = createMemoryRouter(
       [
         {

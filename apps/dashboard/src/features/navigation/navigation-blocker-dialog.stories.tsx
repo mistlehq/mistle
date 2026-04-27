@@ -4,21 +4,21 @@ import { createElement, useState } from "react";
 import { createMemoryRouter, Route, RouterProvider, Routes, useNavigate } from "react-router";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import { UnsavedChangesGuard } from "./unsaved-changes-guard.js";
+import { NavigationBlockerDialog } from "./navigation-blocker-dialog.js";
 
-function UnsavedChangesGuardStoryShell(input: { initialDirty?: boolean }): React.JSX.Element {
+function NavigationBlockerDialogStoryShell(input: { initialDirty?: boolean }): React.JSX.Element {
   const navigate = useNavigate();
   const [isDirty, setIsDirty] = useState(input.initialDirty ?? false);
   const [value, setValue] = useState((input.initialDirty ?? false) ? "Unsaved example" : "");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <UnsavedChangesGuard when={isDirty} />
+      <NavigationBlockerDialog enabled={isDirty} />
 
       <Card>
         <CardContent className="flex flex-col gap-4 pt-4">
           <div className="flex flex-col gap-1">
-            <h1 className="text-xl font-semibold">Unsaved Changes Guard</h1>
+            <h1 className="text-xl font-semibold">Navigation Blocker Dialog</h1>
             <p className="text-muted-foreground text-sm">
               Try navigating away to inspect the discard dialog.
             </p>
@@ -53,14 +53,14 @@ function UnsavedChangesGuardStoryShell(input: { initialDirty?: boolean }): React
   );
 }
 
-function UnsavedChangesGuardStoryRoutes(input: { initialDirty?: boolean }): React.JSX.Element {
+function NavigationBlockerDialogStoryRoutes(input: { initialDirty?: boolean }): React.JSX.Element {
   const navigate = useNavigate();
   const storyShellProps =
     input.initialDirty === undefined ? {} : { initialDirty: input.initialDirty };
 
   return (
     <Routes>
-      <Route element={<UnsavedChangesGuardStoryShell {...storyShellProps} />} path="/" />
+      <Route element={<NavigationBlockerDialogStoryShell {...storyShellProps} />} path="/" />
       <Route
         element={
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -68,7 +68,7 @@ function UnsavedChangesGuardStoryRoutes(input: { initialDirty?: boolean }): Reac
               <CardContent className="flex flex-col gap-4 pt-4">
                 <h1 className="text-xl font-semibold">Next Route</h1>
                 <p className="text-muted-foreground text-sm">
-                  Navigation succeeded after the unsaved changes guard allowed it.
+                  Navigation succeeded after the navigation blocker allowed it.
                 </p>
                 <div>
                   <Button
@@ -92,7 +92,7 @@ function UnsavedChangesGuardStoryRoutes(input: { initialDirty?: boolean }): Reac
 }
 
 const meta = {
-  title: "Dashboard/Navigation/UnsavedChangesGuard",
+  title: "Dashboard/Navigation/NavigationBlockerDialog",
   decorators: [withDashboardCenteredStory],
 } satisfies Meta;
 
@@ -106,7 +106,7 @@ export const Default: Story = {
       [
         {
           path: "*",
-          element: createElement(UnsavedChangesGuardStoryRoutes, { initialDirty: true }),
+          element: createElement(NavigationBlockerDialogStoryRoutes, { initialDirty: true }),
         },
       ],
       {

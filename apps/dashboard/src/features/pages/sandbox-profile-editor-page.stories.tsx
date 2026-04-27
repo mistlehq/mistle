@@ -286,7 +286,7 @@ function SandboxProfileSnapshotStoryPanel(input: {
         <Notice
           autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
           dismissible
-          title="Publish successful, creating a new snapshot"
+          title="Publish successful, creating a snapshot"
           variant="success"
         />
       ) : null}

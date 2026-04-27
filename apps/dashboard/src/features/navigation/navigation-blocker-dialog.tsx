@@ -8,27 +8,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@mistle/ui";
-import { useBeforeUnload, useBlocker } from "react-router";
+import { useCallback } from "react";
+import { useBeforeUnload, useBlocker, type BlockerFunction } from "react-router";
 
-type UnsavedChangesGuardProps = {
-  when: boolean;
+type NavigationBlockerDialogProps = {
+  enabled: boolean;
+  shouldBlockNavigation?: BlockerFunction;
   title?: string;
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
 };
 
-export function UnsavedChangesGuard({
-  when,
+export function NavigationBlockerDialog({
+  enabled,
+  shouldBlockNavigation,
   title = "Discard unsaved changes?",
   description = "Your changes will be discarded if you leave this page.",
   confirmLabel = "Discard changes",
   cancelLabel = "Stay on page",
-}: UnsavedChangesGuardProps): React.JSX.Element {
-  const blocker = useBlocker(when);
+}: NavigationBlockerDialogProps): React.JSX.Element {
+  const shouldBlock = useCallback<BlockerFunction>(
+    (navigation) => enabled && (shouldBlockNavigation?.(navigation) ?? true),
+    [enabled, shouldBlockNavigation],
+  );
+  const blocker = useBlocker(shouldBlock);
 
   useBeforeUnload((event) => {
-    if (!when) {
+    if (!enabled) {
       return;
     }
     event.preventDefault();
