@@ -46,7 +46,7 @@ type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
   availableConnections?: readonly IntegrationConnectionSummary[];
   availableTargets?: readonly IntegrationTargetSummary[];
-  initialSectionId?: string;
+  initialSectionId?: StorySectionId;
   lifecycleState?: "draft" | "draft-with-published" | "published" | "published-with-draft";
   publishSuccessMessage?: boolean;
   snapshotState?:
@@ -74,6 +74,7 @@ type SandboxProfileEditorPageStoryArgs = {
 type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
+type StorySectionId = "integrations" | "resources-and-tools" | "configurations" | "snapshot";
 
 const StorySections = [
   {
@@ -92,12 +93,12 @@ const StorySections = [
     id: "snapshot",
     label: "Snapshot",
   },
-] as const satisfies readonly SandboxProfileEditorSection[];
+] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
 
 function createStorySections(input: {
   snapshotDisabled: boolean;
   showMissingSnapshotAlert: boolean;
-}): readonly SandboxProfileEditorSection[] {
+}): readonly SandboxProfileEditorSection<StorySectionId>[] {
   return StorySections.map((section) =>
     section.id === "snapshot"
       ? {
@@ -333,7 +334,7 @@ function SandboxProfileSnapshotStoryPanel(input: {
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
-  sectionId: SandboxProfileEditorSection["id"];
+  sectionId: StorySectionId;
   state: IntegrationsSectionState;
 }): React.JSX.Element {
   return (
@@ -377,8 +378,8 @@ function SandboxProfileEditorPageStoryView(
   const [setupScriptSaveStatus, setSetupScriptSaveStatus] = useState<
     "idle" | "saving" | "saved" | "saved-fading"
   >("idle");
-  const [activeSectionId, setActiveSectionId] = useState<string>(
-    input.initialSectionId ?? StorySections[0]?.id ?? "",
+  const [activeSectionId, setActiveSectionId] = useState<StorySectionId>(
+    input.initialSectionId ?? "integrations",
   );
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);

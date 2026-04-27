@@ -6,14 +6,16 @@ import { createMemoryRouter, Route, RouterProvider, Routes, useNavigate } from "
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { NavigationBlockerDialog } from "./navigation-blocker-dialog.js";
 
-function NavigationBlockerDialogStoryShell(input: { initialDirty?: boolean }): React.JSX.Element {
+function NavigationBlockerDialogStoryShell(input: {
+  initialBlocking?: boolean;
+}): React.JSX.Element {
   const navigate = useNavigate();
-  const [isDirty, setIsDirty] = useState(input.initialDirty ?? false);
-  const [value, setValue] = useState((input.initialDirty ?? false) ? "Unsaved example" : "");
+  const [isBlocking, setIsBlocking] = useState(input.initialBlocking ?? false);
+  const [value, setValue] = useState((input.initialBlocking ?? false) ? "Blocking example" : "");
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <NavigationBlockerDialog enabled={isDirty} />
+      <NavigationBlockerDialog enabled={isBlocking} />
 
       <Card>
         <CardContent className="flex flex-col gap-4 pt-4">
@@ -27,11 +29,11 @@ function NavigationBlockerDialogStoryShell(input: { initialDirty?: boolean }): R
           <div className="flex flex-col gap-1.5">
             <DetailLabel>Example field</DetailLabel>
             <Input
-              id="storybook-unsaved-input"
+              id="storybook-navigation-blocker-input"
               onChange={(event) => {
                 const nextValue = event.currentTarget.value;
                 setValue(nextValue);
-                setIsDirty(nextValue.trim().length > 0);
+                setIsBlocking(nextValue.trim().length > 0);
               }}
               value={value}
             />
@@ -53,10 +55,12 @@ function NavigationBlockerDialogStoryShell(input: { initialDirty?: boolean }): R
   );
 }
 
-function NavigationBlockerDialogStoryRoutes(input: { initialDirty?: boolean }): React.JSX.Element {
+function NavigationBlockerDialogStoryRoutes(input: {
+  initialBlocking?: boolean;
+}): React.JSX.Element {
   const navigate = useNavigate();
   const storyShellProps =
-    input.initialDirty === undefined ? {} : { initialDirty: input.initialDirty };
+    input.initialBlocking === undefined ? {} : { initialBlocking: input.initialBlocking };
 
   return (
     <Routes>
@@ -106,7 +110,7 @@ export const Default: Story = {
       [
         {
           path: "*",
-          element: createElement(NavigationBlockerDialogStoryRoutes, { initialDirty: true }),
+          element: createElement(NavigationBlockerDialogStoryRoutes, { initialBlocking: true }),
         },
       ],
       {

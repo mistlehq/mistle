@@ -1365,9 +1365,9 @@ function ReadySandboxProfileEditorPage(input: {
         versionActionError={publishFlushError ?? input.versionActionError}
         versionActionIsPending={input.versionActionIsPending}
         isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
-        renderSectionPanel={() => (
+        renderSectionPanel={(sectionId) => (
           <SandboxProfileEditorSectionPanels
-            activeSectionId={activeSectionId}
+            activeSectionId={sectionId}
             draftFieldsAreDisabled={draftFieldsAreDisabled}
             integrationsLoader={integrationsLoader}
             invalidateVersionBindings={input.invalidateVersionBindings}
@@ -1473,12 +1473,12 @@ const SandboxProfileEditorTabs = [
     id: SandboxProfileEditorSectionIds.SNAPSHOT,
     label: "Snapshot",
   },
-] as const satisfies readonly SandboxProfileEditorSection[];
+] as const satisfies readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
 
 function createSandboxProfileEditorSections(input: {
   mode: SandboxProfileEditorVersionMode;
   snapshotState: SnapshotPanelState;
-}): readonly SandboxProfileEditorSection[] {
+}): readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[] {
   return SandboxProfileEditorTabs.map((section) =>
     section.id === SandboxProfileEditorSectionIds.SNAPSHOT
       ? {
@@ -1827,10 +1827,10 @@ export function SandboxProfileEditorView(input: {
   onMakeChanges: () => void;
   onViewActive: () => void;
   onViewDraft: () => void;
-  sections: readonly SandboxProfileEditorSection[];
-  activeSectionId?: string;
-  onActiveSectionIdChange?: (sectionId: string) => void;
-  renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
+  sections: readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
+  activeSectionId?: SandboxProfileEditorSectionId;
+  onActiveSectionIdChange?: (sectionId: SandboxProfileEditorSectionId) => void;
+  renderSectionPanel: (sectionId: SandboxProfileEditorSectionId) => React.JSX.Element;
   versionStatusBadge?: React.JSX.Element;
   versionActions?: React.JSX.Element;
   hasUnpersistedIntegrationChanges?: boolean;
@@ -1968,7 +1968,7 @@ export function SandboxProfileEditorView(input: {
         profileName={input.profileName ?? input.profileNameFallback}
       />
 
-      <SandboxProfileEditorSections
+      <SandboxProfileEditorSections<SandboxProfileEditorSectionId>
         {...(input.activeSectionId === undefined ? {} : { activeSectionId: input.activeSectionId })}
         {...(input.onActiveSectionIdChange === undefined
           ? {}
@@ -1999,7 +1999,7 @@ function resolveDiscardDraftInput(
 }
 
 function LoadedSandboxProfileIntegrationSetupSection(input: {
-  activeSectionId: string;
+  activeSectionId: SandboxProfileEditorSectionId;
   profileId: string;
   version: number;
   disabled: boolean;
@@ -2054,7 +2054,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 }
 
 export function SandboxProfileIntegrationsSetupUnavailableState(input: {
-  activeSectionId: SandboxProfileEditorSection["id"];
+  activeSectionId: SandboxProfileEditorSectionId;
   integrationBindingsError: unknown;
   integrationDirectoryError: unknown;
   isPending: boolean;

@@ -1,27 +1,27 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
 import { useState, type ReactNode } from "react";
 
-export type SandboxProfileEditorSection = {
-  id: string;
+export type SandboxProfileEditorSection<TSectionId extends string = string> = {
+  id: TSectionId;
   label: string;
   sideLabel?: ReactNode;
   disabled?: boolean;
 };
 
-export function SandboxProfileEditorSections(input: {
-  sections: readonly SandboxProfileEditorSection[];
-  activeSectionId?: string;
-  initialSectionId?: string;
-  onActiveSectionIdChange?: (sectionId: string) => void;
-  renderPanel: (activeSectionId: string) => React.JSX.Element;
+export function SandboxProfileEditorSections<TSectionId extends string>(input: {
+  sections: readonly SandboxProfileEditorSection<TSectionId>[];
+  activeSectionId?: TSectionId;
+  initialSectionId?: TSectionId;
+  onActiveSectionIdChange?: (sectionId: TSectionId) => void;
+  renderPanel: (activeSectionId: TSectionId) => React.JSX.Element;
 }): React.JSX.Element {
-  const [internalActiveSectionId, setInternalActiveSectionId] = useState(
-    input.initialSectionId ?? input.sections[0]?.id ?? "",
+  const [internalActiveSectionId, setInternalActiveSectionId] = useState<TSectionId | undefined>(
+    input.initialSectionId ?? input.sections[0]?.id,
   );
   const activeSectionId = input.activeSectionId ?? internalActiveSectionId;
   const activeSection = input.sections.find((section) => section.id === activeSectionId);
 
-  function updateActiveSectionId(sectionId: string): void {
+  function updateActiveSectionId(sectionId: TSectionId): void {
     const nextSection = input.sections.find((section) => section.id === sectionId);
     if (nextSection?.disabled === true) {
       return;
@@ -37,7 +37,14 @@ export function SandboxProfileEditorSections(input: {
     <div className="flex flex-col gap-4">
       <div className="md:hidden">
         <Select
-          onValueChange={(value) => updateActiveSectionId(value ?? "")}
+          onValueChange={(value) => {
+            const nextSection = input.sections.find((section) => section.id === value);
+            if (nextSection === undefined) {
+              return;
+            }
+
+            updateActiveSectionId(nextSection.id);
+          }}
           value={activeSectionId}
         >
           <SelectTrigger aria-label="Select profile editor section" className="w-full">
@@ -100,7 +107,7 @@ export function SandboxProfileEditorSections(input: {
             }
             role="tabpanel"
           >
-            {input.renderPanel(activeSectionId)}
+            {activeSectionId === undefined ? null : input.renderPanel(activeSectionId)}
           </div>
         </div>
       </div>
