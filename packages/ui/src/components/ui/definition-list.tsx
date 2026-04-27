@@ -17,7 +17,7 @@ type DefinitionListProps = React.ComponentProps<"dl"> & {
 function DefinitionList({ className, itemClassName, items, ...props }: DefinitionListProps) {
   return (
     <dl
-      className={cn("grid grid-cols-1 gap-3 md:grid-cols-2", className)}
+      className={cn("grid grid-cols-1 gap-4 md:grid-cols-2", className)}
       data-slot="definition-list"
       {...props}
     >

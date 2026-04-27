@@ -1,4 +1,4 @@
-import { Card, CardContent, Notice, ScreenActionButton } from "@mistle/ui";
+import { Card, CardContent, DefinitionList, Notice, ScreenActionButton } from "@mistle/ui";
 
 import { AuthStatusPage } from "../auth/auth-status-page.js";
 import { formatInvitationRole } from "./invitation-accept-state.js";
@@ -17,29 +17,34 @@ type InvitationAccessViewProps = {
 
 export function InvitationAccessView(props: InvitationAccessViewProps): React.JSX.Element {
   const isSubmitting = props.isAccepting || props.isDeclining;
+  const invitationDetails = [
+    {
+      id: "organization",
+      label: "Organization",
+      value: props.organizationName,
+    },
+    {
+      id: "role",
+      label: "Role",
+      value: formatInvitationRole(props.role),
+    },
+    {
+      id: "invited-email",
+      label: "Invited email",
+      value: props.invitedEmail,
+    },
+    {
+      id: "invited-by",
+      label: "Invited by",
+      value: props.invitedBy,
+    },
+  ];
 
   return (
     <AuthStatusPage title="You've been invited to join Mistle">
       <Card className="w-full">
-        <CardContent className="grid gap-4">
-          <dl className="grid gap-3">
-            <div>
-              <dt className="text-muted-foreground text-xs">Organization</dt>
-              <dd className="text-sm font-medium">{props.organizationName}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Role</dt>
-              <dd className="text-sm">{formatInvitationRole(props.role)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Invited email</dt>
-              <dd className="text-sm">{props.invitedEmail}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground text-xs">Invited by</dt>
-              <dd className="text-sm">{props.invitedBy}</dd>
-            </div>
-          </dl>
+        <CardContent>
+          <DefinitionList items={invitationDetails} />
         </CardContent>
       </Card>
       {props.mutationError === null ? null : (
