@@ -39,7 +39,7 @@ RUN apt-get update \
 # Login shells source /etc/profile, which resets PATH on Debian. Re-add
 # sandbox tool locations so commands like `nix` remain discoverable.
 RUN cat > /etc/profile.d/mistle-path.sh <<'EOF'
-for p in /opt/mistle/bin /root/.nix-profile/bin /nix/var/nix/profiles/default/bin; do
+for p in /opt/mistle/bin /root/.nix-profile/bin /nix/var/nix/profiles/default/bin /nix/var/nix/profiles/default/sbin; do
   case ":$PATH:" in
     *":$p:"*) ;;
     *) PATH="$p:$PATH" ;;
