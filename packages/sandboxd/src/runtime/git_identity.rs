@@ -75,7 +75,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use crate::protocol::startup::{GitIdentity, GitSigningConfig, StartupInput, StartupMode};
-    use crate::test_support::TestEnvVarGuard;
+    use crate::test_support::TestEnvVarsGuard;
 
     use super::{apply_git_identity, apply_global_git_config};
 
@@ -85,9 +85,15 @@ mod tests {
     fn applies_git_identity_to_global_git_config() {
         let test_dir = create_temp_test_dir("git_identity");
         let home_dir = test_dir.join("home");
+        let global_git_config_path = home_dir.join(".gitconfig");
         fs::create_dir_all(&home_dir).expect("home dir should be creatable");
-        let home_dir_string = home_dir.display().to_string();
-        let _home_guard = TestEnvVarGuard::set("HOME", &home_dir_string);
+        let _env_guard = TestEnvVarsGuard::set([
+            ("HOME", home_dir.display().to_string()),
+            (
+                "GIT_CONFIG_GLOBAL",
+                global_git_config_path.display().to_string(),
+            ),
+        ]);
 
         apply_git_identity(&StartupInput {
             startup_mode: StartupMode::New,
@@ -133,9 +139,15 @@ mod tests {
     fn applies_git_signing_config_when_present() {
         let test_dir = create_temp_test_dir("git_identity_signing");
         let home_dir = test_dir.join("home");
+        let global_git_config_path = home_dir.join(".gitconfig");
         fs::create_dir_all(&home_dir).expect("home dir should be creatable");
-        let home_dir_string = home_dir.display().to_string();
-        let _home_guard = TestEnvVarGuard::set("HOME", &home_dir_string);
+        let _env_guard = TestEnvVarsGuard::set([
+            ("HOME", home_dir.display().to_string()),
+            (
+                "GIT_CONFIG_GLOBAL",
+                global_git_config_path.display().to_string(),
+            ),
+        ]);
 
         apply_git_identity(&StartupInput {
             startup_mode: StartupMode::New,
@@ -190,9 +202,15 @@ mod tests {
     fn clears_existing_git_signing_config_when_signing_is_absent() {
         let test_dir = create_temp_test_dir("git_identity_clear_signing");
         let home_dir = test_dir.join("home");
+        let global_git_config_path = home_dir.join(".gitconfig");
         fs::create_dir_all(&home_dir).expect("home dir should be creatable");
-        let home_dir_string = home_dir.display().to_string();
-        let _home_guard = TestEnvVarGuard::set("HOME", &home_dir_string);
+        let _env_guard = TestEnvVarsGuard::set([
+            ("HOME", home_dir.display().to_string()),
+            (
+                "GIT_CONFIG_GLOBAL",
+                global_git_config_path.display().to_string(),
+            ),
+        ]);
 
         apply_global_git_config("gpg.format", "ssh").expect("precondition git config should write");
         apply_global_git_config("gpg.ssh.program", "/opt/mistle/bin/mistle-ssh-sign")

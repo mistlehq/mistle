@@ -47,6 +47,11 @@ pub struct TestEnvVarGuard {
     previous: Option<OsString>,
 }
 
+pub struct TestEnvVarsGuard {
+    _lock: MutexGuard<'static, ()>,
+    previous: Vec<(&'static str, Option<OsString>)>,
+}
+
 impl TestEnvVarGuard {
     pub fn set(name: &'static str, value: &str) -> Self {
         let lock = ENV_MUTEX
@@ -81,6 +86,28 @@ impl TestEnvVarGuard {
     }
 }
 
+impl TestEnvVarsGuard {
+    pub fn set<const N: usize>(entries: [(&'static str, String); N]) -> Self {
+        let lock = ENV_MUTEX
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        let mut previous = Vec::with_capacity(N);
+
+        for (name, value) in entries {
+            previous.push((name, std::env::var_os(name)));
+            // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+            unsafe {
+                std::env::set_var(name, value);
+            }
+        }
+
+        Self {
+            _lock: lock,
+            previous,
+        }
+    }
+}
+
 impl Drop for TestEnvVarGuard {
     fn drop(&mut self) {
         match &self.previous {
@@ -94,6 +121,27 @@ impl Drop for TestEnvVarGuard {
                 // SAFETY: tests serialize environment mutation through ENV_MUTEX.
                 unsafe {
                     std::env::remove_var(self.name);
+                }
+            }
+        }
+    }
+}
+
+impl Drop for TestEnvVarsGuard {
+    fn drop(&mut self) {
+        for (name, previous) in self.previous.iter().rev() {
+            match previous {
+                Some(previous) => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::set_var(name, previous);
+                    }
+                }
+                None => {
+                    // SAFETY: tests serialize environment mutation through ENV_MUTEX.
+                    unsafe {
+                        std::env::remove_var(name);
+                    }
                 }
             }
         }
