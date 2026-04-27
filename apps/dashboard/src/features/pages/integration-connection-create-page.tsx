@@ -163,17 +163,19 @@ function LoadedIntegrationConnectionCreatePage(input: {
         });
 
         if (managedWebhookSetup.status === "failed") {
-          detailSearchParams.set("managedWebhookSetup", "failed");
           await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`, {
             state: {
-              managedWebhookSetupMessage: managedWebhookSetup.message,
+              managedWebhookSetup,
             },
           });
           return;
         }
 
-        detailSearchParams.set("managedWebhookSetup", "created");
-        await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`);
+        await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`, {
+          state: {
+            managedWebhookSetup,
+          },
+        });
         return;
       }
 

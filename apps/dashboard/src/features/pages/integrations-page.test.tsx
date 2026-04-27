@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
@@ -184,7 +184,7 @@ describe("IntegrationsPage", () => {
     ).toBe(false);
   });
 
-  it("shows Slack install success on the selected connection detail route", () => {
+  it("shows Slack install success on the selected connection detail route", async () => {
     globalThis.__MISTLE_RUNTIME_CONFIG__ = {
       controlPlaneApiOrigin: "https://control-plane.example.com",
     };
@@ -213,11 +213,14 @@ describe("IntegrationsPage", () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter
           initialEntries={[
-            "/integrations/slack-default?connectionId=icn_slack_installed&slackApp=installed",
+            "/integrations/slack-default?connectionId=icn_slack_installed&connectionNotice=installed",
           ]}
         >
           <Routes>
-            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+            <Route
+              element={<IntegrationsPageWithLocationSearch />}
+              path="/integrations/:targetKey"
+            />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -243,9 +246,14 @@ describe("IntegrationsPage", () => {
         .getByRole("button", { name: "Select connection Engineering Slack" })
         .getAttribute("aria-current"),
     ).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toBe(
+        "?connectionId=icn_slack_installed",
+      );
+    });
   });
 
-  it("shows GitHub App install success on the selected connection detail route", () => {
+  it("shows GitHub App install success on the selected connection detail route", async () => {
     globalThis.__MISTLE_RUNTIME_CONFIG__ = {
       controlPlaneApiOrigin: "https://control-plane.example.com",
     };
@@ -275,11 +283,14 @@ describe("IntegrationsPage", () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter
           initialEntries={[
-            "/integrations/github-cloud?connectionId=icn_github_installed&githubApp=installed",
+            "/integrations/github-cloud?connectionId=icn_github_installed&connectionNotice=installed",
           ]}
         >
           <Routes>
-            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+            <Route
+              element={<IntegrationsPageWithLocationSearch />}
+              path="/integrations/:targetKey"
+            />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>,
@@ -303,6 +314,11 @@ describe("IntegrationsPage", () => {
         .getByRole("button", { name: "Select connection Engineering GitHub" })
         .getAttribute("aria-current"),
     ).toBe("true");
+    await waitFor(() => {
+      expect(screen.getByTestId("location-search").textContent).toBe(
+        "?connectionId=icn_github_installed",
+      );
+    });
   });
 
   it("shows Jira webhook setup success on the selected connection detail route", () => {
@@ -334,7 +350,16 @@ describe("IntegrationsPage", () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter
           initialEntries={[
-            "/integrations/jira-default?connectionId=icn_jira_created&managedWebhookSetup=created",
+            {
+              pathname: "/integrations/jira-default",
+              search: "?connectionId=icn_jira_created",
+              state: {
+                managedWebhookSetup: {
+                  status: "created",
+                  webhookSourceId: "iws_jira_created",
+                },
+              },
+            },
           ]}
         >
           <Routes>
@@ -354,6 +379,72 @@ describe("IntegrationsPage", () => {
       throw new Error("Expected Jira success notice to render inside the selected detail pane.");
     }
     expect(successNoticeSection).toBe(selectedConnectionTitleSection);
+    expect(
+      screen
+        .getByRole("button", { name: "Select connection Engineering Jira" })
+        .getAttribute("aria-current"),
+    ).toBe("true");
+  });
+
+  it("shows Jira webhook setup failure from route state on the selected connection detail route", () => {
+    globalThis.__MISTLE_RUNTIME_CONFIG__ = {
+      controlPlaneApiOrigin: "https://control-plane.example.com",
+    };
+    resetDashboardConfigForTest();
+
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SESSION_QUERY_KEY, {
+      session: {
+        activeOrganizationId: "org_mistle",
+      },
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [createJiraTarget()],
+      connections: [
+        createJiraConnection({
+          id: "icn_jira_created",
+          displayName: "Engineering Jira",
+        }),
+      ],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            {
+              pathname: "/integrations/jira-default",
+              search: "?connectionId=icn_jira_created",
+              state: {
+                managedWebhookSetup: {
+                  status: "failed",
+                  message: "Jira admin webhook creation failed (403): Forbidden",
+                },
+              },
+            },
+          ]}
+        >
+          <Routes>
+            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const failureNoticeTitle = screen.getByText("Connection created, webhook setup failed");
+    expect(failureNoticeTitle).toBeTruthy();
+    expect(screen.getByText("Jira admin webhook creation failed (403): Forbidden")).toBeTruthy();
+    const failureNoticeSection = failureNoticeTitle.closest("section");
+    const selectedConnectionTitleSection = screen
+      .getByRole("textbox", { name: "Connection name" })
+      .closest("section");
+    if (failureNoticeSection === null || selectedConnectionTitleSection === null) {
+      throw new Error("Expected Jira failure notice to render inside the selected detail pane.");
+    }
+    expect(failureNoticeSection).toBe(selectedConnectionTitleSection);
     expect(
       screen
         .getByRole("button", { name: "Select connection Engineering Jira" })
@@ -462,6 +553,17 @@ describe("IntegrationsPage", () => {
     }
   });
 });
+
+function IntegrationsPageWithLocationSearch() {
+  const location = useLocation();
+
+  return (
+    <>
+      <IntegrationsPage />
+      <span data-testid="location-search">{location.search}</span>
+    </>
+  );
+}
 
 function createGitHubTarget(): IntegrationTarget {
   return {

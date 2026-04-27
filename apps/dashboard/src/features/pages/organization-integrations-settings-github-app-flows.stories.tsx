@@ -467,7 +467,7 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
       ),
       {
         initialEntries: [
-          "/integrations/github-cloud?connectionId=icn_github_story_draft&githubApp=installed",
+          "/integrations/github-cloud?connectionId=icn_github_story_draft&connectionNotice=installed",
         ],
       },
     ),

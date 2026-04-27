@@ -60,16 +60,16 @@ function createDashboardOrganizationIntegrationsUrl(
   fixture: ControlPlaneApiIntegrationFixture,
   targetKey: string,
   options?: {
+    connectionNotice?: string;
     connectionId?: string;
-    githubApp?: string;
   },
 ): string {
   const searchParams = new URLSearchParams();
   if (options?.connectionId !== undefined) {
     searchParams.set("connectionId", options.connectionId);
   }
-  if (options?.githubApp !== undefined) {
-    searchParams.set("githubApp", options.githubApp);
+  if (options?.connectionNotice !== undefined) {
+    searchParams.set("connectionNotice", options.connectionNotice);
   }
   const query = searchParams.size === 0 ? "" : `?${searchParams.toString()}`;
 
@@ -361,7 +361,7 @@ describe("integration connections GitHub App integration", () => {
     expect(completeResponse.headers.get("location")).toBe(
       createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", {
         connectionId,
-        githubApp: "installed",
+        connectionNotice: "installed",
       }),
     );
 

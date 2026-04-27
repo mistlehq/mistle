@@ -476,7 +476,7 @@ function SlackInstalledDetailPageStory(): React.JSX.Element {
       ),
       {
         initialEntries: [
-          "/integrations/slack-default?connectionId=icn_slack_story_draft&slackApp=installed",
+          "/integrations/slack-default?connectionId=icn_slack_story_draft&connectionNotice=installed",
         ],
       },
     ),
