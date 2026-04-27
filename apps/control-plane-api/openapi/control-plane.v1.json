@@ -3751,6 +3751,40 @@
                     "updatedAt": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "managedWebhookSetup": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["created"]
+                            },
+                            "webhookSourceId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["status", "webhookSourceId"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["failed"]
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["status", "message"],
+                          "additionalProperties": false
+                        }
+                      ]
                     }
                   },
                   "required": [

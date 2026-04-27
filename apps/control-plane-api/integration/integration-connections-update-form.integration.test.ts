@@ -14,7 +14,10 @@ import {
 import { describe, expect } from "vitest";
 
 import { CreateFormConnectionBodySchema } from "../src/integration-connections/create-form-connection/schema.js";
-import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+import {
+  CreatedFormIntegrationConnectionSchema,
+  IntegrationConnectionSchema,
+} from "../src/integration-connections/schemas.js";
 import {
   UpdateFormConnectionBadRequestResponseSchema,
   UpdateFormConnectionBodySchema,
@@ -62,7 +65,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
@@ -192,7 +197,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
       organizationId: authenticatedSession.organizationId,
@@ -263,7 +270,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
@@ -488,7 +497,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
@@ -569,7 +580,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -628,7 +641,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -688,7 +703,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -746,7 +763,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -865,7 +884,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/form`,
@@ -921,7 +942,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
       where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
@@ -1019,7 +1042,9 @@ describe("integration connections update form integration", () => {
     );
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
       where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
@@ -1118,7 +1143,9 @@ describe("integration connections update form integration", () => {
     });
 
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const previousLinks = await fixture.db.query.integrationConnectionCredentials.findMany({
       where: (table, { eq }) => eq(table.connectionId, createdConnection.id),

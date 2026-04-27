@@ -1,5 +1,8 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
+import {
+  JiraConnectionMethodIds,
+  SlackConnectionMethodId,
+} from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -11,7 +14,10 @@ import type {
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
 import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
-import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
+import type {
+  IntegrationConnectionMethod,
+  ManagedWebhookSetupResult,
+} from "../integrations/integrations-service-shared.js";
 import {
   cancelDeviceAuthorizationAttempt,
   createFormIntegrationConnection,
@@ -37,6 +43,7 @@ import {
 type IntegrationConnectionSubmitSuccessInput = {
   connectionId: string | null;
   editor: IntegrationConnectionEditorState;
+  managedWebhookSetup?: ManagedWebhookSetupResult;
   methodId: IntegrationConnectionMethodId;
 };
 
@@ -407,6 +414,9 @@ export function useIntegrationConnectionEditorState(
         await handleSubmitSuccess({
           connectionId: createdConnection.id,
           editor,
+          ...(createdConnection.managedWebhookSetup === undefined
+            ? {}
+            : { managedWebhookSetup: createdConnection.managedWebhookSetup }),
           methodId: draft.methodId,
         });
         return;
@@ -567,4 +577,15 @@ export function useIntegrationConnectionEditorState(
       );
     },
   };
+}
+
+export function isJiraPersonalApiTokenCreateResult(input: {
+  editor: IntegrationConnectionEditorState;
+  methodId: IntegrationConnectionMethodId;
+}): boolean {
+  return (
+    input.editor.mode === "create" &&
+    input.editor.targetFamilyId === "jira" &&
+    input.methodId === JiraConnectionMethodIds.PERSONAL_API_TOKEN
+  );
 }

@@ -20,7 +20,7 @@ import {
   CreateFormConnectionBodySchema,
   CreateFormConnectionNotFoundResponseSchema,
 } from "../src/integration-connections/create-form-connection/schema.js";
-import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -81,7 +81,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
 
     expect(responseBody.targetKey).toBe("openai-default");
     expect(responseBody.displayName).toBe("Primary OpenAI key");
@@ -195,7 +195,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.targetKey).toBe("aws-cli-default");
     expect(responseBody.displayName).toBe("AWS assume role");
     expect(responseBody.status).toBe("active");
@@ -322,7 +322,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: JiraConnectionMethodIds.PERSONAL_API_TOKEN,
       site_url: "https://mistle.atlassian.net",
@@ -407,7 +407,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,
       cloud_id: "cloud-id-123",
@@ -443,7 +443,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: JiraConnectionMethodIds.SERVICE_ACCOUNT_OAUTH_CLIENT_CREDENTIALS,
       cloud_id: "cloud-id-123",
@@ -535,7 +535,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: SlackConnectionMethodIds.SLACK_APP,
     });
@@ -616,7 +616,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: IntegrationConnectionMethodIds.API_KEY,
     });
@@ -682,7 +682,7 @@ describe("integration connections create form integration", () => {
     });
 
     expect(response.status).toBe(201);
-    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    const responseBody = CreatedFormIntegrationConnectionSchema.parse(await response.json());
     expect(responseBody.config).toEqual({
       connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       app_id: "123",

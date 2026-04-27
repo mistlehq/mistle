@@ -420,6 +420,7 @@ describe("receive integration webhook immediate response integration", () => {
         db: fixture.db,
         integrationRegistry: registry,
         integrationsConfig: fixture.config.integrations,
+        controlPlaneBaseUrl: fixture.config.auth.baseUrl,
       },
       {
         organizationId: authenticatedSession.organizationId,
@@ -564,6 +565,7 @@ describe("receive integration webhook immediate response integration", () => {
         db: fixture.db,
         integrationRegistry: registry,
         integrationsConfig: fixture.config.integrations,
+        controlPlaneBaseUrl: fixture.config.auth.baseUrl,
       },
       {
         organizationId: authenticatedSession.organizationId,
@@ -663,6 +665,7 @@ describe("receive integration webhook immediate response integration", () => {
         db: fixture.db,
         integrationRegistry: registry,
         integrationsConfig: fixture.config.integrations,
+        controlPlaneBaseUrl: fixture.config.auth.baseUrl,
       },
       {
         organizationId: authenticatedSession.organizationId,
@@ -744,6 +747,7 @@ describe("receive integration webhook immediate response integration", () => {
         db: fixture.db,
         integrationRegistry: registry,
         integrationsConfig: fixture.config.integrations,
+        controlPlaneBaseUrl: fixture.config.auth.baseUrl,
       },
       {
         organizationId: authenticatedSession.organizationId,

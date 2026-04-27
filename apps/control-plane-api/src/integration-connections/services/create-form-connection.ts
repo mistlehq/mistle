@@ -8,23 +8,29 @@ import {
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationConnectionMethodId, IntegrationRegistry } from "@mistle/integrations-core";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
 
 import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../lib/crypto.js";
+import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import type { CreatedFormIntegrationConnection, ManagedWebhookSetupResult } from "../schemas.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
 import {
   parseFormConnectionConfigOrThrow,
   parseCreateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
 } from "./form-connection-methods.js";
-import { ensureImplicitConnectionWebhookSource } from "./webhook-sources.js";
+import {
+  createIntegrationWebhookSource,
+  ensureImplicitConnectionWebhookSource,
+} from "./webhook-sources.js";
 
 export type CreateFormConnectionInput = {
   organizationId: string;
@@ -35,16 +41,70 @@ export type CreateFormConnectionInput = {
   secrets: Record<string, string>;
 };
 
+function shouldAutoCreateManagedWebhookSource(input: {
+  familyId: string;
+  variantId: string;
+  methodId: IntegrationConnectionMethodId;
+}): boolean {
+  return (
+    input.familyId === "jira" &&
+    input.variantId === "jira-default" &&
+    input.methodId === JiraConnectionMethodIds.PERSONAL_API_TOKEN
+  );
+}
+
+export function shouldReturnPartialManagedWebhookSetupFailure(
+  error: unknown,
+): error is BadRequestError {
+  return (
+    error instanceof BadRequestError &&
+    error.code === IntegrationConnectionsBadRequestCodes.INVALID_WEBHOOK_SOURCE_INPUT
+  );
+}
+
+async function tryCreateManagedWebhookSource(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
+  },
+  input: {
+    organizationId: string;
+    connectionId: string;
+  },
+): Promise<ManagedWebhookSetupResult> {
+  try {
+    const createdSource = await createIntegrationWebhookSource(ctx, {
+      organizationId: input.organizationId,
+      connectionId: input.connectionId,
+    });
+
+    return {
+      status: "created",
+      webhookSourceId: createdSource.id,
+    };
+  } catch (error) {
+    if (!shouldReturnPartialManagedWebhookSetupFailure(error)) {
+      throw error;
+    }
+
+    return {
+      status: "failed",
+      message: error.message,
+    };
+  }
+}
+
 export async function createFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
-    integrationsConfig: {
-      masterEncryptionKeys: Record<string, string>;
-    };
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+    controlPlaneBaseUrl: string;
   },
   input: CreateFormConnectionInput,
-): Promise<ReturnType<typeof buildIntegrationConnectionResponse>> {
+): Promise<CreatedFormIntegrationConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
 
   const target = await db.query.integrationTargets.findFirst({
@@ -108,7 +168,7 @@ export async function createFormConnection(
   });
 
   try {
-    return await db.transaction(async (tx) => {
+    const createdConnection = await db.transaction(async (tx) => {
       const [createdConnection] = await tx
         .insert(integrationConnections)
         .values({
@@ -186,6 +246,24 @@ export async function createFormConnection(
         connection: createdConnection,
       });
     });
+
+    if (
+      shouldAutoCreateManagedWebhookSource({
+        familyId: target.familyId,
+        variantId: target.variantId,
+        methodId: input.methodId,
+      })
+    ) {
+      return {
+        ...createdConnection,
+        managedWebhookSetup: await tryCreateManagedWebhookSource(ctx, {
+          organizationId: input.organizationId,
+          connectionId: createdConnection.id,
+        }),
+      };
+    }
+
+    return createdConnection;
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
   }

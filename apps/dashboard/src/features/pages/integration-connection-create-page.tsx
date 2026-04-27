@@ -19,7 +19,10 @@ import {
   resolveIntegrationConnectionReturnPath,
 } from "./integration-connection-return-path.js";
 import { buildOpenCreateIntegrationConnectionInput } from "./integrations-page-view-model.js";
-import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
+import {
+  isJiraPersonalApiTokenCreateResult,
+  useIntegrationConnectionEditorState,
+} from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 export function IntegrationConnectionCreatePage(): React.JSX.Element {
@@ -115,7 +118,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
   const connectionState = useIntegrationConnectionEditorState({
     initialEditorInput: input.initialEditorInput,
     onClose: () => navigate(input.returnPath ?? "/integrations"),
-    onSubmitSuccess: async ({ connectionId, editor, methodId }) => {
+    onSubmitSuccess: async ({ connectionId, editor, managedWebhookSetup, methodId }) => {
       if (
         connectionId !== null &&
         editor.targetFamilyId === "github" &&
@@ -147,6 +150,29 @@ function LoadedIntegrationConnectionCreatePage(input: {
             },
           }),
         );
+        return;
+      }
+
+      if (
+        connectionId !== null &&
+        isJiraPersonalApiTokenCreateResult({ editor, methodId }) &&
+        managedWebhookSetup !== undefined
+      ) {
+        const detailSearchParams = new URLSearchParams({
+          connectionId,
+        });
+
+        if (managedWebhookSetup.status === "failed") {
+          detailSearchParams.set("managedWebhookSetup", "failed");
+          await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`, {
+            state: {
+              managedWebhookSetupMessage: managedWebhookSetup.message,
+            },
+          });
+          return;
+        }
+
+        await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`);
         return;
       }
 

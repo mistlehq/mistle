@@ -3,6 +3,7 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
   type DeviceAuthorizationAttemptResponse,
+  type CreatedFormIntegrationConnection,
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
@@ -10,6 +11,7 @@ import {
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
   DeviceAuthorizationAttemptResponseSchema,
+  CreatedFormIntegrationConnectionSchema,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
   StartedGitHubAppManifestConnectionSchema,
@@ -25,7 +27,7 @@ export async function createFormIntegrationConnection(input: {
   methodId: IntegrationConnectionMethod["id"];
   config: Record<string, unknown>;
   secrets: Record<string, string>;
-}): Promise<CreatedIntegrationConnection> {
+}): Promise<CreatedFormIntegrationConnection> {
   try {
     const response = await requestControlPlane({
       operation: "createFormIntegrationConnection",
@@ -42,7 +44,7 @@ export async function createFormIntegrationConnection(input: {
 
     return readJsonWithSchema({
       response,
-      schema: IntegrationConnectionSchema,
+      schema: CreatedFormIntegrationConnectionSchema,
       operation: "createFormIntegrationConnection",
     });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionSchema } from "../schemas.js";
+import { CreatedFormIntegrationConnectionSchema } from "../schemas.js";
 import {
   CreateFormConnectionBadRequestResponseSchema,
   CreateFormConnectionBodySchema,
@@ -29,7 +29,7 @@ export const route = createRoute({
       description: "Create a form-backed integration connection.",
       content: {
         "application/json": {
-          schema: IntegrationConnectionSchema,
+          schema: CreatedFormIntegrationConnectionSchema,
         },
       },
     },

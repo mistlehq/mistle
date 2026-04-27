@@ -93,6 +93,29 @@ export const CreatedIntegrationWebhookSourceSchema = IntegrationWebhookSourceSch
   webhookSecret: z.string().min(1).optional(),
 }).strict();
 
+export const ManagedWebhookSetupResultSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("created"),
+      webhookSourceId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("failed"),
+      message: z.string().min(1),
+    })
+    .strict(),
+]);
+export type ManagedWebhookSetupResult = z.output<typeof ManagedWebhookSetupResultSchema>;
+
+export const CreatedFormIntegrationConnectionSchema = IntegrationConnectionSchema.extend({
+  managedWebhookSetup: ManagedWebhookSetupResultSchema.optional(),
+}).strict();
+export type CreatedFormIntegrationConnection = z.output<
+  typeof CreatedFormIntegrationConnectionSchema
+>;
+
 export const IntegrationDeviceAuthorizationAttemptStatusSchema = z.enum([
   IntegrationDeviceAuthorizationAttemptStatuses.PENDING,
   IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED,

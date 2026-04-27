@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { resetDashboardConfigForTest } from "../../config.js";
 import { resetAuthClientForTest } from "../../lib/auth/client.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
+import type { ManagedWebhookSetupResult } from "../integrations/integrations-service-shared.js";
 import { useIntegrationConnectionEditorState } from "./use-integration-connection-editor-state.js";
 
 function createWrapper(queryClient: QueryClient) {
@@ -220,6 +221,32 @@ function slackAppCreateEditorInput() {
     targetFamilyId: "slack",
     targetKey: "slack-default",
     targetVariantId: "slack-default",
+  };
+}
+
+function jiraPersonalApiTokenCreateEditorInput() {
+  return {
+    mode: "create" as const,
+    methods: [
+      {
+        id: "jira-personal-api-token",
+        label: "Personal API token",
+        kind: "form" as const,
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "Personal API token",
+            inputType: "password" as const,
+            slotKey: "jira.jira-default.jira-personal-api-token.api-key",
+          },
+        ],
+      },
+    ],
+    targetConfig: {},
+    targetDisplayName: "Jira",
+    targetFamilyId: "jira",
+    targetKey: "jira-default",
+    targetVariantId: "jira-default",
   };
 }
 
@@ -630,6 +657,104 @@ describe("useIntegrationConnectionEditorState", () => {
         pathname: "/v1/integration/connections/slack-default/slack-app/draft",
         body: {
           displayName: "Engineering Slack",
+        },
+      },
+    ]);
+  });
+
+  it("passes managed webhook setup failure after Jira connection creation", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname === "/v1/integration/connections/jira-default/form"
+      ) {
+        return {
+          status: 201,
+          body: {
+            id: "icn_jira_created",
+            targetKey: "jira-default",
+            displayName: "Engineering Jira",
+            status: "active",
+            config: {
+              connection_method: "jira-personal-api-token",
+              site_url: "https://engineering.atlassian.net",
+              email: "ops@example.com",
+            },
+            connectionMethodId: "jira-personal-api-token",
+            connectionMethodLabel: "Personal API token",
+            managedWebhookSetup: {
+              status: "failed",
+              message: "Jira admin webhook creation failed (403): Forbidden",
+            },
+            createdAt: "2026-04-27T00:00:00.000Z",
+            updatedAt: "2026-04-27T00:00:00.000Z",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    let submitResult: {
+      connectionId: string | null;
+      managedWebhookSetup?: ManagedWebhookSetupResult;
+    } | null = null;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: jiraPersonalApiTokenCreateEditorInput(),
+          onSubmitSuccess: ({ connectionId, managedWebhookSetup }) => {
+            submitResult = {
+              connectionId,
+              ...(managedWebhookSetup === undefined ? {} : { managedWebhookSetup }),
+            };
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("Engineering Jira");
+      result.current.onConfigChange({
+        connection_method: "jira-personal-api-token",
+        site_url: "https://engineering.atlassian.net",
+        email: "ops@example.com",
+      });
+      result.current.onSecretChange("apiKey", "jira-api-token");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(submitResult).toEqual({
+        connectionId: "icn_jira_created",
+        managedWebhookSetup: {
+          status: "failed",
+          message: "Jira admin webhook creation failed (403): Forbidden",
+        },
+      });
+    });
+
+    expect(server.requests).toEqual([
+      {
+        method: "POST",
+        pathname: "/v1/integration/connections/jira-default/form",
+        body: {
+          displayName: "Engineering Jira",
+          methodId: "jira-personal-api-token",
+          config: {
+            connection_method: "jira-personal-api-token",
+            site_url: "https://engineering.atlassian.net",
+            email: "ops@example.com",
+          },
+          secrets: {
+            apiKey: "jira-api-token",
+          },
         },
       },
     ]);

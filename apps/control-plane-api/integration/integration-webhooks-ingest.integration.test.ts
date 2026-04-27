@@ -24,7 +24,7 @@ import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { beforeEach, describe, expect } from "vitest";
 
-import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   IngestIntegrationWebhookResponseSchema,
   IntegrationWebhooksBadRequestResponseSchema,
@@ -134,7 +134,9 @@ async function createGitHubWebhookConnection(input: {
     },
   );
   expect(createConnectionResponse.status).toBe(201);
-  const connection = IntegrationConnectionSchema.parse(await createConnectionResponse.json());
+  const connection = CreatedFormIntegrationConnectionSchema.parse(
+    await createConnectionResponse.json(),
+  );
 
   await input.fixture.db
     .update(integrationConnections)
@@ -296,7 +298,9 @@ async function createSlackAppOAuthConnection(input: {
   );
 
   expect(createConnectionResponse.status).toBe(201);
-  const connection = IntegrationConnectionSchema.parse(await createConnectionResponse.json());
+  const connection = CreatedFormIntegrationConnectionSchema.parse(
+    await createConnectionResponse.json(),
+  );
   return connection.id;
 }
 
@@ -871,7 +875,7 @@ describe("integration webhooks ingest integration", () => {
     );
 
     expect(createConnectionResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
       await createConnectionResponse.json(),
     );
 
@@ -1096,7 +1100,7 @@ describe("integration webhooks ingest integration", () => {
     );
 
     expect(createWebhookConnectionResponse.status).toBe(201);
-    const webhookConnection = IntegrationConnectionSchema.parse(
+    const webhookConnection = CreatedFormIntegrationConnectionSchema.parse(
       await createWebhookConnectionResponse.json(),
     );
     const webhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
@@ -1232,7 +1236,7 @@ describe("integration webhooks ingest integration", () => {
       );
 
       expect(createConnectionResponse.status).toBe(201);
-      const createdConnection = IntegrationConnectionSchema.parse(
+      const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
         await createConnectionResponse.json(),
       );
 
@@ -1364,7 +1368,7 @@ describe("integration webhooks ingest integration", () => {
     );
 
     expect(createConnectionResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
       await createConnectionResponse.json(),
     );
 
@@ -1474,7 +1478,7 @@ describe("integration webhooks ingest integration", () => {
     );
 
     expect(createConnectionResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
       await createConnectionResponse.json(),
     );
 

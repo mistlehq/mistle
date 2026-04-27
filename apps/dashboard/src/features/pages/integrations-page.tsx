@@ -82,6 +82,15 @@ function buildGitHubAppInstallationStateByConnectionId(input: {
   );
 }
 
+function resolveManagedWebhookSetupMessage(state: unknown): string | null {
+  if (typeof state !== "object" || state === null || !("managedWebhookSetupMessage" in state)) {
+    return null;
+  }
+
+  const message = state.managedWebhookSetupMessage;
+  return typeof message === "string" && message.trim().length > 0 ? message : null;
+}
+
 export function IntegrationsPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -136,6 +145,12 @@ export function IntegrationsPage() {
     selectedDetailConnection.connectionMethodId === SlackConnectionMethodId
       ? detailConnectionId
       : null;
+  const managedWebhookSetupMessage = resolveManagedWebhookSetupMessage(location.state);
+  const shouldShowManagedWebhookSetupFailureNotice =
+    searchParams.get("managedWebhookSetup") === "failed" &&
+    managedWebhookSetupMessage !== null &&
+    detailConnectionId !== null &&
+    selectedDetailConnection?.id === detailConnectionId;
 
   if (directoryState.integrationsQuery.isPending) {
     return null;
@@ -225,6 +240,10 @@ export function IntegrationsPage() {
               variant="success"
             >
               The Slack app was created in Slack and connected to Mistle.
+            </Notice>
+          ) : shouldShowManagedWebhookSetupFailureNotice ? (
+            <Notice title="Connection created, webhook setup failed" variant="alert">
+              {managedWebhookSetupMessage}
             </Notice>
           ) : undefined
         }

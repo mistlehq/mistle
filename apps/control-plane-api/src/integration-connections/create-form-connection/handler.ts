@@ -12,22 +12,24 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const integrationsConfig = ctx.get("config").integrations;
+  const appConfig = ctx.get("config");
+  const integrationsConfig = appConfig.integrations;
   const { targetKey } = ctx.req.valid("param");
-  const { config, displayName, methodId, secrets } = ctx.req.valid("json");
+  const { config: connectionConfig, displayName, methodId, secrets } = ctx.req.valid("json");
 
   const createdConnection = await createFormConnection(
     {
       db,
       integrationRegistry,
       integrationsConfig,
+      controlPlaneBaseUrl: appConfig.auth.baseUrl,
     },
     {
       organizationId: session.activeOrganizationId,
       targetKey,
       displayName,
       methodId,
-      config,
+      config: connectionConfig,
       secrets,
     },
   );

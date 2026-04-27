@@ -3168,6 +3168,17 @@ export interface paths {
               externalSubjectId?: string;
               id: string;
               isIdentityLinked?: boolean;
+              managedWebhookSetup?:
+                | {
+                    /** @enum {string} */
+                    status: "created";
+                    webhookSourceId: string;
+                  }
+                | {
+                    message: string;
+                    /** @enum {string} */
+                    status: "failed";
+                  };
               resources?: {
                 count: number;
                 kind: string;

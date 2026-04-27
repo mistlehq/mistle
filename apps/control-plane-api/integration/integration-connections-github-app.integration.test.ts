@@ -22,7 +22,10 @@ import {
 } from "../src/integration-connections/github-app/start-installation/schema.js";
 import { StartGitHubAppManifestConnectionResponseSchema } from "../src/integration-connections/github-app/start-manifest/schema.js";
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
-import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
+import {
+  CreatedFormIntegrationConnectionSchema,
+  IntegrationConnectionSchema,
+} from "../src/integration-connections/schemas.js";
 import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -610,7 +613,9 @@ describe("integration connections GitHub App integration", () => {
       }),
     });
     expect(createResponse.status).toBe(201);
-    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+    const createdConnection = CreatedFormIntegrationConnectionSchema.parse(
+      await createResponse.json(),
+    );
 
     const response = await fixture.request(
       `/v1/integration/connections/${createdConnection.id}/github-app-installation/start`,
@@ -736,7 +741,7 @@ async function createGitHubAppConnection(
   });
 
   expect(response.status).toBe(201);
-  const createdConnection = IntegrationConnectionSchema.parse(await response.json());
+  const createdConnection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
 
   return {
     authenticatedSession,
