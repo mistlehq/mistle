@@ -15,6 +15,7 @@ export type ExecCommandRequest = {
   command: string;
   args?: string[];
   cwd?: string;
+  stdin?: string;
   timeoutMs?: number;
   maxOutputBytes?: number;
 };
@@ -137,6 +138,7 @@ export class ExecStreamClient {
         command: input.command,
         ...(input.args === undefined ? {} : { args: input.args }),
         ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+        ...(input.stdin === undefined ? {} : { stdin: input.stdin }),
         ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
         ...(input.maxOutputBytes === undefined ? {} : { maxOutputBytes: input.maxOutputBytes }),
       },

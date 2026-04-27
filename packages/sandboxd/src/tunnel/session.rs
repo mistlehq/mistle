@@ -9,8 +9,9 @@ use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fmt::{self, Display};
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::net::SocketAddr;
+use std::os::fd::AsFd;
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -30,6 +31,7 @@ use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use nix::errno::Errno;
+use nix::fcntl::{FcntlArg, OFlag, fcntl};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use serde::Deserialize;
@@ -2583,7 +2585,11 @@ fn run_exec_command(
     if let Some(args) = message.channel.args.as_ref() {
         child_command.args(args);
     }
-    child_command.stdin(Stdio::null());
+    child_command.stdin(if message.channel.stdin.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
     child_command.stdout(Stdio::piped());
     child_command.stderr(Stdio::piped());
     child_command.envs(runtime_env);
@@ -2600,6 +2606,19 @@ fn run_exec_command(
             .expect("exec child pid lock should not be poisoned");
         *stored_pid = Some(child.id());
     }
+    let foreground_process_exited = Arc::new(AtomicBool::new(false));
+    let stdin_thread = if let Some(stdin) = message.channel.stdin.clone() {
+        let child_stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| "command stdin pipe was not available".to_string())?;
+        let stdin_foreground_process_exited = Arc::clone(&foreground_process_exited);
+        Some(thread::spawn(move || {
+            write_exec_stdin(child_stdin, stdin, stdin_foreground_process_exited)
+        }))
+    } else {
+        None
+    };
     if cancel_requested.load(Ordering::Relaxed) {
         kill_exec_child_process(child.id())?;
     }
@@ -2616,7 +2635,14 @@ fn run_exec_command(
     let stderr_budget = Arc::clone(&shared_budget);
     let stdout_thread = thread::spawn(move || read_bounded_output(stdout_reader, stdout_budget));
     let stderr_thread = thread::spawn(move || read_bounded_output(stderr_reader, stderr_budget));
-    let status = wait_for_exec_child(&mut child, timeout_ms, cancel_requested)?;
+    let status_result = wait_for_exec_child(&mut child, timeout_ms, cancel_requested);
+    foreground_process_exited.store(true, Ordering::Relaxed);
+    if let Some(stdin_thread) = stdin_thread {
+        stdin_thread
+            .join()
+            .map_err(|_| "command stdin writer panicked".to_string())??;
+    }
+    let status = status_result?;
     let stdout = stdout_thread
         .join()
         .map_err(|_| "command stdout reader panicked".to_string())??;
@@ -2630,6 +2656,46 @@ fn run_exec_command(
         stderr: stderr.text,
         truncated: stdout.truncated || stderr.truncated,
     })
+}
+
+fn write_exec_stdin(
+    mut child_stdin: std::process::ChildStdin,
+    stdin: String,
+    foreground_process_exited: Arc<AtomicBool>,
+) -> Result<(), String> {
+    set_exec_stdin_nonblocking(&child_stdin)?;
+
+    let bytes = stdin.as_bytes();
+    let mut bytes_written = 0;
+    while bytes_written < bytes.len() {
+        match child_stdin.write(&bytes[bytes_written..]) {
+            Ok(0) if foreground_process_exited.load(Ordering::Relaxed) => return Ok(()),
+            Ok(0) => thread::sleep(std::time::Duration::from_millis(10)),
+            Ok(count) => bytes_written += count,
+            Err(error) if error.kind() == ErrorKind::BrokenPipe => return Ok(()),
+            Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                if foreground_process_exited.load(Ordering::Relaxed) {
+                    return Ok(());
+                }
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(error) => return Err(format!("failed to write command stdin: {error}")),
+        }
+    }
+
+    Ok(())
+}
+
+fn set_exec_stdin_nonblocking(child_stdin: &std::process::ChildStdin) -> Result<(), String> {
+    let flags_bits = fcntl(child_stdin.as_fd(), FcntlArg::F_GETFL)
+        .map_err(|error| format!("failed to read command stdin flags: {error}"))?;
+    let flags = OFlag::from_bits_truncate(flags_bits);
+    fcntl(
+        child_stdin.as_fd(),
+        FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK),
+    )
+    .map_err(|error| format!("failed to set command stdin non-blocking: {error}"))?;
+    Ok(())
 }
 
 fn wait_for_exec_child(
@@ -5142,7 +5208,6 @@ mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{Arc, Mutex, mpsc};
     use std::thread;
-    #[cfg(target_os = "linux")]
     use std::time::{Duration, Instant};
 
     #[cfg(target_os = "linux")]
@@ -8021,7 +8086,9 @@ mod tests {
                         "streamId": 11,
                         "channel": {
                             "kind": "exec",
-                            "command": "pwd",
+                            "command": "sh",
+                            "args": ["-c", "cat"],
+                            "stdin": "exec stdin\n",
                             "timeoutMs": 1000,
                             "maxOutputBytes": 4096
                         }
@@ -8051,14 +8118,9 @@ mod tests {
             assert_eq!(exec_result["event"]["exitCode"], Value::Number(0.into()));
             assert_eq!(exec_result["event"]["stderr"], Value::String(String::new()));
             assert_eq!(exec_result["event"]["truncated"], Value::Bool(false));
-            let stdout = exec_result["event"]["stdout"]
-                .as_str()
-                .expect("exec.result stdout should be a string");
-            let expected_working_directory = std::env::current_dir()
-                .expect("test process should expose a current working directory");
             assert_eq!(
-                std::path::Path::new(stdout.trim()),
-                expected_working_directory.as_path()
+                exec_result["event"]["stdout"],
+                Value::String("exec stdin\n".to_string())
             );
 
             let exec_complete = read_stream_text_message(&mut websocket);
@@ -8067,6 +8129,66 @@ mod tests {
                 Value::String("stream.complete".to_string())
             );
             assert_eq!(exec_complete["streamId"], Value::Number(11.into()));
+
+            let large_stdin = "x".repeat(1024 * 1024);
+            let background_exec_started = Instant::now();
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 12,
+                        "channel": {
+                            "kind": "exec",
+                            "command": "sh",
+                            "args": ["-c", "sleep 5 >/dev/null 2>/dev/null & exit 0"],
+                            "stdin": large_stdin,
+                            "timeoutMs": 1000,
+                            "maxOutputBytes": 4096
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the background exec stream");
+
+            let background_exec_open_ok = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                background_exec_open_ok["type"],
+                Value::String("stream.open.ok".to_string())
+            );
+            assert_eq!(
+                background_exec_open_ok["streamId"],
+                Value::Number(12.into())
+            );
+
+            let background_exec_result = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                background_exec_result["type"],
+                Value::String("stream.event".to_string())
+            );
+            assert_eq!(background_exec_result["streamId"], Value::Number(12.into()));
+            assert_eq!(
+                background_exec_result["event"]["type"],
+                Value::String("exec.result".to_string())
+            );
+            assert_eq!(
+                background_exec_result["event"]["exitCode"],
+                Value::Number(0.into())
+            );
+
+            let background_exec_complete = read_stream_text_message(&mut websocket);
+            assert_eq!(
+                background_exec_complete["type"],
+                Value::String("stream.complete".to_string())
+            );
+            assert_eq!(
+                background_exec_complete["streamId"],
+                Value::Number(12.into())
+            );
+            assert!(
+                background_exec_started.elapsed() < Duration::from_secs(2),
+                "exec stream should complete after the foreground command exits"
+            );
 
             send_websocket_ping_and_expect_pong(&mut websocket, b"bootstrap-still-open-after-exec");
 

@@ -154,6 +154,7 @@ pub struct ExecStreamChannel {
     pub command: String,
     pub args: Option<Vec<String>>,
     pub cwd: Option<String>,
+    pub stdin: Option<String>,
     pub timeout_ms: Option<u64>,
     pub max_output_bytes: Option<usize>,
 }
@@ -2026,7 +2027,7 @@ mod tests {
         assert!(matches!(upload, StreamControlMessage::OpenFileUpload(_)));
 
         let exec = parse_stream_control_message(
-            r#"{"type":"stream.open","streamId":8,"channel":{"kind":"exec","command":"git","args":["status","--short"],"cwd":"/workspace/repo","timeoutMs":15000,"maxOutputBytes":65536}}"#,
+            r#"{"type":"stream.open","streamId":8,"channel":{"kind":"exec","command":"git","args":["status","--short"],"cwd":"/workspace/repo","stdin":"prompt text","timeoutMs":15000,"maxOutputBytes":65536}}"#,
         )
         .expect("exec stream.open should parse");
         assert!(matches!(exec, StreamControlMessage::OpenExec(_)));

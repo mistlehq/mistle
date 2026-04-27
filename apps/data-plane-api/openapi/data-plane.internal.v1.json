@@ -3088,6 +3088,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "onlyIfUnset": {
+                    "type": "boolean"
+                  },
                   "organizationId": {
                     "type": "string",
                     "minLength": 1
@@ -3118,9 +3121,13 @@
                     "title": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
-                  "required": ["id", "title"],
+                  "required": ["id", "title", "updatedAt"],
                   "additionalProperties": false
                 }
               }

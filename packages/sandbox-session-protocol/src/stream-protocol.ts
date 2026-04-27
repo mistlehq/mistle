@@ -45,6 +45,7 @@ const ExecStreamChannelSchema = z.object({
   command: NonEmptyStringSchema,
   args: z.array(NonEmptyStringSchema).optional(),
   cwd: NonEmptyStringSchema.optional(),
+  stdin: z.string().optional(),
   timeoutMs: PositiveIntegerSchema.optional(),
   maxOutputBytes: PositiveIntegerSchema.optional(),
 });

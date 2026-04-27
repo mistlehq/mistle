@@ -6799,6 +6799,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            onlyIfUnset?: boolean;
             title: string;
           };
         };
@@ -6813,6 +6814,7 @@ export interface paths {
             "application/json": {
               id: string;
               title: string;
+              updatedAt: string;
             };
           };
         };

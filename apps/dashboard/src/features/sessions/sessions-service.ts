@@ -65,6 +65,7 @@ const PatchSandboxInstanceTitleResponseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1),
+    updatedAt: z.string().min(1),
   })
   .strict();
 
@@ -93,6 +94,7 @@ export type ResumeSandboxInstanceResult = SandboxInstanceStatusResult;
 export type PatchSandboxInstanceTitleResult = {
   id: string;
   title: string;
+  updatedAt: string;
 };
 
 export async function listSandboxInstances(input: {
@@ -299,6 +301,7 @@ export async function createSandboxInstancePortAccess(input: {
 
 export async function patchSandboxInstanceTitle(input: {
   instanceId: string;
+  onlyIfUnset?: boolean;
   title: string;
   signal?: AbortSignal;
 }): Promise<PatchSandboxInstanceTitleResult> {
@@ -308,6 +311,7 @@ export async function patchSandboxInstanceTitle(input: {
       method: "PATCH",
       pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/title`,
       body: {
+        ...(input.onlyIfUnset === undefined ? {} : { onlyIfUnset: input.onlyIfUnset }),
         title: input.title,
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),

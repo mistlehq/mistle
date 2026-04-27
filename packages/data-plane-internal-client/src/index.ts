@@ -127,12 +127,14 @@ export type DeleteSandboxInstanceDeadlineOkResponse = z.infer<
 export type PatchSandboxInstanceTitleInput = {
   organizationId: string;
   instanceId: string;
+  onlyIfUnset?: boolean;
   title: string;
 };
 const PatchSandboxInstanceTitleResponseSchema = z
   .object({
     id: z.string().min(1),
     title: z.string().min(1),
+    updatedAt: z.string().min(1),
   })
   .strict();
 export type PatchSandboxInstanceTitleResponse = z.infer<
@@ -545,6 +547,9 @@ export function createDataPlaneSandboxInstancesClient(
           method: "PATCH",
           headers: createAuthedJsonHeaders(internalClient.serviceToken),
           body: JSON.stringify({
+            ...(patchInput.onlyIfUnset === undefined
+              ? {}
+              : { onlyIfUnset: patchInput.onlyIfUnset }),
             organizationId: patchInput.organizationId,
             title: patchInput.title,
           }),

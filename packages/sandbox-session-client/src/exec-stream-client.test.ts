@@ -198,11 +198,14 @@ describe("ExecStreamClient", () => {
         command: "git",
         args: ["status", "--short"],
         cwd: "/workspace/repo",
+        stdin: "status prompt",
         timeoutMs: 1000,
         maxOutputBytes: 4096,
       });
 
-      expect(await server.openRequest).toContain('"kind":"exec"');
+      const openRequest = await server.openRequest;
+      expect(openRequest).toContain('"kind":"exec"');
+      expect(openRequest).toContain('"stdin":"status prompt"');
       await systemSleeper.sleep(20);
       server.sendResult({
         exitCode: 0,

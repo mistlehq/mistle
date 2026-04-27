@@ -29,15 +29,10 @@ export function SessionHeaderTitle(input: { sandboxInstanceId: string }): React.
     },
     onSuccess: async (patchedTitle) => {
       applyPatchedSessionTitleToCache(queryClient, patchedTitle);
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: sandboxInstanceStatusQueryKey(patchedTitle.id),
-          exact: true,
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["sandbox-instances", "list"],
-        }),
-      ]);
+      await queryClient.invalidateQueries({
+        queryKey: sandboxInstanceStatusQueryKey(patchedTitle.id),
+        exact: true,
+      });
     },
   });
 

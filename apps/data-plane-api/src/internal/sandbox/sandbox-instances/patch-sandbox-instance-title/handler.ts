@@ -17,6 +17,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
     {
       organizationId: body.organizationId,
       instanceId: params.id,
+      ...(body.onlyIfUnset === undefined ? {} : { onlyIfUnset: body.onlyIfUnset }),
       title: body.title,
     },
   );

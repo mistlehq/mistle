@@ -21,6 +21,7 @@ const routeHandler = async (
     {
       organizationId: session.activeOrganizationId,
       instanceId,
+      ...(body.onlyIfUnset === undefined ? {} : { onlyIfUnset: body.onlyIfUnset }),
       title: body.title,
     },
   );

@@ -1153,6 +1153,7 @@ describe("TunnelProtocolTranslator", () => {
           channel: {
             kind: "exec",
             command: "pwd",
+            stdin: "input",
           },
         }),
         sandboxInstanceId: SandboxInstanceId,
@@ -1167,6 +1168,7 @@ describe("TunnelProtocolTranslator", () => {
           channel: {
             kind: "exec",
             command: "pwd",
+            stdin: "input",
           },
         }),
       },

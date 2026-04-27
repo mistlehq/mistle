@@ -7,6 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
+import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
+import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -265,6 +267,43 @@ export function useSessionWorkbenchController(input: {
       sessionState.threads.switchPrimaryRepository,
     ],
   );
+  const startTurn = useCallback(
+    async (turnInput: Parameters<typeof chat.startTurn>[0]): Promise<void> => {
+      const shouldGenerateSessionTitle =
+        input.sandboxInstanceId !== null &&
+        chat.chatState.turnOrder.length === 0 &&
+        !(sandboxStatus?.title !== undefined && sandboxStatus.title !== null);
+
+      await chat.startTurn(turnInput);
+
+      if (!shouldGenerateSessionTitle || input.sandboxInstanceId === null) {
+        return;
+      }
+
+      void generateSessionTitleWithSandboxCodexExec({
+        cwd: primaryRepositoryState.selectedRepositoryPath,
+        ensureTransportConnected: transportManager.ensureTransportConnected,
+        messagePayload: turnInput.transcriptPrompt ?? turnInput.submittedPrompt,
+        sandboxInstanceId: input.sandboxInstanceId,
+      })
+        .then((patchedTitle) => {
+          applyPatchedSessionTitleToCache(queryClient, patchedTitle);
+        })
+        .catch((error: unknown) => {
+          console.warn(
+            error instanceof Error ? error.message : "Could not generate sandbox session title.",
+          );
+        });
+    },
+    [
+      chat,
+      input.sandboxInstanceId,
+      primaryRepositoryState.selectedRepositoryPath,
+      queryClient,
+      sandboxStatus?.title,
+      transportManager.ensureTransportConnected,
+    ],
+  );
 
   return {
     workbench: {
@@ -324,7 +363,7 @@ export function useSessionWorkbenchController(input: {
           isInterrupting: chat.isInterruptingTurn,
           isStarting: chat.isStartingTurn,
           isSteering: chat.isSteeringTurn,
-          startTurn: chat.startTurn,
+          startTurn,
           steerTurn: chat.steerTurn,
         },
         sessionErrorMessage: sessionMessage.sessionErrorMessage,

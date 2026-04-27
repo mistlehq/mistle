@@ -13,13 +13,14 @@ type PatchInstanceTitleDependencies = {
 type PatchInstanceTitleInput = {
   organizationId: string;
   instanceId: string;
+  onlyIfUnset?: boolean;
   title: string;
 };
 
 export async function patchInstanceTitle(
   deps: PatchInstanceTitleDependencies,
   input: PatchInstanceTitleInput,
-): Promise<{ id: string; title: string }> {
+): Promise<{ id: string; title: string; updatedAt: string }> {
   try {
     return await deps.dataPlaneClient.patchSandboxInstanceTitle(input);
   } catch (error) {

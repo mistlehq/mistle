@@ -11,6 +11,7 @@ export const PatchSandboxInstanceTitleParamsSchema = z
 
 export const PatchSandboxInstanceTitleBodySchema = z
   .object({
+    onlyIfUnset: z.boolean().optional(),
     organizationId: z.string().min(1),
     title: z.string().trim().min(1),
   })
