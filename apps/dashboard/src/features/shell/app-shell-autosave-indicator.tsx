@@ -6,9 +6,10 @@ import {
   type TimerHandle,
 } from "@mistle/time";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
+import { useIsMutating } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useAppShellHeaderActions } from "./app-shell-header-actions.js";
+import { AppShellAutosaveIndicatorMeta } from "./app-shell-autosave-indicator-meta.js";
 
 const AutosaveIndicatorShowDelayMs = 200;
 const AutosaveIndicatorMinimumVisibleMs = 500;
@@ -26,26 +27,26 @@ export function AppShellAutosaveIndicator(): React.JSX.Element {
   );
 }
 
-export function AppShellAutosaveHeaderActions(input: {
-  active: boolean;
+export function useAppShellAutosaveIndicator(input?: {
   minimumVisibleMs?: number;
   scheduler?: Scheduler;
   showDelayMs?: number;
-}): null {
-  const showSavingIndicator = useDelayedMinimumVisibleFlag({
-    active: input.active,
-    clock: systemClock,
-    minimumVisibleMs: input.minimumVisibleMs ?? AutosaveIndicatorMinimumVisibleMs,
-    scheduler: input.scheduler ?? systemScheduler,
-    showDelayMs: input.showDelayMs ?? AutosaveIndicatorShowDelayMs,
+}): React.ReactNode | null {
+  const activeAutosaveMutationCount = useIsMutating({
+    predicate: (mutation) => mutation.options.meta?.[AppShellAutosaveIndicatorMeta.SHOW] === true,
   });
-  const headerActions = useMemo(
+  const showSavingIndicator = useDelayedMinimumVisibleFlag({
+    active: activeAutosaveMutationCount > 0,
+    clock: systemClock,
+    minimumVisibleMs: input?.minimumVisibleMs ?? AutosaveIndicatorMinimumVisibleMs,
+    scheduler: input?.scheduler ?? systemScheduler,
+    showDelayMs: input?.showDelayMs ?? AutosaveIndicatorShowDelayMs,
+  });
+
+  return useMemo(
     () => (showSavingIndicator ? <AppShellAutosaveIndicator /> : null),
     [showSavingIndicator],
   );
-  useAppShellHeaderActions(headerActions);
-
-  return null;
 }
 
 function useDelayedMinimumVisibleFlag(input: {

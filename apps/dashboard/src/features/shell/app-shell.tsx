@@ -19,6 +19,7 @@ import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
 } from "../shared/singleton-image.js";
+import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
@@ -45,6 +46,7 @@ export function AppShell(): React.JSX.Element {
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
   const headerLeadingModel = useAppHeaderLeadingModel();
   const pageMeta = useAppPageMeta();
+  const autosaveIndicator = useAppShellAutosaveIndicator();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -255,6 +257,7 @@ export function AppShell(): React.JSX.Element {
           ) : null
         }
         headerActions={headerActions}
+        autosaveIndicator={autosaveIndicator}
         mainContent={<Outlet />}
         {...appShellFrame}
       />

@@ -22,6 +22,7 @@ export interface AppShellViewProps {
   sidebarFooterContent: React.ReactNode;
   headerLeadingContent: React.ReactNode | null;
   contentInsetOwner: "app-shell" | "child";
+  autosaveIndicator: React.ReactNode | null;
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
   topLoadingBar: React.ReactNode;
@@ -68,11 +69,12 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
 function AppShellStickyHeader(
   input: Pick<
     AppShellViewProps,
-    "headerLeadingContent" | "headerActions" | "showHeaderLeadingContent"
+    "autosaveIndicator" | "headerLeadingContent" | "headerActions" | "showHeaderLeadingContent"
   >,
 ): React.JSX.Element {
   const { isMobile, openMobile, state } = useSidebar();
   const shouldRenderSidebarTrigger = isMobile ? !openMobile : state === "collapsed";
+  const hasHeaderTrailingContent = input.headerActions !== null || input.autosaveIndicator !== null;
 
   return (
     <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
@@ -84,9 +86,12 @@ function AppShellStickyHeader(
       ) : (
         <div className="flex-1" />
       )}
-      {input.headerActions === null ? null : (
-        <div className="ml-4 shrink-0">{input.headerActions}</div>
-      )}
+      {hasHeaderTrailingContent ? (
+        <div className="ml-4 flex shrink-0 items-center gap-2">
+          {input.headerActions}
+          {input.autosaveIndicator}
+        </div>
+      ) : null}
     </header>
   );
 }

@@ -54,7 +54,6 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
-import { AppShellAutosaveHeaderActions } from "../shell/app-shell-autosave-indicator.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -1007,70 +1006,67 @@ function ReadySandboxProfileEditorPage(input: {
   }
 
   return (
-    <>
-      <AppShellAutosaveHeaderActions active={input.mode.kind === "draft" && isSavingDraftChanges} />
-      <SandboxProfileEditorView
-        snapshotPreparationStatus={resolveSnapshotPreparationStatus({
-          mode: input.mode,
-          version: input.currentVersion,
-        })}
-        hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
-        hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
-        isSavingProfileName={metaState.isUpdating}
-        mode={input.mode}
-        deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
-        deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
-        deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
-        deleteProfileError={input.deleteProfileError}
-        deleteProfileIsPending={input.deleteProfileIsPending}
-        onMakeChanges={input.onMakeChanges}
-        onConfirmDeleteProfile={input.onConfirmDeleteProfile}
-        onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
-        onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
-        onPublish={(version) => {
-          void handlePublish(version);
-        }}
-        onRefreshSnapshot={input.onRefreshSnapshot}
-        onSaveProfileName={metaState.onProfileNameSave}
-        onViewActive={input.onViewActive}
-        onViewDraft={input.onViewDraft}
-        profileName={metaState.formState.displayName}
-        profileNameFallback={metaState.pageTitle}
-        publishRequestIsPending={publishRequestIsPending}
-        versionActionError={publishFlushError ?? input.versionActionError}
-        versionActionIsPending={input.versionActionIsPending}
-        isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
-        renderSectionPanel={(sectionId) => {
-          if (sectionId === "configurations") {
-            return (
-              <LoadedSandboxProfileSetupScriptSection
-                disabled={draftFieldsAreDisabled}
-                key={`${input.profileId}:${String(input.mode.version)}`}
-                loader={setupScriptLoader}
-                profileId={input.profileId}
-                invalidateVersionSetupScript={input.invalidateVersionSetupScript}
-                onDraftStateChange={setSetupScriptDraftState}
-                version={input.mode.version}
-              />
-            );
-          }
-
+    <SandboxProfileEditorView
+      snapshotPreparationStatus={resolveSnapshotPreparationStatus({
+        mode: input.mode,
+        version: input.currentVersion,
+      })}
+      hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
+      hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
+      isSavingProfileName={metaState.isUpdating}
+      mode={input.mode}
+      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+      deleteProfileError={input.deleteProfileError}
+      deleteProfileIsPending={input.deleteProfileIsPending}
+      onMakeChanges={input.onMakeChanges}
+      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+      onPublish={(version) => {
+        void handlePublish(version);
+      }}
+      onRefreshSnapshot={input.onRefreshSnapshot}
+      onSaveProfileName={metaState.onProfileNameSave}
+      onViewActive={input.onViewActive}
+      onViewDraft={input.onViewDraft}
+      profileName={metaState.formState.displayName}
+      profileNameFallback={metaState.pageTitle}
+      publishRequestIsPending={publishRequestIsPending}
+      versionActionError={publishFlushError ?? input.versionActionError}
+      versionActionIsPending={input.versionActionIsPending}
+      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
+      renderSectionPanel={(sectionId) => {
+        if (sectionId === "configurations") {
           return (
-            <LoadedSandboxProfileIntegrationSetupSection
-              key={`${input.profileId}:integration-setup`}
-              activeSectionId={sectionId}
-              loader={integrationsLoader}
-              onDraftStateChange={setIntegrationDraftState}
-              profileId={input.profileId}
+            <LoadedSandboxProfileSetupScriptSection
               disabled={draftFieldsAreDisabled}
+              key={`${input.profileId}:${String(input.mode.version)}`}
+              loader={setupScriptLoader}
+              profileId={input.profileId}
+              invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+              onDraftStateChange={setSetupScriptDraftState}
               version={input.mode.version}
-              invalidateVersionBindings={input.invalidateVersionBindings}
             />
           );
-        }}
-        sections={SandboxProfileEditorTabs}
-      />
-    </>
+        }
+
+        return (
+          <LoadedSandboxProfileIntegrationSetupSection
+            key={`${input.profileId}:integration-setup`}
+            activeSectionId={sectionId}
+            loader={integrationsLoader}
+            onDraftStateChange={setIntegrationDraftState}
+            profileId={input.profileId}
+            disabled={draftFieldsAreDisabled}
+            version={input.mode.version}
+            invalidateVersionBindings={input.invalidateVersionBindings}
+          />
+        );
+      }}
+      sections={SandboxProfileEditorTabs}
+    />
   );
 }
 

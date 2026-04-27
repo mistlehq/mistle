@@ -231,6 +231,7 @@ const meta = {
     },
   },
   args: {
+    autosaveIndicator: null,
     headerLeadingContent: <p className="truncate text-sm">Sessions / Storybook Session</p>,
     contentInsetOwner: "app-shell",
     headerActions: (

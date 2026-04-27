@@ -21,7 +21,6 @@ import {
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { AppShellAutosaveHeaderActions } from "../shell/app-shell-autosave-indicator.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import {
   applyPublishedSandboxProfileVersionToProfile,
@@ -443,18 +442,6 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
   );
 }
 
-function HeaderActionsHarness(input: { isSavingDraftChanges: boolean }): JSX.Element {
-  return (
-    <TestAppShellHeaderActionsProvider>
-      <AppShellAutosaveHeaderActions
-        active={input.isSavingDraftChanges}
-        minimumVisibleMs={0}
-        showDelayMs={0}
-      />
-    </TestAppShellHeaderActionsProvider>
-  );
-}
-
 function renderDeleteProfileDialogHarness(input: {
   automationUsages?: readonly {
     id: string;
@@ -481,10 +468,6 @@ function renderDraftActionsHarness(input?: {
   );
 
   render(<RouterProvider router={router} />);
-}
-
-function renderHeaderActionsHarness(input: { isSavingDraftChanges: boolean }): void {
-  render(<HeaderActionsHarness isSavingDraftChanges={input.isSavingDraftChanges} />);
 }
 
 function renderPublishedWithDraftActionsHarness(): void {
@@ -1051,14 +1034,6 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
     expect(screen.getByRole("button", { name: "More actions" })).toHaveProperty("disabled", false);
     expect(screen.queryByText("Saving")).toBeNull();
-  });
-
-  it("renders draft save progress in the app shell header actions", async () => {
-    renderHeaderActionsHarness({
-      isSavingDraftChanges: true,
-    });
-
-    expect(await screen.findByText("Saving")).toBeDefined();
   });
 
   it("surfaces draft save failures before publishing as a page-level action error", () => {

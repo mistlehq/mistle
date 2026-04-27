@@ -213,6 +213,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
       <AppShellView
         {...appShellFrame}
+        autosaveIndicator={null}
         headerLeadingContent={
           headerLeadingModel.kind === "custom" ? (
             <>{headerLeadingModel.content}</>

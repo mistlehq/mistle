@@ -14,6 +14,7 @@ import {
   putSandboxProfileVersionIntegrationBindings,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { AppShellAutosaveIndicatorMeta } from "../shell/app-shell-autosave-indicator-meta.js";
 import { TopLoadingBarMeta } from "../shell/top-loading-bar-query-meta.js";
 import { resolveBindingConfigUiModel } from "./sandbox-profile-binding-config-editor.js";
 import type {
@@ -234,6 +235,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 
   const putIntegrationBindingsMutation = useMutation({
     meta: {
+      [AppShellAutosaveIndicatorMeta.SHOW]: true,
       [TopLoadingBarMeta.SUPPRESS]: true,
     },
     mutationFn: async (mutationInput: {
