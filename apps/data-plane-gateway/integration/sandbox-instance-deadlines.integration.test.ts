@@ -199,7 +199,7 @@ function expectWorkflowRunMatchesDeadline(input: {
 
 describe("sandbox instance deadlines integration", () => {
   it(
-    "clears disconnect and schedules idle when the bootstrap peer attaches",
+    "schedules idle without blindly clearing prior disconnect when the bootstrap peer attaches",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -239,11 +239,12 @@ describe("sandbox instance deadlines integration", () => {
         predicate: (row) =>
           row.ownerLeaseId === runtimeState.ownerLeaseId && row.clearedAt === null,
       });
-      const clearedDisconnectDeadline = await waitForDeadlineRow({
+      const priorDisconnectDeadline = await waitForDeadlineRow({
         fixture,
         sandboxInstanceId,
         kind: "disconnect",
-        predicate: (row) => row.clearedAt !== null,
+        predicate: (row) =>
+          row.ownerLeaseId === "dtl_old_bootstrap_attach" && row.clearedAt === null,
       });
       const workflowRuns = await waitForWorkflowRuns({
         fixture,
@@ -252,8 +253,7 @@ describe("sandbox instance deadlines integration", () => {
       });
 
       expect(idleDeadline.generation).toBe(1);
-      expect(clearedDisconnectDeadline.ownerLeaseId).toBe("dtl_old_bootstrap_attach");
-      expect(clearedDisconnectDeadline.clearedAt).toEqual(expect.any(String));
+      expect(priorDisconnectDeadline.generation).toBe(1);
       expect(workflowRuns).toHaveLength(1);
       expectWorkflowRunMatchesDeadline({
         workflowRun: workflowRuns[0]!,
@@ -264,13 +264,13 @@ describe("sandbox instance deadlines integration", () => {
         dueAt: canonicalizeIsoString(idleDeadline.dueAt),
       });
 
-      await closeWebSocket(bootstrapSocket);
+      await closeWebSocketIfOpen(bootstrapSocket);
     },
     IntegrationTestTimeoutMs,
   );
 
   it(
-    "clears the stale disconnect deadline when bootstrap disconnect overlaps a replacement attach",
+    "keeps replacement idle active when bootstrap disconnect overlaps a replacement attach",
     async ({ fixture }) => {
       await exerciseOverlappingBootstrapReplacement({
         fixture,
@@ -589,12 +589,12 @@ describe("sandbox instance deadlines integration", () => {
           row.generation === 2 &&
           row.clearedAt === null,
       });
-      const clearedDisconnectDeadline = await waitForDeadlineRow({
+      const staleDisconnectDeadline = await waitForDeadlineRow({
         fixture,
         sandboxInstanceId,
         kind: "disconnect",
         predicate: (row) =>
-          row.ownerLeaseId === firstRuntimeState.ownerLeaseId && row.clearedAt !== null,
+          row.ownerLeaseId === firstRuntimeState.ownerLeaseId && row.clearedAt === null,
       });
       const workflowRuns = await waitForWorkflowRuns({
         fixture,
@@ -602,7 +602,7 @@ describe("sandbox instance deadlines integration", () => {
         minimumCount: 3,
       });
 
-      expect(clearedDisconnectDeadline.clearedAt).toEqual(expect.any(String));
+      expect(staleDisconnectDeadline.generation).toBe(1);
       expectWorkflowRunMatchesDeadline({
         workflowRun: workflowRuns[2]!,
         sandboxInstanceId,

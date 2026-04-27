@@ -182,6 +182,7 @@ describe("sandbox instance deadlines integration", () => {
     const deleteInput: DeleteSandboxInstanceDeadlineInput = {
       sandboxInstanceId,
       kind: "idle",
+      ownerLeaseId: putInput.ownerLeaseId,
     };
 
     await fixture.db.insert(sandboxInstances).values({
@@ -303,6 +304,7 @@ describe("sandbox instance deadlines integration", () => {
     const clearedResponse = await client.deleteSandboxInstanceDeadline({
       sandboxInstanceId,
       kind: "disconnect",
+      ownerLeaseId: "sol_dp_api_deadline_reactivate",
     });
     expect(clearedResponse.status).toBe("ok");
 
@@ -330,6 +332,67 @@ describe("sandbox instance deadlines integration", () => {
     });
   }, 60_000);
 
+  it("does not let a stale clear remove a replacement deadline", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxInstanceId = "sbi_dp_api_deadline_stale_clear";
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: "org_dp_api_deadline_stale_clear",
+      sandboxProfileId: "sbp_dp_api_deadline_stale_clear",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-deadline-stale-clear",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_dp_api_deadline_stale_clear",
+      source: "dashboard",
+    });
+
+    const oldResponse = await client.putSandboxInstanceDeadline({
+      sandboxInstanceId,
+      kind: "idle",
+      ownerLeaseId: "sol_dp_api_deadline_stale_clear_old",
+      dueAt: CanonicalDueAt,
+    });
+    expect(oldResponse.generation).toBe(1);
+
+    const replacementResponse = await client.putSandboxInstanceDeadline({
+      sandboxInstanceId,
+      kind: "idle",
+      ownerLeaseId: "sol_dp_api_deadline_stale_clear_replacement",
+      dueAt: AlternateCanonicalDueAt,
+    });
+    expect(replacementResponse.generation).toBe(2);
+
+    await client.deleteSandboxInstanceDeadline({
+      sandboxInstanceId,
+      kind: "idle",
+      ownerLeaseId: "sol_dp_api_deadline_stale_clear_old",
+    });
+
+    const persistedDeadline = await fixture.db.query.sandboxInstanceDeadlines.findFirst({
+      columns: {
+        ownerLeaseId: true,
+        dueAt: true,
+        generation: true,
+        clearedAt: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.kind, "idle")),
+    });
+
+    expect(persistedDeadline).toEqual({
+      ownerLeaseId: "sol_dp_api_deadline_stale_clear_replacement",
+      dueAt: expect.any(String),
+      generation: 2,
+      clearedAt: null,
+    });
+    expect(canonicalizePersistedDueAt(persistedDeadline?.dueAt ?? "")).toBe(
+      AlternateCanonicalDueAt,
+    );
+  }, 60_000);
+
   it("returns idempotent ok when deleting a missing or already-cleared deadline", async ({
     fixture,
   }) => {
@@ -340,6 +403,7 @@ describe("sandbox instance deadlines integration", () => {
       client.deleteSandboxInstanceDeadline({
         sandboxInstanceId: missingSandboxInstanceId,
         kind: "idle",
+        ownerLeaseId: "sol_dp_api_deadline_delete_missing",
       }),
     ).resolves.toEqual({
       status: "ok",
@@ -372,6 +436,7 @@ describe("sandbox instance deadlines integration", () => {
       client.deleteSandboxInstanceDeadline({
         sandboxInstanceId,
         kind: "idle",
+        ownerLeaseId: "sol_dp_api_deadline_delete_cleared",
       }),
     ).resolves.toEqual({
       status: "ok",

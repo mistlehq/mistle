@@ -1129,7 +1129,13 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody: {
+        content: {
+          "application/json": {
+            ownerLeaseId: string;
+          };
+        };
+      };
       responses: {
         /** @description Clear a sandbox instance deadline for internal callers. */
         200: {

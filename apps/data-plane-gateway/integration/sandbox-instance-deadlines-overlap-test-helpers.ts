@@ -236,14 +236,14 @@ export async function exerciseOverlappingBootstrapReplacement(input: {
         row.generation === 2 &&
         row.clearedAt === null,
     });
-    const clearedDisconnectDeadline = await waitForDeadlineRow({
+    const staleDisconnectDeadline = await waitForDeadlineRow({
       fixture: input.fixture,
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "disconnect",
       predicate: (row) =>
         row.ownerLeaseId === firstRuntimeState.ownerLeaseId &&
         row.generation === 1 &&
-        row.clearedAt !== null,
+        row.clearedAt === null,
     });
     const workflowRuns = await waitForWorkflowRuns({
       fixture: input.fixture,
@@ -265,8 +265,8 @@ export async function exerciseOverlappingBootstrapReplacement(input: {
           sandboxInstanceId: input.sandboxInstanceId,
           kind: "disconnect",
           ownerLeaseId: firstRuntimeState.ownerLeaseId,
-          generation: clearedDisconnectDeadline.generation,
-          dueAt: canonicalizeIsoString(clearedDisconnectDeadline.dueAt),
+          generation: staleDisconnectDeadline.generation,
+          dueAt: canonicalizeIsoString(staleDisconnectDeadline.dueAt),
         },
         {
           sandboxInstanceId: input.sandboxInstanceId,

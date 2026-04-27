@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { UnauthorizedResponseSchema, ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
 import {
+  DeleteSandboxInstanceDeadlineBodySchema,
   DeleteSandboxInstanceDeadlineOkResponseSchema,
   DeleteSandboxInstanceDeadlineParamsSchema,
 } from "./schema.js";
@@ -12,6 +13,14 @@ export const route = createRoute({
   tags: ["Internal"],
   request: {
     params: DeleteSandboxInstanceDeadlineParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: DeleteSandboxInstanceDeadlineBodySchema,
+        },
+      },
+    },
   },
   responses: {
     200: {

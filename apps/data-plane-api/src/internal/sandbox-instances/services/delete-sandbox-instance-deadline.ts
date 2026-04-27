@@ -12,6 +12,7 @@ type DeleteSandboxInstanceDeadlineContext = {
 export type DeleteSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
+  ownerLeaseId: string;
 };
 
 export type DeleteSandboxInstanceDeadlineOkResponse = {
@@ -34,6 +35,7 @@ export async function deleteSandboxInstanceDeadline(
       and(
         eq(sandboxInstanceDeadlines.sandboxInstanceId, input.sandboxInstanceId),
         eq(sandboxInstanceDeadlines.kind, input.kind),
+        eq(sandboxInstanceDeadlines.ownerLeaseId, input.ownerLeaseId),
         isNull(sandboxInstanceDeadlines.clearedAt),
       ),
     );

@@ -113,6 +113,7 @@ export type PutSandboxInstanceDeadlineAcceptedResponse = z.infer<
 export type DeleteSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: "idle" | "disconnect";
+  ownerLeaseId: string;
 };
 const DeleteSandboxInstanceDeadlineOkResponseSchema = z
   .object({
@@ -513,9 +514,10 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "DELETE",
-          headers: {
-            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
-          },
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            ownerLeaseId: deleteDeadlineInput.ownerLeaseId,
+          }),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },
       );

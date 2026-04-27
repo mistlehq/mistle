@@ -7,6 +7,7 @@ import { route } from "./route.js";
 export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
   const params = ctx.req.valid("param");
+  const body = ctx.req.valid("json");
 
   const response = await deleteSandboxInstanceDeadline(
     {
@@ -15,6 +16,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
     {
       sandboxInstanceId: params.id,
       kind: params.kind,
+      ownerLeaseId: body.ownerLeaseId,
     },
   );
 

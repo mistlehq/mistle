@@ -9,6 +9,12 @@ export const DeleteSandboxInstanceDeadlineParamsSchema = z
   })
   .strict();
 
+export const DeleteSandboxInstanceDeadlineBodySchema = z
+  .object({
+    ownerLeaseId: z.string().min(1),
+  })
+  .strict();
+
 export const DeleteSandboxInstanceDeadlineOkResponseSchema = z
   .object({
     status: z.literal("ok"),

@@ -27,9 +27,6 @@ export class SandboxInstanceDeadlineService {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   }): Promise<void> {
-    await this.clearDisconnectDeadline({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
     await this.touchIdleDeadline(input);
   }
 
@@ -49,9 +46,7 @@ export class SandboxInstanceDeadlineService {
     sandboxInstanceId: string;
     ownerLeaseId: string;
   }): Promise<void> {
-    await this.clearIdleDeadline({
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
+    await this.clearIdleDeadline(input);
     await this.dataPlaneClient.putSandboxInstanceDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "disconnect",
@@ -62,17 +57,14 @@ export class SandboxInstanceDeadlineService {
     });
   }
 
-  public async clearIdleDeadline(input: { sandboxInstanceId: string }): Promise<void> {
+  public async clearIdleDeadline(input: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+  }): Promise<void> {
     await this.dataPlaneClient.deleteSandboxInstanceDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "idle",
-    });
-  }
-
-  public async clearDisconnectDeadline(input: { sandboxInstanceId: string }): Promise<void> {
-    await this.dataPlaneClient.deleteSandboxInstanceDeadline({
-      sandboxInstanceId: input.sandboxInstanceId,
-      kind: "disconnect",
+      ownerLeaseId: input.ownerLeaseId,
     });
   }
 }
