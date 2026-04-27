@@ -4,11 +4,7 @@ import type React from "react";
 import { userEvent, within } from "storybook/test";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
-import {
-  ConfiguredSecretField,
-  SavingTextField,
-  type SavingFieldState,
-} from "./configured-secret-field.js";
+import { ConfiguredSecretField, type SavingFieldState } from "./configured-secret-field.js";
 
 function createIdleFieldState(): SavingFieldState {
   return {
@@ -17,57 +13,27 @@ function createIdleFieldState(): SavingFieldState {
   };
 }
 
-function SavingTextFieldStory(input: {
+function ConfiguredSecretFieldStory(input: {
+  confirmReplacement?: boolean;
+  configured?: boolean;
   description?: string;
   errorMessage?: string;
   label: string;
   multiline?: boolean;
   placeholder?: string;
+  replacementStaged?: boolean;
   required?: boolean;
   rows?: number;
+  secretLabel: string;
   status?: SavingFieldState["status"];
   type?: React.ComponentProps<"input">["type"];
   value: string;
 }): React.JSX.Element {
   const [value, setValue] = useState(input.value);
-
-  return (
-    <div className="w-[32rem]">
-      <SavingTextField
-        fieldState={{
-          status: input.status ?? "idle",
-          errorMessage: input.errorMessage ?? null,
-        }}
-        id="storybook-saving-text-field"
-        label={input.label}
-        onBlur={() => {}}
-        onChange={setValue}
-        value={value}
-        {...(input.description === undefined ? {} : { description: input.description })}
-        {...(input.multiline === undefined ? {} : { multiline: input.multiline })}
-        {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
-        {...(input.required === undefined ? {} : { required: input.required })}
-        {...(input.rows === undefined ? {} : { rows: input.rows })}
-        {...(input.type === undefined ? {} : { type: input.type })}
-      />
-    </div>
-  );
-}
-
-function ConfiguredSecretFieldStory(input: {
-  configured?: boolean;
-  description?: string;
-  label: string;
-  multiline?: boolean;
-  placeholder?: string;
-  required?: boolean;
-  rows?: number;
-  secretLabel: string;
-  type?: React.ComponentProps<"input">["type"];
-  value: string;
-}): React.JSX.Element {
-  const [value, setValue] = useState(input.value);
-  const [fieldState, setFieldState] = useState<SavingFieldState>(createIdleFieldState);
+  const [fieldState, setFieldState] = useState<SavingFieldState>({
+    status: input.status ?? "idle",
+    errorMessage: input.errorMessage ?? null,
+  });
 
   return (
     <div className="w-[32rem]">
@@ -93,10 +59,16 @@ function ConfiguredSecretFieldStory(input: {
         }}
         secretLabel={input.secretLabel}
         value={value}
+        {...(input.confirmReplacement === undefined
+          ? {}
+          : { confirmReplacement: input.confirmReplacement })}
         {...(input.configured === undefined ? {} : { configured: input.configured })}
         {...(input.description === undefined ? {} : { description: input.description })}
         {...(input.multiline === undefined ? {} : { multiline: input.multiline })}
         {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
+        {...(input.replacementStaged === undefined
+          ? {}
+          : { replacementStaged: input.replacementStaged })}
         {...(input.required === undefined ? {} : { required: input.required })}
         {...(input.rows === undefined ? {} : { rows: input.rows })}
         {...(input.type === undefined ? {} : { type: input.type })}
@@ -114,12 +86,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const BasicField: Story = {
-  render: function RenderStory(): React.JSX.Element {
-    return <SavingTextFieldStory label="App ID" required value="123456" />;
-  },
-};
-
 export const ConfiguredSecret: Story = {
   render: function RenderStory(): React.JSX.Element {
     return (
@@ -130,6 +96,23 @@ export const ConfiguredSecret: Story = {
         secretLabel="client secret"
         type="password"
         value=""
+      />
+    );
+  },
+};
+
+export const ReplaceOnSave: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <ConfiguredSecretFieldStory
+        confirmReplacement={false}
+        configured
+        label="Webhook secret"
+        replacementStaged
+        required
+        secretLabel="webhook secret"
+        type="password"
+        value="replacement-webhook-secret"
       />
     );
   },
@@ -158,6 +141,42 @@ export const ReplaceConfirmation: Story = {
   },
 };
 
+export const SavingReplacement: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <ConfiguredSecretFieldStory
+        confirmReplacement={false}
+        configured
+        label="Client secret"
+        replacementStaged
+        required
+        secretLabel="client secret"
+        status="saving"
+        type="password"
+        value="replacement-client-secret"
+      />
+    );
+  },
+};
+
+export const SavedReplacement: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <ConfiguredSecretFieldStory
+        confirmReplacement={false}
+        configured
+        label="Client secret"
+        replacementStaged
+        required
+        secretLabel="client secret"
+        status="saved"
+        type="password"
+        value="replacement-client-secret"
+      />
+    );
+  },
+};
+
 export const MultilineConfiguredSecret: Story = {
   render: function RenderStory(): React.JSX.Element {
     return (
@@ -175,14 +194,39 @@ export const MultilineConfiguredSecret: Story = {
   },
 };
 
-export const ErrorState: Story = {
+export const MultilineReplaceOnSave: Story = {
   render: function RenderStory(): React.JSX.Element {
     return (
-      <SavingTextFieldStory
-        errorMessage="Client ID is required."
-        label="Client ID"
+      <ConfiguredSecretFieldStory
+        confirmReplacement={false}
+        configured
+        label="App private key"
+        multiline
+        replacementStaged
         required
-        value=""
+        rows={8}
+        secretLabel="app private key"
+        value={
+          "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC...\n-----END PRIVATE KEY-----"
+        }
+      />
+    );
+  },
+};
+
+export const ReplacementError: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    return (
+      <ConfiguredSecretFieldStory
+        confirmReplacement={false}
+        configured
+        errorMessage="Webhook secret could not be updated."
+        label="Webhook secret"
+        replacementStaged
+        required
+        secretLabel="webhook secret"
+        type="password"
+        value="replacement-webhook-secret"
       />
     );
   },

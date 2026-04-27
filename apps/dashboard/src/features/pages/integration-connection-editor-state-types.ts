@@ -17,6 +17,7 @@ export type OpenIntegrationConnectionEditorInput =
       connectionConfig?: Record<string, unknown>;
       connectionDisplayName?: string;
       connectionId: string;
+      configuredSecretNames?: readonly string[];
       currentMethod: IntegrationConnectionMethod;
       mode: "update";
     });

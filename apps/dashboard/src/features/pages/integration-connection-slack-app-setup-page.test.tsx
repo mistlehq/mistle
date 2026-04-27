@@ -155,7 +155,7 @@ describe("SlackAppSetupPane", () => {
     expect(screen.getByText("Existing Slack App")).toBeTruthy();
     expect(screen.getByText("Secrets")).toBeTruthy();
     expect(screen.getByDisplayValue("123.456")).toBeTruthy();
-    expect(screen.getAllByPlaceholderText("******")).toHaveLength(3);
+    expect(screen.getAllByPlaceholderText("••••••")).toHaveLength(3);
     expect(screen.queryByText("Bot token is already configured.")).toBeNull();
     expect(screen.queryByText("Signing secret is already configured.")).toBeNull();
     expect(screen.queryByText("Client secret is already configured.")).toBeNull();

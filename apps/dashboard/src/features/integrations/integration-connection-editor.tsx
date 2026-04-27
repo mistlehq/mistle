@@ -4,7 +4,6 @@ import {
   Button,
   Field,
   FieldContent,
-  FieldDescription,
   FieldHeader,
   FieldLabel,
   Input,
@@ -14,13 +13,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Textarea,
   TextLink,
 } from "@mistle/ui";
 import type { IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
+import { ConfiguredSecretField, type SavingFieldState } from "../forms/configured-secret-field.js";
 import { SchemaFormWithoutSubmit } from "../forms/schema-form.js";
 import type { ConnectionMethodFormUiModel } from "../pages/use-integration-connection-editor-state-helpers.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -30,6 +29,13 @@ import type { IntegrationConnectionMethod as ServiceIntegrationConnectionMethod 
 export type IntegrationConnectionMethod = ServiceIntegrationConnectionMethod;
 export type IntegrationConnectionMethodId = IntegrationConnectionMethod["id"];
 export { IntegrationConnectionMethodIds };
+
+const IdleSecretFieldState: SavingFieldState = {
+  status: "idle",
+  errorMessage: null,
+};
+
+function ignoreSecretCommit(): void {}
 
 type CreateIntegrationConnectionEditorState = {
   methods: readonly IntegrationConnectionMethod[];
@@ -44,6 +50,7 @@ type CreateIntegrationConnectionEditorState = {
 type UpdateIntegrationConnectionEditorState = {
   connectionConfig?: Record<string, unknown>;
   connectionId: string;
+  configuredSecretNames?: readonly string[];
   currentConnectionConfig: Record<string, unknown>;
   currentMethod: IntegrationConnectionMethod;
   displayName?: string;
@@ -81,7 +88,6 @@ type IntegrationConnectionEditorProps = {
   editor: IntegrationConnectionEditorState;
   hasChanges: boolean;
   isConnectionDisplayNameChanged: boolean;
-  isSecretChanged: boolean;
   methodId: IntegrationConnectionMethodId;
   onClose: () => void;
   onConfigChange: (value: Record<string, unknown>) => void;
@@ -90,6 +96,7 @@ type IntegrationConnectionEditorProps = {
   onSecretChange: (name: string, value: string) => void;
   onSubmit: () => void;
   pending: boolean;
+  changedSecretNames: readonly string[];
   secrets: Record<string, string>;
 };
 
@@ -275,59 +282,44 @@ function renderConnectionEditorFields(props: IntegrationConnectionEditorProps) {
 
       {showsSecretInput && selectedMethod !== null ? (
         <>
-          {selectedMethod.secretFields.map((secretField) => (
-            <Field contentWidth="fill" key={secretField.name} orientation="vertical">
-              <FieldHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <FieldLabel htmlFor={`connection-secret-${editor.targetKey}-${secretField.name}`}>
-                    {secretField.label}
-                    {secretField.optional ? " (Optional)" : ""}
-                  </FieldLabel>
-                  {isUpdateMode && props.isSecretChanged ? (
-                    <span className="text-muted-foreground text-xs">Will update</span>
-                  ) : null}
-                </div>
-                {secretField.description ? (
-                  <FieldDescription>{secretField.description}</FieldDescription>
-                ) : null}
-              </FieldHeader>
-              <FieldContent>
-                {secretField.inputType === "textarea" ? (
-                  <Textarea
-                    autoComplete="off"
-                    data-1p-ignore="true"
-                    id={`connection-secret-${editor.targetKey}-${secretField.name}`}
-                    onChange={(event) => {
-                      props.onSecretChange(secretField.name, event.currentTarget.value);
-                    }}
-                    placeholder={
-                      isUpdateMode
-                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
-                    }
-                    rows={8}
-                    value={props.secrets[secretField.name] ?? ""}
-                  />
-                ) : (
-                  <Input
-                    autoComplete="off"
-                    data-1p-ignore="true"
-                    id={`connection-secret-${editor.targetKey}-${secretField.name}`}
-                    onChange={(event) => {
-                      props.onSecretChange(secretField.name, event.currentTarget.value);
-                    }}
-                    placeholder={
-                      isUpdateMode
-                        ? `Leave blank to keep existing ${secretField.label.toLowerCase()}`
-                        : (secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`)
-                    }
-                    type={secretField.inputType}
-                    value={props.secrets[secretField.name] ?? ""}
-                  />
-                )}
-              </FieldContent>
-            </Field>
-          ))}
+          {selectedMethod.secretFields.map((secretField) => {
+            const fieldId = `connection-secret-${editor.targetKey}-${secretField.name}`;
+            const configured =
+              isUpdateMode && (editor.configuredSecretNames?.includes(secretField.name) ?? false);
+            const secretChanged = props.changedSecretNames.includes(secretField.name);
+
+            return (
+              <ConfiguredSecretField
+                autoComplete="off"
+                confirmReplacement={false}
+                configured={configured}
+                fieldState={IdleSecretFieldState}
+                id={fieldId}
+                key={secretField.name}
+                label={`${secretField.label}${secretField.optional ? " (Optional)" : ""}`}
+                onePasswordIgnore
+                onCancelReplace={ignoreSecretCommit}
+                onChange={(nextValue) => {
+                  props.onSecretChange(secretField.name, nextValue);
+                }}
+                onCommit={ignoreSecretCommit}
+                placeholder={secretField.placeholder ?? `Enter ${secretField.label.toLowerCase()}`}
+                required={secretField.optional !== true}
+                secretLabel={secretField.label.toLowerCase()}
+                value={props.secrets[secretField.name] ?? ""}
+                {...(secretField.description === undefined
+                  ? {}
+                  : { description: secretField.description })}
+                replacementStaged={isUpdateMode && secretChanged}
+                {...(secretField.inputType === "textarea" ? { multiline: true, rows: 8 } : {})}
+                {...(secretField.inputType === "password"
+                  ? { type: "password" }
+                  : secretField.inputType === "text"
+                    ? { type: "text" }
+                    : {})}
+              />
+            );
+          })}
         </>
       ) : props.configForm.mode === "unsupported" ? (
         <p className="text-destructive text-sm">{props.configForm.message}</p>

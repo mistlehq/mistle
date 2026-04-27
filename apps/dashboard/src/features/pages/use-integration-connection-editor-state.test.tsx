@@ -966,4 +966,113 @@ describe("useIntegrationConnectionEditorState", () => {
       ]);
     });
   });
+
+  it("treats configured update secret drafts as changed immediately", () => {
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: {
+            ...openAiFormUpdateEditorInput(),
+            configuredSecretNames: ["apiKey"],
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onSecretChange("apiKey", "replacement-api-key");
+    });
+
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.changedSecretNames).toEqual(["apiKey"]);
+  });
+
+  it("treats unconfigured update secret drafts as changed immediately", () => {
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: openAiFormUpdateEditorInput(),
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onSecretChange("apiKey", "new-api-key");
+    });
+
+    expect(result.current.hasChanges).toBe(true);
+    expect(result.current.changedSecretNames).toEqual(["apiKey"]);
+  });
+
+  it("sends configured secret replacements during form update", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "PUT" &&
+        request.pathname === "/v1/integration/connections/icn_openai_001/form"
+      ) {
+        return {
+          status: 200,
+          body: {
+            id: "icn_openai_001",
+            targetKey: "openai-default",
+            displayName: "OpenAI Primary",
+            status: "active",
+            config: {
+              connection_method: "api-key",
+            },
+            createdAt: "2026-04-15T00:00:00.000Z",
+            updatedAt: "2026-04-15T00:01:00.000Z",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: {
+            ...openAiFormUpdateEditorInput(),
+            configuredSecretNames: ["apiKey"],
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onSecretChange("apiKey", "replacement-api-key");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(server.requests).toEqual([
+        {
+          method: "PUT",
+          pathname: "/v1/integration/connections/icn_openai_001/form",
+          body: {
+            displayName: "OpenAI Primary",
+            config: {},
+            secrets: {
+              apiKey: "replacement-api-key",
+            },
+          },
+        },
+      ]);
+    });
+  });
 });

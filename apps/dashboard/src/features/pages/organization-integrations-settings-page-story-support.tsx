@@ -255,6 +255,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
           connectError={draft.error}
           editor={editor}
           hasChanges={hasIntegrationConnectionEditorChanges({
+            changedSecretNames: [],
             editor,
             configValue: draft.configValue,
             connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
@@ -267,8 +268,8 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
             connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
             connectionDisplayNameValue: draft.connectionDisplayNameValue,
           })}
-          isSecretChanged={Object.values(draft.secrets).some((value) => value.trim().length > 0)}
           methodId={draft.methodId}
+          changedSecretNames={[]}
           onClose={() => {}}
           onConfigChange={(value) => {
             setDraft((currentDraft) => ({

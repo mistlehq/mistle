@@ -253,7 +253,7 @@ describe("useIntegrationConnectionEditorState update form behavior", () => {
         result.current.onSecretChange("apiKey", "   ");
       });
 
-      expect(result.current.isSecretChanged).toBe(false);
+      expect(result.current.changedSecretNames).toEqual([]);
 
       act(() => {
         result.current.submitEditor();

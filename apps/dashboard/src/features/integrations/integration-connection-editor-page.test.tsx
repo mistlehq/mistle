@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/jira";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -67,8 +67,8 @@ function renderEditorPage(
     editor: createEditor,
     hasChanges: true,
     isConnectionDisplayNameChanged: false,
-    isSecretChanged: false,
     methodId: IntegrationConnectionMethodIds.API_KEY,
+    changedSecretNames: [],
     onClose: () => {},
     onConfigChange: () => {},
     onConnectionDisplayNameChange: () => {},
@@ -152,6 +152,92 @@ describe("IntegrationConnectionEditorPage", () => {
     const input = screen.getByPlaceholderText("Enter API key");
     expect(input.getAttribute("data-1p-ignore")).toBe("true");
     expect(input.getAttribute("autocomplete")).toBe("off");
+  });
+
+  it("keeps create password secrets masked while focused", () => {
+    renderEditorPage({
+      secrets: {
+        apiKey: "new-api-key",
+      },
+    });
+
+    const input = screen.getByDisplayValue("new-api-key");
+
+    expect(input.getAttribute("type")).toBe("password");
+    fireEvent.focus(input);
+    expect(input.getAttribute("type")).toBe("password");
+  });
+
+  it("renders configured update secrets with a masked placeholder", () => {
+    renderEditorPage({
+      editor: createUpdateFormEditor({
+        configuredSecretNames: ["webhookSecret"],
+      }),
+      connectionDisplayNameValue: "Existing GitHub App installation connection",
+      hasChanges: false,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    });
+
+    expect(screen.getByPlaceholderText("••••••")).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Leave blank to keep existing webhook secret")).toBeNull();
+  });
+
+  it("does not show a dialog for configured secret replacements", () => {
+    renderEditorPage({
+      editor: createUpdateFormEditor({
+        configuredSecretNames: ["webhookSecret"],
+      }),
+      connectionDisplayNameValue: "Existing GitHub App installation connection",
+      hasChanges: false,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      secrets: {
+        webhookSecret: "replacement-secret",
+      },
+    });
+
+    const input = screen.getByDisplayValue("replacement-secret");
+
+    expect(input.getAttribute("type")).toBe("password");
+    fireEvent.focus(input);
+    expect(input.getAttribute("type")).toBe("text");
+    fireEvent.blur(input);
+
+    expect(input.getAttribute("type")).toBe("password");
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("does not show a dialog for unconfigured update secrets", () => {
+    renderEditorPage({
+      editor: createUpdateFormEditor(),
+      connectionDisplayNameValue: "Existing GitHub App installation connection",
+      hasChanges: true,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      secrets: {
+        webhookSecret: "new-webhook-secret",
+      },
+    });
+
+    fireEvent.blur(screen.getByDisplayValue("new-webhook-secret"));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+
+  it("marks only changed secrets as updating", () => {
+    renderEditorPage({
+      changedSecretNames: ["webhookSecret"],
+      editor: createUpdateFormEditor({
+        configuredSecretNames: ["appPrivateKeyPem", "webhookSecret"],
+      }),
+      connectionDisplayNameValue: "Existing GitHub App installation connection",
+      hasChanges: true,
+      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      secrets: {
+        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----",
+        webhookSecret: "replacement-secret",
+      },
+    });
+
+    expect(screen.getAllByText("Replace on save")).toHaveLength(1);
   });
 
   it("renders definition-driven config fields for form methods", () => {

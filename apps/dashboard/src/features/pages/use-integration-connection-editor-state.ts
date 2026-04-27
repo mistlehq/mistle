@@ -342,11 +342,15 @@ export function useIntegrationConnectionEditorState(
       );
 
       if (editor.mode === "update") {
+        const changedSecretNames = new Set(draft.changedSecretNames);
+        const updateSecrets = Object.fromEntries(
+          Object.entries(normalizedSecrets).filter(([name]) => changedSecretNames.has(name)),
+        );
         const updatedConnection = await updateFormMutation.mutateAsync({
           connectionId: editor.connectionId,
           displayName: normalizedConnectionDisplayName,
           config: draft.configValue,
-          ...(Object.keys(normalizedSecrets).length === 0 ? {} : { secrets: normalizedSecrets }),
+          ...(Object.keys(updateSecrets).length === 0 ? {} : { secrets: updateSecrets }),
         });
 
         await queryClient.invalidateQueries({
@@ -518,9 +522,10 @@ export function useIntegrationConnectionEditorState(
       connectionDisplayNameValue: draft.connectionDisplayNameValue,
       configValue: draft.configValue,
       initialConfigValue: draft.initialConfigValue,
+      changedSecretNames: draft.changedSecretNames,
       secrets: draft.secrets,
     }),
-    isSecretChanged: Object.values(draft.secrets).some((value) => value.trim().length > 0),
+    changedSecretNames: draft.changedSecretNames,
     isConnectionDisplayNameChanged: isIntegrationConnectionDisplayNameChanged({
       editor,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
@@ -551,14 +556,25 @@ export function useIntegrationConnectionEditorState(
       }));
     },
     onSecretChange: (name: string, value: string): void => {
-      setDraft((currentDraft) => ({
-        ...currentDraft,
-        error: null,
-        secrets: {
-          ...currentDraft.secrets,
-          [name]: value,
-        },
-      }));
+      setDraft((currentDraft) => {
+        const changedNamesWithoutCurrentSecret = currentDraft.changedSecretNames.filter(
+          (changedName) => changedName !== name,
+        );
+        const nextChangedSecretNames =
+          editor.mode === "update" && value.trim().length > 0
+            ? [...changedNamesWithoutCurrentSecret, name]
+            : changedNamesWithoutCurrentSecret;
+
+        return {
+          ...currentDraft,
+          error: null,
+          changedSecretNames: nextChangedSecretNames,
+          secrets: {
+            ...currentDraft.secrets,
+            [name]: value,
+          },
+        };
+      });
     },
     onConnectionDisplayNameChange: (value: string): void => {
       setDraft((currentDraft) => ({

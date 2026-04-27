@@ -41,6 +41,7 @@ export type ConnectionMethodFormUiModel =
     };
 
 export type IntegrationConnectionEditorDraft = {
+  changedSecretNames: readonly string[];
   configValue: Record<string, unknown>;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
@@ -355,6 +356,9 @@ export function createInitialIntegrationConnectionEditorState(input: {
           connectionId: input.initialEditorInput.connectionId,
           currentConnectionConfig: input.initialEditorInput.connectionConfig ?? {},
           currentMethod: input.initialEditorInput.currentMethod,
+          ...(input.initialEditorInput.configuredSecretNames === undefined
+            ? {}
+            : { configuredSecretNames: input.initialEditorInput.configuredSecretNames }),
           targetConfig: input.initialEditorInput.targetConfig,
           targetDisplayName: input.initialEditorInput.targetDisplayName,
           targetFamilyId: input.initialEditorInput.targetFamilyId,
@@ -377,6 +381,7 @@ export function createInitialIntegrationConnectionEditorState(input: {
   return {
     editor,
     draft: {
+      changedSecretNames: [],
       configValue: initialConfigValue,
       connectionDisplayNamePlaceholder: defaultConnectionDisplayName,
       connectionDisplayNameValue: existingConnectionDisplayName ?? "",
@@ -393,6 +398,7 @@ function areConfigsEqual(left: Record<string, unknown>, right: Record<string, un
 }
 
 export function hasIntegrationConnectionEditorChanges(input: {
+  changedSecretNames: readonly string[];
   editor: IntegrationConnectionEditorState;
   connectionDisplayNamePlaceholder: string;
   connectionDisplayNameValue: string;
@@ -408,7 +414,7 @@ export function hasIntegrationConnectionEditorChanges(input: {
     (input.editor.initialConnectionDisplayName ?? input.connectionDisplayNamePlaceholder).trim() !==
       input.connectionDisplayNameValue.trim() ||
     !areConfigsEqual(input.initialConfigValue, input.configValue) ||
-    Object.values(input.secrets).some((value) => value.trim().length > 0)
+    input.changedSecretNames.some((name) => (input.secrets[name] ?? "").trim().length > 0)
   );
 }
 
@@ -508,6 +514,7 @@ export function resolveNextDraftForMethodChange(input: {
     error: null,
     initialConfigValue: nextInitialConfigValue,
     methodId: input.nextMethodId,
+    changedSecretNames: [],
     secrets: {},
   };
 }

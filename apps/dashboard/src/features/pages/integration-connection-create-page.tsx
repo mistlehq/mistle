@@ -193,8 +193,8 @@ function LoadedIntegrationConnectionCreatePage(input: {
       editor={connectionState.editor}
       hasChanges={connectionState.hasChanges}
       isConnectionDisplayNameChanged={connectionState.isConnectionDisplayNameChanged}
-      isSecretChanged={connectionState.isSecretChanged}
       methodId={connectionState.methodId}
+      changedSecretNames={connectionState.changedSecretNames}
       onClose={connectionState.closeEditor}
       onConfigChange={connectionState.onConfigChange}
       onConnectionDisplayNameChange={connectionState.onConnectionDisplayNameChange}

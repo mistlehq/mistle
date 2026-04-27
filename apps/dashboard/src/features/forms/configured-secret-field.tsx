@@ -18,7 +18,7 @@ import {
   cn,
 } from "@mistle/ui";
 import { CheckCircleIcon } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type SavingFieldStatus = "idle" | "saving" | "saved" | "saved-fading";
 
@@ -27,9 +27,13 @@ export type SavingFieldState = {
   errorMessage: string | null;
 };
 
+const ConfiguredSecretPlaceholder = "******";
+const PasswordConfiguredSecretPlaceholder = "••••••";
+
 type SavingTextFieldProps = {
   id: string;
   label: string;
+  labelAccessory?: React.ReactNode;
   value: string;
   fieldState: SavingFieldState;
   required?: boolean;
@@ -39,8 +43,11 @@ type SavingTextFieldProps = {
   type?: React.ComponentProps<typeof Input>["type"];
   multiline?: boolean;
   inputClassName?: string;
+  autoComplete?: string;
+  onePasswordIgnore?: boolean;
   onChange: (nextValue: string) => void;
   onBlur: () => void;
+  onFocus?: () => void;
 };
 
 export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element {
@@ -58,9 +65,18 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
   return (
     <Field contentWidth="fill" orientation="vertical">
       <FieldHeader>
-        <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
-          {input.label}
-        </FieldLabel>
+        {input.labelAccessory === undefined ? (
+          <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
+            {input.label}
+          </FieldLabel>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <FieldLabel htmlFor={input.id} {...(input.required === true ? { required: true } : {})}>
+              {input.label}
+            </FieldLabel>
+            {input.labelAccessory}
+          </div>
+        )}
         {input.description === undefined ? null : (
           <FieldDescription>{input.description}</FieldDescription>
         )}
@@ -74,13 +90,16 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
             {input.multiline ? (
               <Textarea
                 aria-invalid={input.fieldState.errorMessage === null ? undefined : true}
+                autoComplete={input.autoComplete}
                 className={cn(showIndicator ? "pr-10" : null, input.inputClassName)}
+                data-1p-ignore={input.onePasswordIgnore === true ? "true" : undefined}
                 disabled={input.fieldState.status === "saving"}
                 id={input.id}
                 onBlur={input.onBlur}
                 onChange={(event) => {
                   input.onChange(event.currentTarget.value);
                 }}
+                onFocus={input.onFocus}
                 placeholder={input.placeholder}
                 rows={input.rows}
                 value={input.value}
@@ -88,13 +107,16 @@ export function SavingTextField(input: SavingTextFieldProps): React.JSX.Element 
             ) : (
               <Input
                 aria-invalid={input.fieldState.errorMessage === null ? undefined : true}
+                autoComplete={input.autoComplete}
                 className={cn(showIndicator ? "pr-9" : null, input.inputClassName)}
+                data-1p-ignore={input.onePasswordIgnore === true ? "true" : undefined}
                 disabled={input.fieldState.status === "saving"}
                 id={input.id}
                 onBlur={input.onBlur}
                 onChange={(event) => {
                   input.onChange(event.currentTarget.value);
                 }}
+                onFocus={input.onFocus}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.currentTarget.blur();
@@ -142,18 +164,33 @@ export function ConfiguredSecretField(input: {
   rows?: number;
   type?: React.ComponentProps<typeof Input>["type"];
   multiline?: boolean;
+  autoComplete?: string;
+  onePasswordIgnore?: boolean;
+  confirmReplacement?: boolean;
+  replacementStaged?: boolean;
   onChange: (nextValue: string) => void;
   onCommit: () => void;
   onCancelReplace: () => void;
   onReplacementDialogOpenChange?: (open: boolean) => void;
 }): React.JSX.Element {
   const [isReplaceDialogOpen, setIsReplaceDialogOpen] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const replaceConfirmedRef = useRef(false);
+  const confirmReplacement = input.confirmReplacement !== false;
+  const canRevealConfiguredPassword = input.configured === true && input.type === "password";
+  const resolvedType = canRevealConfiguredPassword && isFocused ? "text" : input.type;
   const resolvedPlaceholder =
-    input.configured === true && input.value.length === 0 ? "******" : input.placeholder;
+    input.configured === true && input.value.length === 0
+      ? resolveConfiguredSecretPlaceholder(input.type)
+      : input.placeholder;
   const configuredPlaceholderClassName =
     input.configured === true && input.value.length === 0
       ? "placeholder:text-foreground placeholder:opacity-100 focus:placeholder:text-transparent focus:placeholder:opacity-0"
       : undefined;
+  const replacementLabel =
+    input.replacementStaged === true ? (
+      <span className="text-muted-foreground text-xs">Replace on save</span>
+    ) : undefined;
 
   useEffect(() => {
     input.onReplacementDialogOpenChange?.(isReplaceDialogOpen);
@@ -164,13 +201,23 @@ export function ConfiguredSecretField(input: {
     setIsReplaceDialogOpen(false);
   }
 
+  function handleReplace(): void {
+    replaceConfirmedRef.current = true;
+    setIsReplaceDialogOpen(false);
+    input.onCommit();
+  }
+
   function handleBlur(): void {
+    if (canRevealConfiguredPassword) {
+      setIsFocused(false);
+    }
+
     if (input.value.trim().length === 0) {
       input.onCommit();
       return;
     }
 
-    if (input.configured === true) {
+    if (input.configured === true && confirmReplacement) {
       setIsReplaceDialogOpen(true);
       return;
     }
@@ -186,51 +233,70 @@ export function ConfiguredSecretField(input: {
         label={input.label}
         onBlur={handleBlur}
         onChange={input.onChange}
+        {...(canRevealConfiguredPassword
+          ? {
+              onFocus: () => {
+                setIsFocused(true);
+              },
+            }
+          : {})}
         value={input.value}
         {...(input.description === undefined ? {} : { description: input.description })}
+        {...(input.autoComplete === undefined ? {} : { autoComplete: input.autoComplete })}
         {...(configuredPlaceholderClassName === undefined
           ? {}
           : { inputClassName: configuredPlaceholderClassName })}
         {...(input.multiline === undefined ? {} : { multiline: input.multiline })}
+        {...(input.onePasswordIgnore === undefined
+          ? {}
+          : { onePasswordIgnore: input.onePasswordIgnore })}
+        {...(replacementLabel === undefined ? {} : { labelAccessory: replacementLabel })}
         {...(resolvedPlaceholder === undefined ? {} : { placeholder: resolvedPlaceholder })}
         {...(input.required === undefined ? {} : { required: input.required })}
         {...(input.rows === undefined ? {} : { rows: input.rows })}
-        {...(input.type === undefined ? {} : { type: input.type })}
+        {...(resolvedType === undefined ? {} : { type: resolvedType })}
       />
 
-      <AlertDialog
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            handleCancel();
-            return;
-          }
-
-          setIsReplaceDialogOpen(true);
-        }}
-        open={isReplaceDialogOpen}
-      >
-        <AlertDialogContent className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Replace secret?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will replace the existing {input.secretLabel}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="sm:grid-cols-[1fr_auto]">
-            <AlertDialogCancel onClick={handleCancel}>Keep existing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
+      {confirmReplacement ? (
+        <AlertDialog
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              if (replaceConfirmedRef.current) {
+                replaceConfirmedRef.current = false;
                 setIsReplaceDialogOpen(false);
-                input.onCommit();
-              }}
-            >
-              Replace
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                return;
+              }
+
+              handleCancel();
+              return;
+            }
+
+            setIsReplaceDialogOpen(true);
+          }}
+          open={isReplaceDialogOpen}
+        >
+          <AlertDialogContent className="sm:max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Replace secret?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will replace the existing {input.secretLabel}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="sm:grid-cols-[1fr_auto]">
+              <AlertDialogCancel>Keep existing</AlertDialogCancel>
+              <AlertDialogAction onClick={handleReplace}>Replace</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </>
   );
+}
+
+function resolveConfiguredSecretPlaceholder(
+  type: React.ComponentProps<typeof Input>["type"] | undefined,
+): string {
+  return type === "password" ? PasswordConfiguredSecretPlaceholder : ConfiguredSecretPlaceholder;
 }
 
 function SavingFieldIndicator(input: { status: SavingFieldStatus }): React.JSX.Element | null {

@@ -112,6 +112,9 @@ export function buildOpenUpdateIntegrationConnectionInput(input: {
     connectionConfig: resolveTargetConfig(input.connection.config),
     connectionDisplayName: input.connection.displayName,
     connectionId: input.connection.id,
+    ...(input.connection.configuredSecretNames === undefined
+      ? {}
+      : { configuredSecretNames: input.connection.configuredSecretNames }),
     currentMethod,
     targetConfig: resolveTargetConfig(input.card.target.config),
     targetDisplayName: input.card.displayName,
