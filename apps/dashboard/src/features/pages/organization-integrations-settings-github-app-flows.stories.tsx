@@ -364,10 +364,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionCreatePage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationCreate,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationCreate}
                 path="add"
               />
             </Route>
@@ -406,10 +403,7 @@ function GitHubAppSetupPageStory(input: {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionGitHubAppSetupPage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationGitHubAppSetup,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationGitHubAppSetup}
                 path=":connectionId/github-app/setup"
               />
             </Route>

@@ -13,15 +13,12 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.integrations.description).toBe("");
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
-    expect(typeof ROUTE_HANDLES.integrationCreate.description).toBe("function");
     expect(ROUTE_HANDLES.integrationCreate.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.title).toBe("function");
-    expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.description).toBe("function");
     expect(ROUTE_HANDLES.integrationGitHubAppSetup.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationGitHubAppSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
-    expect(typeof ROUTE_HANDLES.integrationDetail.description).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
@@ -86,10 +83,6 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.description).toBe("");
-
-    expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe("function");
-    expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe("function");
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.header?.icon).toBeDefined();
   });
 
   it("defines intended breadcrumb clickability for parent crumbs", () => {
@@ -165,16 +158,12 @@ describe("route handles", () => {
     );
   });
 
-  it("resolves integration detail supporting text from the target key", () => {
-    const detailDescription = ROUTE_HANDLES.integrationDetail.description;
-    expect(typeof detailDescription).toBe("function");
-
-    if (typeof detailDescription !== "function") {
-      throw new Error("integrationDetail description must be a function");
-    }
-
-    expect(detailDescription({ params: { targetKey: "github-cloud" } })).toBe("github-cloud");
-    expect(detailDescription({ params: {} })).toBe("");
+  it("omits supporting text from integration route handles", () => {
+    expect(ROUTE_HANDLES.integrationDetail).not.toHaveProperty("description");
+    expect(ROUTE_HANDLES.integrationCreate).not.toHaveProperty("description");
+    expect(ROUTE_HANDLES.integrationEdit).not.toHaveProperty("description");
+    expect(ROUTE_HANDLES.integrationGitHubAppSetup).not.toHaveProperty("description");
+    expect(ROUTE_HANDLES.integrationSlackAppSetup).not.toHaveProperty("description");
   });
 
   it("defines sandbox profile published and draft breadcrumbs", () => {

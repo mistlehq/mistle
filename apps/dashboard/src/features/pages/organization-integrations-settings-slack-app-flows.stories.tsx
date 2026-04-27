@@ -378,18 +378,12 @@ function SlackCreatePageStory(): React.JSX.Element {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionCreatePage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationCreate,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationCreate}
                 path="add"
               />
               <Route
                 element={<IntegrationConnectionSlackAppSetupPage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationSlackAppSetup,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationSlackAppSetup}
                 path=":connectionId/slack-app/setup"
               />
             </Route>
@@ -428,10 +422,7 @@ function SlackAppSetupPageStory(input: {
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
                 element={<IntegrationConnectionSlackAppSetupPage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationSlackAppSetup,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationSlackAppSetup}
                 path=":connectionId/slack-app/setup"
               />
             </Route>

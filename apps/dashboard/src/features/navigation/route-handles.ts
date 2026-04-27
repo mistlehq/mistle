@@ -70,15 +70,6 @@ function resolveIntegrationDetailTitle(input: RouteTextResolverInput): string {
   return normalizeIntegrationBreadcrumbLabel(targetKey);
 }
 
-function resolveIntegrationDetailSubtitle(input: RouteTextResolverInput): string {
-  const targetKey = input.params["targetKey"];
-  if (targetKey === undefined || targetKey.trim().length === 0) {
-    return "";
-  }
-
-  return targetKey;
-}
-
 function resolveIntegrationBreadcrumbIcon(input: RouteTextResolverInput): React.ReactNode | null {
   const targetKey = input.params["targetKey"];
   if (targetKey === undefined || targetKey.trim().length === 0) {
@@ -181,7 +172,6 @@ export const ROUTE_HANDLES = {
     breadcrumb: resolveIntegrationDetailTitle,
     breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
     title: resolveIntegrationDetailTitle,
-    description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
     },
@@ -190,7 +180,6 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Add",
     title: resolveIntegrationCreateTitle,
-    description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
     },
@@ -199,7 +188,6 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Edit",
     title: resolveIntegrationEditTitle,
-    description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
     },
@@ -208,7 +196,6 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Setup",
     title: resolveIntegrationAppSetupTitle,
-    description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
     },
@@ -217,7 +204,6 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: "Setup",
     title: resolveIntegrationAppSetupTitle,
-    description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
     },
@@ -347,14 +333,6 @@ export const ROUTE_HANDLES = {
     title: "Integrations",
     description: "",
   },
-  settingsOrganizationIntegrationDetail: {
-    breadcrumb: resolveIntegrationDetailTitle,
-    title: resolveIntegrationDetailTitle,
-    description: resolveIntegrationDetailSubtitle,
-    header: {
-      icon: resolveIntegrationDetailHeaderIcon,
-    },
-  },
 } as const satisfies Record<string, AppRouteHandle>;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
@@ -364,7 +342,6 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsOrganizationIdentityLinking",
   "settingsOrganizationSandboxes",
   "settingsOrganizationIntegrations",
-  "settingsOrganizationIntegrationDetail",
 ] as const;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
@@ -376,5 +353,4 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsOrganizationIdentityLinking: ROUTE_HANDLES.settingsOrganizationIdentityLinking,
   settingsOrganizationSandboxes: ROUTE_HANDLES.settingsOrganizationSandboxes,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
-  settingsOrganizationIntegrationDetail: ROUTE_HANDLES.settingsOrganizationIntegrationDetail,
 };

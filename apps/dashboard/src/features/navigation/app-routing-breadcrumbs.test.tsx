@@ -55,7 +55,7 @@ function PageHarness(): React.JSX.Element {
         <AppBreadcrumbs breadcrumbs={headerLeadingModel.breadcrumbs} />
       ) : null}
       <p data-slot="meta-title">{pageMeta.title ?? "MISSING_TITLE"}</p>
-      <p data-slot="meta-description">{pageMeta.supportingText ?? "MISSING_DESCRIPTION"}</p>
+      <p data-slot="meta-description">{pageMeta.supportingText ?? ""}</p>
     </div>
   );
 }
@@ -216,7 +216,7 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainCurrentPageLabel(markup, "GitHub");
     expect(markup).toContain("/integration-logos/github.svg");
     expectMarkupToContainMetaTitle(markup, "GitHub");
-    expectMarkupToContainMetaDescription(markup, "github");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/integrations/github/add");
     markup = renderRoutingMarkup(router);
@@ -225,7 +225,7 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainHref(markup, "/integrations/github");
     expectMarkupToContainCurrentPageLabel(markup, "Add");
     expectMarkupToContainMetaTitle(markup, "Add GitHub Connection");
-    expectMarkupToContainMetaDescription(markup, "github");
+    expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/integrations/github/icn_123/edit");
     markup = renderRoutingMarkup(router);
@@ -234,7 +234,7 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainHref(markup, "/integrations/github");
     expectMarkupToContainCurrentPageLabel(markup, "Edit");
     expectMarkupToContainMetaTitle(markup, "Edit GitHub Connection");
-    expectMarkupToContainMetaDescription(markup, "github");
+    expectMarkupToContainEmptyMetaDescription(markup);
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
@@ -252,7 +252,6 @@ describe("app routing breadcrumb integration", () => {
       });
       const markup = renderRoutingMarkup(router);
       expect(markup).not.toContain("MISSING_TITLE");
-      expect(markup).not.toContain("MISSING_DESCRIPTION");
     }
   });
 
@@ -270,7 +269,6 @@ describe("app routing breadcrumb integration", () => {
       });
       const markup = renderRoutingMarkup(router);
       expect(markup).not.toContain("MISSING_TITLE");
-      expect(markup).not.toContain("MISSING_DESCRIPTION");
     }
   });
 

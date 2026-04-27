@@ -348,10 +348,7 @@ function JiraAddFlowStory(input: {
               <Route element={<IntegrationsPage />} index />
               <Route
                 element={<IntegrationConnectionCreatePage />}
-                handle={{
-                  ...ROUTE_HANDLES.integrationCreate,
-                  description: "",
-                }}
+                handle={ROUTE_HANDLES.integrationCreate}
                 path="add"
               />
             </Route>
