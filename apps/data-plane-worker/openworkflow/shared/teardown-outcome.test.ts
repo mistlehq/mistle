@@ -44,6 +44,7 @@ describe("throwSandboxTeardownOutcome", () => {
     const computeTeardownError = new Error("compute teardown failed");
     const storageCleanupError = new Error("storage cleanup failed");
 
+    let error: unknown;
     try {
       throwSandboxTeardownOutcome({
         lifecycle: "destroy",
@@ -51,20 +52,21 @@ describe("throwSandboxTeardownOutcome", () => {
         storageCleanupError,
       });
       throw new Error("Expected combined teardown outcome to throw.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(Error);
-      if (!(error instanceof Error)) {
-        throw error;
-      }
-
-      expect(error.message).toBe(
-        "Failed to destroy sandbox compute and failed to clean up sandbox storage after compute teardown.",
-      );
-      expect(error.cause).toEqual({
-        computeTeardownError,
-        storageCleanupError,
-      });
+    } catch (caughtError) {
+      error = caughtError;
     }
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) {
+      throw error;
+    }
+
+    expect(error.message).toBe(
+      "Failed to destroy sandbox compute and failed to clean up sandbox storage after compute teardown.",
+    );
+    expect(error.cause).toEqual({
+      computeTeardownError,
+      storageCleanupError,
+    });
   });
 });
 

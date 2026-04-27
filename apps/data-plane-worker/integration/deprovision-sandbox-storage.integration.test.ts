@@ -312,7 +312,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
         sandboxInstanceId,
       });
 
-      await expect(archil.disks.get(provisionedStorage.handle)).rejects.toThrow();
+      await expect(archil.disks.get(provisionedStorage.handle)).rejects.toBeInstanceOf(Error);
       createdDiskIds.delete(provisionedStorage.handle);
       await expect(
         getSandboxInstanceStorageBySandboxInstanceId(

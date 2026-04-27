@@ -1,3 +1,7 @@
+/* eslint-disable jest/no-standalone-expect --
+ * This suite uses an extended integration `it` fixture imported from test context.
+ */
+
 import { derivePortAccessHost } from "@mistle/port-access-auth";
 import {
   parsePortsTransportMessage,

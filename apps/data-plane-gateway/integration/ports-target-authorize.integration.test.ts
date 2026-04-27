@@ -1,3 +1,7 @@
+/* eslint-disable jest/no-standalone-expect --
+ * This suite uses an extended integration `it` fixture imported from test context.
+ */
+
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
@@ -698,12 +702,10 @@ describe("ports target authorize integration", () => {
         },
       });
 
-      const resultRejection = expect(resultPromise).rejects.toBeInstanceOf(
+      await closeWebSocket(bootstrapSocket);
+      await expect(resultPromise).rejects.toBeInstanceOf(
         PortsTargetAuthorizeBootstrapDisconnectedError,
       );
-      await closeWebSocket(bootstrapSocket);
-
-      await resultRejection;
     } finally {
       if (bootstrapSocket.readyState === WebSocket.OPEN) {
         await closeWebSocket(bootstrapSocket);

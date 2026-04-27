@@ -76,6 +76,8 @@ describe("workspace app launcher integration", () => {
         },
       });
 
+      expect(service.containerBaseUrl).toBe("http://workspace-command-app:38084");
+      expect(service.containerId).toMatch(/^[0-9a-f]{12,}$/);
       await service.stop();
       await expect(service.stop()).rejects.toThrow("Workspace app container was already stopped.");
     },
@@ -85,6 +87,7 @@ describe("workspace app launcher integration", () => {
   test(
     "supports command readiness",
     async () => {
+      expect.hasAssertions();
       const service = await startWorkspaceApp({
         baseImage: "alpine:3.22",
         projectRootHostPath: PROJECT_ROOT_HOST_PATH,
@@ -100,6 +103,8 @@ describe("workspace app launcher integration", () => {
         },
       });
 
+      expect(service.containerBaseUrl).toBe("http://workspace-command-app:38084");
+      expect(service.containerId).toMatch(/^[0-9a-f]{12,}$/);
       await service.stop();
     },
     TEST_TIMEOUT_MS,
@@ -154,6 +159,7 @@ describe("workspace app launcher integration", () => {
   test(
     "cacheBustKey forces docker target image rebuild",
     async () => {
+      expect.hasAssertions();
       const dockerContextPath = await mkdtemp(join(tmpdir(), "mistle-test-harness-cache-bust-"));
       const dockerfilePath = join(dockerContextPath, "Dockerfile");
 
@@ -181,6 +187,9 @@ describe("workspace app launcher integration", () => {
             times: 1,
           },
         });
+        expect(firstService.containerBaseUrl).toBe("http://docker-target-cache-bust-a:38085");
+        expect(firstService.containerId).toMatch(/^[0-9a-f]{12,}$/);
+        const firstContainerId = firstService.containerId;
         await firstService.stop();
 
         await writeFile(
@@ -207,6 +216,9 @@ describe("workspace app launcher integration", () => {
             times: 1,
           },
         });
+        expect(secondService.containerBaseUrl).toBe("http://docker-target-cache-bust-b:38086");
+        expect(secondService.containerId).toMatch(/^[0-9a-f]{12,}$/);
+        expect(secondService.containerId).not.toBe(firstContainerId);
 
         await secondService.stop();
       } finally {

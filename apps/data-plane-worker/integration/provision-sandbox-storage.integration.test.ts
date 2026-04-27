@@ -649,7 +649,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           organizationId,
           sandboxInstanceId,
         }),
-      ).rejects.toThrow();
+      ).rejects.toBeInstanceOf(Error);
 
       const provisionedDiskName = createArchilDiskName({
         sandboxInstanceId,

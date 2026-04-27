@@ -1123,30 +1123,31 @@ describe("sandbox profile compile runtime plan integration", () => {
       email: "integration-sandbox-profile-compile-missing-profile@example.com",
     });
 
-    try {
-      await compileProfileVersionRuntimePlan(
-        {
-          db: fixture.db,
-          integrationsConfig: fixture.config.integrations,
+    const error = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_missing_profile",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
-        {
-          organizationId: authenticatedSession.organizationId,
-          profileId: "sbp_compile_missing_profile",
-          profileVersion: 1,
-          image: {
-            source: "base",
-            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-          },
-        },
-      );
-      throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SandboxProfilesNotFoundError);
-
-      if (error instanceof SandboxProfilesNotFoundError) {
-        expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND);
-      }
+      },
+    ).then(
+      () => {
+        throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
+      },
+      (error: unknown) => error,
+    );
+    expect(error).toBeInstanceOf(SandboxProfilesNotFoundError);
+    if (!(error instanceof SandboxProfilesNotFoundError)) {
+      throw error;
     }
+    expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND);
   });
 
   it("returns profile version not found when the version does not exist", async ({ fixture }) => {
@@ -1161,30 +1162,31 @@ describe("sandbox profile compile runtime plan integration", () => {
       status: "active",
     });
 
-    try {
-      await compileProfileVersionRuntimePlan(
-        {
-          db: fixture.db,
-          integrationsConfig: fixture.config.integrations,
+    const error = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_missing_version",
+        profileVersion: 9,
+        image: {
+          source: "base",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
-        {
-          organizationId: authenticatedSession.organizationId,
-          profileId: "sbp_compile_missing_version",
-          profileVersion: 9,
-          image: {
-            source: "base",
-            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-          },
-        },
-      );
-      throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SandboxProfilesNotFoundError);
-
-      if (error instanceof SandboxProfilesNotFoundError) {
-        expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND);
-      }
+      },
+    ).then(
+      () => {
+        throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
+      },
+      (error: unknown) => error,
+    );
+    expect(error).toBeInstanceOf(SandboxProfilesNotFoundError);
+    if (!(error instanceof SandboxProfilesNotFoundError)) {
+      throw error;
     }
+    expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND);
   });
 
   it("fails when a binding references a connection from another organization", async ({
@@ -1246,32 +1248,31 @@ describe("sandbox profile compile runtime plan integration", () => {
       },
     });
 
-    try {
-      await compileProfileVersionRuntimePlan(
-        {
-          db: fixture.db,
-          integrationsConfig: fixture.config.integrations,
+    const error = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_missing_connection",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
-        {
-          organizationId: authenticatedSession.organizationId,
-          profileId: "sbp_compile_missing_connection",
-          profileVersion: 1,
-          image: {
-            source: "base",
-            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-          },
-        },
-      );
-      throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SandboxProfilesCompileError);
-
-      if (error instanceof SandboxProfilesCompileError) {
-        expect(error.code).toBe(
-          SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,
-        );
-      }
+      },
+    ).then(
+      () => {
+        throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
+      },
+      (error: unknown) => error,
+    );
+    expect(error).toBeInstanceOf(SandboxProfilesCompileError);
+    if (!(error instanceof SandboxProfilesCompileError)) {
+      throw error;
     }
+    expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE);
   });
 
   it("fails when a target has invalid encrypted secrets", async ({ fixture }) => {
@@ -1333,29 +1334,30 @@ describe("sandbox profile compile runtime plan integration", () => {
       },
     });
 
-    try {
-      await compileProfileVersionRuntimePlan(
-        {
-          db: fixture.db,
-          integrationsConfig: fixture.config.integrations,
+    const error = await compileProfileVersionRuntimePlan(
+      {
+        db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_compile_invalid_target_secrets",
+        profileVersion: 1,
+        image: {
+          source: "base",
+          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
         },
-        {
-          organizationId: authenticatedSession.organizationId,
-          profileId: "sbp_compile_invalid_target_secrets",
-          profileVersion: 1,
-          image: {
-            source: "base",
-            imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-          },
-        },
-      );
-      throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
-    } catch (error) {
-      expect(error).toBeInstanceOf(SandboxProfilesCompileError);
-
-      if (error instanceof SandboxProfilesCompileError) {
-        expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS);
-      }
+      },
+    ).then(
+      () => {
+        throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
+      },
+      (error: unknown) => error,
+    );
+    expect(error).toBeInstanceOf(SandboxProfilesCompileError);
+    if (!(error instanceof SandboxProfilesCompileError)) {
+      throw error;
     }
+    expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS);
   });
 });

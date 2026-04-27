@@ -105,7 +105,7 @@ describe("runtime lifecycle integration", () => {
       await runtime.stop();
     }
 
-    await expect(fetch(healthURL)).rejects.toThrow();
+    await expect(fetch(healthURL)).rejects.toBeInstanceOf(Error);
   });
 
   it("releases runtime resources after stop", async ({ fixture }) => {
@@ -120,6 +120,6 @@ describe("runtime lifecycle integration", () => {
     await runtime.db.execute(sql`select 1`);
     await runtime.stop();
 
-    await expect(runtime.db.execute(sql`select 1`)).rejects.toThrow();
+    await expect(runtime.db.execute(sql`select 1`)).rejects.toBeInstanceOf(Error);
   });
 });
