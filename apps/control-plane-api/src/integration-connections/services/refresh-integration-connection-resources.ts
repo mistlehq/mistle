@@ -28,6 +28,15 @@ export type RequestIntegrationConnectionResourceRefreshResult = {
   syncState: typeof IntegrationConnectionResourceSyncStates.SYNCING;
 };
 
+export type RequestIntegrationConnectionAllResourceRefreshResult = {
+  connectionId: string;
+  familyId: string;
+  resources: Array<{
+    kind: string;
+    syncState: typeof IntegrationConnectionResourceSyncStates.SYNCING;
+  }>;
+};
+
 type PersistedResourceStateSnapshot = {
   familyId: string;
   kind: string;
@@ -45,6 +54,84 @@ type AcquireResourceSyncAttemptResult =
       alreadySyncing: false;
       startedAt: string;
     };
+
+export async function requestIntegrationConnectionAllResourceRefresh(
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    openWorkflow: OpenWorkflow;
+  },
+  input: Omit<RequestIntegrationConnectionResourceRefreshInput, "kind">,
+): Promise<RequestIntegrationConnectionAllResourceRefreshResult> {
+  const { db, integrationRegistry } = ctx;
+  const connection = await db.query.integrationConnections.findFirst({
+    columns: {
+      id: true,
+      organizationId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.organizationId, input.organizationId), eq(table.id, input.connectionId)),
+    with: {
+      target: {
+        columns: {
+          familyId: true,
+          variantId: true,
+        },
+      },
+    },
+  });
+
+  if (connection === undefined) {
+    throw new NotFoundError(
+      IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+      "Integration connection was not found.",
+    );
+  }
+
+  const target = connection.target;
+  if (target === null) {
+    throw new Error("Expected integration connection target relation to be present.");
+  }
+
+  const definition = integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  const resourceDefinitions = definition?.resourceDefinitions ?? [];
+  if (resourceDefinitions.length === 0) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.RESOURCE_KIND_NOT_SUPPORTED,
+      `No resource kinds are supported for connection \`${connection.id}\`.`,
+    );
+  }
+
+  const resourceRefreshResults = await Promise.allSettled(
+    resourceDefinitions.map((resourceDefinition) =>
+      requestIntegrationConnectionResourceRefresh(ctx, {
+        organizationId: input.organizationId,
+        connectionId: input.connectionId,
+        kind: resourceDefinition.kind,
+      }),
+    ),
+  );
+  const resources: RequestIntegrationConnectionAllResourceRefreshResult["resources"] = [];
+  for (const result of resourceRefreshResults) {
+    if (result.status === "rejected") {
+      throw result.reason;
+    }
+
+    resources.push({
+      kind: result.value.kind,
+      syncState: result.value.syncState,
+    });
+  }
+
+  return {
+    connectionId: connection.id,
+    familyId: target.familyId,
+    resources,
+  };
+}
 
 export async function requestIntegrationConnectionResourceRefresh(
   ctx: {

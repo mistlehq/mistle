@@ -17,6 +17,7 @@ import * as startGitHubAppManifestConnection from "./github-app/start-manifest/i
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
 import * as listIntegrationWebhookSources from "./list-integration-webhook-sources/index.js";
+import * as refreshAllIntegrationConnectionResources from "./refresh-all-integration-connection-resources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as createSlackAppDraftConnection from "./slack-app/create-draft-connection/index.js";
 import * as startSlackAppManifestConnection from "./slack-app/start-manifest/index.js";
@@ -66,6 +67,12 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   routes.openapi(
     refreshIntegrationConnectionResources.route,
     refreshIntegrationConnectionResources.handler,
+  );
+
+  routes.use(refreshAllIntegrationConnectionResources.route.path, requireAuthSession);
+  routes.openapi(
+    refreshAllIntegrationConnectionResources.route,
+    refreshAllIntegrationConnectionResources.handler,
   );
 
   routes.use(createFormConnection.route.path, requireAuthSession);

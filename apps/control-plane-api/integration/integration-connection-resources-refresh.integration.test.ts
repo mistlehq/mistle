@@ -9,11 +9,121 @@ import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { RefreshAllIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-all-integration-connection-resources/schema.js";
 import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import { it } from "./test-context.js";
 
+const GitHubRefreshAllConnectionId = "icn_refresh_all_001";
+const GitHubRefreshAllResourcesPath = `/v1/integration/connections/${GitHubRefreshAllConnectionId}/resources/refresh`;
+const GitHubRefreshAllResourceKinds: readonly ["repository", "branch", "user"] = [
+  "repository",
+  "branch",
+  "user",
+];
+const SortedGitHubRefreshAllResourceKinds = [...GitHubRefreshAllResourceKinds].sort();
+
 describe("integration connection resources refresh integration", () => {
+  it("returns accepted, enqueues one sync for every supported resource kind, and reuses in-flight syncs", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "integration-connection-all-resources-refresh@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "github_cloud_all_refresh",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          base_url: "https://github.com",
+        },
+      })
+      .onConflictDoNothing();
+
+    await fixture.db.insert(integrationConnections).values({
+      id: GitHubRefreshAllConnectionId,
+      organizationId: session.organizationId,
+      targetKey: "github_cloud_all_refresh",
+      displayName: "GitHub Refresh All",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      createdAt: "2026-03-09T00:00:00.000Z",
+      updatedAt: "2026-03-09T00:00:00.000Z",
+    });
+
+    const firstResponse = await fixture.request(GitHubRefreshAllResourcesPath, {
+      method: "POST",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(firstResponse.status).toBe(202);
+    const firstBody = RefreshAllIntegrationConnectionResourcesResponseSchema.parse(
+      await firstResponse.json(),
+    );
+    expect(firstBody).toEqual({
+      connectionId: GitHubRefreshAllConnectionId,
+      familyId: "github",
+      resources: GitHubRefreshAllResourceKinds.map((kind) => ({
+        kind,
+        syncState: IntegrationConnectionResourceSyncStates.SYNCING,
+      })),
+    });
+
+    for (const kind of GitHubRefreshAllResourceKinds) {
+      const workflowRunCount = await countControlPlaneWorkflowRuns({
+        databaseUrl: fixture.databaseStack.directUrl,
+        workflowName: SyncIntegrationConnectionResourcesWorkflowSpec.name,
+        inputEquals: {
+          organizationId: session.organizationId,
+          connectionId: GitHubRefreshAllConnectionId,
+          kind,
+        },
+      });
+      expect(workflowRunCount).toBe(1);
+    }
+
+    const persistedStates = await fixture.db.query.integrationConnectionResourceStates.findMany({
+      where: (table, { eq }) => eq(table.connectionId, GitHubRefreshAllConnectionId),
+      orderBy: (table, { asc }) => [asc(table.kind)],
+    });
+    expect(persistedStates.map((state) => state.kind)).toEqual(SortedGitHubRefreshAllResourceKinds);
+    for (const persistedState of persistedStates) {
+      expect(persistedState.familyId).toBe("github");
+      expect(persistedState.syncState).toBe(IntegrationConnectionResourceSyncStates.SYNCING);
+      expect(persistedState.lastSyncStartedAt).toBeTruthy();
+      expect(persistedState.lastErrorCode).toBeNull();
+      expect(persistedState.lastErrorMessage).toBeNull();
+    }
+
+    const secondResponse = await fixture.request(GitHubRefreshAllResourcesPath, {
+      method: "POST",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(secondResponse.status).toBe(202);
+    RefreshAllIntegrationConnectionResourcesResponseSchema.parse(await secondResponse.json());
+
+    for (const kind of GitHubRefreshAllResourceKinds) {
+      const workflowRunCount = await countControlPlaneWorkflowRuns({
+        databaseUrl: fixture.databaseStack.directUrl,
+        workflowName: SyncIntegrationConnectionResourcesWorkflowSpec.name,
+        inputEquals: {
+          organizationId: session.organizationId,
+          connectionId: GitHubRefreshAllConnectionId,
+          kind,
+        },
+      });
+      expect(workflowRunCount).toBe(1);
+    }
+  });
+
   it("returns accepted, enqueues a resource sync once, and does not enqueue again while the resource is already syncing", async ({
     fixture,
   }) => {
