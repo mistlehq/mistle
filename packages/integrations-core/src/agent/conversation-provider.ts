@@ -51,6 +51,16 @@ export type AgentConversationReadMetadataResult = {
   preview: string | null;
 };
 
+export type AgentConversationGenerateTitleInput = {
+  connectionUrl: string;
+  providerConversationId: string;
+  inputText: string;
+};
+
+export type AgentConversationGenerateTitleResult = {
+  title: string;
+};
+
 export type AgentConversationCollaborationModeSettings = {
   model: string;
   reasoningEffort: string | null;
@@ -109,6 +119,10 @@ export type AgentConversationProvider = {
     this: void,
     input: AgentConversationReadMetadataInput,
   ): Promise<AgentConversationReadMetadataResult>;
+  generateConversationTitle?(
+    this: void,
+    input: AgentConversationGenerateTitleInput,
+  ): Promise<AgentConversationGenerateTitleResult>;
   createConversation(
     this: void,
     input: AgentConversationCreateInput,

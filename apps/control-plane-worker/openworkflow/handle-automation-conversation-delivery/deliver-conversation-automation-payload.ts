@@ -244,17 +244,38 @@ export async function deliverConversationAutomationPayload(
   );
 
   try {
-    await seedSandboxInstanceTitle(
+    const titleSeedResult = await seedSandboxInstanceTitle(
       {
         dataPlaneClient: ctx.dataPlaneClient,
       },
       {
         organizationId: input.preparedAutomationRun.organizationId,
         sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+        runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
         connectionUrl: input.acquiredAutomationConnection.url,
-        messagePayload: input.preparedAutomationRun.renderedInput,
+        providerConversationId: deliveryResult.providerConversationId,
+        inputText: input.preparedAutomationRun.renderedInput,
       },
     );
+    if (titleSeedResult === "unsupported") {
+      logAutomationConversationDeliveryEvent({
+        eventName: "sandbox_title.generation_unsupported",
+        message:
+          "Automation sandbox title generation skipped because runtime has no title capability",
+        telemetryContext: {
+          automationRunId: input.preparedAutomationRun.automationRunId,
+          conversationId: input.preparedAutomationRun.conversationId,
+          deliveryTaskId: input.taskId,
+          routeId: activeRoute.id,
+          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+          webhookEventId: input.preparedAutomationRun.webhookEventId,
+          workflowRunId: input.workflowRunId,
+        },
+        attributes: {
+          "mistle.runtime.id": input.resolvedAutomationConversationRoute.runtimeId,
+        },
+      });
+    }
   } catch (error) {
     logAutomationConversationDeliveryEvent({
       eventName: "sandbox_title.seed_failed",

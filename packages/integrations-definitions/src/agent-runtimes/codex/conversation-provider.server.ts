@@ -14,6 +14,7 @@ import {
   connectSandboxAgentConnection,
   type SandboxAgentConnection,
 } from "./sandbox-agent-connection.server.js";
+import { generateConversationTitleWithSandboxCodexExec } from "./title-generation.js";
 
 const CodexMethodNames = {
   THREAD_READ: "thread/read",
@@ -624,6 +625,14 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
         name: readNestedString(threadResult, ["thread", "name"]),
         preview: readNestedString(threadResult, ["thread", "preview"]),
       };
+    },
+    generateConversationTitle: async (input) => {
+      const title = await generateConversationTitleWithSandboxCodexExec({
+        connectionUrl: input.connectionUrl,
+        inputText: input.inputText,
+      });
+
+      return { title };
     },
     createConversation: async (input) => {
       let createResult: unknown;

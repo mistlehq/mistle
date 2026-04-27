@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, type WebSocket as NodeWebSocket, WebSocketServer } from "ws";
 
 import {
-  buildAutomationSessionTitleGenerationPrompt,
-  generateAutomationSessionTitleWithSandboxCodexExec,
-  parseAutomationSessionTitleGenerationOutput,
-} from "./seed-sandbox-instance-title.js";
+  buildCodexConversationTitleGenerationPrompt,
+  generateConversationTitleWithSandboxCodexExec,
+  parseCodexConversationTitleGenerationOutput,
+} from "./title-generation.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -69,8 +69,7 @@ function toText(data: RawData): string {
 }
 
 function parseJson(value: string): unknown {
-  const parsedValue: unknown = JSON.parse(value);
-  return parsedValue;
+  return JSON.parse(value);
 }
 
 function expectRecord(value: unknown): Record<string, unknown> {
@@ -170,37 +169,37 @@ afterEach(async () => {
   openServers.clear();
 });
 
-describe("buildAutomationSessionTitleGenerationPrompt", () => {
-  it("uses the rendered automation input as the title source", () => {
-    const prompt = buildAutomationSessionTitleGenerationPrompt(RenderedAutomationInput);
+describe("buildCodexConversationTitleGenerationPrompt", () => {
+  it("uses the delivered input as the title source", () => {
+    const prompt = buildCodexConversationTitleGenerationPrompt(RenderedAutomationInput);
 
     expect(prompt).toContain("Investigate this failed deploy");
     expect(prompt).not.toContain("Webhook context:");
   });
 });
 
-describe("parseAutomationSessionTitleGenerationOutput", () => {
+describe("parseCodexConversationTitleGenerationOutput", () => {
   it("normalizes whitespace and strips trailing punctuation", () => {
     expect(
-      parseAutomationSessionTitleGenerationOutput('{"title":"  Failed   deploy triage! "}'),
+      parseCodexConversationTitleGenerationOutput('{"title":"  Failed   deploy triage! "}'),
     ).toBe("Failed deploy triage");
   });
 
   it("rejects non-JSON output", () => {
-    expect(() => parseAutomationSessionTitleGenerationOutput("Failed deploy triage")).toThrow(
-      "Codex automation title generation returned output that is not valid JSON.",
+    expect(() => parseCodexConversationTitleGenerationOutput("Failed deploy triage")).toThrow(
+      "Codex conversation title generation returned output that is not valid JSON.",
     );
   });
 });
 
-describe("generateAutomationSessionTitleWithSandboxCodexExec", () => {
+describe("generateConversationTitleWithSandboxCodexExec", () => {
   it("runs Codex non-interactively through sandbox exec stdin", async () => {
     const server = await startExecTitleServer();
     openServers.add(server);
 
-    const titlePromise = generateAutomationSessionTitleWithSandboxCodexExec({
+    const titlePromise = generateConversationTitleWithSandboxCodexExec({
       connectionUrl: server.url,
-      messagePayload: RenderedAutomationInput,
+      inputText: RenderedAutomationInput,
     });
 
     const openRequest = await server.openRequest;

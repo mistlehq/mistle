@@ -17,6 +17,10 @@ export type ProviderCreateConversationOutput = {
   providerState?: unknown;
 };
 
+export type ProviderGenerateConversationTitleOutput = {
+  title: string;
+};
+
 export type ProviderStartExecutionOutput = {
   providerExecutionId: string | null;
   providerState?: unknown;
@@ -46,6 +50,12 @@ export type ProviderInspectConversationInput = {
 export type ProviderCreateConversationInput = {
   connection: ProviderConnection;
   options?: Record<string, unknown>;
+};
+
+export type ProviderGenerateConversationTitleInput = {
+  connectionUrl: string;
+  providerConversationId: string;
+  inputText: string;
 };
 
 export type ProviderResumeConversationInput = {
@@ -88,6 +98,9 @@ export type ConversationProviderAdapter = {
   createAutomationConversation: (
     input: ProviderCreateConversationInput,
   ) => Promise<ProviderCreateConversationOutput>;
+  generateConversationTitle?: (
+    input: ProviderGenerateConversationTitleInput,
+  ) => Promise<ProviderGenerateConversationTitleOutput>;
   resumeAutomationConversation: (input: ProviderResumeConversationInput) => Promise<void>;
   startExecution: (input: ProviderStartExecutionInput) => Promise<ProviderStartExecutionOutput>;
   steerExecution: (input: ProviderSteerExecutionInput) => Promise<ProviderSteerExecutionOutput>;
@@ -105,11 +118,17 @@ function adaptConversationProvider(
   provider: AgentConversationProvider,
 ): ConversationProviderAdapter {
   const recoverLateSteer = provider.recoverLateSteer;
+  const generateConversationTitle = provider.generateConversationTitle;
 
   return {
     connect: async (input) => await provider.connect(input),
     inspectAutomationConversation: async (input) => await provider.inspectConversation(input),
     createAutomationConversation: async (input) => await provider.createConversation(input),
+    ...(generateConversationTitle === undefined
+      ? {}
+      : {
+          generateConversationTitle: async (input) => await generateConversationTitle(input),
+        }),
     resumeAutomationConversation: async (input) => await provider.resumeConversation(input),
     startExecution: async (input) => await provider.startExecution(input),
     steerExecution: async (input) => await provider.steerExecution(input),
