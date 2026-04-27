@@ -38,6 +38,7 @@ import {
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
+import { buildSlackApiUrl } from "./slack-api-url.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -78,15 +79,6 @@ const SlackOAuthAccessErrorResponseSchema = z
   .loose();
 
 type SlackOAuthAccessSuccessResponse = z.output<typeof SlackOAuthAccessSuccessResponseSchema>;
-
-function buildSlackApiUrl(input: { apiBaseUrl: string; path: string }): URL {
-  const apiUrl = new URL(input.apiBaseUrl);
-  const normalizedBasePath = apiUrl.pathname === "/" ? "" : apiUrl.pathname.replace(/\/$/, "");
-  apiUrl.pathname = `${normalizedBasePath}/${input.path.replace(/^\//, "")}`;
-  apiUrl.search = "";
-  apiUrl.hash = "";
-  return apiUrl;
-}
 
 function buildSlackAppInstallationCompleteUrl(input: { controlPlaneBaseUrl: string }): string {
   return new URL(

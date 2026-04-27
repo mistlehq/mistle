@@ -136,10 +136,19 @@ describe("IntegrationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Slack app installed and connected")).toBeTruthy();
+    const successNoticeTitle = screen.getByText("Slack app installed and connected");
+    expect(successNoticeTitle).toBeTruthy();
     expect(
       screen.getByText("The Slack app was created in Slack and connected to Mistle."),
     ).toBeTruthy();
+    const successNoticeSection = successNoticeTitle.closest("section");
+    const selectedConnectionTitleSection = screen
+      .getByRole("textbox", { name: "Connection name" })
+      .closest("section");
+    if (successNoticeSection === null || selectedConnectionTitleSection === null) {
+      throw new Error("Expected Slack success notice to render inside the selected detail pane.");
+    }
+    expect(successNoticeSection).toBe(selectedConnectionTitleSection);
     expect(
       screen
         .getByRole("button", { name: "Select connection Engineering Slack" })

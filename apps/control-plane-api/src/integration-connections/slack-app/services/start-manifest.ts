@@ -34,6 +34,7 @@ import {
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
 import { buildSlackAppInstallationCompleteUrl, buildSlackAppManifest } from "./manifest-builder.js";
+import { buildSlackApiUrl } from "./slack-api-url.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -84,15 +85,6 @@ const SlackManifestCreateErrorResponseSchema = z
   .loose();
 
 type SlackManifestCreateSuccessResponse = z.output<typeof SlackManifestCreateSuccessResponseSchema>;
-
-function buildSlackApiUrl(input: { apiBaseUrl: string; path: string }): URL {
-  const apiUrl = new URL(input.apiBaseUrl);
-  const normalizedBasePath = apiUrl.pathname === "/" ? "" : apiUrl.pathname.replace(/\/$/, "");
-  apiUrl.pathname = `${normalizedBasePath}/${input.path.replace(/^\//, "")}`;
-  apiUrl.search = "";
-  apiUrl.hash = "";
-  return apiUrl;
-}
 
 async function createSlackManifest(input: {
   apiBaseUrl: string;

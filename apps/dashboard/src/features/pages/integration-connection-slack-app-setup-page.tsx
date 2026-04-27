@@ -82,12 +82,6 @@ const SlackExistingAppFieldKeys = [
   "clientSecret",
 ] as const satisfies readonly SlackExistingAppFieldKey[];
 
-const SlackExistingAppSecretFieldKeys = [
-  "botToken",
-  "signingSecret",
-  "clientSecret",
-] as const satisfies readonly SlackExistingAppSecretFieldKey[];
-
 const SlackDraftBotScopes = [
   "app_mentions:read",
   "channels:history",
@@ -158,7 +152,7 @@ function createInitialExistingAppDraft(connection: IntegrationConnection): Slack
 function isSlackExistingAppSecretFieldKey(
   fieldKey: SlackExistingAppFieldKey,
 ): fieldKey is SlackExistingAppSecretFieldKey {
-  return SlackExistingAppSecretFieldKeys.includes(fieldKey as SlackExistingAppSecretFieldKey);
+  return fieldKey === "botToken" || fieldKey === "signingSecret" || fieldKey === "clientSecret";
 }
 
 function createInitialFieldStates(): Record<SlackExistingAppFieldKey, SavingFieldState> {
