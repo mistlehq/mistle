@@ -30,4 +30,16 @@ describe("sortOrganizationSwitcherOptions", () => {
       { id: "org_mistle", name: "Mistle" },
     ]);
   });
+
+  it("uses organization id as a deterministic tie-breaker", () => {
+    const sortedOrganizations = sortOrganizationSwitcherOptions([
+      { id: "org_beta", name: "Mistle" },
+      { id: "org_alpha", name: "Mistle" },
+    ]);
+
+    expect(sortedOrganizations).toEqual([
+      { id: "org_alpha", name: "Mistle" },
+      { id: "org_beta", name: "Mistle" },
+    ]);
+  });
 });

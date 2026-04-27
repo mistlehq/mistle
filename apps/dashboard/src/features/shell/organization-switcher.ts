@@ -7,7 +7,7 @@ export type OrganizationSwitcherOption = {
 
 export const ORGANIZATION_SWITCHER_QUERY_KEY = ["auth", "organizations"] as const;
 
-const OrganizationSwitcherNameCollator = new Intl.Collator("en", {
+const organizationSwitcherNameCollator = new Intl.Collator("en", {
   sensitivity: "base",
 });
 
@@ -58,7 +58,7 @@ export function sortOrganizationSwitcherOptions(
   organizations: readonly OrganizationSwitcherOption[],
 ): OrganizationSwitcherOption[] {
   return [...organizations].sort((firstOrganization, secondOrganization) => {
-    const nameComparison = OrganizationSwitcherNameCollator.compare(
+    const nameComparison = organizationSwitcherNameCollator.compare(
       firstOrganization.name,
       secondOrganization.name,
     );
