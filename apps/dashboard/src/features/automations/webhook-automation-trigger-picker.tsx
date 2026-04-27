@@ -37,6 +37,10 @@ import type {
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
 
+const TriggerParameterRowClassName = "flex w-full items-center gap-4";
+const TriggerParameterLabelClassName = "text-muted-foreground shrink-0 text-sm whitespace-nowrap";
+const TriggerParameterControlClassName = "min-w-0 flex-1";
+
 export function WebhookAutomationTriggerPicker(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
@@ -94,30 +98,30 @@ export function WebhookAutomationTriggerPicker(input: {
             <div
               className={
                 isWebhookAutomationEventOptionUnavailable(option)
-                  ? "bg-destructive/5 flex flex-col gap-3 rounded-lg border border-destructive/40 px-3.5 py-2 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-start md:gap-x-3 md:gap-y-2"
-                  : "bg-muted/20 flex flex-col gap-3 rounded-lg border px-3.5 py-2 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-start md:gap-x-3 md:gap-y-2"
+                  ? "bg-destructive/5 flex flex-col gap-4 rounded-lg border border-destructive/40 px-3.5 py-3"
+                  : "bg-muted/20 flex flex-col gap-4 rounded-lg border px-3.5 py-3"
               }
               key={option.id}
             >
-              <div className="flex items-start justify-between gap-3 md:contents">
-                <div className="min-w-0 self-start my-auto md:col-start-1 md:row-start-1 md:self-center">
-                  <div className="flex min-w-0 items-start gap-2.5 md:items-center">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 self-start">
+                  <div className="flex min-w-0 items-start gap-2.5">
                     {option.logoKey === undefined ? null : (
                       <img
                         alt=""
                         aria-hidden
-                        className="mt-0.5 size-4 shrink-0 md:mt-0"
+                        className="mt-0.5 size-4 shrink-0"
                         src={resolveIntegrationLogoPath({ logoKey: option.logoKey })}
                       />
                     )}
-                    <p className="text-sm leading-5 font-medium text-balance md:leading-none">
+                    <p className="min-w-0 text-sm leading-5 font-medium text-balance">
                       {option.label}
                     </p>
                   </div>
                 </div>
                 <Button
                   aria-label={`Remove ${option.label} trigger`}
-                  className="size-7 shrink-0 self-start md:col-start-3 md:row-start-1 md:self-center"
+                  className="size-7 shrink-0 self-start"
                   onClick={() => {
                     input.onValueChange(
                       input.selectedTriggerIds.filter(
@@ -132,35 +136,25 @@ export function WebhookAutomationTriggerPicker(input: {
                   <TrashIcon aria-hidden className="size-3.5" />
                 </Button>
               </div>
-              {option.parameters?.map((parameter, index) => (
-                <div
-                  className="w-full md:col-start-2 md:w-auto md:justify-self-end"
+              {option.parameters?.map((parameter) => (
+                <TriggerParameterField
+                  connectionId={input.selectedConnectionId}
+                  eventType={option.eventType}
                   key={`${option.id}:${parameter.id}`}
-                  style={{ gridRowStart: index + 1 }}
-                >
-                  <TriggerParameterField
-                    connectionId={input.selectedConnectionId}
-                    eventType={option.eventType}
-                    onValueChange={(value) => {
-                      input.onTriggerParameterValueChange({
-                        triggerId: option.id,
-                        parameterId: parameter.id,
-                        value,
-                      });
-                    }}
-                    parameter={parameter}
-                    value={input.triggerParameterValues[option.id]?.[parameter.id] ?? ""}
-                  />
-                </div>
+                  onValueChange={(value) => {
+                    input.onTriggerParameterValueChange({
+                      triggerId: option.id,
+                      parameterId: parameter.id,
+                      value,
+                    });
+                  }}
+                  parameter={parameter}
+                  value={input.triggerParameterValues[option.id]?.[parameter.id] ?? ""}
+                />
               ))}
               {isWebhookAutomationEventOptionUnavailable(option) &&
               option.description !== undefined ? (
-                <p
-                  className="text-destructive text-sm md:col-start-1 md:self-end"
-                  style={{ gridRowStart: Math.max(option.parameters?.length ?? 0, 2) }}
-                >
-                  {option.description}
-                </p>
+                <p className="text-destructive text-sm">{option.description}</p>
               ) : null}
             </div>
           ))}
@@ -315,8 +309,8 @@ function TriggerParameterField(input: {
   if (input.parameter.kind === "string") {
     if (input.parameter.controlVariant === "invocation-token") {
       return (
-        <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-          <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm whitespace-nowrap">
+        <span className={TriggerParameterRowClassName}>
+          <span className={`${TriggerParameterLabelClassName} flex items-center gap-1`}>
             <span>includes</span>
             <Tooltip delay={0}>
               <TooltipTrigger
@@ -336,7 +330,7 @@ function TriggerParameterField(input: {
             </Tooltip>
           </span>
           <Input
-            className="min-w-0 flex-1 md:min-w-44 md:flex-none"
+            className={TriggerParameterControlClassName}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
               input.onValueChange(event.currentTarget.value);
             }}
@@ -348,12 +342,12 @@ function TriggerParameterField(input: {
     }
 
     return (
-      <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-        <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
+      <span className={TriggerParameterRowClassName}>
+        <span className={TriggerParameterLabelClassName}>
           {input.parameter.prefix ?? input.parameter.label}
         </span>
         <Input
-          className="min-w-0 flex-1 md:min-w-32 md:flex-none"
+          className={TriggerParameterControlClassName}
           onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
             input.onValueChange(event.currentTarget.value);
           }}
@@ -366,8 +360,8 @@ function TriggerParameterField(input: {
 
   if (input.parameter.kind === "enum-select") {
     return (
-      <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-        <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
+      <span className={TriggerParameterRowClassName}>
+        <span className={TriggerParameterLabelClassName}>
           {input.parameter.prefix ?? input.parameter.label}
         </span>
         <Select
@@ -382,7 +376,7 @@ function TriggerParameterField(input: {
           }}
           value={input.value.length === 0 ? null : input.value}
         >
-          <SelectTrigger className="min-w-0 flex-1 md:min-w-44 md:flex-none">
+          <SelectTrigger className={TriggerParameterControlClassName}>
             <SelectValue
               placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}
             >
@@ -437,7 +431,6 @@ function TriggerParameterField(input: {
       parameter={input.parameter}
       placeholder={placeholder}
       resourceOptions={normalizedResourceOptions}
-      selectedDisplayName={resolvedSelectedResourceOption?.displayName ?? ""}
       value={input.value}
     />
   );
@@ -450,7 +443,6 @@ function ResourceSelectParameterField(input: {
   >;
   value: string;
   placeholder: string;
-  selectedDisplayName: string;
   resourceOptions: Array<{
     id: string;
     handle: string;
@@ -461,15 +453,15 @@ function ResourceSelectParameterField(input: {
   const inputId = useId();
 
   return (
-    <span className="flex w-full items-center justify-between gap-2 md:w-auto md:justify-end">
-      <span className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">
+    <span className={TriggerParameterRowClassName}>
+      <span className={TriggerParameterLabelClassName}>
         {input.parameter.prefix ?? input.parameter.label}
       </span>
       <SingleSelectStringComboboxField
         contentClassName="w-[min(22rem,calc(100vw-2rem))]"
         inputId={inputId}
         inputLabel={input.parameter.label}
-        inputWrapperClassName="min-w-0 flex-1 md:min-w-44 md:flex-none"
+        inputWrapperClassName={TriggerParameterControlClassName}
         onChange={(value) => {
           input.onValueChange(value ?? "");
         }}

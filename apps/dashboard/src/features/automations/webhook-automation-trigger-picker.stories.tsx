@@ -318,10 +318,11 @@ export const Default: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
-    selectedTriggerIds: [PullRequestOpenedTriggerId],
+    selectedTriggerIds: [PullRequestReviewCommentCreatedTriggerId],
     triggerParameterValues: {
-      [PullRequestOpenedTriggerId]: {
-        author: "octocat",
+      [PullRequestReviewCommentCreatedTriggerId]: {
+        invocationToken: "@mistlebot",
+        commenter: "octocat",
         baseBranch: "main",
         repository: "mistlehq/platform",
       },
