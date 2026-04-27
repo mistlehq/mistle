@@ -8,6 +8,9 @@ import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../src/sandbox-bas
 import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
+const nextConfigFixturePath = fileURLToPath(
+  new URL("./fixtures/config.next.toml", import.meta.url),
+);
 const configSamplePath = fileURLToPath(
   new URL("../../../config/config.sample.toml", import.meta.url),
 );
@@ -471,6 +474,58 @@ const tokenizerProxyFixtureConfig = {
   },
 } as const;
 
+const pooledPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle";
+
+const controlPlaneApiNextFixtureConfig = {
+  ...controlPlaneApiFixtureConfig,
+  database: {
+    url: pooledPostgresUrl,
+    migrationUrl: controlPlaneApiFixtureConfig.database.migrationUrl,
+  },
+  auth: {
+    ...controlPlaneApiFixtureConfig.auth,
+    baseUrl: "https://mistle.example.test",
+  },
+};
+
+const controlPlaneWorkerNextFixtureConfig = {
+  ...controlPlaneWorkerFixtureConfig,
+  workflow: {
+    ...controlPlaneWorkerFixtureConfig.workflow,
+    databaseUrl: pooledPostgresUrl,
+  },
+};
+
+const dataPlaneApiNextFixtureConfig = {
+  ...dataPlaneApiFixtureConfig,
+  database: {
+    url: pooledPostgresUrl,
+    migrationUrl: dataPlaneApiFixtureConfig.database.migrationUrl,
+  },
+};
+
+const dataPlaneGatewayNextFixtureConfig = {
+  ...dataPlaneGatewayFixtureConfig,
+  database: {
+    url: pooledPostgresUrl,
+  },
+};
+
+const dataPlaneWorkerNextFixtureConfig = {
+  ...dataPlaneWorkerFixtureConfig,
+  database: {
+    url: pooledPostgresUrl,
+  },
+};
+
+const tokenizerProxyNextFixtureConfig = {
+  ...tokenizerProxyFixtureConfig,
+  controlPlaneApi: {
+    baseUrl: tokenizerProxyFixtureConfig.controlPlaneApi.baseUrl,
+    publicBaseUrl: "https://mistle.example.test",
+  },
+};
+
 describe("loadConfig integrations", () => {
   it("loads every app from config.sample.toml", () => {
     expect(() => {
@@ -481,6 +536,113 @@ describe("loadConfig integrations", () => {
       loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath });
       loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath });
     }).not.toThrow();
+  });
+
+  it("loads every app from the next config file fixture when format is opted in", () => {
+    expect(
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: controlPlaneApiNextFixtureConfig,
+    });
+    expect(
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_WORKER,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: controlPlaneWorkerNextFixtureConfig,
+    });
+    expect(
+      loadConfig({
+        app: AppIds.DATA_PLANE_API,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: dataPlaneApiNextFixtureConfig,
+    });
+    expect(
+      loadConfig({
+        app: AppIds.DATA_PLANE_GATEWAY,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: dataPlaneGatewayNextFixtureConfig,
+    });
+    expect(
+      loadConfig({
+        app: AppIds.DATA_PLANE_WORKER,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: dataPlaneWorkerNextFixtureConfig,
+    });
+    expect(
+      loadConfig({
+        app: AppIds.TOKENIZER_PROXY,
+        configPath: nextConfigFixturePath,
+        format: "next",
+      }),
+    ).toEqual({
+      global: globalDevelopmentConfig,
+      app: tokenizerProxyNextFixtureConfig,
+    });
+  });
+
+  it("keeps the next config file fixture behind an explicit format opt-in", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        configPath: nextConfigFixturePath,
+      }),
+    ).toThrow(/Invalid input/);
+  });
+
+  it("applies env overrides after loading the next config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_API,
+      configPath: nextConfigFixturePath,
+      format: "next",
+      env: {
+        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: {
+        ...controlPlaneApiNextFixtureConfig,
+        server: {
+          host: "localhost",
+          port: 5100,
+        },
+      },
+    });
+  });
+
+  it("returns only app config for the next config file fixture when includeGlobal is false", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      includeGlobal: false,
+      configPath: nextConfigFixturePath,
+      format: "next",
+    });
+
+    expect(config).toEqual({
+      app: dataPlaneWorkerNextFixtureConfig,
+    });
   });
 
   it("loads control-plane-api purely from a config file fixture", () => {

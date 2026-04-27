@@ -24,12 +24,14 @@ import {
   type AppConfigModuleKey,
   type AppConfigModuleValue,
 } from "./modules.js";
+import * as nextConfig from "./next/index.js";
 import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
 import { type AppConfig, ConfigSchema } from "./schema.js";
 
 type LoadConfigSourceOptions = {
   configPath?: string;
   env?: NodeJS.ProcessEnv;
+  format?: "next";
 };
 
 export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleKey> =
@@ -83,7 +85,10 @@ function loadValidatedRoot(
   const parsedTomlRoot =
     configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
 
-  const tomlLoadedRoot = loadFromToml(modules, parsedTomlRoot);
+  const tomlLoadedRoot =
+    configPath === undefined || options.format === undefined
+      ? loadFromToml(modules, parsedTomlRoot)
+      : nextConfig.loadFromToml(parsedTomlRoot);
   const envLoadedRoot = loadFromEnv(modules, env);
   const mergedRoot = mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
   return validateModules(modules, mergedRoot);

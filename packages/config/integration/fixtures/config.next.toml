@@ -1,0 +1,160 @@
+[global]
+env = "development"
+
+[telemetry]
+enabled = true
+debug = false
+resource_attributes = "deployment.environment=test"
+
+[telemetry.traces]
+endpoint = "http://127.0.0.1:4318/v1/traces"
+
+[telemetry.logs]
+endpoint = "http://127.0.0.1:4318/v1/logs"
+
+[telemetry.metrics]
+endpoint = "http://127.0.0.1:4318/v1/metrics"
+
+[services.dashboard]
+public_url = "http://127.0.0.1:5173"
+control_plane_api_origin = "https://mistle.example.test"
+
+[services.control_plane_api]
+host = "0.0.0.0"
+port = 5100
+public_url = "https://mistle.example.test"
+internal_url = "http://127.0.0.1:5100"
+
+[services.control_plane_api.auth]
+secret = "test-secret"
+trusted_origins = ["http://127.0.0.1:3000"]
+enabled_methods = ["otp"]
+
+[services.control_plane_api.auth.otp]
+length = 6
+expires_in_seconds = 300
+allowed_attempts = 3
+
+[services.control_plane_api.integrations]
+active_master_encryption_key_version = 2
+
+[services.control_plane_api.integrations.master_encryption_keys]
+2 = "integration-master-key-fixture"
+
+[services.data_plane_api]
+host = "0.0.0.0"
+port = 5300
+internal_url = "http://127.0.0.1:5300"
+
+[services.data_plane_gateway]
+host = "0.0.0.0"
+port = 5302
+internal_url = "http://127.0.0.1:5302"
+sandbox_ws_public_url = "ws://127.0.0.1:5003/tunnel/sandbox"
+sandbox_ws_internal_url = "ws://127.0.0.1:5003/tunnel/sandbox"
+
+[services.tokenizer_proxy]
+host = "0.0.0.0"
+port = 5305
+public_url = "https://tokenizer-proxy.example.test"
+internal_url = "http://127.0.0.1:5305"
+egress_url = "http://127.0.0.1:5004/tokenizer-proxy/egress"
+
+[services.control_plane_worker]
+workflow_concurrency = 2
+
+[services.data_plane_worker]
+workflow_concurrency = 2
+
+[workflow.control_plane]
+namespace_id = "fixture"
+run_migrations = true
+
+[workflow.data_plane]
+namespace_id = "fixture"
+run_migrations = true
+
+[postgres.control_plane]
+direct_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+pooled_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
+
+[postgres.data_plane]
+direct_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+pooled_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
+
+[kv.data_plane]
+backend = "valkey"
+url = "redis://127.0.0.1:6379"
+key_prefix = "mistle:runtime-state:fixture"
+
+[object_store.assets]
+bucket_name = "mistle-assets"
+region = "us-east-1"
+endpoint = "http://127.0.0.1:8333"
+force_path_style = true
+access_key_id = "mistle-access-key"
+secret_access_key = "mistle-secret-key"
+
+[object_store.sandbox_storage]
+bucket_name = "mistle-sandbox-storage"
+region = "us-east-1"
+endpoint = "https://s3.example.com"
+force_path_style = true
+access_key_id = "fixture-access-key-id"
+secret_access_key = "fixture-secret-access-key"
+
+[email.smtp]
+from_address = "no-reply@mistle.local"
+from_name = "Mistle Local"
+host = "127.0.0.1"
+port = 1025
+secure = false
+username = "mailpit"
+password = "mailpit"
+
+[internal_auth]
+method = "shared_token"
+
+[internal_auth.shared_token]
+token = "fixture-service-token"
+
+[sandbox]
+provider = "docker"
+default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
+publish_base_domain = "mistle.example.test"
+
+[sandbox.storage]
+backend = "archil"
+
+[sandbox.tokens.connect]
+token_secret = "fixture-connection-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[sandbox.tokens.bootstrap]
+token_secret = "fixture-bootstrap-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "data-plane-gateway"
+
+[sandbox.tokens.egress]
+token_secret = "fixture-egress-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "tokenizer-proxy"
+
+[sandbox.publish.access_token]
+token_secret = "fixture-publish-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[sandbox.publish.session]
+cookie_signing_secret = "fixture-publish-cookie-secret"
+
+[sandbox.docker]
+socket_path = "/var/run/docker.sock"
+network_name = "mistle-sandbox-dev"
+
+[sandbox.storage_backends.archil]
+api_key = "fixture-archil-api-key"
+region = "gcp-us-central1"
+name_prefix = "mistle-"
+mount_object_store = "sandbox_storage"
