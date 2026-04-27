@@ -27,7 +27,7 @@ export function HomePageView({ onboarding, onNavigate }: HomePageViewProps): Rea
 export function HomePageShell({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
     <div className="px-4 py-6">
-      <div className="w-full max-w-4xl space-y-6">
+      <div className="mx-auto w-full max-w-4xl space-y-6">
         <h1 className="text-3xl font-semibold tracking-tight">Get started</h1>
         {children}
       </div>
