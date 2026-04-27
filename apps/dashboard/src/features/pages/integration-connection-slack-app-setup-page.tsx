@@ -40,6 +40,7 @@ import {
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   ManifestJsonEditor,
+  type ManifestJsonValidation,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -245,7 +246,7 @@ function buildDraftWithSavedFieldValues(input: {
 function SlackManifestSetupPanel(input: {
   appConfigToken: string;
   manifestValue: string;
-  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
+  manifestValidation: ManifestJsonValidation;
   onAppConfigTokenChange: (value: string) => void;
   onManifestChange: (value: string) => void;
 }): React.JSX.Element {

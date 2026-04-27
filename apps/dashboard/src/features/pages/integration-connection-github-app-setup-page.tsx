@@ -39,6 +39,7 @@ import {
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   ManifestJsonEditor,
+  type ManifestJsonValidation,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -401,7 +402,7 @@ function submitGitHubAppManifestForm(input: {
 function GitHubManifestSetupPanel(input: {
   appOwnerKind: GitHubManifestAppOwnerKind | null;
   manifestValue: string;
-  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
+  manifestValidation: ManifestJsonValidation;
   onAppOwnerKindChange: (value: GitHubManifestAppOwnerKind) => void;
   onManifestChange: (value: string) => void;
   onOrganizationSlugChange: (value: string) => void;

@@ -3,7 +3,7 @@ import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 
-type ManifestJsonValidation =
+export type ManifestJsonValidation =
   | {
       status: "valid";
     }
@@ -49,9 +49,9 @@ export function formatManifestJson(value: string): string {
   return JSON.stringify(parseManifestJsonObject(value), null, 2);
 }
 
-function createManifestFormatOnBlurExtension(input: {
-  onChange: (value: string) => void;
-}): ReturnType<typeof EditorView.domEventHandlers> {
+function createManifestFormatOnBlurExtension(
+  onChange: (value: string) => void,
+): ReturnType<typeof EditorView.domEventHandlers> {
   return EditorView.domEventHandlers({
     blur: (_event, view) => {
       const currentValue = view.state.doc.toString();
@@ -62,7 +62,7 @@ function createManifestFormatOnBlurExtension(input: {
 
       const formattedValue = formatManifestJson(currentValue);
       if (formattedValue !== currentValue) {
-        input.onChange(formattedValue);
+        onChange(formattedValue);
       }
     },
   });
@@ -88,9 +88,7 @@ export function ManifestJsonEditor(input: {
           extensions={[
             json(),
             linter(jsonParseLinter()),
-            createManifestFormatOnBlurExtension({
-              onChange: input.onChange,
-            }),
+            createManifestFormatOnBlurExtension(input.onChange),
           ]}
           id={input.id}
           onChange={input.onChange}
