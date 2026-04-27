@@ -21,3 +21,5 @@ Namespace in final config:
 | `email.smtpPassword`      | `string`              | SMTP password for control-plane worker email sender authentication.    | None    | `[apps.control_plane_worker.email].smtp_password`        | `MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD`                          |
 | `dataPlaneApi.baseUrl`    | `string`              | Base URL for data-plane API calls made by control-plane worker flows.  | None    | `[apps.control_plane_worker.data_plane_api].base_url`    | `MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL`                |
 | `controlPlaneApi.baseUrl` | `string`              | Base URL for internal control-plane API calls made by worker flows.    | None    | `[apps.control_plane_worker.control_plane_api].base_url` | `MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL`             |
+
+Managed deployments should set `workflow.runMigrations` to `false` and run OpenWorkflow migrations separately.

@@ -13,10 +13,6 @@ export const dataPlaneWorkerDevelopmentPreset = {
           run_migrations: true,
           concurrency: 1,
         },
-        tunnel: {
-          bootstrap_token_ttl_seconds: 120,
-          exchange_token_ttl_seconds: 3600,
-        },
         runtime_state: {
           gateway_base_url: "http://127.0.0.1:5202",
         },

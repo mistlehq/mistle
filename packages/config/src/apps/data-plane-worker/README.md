@@ -31,6 +31,7 @@ Namespace in final config:
 Notes:
 
 - Sandbox provider selection now comes from `global.sandbox.provider`.
+- Managed deployments should set `workflow.runMigrations` to `false` and run OpenWorkflow migrations separately.
 - `apps.data_plane_worker.sandbox` only carries provider-specific runtime settings plus `tokenizer_proxy_egress_base_url`.
 - `sandboxStorage.dockerVolume` is only used when `global.sandbox.storage.backend = "docker_volume"`.
 - `sandbox.sandboxdTestFaultsEnabled` is intended only for non-release/test environments where sandboxd fault injection must be enabled explicitly.
