@@ -2,20 +2,8 @@
  * This suite uses an extended test `it` fixture imported from shared system test context.
  */
 
-import { randomUUID } from "node:crypto";
-
-import {
-  createDataPlaneDatabase,
-  sandboxInstances,
-  SandboxInstanceProviders,
-  SandboxInstanceSources,
-  SandboxInstanceStarterKinds,
-  SandboxInstanceStatuses,
-} from "@mistle/db/data-plane";
 import { readCapturedOtlpRequests } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
-import { and, eq } from "drizzle-orm";
-import { Pool } from "pg";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -56,7 +44,6 @@ const OtlpResourceSpansSchema = z.looseObject({
 const OtlpTraceExportSchema = z.looseObject({
   resourceSpans: z.array(OtlpResourceSpansSchema).optional(),
 });
-
 type RecordedSpan = {
   attributes: z.infer<typeof OtlpAttributeSchema>[] | undefined;
   name: string;
@@ -126,7 +113,7 @@ async function waitForSynchronousRuntimeStateTrace(input: {
     const capturedRequests = await readCapturedOtlpRequests(input.otlpTraceCaptureFilePath);
     const newRequests = capturedRequests.slice(input.baselineRequestCount);
     const recordedSpans = collectRecordedSpans(newRequests);
-    const apiGatewayClientSpan = recordedSpans.find(
+    const apiGatewayClientSpans = recordedSpans.filter(
       (span) =>
         span.serviceName === "@mistle/data-plane-api" &&
         span.name === "GET" &&
@@ -142,7 +129,7 @@ async function waitForSynchronousRuntimeStateTrace(input: {
         ),
     );
 
-    if (apiGatewayClientSpan !== undefined) {
+    for (const apiGatewayClientSpan of apiGatewayClientSpans) {
       const gatewaySpan = recordedSpans.find(
         (span) =>
           span.serviceName === "@mistle/data-plane-gateway" &&
@@ -181,58 +168,49 @@ describe("system runtime state tracing", () => {
   it("propagates one trace across data-plane-api and data-plane-gateway for runtime-state reads", async ({
     fixture,
   }) => {
-    const organizationId = `org_${randomUUID().replaceAll("-", "")}`;
-    const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
-    const pool = new Pool({
-      connectionString: fixture.controlPlaneDatabaseUrl,
-    });
-    const dataPlaneDb = createDataPlaneDatabase(pool);
-
-    try {
-      await dataPlaneDb.insert(sandboxInstances).values({
-        id: sandboxInstanceId,
-        organizationId,
-        sandboxProfileId: `sbp_${randomUUID().replaceAll("-", "")}`,
-        sandboxProfileVersion: 1,
-        runtimeProvider: SandboxInstanceProviders.DOCKER,
-        status: SandboxInstanceStatuses.STARTING,
-        startedByKind: SandboxInstanceStarterKinds.SYSTEM,
-        startedById: "system-runtime-state-tracing",
-        source: SandboxInstanceSources.DASHBOARD,
-        title: "Tracing system test sandbox",
-      });
-
-      const baselineRequestCount = (
-        await readCapturedOtlpRequests(fixture.otlpTraceCaptureFilePath)
-      ).length;
-      const response = await fetch(
-        `${fixture.dataPlaneApiBaseUrl}/internal/sandbox/instances?organizationId=${encodeURIComponent(organizationId)}`,
-        {
-          headers: {
-            [DataPlaneInternalAuthHeader]: fixture.internalAuthServiceToken,
+    const existingProfileIds = new Set(
+      (
+        await fixture.db.query.sandboxProfiles.findMany({
+          columns: {
+            id: true,
           },
-        },
-      );
-
-      expect(response.status).toBe(200);
-
-      const { apiGatewayClientSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
-        baselineRequestCount,
-        otlpTraceCaptureFilePath: fixture.otlpTraceCaptureFilePath,
-      });
-
-      expect(gatewaySpan.traceId).toBe(apiGatewayClientSpan.traceId);
-      expect(gatewaySpan.spanId).not.toBe(apiGatewayClientSpan.spanId);
-    } finally {
-      await dataPlaneDb
-        .delete(sandboxInstances)
-        .where(
-          and(
-            eq(sandboxInstances.organizationId, organizationId),
-            eq(sandboxInstances.id, sandboxInstanceId),
-          ),
-        );
-      await pool.end();
+        })
+      ).map((profile) => profile.id),
+    );
+    const sandboxInstanceId = await fixture.startSandboxAndWaitReady();
+    const newSandboxProfiles = await fixture.db.query.sandboxProfiles.findMany({
+      columns: {
+        id: true,
+        organizationId: true,
+      },
+      orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+    });
+    const createdSandboxProfile = newSandboxProfiles.find(
+      (profile) => !existingProfileIds.has(profile.id),
+    );
+    if (createdSandboxProfile === undefined) {
+      throw new Error("Expected sandbox startup fixture to create one new sandbox profile.");
     }
+
+    const baselineRequestCount = (await readCapturedOtlpRequests(fixture.otlpTraceCaptureFilePath))
+      .length;
+    const response = await fetch(
+      `${fixture.dataPlaneApiBaseUrl}/internal/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}?organizationId=${encodeURIComponent(createdSandboxProfile.organizationId)}`,
+      {
+        headers: {
+          [DataPlaneInternalAuthHeader]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+
+    const { apiGatewayClientSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
+      baselineRequestCount,
+      otlpTraceCaptureFilePath: fixture.otlpTraceCaptureFilePath,
+    });
+
+    expect(gatewaySpan.traceId).toBe(apiGatewayClientSpan.traceId);
+    expect(gatewaySpan.spanId).not.toBe(apiGatewayClientSpan.spanId);
   }, 60_000);
 });
