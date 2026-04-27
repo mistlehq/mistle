@@ -1,229 +1,193 @@
-# Full reference of config keys (current set).
-# This sample is production-centric.
+# Full reference of config keys.
+# This sample uses the next TOML shape and is production-centric.
+# Runtime consumers must set MISTLE_CONFIG_FORMAT=next while legacy TOML support remains available.
 
 [global]
 env = "production"
 
-[global.telemetry]
+[telemetry]
 enabled = true
 debug = false
 resource_attributes = "deployment.environment=production"
 
-[global.telemetry.traces]
+[telemetry.traces]
 endpoint = "http://otel-collector:4318/v1/traces"
 
-[global.telemetry.logs]
+[telemetry.logs]
 endpoint = "http://otel-collector:4318/v1/logs"
 
-[global.telemetry.metrics]
+[telemetry.metrics]
 endpoint = "http://otel-collector:4318/v1/metrics"
 
-[global.internal_auth]
-service_token = "replace-with-internal-service-token"
+[services.dashboard]
+public_url = "https://app.mistle.example"
+control_plane_api_origin = "https://api.mistle.example"
 
-[global.sandbox.connect]
-token_secret = "replace-with-connect-token-secret"
-token_issuer = "control-plane-api"
-token_audience = "data-plane-gateway"
-
-[global.sandbox.bootstrap]
-token_secret = "replace-with-bootstrap-token-secret"
-token_issuer = "data-plane-worker"
-token_audience = "data-plane-gateway"
-
-[global.sandbox.egress]
-token_secret = "replace-with-egress-token-secret"
-token_issuer = "data-plane-worker"
-token_audience = "tokenizer-proxy"
-
-[global.sandbox.publish]
-base_domain = "mistle.example"
-
-[global.sandbox.publish.access]
-token_secret = "replace-with-publish-access-token-secret"
-token_issuer = "control-plane-api"
-token_audience = "data-plane-gateway"
-
-[global.sandbox.publish.session]
-cookie_signing_secret = "replace-with-publish-session-cookie-signing-secret"
-
-[global.sandbox]
-# Use "docker" for local development or "e2b" for cloud sandboxes.
-provider = "docker"
-# Shared OCI base image used by both Docker and E2B providers.
-default_base_image = "registry.example.com/mistle/sandbox-base:prod"
-gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
-internal_gateway_ws_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
-
-[global.sandbox.storage]
-backend = "archil"
-
-[apps.control_plane_api.server]
+[services.control_plane_api]
 host = "0.0.0.0"
 port = 8080
+public_url = "https://api.mistle.example"
+internal_url = "http://control-plane-api:8080"
 
-[apps.control_plane_api.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+[services.control_plane_api.auth]
+secret = "replace-with-strong-auth-secret"
+trusted_origins = ["https://app.mistle.example"]
+enabled_methods = ["otp"]
 
-[apps.control_plane_api.object_store]
+[services.control_plane_api.auth.otp]
+length = 6
+expires_in_seconds = 300
+allowed_attempts = 3
+
+# Required when enabled_methods includes "google".
+#[services.control_plane_api.auth.google]
+#client_id = "replace-with-google-client-id"
+#client_secret = "replace-with-google-client-secret"
+
+[services.control_plane_api.integrations]
+active_master_encryption_key_version = 1
+
+[services.control_plane_api.integrations.master_encryption_keys]
+"1" = "replace-with-master-encryption-key"
+
+[services.data_plane_api]
+host = "0.0.0.0"
+port = 8082
+internal_url = "http://data-plane-api:8082"
+
+[services.data_plane_gateway]
+host = "0.0.0.0"
+port = 8084
+internal_url = "http://data-plane-gateway:8084"
+sandbox_ws_public_url = "wss://gateway.mistle.example/tunnel/sandbox"
+sandbox_ws_internal_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
+
+[services.tokenizer_proxy]
+host = "0.0.0.0"
+port = 8085
+public_url = "https://api.mistle.example"
+internal_url = "http://tokenizer-proxy:8085"
+egress_url = "https://api.mistle.example/tokenizer-proxy/egress"
+
+[services.control_plane_worker]
+workflow_concurrency = 4
+
+[services.data_plane_worker]
+workflow_concurrency = 4
+
+[workflow.control_plane]
+namespace_id = "production"
+
+[workflow.data_plane]
+namespace_id = "production"
+
+# Each plane can point at separate Postgres instances. For local and simple
+# deployments, direct_url and pooled_url may still target the same database.
+# Use direct_url for migrations and pooled_url for app runtime traffic.
+[postgres.control_plane]
+direct_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+pooled_url = "postgresql://mistle:replace-with-password@pgbouncer:6432/mistle"
+
+[postgres.data_plane]
+direct_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+pooled_url = "postgresql://mistle:replace-with-password@pgbouncer:6432/mistle"
+
+# Valkey is modeled as a shared dependency. Services consume the plane-specific
+# KV backend they need instead of owning duplicated Valkey config.
+[kv.control_plane]
+backend = "valkey"
+url = "redis://valkey:6379"
+key_prefix = "mistle:control"
+
+[kv.data_plane]
+backend = "valkey"
+url = "redis://valkey:6379"
+key_prefix = "mistle:runtime-state"
+
+[object_store.assets]
 bucket_name = "mistle-assets"
 region = "us-east-1"
-endpoint = "http://seaweedfs:8333"
+endpoint = "https://s3.example.com"
 force_path_style = true
 access_key_id = "replace-with-object-store-access-key"
 secret_access_key = "replace-with-object-store-secret-key"
 
-[apps.control_plane_api.auth]
-base_url = "https://api.mistle.example"
-secret = "replace-with-strong-secret"
-trusted_origins = ["https://app.mistle.example"]
-otp_length = 6
-otp_expires_in_seconds = 300
-otp_allowed_attempts = 3
+# Used when sandbox.storage.archil.mount_object_store = "sandbox_storage".
+[object_store.sandbox_storage]
+bucket_name = "mistle-sandbox-storage"
+region = "us-east-1"
+endpoint = "https://s3.example.com"
+force_path_style = true
+access_key_id = "replace-with-sandbox-storage-access-key"
+secret_access_key = "replace-with-sandbox-storage-secret-key"
 
-# Optional Google login support. Leave this block out to disable Google login.
-#[apps.control_plane_api.auth.google]
-#client_id = "replace-with-google-client-id"
-#client_secret = "replace-with-google-client-secret"
-
-[apps.control_plane_api.dashboard]
-base_url = "https://app.mistle.example"
-
-[apps.control_plane_api.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
-namespace_id = "production"
-
-[apps.control_plane_api.data_plane_api]
-base_url = "http://data-plane-api:8082"
-
-# Optional. Omit this block to use the default runtime path `/usr/local/bin/commit-sign`.
-#[apps.control_plane_api.commit_sign]
-#binary_path = "/usr/local/bin/commit-sign"
-
-[apps.control_plane_api.integrations]
-active_master_encryption_key_version = 1
-
-[apps.control_plane_api.integrations.master_encryption_keys]
-"1" = "replace-with-master-encryption-key"
-
-[apps.control_plane_worker.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-namespace_id = "production"
-run_migrations = true
-concurrency = 4
-
-[apps.control_plane_worker.email]
+[email.smtp]
 from_address = "no-reply@mistle.example"
 from_name = "Mistle"
-smtp_host = "smtp.mistle.example"
-smtp_port = 587
-smtp_secure = false
-smtp_username = "replace-with-smtp-username"
-smtp_password = "replace-with-smtp-password"
+host = "smtp.mistle.example"
+port = 587
+secure = false
+username = "replace-with-smtp-username"
+password = "replace-with-smtp-password"
 
-[apps.control_plane_worker.data_plane_api]
-base_url = "http://data-plane-api:8082"
+# Service-to-service auth is currently a shared token. The method field keeps
+# the shape explicit if this later moves to signed workload identity/JWTs.
+[internal_auth]
+method = "shared_token"
 
-[apps.control_plane_worker.control_plane_api]
-base_url = "http://control-plane-api:8080"
+[internal_auth.shared_token]
+token = "replace-with-internal-service-token"
 
-[apps.data_plane_api.server]
-host = "0.0.0.0"
-port = 8082
+[sandbox]
+# Use "docker" for local/single-node sandboxes or "e2b" for cloud sandboxes.
+provider = "e2b"
+default_base_image = "registry.example.com/mistle/sandbox-base:prod"
+publish_base_domain = "mistle.example"
 
-[apps.data_plane_api.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-migration_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+[sandbox.storage]
+backend = "archil"
 
-[apps.data_plane_api.sandbox.docker]
-socket_path = "/var/run/docker.sock"
+[sandbox.storage.archil]
+api_key = "replace-with-archil-api-key"
+# Region availability: https://docs.archil.com/reference/regions
+region = "gcp-us-central1"
+name_prefix = "mistle-"
+mount_object_store = "sandbox_storage"
 
-# [apps.data_plane_api.sandbox.e2b]
-# api_key = "replace-with-e2b-api-key"
-# domain = "e2b.app"
-
-[apps.data_plane_api.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
-namespace_id = "production"
-
-[apps.data_plane_api.runtime_state]
-gateway_base_url = "http://data-plane-gateway:8084"
-
-[apps.data_plane_api.control_plane_api]
-base_url = "http://control-plane-api:8080"
-
-[apps.data_plane_gateway.server]
-host = "0.0.0.0"
-port = 8084
-
-[apps.data_plane_gateway.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-
-[apps.data_plane_gateway.runtime_state]
-backend = "valkey"
-
-[apps.data_plane_gateway.runtime_state.valkey]
-url = "redis://valkey:6379"
-key_prefix = "mistle:runtime-state"
-
-[apps.data_plane_gateway.data_plane_api]
-base_url = "http://data-plane-api:8082"
-
-[apps.data_plane_gateway.control_plane_api]
-base_url = "http://control-plane-api:8080"
-[apps.data_plane_worker.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-
-[apps.data_plane_worker.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
-namespace_id = "production"
-run_migrations = true
-concurrency = 4
-[apps.data_plane_worker.runtime_state]
-gateway_base_url = "http://data-plane-gateway:8084"
-
-[apps.data_plane_worker.control_plane_api]
-base_url = "http://control-plane-api:8080"
-
-[apps.data_plane_worker.sandbox]
-tokenizer_proxy_egress_base_url = "https://api.mistle.example/tokenizer-proxy/egress"
-
-[apps.data_plane_worker.sandbox.docker]
-socket_path = "/var/run/docker.sock"
-# network_name = "mistle-sandbox"
-
-[apps.data_plane_worker.sandbox.e2b]
+[sandbox.e2b]
 api_key = "replace-with-e2b-api-key"
 domain = "e2b.app"
 cpu_count = 4
 memory_mb = 8192
 
-[apps.data_plane_worker.sandbox_storage.archil]
-api_key = "replace-with-archil-api-key"
-# Region availability: https://docs.archil.com/reference/regions
-# Use a real remote S3-compatible bucket for Archil-backed development/test work.
-# Do not assume a local SeaweedFS endpoint is a supported Archil backing store.
-region = "gcp-us-central1"
-name_prefix = "mistle-"
+# Required when sandbox.provider = "docker".
+#[sandbox.docker]
+#socket_path = "/var/run/docker.sock"
+#network_name = "mistle-sandbox"
 
-[[apps.data_plane_worker.sandbox_storage.archil.mounts]]
-type = "s3-compatible"
-bucket = "mistle-sandbox-storage"
-endpoint = "https://s3.example.com"
-access_key_id = "replace-with-archil-mount-access-key-id"
-secret_access_key = "replace-with-archil-mount-secret-access-key"
-
-#[apps.data_plane_worker.sandbox_storage.docker_volume]
+# Required when sandbox.storage.backend = "docker_volume".
+#[sandbox.storage.docker_volume]
 #name_prefix = "mistle-"
 
-[apps.tokenizer_proxy.server]
-host = "0.0.0.0"
-port = 8085
+[sandbox.tokens.connect]
+secret = "replace-with-connect-token-secret"
+issuer = "control-plane-api"
+audience = "data-plane-gateway"
 
-[apps.tokenizer_proxy.control_plane_api]
-base_url = "http://control-plane-api:8080"
-public_base_url = "https://api.mistle.example"
+[sandbox.tokens.bootstrap]
+secret = "replace-with-bootstrap-token-secret"
+issuer = "data-plane-worker"
+audience = "data-plane-gateway"
 
-[apps.dashboard]
-control_plane_api_origin = "https://api.mistle.example"
+[sandbox.tokens.egress]
+secret = "replace-with-egress-token-secret"
+issuer = "data-plane-worker"
+audience = "tokenizer-proxy"
+
+[sandbox.publish.access_token]
+secret = "replace-with-publish-access-token-secret"
+issuer = "control-plane-api"
+audience = "data-plane-gateway"
+
+[sandbox.publish.session]
+cookie_signing_secret = "replace-with-publish-session-cookie-signing-secret"

@@ -6,7 +6,6 @@ const ServiceEndpointSchema = z
   .object({
     host: z.string().trim().min(1),
     port: z.number().int().min(1).max(65535),
-    public_url: UrlSchema.optional(),
     internal_url: UrlSchema,
   })
   .strict();
@@ -150,6 +149,7 @@ export const ConfigSchema = z
           sandbox_ws_internal_url: UrlSchema,
         }).strict(),
         tokenizer_proxy: ServiceEndpointSchema.extend({
+          public_url: UrlSchema,
           egress_url: UrlSchema,
         }).strict(),
         control_plane_worker: z

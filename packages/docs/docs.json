@@ -41,7 +41,11 @@
         "tab": "Self-Hosting",
         "groups": [
           {
-            "group": "Operators",
+            "group": "Configuration",
+            "pages": ["guides/self-hosted-configuration"]
+          },
+          {
+            "group": "Integrations",
             "pages": [
               "guides/self-hosted-integrations-overview",
               "guides/self-hosted-integration-targets",

@@ -7,10 +7,12 @@ description: Operator guide to enabling integration targets in a self-hosted Mis
 
 Self-hosted integration setup has two separate concerns:
 
-1. Operators enable Mistle integration targets in the deployment.
-2. Users or workspace admins create provider-specific connections in the dashboard.
+1. Operators configure the deployment and public control-plane URL.
+2. Operators enable Mistle integration targets in the deployment.
+3. Users or workspace admins create provider-specific connections in the dashboard.
 
-This section is only for the first concern: operator-owned self-hosted setup.
+This section is for the operator-owned integration setup after the deployment
+configuration exists.
 
 Use the connection guides when you need provider-specific setup such as GitHub App registration, Slack app configuration, Jira service-account credentials, or OAuth approval flows.
 
@@ -41,6 +43,7 @@ Mistle currently ships these built-in targets:
 
 ## Next Steps
 
+- Read [Configuration](/guides/self-hosted-configuration)
 - Read [Provision Integration Targets](/guides/self-hosted-integration-targets)
 - Read [Webhook And Callback URLs](/guides/self-hosted-webhook-callbacks)
 - Then use the provider-specific connection guides in the `Connect Integrations` section

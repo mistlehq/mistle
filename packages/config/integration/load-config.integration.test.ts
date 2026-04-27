@@ -545,12 +545,20 @@ const tokenizerProxyNextFixtureConfig = {
 describe("loadConfig integrations", () => {
   it("loads every app from config.sample.toml", () => {
     expect(() => {
-      loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath: configSamplePath });
-      loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath: configSamplePath });
-      loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath });
-      loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath: configSamplePath });
-      loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath });
-      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath });
+      loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath: configSamplePath, format: "next" });
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_WORKER,
+        configPath: configSamplePath,
+        format: "next",
+      });
+      loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath, format: "next" });
+      loadConfig({
+        app: AppIds.DATA_PLANE_GATEWAY,
+        configPath: configSamplePath,
+        format: "next",
+      });
+      loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath, format: "next" });
+      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath, format: "next" });
     }).not.toThrow();
   });
 

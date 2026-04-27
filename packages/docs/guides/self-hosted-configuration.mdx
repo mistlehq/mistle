@@ -1,0 +1,272 @@
+---
+title: Configuration
+description: Configure a self-hosted Mistle deployment with TOML and environment overrides
+---
+
+## Overview
+
+Self-hosted Mistle deployments are configured with a TOML file plus optional
+environment overrides.
+
+Use [`config/config.sample.toml`](https://github.com/mistlehq/mistle/blob/main/config/config.sample.toml)
+as the complete reference for the current TOML shape. During the migration
+period, services that read this TOML file must also set:
+
+```bash
+MISTLE_CONFIG_FORMAT=next
+```
+
+Set `MISTLE_CONFIG_PATH` to the TOML file path used by each service. Existing
+`MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment variables still work as
+overrides after TOML is loaded.
+
+## Deployment Shape
+
+A simple deployment can point the control plane and data plane at the same
+Postgres, PgBouncer, Valkey, and object storage instances. Larger deployments
+can split those resources by plane.
+
+The config file keeps these shared resources separate from individual service
+settings:
+
+| Section          | Purpose                                                                      |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `services.*`     | Service hosts, ports, public URLs, internal URLs, and service-owned settings |
+| `postgres.*`     | Plane-specific Postgres URLs                                                 |
+| `kv.*`           | Plane-specific Valkey configuration                                          |
+| `object_store.*` | Shared object stores                                                         |
+| `workflow.*`     | OpenWorkflow namespaces                                                      |
+| `email.smtp`     | SMTP delivery settings                                                       |
+| `internal_auth`  | Service-to-service authentication                                            |
+| `sandbox.*`      | Sandbox provider, storage, publish, and token settings                       |
+| `telemetry.*`    | OpenTelemetry export settings                                                |
+
+## Services
+
+Service sections define where each service listens and how other services reach
+it.
+
+| Section                         | Required settings                                          |
+| ------------------------------- | ---------------------------------------------------------- |
+| `services.dashboard`            | `public_url`, `control_plane_api_origin`                   |
+| `services.control_plane_api`    | `host`, `port`, `public_url`, `internal_url`               |
+| `services.data_plane_api`       | `host`, `port`, `internal_url`                             |
+| `services.data_plane_gateway`   | `host`, `port`, `internal_url`, sandbox WebSocket URLs     |
+| `services.tokenizer_proxy`      | `host`, `port`, `public_url`, `internal_url`, `egress_url` |
+| `services.control_plane_worker` | `workflow_concurrency`                                     |
+| `services.data_plane_worker`    | `workflow_concurrency`                                     |
+
+Use public URLs for browser-facing and provider-facing traffic. Use internal
+URLs for service-to-service traffic inside the deployment network.
+
+## Postgres
+
+Postgres is configured separately for the control plane and data plane.
+
+| Field        | Used for                                             |
+| ------------ | ---------------------------------------------------- |
+| `direct_url` | Migrations and other direct database ownership tasks |
+| `pooled_url` | Runtime application traffic through PgBouncer        |
+
+Simple deployments can set both planes to the same database. Split deployments
+can use separate databases for `postgres.control_plane` and `postgres.data_plane`.
+
+## KV
+
+`kv.control_plane` and `kv.data_plane` describe plane-specific Valkey
+dependencies.
+
+Only `valkey` is supported today:
+
+```toml
+[kv.data_plane]
+backend = "valkey"
+url = "redis://valkey:6379"
+key_prefix = "mistle:runtime-state"
+```
+
+## Object Stores
+
+`object_store.assets` stores application assets.
+
+`object_store.sandbox_storage` is used when Archil sandbox storage should mount
+an S3-compatible bucket:
+
+```toml
+[sandbox.storage.archil]
+mount_object_store = "sandbox_storage"
+```
+
+## Authentication
+
+Control-plane user authentication is configured under
+`services.control_plane_api.auth`.
+
+`enabled_methods` controls which login methods are available. `otp` is required
+by the current runtime. Add `google` only when Google OAuth is configured:
+
+```toml
+[services.control_plane_api.auth]
+enabled_methods = ["otp", "google"]
+```
+
+Service-to-service auth is configured under `internal_auth`. The current method
+is `shared_token`.
+
+## Workflows
+
+Workflow config is split by plane:
+
+```toml
+[workflow.control_plane]
+namespace_id = "production"
+
+[workflow.data_plane]
+namespace_id = "production"
+```
+
+Workers consume the namespace and their service-specific concurrency. Managed
+deployments should run database and workflow migrations as deployment steps
+instead of relying on long-lived worker startup.
+
+## Sandbox
+
+Use `sandbox.provider = "docker"` for local or simple single-node deployments.
+Use `sandbox.provider = "e2b"` for cloud sandboxes.
+
+Sandbox storage is configured independently:
+
+| Backend         | Required section                |
+| --------------- | ------------------------------- |
+| `docker_volume` | `sandbox.storage.docker_volume` |
+| `archil`        | `sandbox.storage.archil`        |
+
+Archil-backed storage can mount `object_store.sandbox_storage` by setting:
+
+```toml
+[sandbox.storage.archil]
+mount_object_store = "sandbox_storage"
+```
+
+## Environment Overrides
+
+TOML should be the primary authored config. Environment variables are override
+inputs for deployment systems and secret managers.
+
+During the migration period:
+
+- keep using existing `MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment names
+- set `MISTLE_CONFIG_PATH` to the config file path
+- set `MISTLE_CONFIG_FORMAT=next` when using the sample TOML shape
+- do not use new `MISTLE_POSTGRES_*`, `MISTLE_KV_*`, or `MISTLE_SERVICES_*`
+  environment namespaces
+
+Environment overrides win when both TOML and env provide the same runtime
+setting.
+
+## Full TOML Key Reference
+
+This table covers the operator-facing next TOML keys accepted by
+`@mistle/config`.
+
+| Key                                                                            | Required                                   | Notes                                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `global.env`                                                                   | Yes                                        | `development` or `production`.                                                            |
+| `telemetry.enabled`                                                            | Yes                                        | Enables or disables telemetry export.                                                     |
+| `telemetry.debug`                                                              | Yes                                        | Enables debug telemetry behavior.                                                         |
+| `telemetry.resource_attributes`                                                | No                                         | OpenTelemetry resource attributes string.                                                 |
+| `telemetry.traces.endpoint`                                                    | Yes when telemetry is enabled              | Optional when telemetry is disabled.                                                      |
+| `telemetry.logs.endpoint`                                                      | Yes when telemetry is enabled              | Optional when telemetry is disabled.                                                      |
+| `telemetry.metrics.endpoint`                                                   | Yes when telemetry is enabled              | Optional when telemetry is disabled.                                                      |
+| `services.dashboard.public_url`                                                | Yes                                        | Public dashboard origin.                                                                  |
+| `services.dashboard.control_plane_api_origin`                                  | Yes                                        | Browser-facing control-plane API origin used by the dashboard build.                      |
+| `services.control_plane_api.host`                                              | Yes                                        | Bind host.                                                                                |
+| `services.control_plane_api.port`                                              | Yes                                        | Bind port.                                                                                |
+| `services.control_plane_api.public_url`                                        | Yes                                        | Public control-plane API URL.                                                             |
+| `services.control_plane_api.internal_url`                                      | Yes                                        | Internal control-plane API URL.                                                           |
+| `services.control_plane_api.auth.secret`                                       | Yes                                        | Auth signing secret.                                                                      |
+| `services.control_plane_api.auth.trusted_origins`                              | Yes                                        | Allowed dashboard/browser origins.                                                        |
+| `services.control_plane_api.auth.enabled_methods`                              | Yes                                        | Supported values: `otp`, `google`. `otp` is currently required.                           |
+| `services.control_plane_api.auth.otp.length`                                   | Yes                                        | OTP code length.                                                                          |
+| `services.control_plane_api.auth.otp.expires_in_seconds`                       | Yes                                        | OTP expiry.                                                                               |
+| `services.control_plane_api.auth.otp.allowed_attempts`                         | Yes                                        | Maximum OTP attempts.                                                                     |
+| `services.control_plane_api.auth.google.client_id`                             | Required when Google auth is enabled       | Google OAuth client ID.                                                                   |
+| `services.control_plane_api.auth.google.client_secret`                         | Required when Google auth is enabled       | Google OAuth client secret.                                                               |
+| `services.control_plane_api.integrations.active_master_encryption_key_version` | Yes                                        | Active integration credential key version.                                                |
+| `services.control_plane_api.integrations.master_encryption_keys.<version>`     | Yes                                        | One or more positive integer string versions.                                             |
+| `services.data_plane_api.host`                                                 | Yes                                        | Bind host.                                                                                |
+| `services.data_plane_api.port`                                                 | Yes                                        | Bind port.                                                                                |
+| `services.data_plane_api.internal_url`                                         | Yes                                        | Internal data-plane API URL.                                                              |
+| `services.data_plane_gateway.host`                                             | Yes                                        | Bind host.                                                                                |
+| `services.data_plane_gateway.port`                                             | Yes                                        | Bind port.                                                                                |
+| `services.data_plane_gateway.internal_url`                                     | Yes                                        | Internal data-plane gateway URL.                                                          |
+| `services.data_plane_gateway.sandbox_ws_public_url`                            | Yes                                        | Public sandbox WebSocket tunnel URL.                                                      |
+| `services.data_plane_gateway.sandbox_ws_internal_url`                          | Yes                                        | Internal sandbox WebSocket tunnel URL.                                                    |
+| `services.tokenizer_proxy.host`                                                | Yes                                        | Bind host.                                                                                |
+| `services.tokenizer_proxy.port`                                                | Yes                                        | Bind port.                                                                                |
+| `services.tokenizer_proxy.public_url`                                          | Yes                                        | Public tokenizer proxy URL.                                                               |
+| `services.tokenizer_proxy.internal_url`                                        | Yes                                        | Internal tokenizer proxy URL.                                                             |
+| `services.tokenizer_proxy.egress_url`                                          | Yes                                        | Sandbox egress URL.                                                                       |
+| `services.control_plane_worker.workflow_concurrency`                           | Yes                                        | Control-plane workflow worker concurrency.                                                |
+| `services.data_plane_worker.workflow_concurrency`                              | Yes                                        | Data-plane workflow worker concurrency.                                                   |
+| `workflow.control_plane.namespace_id`                                          | Yes                                        | Control-plane workflow namespace.                                                         |
+| `workflow.data_plane.namespace_id`                                             | Yes                                        | Data-plane workflow namespace.                                                            |
+| `postgres.control_plane.direct_url`                                            | Yes                                        | Direct control-plane Postgres URL for migrations.                                         |
+| `postgres.control_plane.pooled_url`                                            | Yes                                        | Pooled control-plane Postgres URL for runtime traffic.                                    |
+| `postgres.data_plane.direct_url`                                               | Yes                                        | Direct data-plane Postgres URL for migrations.                                            |
+| `postgres.data_plane.pooled_url`                                               | Yes                                        | Pooled data-plane Postgres URL for runtime traffic.                                       |
+| `kv.control_plane.backend`                                                     | Yes                                        | Currently `valkey`.                                                                       |
+| `kv.control_plane.url`                                                         | Yes                                        | Control-plane Valkey URL.                                                                 |
+| `kv.control_plane.key_prefix`                                                  | Yes                                        | Control-plane Valkey key prefix.                                                          |
+| `kv.data_plane.backend`                                                        | Yes                                        | Currently `valkey`.                                                                       |
+| `kv.data_plane.url`                                                            | Yes                                        | Data-plane Valkey URL.                                                                    |
+| `kv.data_plane.key_prefix`                                                     | Yes                                        | Data-plane Valkey key prefix.                                                             |
+| `object_store.assets.bucket_name`                                              | Yes                                        | Asset object store bucket.                                                                |
+| `object_store.assets.region`                                                   | Yes                                        | Asset object store region.                                                                |
+| `object_store.assets.endpoint`                                                 | No                                         | Custom object store endpoint.                                                             |
+| `object_store.assets.force_path_style`                                         | No                                         | S3 path-style setting.                                                                    |
+| `object_store.assets.access_key_id`                                            | Yes                                        | Asset object store access key.                                                            |
+| `object_store.assets.secret_access_key`                                        | Yes                                        | Asset object store secret key.                                                            |
+| `object_store.sandbox_storage.bucket_name`                                     | Required when mounted by Archil storage    | Sandbox storage object store bucket.                                                      |
+| `object_store.sandbox_storage.region`                                          | Required when mounted by Archil storage    | Sandbox storage object store region.                                                      |
+| `object_store.sandbox_storage.endpoint`                                        | Required when mounted by Archil storage    | Sandbox storage object store endpoint.                                                    |
+| `object_store.sandbox_storage.force_path_style`                                | No                                         | S3 path-style setting.                                                                    |
+| `object_store.sandbox_storage.access_key_id`                                   | Required when mounted by Archil storage    | Sandbox storage access key.                                                               |
+| `object_store.sandbox_storage.secret_access_key`                               | Required when mounted by Archil storage    | Sandbox storage secret key.                                                               |
+| `email.smtp.from_address`                                                      | Yes                                        | SMTP sender address.                                                                      |
+| `email.smtp.from_name`                                                         | Yes                                        | SMTP sender name.                                                                         |
+| `email.smtp.host`                                                              | Yes                                        | SMTP host.                                                                                |
+| `email.smtp.port`                                                              | Yes                                        | SMTP port.                                                                                |
+| `email.smtp.secure`                                                            | Yes                                        | Whether SMTP uses TLS.                                                                    |
+| `email.smtp.username`                                                          | Yes                                        | SMTP username.                                                                            |
+| `email.smtp.password`                                                          | Yes                                        | SMTP password.                                                                            |
+| `internal_auth.method`                                                         | Yes                                        | Currently `shared_token`.                                                                 |
+| `internal_auth.shared_token.token`                                             | Required when method is `shared_token`     | Shared service-to-service token.                                                          |
+| `sandbox.provider`                                                             | Yes                                        | `docker` or `e2b`.                                                                        |
+| `sandbox.default_base_image`                                                   | Yes                                        | Sandbox base image reference.                                                             |
+| `sandbox.publish_base_domain`                                                  | Yes                                        | Base domain for published sandbox URLs.                                                   |
+| `sandbox.storage.backend`                                                      | Yes                                        | `archil` or `docker_volume`.                                                              |
+| `sandbox.storage.archil.api_key`                                               | Required when storage backend is `archil`  | Archil API key.                                                                           |
+| `sandbox.storage.archil.region`                                                | Required when storage backend is `archil`  | Archil region.                                                                            |
+| `sandbox.storage.archil.name_prefix`                                           | No                                         | Prefix for Archil storage names.                                                          |
+| `sandbox.storage.archil.mount_object_store`                                    | No                                         | Currently only `sandbox_storage`.                                                         |
+| `sandbox.storage.docker_volume.name_prefix`                                    | No                                         | Prefix for Docker volume names; section required when storage backend is `docker_volume`. |
+| `sandbox.tokens.connect.secret`                                                | Yes                                        | Connect token signing secret.                                                             |
+| `sandbox.tokens.connect.issuer`                                                | Yes                                        | Connect token issuer.                                                                     |
+| `sandbox.tokens.connect.audience`                                              | Yes                                        | Connect token audience.                                                                   |
+| `sandbox.tokens.bootstrap.secret`                                              | Yes                                        | Bootstrap token signing secret.                                                           |
+| `sandbox.tokens.bootstrap.issuer`                                              | Yes                                        | Bootstrap token issuer.                                                                   |
+| `sandbox.tokens.bootstrap.audience`                                            | Yes                                        | Bootstrap token audience.                                                                 |
+| `sandbox.tokens.egress.secret`                                                 | Yes                                        | Egress token signing secret.                                                              |
+| `sandbox.tokens.egress.issuer`                                                 | Yes                                        | Egress token issuer.                                                                      |
+| `sandbox.tokens.egress.audience`                                               | Yes                                        | Egress token audience.                                                                    |
+| `sandbox.publish.access_token.secret`                                          | Yes                                        | Published sandbox access token signing secret.                                            |
+| `sandbox.publish.access_token.issuer`                                          | Yes                                        | Published sandbox access token issuer.                                                    |
+| `sandbox.publish.access_token.audience`                                        | Yes                                        | Published sandbox access token audience.                                                  |
+| `sandbox.publish.session.cookie_signing_secret`                                | Yes                                        | Published sandbox session cookie signing secret.                                          |
+| `sandbox.docker.socket_path`                                                   | Required when sandbox provider is `docker` | Docker socket path.                                                                       |
+| `sandbox.docker.network_name`                                                  | No                                         | Docker sandbox network name.                                                              |
+| `sandbox.e2b.api_key`                                                          | Required when sandbox provider is `e2b`    | E2B API key.                                                                              |
+| `sandbox.e2b.domain`                                                           | Required when sandbox provider is `e2b`    | E2B domain.                                                                               |
+| `sandbox.e2b.cpu_count`                                                        | Required when sandbox provider is `e2b`    | E2B sandbox CPU count.                                                                    |
+| `sandbox.e2b.memory_mb`                                                        | Required when sandbox provider is `e2b`    | E2B sandbox memory in MiB.                                                                |
