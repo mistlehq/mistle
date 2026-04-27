@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import {
-  AppShellLoadingIndicatorMeta,
   AppShellLoadingIndicators,
+  createAppShellLoadingIndicatorMeta,
 } from "./app-shell-loading-indicator-meta.js";
 
 function createDeferredPromise<T>() {
@@ -44,9 +44,7 @@ function MutationHarness(input: {
   const mutation = useMutation({
     ...(input.autosave
       ? {
-          meta: {
-            [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicators.AUTOSAVE,
-          },
+          meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.AUTOSAVE),
         }
       : {}),
     mutationFn: async () => input.promise,

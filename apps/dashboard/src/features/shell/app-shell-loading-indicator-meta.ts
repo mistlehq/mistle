@@ -1,4 +1,4 @@
-export const AppShellLoadingIndicatorMeta = {
+const AppShellLoadingIndicatorMeta = {
   INDICATOR: "appShellLoadingIndicator",
 } as const;
 
@@ -10,6 +10,18 @@ export const AppShellLoadingIndicators = {
 
 export type AppShellLoadingIndicator =
   (typeof AppShellLoadingIndicators)[keyof typeof AppShellLoadingIndicators];
+
+type AppShellLoadingIndicatorMetaValue = {
+  [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicator;
+};
+
+export function createAppShellLoadingIndicatorMeta(
+  indicator: AppShellLoadingIndicator,
+): AppShellLoadingIndicatorMetaValue {
+  return {
+    [AppShellLoadingIndicatorMeta.INDICATOR]: indicator,
+  };
+}
 
 export function resolveAppShellLoadingIndicator(
   meta: Record<string, unknown> | undefined,

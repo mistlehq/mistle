@@ -7,8 +7,9 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
-  AppShellLoadingIndicatorMeta,
+  type AppShellLoadingIndicator,
   AppShellLoadingIndicators,
+  createAppShellLoadingIndicatorMeta,
 } from "./app-shell-loading-indicator-meta.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
@@ -24,52 +25,33 @@ function createDeferredPromise<T>() {
   };
 }
 
-function QueryLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
+function QueryLoadingHarness(props: {
+  indicator?: AppShellLoadingIndicator;
+  promise: Promise<string>;
+}): React.JSX.Element {
   useQuery({
     queryKey: ["top-loading-bar-test"],
+    ...(props.indicator === undefined
+      ? {}
+      : {
+          meta: createAppShellLoadingIndicatorMeta(props.indicator),
+        }),
     queryFn: async () => props.promise,
   });
 
   return <TopLoadingBar />;
 }
 
-function SuppressedQueryLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
-  useQuery({
-    queryKey: ["top-loading-bar-test", "suppressed"],
-    meta: {
-      [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicators.NONE,
-    },
-    queryFn: async () => props.promise,
-  });
-
-  return <TopLoadingBar />;
-}
-
-function MutationLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
+function MutationLoadingHarness(props: {
+  indicator?: AppShellLoadingIndicator;
+  promise: Promise<string>;
+}): React.JSX.Element {
   const mutation = useMutation({
-    mutationFn: async () => props.promise,
-  });
-
-  return (
-    <>
-      <button
-        onClick={() => {
-          mutation.mutate();
-        }}
-        type="button"
-      >
-        Trigger mutation
-      </button>
-      <TopLoadingBar />
-    </>
-  );
-}
-
-function SuppressedMutationLoadingHarness(props: { promise: Promise<string> }): React.JSX.Element {
-  const mutation = useMutation({
-    meta: {
-      [AppShellLoadingIndicatorMeta.INDICATOR]: AppShellLoadingIndicators.NONE,
-    },
+    ...(props.indicator === undefined
+      ? {}
+      : {
+          meta: createAppShellLoadingIndicatorMeta(props.indicator),
+        }),
     mutationFn: async () => props.promise,
   });
 
@@ -136,7 +118,12 @@ describe("top-loading-bar", () => {
     const router = createMemoryRouter(
       createRoutesFromElements(
         <Route
-          element={<SuppressedQueryLoadingHarness promise={pendingQuery.promise} />}
+          element={
+            <QueryLoadingHarness
+              indicator={AppShellLoadingIndicators.NONE}
+              promise={pendingQuery.promise}
+            />
+          }
           path="/"
         />,
       ),
@@ -189,7 +176,12 @@ describe("top-loading-bar", () => {
     const router = createMemoryRouter(
       createRoutesFromElements(
         <Route
-          element={<SuppressedMutationLoadingHarness promise={pendingMutation.promise} />}
+          element={
+            <MutationLoadingHarness
+              indicator={AppShellLoadingIndicators.NONE}
+              promise={pendingMutation.promise}
+            />
+          }
           path="/"
         />,
       ),

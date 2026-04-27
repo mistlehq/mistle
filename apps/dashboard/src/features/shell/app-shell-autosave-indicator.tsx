@@ -7,7 +7,7 @@ import {
 } from "@mistle/time";
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useIsMutating } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AppShellLoadingIndicators,
@@ -39,7 +39,7 @@ export function useAppShellAutosaveIndicator(input?: {
     predicate: (mutation) =>
       resolveAppShellLoadingIndicator(mutation.options.meta) === AppShellLoadingIndicators.AUTOSAVE,
   });
-  const showSavingIndicator = useDelayedMinimumVisibleFlag({
+  const showAutosaveIndicator = useDelayedMinimumVisibleFlag({
     active: activeAutosaveMutationCount > 0,
     clock: systemClock,
     minimumVisibleMs: input?.minimumVisibleMs ?? AutosaveIndicatorMinimumVisibleMs,
@@ -47,10 +47,7 @@ export function useAppShellAutosaveIndicator(input?: {
     showDelayMs: input?.showDelayMs ?? AutosaveIndicatorShowDelayMs,
   });
 
-  return useMemo(
-    () => (showSavingIndicator ? <AppShellAutosaveIndicator /> : null),
-    [showSavingIndicator],
-  );
+  return showAutosaveIndicator ? <AppShellAutosaveIndicator /> : null;
 }
 
 function useDelayedMinimumVisibleFlag(input: {
