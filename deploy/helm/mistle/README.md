@@ -55,7 +55,9 @@ secretEnv:
     secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
 ```
 
-The API workloads run their app-data migrations on boot, so they need both:
+Managed deployments should run app-data migrations as explicit deployment steps
+before rolling out API workloads. Keep both database URLs wired so runtime
+traffic and migration jobs can use the right connection path:
 
 - a runtime app DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_URL`)
 - a direct migration DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL`)
