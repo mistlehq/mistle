@@ -109,6 +109,16 @@ async function selectPrimaryRepositoryOption(optionName: string): Promise<void> 
   fireEvent.click(repositoryOption);
 }
 
+function getRepositoryBranchElement(branchLabel: string): Element | null {
+  const branchElement = document.querySelector("[data-repository-branch-state='present']");
+
+  if (branchElement?.textContent?.trim() !== branchLabel) {
+    return null;
+  }
+
+  return branchElement;
+}
+
 async function startGitBranchTunnelServer(): Promise<{
   close: () => Promise<void>;
   emitTurnCompleted: (turnId: string) => void;
@@ -537,14 +547,14 @@ describe("SessionWorkbenchPage git branch label", () => {
 
     try {
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
+        expect(getRepositoryBranchElement("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
       expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
 
       tunnelServer.emitTurnStarted("turn_1");
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
+        expect(getRepositoryBranchElement("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
       expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
@@ -559,7 +569,7 @@ describe("SessionWorkbenchPage git branch label", () => {
       });
       tunnelServer.emitTurnCompleted("turn_1");
       await waitFor(() => {
-        expect(screen.getByText("feature/after-turn")).toBeTruthy();
+        expect(getRepositoryBranchElement("feature/after-turn")).toBeTruthy();
       });
       await waitFor(() => {
         expect(screen.getByRole("link", { name: "PR #143" })).toBeTruthy();
@@ -594,7 +604,7 @@ describe("SessionWorkbenchPage git branch label", () => {
 
     try {
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
+        expect(getRepositoryBranchElement("main")).toBeTruthy();
       });
       expect(tunnelServer.getBranchCommandCount()).toBe(1);
       expect(tunnelServer.getPullRequestCommandCount()).toBe(1);
@@ -625,11 +635,11 @@ describe("SessionWorkbenchPage git branch label", () => {
 
     try {
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
+        expect(getRepositoryBranchElement("main")).toBeTruthy();
       });
       await selectPrimaryRepositoryOption("mistlehq/company-os");
       await waitFor(() => {
-        expect(screen.getByText("company-main")).toBeTruthy();
+        expect(getRepositoryBranchElement("company-main")).toBeTruthy();
       });
       expect(screen.queryByRole("link", { name: "PR #142" })).toBeNull();
 
@@ -644,11 +654,11 @@ describe("SessionWorkbenchPage git branch label", () => {
       await selectPrimaryRepositoryOption("mistlehq/mistle");
 
       await waitFor(() => {
-        expect(screen.queryByText("main")).toBeNull();
+        expect(getRepositoryBranchElement("main")).toBeNull();
       });
 
       await waitFor(() => {
-        expect(screen.getByText("feature/returned-repo")).toBeTruthy();
+        expect(getRepositoryBranchElement("feature/returned-repo")).toBeTruthy();
       });
       await waitFor(() => {
         expect(screen.getByRole("link", { name: "PR #144 Draft" })).toBeTruthy();
@@ -681,7 +691,7 @@ describe("SessionWorkbenchPage git branch label", () => {
 
     try {
       await waitFor(() => {
-        expect(screen.getByText("main")).toBeTruthy();
+        expect(getRepositoryBranchElement("main")).toBeTruthy();
       });
       expect(screen.queryByRole("link", { name: "PR #142" })).toBeNull();
       expect(tunnelServer.getPullRequestCommandCount()).toBe(0);

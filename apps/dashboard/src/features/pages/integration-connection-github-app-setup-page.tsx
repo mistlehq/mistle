@@ -756,6 +756,7 @@ function GitHubAppSetupActions(input: {
       ) : null}
       {input.isInstalled || !input.isManifestMode ? (
         <Button
+          aria-busy={input.startInstallationPending}
           disabled={
             !input.canInstall ||
             input.startInstallationPending ||
@@ -896,6 +897,7 @@ export function GitHubAppSetupPane(input: {
     resolveConfiguredSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
+  const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
@@ -959,8 +961,10 @@ export function GitHubAppSetupPane(input: {
 
     try {
       const startedInstallation = await startInstallationMutation.mutateAsync();
+      setIsRedirectingToInstallation(true);
       globalThis.location.assign(startedInstallation.authorizationUrl);
     } catch (error) {
+      setIsRedirectingToInstallation(false);
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
@@ -1354,7 +1358,9 @@ export function GitHubAppSetupPane(input: {
               }}
               canCreateManifest={canCreateManifest}
               createManifestPending={startManifestCreationMutation.isPending}
-              startInstallationPending={startInstallationMutation.isPending}
+              startInstallationPending={
+                startInstallationMutation.isPending || isRedirectingToInstallation
+              }
             />
           </div>
         </FormPageSection>

@@ -406,7 +406,7 @@ export function ChatComposer({
       {gitBranchLabel === null && pullRequest === null ? null : (
         <div className="text-muted-foreground flex items-center gap-4 px-1.5 pt-2 text-sm">
           {gitBranchLabel === null ? null : (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5" data-repository-branch-state="present">
               <GitBranchIcon aria-hidden="true" className="size-4" />
               <span>{gitBranchLabel}</span>
             </div>

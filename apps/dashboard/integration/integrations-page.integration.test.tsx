@@ -11,6 +11,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ROUTE_HANDLES } from "../src/features/navigation/route-handles.js";
+import { IntegrationConnectionGitHubAppSetupPage } from "../src/features/pages/integration-connection-github-app-setup-page.js";
 import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
 import { renderDashboardPageIntegration } from "./helpers/dashboard-page.js";
 
@@ -60,21 +61,26 @@ function createGitHubTarget() {
   };
 }
 
-function createIntegrationsRouter(): ReturnType<typeof createMemoryRouter> {
+function createIntegrationsRouter(
+  initialEntries: string[] = ["/integrations/github"],
+): ReturnType<typeof createMemoryRouter> {
   return createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
         <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
-          <Route
-            element={<IntegrationsPage />}
-            handle={ROUTE_HANDLES.integrationDetail}
-            path=":targetKey"
-          />
+          <Route handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
+            <Route element={<IntegrationsPage />} index />
+            <Route
+              element={<IntegrationConnectionGitHubAppSetupPage />}
+              handle={ROUTE_HANDLES.integrationGitHubAppSetup}
+              path=":connectionId/github-app/setup"
+            />
+          </Route>
         </Route>
       </Route>,
     ),
     {
-      initialEntries: ["/integrations/github"],
+      initialEntries,
     },
   );
 }
@@ -197,9 +203,6 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     });
 
     try {
-      const connectionNameMatches = await screen.findAllByText("Engineering GitHub");
-      expect(connectionNameMatches.length).toBeGreaterThanOrEqual(1);
-
       const repositoriesRefreshButton = await screen.findByRole("button", {
         name: "Refresh repositories",
       });
@@ -348,12 +351,9 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     });
 
     try {
-      expect((await screen.findAllByText("Bound GitHub")).length).toBeGreaterThanOrEqual(1);
-      expect((await screen.findAllByText("Free GitHub")).length).toBeGreaterThanOrEqual(1);
-      expect(screen.getByRole("button", { name: "Delete connection Bound GitHub" })).toHaveProperty(
-        "disabled",
-        true,
-      );
+      expect(
+        await screen.findByRole("button", { name: "Delete connection Bound GitHub" }),
+      ).toHaveProperty("disabled", true);
 
       fireEvent.click(screen.getByRole("button", { name: "Select connection Free GitHub" }));
       fireEvent.click(screen.getByRole("button", { name: "Delete connection Free GitHub" }));
@@ -369,6 +369,8 @@ describe("IntegrationsPage resource refresh concurrency", () => {
   });
 
   it("keeps the GitHub App install action in its pending state after the redirect URL is returned", async () => {
+    let startRequestCount = 0;
+
     const renderedPage = await renderDashboardPageIntegration({
       handler: (request, response) => {
         const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -432,10 +434,11 @@ describe("IntegrationsPage resource refresh concurrency", () => {
           requestUrl.pathname ===
             "/v1/integration/connections/icn_install/github-app-installation/start"
         ) {
+          startRequestCount += 1;
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              authorizationUrl: "http://127.0.0.1/#install-github-app",
+              authorizationUrl: new URL("#install-github-app", globalThis.location.href).toString(),
             }),
           );
           return;
@@ -444,21 +447,24 @@ describe("IntegrationsPage resource refresh concurrency", () => {
         response.writeHead(404, { "content-type": "application/json" });
         response.end(JSON.stringify({ message: "Not found" }));
       },
-      ui: <RouterProvider router={createIntegrationsRouter()} />,
+      ui: (
+        <RouterProvider
+          router={createIntegrationsRouter(["/integrations/github/icn_install/github-app/setup"])}
+        />
+      ),
     });
 
     try {
-      expect((await screen.findAllByText("Install GitHub")).length).toBeGreaterThanOrEqual(1);
-
-      const installButton = await screen.findByRole("button", { name: "Install App" });
+      const installButton = await screen.findByRole("button", { name: "Install GitHub App" });
       await waitFor(() => {
         expect(installButton).toHaveProperty("disabled", false);
       });
       fireEvent.click(installButton);
 
       await waitFor(() => {
-        const pendingButton = screen.getByRole("button", { name: "Starting install..." });
-        expect(pendingButton).toHaveProperty("disabled", true);
+        expect(startRequestCount).toBe(1);
+        expect(installButton.getAttribute("aria-busy")).toBe("true");
+        expect(installButton).toHaveProperty("disabled", true);
       });
     } finally {
       await renderedPage.close();
