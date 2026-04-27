@@ -296,7 +296,7 @@ function AddConnectorTile(input: {
           <TextLink
             className="text-sm font-medium"
             opensInNewWindow
-            render={<RouterLink to={`/integrations/${input.choice.id}`} />}
+            render={<RouterLink to={`/integrations/${input.choice.id}/add`} />}
           >
             Setup integration
           </TextLink>

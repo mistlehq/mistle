@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 describe("SandboxProfileIntegrationsSetupSection", () => {
-  it("keeps add connectors available for disconnected connector targets", () => {
+  it("links disconnected connector setup to the integration add flow", () => {
     render(
       <TestSandboxProfileIntegrationsSetupSection
         overrides={{
@@ -40,7 +40,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     const dialog = screen.getByRole("dialog", { name: "Add connectors" });
     expect(within(dialog).getByText("Datadog")).toBeDefined();
     const setupLink = within(dialog).getByRole("link", { name: "Setup integration" });
-    expect(setupLink.getAttribute("href")).toBe("/integrations/target-datadog");
+    expect(setupLink.getAttribute("href")).toBe("/integrations/target-datadog/add");
     expect(setupLink.getAttribute("target")).toBe("_blank");
   });
 
