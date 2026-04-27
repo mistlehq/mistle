@@ -11,7 +11,7 @@ function OrganizationIntegrationsAddFlowStory(): React.JSX.Element {
 }
 
 const meta = {
-  title: "Dashboard/Integrations/AddFlows",
+  title: "Dashboard/Integrations/Add Connection",
   component: OrganizationIntegrationsAddFlowStory,
   decorators: [withDashboardPageStory],
 } satisfies Meta<typeof OrganizationIntegrationsAddFlowStory>;

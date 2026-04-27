@@ -113,7 +113,7 @@ function IntegrationConnectionEditorStory(input: {
 }
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/Editor",
+  title: "Dashboard/Integrations/Connection Editor",
   component: IntegrationConnectionEditorStory,
   decorators: [withDashboardCenteredStory],
   parameters: {

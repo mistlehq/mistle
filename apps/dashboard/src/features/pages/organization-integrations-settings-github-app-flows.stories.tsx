@@ -458,7 +458,7 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/GitHub App Flows",
+  title: "Dashboard/Integrations/Setup/GitHub App",
   decorators: [withDashboardPageStory],
 } satisfies Meta;
 
@@ -472,13 +472,13 @@ export const AddConnection: PageStory = {
   },
 };
 
-export const SetupDraftWithManifest: PageStory = {
+export const SetupWithManifest: PageStory = {
   render: function RenderStory() {
     return <GitHubAppSetupPageStory connection={createDraftGitHubConnection()} />;
   },
 };
 
-export const SetupDraftWithExistingApp: PageStory = {
+export const SetupWithExistingApp: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubAppSetupPageStory
@@ -494,7 +494,7 @@ export const SetupDraftWithExistingApp: PageStory = {
   },
 };
 
-export const SetupDraftReadyToInstall: PageStory = {
+export const ReadyToInstall: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubAppSetupPageStory
@@ -511,7 +511,7 @@ export const SetupDraftReadyToInstall: PageStory = {
   },
 };
 
-export const ManifestCreationSuccess: PageStory = {
+export const ManifestCreated: PageStory = {
   render: function RenderStory() {
     return (
       <GitHubAppSetupPageStory
@@ -529,13 +529,13 @@ export const ManifestCreationSuccess: PageStory = {
   },
 };
 
-export const ManifestInstalledDetail: PageStory = {
+export const InstalledRedirect: PageStory = {
   render: function RenderStory() {
     return <GitHubInstalledDetailPageStory />;
   },
 };
 
-export const InstalledDetail: PageStory = {
+export const InstalledDetailPreview: PageStory = {
   decorators: [withDashboardCenteredStory],
   render: function RenderStory() {
     return (

@@ -369,7 +369,7 @@ function createJiraResultInitialEntry(
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Jira Add Flow",
+  title: "Dashboard/Integrations/Setup/Jira",
   decorators: [withDashboardPageStory],
 } satisfies Meta;
 
@@ -388,7 +388,7 @@ export const AddConnection: PageStory = {
   },
 };
 
-export const WebhookCreatedResult: PageStory = {
+export const WebhookCreated: PageStory = {
   render: function RenderStory() {
     return (
       <JiraAddFlowStory
@@ -401,7 +401,7 @@ export const WebhookCreatedResult: PageStory = {
   },
 };
 
-export const WebhookFailedResult: PageStory = {
+export const WebhookFailed: PageStory = {
   render: function RenderStory() {
     return (
       <JiraAddFlowStory

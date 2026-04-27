@@ -467,7 +467,7 @@ function SlackInstalledDetailPageStory(): React.JSX.Element {
 }
 
 const pageMeta = {
-  title: "Dashboard/Integrations/Slack App Flows",
+  title: "Dashboard/Integrations/Setup/Slack App",
   decorators: [withDashboardPageStory],
 } satisfies Meta;
 
@@ -481,7 +481,7 @@ export const AddConnection: PageStory = {
   },
 };
 
-export const SetupDraftWithManifest: PageStory = {
+export const SetupWithManifest: PageStory = {
   render: function RenderStory() {
     return <SlackAppSetupPageStory connection={createDraftSlackConnection()} />;
   },
@@ -503,13 +503,13 @@ export const SetupConfiguredExistingApp: PageStory = {
   },
 };
 
-export const ManifestInstalledDetail: PageStory = {
+export const InstalledRedirect: PageStory = {
   render: function RenderStory() {
     return <SlackInstalledDetailPageStory />;
   },
 };
 
-export const InstalledDetail: PageStory = {
+export const InstalledDetailPreview: PageStory = {
   decorators: [withDashboardCenteredStory],
   render: function RenderStory() {
     return (

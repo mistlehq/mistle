@@ -4,7 +4,7 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionApiKeyDialog } from "./integration-connection-api-key-dialog.js";
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/ApiKeyDialog",
+  title: "Dashboard/Integrations/Dialogs",
   component: IntegrationConnectionApiKeyDialog,
   decorators: [withDashboardCenteredStory],
   parameters: {
@@ -25,15 +25,15 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const ApiKey: Story = {};
 
-export const ErrorState: Story = {
+export const ApiKeyError: Story = {
   args: {
     errorMessage: "The API key could not be updated. Please try again later.",
   },
 };
 
-export const Pending: Story = {
+export const ApiKeyPending: Story = {
   args: {
     isPending: true,
   },

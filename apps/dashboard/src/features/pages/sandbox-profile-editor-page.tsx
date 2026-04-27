@@ -68,10 +68,10 @@ import type {
   SandboxProfile,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { ActivityStatus } from "../shared/activity-status.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
-import { ActivityStatus } from "./activity-status.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,

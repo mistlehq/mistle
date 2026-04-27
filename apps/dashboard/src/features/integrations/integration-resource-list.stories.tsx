@@ -93,7 +93,7 @@ const allStateArgs: React.ComponentProps<typeof IntegrationResourceList> = {
 };
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/ResourceList",
+  title: "Dashboard/Integrations/Primitives/ResourceList",
   component: IntegrationResourceList,
   decorators: [withDashboardCenteredStory],
   args: allStateArgs,

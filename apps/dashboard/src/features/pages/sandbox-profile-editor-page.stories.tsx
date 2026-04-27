@@ -8,11 +8,11 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { ActivityStatus } from "../shared/activity-status.js";
 import {
   clearPendingStatusTimeouts,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
-import { ActivityStatus } from "./activity-status.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,

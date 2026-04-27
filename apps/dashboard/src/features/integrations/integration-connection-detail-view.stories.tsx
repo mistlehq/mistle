@@ -13,7 +13,7 @@ import {
 } from "./integration-story-harness.js";
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/DetailView",
+  title: "Dashboard/Integrations/Connection Detail",
   component: IntegrationConnectionDetailView,
   decorators: [withDashboardCenteredStory],
   args: {

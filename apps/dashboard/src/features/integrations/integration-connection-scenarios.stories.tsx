@@ -64,7 +64,7 @@ function withoutStoryHandlers(
 }
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/Scenarios",
+  title: "Dashboard/Integrations/Connection Detail",
   component: IntegrationConnectionDetailView,
   decorators: [withDashboardCenteredStory],
   args: {

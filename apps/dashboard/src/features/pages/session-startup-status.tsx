@@ -1,4 +1,4 @@
-import { ActivityStatus } from "./activity-status.js";
+import { ActivityStatus } from "../shared/activity-status.js";
 
 export type SessionStartupState =
   | "loading_status"

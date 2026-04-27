@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ActivityStatus } from "./activity-status.js";
 
 const meta = {
-  title: "Dashboard/Pages/ActivityStatus",
+  title: "Dashboard/Shared/ActivityStatus",
   component: ActivityStatus,
   tags: ["autodocs"],
   parameters: {

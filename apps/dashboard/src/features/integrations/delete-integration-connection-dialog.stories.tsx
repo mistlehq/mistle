@@ -4,7 +4,7 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { DeleteIntegrationConnectionDialog } from "./delete-integration-connection-dialog.js";
 
 const meta = {
-  title: "Dashboard/Integrations/Connection/DeleteDialog",
+  title: "Dashboard/Integrations/Dialogs",
   component: DeleteIntegrationConnectionDialog,
   decorators: [withDashboardCenteredStory],
   parameters: {
@@ -24,15 +24,15 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const DeleteConnection: Story = {};
 
-export const ErrorState: Story = {
+export const DeleteConnectionError: Story = {
   args: {
     errorMessage: "This integration connection cannot be deleted while it is still used.",
   },
 };
 
-export const Pending: Story = {
+export const DeleteConnectionPending: Story = {
   args: {
     isPending: true,
   },
