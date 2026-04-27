@@ -335,7 +335,7 @@ async function createDisconnectTestHarness() {
 }
 
 describe("TunnelSessionService", () => {
-  it("renews the active owner lease while the bootstrap attachment remains healthy", async () => {
+  it("renews the active runtime attachment while the bootstrap attachment remains healthy", async () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
@@ -445,15 +445,16 @@ describe("TunnelSessionService", () => {
 
     clock.advanceMs(OWNER_LEASE_RENEW_INTERVAL_MS);
     scheduler.runDue();
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       await Promise.resolve();
     }
 
-    const renewedOwner = await ownerStore.getOwner({
+    clock.advanceMs(25_000);
+    const renewedAttachment = await attachmentStore.getAttachment({
       sandboxInstanceId: SandboxInstanceId,
+      nowMs: clock.nowMs(),
     });
-    expect(renewedOwner?.leaseId).toBe(OwnerLeaseId);
-    expect(renewedOwner?.expiresAt.toISOString()).toBe(new Date(71_000).toISOString());
+    expect(renewedAttachment?.ownerLeaseId).toBe(OwnerLeaseId);
   });
 
   it("closes only the bootstrap peer when presence deadline persistence fails", async () => {

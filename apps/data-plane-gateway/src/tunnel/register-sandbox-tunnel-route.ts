@@ -14,6 +14,7 @@ import type { SandboxKeepaliveStore } from "../runtime-state/sandbox-keepalive-s
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxRuntimeReadinessStore } from "../runtime-state/sandbox-runtime-readiness-store.js";
+import type { AsyncTaskTracker } from "../runtime/async-task-tracker.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
@@ -62,6 +63,7 @@ type RegisterSandboxTunnelRouteInput = {
   activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
   telemetryIngressService: SandboxTelemetryIngressService;
+  sandboxTunnelTaskTracker: AsyncTaskTracker;
   clock: Clock;
   scheduler: Scheduler;
 };
@@ -297,86 +299,89 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            void (async () => {
-              if (attachedPeer?.activationPromise !== undefined) {
-                await attachedPeer.activationPromise;
+            input.sandboxTunnelTaskTracker.track(
+              (async () => {
+                if (attachedPeer?.activationPromise !== undefined) {
+                  await attachedPeer.activationPromise;
 
-                if (ws.readyState !== 1) {
-                  return;
+                  if (ws.readyState !== 1) {
+                    return;
+                  }
+                  if (!input.relayCoordinator.isCurrentPeer(relayTarget)) {
+                    return;
+                  }
                 }
-                if (!input.relayCoordinator.isCurrentPeer(relayTarget)) {
-                  return;
-                }
-              }
 
-              await handleTunnelWebSocketMessage({
-                ...(admittedRequest.kind === "bootstrap"
-                  ? { bootstrapOwnerLeaseId: admittedRequest.ownerLeaseId }
-                  : {}),
-                clientSessionId: relaySessionId,
-                currentSocket: ws,
-                handleSigningDelivery: async (delivery) => {
-                  const result =
-                    await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
-                      liveSandboxInstanceId: sandboxInstanceId,
-                      request: delivery.message,
+                await handleTunnelWebSocketMessage({
+                  ...(admittedRequest.kind === "bootstrap"
+                    ? { bootstrapOwnerLeaseId: admittedRequest.ownerLeaseId }
+                    : {}),
+                  clientSessionId: relaySessionId,
+                  currentSocket: ws,
+                  handleSigningDelivery: async (delivery) => {
+                    const result =
+                      await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
+                        liveSandboxInstanceId: sandboxInstanceId,
+                        request: delivery.message,
+                      });
+                    ws.send(JSON.stringify(result));
+                  },
+                  sandboxKeepaliveRepository,
+                  sandboxRuntimeReadinessRepository,
+                  handleTelemetryDelivery: async (delivery) => {
+                    await input.telemetryIngressService.handleDelivery({
+                      delivery,
+                      relaySessionId,
+                      sandboxInstanceId,
+                      sendControlMessage: (message) => {
+                        ws.send(JSON.stringify(message));
+                      },
                     });
-                  ws.send(JSON.stringify(result));
-                },
-                sandboxKeepaliveRepository,
-                sandboxRuntimeReadinessRepository,
-                handleTelemetryDelivery: async (delivery) => {
-                  await input.telemetryIngressService.handleDelivery({
-                    delivery,
-                    relaySessionId,
-                    sandboxInstanceId,
-                    sendControlMessage: (message) => {
-                      ws.send(JSON.stringify(message));
+                  },
+                  interactiveStreamRouter: input.interactiveStreamRouter,
+                  payload,
+                  relayCoordinator: input.relayCoordinator,
+                  sandboxInstanceId,
+                  sourcePeerSide,
+                  tunnelProtocolTranslator,
+                });
+              })().catch((error: unknown) => {
+                if (error instanceof TunnelProtocolViolationError) {
+                  logger.info(
+                    {
+                      instanceId: sandboxInstanceId,
+                      sourceTokenKind,
                     },
-                  });
-                },
-                interactiveStreamRouter: input.interactiveStreamRouter,
-                payload,
-                relayCoordinator: input.relayCoordinator,
-                sandboxInstanceId,
-                sourcePeerSide,
-                tunnelProtocolTranslator,
-              });
-            })().catch((error: unknown) => {
-              if (error instanceof TunnelProtocolViolationError) {
-                logger.info(
+                    error.message,
+                  );
+                  ws.close(CloseCodes.PROTOCOL_ERROR, error.message);
+                  return;
+                }
+
+                recordTunnelSessionError({
+                  tunnelSessionSpan,
+                  error,
+                  statusMessage: "Failed handling sandbox tunnel websocket message.",
+                });
+                logger.error(
                   {
+                    err: error,
                     instanceId: sandboxInstanceId,
                     sourceTokenKind,
                   },
-                  error.message,
+                  "Failed handling sandbox tunnel websocket message",
                 );
-                ws.close(CloseCodes.PROTOCOL_ERROR, error.message);
-                return;
-              }
-
-              recordTunnelSessionError({
-                tunnelSessionSpan,
-                error,
-                statusMessage: "Failed handling sandbox tunnel websocket message.",
-              });
-              logger.error(
-                {
-                  err: error,
-                  instanceId: sandboxInstanceId,
-                  sourceTokenKind,
-                },
-                "Failed handling sandbox tunnel websocket message",
-              );
-              ws.close(
-                CloseCodes.INTERNAL_ERROR,
-                "Failed handling sandbox tunnel websocket message.",
-              );
-            });
+                ws.close(
+                  CloseCodes.INTERNAL_ERROR,
+                  "Failed handling sandbox tunnel websocket message.",
+                );
+              }),
+            );
           },
           onClose: (event) => {
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
+                const closeTasks: Promise<void>[] = [];
                 input.portAccessTransportService.rejectPendingStreamsForSandbox({
                   sandboxInstanceId,
                 });
@@ -385,81 +390,92 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     sandboxInstanceId,
                   });
                 if (rejectedPendingAuthorizeRequests.length > 0) {
-                  void Promise.all(
-                    rejectedPendingAuthorizeRequests.map(async (pendingRequest) => {
-                      await input.relayCoordinator.forwardPeerMessage({
-                        sandboxInstanceId,
-                        fromSide: "bootstrap",
-                        payload: JSON.stringify(pendingRequest.result),
-                        targetSessionId: pendingRequest.targetConnectionSessionId,
-                      });
-                    }),
-                  ).catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        relaySessionId,
-                        sandboxInstanceId,
-                        tokenKind: sourceTokenKind,
-                      },
-                      "Failed rejecting pending ports target authorize requests",
-                    );
-                  });
+                  closeTasks.push(
+                    Promise.all(
+                      rejectedPendingAuthorizeRequests.map(async (pendingRequest) => {
+                        await input.relayCoordinator.forwardPeerMessage({
+                          sandboxInstanceId,
+                          fromSide: "bootstrap",
+                          payload: JSON.stringify(pendingRequest.result),
+                          targetSessionId: pendingRequest.targetConnectionSessionId,
+                        });
+                      }),
+                    )
+                      .then(() => {})
+                      .catch((error: unknown) => {
+                        logger.error(
+                          {
+                            err: error,
+                            relaySessionId,
+                            sandboxInstanceId,
+                            tokenKind: sourceTokenKind,
+                          },
+                          "Failed rejecting pending ports target authorize requests",
+                        );
+                      }),
+                  );
                 }
-                void input.telemetryIngressService
-                  .detachBootstrapSession({
-                    relaySessionId,
-                    sandboxInstanceId,
-                  })
-                  .catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        relaySessionId,
-                        sandboxInstanceId,
-                        tokenKind: sourceTokenKind,
-                      },
-                      "Failed detaching sandbox telemetry ingress session",
-                    );
-                  });
-                void tunnelSessionService
-                  .detachBootstrapPeer({
-                    attachedPeer,
-                    leaseId: admittedRequest.ownerLeaseId,
-                    sandboxInstanceId,
-                  })
-                  .catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        relaySessionId,
-                        sandboxInstanceId,
-                        tokenKind: sourceTokenKind,
-                      },
-                      "Failed detaching sandbox bootstrap tunnel session",
-                    );
-                  });
+                closeTasks.push(
+                  input.telemetryIngressService
+                    .detachBootstrapSession({
+                      relaySessionId,
+                      sandboxInstanceId,
+                    })
+                    .catch((error: unknown) => {
+                      logger.error(
+                        {
+                          err: error,
+                          relaySessionId,
+                          sandboxInstanceId,
+                          tokenKind: sourceTokenKind,
+                        },
+                        "Failed detaching sandbox telemetry ingress session",
+                      );
+                    }),
+                );
+                closeTasks.push(
+                  tunnelSessionService
+                    .detachBootstrapPeer({
+                      attachedPeer,
+                      leaseId: admittedRequest.ownerLeaseId,
+                      sandboxInstanceId,
+                    })
+                    .catch((error: unknown) => {
+                      logger.error(
+                        {
+                          err: error,
+                          relaySessionId,
+                          sandboxInstanceId,
+                          tokenKind: sourceTokenKind,
+                        },
+                        "Failed detaching sandbox bootstrap tunnel session",
+                      );
+                    }),
+                );
+                input.sandboxTunnelTaskTracker.track(Promise.all(closeTasks).then(() => {}));
               } else {
                 input.portsTargetAuthorizeService.rejectPendingRequestsForConnection({
                   clientSessionId: relaySessionId,
                   sandboxInstanceId,
                 });
-                void tunnelSessionService
-                  .detachConnectionPeer({
-                    attachedPeer,
-                    sandboxInstanceId,
-                  })
-                  .catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        relaySessionId,
-                        sandboxInstanceId,
-                        tokenKind: sourceTokenKind,
-                      },
-                      "Failed detaching sandbox connection tunnel session",
-                    );
-                  });
+                input.sandboxTunnelTaskTracker.track(
+                  tunnelSessionService
+                    .detachConnectionPeer({
+                      attachedPeer,
+                      sandboxInstanceId,
+                    })
+                    .catch((error: unknown) => {
+                      logger.error(
+                        {
+                          err: error,
+                          relaySessionId,
+                          sandboxInstanceId,
+                          tokenKind: sourceTokenKind,
+                        },
+                        "Failed detaching sandbox connection tunnel session",
+                      );
+                    }),
+                );
               }
             }
             finalizeTunnelSession({

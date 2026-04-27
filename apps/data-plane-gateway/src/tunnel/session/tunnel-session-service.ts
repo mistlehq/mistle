@@ -192,7 +192,6 @@ export class TunnelSessionService {
       relayTarget,
       sandboxInstanceId: input.sandboxInstanceId,
       socket: input.socket,
-      websocketHealthHandle,
     });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
@@ -380,35 +379,36 @@ export class TunnelSessionService {
       },
     });
 
-    void this.sandboxRuntimeAttachmentStore
-      .clearAttachment({
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.leaseId,
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
-        );
-      });
-
-    void this.sandboxOwnerStore
-      .releaseOwner({
-        sandboxInstanceId: input.sandboxInstanceId,
-        leaseId: input.leaseId,
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to release sandbox ownership for disconnected bootstrap tunnel",
-        );
-      });
+    await Promise.all([
+      this.sandboxRuntimeAttachmentStore
+        .clearAttachment({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        })
+        .catch((error: unknown) => {
+          logger.error(
+            {
+              err: error,
+              sandboxInstanceId: input.sandboxInstanceId,
+            },
+            "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
+          );
+        }),
+      this.sandboxOwnerStore
+        .releaseOwner({
+          sandboxInstanceId: input.sandboxInstanceId,
+          leaseId: input.leaseId,
+        })
+        .catch((error: unknown) => {
+          logger.error(
+            {
+              err: error,
+              sandboxInstanceId: input.sandboxInstanceId,
+            },
+            "Failed to release sandbox ownership for disconnected bootstrap tunnel",
+          );
+        }),
+    ]);
 
     const detachedBootstrapSession = this.tunnelSessionRegistry.detachBootstrapSession(
       input.attachedPeer.relayTarget,
@@ -505,18 +505,6 @@ export class TunnelSessionService {
     });
   }
 
-  private async renewActiveOwnerLease(input: {
-    leaseId: string;
-    sandboxInstanceId: string;
-    ttlMs: number;
-  }): Promise<boolean> {
-    return this.sandboxOwnerStore.renewOwnerLease({
-      sandboxInstanceId: input.sandboxInstanceId,
-      leaseId: input.leaseId,
-      ttlMs: input.ttlMs,
-    });
-  }
-
   private async activateBootstrapAttachment(input: {
     attachedAtMs: number;
     attachedPeer: AttachedTunnelPeer;
@@ -528,12 +516,6 @@ export class TunnelSessionService {
     relayTarget: RelayTarget;
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
-    websocketHealthHandle?:
-      | {
-          stop: () => void;
-          isHealthy: () => boolean;
-        }
-      | undefined;
   }): Promise<void> {
     try {
       const owner = await this.sandboxOwnerStore.claimOwner({
@@ -615,7 +597,6 @@ export class TunnelSessionService {
         sandboxInstanceId: input.sandboxInstanceId,
         socket: input.socket,
         ttlMs: input.ownerLeaseTtlMs,
-        websocketHealthHandle: input.websocketHealthHandle,
       });
     } catch (error) {
       logger.error(
@@ -643,12 +624,6 @@ export class TunnelSessionService {
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
     ttlMs: number;
-    websocketHealthHandle?:
-      | {
-          stop: () => void;
-          isHealthy: () => boolean;
-        }
-      | undefined;
   }): LeaseRenewalHandle {
     let stopped = false;
     let scheduledHandle: TimerHandle | undefined;
@@ -691,26 +666,12 @@ export class TunnelSessionService {
           return;
         }
 
-        if (input.websocketHealthHandle?.isHealthy() === true || currentAttachment === null) {
-          const renewed = await this.renewActiveOwnerLease({
-            leaseId: input.leaseId,
-            sandboxInstanceId: input.sandboxInstanceId,
-            ttlMs: input.ttlMs,
-          });
-          if (!renewed) {
-            stopped = true;
-            scheduledHandle = undefined;
-            input.onLeaseLost();
-            return;
-          }
-
-          await this.refreshRuntimeAttachment({
-            attachedAtMs: input.attachedAtMs,
-            leaseId: input.leaseId,
-            relaySessionId: input.relaySessionId,
-            sandboxInstanceId: input.sandboxInstanceId,
-          });
-        }
+        await this.refreshRuntimeAttachment({
+          attachedAtMs: input.attachedAtMs,
+          leaseId: input.leaseId,
+          relaySessionId: input.relaySessionId,
+          sandboxInstanceId: input.sandboxInstanceId,
+        });
       } catch (error) {
         if (stopped) {
           return;

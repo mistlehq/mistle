@@ -5,7 +5,7 @@ import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
 import { typeid } from "typeid-js";
-import type { WebSocketServer } from "ws";
+import WebSocket, { type WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
 import {
@@ -53,15 +53,39 @@ import type {
   DataPlaneGatewayRuntimeConfig,
   StartedServer,
 } from "../types.js";
+import { AsyncTaskTracker } from "./async-task-tracker.js";
 
 const DefaultMaxActiveBindingsPerSandbox = 32;
 
-function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
-  for (const client of webSocketServer.clients) {
-    client.terminate();
+function closeWebSocketClient(client: WebSocket): Promise<void> {
+  if (client.readyState === WebSocket.CLOSED) {
+    return Promise.resolve();
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    const cleanup = (): void => {
+      client.off("close", onClose);
+      client.off("error", onError);
+    };
+    const onClose = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (): void => {
+      cleanup();
+      resolve();
+    };
+
+    client.once("close", onClose);
+    client.once("error", onError);
+    client.terminate();
+  });
+}
+
+async function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
+  await Promise.all([...webSocketServer.clients].map(closeWebSocketClient));
+
+  await new Promise<void>((resolve, reject) => {
     webSocketServer.close((error?: Error) => {
       if (error !== undefined) {
         reject(error);
@@ -80,6 +104,7 @@ export function createDataPlaneGatewayRuntime(
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
+  const sandboxTunnelTaskTracker = new AsyncTaskTracker();
   let hasValkeyClient = false;
   let valkeyClient!: ValkeyClient;
   let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
@@ -213,6 +238,7 @@ export function createDataPlaneGatewayRuntime(
     activeBootstrapSessionStore,
     sandboxInstanceDeadlineService,
     telemetryIngressService,
+    sandboxTunnelTaskTracker,
     clock: systemClock,
     scheduler: systemScheduler,
   });
@@ -254,6 +280,7 @@ export function createDataPlaneGatewayRuntime(
 
   async function stopRuntimeResources(): Promise<void> {
     await closeWebSocketServer(nodeWebSocket.wss);
+    await sandboxTunnelTaskTracker.drain();
     await telemetryIngressService.shutdown();
 
     if (startedServer !== undefined) {
