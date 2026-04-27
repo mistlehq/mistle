@@ -33,7 +33,11 @@ import {
   SANDBOX_SNAPSHOT_REPOSITORY_PATH,
 } from "./prepared-runtime.js";
 import {
+  createControlPlaneDatabaseMigrationCommandInput,
   createControlPlaneIntegrationTargetsSyncCommandInput,
+  createControlPlaneWorkflowMigrationCommandInput,
+  createDataPlaneDatabaseMigrationCommandInput,
+  createDataPlaneWorkflowMigrationCommandInput,
   resolveHostPathFromContainerPath,
 } from "./provision-system-integration-targets.js";
 
@@ -528,6 +532,43 @@ export async function startFullSystemEnvironment(
       databaseName: sharedInfraLease.infra.postgres.postgres.databaseName,
     });
 
+    await withStepTiming("run data-plane database migrations", async () => {
+      await runCommand(
+        createDataPlaneDatabaseMigrationCommandInput({
+          buildContextHostPath: input.buildContextHostPath,
+          configPathInContainer: input.configPathInContainer,
+          hostDatabaseUrl,
+        }),
+      );
+    });
+    await withStepTiming("run data-plane workflow migrations", async () => {
+      await runCommand(
+        createDataPlaneWorkflowMigrationCommandInput({
+          buildContextHostPath: input.buildContextHostPath,
+          configPathInContainer: input.configPathInContainer,
+          hostDatabaseUrl,
+        }),
+      );
+    });
+    await withStepTiming("run control-plane database migrations", async () => {
+      await runCommand(
+        createControlPlaneDatabaseMigrationCommandInput({
+          buildContextHostPath: input.buildContextHostPath,
+          configPathInContainer: input.configPathInContainer,
+          hostDatabaseUrl,
+        }),
+      );
+    });
+    await withStepTiming("run control-plane workflow migrations", async () => {
+      await runCommand(
+        createControlPlaneWorkflowMigrationCommandInput({
+          buildContextHostPath: input.buildContextHostPath,
+          configPathInContainer: input.configPathInContainer,
+          hostDatabaseUrl,
+        }),
+      );
+    });
+
     const dataPlaneApi = await withStepTiming("start data-plane-api", async () => {
       return startDataPlaneApi({
         buildContextHostPath: input.buildContextHostPath,
@@ -859,7 +900,14 @@ export async function startFullSystemEnvironment(
   }
 }
 
-export { createControlPlaneIntegrationTargetsSyncCommandInput, resolveHostPathFromContainerPath };
+export {
+  createControlPlaneDatabaseMigrationCommandInput,
+  createControlPlaneIntegrationTargetsSyncCommandInput,
+  createControlPlaneWorkflowMigrationCommandInput,
+  createDataPlaneDatabaseMigrationCommandInput,
+  createDataPlaneWorkflowMigrationCommandInput,
+  resolveHostPathFromContainerPath,
+};
 
 export const FullSystemContainerBaseUrls = {
   CONTROL_PLANE_API: CONTROL_PLANE_API_CONTAINER_BASE_URL,
