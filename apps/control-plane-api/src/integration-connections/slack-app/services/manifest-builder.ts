@@ -1,23 +1,8 @@
 import { buildUrlWithPath } from "@mistle/http";
-
-const SlackBotScopes = [
-  "app_mentions:read",
-  "channels:history",
-  "channels:read",
-  "chat:write",
-  "groups:history",
-  "groups:read",
-  "reactions:read",
-  "users:read",
-];
-
-const SlackBotEvents = [
-  "app_mention",
-  "message.channels",
-  "message.groups",
-  "reaction_added",
-  "reaction_removed",
-];
+import {
+  SlackAppManifestBotEvents,
+  SlackAppManifestBotScopes,
+} from "@mistle/integrations-definitions";
 
 function mergeUniqueStrings(input: {
   existing: unknown;
@@ -69,7 +54,7 @@ export function buildSlackAppManifest(input: {
         request_url: input.webhookCallbackUrl,
         bot_events: mergeUniqueStrings({
           existing: eventSubscriptions["bot_events"],
-          requiredValues: SlackBotEvents,
+          requiredValues: SlackAppManifestBotEvents,
         }),
       },
       socket_mode_enabled: false,
@@ -87,7 +72,7 @@ export function buildSlackAppManifest(input: {
         ...scopes,
         bot: mergeUniqueStrings({
           existing: scopes["bot"],
-          requiredValues: SlackBotScopes,
+          requiredValues: SlackAppManifestBotScopes,
         }),
       },
     },

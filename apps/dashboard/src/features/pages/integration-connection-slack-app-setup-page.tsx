@@ -1,7 +1,11 @@
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { linter } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
+import {
+  SlackAppManifestBotEvents,
+  SlackAppManifestBotScopes,
+  SlackConnectionMethodId,
+} from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
@@ -82,25 +86,6 @@ const SlackExistingAppFieldKeys = [
   "clientSecret",
 ] as const satisfies readonly SlackExistingAppFieldKey[];
 
-const SlackDraftBotScopes = [
-  "app_mentions:read",
-  "channels:history",
-  "channels:read",
-  "chat:write",
-  "groups:history",
-  "groups:read",
-  "reactions:read",
-  "users:read",
-] as const;
-
-const SlackDraftBotEvents = [
-  "app_mention",
-  "message.channels",
-  "message.groups",
-  "reaction_added",
-  "reaction_removed",
-] as const;
-
 export const SlackDraftManifest = JSON.stringify(
   {
     display_information: {
@@ -117,7 +102,7 @@ export const SlackDraftManifest = JSON.stringify(
     settings: {
       event_subscriptions: {
         request_url: "https://mistle.example.com/api/integrations/slack/webhook",
-        bot_events: SlackDraftBotEvents,
+        bot_events: SlackAppManifestBotEvents,
       },
       socket_mode_enabled: false,
       token_rotation_enabled: false,
@@ -128,7 +113,7 @@ export const SlackDraftManifest = JSON.stringify(
         "https://mistle.example.com/api/identity-linking/slack/callback",
       ],
       scopes: {
-        bot: SlackDraftBotScopes,
+        bot: SlackAppManifestBotScopes,
       },
     },
   },

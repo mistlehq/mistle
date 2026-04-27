@@ -6,6 +6,7 @@ export * from "./compile-binding.js";
 export * from "./connection-config-form.js";
 export * from "./definition.js";
 export * from "./identity-linking.server.js";
+export * from "./manifest.js";
 export * from "./supported-webhook-events.js";
 export * from "./target-config-schema.js";
 export * from "./target-secret-schema.js";
