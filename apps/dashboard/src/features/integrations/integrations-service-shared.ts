@@ -267,6 +267,21 @@ export const RefreshedIntegrationConnectionResourcesSchema = z
   })
   .strict();
 
+export const RefreshedAllIntegrationConnectionResourcesSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    resources: z.array(
+      z
+        .object({
+          kind: z.string().min(1),
+          syncState: z.literal("syncing"),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export const IntegrationWebhookSourceSchema = z
   .object({
     id: z.string().min(1),
@@ -420,6 +435,9 @@ export type IntegrationConnectionResources = Omit<
 };
 export type RefreshedIntegrationConnectionResources = z.infer<
   typeof RefreshedIntegrationConnectionResourcesSchema
+>;
+export type RefreshedAllIntegrationConnectionResources = z.infer<
+  typeof RefreshedAllIntegrationConnectionResourcesSchema
 >;
 
 export class IntegrationsApiError extends Error {

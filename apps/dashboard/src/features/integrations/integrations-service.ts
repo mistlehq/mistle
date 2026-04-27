@@ -1,5 +1,6 @@
 export {
   listIntegrationConnectionResources,
+  refreshAllIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "./integration-connection-resources-service.js";
 export {
@@ -36,6 +37,7 @@ export {
   type IntegrationConnectionResourceSummary,
   type IntegrationWebhookSource,
   type IntegrationTarget,
+  type RefreshedAllIntegrationConnectionResources,
   type RefreshedIntegrationConnectionResources,
   type StartedRedirectConnection,
   type StartedGitHubAppManifestConnection,

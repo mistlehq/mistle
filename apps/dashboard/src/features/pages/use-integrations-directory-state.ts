@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 
 import { buildIntegrationCards } from "../integrations/directory-model.js";
@@ -7,6 +7,7 @@ import { listIntegrationDirectory } from "../integrations/integrations-service.j
 import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
+  shouldAutoRefreshIntegrationConnectionResources,
 } from "./integrations-page-view-model.js";
 import { useIntegrationDetailState } from "./use-integration-detail-state.js";
 import {
@@ -26,6 +27,7 @@ export function useIntegrationsDirectoryState(input: {
 }) {
   const navigate = useNavigate();
   const activeDetailConnectionIdRef = useRef<string | null>(null);
+  const autoRefreshStartedConnectionIdsRef = useRef<Set<string>>(new Set());
 
   const integrationsQuery = useQuery({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -62,6 +64,28 @@ export function useIntegrationsDirectoryState(input: {
   const resourceState = useIntegrationResourceState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
+  const selectedDetailConnection =
+    selectedDetailConnections.find((connection) => connection.id === activeDetailConnectionId) ??
+    null;
+  const shouldAutoRefreshResources = shouldAutoRefreshIntegrationConnectionResources({
+    connection: selectedDetailConnection,
+    routeConnectionId: input.detailConnectionId,
+  });
+
+  useEffect(() => {
+    if (
+      selectedDetailConnection === null ||
+      !shouldAutoRefreshResources ||
+      autoRefreshStartedConnectionIdsRef.current.has(selectedDetailConnection.id)
+    ) {
+      return;
+    }
+
+    autoRefreshStartedConnectionIdsRef.current.add(selectedDetailConnection.id);
+    resourceState.onRefreshAllResources({
+      connectionId: selectedDetailConnection.id,
+    });
+  }, [resourceState.onRefreshAllResources, selectedDetailConnection, shouldAutoRefreshResources]);
 
   const connectedViewCards = buildConnectedIntegrationViewCards({
     connectedCards: connectedIntegrationCards,
@@ -83,6 +107,7 @@ export function useIntegrationsDirectoryState(input: {
     connectedViewCards,
     integrationsQuery,
     activeDetailConnectionId,
+    refreshingConnectionIds: resourceState.refreshingConnectionIds,
     setActiveDetailConnectionId,
     onRefreshResource: resourceState.onRefreshResource,
     refreshingResourceKeys: resourceState.refreshingResourceKeys,

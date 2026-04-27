@@ -53,6 +53,35 @@ function isIncompleteSlackAppConnection(input: {
   );
 }
 
+type GitHubAppInstallationState = {
+  errorMessage?: string;
+  isPending: boolean;
+};
+
+type GitHubAppInstallationStateEntry = [string, GitHubAppInstallationState];
+
+function buildGitHubAppInstallationStateByConnectionId(input: {
+  connections: readonly {
+    id: string;
+  }[];
+  errorMessageByConnectionId: Readonly<Record<string, string | undefined>>;
+  pendingConnectionId: string | null | undefined;
+}): ReadonlyMap<string, GitHubAppInstallationState> {
+  return new Map(
+    input.connections.map((connection): GitHubAppInstallationStateEntry => {
+      const errorMessage = input.errorMessageByConnectionId[connection.id];
+
+      return [
+        connection.id,
+        {
+          ...(errorMessage === undefined ? {} : { errorMessage }),
+          isPending: input.pendingConnectionId === connection.id,
+        },
+      ];
+    }),
+  );
+}
+
 export function IntegrationsPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -74,20 +103,11 @@ export function IntegrationsPage() {
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
   });
-  const githubAppInstallationStateByConnectionId = new Map(
-    directoryState.selectedDetailConnections.map((connection) => {
-      const errorMessage =
-        connectionEditors.githubAppInstallation.errorMessageByConnectionId[connection.id];
-
-      return [
-        connection.id,
-        {
-          ...(errorMessage === undefined ? {} : { errorMessage }),
-          isPending: connectionEditors.githubAppInstallation.pendingConnectionId === connection.id,
-        },
-      ] as const;
-    }),
-  );
+  const githubAppInstallationStateByConnectionId = buildGitHubAppInstallationStateByConnectionId({
+    connections: directoryState.selectedDetailConnections,
+    errorMessageByConnectionId: connectionEditors.githubAppInstallation.errorMessageByConnectionId,
+    pendingConnectionId: connectionEditors.githubAppInstallation.pendingConnectionId,
+  });
 
   if (
     detailTargetKey !== null &&
@@ -126,6 +146,7 @@ export function IntegrationsPage() {
           connections: directoryState.selectedDetailConnections,
           controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
           githubAppInstallationStateByConnectionId,
+          refreshingConnectionIds: directoryState.refreshingConnectionIds,
           refreshingResourceKeys: directoryState.refreshingResourceKeys,
           ...(directoryState.selectedDetailCard === null
             ? {}

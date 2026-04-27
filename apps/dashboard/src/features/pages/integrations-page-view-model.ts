@@ -131,6 +131,7 @@ export function buildIntegrationConnectionDetailItems(input: {
       isPending: boolean;
     }
   >;
+  refreshingConnectionIds?: ReadonlySet<string>;
   refreshingResourceKeys: ReadonlySet<string>;
   targetConfig?: Record<string, unknown>;
   targetConnectionMethods?: readonly IntegrationConnectionMethod[];
@@ -212,6 +213,7 @@ export function buildIntegrationConnectionDetailItems(input: {
           : { lastErrorMessage: resource.lastErrorMessage }),
         isRefreshing:
           resource.syncState === "syncing" ||
+          input.refreshingConnectionIds?.has(connection.id) === true ||
           input.refreshingResourceKeys.has(
             createIntegrationConnectionResourceKey({
               connectionId: connection.id,
@@ -464,5 +466,24 @@ export function shouldPollIntegrationDetailResources(input: {
 
   return (
     selectedConnection.resources?.some((resource) => resource.syncState === "syncing") ?? false
+  );
+}
+
+export function shouldAutoRefreshIntegrationConnectionResources(input: {
+  connection: Pick<IntegrationConnection, "id" | "resources"> | null | undefined;
+  routeConnectionId: string | null;
+}): boolean {
+  if (
+    input.routeConnectionId === null ||
+    input.connection === null ||
+    input.connection === undefined ||
+    input.connection.id !== input.routeConnectionId
+  ) {
+    return false;
+  }
+
+  const resources = input.connection.resources ?? [];
+  return (
+    resources.length > 0 && resources.every((resource) => resource.syncState === "never-synced")
   );
 }

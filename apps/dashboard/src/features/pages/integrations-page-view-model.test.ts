@@ -16,6 +16,7 @@ import {
   buildOpenUpdateIntegrationConnectionInput,
   createIntegrationConnectionResourceKey,
   getIntegrationConnectionResourceSummaries,
+  shouldAutoRefreshIntegrationConnectionResources,
   shouldPollIntegrationDetailResources,
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
@@ -583,6 +584,35 @@ describe("integrations page view model", () => {
     expect(item?.resources[0]?.isRefreshing).toBe(true);
   });
 
+  it("marks every connection resource as refreshing while a refresh-all request is pending", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        createConnection({
+          id: "icn_123",
+          status: "active",
+          resources: [
+            {
+              kind: "repositories",
+              selectionMode: "multi",
+              count: 0,
+              syncState: "never-synced",
+            },
+            {
+              kind: "branches",
+              selectionMode: "multi",
+              count: 0,
+              syncState: "never-synced",
+            },
+          ],
+        }),
+      ],
+      refreshingConnectionIds: new Set(["icn_123"]),
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.resources.map((resource) => resource.isRefreshing)).toEqual([true, true]);
+  });
+
   it("disables deletion when a connection is still referenced by webhook automations", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
@@ -742,6 +772,51 @@ describe("integrations page view model", () => {
         ],
         activeDetailConnectionId: "icn_ready",
         detailTargetKey: "github",
+      }),
+    ).toBe(false);
+  });
+
+  it("auto-refreshes only the routed connection when all of its resources have never synced", () => {
+    const connection = createConnection({
+      id: "icn_new",
+      status: "active",
+      resources: [
+        {
+          kind: "repositories",
+          selectionMode: "multi",
+          count: 0,
+          syncState: "never-synced",
+        },
+      ],
+    });
+
+    expect(
+      shouldAutoRefreshIntegrationConnectionResources({
+        connection,
+        routeConnectionId: "icn_new",
+      }),
+    ).toBe(true);
+    expect(
+      shouldAutoRefreshIntegrationConnectionResources({
+        connection,
+        routeConnectionId: "icn_other",
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoRefreshIntegrationConnectionResources({
+        connection: createConnection({
+          id: "icn_new",
+          status: "active",
+          resources: [
+            {
+              kind: "repositories",
+              selectionMode: "multi",
+              count: 42,
+              syncState: "ready",
+            },
+          ],
+        }),
+        routeConnectionId: "icn_new",
       }),
     ).toBe(false);
   });

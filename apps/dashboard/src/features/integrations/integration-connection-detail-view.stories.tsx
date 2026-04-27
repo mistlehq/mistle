@@ -8,6 +8,7 @@ import { IntegrationConnectionDetailView } from "./integration-connection-detail
 import {
   createDetailViewStoryProps,
   createRefreshingDetailViewStoryProps,
+  createGitHubNotSyncedDetailViewStoryProps,
   getPrimaryDemoIntegrationConnection,
 } from "./integration-story-harness.js";
 
@@ -17,14 +18,30 @@ const meta = {
   decorators: [withDashboardCenteredStory],
   args: {
     ...createDetailViewStoryProps(),
-    onEditAuthentication: () => {},
-    onRefreshResource: () => {},
+    onEditAuthentication: (_connectionId: string) => {},
+    onRefreshResource: (_input: { connectionId: string; kind: string }) => {},
   },
 } satisfies Meta<typeof IntegrationConnectionDetailView>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
+type StoryArgs = NonNullable<Story["args"]>;
+
+function createAutoSyncAfterConnectionStoryProps(): StoryArgs {
+  const props = createGitHubNotSyncedDetailViewStoryProps();
+
+  return {
+    ...props,
+    connections: props.connections.map((connection) => ({
+      ...connection,
+      resources: connection.resources.map((resource) => ({
+        ...resource,
+        isRefreshing: true,
+      })),
+    })),
+  };
+}
 
 export const StackedConnections: Story = {};
 
@@ -36,6 +53,11 @@ export const Refreshing: Story = {
   args: {
     ...createRefreshingDetailViewStoryProps(),
   },
+};
+
+export const AutoSyncAfterConnection: Story = {
+  name: "Auto-sync after connection",
+  args: createAutoSyncAfterConnectionStoryProps(),
 };
 
 export const Empty: Story = {

@@ -1,8 +1,14 @@
-import { useMutation, useMutationState, useQueryClient } from "@tanstack/react-query";
+import {
+  type QueryClient,
+  useMutation,
+  useMutationState,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
+  refreshAllIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import {
@@ -12,11 +18,17 @@ import {
 
 type IntegrationDirectoryData = Awaited<ReturnType<typeof listIntegrationDirectory>>;
 
-const RefreshIntegrationConnectionResourcesMutationKey = [
+const RefreshIntegrationConnectionResourcesMutationKey: readonly [
   "settings",
   "integrations",
   "refresh-resource",
-] as const;
+] = ["settings", "integrations", "refresh-resource"];
+
+const RefreshAllIntegrationConnectionResourcesMutationKey: readonly [
+  "settings",
+  "integrations",
+  "refresh-all-resources",
+] = ["settings", "integrations", "refresh-all-resources"];
 
 export const SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX: readonly [
   "settings",
@@ -38,12 +50,40 @@ function isRefreshResourceMutationVariables(
   return "kind" in value && typeof value.kind === "string";
 }
 
+function isRefreshAllResourceMutationVariables(value: unknown): value is { connectionId: string } {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  return "connectionId" in value && typeof value.connectionId === "string";
+}
+
 function createRefreshingResourceKeys(pendingMutationVariables: readonly unknown[]): Set<string> {
   return new Set<string>(
     pendingMutationVariables
       .filter(isRefreshResourceMutationVariables)
       .map(createIntegrationConnectionResourceKey),
   );
+}
+
+function createRefreshingConnectionIds(pendingMutationVariables: readonly unknown[]): Set<string> {
+  return new Set<string>(
+    pendingMutationVariables
+      .filter(isRefreshAllResourceMutationVariables)
+      .map((variables) => variables.connectionId),
+  );
+}
+
+async function invalidateIntegrationResourceQueries(input: {
+  queryClient: QueryClient;
+  queryKey: readonly ["settings", "integrations", "directory"];
+}): Promise<void> {
+  await input.queryClient.invalidateQueries({
+    queryKey: input.queryKey,
+  });
+  await input.queryClient.invalidateQueries({
+    queryKey: SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX,
+  });
 }
 
 export function shouldPollIntegrationDirectory(input: {
@@ -72,11 +112,21 @@ export function useIntegrationResourceState(input: {
     mutationFn: async (payload: { connectionId: string; kind: string }) =>
       refreshIntegrationConnectionResources(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
+      await invalidateIntegrationResourceQueries({
+        queryClient,
         queryKey: input.queryKey,
       });
-      await queryClient.invalidateQueries({
-        queryKey: SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX,
+    },
+  });
+
+  const refreshAllResourcesMutation = useMutation({
+    mutationKey: RefreshAllIntegrationConnectionResourcesMutationKey,
+    mutationFn: async (payload: { connectionId: string }) =>
+      refreshAllIntegrationConnectionResources(payload),
+    onSuccess: async () => {
+      await invalidateIntegrationResourceQueries({
+        queryClient,
+        queryKey: input.queryKey,
       });
     },
   });
@@ -89,10 +139,21 @@ export function useIntegrationResourceState(input: {
     select: (mutation) => mutation.state.variables,
   });
 
+  const pendingRefreshAllMutationVariables = useMutationState<unknown>({
+    filters: {
+      mutationKey: RefreshAllIntegrationConnectionResourcesMutationKey,
+      status: "pending",
+    },
+    select: (mutation) => mutation.state.variables,
+  });
+
   const refreshingResourceKeys = createRefreshingResourceKeys(pendingRefreshMutationVariables);
+  const refreshingConnectionIds = createRefreshingConnectionIds(pendingRefreshAllMutationVariables);
 
   return {
+    onRefreshAllResources: refreshAllResourcesMutation.mutate,
     onRefreshResource: refreshResourceMutation.mutate,
+    refreshingConnectionIds,
     refreshingResourceKeys,
   };
 }

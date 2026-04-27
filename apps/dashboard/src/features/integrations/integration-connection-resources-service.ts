@@ -2,8 +2,10 @@ import { requestControlPlane } from "../api/request-control-plane.js";
 import {
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,
+  type RefreshedAllIntegrationConnectionResources,
   type RefreshedIntegrationConnectionResources,
   IntegrationConnectionResourcesPageSchema,
+  RefreshedAllIntegrationConnectionResourcesSchema,
   RefreshedIntegrationConnectionResourcesSchema,
   readJsonWithSchema,
   wrapIntegrationsApiError,
@@ -98,6 +100,31 @@ export async function refreshIntegrationConnectionResources(input: {
   } catch (error) {
     throw wrapIntegrationsApiError({
       operation: "refreshIntegrationConnectionResources",
+      error,
+      fallbackMessage: "Could not refresh integration connection resources.",
+    });
+  }
+}
+
+export async function refreshAllIntegrationConnectionResources(input: {
+  connectionId: string;
+}): Promise<RefreshedAllIntegrationConnectionResources> {
+  try {
+    const response = await requestControlPlane({
+      operation: "refreshAllIntegrationConnectionResources",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/resources/refresh`,
+      fallbackMessage: "Could not refresh integration connection resources.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: RefreshedAllIntegrationConnectionResourcesSchema,
+      operation: "refreshAllIntegrationConnectionResources",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "refreshAllIntegrationConnectionResources",
       error,
       fallbackMessage: "Could not refresh integration connection resources.",
     });

@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
@@ -14,6 +16,91 @@ import type {
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationsPage } from "./integrations-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+
+type ServerRequestRecord = {
+  method: string;
+  pathname: string;
+};
+
+type ServerHandler = (request: ServerRequestRecord) =>
+  | {
+      status: number;
+      body: unknown;
+    }
+  | Promise<{
+      status: number;
+      body: unknown;
+    }>;
+
+function createDeferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+} {
+  let resolvePromise: (() => void) | null = null;
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  return {
+    promise,
+    resolve: () => {
+      resolvePromise?.();
+    },
+  };
+}
+
+async function startControlPlaneTestServer(input: { handler: ServerHandler }): Promise<{
+  origin: string;
+  requests: ServerRequestRecord[];
+  close: () => Promise<void>;
+}> {
+  const requests: ServerRequestRecord[] = [];
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
+    const requestRecord: ServerRequestRecord = {
+      method: request.method ?? "GET",
+      pathname: new URL(request.url ?? "/", "http://127.0.0.1").pathname,
+    };
+    requests.push(requestRecord);
+
+    const handled = await input.handler(requestRecord);
+    response.statusCode = handled.status;
+    response.setHeader("content-type", "application/json");
+    response.end(JSON.stringify(handled.body));
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.listen(0, "127.0.0.1", (error?: Error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected a TCP server address.");
+  }
+
+  return {
+    origin: `http://127.0.0.1:${String(address.port)}`,
+    requests,
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error?: Error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
+  };
+}
 
 describe("IntegrationsPage", () => {
   afterEach(() => {
@@ -155,6 +242,107 @@ describe("IntegrationsPage", () => {
         .getAttribute("aria-current"),
     ).toBe("true");
   });
+
+  it("starts a refresh-all resource sync when a newly connected route connection has no synced resources", async () => {
+    const refreshResponseDeferred = createDeferred();
+    const server = await startControlPlaneTestServer({
+      handler: async (request) => {
+        if (
+          request.method === "POST" &&
+          request.pathname === "/v1/integration/connections/icn_newly_installed/resources/refresh"
+        ) {
+          await refreshResponseDeferred.promise;
+          return {
+            status: 202,
+            body: {
+              connectionId: "icn_newly_installed",
+              familyId: "github",
+              resources: [
+                {
+                  kind: "repositories",
+                  syncState: "syncing",
+                },
+              ],
+            },
+          };
+        }
+
+        return {
+          status: 404,
+          body: {
+            code: "NOT_FOUND",
+            message: "Unhandled test route.",
+          },
+        };
+      },
+    });
+
+    try {
+      globalThis.__MISTLE_RUNTIME_CONFIG__ = {
+        controlPlaneApiOrigin: server.origin,
+      };
+      resetDashboardConfigForTest();
+
+      const queryClient = createTestQueryClient({
+        refetchOnMount: false,
+        staleTime: Number.POSITIVE_INFINITY,
+      });
+      queryClient.setQueryData(SESSION_QUERY_KEY, {
+        session: {
+          activeOrganizationId: "org_mistle",
+        },
+      });
+      queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+        targets: [createGitHubTarget()],
+        connections: [
+          createGitHubConnection({
+            id: "icn_newly_installed",
+            displayName: "Newly Installed GitHub",
+            installationId: "222",
+            resources: [
+              {
+                kind: "repositories",
+                selectionMode: "multi",
+                count: 0,
+                syncState: "never-synced",
+              },
+            ],
+          }),
+        ],
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter
+            initialEntries={["/integrations/github-cloud?connectionId=icn_newly_installed"]}
+          >
+            <Routes>
+              <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => {
+        expect(
+          server.requests.some(
+            (request) =>
+              request.method === "POST" &&
+              request.pathname ===
+                "/v1/integration/connections/icn_newly_installed/resources/refresh",
+          ),
+        ).toBe(true);
+      });
+
+      expect(screen.getByRole("button", { name: "Refresh repositories" })).toHaveProperty(
+        "disabled",
+        true,
+      );
+    } finally {
+      refreshResponseDeferred.resolve();
+      await server.close();
+    }
+  });
 });
 
 function createGitHubTarget(): IntegrationTarget {
@@ -190,6 +378,7 @@ function createGitHubConnection(input: {
   id: string;
   displayName: string;
   installationId: string;
+  resources?: IntegrationConnection["resources"];
 }): IntegrationConnection {
   return {
     id: input.id,
@@ -207,7 +396,7 @@ function createGitHubConnection(input: {
       client_id: "Iv1.client",
       installation_id: input.installationId,
     },
-    resources: [],
+    resources: input.resources ?? [],
     createdAt: "2026-04-24T00:00:00.000Z",
     updatedAt: "2026-04-24T00:00:00.000Z",
   };
