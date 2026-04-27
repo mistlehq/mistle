@@ -178,16 +178,6 @@ function readDeliveryContextMessage(value: unknown): DeliveryContextMessage {
   };
 }
 
-function finalThreadReadCountForScenario(scenario: DeliveryServerScenario): number {
-  switch (scenario) {
-    case "existing_conversation":
-    case "create_conversation":
-      return 2;
-    case "resume_not_loaded_conversation":
-      return 3;
-  }
-}
-
 async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<DeliveryServer> {
   const deliveryContextDeferred = createDeferred<DeliveryContextMessage>();
   const methodSequenceDeferred = createDeferred<string[]>();
@@ -276,7 +266,6 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
           scenario === "resume_not_loaded_conversation" && threadReadCount === 1
             ? "notLoaded"
             : "idle";
-        const includeMetadata = threadReadCount === finalThreadReadCountForScenario(scenario);
 
         socket.send(
           encodeAgentTextPayload({
@@ -286,8 +275,6 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
               result: {
                 thread: {
                   id: "thread_123",
-                  name: includeMetadata ? "Automation Thread" : null,
-                  preview: includeMetadata ? "Webhook delivery preview" : null,
                   status: {
                     type: threadStatusType,
                   },
@@ -296,9 +283,6 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
             },
           }),
         );
-        if (threadReadCount >= finalThreadReadCountForScenario(scenario)) {
-          methodSequenceDeferred.resolve([...methodSequence]);
-        }
         return;
       }
 
@@ -354,6 +338,7 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
             },
           }),
         );
+        methodSequenceDeferred.resolve([...methodSequence]);
         return;
       }
 
@@ -438,10 +423,6 @@ describe("executeConversationProviderDelivery", () => {
       expect(result).toEqual({
         providerConversationId: "thread_123",
         providerExecutionId: "turn_123",
-        conversationMetadata: {
-          name: "Automation Thread",
-          preview: "Webhook delivery preview",
-        },
       });
 
       const deliveryContextMessage = await server.deliveryContextMessage;
@@ -466,7 +447,6 @@ describe("executeConversationProviderDelivery", () => {
         "mistle/setDeliveryContext",
         "thread/read",
         "turn/start",
-        "thread/read",
       ]);
     } finally {
       await server.close();
@@ -522,7 +502,6 @@ describe("executeConversationProviderDelivery", () => {
         "thread/start",
         "thread/read",
         "turn/start",
-        "thread/read",
       ]);
     } finally {
       await server.close();
@@ -561,7 +540,6 @@ describe("executeConversationProviderDelivery", () => {
         "thread/resume",
         "thread/read",
         "turn/start",
-        "thread/read",
       ]);
     } finally {
       await server.close();

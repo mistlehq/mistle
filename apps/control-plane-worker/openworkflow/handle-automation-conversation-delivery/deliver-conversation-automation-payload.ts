@@ -243,15 +243,33 @@ export async function deliverConversationAutomationPayload(
     },
   );
 
-  await seedSandboxInstanceTitle(
-    {
-      dataPlaneClient: ctx.dataPlaneClient,
-    },
-    {
-      organizationId: input.preparedAutomationRun.organizationId,
-      sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-      conversationName: deliveryResult.conversationMetadata?.name ?? null,
-      conversationPreview: deliveryResult.conversationMetadata?.preview ?? null,
-    },
-  );
+  try {
+    await seedSandboxInstanceTitle(
+      {
+        dataPlaneClient: ctx.dataPlaneClient,
+      },
+      {
+        organizationId: input.preparedAutomationRun.organizationId,
+        sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+        connectionUrl: input.acquiredAutomationConnection.url,
+        messagePayload: input.preparedAutomationRun.renderedInput,
+      },
+    );
+  } catch (error) {
+    logAutomationConversationDeliveryEvent({
+      eventName: "sandbox_title.seed_failed",
+      message: "Failed to seed automation sandbox title after delivery",
+      level: "warn",
+      err: error,
+      telemetryContext: {
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        conversationId: input.preparedAutomationRun.conversationId,
+        deliveryTaskId: input.taskId,
+        routeId: activeRoute.id,
+        sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+        webhookEventId: input.preparedAutomationRun.webhookEventId,
+        workflowRunId: input.workflowRunId,
+      },
+    });
+  }
 }
