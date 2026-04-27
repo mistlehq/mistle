@@ -664,6 +664,7 @@ export class TunnelProtocolTranslator {
     if (portsControlMessage?.type === "ports.target.authorize.result") {
       const resolution = this.portsTargetAuthorizeService.resolveTargetAuthorizeResult({
         sandboxInstanceId: input.sandboxInstanceId,
+        sourceBootstrapSessionId: input.clientSessionId,
         result: portsControlMessage,
       });
 
@@ -696,6 +697,7 @@ export class TunnelProtocolTranslator {
       ) {
         await this.portAccessTransportService.handleBootstrapTransportMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.clientSessionId,
           message: portsTransportMessage,
         });
 

@@ -10,10 +10,12 @@ import type { Scheduler, TimerHandle } from "@mistle/time";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
+import type { RelayTarget } from "../tunnel/types.js";
 
 const PortsTargetAuthorizeTimeoutMs = 5_000;
 
 type PendingPortsTargetAuthorizeRequest = {
+  targetBootstrapSessionId: string;
   timeoutHandle: TimerHandle;
 } & (
   | {
@@ -73,13 +75,9 @@ export class PortsTargetAuthorizeService {
     sandboxInstanceId: string;
     target: PortAccessTarget;
   }): Promise<PortsTargetAuthorizeResult> {
-    if (
-      this.relayCoordinator.getBootstrapPeer({
-        sandboxInstanceId: input.sandboxInstanceId,
-      }) === undefined
-    ) {
-      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
-    }
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
 
     const requestId = randomUUID();
     const payload = JSON.stringify({
@@ -104,6 +102,7 @@ export class PortsTargetAuthorizeService {
           kind: "internal",
           resolve,
           reject,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
           timeoutHandle,
         },
       });
@@ -114,6 +113,7 @@ export class PortsTargetAuthorizeService {
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "connection",
         payload,
+        targetSessionId: bootstrapTarget.sessionId,
       });
     } catch (error) {
       this.rejectPendingRequest({
@@ -132,6 +132,9 @@ export class PortsTargetAuthorizeService {
     clientSessionId: string;
     request: PortsTargetAuthorize;
   }): Promise<void> {
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
     const forwardedRequestId = randomUUID();
     const timeoutHandle = this.scheduler.schedule(() => {
       this.deletePendingRequest({
@@ -147,6 +150,7 @@ export class PortsTargetAuthorizeService {
         kind: "connection",
         clientSessionId: input.clientSessionId,
         originalRequestId: input.request.requestId,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
         timeoutHandle,
       },
     });
@@ -159,6 +163,7 @@ export class PortsTargetAuthorizeService {
           ...input.request,
           requestId: forwardedRequestId,
         } satisfies PortsTargetAuthorize),
+        targetSessionId: bootstrapTarget.sessionId,
       });
     } catch (error) {
       this.deletePendingRequest({
@@ -171,6 +176,7 @@ export class PortsTargetAuthorizeService {
 
   public resolveTargetAuthorizeResult(input: {
     sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
     result: PortsTargetAuthorizeResult;
   }):
     | {
@@ -183,6 +189,12 @@ export class PortsTargetAuthorizeService {
       requestId: input.result.requestId,
     });
     if (pendingRequest === undefined) {
+      return undefined;
+    }
+    if (
+      pendingRequest.targetBootstrapSessionId !== input.sourceBootstrapSessionId ||
+      !this.isCurrentBootstrapSession(input)
+    ) {
       return undefined;
     }
 
@@ -209,8 +221,9 @@ export class PortsTargetAuthorizeService {
     };
   }
 
-  public rejectPendingRequestsForSandbox(input: {
+  public rejectPendingRequestsForBootstrapSession(input: {
     sandboxInstanceId: string;
+    targetBootstrapSessionId: string;
   }): RejectedPendingConnectionTargetAuthorizeRequest[] {
     const pendingRequests = this.#pendingRequestsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (pendingRequests === undefined) {
@@ -218,9 +231,13 @@ export class PortsTargetAuthorizeService {
     }
 
     const rejectedConnectionRequests: RejectedPendingConnectionTargetAuthorizeRequest[] = [];
-    this.#pendingRequestsBySandboxInstanceId.delete(input.sandboxInstanceId);
-    for (const pendingRequest of pendingRequests.values()) {
+    for (const [requestId, pendingRequest] of pendingRequests) {
+      if (pendingRequest.targetBootstrapSessionId !== input.targetBootstrapSessionId) {
+        continue;
+      }
+
       this.scheduler.cancel(pendingRequest.timeoutHandle);
+      pendingRequests.delete(requestId);
       if (pendingRequest.kind === "internal") {
         pendingRequest.reject(
           new PortsTargetAuthorizeBootstrapDisconnectedError(input.sandboxInstanceId),
@@ -237,6 +254,9 @@ export class PortsTargetAuthorizeService {
         },
         targetConnectionSessionId: pendingRequest.clientSessionId,
       });
+    }
+    if (pendingRequests.size === 0) {
+      this.#pendingRequestsBySandboxInstanceId.delete(input.sandboxInstanceId);
     }
 
     return rejectedConnectionRequests;
@@ -321,5 +341,27 @@ export class PortsTargetAuthorizeService {
     if (pendingRequest.kind === "internal") {
       pendingRequest.reject(input.error);
     }
+  }
+
+  private requireBootstrapTarget(input: { sandboxInstanceId: string }): RelayTarget {
+    const bootstrapTarget = this.relayCoordinator.getBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    return bootstrapTarget;
+  }
+
+  private isCurrentBootstrapSession(input: {
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+  }): boolean {
+    return (
+      this.relayCoordinator.getBootstrapPeer({
+        sandboxInstanceId: input.sandboxInstanceId,
+      })?.sessionId === input.sourceBootstrapSessionId
+    );
   }
 }

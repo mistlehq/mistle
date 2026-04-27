@@ -1,10 +1,226 @@
-import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
 
+import { systemSleeper } from "@mistle/time";
+import { WSContext } from "hono/ws";
+import { afterEach, describe, expect, it } from "vitest";
+import WebSocket, { type RawData, WebSocketServer } from "ws";
+
+import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
+import type { RelayPeerSocket, RelayTarget } from "../tunnel/types.js";
 import {
   buildPortAccessRequestHeaders,
   buildPortAccessWebSocketRequestHeaders,
+  PortAccessTransportService,
   toPortAccessResponseHeaders,
 } from "./port-access-transport.js";
+
+type ReceivedWebSocketMessage = {
+  data: string | Buffer;
+  isBinary: boolean;
+};
+
+type WebSocketPair = {
+  clientSocket: WebSocket;
+  serverSocket: WebSocket;
+  peerSocket: RelayPeerSocket;
+  closeAll: () => Promise<void>;
+};
+
+const LocalNodeId = "dpg_test";
+const SandboxInstanceId = "sbi_port_access_transport";
+
+const openWebSocketPairs: WebSocketPair[] = [];
+
+function toBuffer(data: RawData): Buffer {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  return Buffer.concat(data);
+}
+
+function waitForWebSocketOpen(socket: WebSocket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onOpen = (): void => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("open", onOpen);
+      socket.off("error", onError);
+    };
+
+    socket.once("open", onOpen);
+    socket.once("error", onError);
+  });
+}
+
+function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebSocketMessage> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (data: RawData, isBinary: boolean): void => {
+      cleanup();
+      resolve({
+        data: isBinary ? toBuffer(data) : toBuffer(data).toString("utf8"),
+        isBinary,
+      });
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+
+    socket.once("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
+function waitForNoWebSocketMessage(socket: WebSocket, timeoutMs = 50): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (): void => {
+      cleanup();
+      reject(new Error("Expected websocket to receive no message."));
+    };
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = (): void => {
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+
+    socket.on("message", onMessage);
+    socket.on("error", onError);
+
+    void systemSleeper.sleep(timeoutMs).then(() => {
+      cleanup();
+      resolve();
+    });
+  });
+}
+
+function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
+  if (input === 0 || input === 1 || input === 2 || input === 3) {
+    return input;
+  }
+
+  throw new Error(`Unexpected websocket ready state: ${String(input)}`);
+}
+
+function toPeerSocket(socket: WebSocket): RelayPeerSocket {
+  return new WSContext<WebSocket>({
+    send: (data, options) => {
+      socket.send(data, {
+        compress: options.compress,
+      });
+    },
+    close: (code, reason) => {
+      socket.close(code, reason);
+    },
+    get readyState() {
+      return toWsReadyState(socket.readyState);
+    },
+    raw: socket,
+  });
+}
+
+async function createWebSocketPair(): Promise<WebSocketPair> {
+  const server = createServer();
+  const webSocketServer = new WebSocketServer({
+    server,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected TCP server address to be available.");
+  }
+
+  const serverSocketPromise = new Promise<WebSocket>((resolve, reject) => {
+    webSocketServer.once("connection", (socket) => {
+      resolve(socket);
+    });
+    webSocketServer.once("error", reject);
+  });
+  const clientSocket = new WebSocket(`ws://127.0.0.1:${String(address.port)}`);
+
+  await waitForWebSocketOpen(clientSocket);
+  const serverSocket = await serverSocketPromise;
+
+  return {
+    clientSocket,
+    serverSocket,
+    peerSocket: toPeerSocket(serverSocket),
+    closeAll: async () => {
+      if (clientSocket.readyState === WebSocket.OPEN) {
+        await new Promise<void>((resolve) => {
+          clientSocket.once("close", () => {
+            resolve();
+          });
+          clientSocket.close();
+        });
+      }
+
+      if (serverSocket.readyState === WebSocket.OPEN) {
+        await new Promise<void>((resolve) => {
+          serverSocket.once("close", () => {
+            resolve();
+          });
+          serverSocket.close();
+        });
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        webSocketServer.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          server.close((serverError) => {
+            if (serverError !== undefined) {
+              reject(serverError);
+              return;
+            }
+            resolve();
+          });
+        });
+      });
+    },
+  };
+}
+
+function createBootstrapTarget(input: { sessionId: string }): RelayTarget {
+  return {
+    sandboxInstanceId: SandboxInstanceId,
+    side: "bootstrap",
+    nodeId: LocalNodeId,
+    sessionId: input.sessionId,
+  };
+}
+
+afterEach(async () => {
+  while (openWebSocketPairs.length > 0) {
+    await openWebSocketPairs.pop()?.closeAll();
+  }
+});
 
 describe("port access transport helpers", () => {
   it("rewrites browser request headers for tunneled upstream delivery", () => {
@@ -130,6 +346,185 @@ describe("port access transport helpers", () => {
       "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
       "x-forwarded-port": ["80"],
       "x-forwarded-proto": ["http"],
+    });
+  });
+});
+
+describe("port access transport session fencing", () => {
+  it("does not send follow-up HTTP request body messages to a replacement bootstrap", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(relayCoordinator);
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    const handle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "POST",
+        path: "/submit",
+        headers: {},
+      },
+    });
+
+    const openMessage = JSON.parse(
+      String((await waitForWebSocketMessage(firstBootstrap.clientSocket)).data),
+    );
+    expect(openMessage).toEqual({
+      type: "ports.http.open",
+      streamId: 1,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "POST",
+        path: "/submit",
+        headers: {},
+      },
+    });
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    await handle.sendRequestBodyChunk(Uint8Array.from([1, 2, 3]));
+
+    await waitForNoWebSocketMessage(replacementBootstrap.clientSocket);
+  });
+
+  it("ignores stale HTTP responses from the bootstrap session that no longer owns the stream", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(relayCoordinator);
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/",
+        headers: {},
+      },
+    });
+
+    await waitForWebSocketMessage(firstBootstrap.clientSocket);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    await expect(
+      service.handleBootstrapTransportMessage({
+        sandboxInstanceId: SandboxInstanceId,
+        sourceBootstrapSessionId: "sess_bootstrap_a",
+        message: {
+          type: "ports.http.response.start",
+          streamId: 1,
+          status: 200,
+          headers: {},
+        },
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("does not reject replacement bootstrap streams when the old bootstrap closes", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(relayCoordinator);
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    const oldHandle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/old",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(firstBootstrap.clientSocket);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    const replacementHandle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/new",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(replacementBootstrap.clientSocket);
+
+    service.rejectPendingStreamsForBootstrapSession({
+      sandboxInstanceId: SandboxInstanceId,
+      targetBootstrapSessionId: "sess_bootstrap_a",
+    });
+    await expect(oldHandle.responseStart).rejects.toBeInstanceOf(Error);
+
+    await replacementHandle.finishRequestBody();
+
+    expect(
+      JSON.parse(String((await waitForWebSocketMessage(replacementBootstrap.clientSocket)).data)),
+    ).toEqual({
+      type: "ports.http.body.end",
+      streamId: 2,
+      direction: "request",
     });
   });
 });

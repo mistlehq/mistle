@@ -16,6 +16,7 @@ import type WebSocket from "ws";
 
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
+import type { RelayTarget } from "../tunnel/types.js";
 import { PortAccessSessionCookieName } from "./auth/port-access-session.js";
 
 const HopByHopHeaderNames = new Set([
@@ -37,6 +38,7 @@ type ActivePortAccessHttpStream = {
   rejectResponseStart: (error: Error) => void;
   resolveResponseStart: (responseStart: PortsHttpResponseStart) => void;
   responseBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
+  targetBootstrapSessionId: string;
 };
 
 type PortAccessWebSocketPendingEvent =
@@ -50,6 +52,7 @@ type ActivePortAccessWebSocketStream = {
   rejectAccept: (error: Error) => void;
   resolveAccept: (accept: PortsWsAccept) => void;
   socket?: WSContext<WebSocket>;
+  targetBootstrapSessionId: string;
 };
 
 export type PortAccessHttpRequestHandle = {
@@ -181,13 +184,9 @@ export class PortAccessTransportService {
     target: PortAccessTarget;
     upstreamProtocol: "http" | "https";
   }): Promise<PortAccessHttpRequestHandle> {
-    if (
-      this.relayCoordinator.getBootstrapPeer({
-        sandboxInstanceId: input.sandboxInstanceId,
-      }) === undefined
-    ) {
-      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
-    }
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
 
     const streamId = this.allocateStreamId();
     const responseStream = new TransformStream<Uint8Array, Uint8Array>();
@@ -210,12 +209,14 @@ export class PortAccessTransportService {
         rejectResponseStart,
         resolveResponseStart,
         responseBodyWriter,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
       },
     });
 
     try {
       await this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
         payload: JSON.stringify({
           type: "ports.http.open",
           streamId,
@@ -242,6 +243,7 @@ export class PortAccessTransportService {
         await responseBodyWriter.abort();
         await this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
           payload: JSON.stringify({
             type: "ports.stream.close",
             streamId,
@@ -251,6 +253,7 @@ export class PortAccessTransportService {
       finishRequestBody: async () => {
         await this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
           payload: JSON.stringify({
             type: "ports.http.body.end",
             streamId,
@@ -263,6 +266,7 @@ export class PortAccessTransportService {
       sendRequestBodyChunk: async (bytes) => {
         await this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
           payload: JSON.stringify({
             type: "ports.http.body.chunk",
             streamId,
@@ -281,13 +285,9 @@ export class PortAccessTransportService {
     target: PortAccessTarget;
     upstreamProtocol: "http" | "https";
   }): Promise<PortAccessWebSocketHandle> {
-    if (
-      this.relayCoordinator.getBootstrapPeer({
-        sandboxInstanceId: input.sandboxInstanceId,
-      }) === undefined
-    ) {
-      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
-    }
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
 
     const streamId = this.allocateStreamId();
     let resolveAccept: ((accept: PortsWsAccept) => void) | undefined;
@@ -309,12 +309,14 @@ export class PortAccessTransportService {
         pendingEvents: [],
         rejectAccept,
         resolveAccept,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
       },
     });
 
     try {
       await this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
         payload: JSON.stringify({
           type: "ports.ws.open",
           streamId,
@@ -359,6 +361,7 @@ export class PortAccessTransportService {
       notifyBrowserFrame: async ({ bytes, opcode }) => {
         await this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
           payload: JSON.stringify({
             type: "ports.ws.frame",
             streamId,
@@ -375,13 +378,16 @@ export class PortAccessTransportService {
   public async handleBootstrapTransportMessage(input: {
     message: PortsTransportMessage;
     sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
   }): Promise<boolean> {
-    const activeHttpStream = this.getActiveHttpStream({
+    const activeHttpStream = this.getMatchingActiveHttpStream({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
-    const activeWebSocketStream = this.getActiveWebSocketStream({
+    const activeWebSocketStream = this.getMatchingActiveWebSocketStream({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
 
@@ -524,11 +530,18 @@ export class PortAccessTransportService {
     }
   }
 
-  public rejectPendingStreamsForSandbox(input: { sandboxInstanceId: string }): void {
+  public rejectPendingStreamsForBootstrapSession(input: {
+    sandboxInstanceId: string;
+    targetBootstrapSessionId: string;
+  }): void {
     const activeStreams = this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (activeStreams !== undefined) {
-      this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
       for (const [streamId, stream] of activeStreams) {
+        if (stream.targetBootstrapSessionId !== input.targetBootstrapSessionId) {
+          continue;
+        }
+
+        activeStreams.delete(streamId);
         const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
           input.sandboxInstanceId,
         );
@@ -538,11 +551,15 @@ export class PortAccessTransportService {
         void stream.responseBodyWriter.abort(disconnectError);
         void this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: stream.targetBootstrapSessionId,
           payload: JSON.stringify({
             type: "ports.stream.close",
             streamId,
           }),
         }).catch(() => undefined);
+      }
+      if (activeStreams.size === 0) {
+        this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
       }
     }
 
@@ -553,8 +570,12 @@ export class PortAccessTransportService {
       return;
     }
 
-    this.#activeWebSocketStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
     for (const [streamId, stream] of activeWebSocketStreams) {
+      if (stream.targetBootstrapSessionId !== input.targetBootstrapSessionId) {
+        continue;
+      }
+
+      activeWebSocketStreams.delete(streamId);
       const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
         input.sandboxInstanceId,
       );
@@ -571,11 +592,15 @@ export class PortAccessTransportService {
       }
       void this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
+        targetBootstrapSessionId: stream.targetBootstrapSessionId,
         payload: JSON.stringify({
           type: "ports.stream.close",
           streamId,
         }),
       }).catch(() => undefined);
+    }
+    if (activeWebSocketStreams.size === 0) {
+      this.#activeWebSocketStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
     }
   }
 
@@ -659,6 +684,7 @@ export class PortAccessTransportService {
     if (input.code === 1006) {
       await this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
+        targetBootstrapSessionId: activeStream.targetBootstrapSessionId,
         payload: JSON.stringify({
           type: "ports.stream.close",
           streamId: input.streamId,
@@ -669,6 +695,7 @@ export class PortAccessTransportService {
 
     await this.forwardMessage({
       sandboxInstanceId: input.sandboxInstanceId,
+      targetBootstrapSessionId: activeStream.targetBootstrapSessionId,
       payload: JSON.stringify({
         type: "ports.ws.close",
         streamId: input.streamId,
@@ -696,6 +723,7 @@ export class PortAccessTransportService {
     activeStream.browserClosed = true;
     await this.forwardMessage({
       sandboxInstanceId: input.sandboxInstanceId,
+      targetBootstrapSessionId: activeStream.targetBootstrapSessionId,
       payload: JSON.stringify({
         type: "ports.stream.close",
         streamId: input.streamId,
@@ -730,12 +758,25 @@ export class PortAccessTransportService {
   private async forwardMessage(input: {
     payload: string;
     sandboxInstanceId: string;
+    targetBootstrapSessionId: string;
   }): Promise<void> {
     await this.relayCoordinator.forwardPeerMessage({
       sandboxInstanceId: input.sandboxInstanceId,
       fromSide: "connection",
       payload: input.payload,
+      targetSessionId: input.targetBootstrapSessionId,
     });
+  }
+
+  private requireBootstrapTarget(input: { sandboxInstanceId: string }): RelayTarget {
+    const bootstrapTarget = this.relayCoordinator.getBootstrapPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (bootstrapTarget === undefined) {
+      throw new BootstrapTunnelNotConnectedError(input.sandboxInstanceId);
+    }
+
+    return bootstrapTarget;
   }
 
   private getActiveHttpStream(input: {
@@ -745,6 +786,23 @@ export class PortAccessTransportService {
     return this.#activeHttpStreamsBySandboxInstanceId
       .get(input.sandboxInstanceId)
       ?.get(input.streamId);
+  }
+
+  private getMatchingActiveHttpStream(input: {
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): ActivePortAccessHttpStream | undefined {
+    if (!this.isCurrentBootstrapSession(input)) {
+      return undefined;
+    }
+
+    const activeStream = this.getActiveHttpStream(input);
+    if (activeStream?.targetBootstrapSessionId !== input.sourceBootstrapSessionId) {
+      return undefined;
+    }
+
+    return activeStream;
   }
 
   private setActiveHttpStream(input: {
@@ -805,6 +863,34 @@ export class PortAccessTransportService {
     return this.#activeWebSocketStreamsBySandboxInstanceId
       .get(input.sandboxInstanceId)
       ?.get(input.streamId);
+  }
+
+  private getMatchingActiveWebSocketStream(input: {
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): ActivePortAccessWebSocketStream | undefined {
+    if (!this.isCurrentBootstrapSession(input)) {
+      return undefined;
+    }
+
+    const activeStream = this.getActiveWebSocketStream(input);
+    if (activeStream?.targetBootstrapSessionId !== input.sourceBootstrapSessionId) {
+      return undefined;
+    }
+
+    return activeStream;
+  }
+
+  private isCurrentBootstrapSession(input: {
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+  }): boolean {
+    return (
+      this.relayCoordinator.getBootstrapPeer({
+        sandboxInstanceId: input.sandboxInstanceId,
+      })?.sessionId === input.sourceBootstrapSessionId
+    );
   }
 
   private setActiveWebSocketStream(input: {

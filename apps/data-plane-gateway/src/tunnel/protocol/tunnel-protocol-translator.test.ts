@@ -1264,27 +1264,39 @@ describe("TunnelProtocolTranslator", () => {
   });
 
   it("forwards connection ports.target.authorize requests to the bootstrap peer", async () => {
-    const { translator } = await createTranslatorHarness();
+    const { relayCoordinator, translator } = await createTranslatorHarness();
+    const websocketPair = await createWebSocketPair();
 
-    await expect(
-      translator.translateInboundMessage({
-        clientSessionId: "conn_1",
-        payload: JSON.stringify({
-          type: "ports.target.authorize",
-          requestId: "req_port_access_1",
-          target: {
-            kind: "port",
-            port: 5173,
-          },
-        }),
-        sandboxInstanceId: SandboxInstanceId,
-        sourcePeerSide: "connection",
-      }),
-    ).resolves.toEqual({
-      delivery: {
-        kind: "drop",
-      },
+    relayCoordinator.attachPeer({
+      sandboxInstanceId: SandboxInstanceId,
+      side: "bootstrap",
+      socket: websocketPair.peerSocket,
+      sessionId: BootstrapSessionId,
     });
+
+    try {
+      await expect(
+        translator.translateInboundMessage({
+          clientSessionId: "conn_1",
+          payload: JSON.stringify({
+            type: "ports.target.authorize",
+            requestId: "req_port_access_1",
+            target: {
+              kind: "port",
+              port: 5173,
+            },
+          }),
+          sandboxInstanceId: SandboxInstanceId,
+          sourcePeerSide: "connection",
+        }),
+      ).resolves.toEqual({
+        delivery: {
+          kind: "drop",
+        },
+      });
+    } finally {
+      await websocketPair.closeAll();
+    }
   });
 
   it("forwards bootstrap ports.target.authorize.result messages back to the requesting connection", async () => {

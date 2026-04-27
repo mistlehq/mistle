@@ -456,6 +456,7 @@ describe("ports target authorize integration", () => {
       expect(
         service.resolveTargetAuthorizeResult({
           sandboxInstanceId: "sbi_port_access_connection_close",
+          sourceBootstrapSessionId: BootstrapSessionId,
           result: {
             type: "ports.target.authorize.result",
             requestId: firstForwardedRequest.requestId,
@@ -469,6 +470,7 @@ describe("ports target authorize integration", () => {
       expect(
         service.resolveTargetAuthorizeResult({
           sandboxInstanceId: "sbi_port_access_connection_close",
+          sourceBootstrapSessionId: BootstrapSessionId,
           result: {
             type: "ports.target.authorize.result",
             requestId: secondForwardedRequest.requestId,
@@ -485,6 +487,164 @@ describe("ports target authorize integration", () => {
           reason: "unsupported_protocol",
         },
         targetConnectionSessionId: "conn_2",
+      });
+
+      clock.advanceMs(5_000);
+      expect(scheduler.runDue()).toBe(0);
+    },
+  );
+
+  vitestIt("drops stale authorize results from a replaced bootstrap session", async () => {
+    const clock = createMutableClock(1_000);
+    const scheduler = createManualScheduler(clock);
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortsTargetAuthorizeService(relayCoordinator, scheduler);
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sandboxInstanceId: "sbi_port_access_stale_authorize",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    await service.forwardConnectionTargetAuthorize({
+      sandboxInstanceId: "sbi_port_access_stale_authorize",
+      clientSessionId: "conn_1",
+      request: {
+        type: "ports.target.authorize",
+        requestId: "req_conn_1",
+        target: {
+          kind: "port",
+          port: 5173,
+        },
+      },
+    });
+    const forwardedRequest = JSON.parse(
+      String((await waitForWebSocketPairMessage(firstBootstrap.clientSocket)).data),
+    );
+
+    relayCoordinator.attachPeer({
+      sandboxInstanceId: "sbi_port_access_stale_authorize",
+      side: "bootstrap",
+      sessionId: "sess_bootstrap_replacement",
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    expect(
+      service.resolveTargetAuthorizeResult({
+        sandboxInstanceId: "sbi_port_access_stale_authorize",
+        sourceBootstrapSessionId: BootstrapSessionId,
+        result: {
+          type: "ports.target.authorize.result",
+          requestId: forwardedRequest.requestId,
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        },
+      }),
+    ).toBeUndefined();
+
+    clock.advanceMs(5_000);
+    expect(scheduler.runDue()).toBe(1);
+  });
+
+  vitestIt(
+    "does not reject replacement bootstrap authorize requests when the old bootstrap closes",
+    async () => {
+      const clock = createMutableClock(1_000);
+      const scheduler = createManualScheduler(clock);
+      const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+      const service = new PortsTargetAuthorizeService(relayCoordinator, scheduler);
+      const firstBootstrap = await createWebSocketPair();
+      const replacementBootstrap = await createWebSocketPair();
+      openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+      relayCoordinator.attachPeer({
+        ...createBootstrapTarget({
+          sandboxInstanceId: "sbi_port_access_replacement_authorize",
+        }),
+        socket: firstBootstrap.peerSocket,
+      });
+
+      await service.forwardConnectionTargetAuthorize({
+        sandboxInstanceId: "sbi_port_access_replacement_authorize",
+        clientSessionId: "conn_old",
+        request: {
+          type: "ports.target.authorize",
+          requestId: "req_old",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        },
+      });
+      await waitForWebSocketPairMessage(firstBootstrap.clientSocket);
+
+      relayCoordinator.attachPeer({
+        sandboxInstanceId: "sbi_port_access_replacement_authorize",
+        side: "bootstrap",
+        sessionId: "sess_bootstrap_replacement",
+        socket: replacementBootstrap.peerSocket,
+      });
+
+      await service.forwardConnectionTargetAuthorize({
+        sandboxInstanceId: "sbi_port_access_replacement_authorize",
+        clientSessionId: "conn_new",
+        request: {
+          type: "ports.target.authorize",
+          requestId: "req_new",
+          target: {
+            kind: "port",
+            port: 8080,
+          },
+        },
+      });
+      const replacementRequest = JSON.parse(
+        String((await waitForWebSocketPairMessage(replacementBootstrap.clientSocket)).data),
+      );
+
+      expect(
+        service.rejectPendingRequestsForBootstrapSession({
+          sandboxInstanceId: "sbi_port_access_replacement_authorize",
+          targetBootstrapSessionId: BootstrapSessionId,
+        }),
+      ).toEqual([
+        {
+          result: {
+            type: "ports.target.authorize.result",
+            requestId: "req_old",
+            authorized: false,
+            reason: "bootstrap_disconnected",
+          },
+          targetConnectionSessionId: "conn_old",
+        },
+      ]);
+
+      expect(
+        service.resolveTargetAuthorizeResult({
+          sandboxInstanceId: "sbi_port_access_replacement_authorize",
+          sourceBootstrapSessionId: "sess_bootstrap_replacement",
+          result: {
+            type: "ports.target.authorize.result",
+            requestId: replacementRequest.requestId,
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: true,
+          },
+        }),
+      ).toEqual({
+        kind: "forward",
+        result: {
+          type: "ports.target.authorize.result",
+          requestId: "req_new",
+          authorized: true,
+          upstreamProtocol: "http",
+          websocketCapable: true,
+        },
+        targetConnectionSessionId: "conn_new",
       });
 
       clock.advanceMs(5_000);

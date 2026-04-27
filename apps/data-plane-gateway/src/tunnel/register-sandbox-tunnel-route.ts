@@ -379,12 +379,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             if (attachedPeer !== undefined) {
               if (admittedRequest.kind === "bootstrap") {
                 const closeTasks: Promise<void>[] = [];
-                input.portAccessTransportService.rejectPendingStreamsForSandbox({
+                input.portAccessTransportService.rejectPendingStreamsForBootstrapSession({
                   sandboxInstanceId,
+                  targetBootstrapSessionId: relaySessionId,
                 });
                 const rejectedPendingAuthorizeRequests =
-                  input.portsTargetAuthorizeService.rejectPendingRequestsForSandbox({
+                  input.portsTargetAuthorizeService.rejectPendingRequestsForBootstrapSession({
                     sandboxInstanceId,
+                    targetBootstrapSessionId: relaySessionId,
                   });
                 if (rejectedPendingAuthorizeRequests.length > 0) {
                   closeTasks.push(
