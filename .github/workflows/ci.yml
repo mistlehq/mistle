@@ -87,7 +87,7 @@ jobs:
   static-ts:
     name: TS Static
     # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -149,7 +149,7 @@ jobs:
 
   build-ts:
     name: TS Build
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -212,7 +212,7 @@ jobs:
   static-rust:
     name: Rust Static
     # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -325,7 +325,7 @@ jobs:
   test-ts:
     name: TS Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -390,7 +390,7 @@ jobs:
   test-commit-sign:
     name: Commit Sign Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -401,8 +401,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -436,14 +436,12 @@ jobs:
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Build commit-sign test runner image
-        uses: docker/build-push-action@v7
+        uses: useblacksmith/build-push-action@v2
         with:
           context: .
           file: packages/commit-sign/Dockerfile.test
           tags: mistle/commit-sign-test-runner:ci
           load: true
-          cache-from: type=gha,scope=commit-sign-test-runner
-          cache-to: type=gha,mode=max,scope=commit-sign-test-runner
 
       - name: Run commit-sign tests in Nix shell
         env:
@@ -461,7 +459,7 @@ jobs:
   test-sandboxd:
     name: Sandboxd Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -473,8 +471,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+      - name: Setup Blacksmith Builder
+        uses: useblacksmith/setup-docker-builder@v1
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -511,14 +509,12 @@ jobs:
         run: nix develop --command bash -lc "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Build sandboxd test runner image
-        uses: docker/build-push-action@v7
+        uses: useblacksmith/build-push-action@v2
         with:
           context: .
           file: packages/sandboxd/Dockerfile.test
           tags: mistle/sandboxd-test-runner:ci
           load: true
-          cache-from: type=gha,scope=sandboxd-test-runner
-          cache-to: type=gha,mode=max,scope=sandboxd-test-runner
 
       - name: Run sandboxd tests in Nix shell
         env:
@@ -547,7 +543,7 @@ jobs:
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 90
     needs:
       - changes

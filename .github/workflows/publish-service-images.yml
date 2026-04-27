@@ -52,7 +52,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare publish matrix
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       publish_latest: ${{ steps.flags.outputs.publish_latest }}
@@ -109,7 +109,7 @@ jobs:
     name: Publish ${{ matrix.component }}
     needs:
       - prepare
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -178,7 +178,7 @@ jobs:
 
   notify:
     name: Notify Slack
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - prepare
       - publish

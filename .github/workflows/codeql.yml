@@ -17,7 +17,7 @@ concurrency:
 jobs:
   changes:
     name: Detect CodeQL changes
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       contents: read
       pull-requests: read
@@ -77,7 +77,7 @@ jobs:
     needs:
       - changes
     if: needs.changes.outputs.actions == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       actions: read
       contents: read
@@ -102,7 +102,7 @@ jobs:
     needs:
       - changes
     if: needs.changes.outputs.javascript_typescript == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       actions: read
       contents: read
@@ -128,7 +128,7 @@ jobs:
     needs:
       - changes
     if: needs.changes.outputs.rust == 'true'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     permissions:
       actions: read
       contents: read

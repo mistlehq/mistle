@@ -27,7 +27,7 @@ concurrency:
 jobs:
   sandboxd-stress:
     name: Scheduled Sandboxd Stress
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     env:
       CI: true
@@ -100,7 +100,7 @@ jobs:
 
   notify:
     name: Notify Slack
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - sandboxd-stress
     if: always()

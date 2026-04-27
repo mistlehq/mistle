@@ -18,7 +18,7 @@ concurrency:
 jobs:
   integration:
     name: Scheduled Integration
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 120
     env:
       CI: true
@@ -89,7 +89,7 @@ jobs:
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 90
 
     steps:
@@ -116,7 +116,7 @@ jobs:
 
   notify:
     name: Notify Slack
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     needs:
       - integration
       - sandbox-base-linux
