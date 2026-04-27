@@ -9,6 +9,7 @@ import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import {
   createWebhookDeliveryTelemetryAttributes,
   logWebhookDeliveryEvent,
+  withWebhookDeliverySpan,
 } from "../shared/webhook-delivery-telemetry.js";
 import { markIntegrationWebhookEventFailed } from "./mark-integration-webhook-event-failed.js";
 import { markIntegrationWebhookEventProcessed } from "./mark-integration-webhook-event-processed.js";
@@ -29,24 +30,62 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
         }),
       );
 
-      const preparedWebhookEvent = await prepareIntegrationWebhookEvent(
+      const preparedWebhookEvent = await withWebhookDeliverySpan(
         {
-          db,
-          integrationRegistry,
+          name: "webhook_event.prepare",
+          telemetryContext: {
+            webhookEventId: input.webhookEventId,
+          },
         },
-        input,
+        async (span) => {
+          const preparedEvent = await prepareIntegrationWebhookEvent(
+            {
+              db,
+              integrationRegistry,
+            },
+            input,
+          );
+
+          span.setAttributes({
+            ...createWebhookDeliveryTelemetryAttributes({
+              webhookEventId: preparedEvent.webhookEventId,
+              externalDeliveryId: preparedEvent.externalDeliveryId ?? undefined,
+              integrationConnectionId: preparedEvent.integrationConnectionId,
+              targetKey: preparedEvent.targetKey,
+            }),
+            "mistle.automation.run.count": preparedEvent.automationRunIds.length,
+            "mistle.webhook.event_status": preparedEvent.webhookEventStatus,
+            "mistle.webhook.finalized": preparedEvent.finalized,
+            "mistle.webhook.resource_sync.count": preparedEvent.resourceSyncRequests.length,
+          });
+
+          return preparedEvent;
+        },
       );
 
-      stepSpan?.setAttributes(
-        createWebhookDeliveryTelemetryAttributes({
+      stepSpan?.setAttributes({
+        ...createWebhookDeliveryTelemetryAttributes({
           webhookEventId: preparedWebhookEvent.webhookEventId,
           externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
           integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
           targetKey: preparedWebhookEvent.targetKey,
         }),
-      );
+        "mistle.automation.run.count": preparedWebhookEvent.automationRunIds.length,
+        "mistle.webhook.event_status": preparedWebhookEvent.webhookEventStatus,
+        "mistle.webhook.finalized": preparedWebhookEvent.finalized,
+        "mistle.webhook.resource_sync.count": preparedWebhookEvent.resourceSyncRequests.length,
+      });
 
       if (preparedWebhookEvent.finalized) {
+        stepSpan?.setAttribute(
+          "mistle.webhook.final_status",
+          preparedWebhookEvent.webhookEventStatus,
+        );
+        stepSpan?.addEvent("webhook_event.finalized", {
+          "mistle.webhook.event_id": input.webhookEventId,
+          "mistle.webhook.final_status": preparedWebhookEvent.webhookEventStatus,
+        });
+
         return {
           webhookEventId: input.webhookEventId,
         };
@@ -54,22 +93,27 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
 
       try {
         for (const resourceSyncRequest of preparedWebhookEvent.resourceSyncRequests) {
-          await controlPlaneInternalClient.requestIntegrationConnectionResourceRefresh(
-            resourceSyncRequest,
+          await withWebhookDeliverySpan(
+            {
+              name: "webhook_event.resource_sync.schedule",
+              telemetryContext: {
+                webhookEventId: preparedWebhookEvent.webhookEventId,
+                externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
+                integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
+                targetKey: preparedWebhookEvent.targetKey,
+              },
+            },
+            async (span) => {
+              span.setAttribute("mistle.integration.resource.kind", resourceSyncRequest.kind);
+
+              await controlPlaneInternalClient.requestIntegrationConnectionResourceRefresh(
+                resourceSyncRequest,
+              );
+            },
           );
         }
 
         for (const automationRunId of preparedWebhookEvent.automationRunIds) {
-          await openWorkflow.runWorkflow(
-            HandleAutomationRunWorkflowSpec,
-            {
-              automationRunId,
-            },
-            {
-              idempotencyKey: automationRunId,
-            },
-          );
-
           const automationRunAttributes = createWebhookDeliveryTelemetryAttributes({
             webhookEventId: preparedWebhookEvent.webhookEventId,
             externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
@@ -77,6 +121,32 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
             integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
             targetKey: preparedWebhookEvent.targetKey,
           });
+
+          await withWebhookDeliverySpan(
+            {
+              name: "webhook_event.automation_run.schedule",
+              telemetryContext: {
+                webhookEventId: preparedWebhookEvent.webhookEventId,
+                externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
+                automationRunId,
+                integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
+                targetKey: preparedWebhookEvent.targetKey,
+              },
+            },
+            async (span) => {
+              await openWorkflow.runWorkflow(
+                HandleAutomationRunWorkflowSpec,
+                {
+                  automationRunId,
+                },
+                {
+                  idempotencyKey: automationRunId,
+                },
+              );
+
+              span.addEvent("automation_run.queued", automationRunAttributes);
+            },
+          );
 
           stepSpan?.addEvent("automation_run.schedule", automationRunAttributes);
 
@@ -93,21 +163,53 @@ export const HandleIntegrationWebhookEventWorkflow = defineTracedControlPlaneWor
           });
         }
 
-        await markIntegrationWebhookEventProcessed(
+        await withWebhookDeliverySpan(
           {
-            db,
+            name: "webhook_event.mark_processed",
+            telemetryContext: {
+              webhookEventId: preparedWebhookEvent.webhookEventId,
+              externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
+              integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
+              targetKey: preparedWebhookEvent.targetKey,
+            },
           },
-          {
-            webhookEventId: input.webhookEventId,
+          async (span) => {
+            await markIntegrationWebhookEventProcessed(
+              {
+                db,
+              },
+              {
+                webhookEventId: input.webhookEventId,
+              },
+            );
+
+            span.setAttribute("mistle.webhook.final_status", "processed");
+            stepSpan?.setAttribute("mistle.webhook.final_status", "processed");
           },
         );
       } catch (error) {
-        await markIntegrationWebhookEventFailed(
+        await withWebhookDeliverySpan(
           {
-            db,
+            name: "webhook_event.mark_failed",
+            telemetryContext: {
+              webhookEventId: preparedWebhookEvent.webhookEventId,
+              externalDeliveryId: preparedWebhookEvent.externalDeliveryId ?? undefined,
+              integrationConnectionId: preparedWebhookEvent.integrationConnectionId,
+              targetKey: preparedWebhookEvent.targetKey,
+            },
           },
-          {
-            webhookEventId: input.webhookEventId,
+          async (span) => {
+            await markIntegrationWebhookEventFailed(
+              {
+                db,
+              },
+              {
+                webhookEventId: input.webhookEventId,
+              },
+            );
+
+            span.setAttribute("mistle.webhook.final_status", "failed");
+            stepSpan?.setAttribute("mistle.webhook.final_status", "failed");
           },
         );
         throw error;

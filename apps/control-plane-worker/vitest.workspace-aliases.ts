@@ -60,6 +60,12 @@ export const WorkspaceAliases = [
     ),
   },
   {
+    find: /^@mistle\/integrations-definitions\/openai$/,
+    replacement: fileURLToPath(
+      new URL("../../packages/integrations-definitions/src/openai/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@mistle\/integrations-definitions\/agent-runtimes\/server$/,
     replacement: fileURLToPath(
       new URL(
@@ -95,6 +101,10 @@ export const WorkspaceAliases = [
     replacement: fileURLToPath(new URL("../../packages/telemetry/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@mistle\/telemetry\/testing\.js$/,
+    replacement: fileURLToPath(new URL("../../packages/telemetry/src/testing.ts", import.meta.url)),
+  },
+  {
     find: /^@mistle\/test-harness$/,
     replacement: fileURLToPath(
       new URL("../../packages/test-harness/src/index.ts", import.meta.url),
@@ -103,6 +113,10 @@ export const WorkspaceAliases = [
   {
     find: /^@mistle\/time$/,
     replacement: fileURLToPath(new URL("../../packages/time/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@mistle\/webhooks$/,
+    replacement: fileURLToPath(new URL("../../packages/webhooks/src/index.ts", import.meta.url)),
   },
   {
     find: /^@mistle\/workflow-registry\/control-plane$/,

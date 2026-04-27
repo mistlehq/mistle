@@ -22,6 +22,7 @@ export type PrepareIntegrationWebhookEventOutput = {
   externalDeliveryId: string | null;
   integrationConnectionId: string;
   targetKey: string;
+  webhookEventStatus: (typeof IntegrationWebhookEventStatuses)[keyof typeof IntegrationWebhookEventStatuses];
   automationRunIds: ReadonlyArray<string>;
   resourceSyncRequests: ReadonlyArray<IntegrationWebhookResourceSyncRequest>;
   finalized: boolean;
@@ -57,6 +58,7 @@ export async function prepareIntegrationWebhookEvent(
       integrationConnectionId: webhookEvent.integrationConnectionId,
       resourceSyncRequests: [],
       targetKey: webhookEvent.targetKey,
+      webhookEventStatus: webhookEvent.status,
       webhookEventId: input.webhookEventId,
     };
   }
@@ -94,6 +96,7 @@ export async function prepareIntegrationWebhookEvent(
           integrationConnectionId: webhookEvent.integrationConnectionId,
           resourceSyncRequests: [],
           targetKey: webhookEvent.targetKey,
+          webhookEventStatus: currentWebhookEvent.status,
           webhookEventId: input.webhookEventId,
         };
       }
@@ -141,6 +144,7 @@ export async function prepareIntegrationWebhookEvent(
         integrationConnectionId: webhookEvent.integrationConnectionId,
         resourceSyncRequests: [],
         targetKey: webhookEvent.targetKey,
+        webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
         webhookEventId: input.webhookEventId,
       };
     }
@@ -186,6 +190,7 @@ export async function prepareIntegrationWebhookEvent(
       integrationConnectionId: webhookEvent.integrationConnectionId,
       resourceSyncRequests,
       targetKey: webhookEvent.targetKey,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
       webhookEventId: input.webhookEventId,
     };
   } catch (error) {

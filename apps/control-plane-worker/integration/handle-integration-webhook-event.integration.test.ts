@@ -621,28 +621,77 @@ describe("handleIntegrationWebhookEvent integration", () => {
 
         await tracing.forceFlush();
 
-        const webhookStepSpan = findWorkerSpan({ name: "handle-webhook-event" });
-        const handoffStepSpan = findWorkerSpan({ name: "handoff-automation-run-delivery" });
+        const webhookWorkflowSpan = findWorkerSpan({
+          name: HandleIntegrationWebhookEventWorkflowSpec.name,
+        });
+        const prepareSpan = findWorkerSpan({ name: "webhook_event.prepare" });
+        const automationScheduleSpan = findWorkerSpan({
+          name: "webhook_event.automation_run.schedule",
+        });
+        const markProcessedSpan = findWorkerSpan({ name: "webhook_event.mark_processed" });
+        const automationRunWorkflowSpan = findWorkerSpan({
+          name: HandleAutomationRunWorkflowSpec.name,
+        });
 
-        expect(webhookStepSpan).toBeDefined();
-        expect(webhookStepSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(webhookStepSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
-        expect(webhookStepSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+        expect(webhookWorkflowSpan).toBeDefined();
+        expect(webhookWorkflowSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
+        expect(webhookWorkflowSpan?.attributes["mistle.integration.connection_id"]).toBe(
+          connectionId,
+        );
+        expect(webhookWorkflowSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+        expect(webhookWorkflowSpan?.attributes["mistle.automation.run.count"]).toBe(1);
+        expect(webhookWorkflowSpan?.attributes["mistle.webhook.event_status"]).toBe(
+          IntegrationWebhookEventStatuses.PROCESSING,
+        );
+        expect(webhookWorkflowSpan?.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
+        expect(webhookWorkflowSpan?.attributes["mistle.webhook.final_status"]).toBe("processed");
         expect(
-          webhookStepSpan?.events.some((event) => event.name === "automation_run.schedule"),
+          webhookWorkflowSpan?.events.some((event) => event.name === "automation_run.schedule"),
         ).toBe(true);
 
-        expect(handoffStepSpan).toBeDefined();
-        expect(handoffStepSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(handoffStepSpan?.attributes["mistle.automation.run_id"]).toBe(
+        expect(prepareSpan, "expected webhook prepare span").toBeDefined();
+        expect(prepareSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
+        expect(prepareSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
+        expect(prepareSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
+        expect(prepareSpan?.attributes["mistle.automation.run.count"]).toBe(1);
+        expect(prepareSpan?.attributes["mistle.webhook.event_status"]).toBe(
+          IntegrationWebhookEventStatuses.PROCESSING,
+        );
+        expect(prepareSpan?.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
+        expect(prepareSpan?.attributes["mistle.webhook.finalized"]).toBe(false);
+
+        expect(automationScheduleSpan, "expected automation run scheduling span").toBeDefined();
+        expect(automationScheduleSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
+        expect(automationScheduleSpan?.attributes["mistle.automation.run_id"]).toBe(
           queuedAutomationRun.id,
         );
-        expect(handoffStepSpan?.attributes["mistle.integration.connection_id"]).toBe(connectionId);
-        expect(handoffStepSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
-        expect(handoffStepSpan?.attributes["mistle.delivery.task_id"]).toBe(persistedTask.id);
-        expect(handoffStepSpan?.events.some((event) => event.name === "delivery_task.queued")).toBe(
-          true,
+        expect(
+          automationScheduleSpan?.events.some((event) => event.name === "automation_run.queued"),
+        ).toBe(true);
+
+        expect(markProcessedSpan, "expected webhook processed status span").toBeDefined();
+        expect(markProcessedSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
+        expect(markProcessedSpan?.attributes["mistle.webhook.final_status"]).toBe("processed");
+
+        expect(automationRunWorkflowSpan).toBeDefined();
+        expect(automationRunWorkflowSpan?.attributes["mistle.webhook.event_id"]).toBe(
+          webhookEventId,
         );
+        expect(automationRunWorkflowSpan?.attributes["mistle.automation.run_id"]).toBe(
+          queuedAutomationRun.id,
+        );
+        expect(automationRunWorkflowSpan?.attributes["mistle.integration.connection_id"]).toBe(
+          connectionId,
+        );
+        expect(automationRunWorkflowSpan?.attributes["mistle.integration.target_key"]).toBe(
+          targetKey,
+        );
+        expect(automationRunWorkflowSpan?.attributes["mistle.delivery.task_id"]).toBe(
+          persistedTask.id,
+        );
+        expect(
+          automationRunWorkflowSpan?.events.some((event) => event.name === "delivery_task.queued"),
+        ).toBe(true);
       } finally {
         await database.stop();
       }

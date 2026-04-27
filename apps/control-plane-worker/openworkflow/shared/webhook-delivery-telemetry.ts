@@ -1,4 +1,8 @@
+import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
+
 import { logger } from "../../logger.js";
+
+const WebhookDeliveryTracer = trace.getTracer("@mistle/control-plane-worker");
 
 type WebhookDeliveryTelemetryAttributeValue = string | number | boolean;
 
@@ -55,4 +59,37 @@ export function logWebhookDeliveryEvent(input: {
     },
     input.message,
   );
+}
+
+export async function withWebhookDeliverySpan<T>(
+  input: {
+    name: string;
+    telemetryContext: WebhookDeliveryTelemetryContext;
+  },
+  fn: (span: Span) => Promise<T>,
+): Promise<T> {
+  return await WebhookDeliveryTracer.startActiveSpan(input.name, async (span) => {
+    span.setAttributes(createWebhookDeliveryTelemetryAttributes(input.telemetryContext));
+
+    try {
+      return await fn(span);
+    } catch (error) {
+      span.recordException(toRecordableError(error));
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  });
+}
+
+function toRecordableError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(String(error));
 }
