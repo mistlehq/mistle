@@ -566,6 +566,15 @@ jobs:
             --file packages/sandboxd/Dockerfile \
             .
 
+      - name: Verify sandbox base login shell PATH
+        run: |
+          docker run --rm --platform linux/amd64 mistle-sandbox-base-check:local bash -lc '
+            set -euo pipefail
+            for tool in cmddir mise sandboxd nix; do
+              command -v "$tool"
+            done
+          '
+
   notify:
     name: Notify Slack
     runs-on: ubuntu-latest
