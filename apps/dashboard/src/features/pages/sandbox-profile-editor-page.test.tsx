@@ -22,12 +22,12 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
+import { SandboxProfileDraftSaveHeaderActions } from "./sandbox-profile-draft-save-indicator.js";
 import {
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
   resolveSandboxProfileEditorVersionMode,
   SandboxProfileDefaultRedirect,
-  SandboxProfileEditorHeaderActions,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
@@ -446,7 +446,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
 function HeaderActionsHarness(input: { isSavingDraftChanges: boolean }): JSX.Element {
   return (
     <TestAppShellHeaderActionsProvider>
-      <SandboxProfileEditorHeaderActions
+      <SandboxProfileDraftSaveHeaderActions
         isSavingDraftChanges={input.isSavingDraftChanges}
         minimumVisibleMs={0}
         showDelayMs={0}
