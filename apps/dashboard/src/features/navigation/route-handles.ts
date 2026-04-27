@@ -105,7 +105,7 @@ function resolveIntegrationEditTitle(input: RouteTextResolverInput): string {
   return `Edit ${resolveIntegrationDetailTitle(input)} Connection`;
 }
 
-function resolveGitHubAppSetupTitle(input: RouteTextResolverInput): string {
+function resolveIntegrationAppSetupTitle(input: RouteTextResolverInput): string {
   return `Setup ${resolveIntegrationDetailTitle(input)} App`;
 }
 
@@ -207,7 +207,16 @@ export const ROUTE_HANDLES = {
   integrationGitHubAppSetup: {
     appShellInsetOwner: "child",
     breadcrumb: "Setup",
-    title: resolveGitHubAppSetupTitle,
+    title: resolveIntegrationAppSetupTitle,
+    description: resolveIntegrationDetailSubtitle,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
+  },
+  integrationSlackAppSetup: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Setup",
+    title: resolveIntegrationAppSetupTitle,
     description: resolveIntegrationDetailSubtitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,

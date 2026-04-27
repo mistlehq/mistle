@@ -130,7 +130,7 @@ export const APP_ROUTES = createRoutesFromElements(
             />
             <Route
               element={<IntegrationConnectionSlackAppSetupPage />}
-              handle={ROUTE_HANDLES.integrationEdit}
+              handle={ROUTE_HANDLES.integrationSlackAppSetup}
               path=":connectionId/slack-app/setup"
             />
           </Route>

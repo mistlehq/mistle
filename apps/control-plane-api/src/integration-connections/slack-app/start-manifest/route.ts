@@ -16,6 +16,7 @@ export const route = createRoute({
   request: {
     params: StartSlackAppManifestConnectionParamsSchema,
     body: {
+      required: true,
       content: {
         "application/json": {
           schema: StartSlackAppManifestConnectionBodySchema,

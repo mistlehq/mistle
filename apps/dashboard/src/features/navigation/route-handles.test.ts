@@ -148,15 +148,18 @@ describe("route handles", () => {
     );
   });
 
-  it("resolves GitHub App setup title from the target key", () => {
+  it("resolves integration app setup titles from the target key", () => {
     const setupTitle = ROUTE_HANDLES.integrationGitHubAppSetup.title;
+    const slackSetupTitle = ROUTE_HANDLES.integrationSlackAppSetup.title;
     expect(typeof setupTitle).toBe("function");
+    expect(typeof slackSetupTitle).toBe("function");
 
-    if (typeof setupTitle !== "function") {
-      throw new Error("integrationGitHubAppSetup title must be a function");
+    if (typeof setupTitle !== "function" || typeof slackSetupTitle !== "function") {
+      throw new Error("integration app setup titles must be functions");
     }
 
     expect(setupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");
+    expect(slackSetupTitle({ params: { targetKey: "slack-default" } })).toBe("Setup Slack App");
     expect(setupTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Setup Custom Integration V2 App",
     );
