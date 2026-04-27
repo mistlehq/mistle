@@ -84,6 +84,7 @@ const execFileAsync = promisify(execFile);
 const TRACE_TEST_HARNESS = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
 const StartupDiagnosticLabelKey = "mistle.test_harness.startup_id";
 const StartupDiagnosticKindLabelKey = "mistle.test_harness.startup_kind";
+const StartupLogBufferMaxLength = 200_000;
 const HostGatewayExtraHosts = [
   {
     host: "host.docker.internal",
@@ -211,6 +212,7 @@ async function wrapStartupErrorWithDiagnostics(input: {
   containerName: string;
   kind: "workspace" | "docker-target";
   descriptor: string;
+  startupLogOutput: string;
 }): Promise<Error> {
   const diagnostics = await collectStartupDiagnostics({
     startupId: input.startupId,
@@ -223,7 +225,40 @@ async function wrapStartupErrorWithDiagnostics(input: {
   });
 
   const normalizedError = normalizeError(input.startupError);
-  return new Error(`${normalizedError.message} Startup diagnostics: ${diagnostics}`);
+  return new Error(
+    `${normalizedError.message} Startup diagnostics: ${diagnostics} startupLogOutput=${input.startupLogOutput}`,
+  );
+}
+
+function appendStartupLogChunk(existingOutput: string, chunk: string): string {
+  const nextOutput = existingOutput.length === 0 ? chunk : `${existingOutput}${chunk}`;
+  if (nextOutput.length <= StartupLogBufferMaxLength) {
+    return nextOutput;
+  }
+
+  return nextOutput.slice(nextOutput.length - StartupLogBufferMaxLength);
+}
+
+function attachStartupLogConsumer(
+  containerDefinition: GenericContainer,
+  startupLogOutputRef: { current: string },
+): GenericContainer {
+  return containerDefinition.withLogConsumer((stream) => {
+    stream.setEncoding("utf8");
+    stream
+      .on("data", (chunk: string | Buffer) => {
+        startupLogOutputRef.current = appendStartupLogChunk(
+          startupLogOutputRef.current,
+          String(chunk),
+        );
+      })
+      .on("err", (chunk: string | Buffer) => {
+        startupLogOutputRef.current = appendStartupLogChunk(
+          startupLogOutputRef.current,
+          String(chunk),
+        );
+      });
+  });
 }
 
 function validatePositiveInteger(value: number, label: string): void {
@@ -621,6 +656,7 @@ export async function startWorkspaceApp(
   let container: StartedTestContainer | undefined;
   const startupId = randomUUID();
   const containerName = `mistle-workspace-${input.networkAlias}-${startupId.replaceAll("-", "")}`;
+  const startupLogOutputRef = { current: "" };
 
   const { network, createdNetwork } = await resolveNetwork(input.network);
 
@@ -631,7 +667,10 @@ export async function startWorkspaceApp(
       startupTimeoutMs: input.startupTimeoutMs,
     });
 
-    container = await new GenericContainer(input.baseImage)
+    container = await attachStartupLogConsumer(
+      new GenericContainer(input.baseImage),
+      startupLogOutputRef,
+    )
       .withName(containerName)
       .withLabels({
         [StartupDiagnosticLabelKey]: startupId,
@@ -669,6 +708,7 @@ export async function startWorkspaceApp(
       containerName,
       kind: "workspace",
       descriptor: input.baseImage,
+      startupLogOutput: startupLogOutputRef.current,
     });
     try {
       await cleanupResources({
@@ -712,6 +752,7 @@ export async function startDockerTargetApp(
   let imageName: string | undefined;
   const startupId = randomUUID();
   const containerName = `mistle-target-${input.networkAlias}-${startupId.replaceAll("-", "")}`;
+  const startupLogOutputRef = { current: "" };
 
   const { network, createdNetwork } = await resolveNetwork(input.network);
   const startupStartedAt = Date.now();
@@ -737,7 +778,10 @@ export async function startDockerTargetApp(
       `resolved Docker target image for ${input.dockerTarget} in ${String(Date.now() - resolveImageStartedAt)}ms`,
     );
 
-    let containerDefinition = new GenericContainer(imageName);
+    let containerDefinition = attachStartupLogConsumer(
+      new GenericContainer(imageName),
+      startupLogOutputRef,
+    );
 
     containerDefinition = containerDefinition
       .withName(containerName)
@@ -801,6 +845,7 @@ export async function startDockerTargetApp(
       containerName,
       kind: "docker-target",
       descriptor: input.dockerTarget,
+      startupLogOutput: startupLogOutputRef.current,
     });
     try {
       await cleanupResources({
