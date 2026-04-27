@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   });
 
   const workflowBackend = await createDataPlaneBackend({
-    url: loadedConfig.app.workflow.databaseUrl,
+    url: loadedConfig.app.workflow.migrationUrl,
     namespaceId: loadedConfig.app.workflow.namespaceId,
     runMigrations: true,
   });

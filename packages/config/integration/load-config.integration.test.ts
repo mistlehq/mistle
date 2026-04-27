@@ -193,6 +193,7 @@ const controlPlaneApiEnvConfig = {
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
   dataPlaneApi: {
@@ -277,6 +278,7 @@ const dataPlaneApiEnvConfig = {
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
   runtimeState: {
@@ -475,6 +477,7 @@ const tokenizerProxyFixtureConfig = {
 } as const;
 
 const pooledPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle";
+const directPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:5432/mistle";
 
 const controlPlaneApiNextFixtureConfig = {
   ...controlPlaneApiFixtureConfig,
@@ -486,6 +489,10 @@ const controlPlaneApiNextFixtureConfig = {
     ...controlPlaneApiFixtureConfig.auth,
     baseUrl: "https://mistle.example.test",
   },
+  workflow: {
+    ...controlPlaneApiFixtureConfig.workflow,
+    migrationUrl: directPostgresUrl,
+  },
 };
 
 const controlPlaneWorkerNextFixtureConfig = {
@@ -493,6 +500,7 @@ const controlPlaneWorkerNextFixtureConfig = {
   workflow: {
     ...controlPlaneWorkerFixtureConfig.workflow,
     databaseUrl: pooledPostgresUrl,
+    runMigrations: false,
   },
 };
 
@@ -501,6 +509,10 @@ const dataPlaneApiNextFixtureConfig = {
   database: {
     url: pooledPostgresUrl,
     migrationUrl: dataPlaneApiFixtureConfig.database.migrationUrl,
+  },
+  workflow: {
+    ...dataPlaneApiFixtureConfig.workflow,
+    migrationUrl: directPostgresUrl,
   },
 };
 
@@ -515,6 +527,10 @@ const dataPlaneWorkerNextFixtureConfig = {
   ...dataPlaneWorkerFixtureConfig,
   database: {
     url: pooledPostgresUrl,
+  },
+  workflow: {
+    ...dataPlaneWorkerFixtureConfig.workflow,
+    runMigrations: false,
   },
 };
 

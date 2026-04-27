@@ -50,12 +50,21 @@ export const ControlPlaneApiDashboardConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiWorkflowConfigSchema = z
+const ControlPlaneApiWorkflowConfigObjectSchema = z
   .object({
     databaseUrl: z.string().min(1),
+    migrationUrl: z.string().min(1).optional(),
     namespaceId: z.string().min(1),
   })
   .strict();
+
+export const ControlPlaneApiWorkflowConfigSchema =
+  ControlPlaneApiWorkflowConfigObjectSchema.transform((workflow) => ({
+    ...workflow,
+    // Legacy TOML/env only has databaseUrl. Keep that shape working until
+    // managed deployments use deployment-owned workflow migration jobs.
+    migrationUrl: workflow.migrationUrl ?? workflow.databaseUrl,
+  }));
 
 export const ControlPlaneApiDataPlaneApiConfigSchema = z
   .object({
@@ -116,7 +125,7 @@ export const PartialControlPlaneApiConfigSchema = z
     objectStore: ControlPlaneApiObjectStoreConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
-    workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
+    workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
     commitSign: ControlPlaneApiCommitSignConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),

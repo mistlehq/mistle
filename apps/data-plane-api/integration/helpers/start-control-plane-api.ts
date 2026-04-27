@@ -67,6 +67,7 @@ async function main(): Promise<void> {
       },
       workflow: {
         databaseUrl: env.MISTLE_TEST_CONTROL_PLANE_API_DATABASE_URL,
+        migrationUrl: env.MISTLE_TEST_CONTROL_PLANE_API_DATABASE_URL,
         namespaceId: env.MISTLE_TEST_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID,
       },
       dataPlaneApi: {

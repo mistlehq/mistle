@@ -22,12 +22,22 @@ export const DataPlaneApiDatabaseConfigSchema = z
   })
   .strict();
 
-export const DataPlaneApiWorkflowConfigSchema = z
+const DataPlaneApiWorkflowConfigObjectSchema = z
   .object({
     databaseUrl: z.string().min(1),
+    migrationUrl: z.string().min(1).optional(),
     namespaceId: z.string().min(1),
   })
   .strict();
+
+export const DataPlaneApiWorkflowConfigSchema = DataPlaneApiWorkflowConfigObjectSchema.transform(
+  (workflow) => ({
+    ...workflow,
+    // Legacy TOML/env only has databaseUrl. Keep that shape working until
+    // managed deployments use deployment-owned workflow migration jobs.
+    migrationUrl: workflow.migrationUrl ?? workflow.databaseUrl,
+  }),
+);
 
 export const DataPlaneApiRuntimeStateConfigSchema = z
   .object({
@@ -89,7 +99,7 @@ export const PartialDataPlaneApiConfigSchema = z
   .object({
     server: DataPlaneApiServerConfigSchema.partial().optional(),
     database: DataPlaneApiDatabaseConfigSchema.partial().optional(),
-    workflow: DataPlaneApiWorkflowConfigSchema.partial().optional(),
+    workflow: DataPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     runtimeState: DataPlaneApiRuntimeStateConfigSchema.partial().optional(),
     sandbox: PartialDataPlaneApiSandboxConfigSchema.optional(),
     controlPlaneApi: PartialDataPlaneApiControlPlaneApiConfigSchema.optional(),

@@ -225,6 +225,7 @@ export async function createDisposableDataPlaneRuntime(input: {
       },
       workflow: {
         databaseUrl,
+        migrationUrl: databaseUrl,
         namespaceId: input.workflowNamespaceId,
       },
       runtimeState: {

@@ -92,6 +92,7 @@ describe("parseConfigRecord", () => {
           },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
           dataPlaneApi: {
@@ -138,6 +139,7 @@ describe("parseConfigRecord", () => {
           },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
           runtimeState: {
@@ -300,6 +302,7 @@ describe("parseConfigRecord", () => {
           },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
           dataPlaneApi: {
@@ -346,6 +349,7 @@ describe("parseConfigRecord", () => {
           },
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
           runtimeState: {

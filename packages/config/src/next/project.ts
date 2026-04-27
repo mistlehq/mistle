@@ -179,6 +179,7 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
         },
         workflow: {
           databaseUrl: config.postgres.control_plane.pooled_url,
+          migrationUrl: config.postgres.control_plane.direct_url,
           namespaceId: config.workflow.control_plane.namespace_id,
         },
         dataPlaneApi: {
@@ -195,7 +196,7 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
         workflow: {
           databaseUrl: config.postgres.control_plane.pooled_url,
           namespaceId: config.workflow.control_plane.namespace_id,
-          runMigrations: config.workflow.control_plane.run_migrations,
+          runMigrations: false,
           concurrency: config.services.control_plane_worker.workflow_concurrency,
         },
         email: {
@@ -225,6 +226,7 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
         },
         workflow: {
           databaseUrl: config.postgres.data_plane.pooled_url,
+          migrationUrl: config.postgres.data_plane.direct_url,
           namespaceId: config.workflow.data_plane.namespace_id,
         },
         runtimeState: {
@@ -270,7 +272,7 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
         workflow: {
           databaseUrl: config.postgres.data_plane.pooled_url,
           namespaceId: config.workflow.data_plane.namespace_id,
-          runMigrations: config.workflow.data_plane.run_migrations,
+          runMigrations: false,
           concurrency: config.services.data_plane_worker.workflow_concurrency,
         },
         runtimeState: {

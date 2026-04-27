@@ -256,6 +256,7 @@ export const it = vitestIt.extend<{
           },
           workflow: {
             databaseUrl: runtimeDatabaseUrl,
+            migrationUrl: runtimeDatabaseUrl,
             namespaceId: sharedInfraConfig.workflowNamespaceId,
           },
           dataPlaneApi: {
