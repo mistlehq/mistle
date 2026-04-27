@@ -8,6 +8,7 @@ import { typeid } from "typeid-js";
 import WebSocket, { type WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
+import { SandboxDeadlineLifecycleCoordinator } from "../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import {
   DefaultDataPlaneGatewayLifecycleDurations,
   SandboxInstanceDeadlineService,
@@ -193,6 +194,7 @@ export function createDataPlaneGatewayRuntime(
     systemClock,
     DefaultDataPlaneGatewayLifecycleDurations,
   );
+  const sandboxDeadlineLifecycleCoordinator = new SandboxDeadlineLifecycleCoordinator();
 
   registerSandboxRuntimeStateRoute({
     app,
@@ -231,6 +233,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxRuntimeAttachmentStore,
     activeBootstrapSessionStore,
     sandboxInstanceDeadlineService,
+    sandboxDeadlineLifecycleCoordinator,
     telemetryIngressService,
     sandboxTunnelTaskTracker,
     clock: systemClock,

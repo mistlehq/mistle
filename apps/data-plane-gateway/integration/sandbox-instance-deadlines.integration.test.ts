@@ -128,6 +128,52 @@ async function waitForWorkflowRuns(input: {
   );
 }
 
+async function countBlockedDeadlineMutations(
+  fixture: DataPlaneGatewayIntegrationFixture,
+): Promise<number> {
+  const result = await fixture.dbPool.query<{ waiters: number }>(
+    `
+      select count(*)::int as waiters
+      from pg_stat_activity
+      where
+        datname = current_database()
+        and wait_event_type = 'Lock'
+        and state = 'active'
+        and query ilike '%sandbox_instance_deadlines%'
+    `,
+  );
+
+  return result.rows[0]?.waiters ?? 0;
+}
+
+async function waitForBlockedDeadlineMutationCount(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  predicate: (count: number) => boolean;
+}): Promise<number> {
+  const deadlineMs = Date.now() + DeadlineWaitTimeoutMs;
+
+  while (Date.now() < deadlineMs) {
+    const waiters = await countBlockedDeadlineMutations(input.fixture);
+    if (input.predicate(waiters)) {
+      return waiters;
+    }
+
+    await systemSleeper.sleep(DeadlinePollIntervalMs);
+  }
+
+  throw new Error("Timed out waiting for blocked sandbox deadline mutation count.");
+}
+
+async function closeWebSocketIfOpen(
+  socket: Awaited<ReturnType<typeof connectSandboxTunnelWebSocket>> | undefined,
+): Promise<void> {
+  if (socket === undefined || socket.readyState === socket.CLOSED) {
+    return;
+  }
+
+  await closeWebSocket(socket);
+}
+
 function expectWorkflowRunMatchesDeadline(input: {
   workflowRun: WorkflowRunRow;
   sandboxInstanceId: string;
@@ -318,6 +364,147 @@ describe("sandbox instance deadlines integration", () => {
     },
     IntegrationTestTimeoutMs,
   );
+
+  it("does not resurrect idle when connection presence overlaps bootstrap disconnect", async ({
+    fixture,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow({
+      fixture,
+      sandboxInstanceId,
+      testId: "gateway_deadline_presence_disconnect_overlap",
+    });
+
+    const bootstrapSocket = await connectBootstrapSocket({
+      fixture,
+      sandboxInstanceId,
+      token: await mintValidBootstrapToken({
+        fixture,
+        sandboxInstanceId,
+      }),
+    });
+    const connectedRuntimeState = await waitForRuntimeState({
+      fixture,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.ownerLeaseId !== null && snapshot.attachment !== null,
+    });
+    if (connectedRuntimeState.ownerLeaseId === null) {
+      throw new Error("Expected an owner lease id after bootstrap attachment.");
+    }
+
+    await waitForDeadlineRow({
+      fixture,
+      sandboxInstanceId,
+      kind: "idle",
+      predicate: (row) =>
+        row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
+        row.generation === 1 &&
+        row.clearedAt === null,
+    });
+
+    const connectionToken = await mintConnectionToken({
+      config: {
+        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId,
+      ttlSeconds: 120,
+    });
+    const connectionSocket = await connectSandboxTunnelWebSocket({
+      websocketBaseUrl: fixture.websocketBaseUrl,
+      sandboxInstanceId,
+      tokenKind: "connect",
+      token: connectionToken,
+    });
+    await waitForDeadlineRow({
+      fixture,
+      sandboxInstanceId,
+      kind: "idle",
+      predicate: (row) =>
+        row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
+        row.generation === 2 &&
+        row.clearedAt === null,
+    });
+
+    await systemSleeper.sleep(9_000);
+
+    const lockClient = await fixture.dbPool.connect();
+    let bootstrapSocketClose: ReturnType<typeof waitForWebSocketClose> | undefined;
+    let lockTransactionCommitted = false;
+    try {
+      await lockClient.query("BEGIN");
+      await lockClient.query(
+        `
+          select 1
+          from "data_plane"."sandbox_instance_deadlines"
+          where sandbox_instance_id = $1
+            and kind = 'idle'
+          for update
+        `,
+        [sandboxInstanceId],
+      );
+
+      bootstrapSocketClose = waitForWebSocketClose(bootstrapSocket);
+      bootstrapSocket.close();
+      await waitForBlockedDeadlineMutationCount({
+        fixture,
+        predicate: (waiters) => waiters >= 1,
+      });
+
+      await systemSleeper.sleep(2_500);
+
+      await lockClient.query("COMMIT");
+      lockTransactionCommitted = true;
+      await waitForBlockedDeadlineMutationCount({
+        fixture,
+        predicate: (waiters) => waiters === 0,
+      });
+
+      await bootstrapSocketClose;
+      await waitForRuntimeState({
+        fixture,
+        sandboxInstanceId,
+        predicate: (snapshot) => snapshot.ownerLeaseId === null && snapshot.attachment === null,
+      });
+      await waitForDeadlineRow({
+        fixture,
+        sandboxInstanceId,
+        kind: "disconnect",
+        predicate: (row) =>
+          row.ownerLeaseId === connectedRuntimeState.ownerLeaseId &&
+          row.generation === 1 &&
+          row.clearedAt === null,
+      });
+
+      const idleDeadline = await fixture.db.query.sandboxInstanceDeadlines.findFirst({
+        columns: {
+          ownerLeaseId: true,
+          clearedAt: true,
+        },
+        where: (table, { and, eq }) =>
+          and(eq(table.sandboxInstanceId, sandboxInstanceId), eq(table.kind, "idle")),
+      });
+
+      expect(idleDeadline).toEqual({
+        ownerLeaseId: connectedRuntimeState.ownerLeaseId,
+        clearedAt: expect.any(String),
+      });
+    } finally {
+      if (!lockTransactionCommitted) {
+        await lockClient.query("ROLLBACK");
+      }
+      lockClient.release();
+
+      await closeWebSocketIfOpen(connectionSocket);
+      if (bootstrapSocketClose === undefined) {
+        await closeWebSocketIfOpen(bootstrapSocket);
+      } else {
+        await bootstrapSocketClose;
+      }
+    }
+  }, 120_000);
 
   it(
     "clears disconnect and replaces idle when the bootstrap peer reattaches",

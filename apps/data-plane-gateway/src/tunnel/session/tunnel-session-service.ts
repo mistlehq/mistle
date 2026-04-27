@@ -1,6 +1,7 @@
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 import { WebSocket } from "ws";
 
+import type { SandboxDeadlineLifecycleCoordinator } from "../../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import type { SandboxInstanceDeadlineService } from "../../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../../logger.js";
 import {
@@ -75,8 +76,6 @@ export type TunnelSessionTransportUnhealthy = {
 };
 
 export class TunnelSessionService {
-  private readonly bootstrapLifecycleTransitions = new Map<string, Promise<void>>();
-
   public constructor(
     private readonly gatewayNodeId: string,
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
@@ -85,6 +84,7 @@ export class TunnelSessionService {
     private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
+    private readonly sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
   ) {}
@@ -293,19 +293,22 @@ export class TunnelSessionService {
     presenceLeaseRenewalHandle = this.startPresenceLeaseRenewal({
       leaseId: input.relaySessionId,
       onLeaseTouched: async () => {
-        const activeSession = await this.sandboxRuntimeAttachmentStore.getAttachment({
+        await this.sandboxDeadlineLifecycleCoordinator.enqueue({
           sandboxInstanceId: input.sandboxInstanceId,
-          nowMs: this.clock.nowMs(),
-        });
-        if (activeSession === null) {
-          throw new Error(
-            `Expected active bootstrap session for sandbox '${input.sandboxInstanceId}' before touching presence deadline.`,
-          );
-        }
+          operation: async () => {
+            const activeSession = await this.sandboxRuntimeAttachmentStore.getAttachment({
+              sandboxInstanceId: input.sandboxInstanceId,
+              nowMs: this.clock.nowMs(),
+            });
+            if (activeSession === null) {
+              return;
+            }
 
-        await this.sandboxInstanceDeadlineService.touchIdleDeadline({
-          sandboxInstanceId: input.sandboxInstanceId,
-          ownerLeaseId: activeSession.ownerLeaseId,
+            await this.sandboxInstanceDeadlineService.touchIdleDeadline({
+              sandboxInstanceId: input.sandboxInstanceId,
+              ownerLeaseId: activeSession.ownerLeaseId,
+            });
+          },
         });
       },
       onTouchFailed: (error) => {
@@ -363,34 +366,23 @@ export class TunnelSessionService {
       return;
     }
 
-    await this.enqueueBootstrapLifecycleTransition({
+    await this.sandboxDeadlineLifecycleCoordinator.enqueue({
       sandboxInstanceId: input.sandboxInstanceId,
       operation: async () => {
         if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
           return;
         }
 
+        await this.sandboxRuntimeAttachmentStore.clearAttachment({
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        });
         await this.sandboxInstanceDeadlineService.handleBootstrapDisconnect({
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: input.leaseId,
         });
       },
     });
-
-    await this.sandboxRuntimeAttachmentStore
-      .clearAttachment({
-        sandboxInstanceId: input.sandboxInstanceId,
-        ownerLeaseId: input.leaseId,
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
-        );
-      });
 
     const detachedBootstrapSession = this.tunnelSessionRegistry.detachBootstrapSession(
       input.attachedPeer.relayTarget,
@@ -517,7 +509,7 @@ export class TunnelSessionService {
         sandboxInstanceId: input.sandboxInstanceId,
       });
 
-      await this.enqueueBootstrapLifecycleTransition({
+      await this.sandboxDeadlineLifecycleCoordinator.enqueue({
         sandboxInstanceId: input.sandboxInstanceId,
         operation: async () => {
           if (!this.relayCoordinator.isCurrentPeer(input.relayTarget)) {
@@ -774,27 +766,5 @@ export class TunnelSessionService {
       },
       input.statusMessage,
     );
-  }
-
-  private async enqueueBootstrapLifecycleTransition(input: {
-    sandboxInstanceId: string;
-    operation: () => Promise<void>;
-  }): Promise<void> {
-    const previousTransition = this.bootstrapLifecycleTransitions.get(input.sandboxInstanceId);
-    const currentTransition = (previousTransition ?? Promise.resolve())
-      .catch(() => {
-        // Keep later lifecycle transitions flowing after an earlier failure.
-      })
-      .then(input.operation);
-
-    this.bootstrapLifecycleTransitions.set(input.sandboxInstanceId, currentTransition);
-
-    try {
-      await currentTransition;
-    } finally {
-      if (this.bootstrapLifecycleTransitions.get(input.sandboxInstanceId) === currentTransition) {
-        this.bootstrapLifecycleTransitions.delete(input.sandboxInstanceId);
-      }
-    }
   }
 }

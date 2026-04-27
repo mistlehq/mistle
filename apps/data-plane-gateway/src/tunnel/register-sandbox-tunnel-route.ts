@@ -4,6 +4,7 @@ import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { Clock, Scheduler } from "@mistle/time";
 import { SpanStatusCode, type Span } from "@opentelemetry/api";
 
+import type { SandboxDeadlineLifecycleCoordinator } from "../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import { logger } from "../logger.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
@@ -60,6 +61,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
+  sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator;
   telemetryIngressService: SandboxTelemetryIngressService;
   sandboxTunnelTaskTracker: AsyncTaskTracker;
   clock: Clock;
@@ -94,6 +96,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxKeepaliveStore,
     input.sandboxInstanceDeadlineService,
     input.activeBootstrapSessionStore,
+    input.sandboxDeadlineLifecycleCoordinator,
     input.clock,
     input.gatewayNodeId,
   );
@@ -111,6 +114,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxInstanceDeadlineService,
+    input.sandboxDeadlineLifecycleCoordinator,
     input.clock,
     input.scheduler,
   );

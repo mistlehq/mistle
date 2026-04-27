@@ -6,6 +6,7 @@ import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
+import { SandboxDeadlineLifecycleCoordinator } from "../../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import {
   DefaultDataPlaneGatewayLifecycleDurations,
   SandboxInstanceDeadlineService,
@@ -292,6 +293,7 @@ async function createDisconnectTestHarness() {
       clock,
       DefaultDataPlaneGatewayLifecycleDurations,
     ),
+    new SandboxDeadlineLifecycleCoordinator(),
     clock,
     scheduler,
   );
@@ -380,6 +382,7 @@ describe("TunnelSessionService", () => {
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
+      new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
     );
@@ -500,6 +503,7 @@ describe("TunnelSessionService", () => {
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
+      new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
     );
