@@ -1,3 +1,4 @@
+import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationConversationDeliveryTaskStatuses,
@@ -33,6 +34,7 @@ import type {
 
 export async function deliverConversationAutomationPayload(
   ctx: {
+    controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "mintSandboxConnectionToken">;
     db: ControlPlaneDatabase;
     dataPlaneClient: Pick<
       DataPlaneSandboxInstancesClient,
@@ -252,7 +254,13 @@ export async function deliverConversationAutomationPayload(
         organizationId: input.preparedAutomationRun.organizationId,
         sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
         runtimeId: input.resolvedAutomationConversationRoute.runtimeId,
-        connectionUrl: input.acquiredAutomationConnection.url,
+        getConnectionUrl: async () =>
+          await mintSandboxTitleConnectionUrl(ctx, {
+            preparedAutomationRun: input.preparedAutomationRun,
+            sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+            deliveryTaskId: input.taskId,
+            workflowRunId: input.workflowRunId,
+          }),
         providerConversationId: deliveryResult.providerConversationId,
         inputText: input.preparedAutomationRun.renderedInput,
       },
@@ -291,6 +299,86 @@ export async function deliverConversationAutomationPayload(
         webhookEventId: input.preparedAutomationRun.webhookEventId,
         workflowRunId: input.workflowRunId,
       },
+    });
+    throw error;
+  }
+}
+
+async function mintSandboxTitleConnectionUrl(
+  ctx: {
+    controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "mintSandboxConnectionToken">;
+  },
+  input: {
+    preparedAutomationRun: PreparedAutomationRun;
+    sandboxInstanceId: string;
+    deliveryTaskId: string;
+    workflowRunId: string;
+  },
+): Promise<string> {
+  const mintStartedAt = Date.now();
+  logAutomationConversationDeliveryEvent({
+    eventName: "sandbox_title.connection_token.mint_started",
+    message: "Minting sandbox connection token for automation title generation",
+    telemetryContext: {
+      automationRunId: input.preparedAutomationRun.automationRunId,
+      conversationId: input.preparedAutomationRun.conversationId,
+      deliveryTaskId: input.deliveryTaskId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      webhookEventId: input.preparedAutomationRun.webhookEventId,
+      workflowRunId: input.workflowRunId,
+    },
+  });
+
+  try {
+    const connection = await ctx.controlPlaneInternalClient.mintSandboxConnectionToken({
+      organizationId: input.preparedAutomationRun.organizationId,
+      instanceId: input.sandboxInstanceId,
+      ...(input.preparedAutomationRun.actingUserId === undefined
+        ? {}
+        : { actingUserId: input.preparedAutomationRun.actingUserId }),
+      webhookEventId: input.preparedAutomationRun.webhookEventId,
+      deliveryTaskId: input.deliveryTaskId,
+      automationRunId: input.preparedAutomationRun.automationRunId,
+      conversationId: input.preparedAutomationRun.conversationId,
+      ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+        ? {}
+        : {
+            externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,
+          }),
+    });
+    const mintDurationMs = Date.now() - mintStartedAt;
+    logAutomationConversationDeliveryEvent({
+      eventName: "sandbox_title.connection_token.minted",
+      message: "Minted sandbox connection token for automation title generation",
+      telemetryContext: {
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        conversationId: input.preparedAutomationRun.conversationId,
+        deliveryTaskId: input.deliveryTaskId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        webhookEventId: input.preparedAutomationRun.webhookEventId,
+        workflowRunId: input.workflowRunId,
+      },
+      attributes: {
+        "mistle.connection.mint_ms": mintDurationMs,
+        "mistle.connection.token_jti": connection.tokenJti,
+      },
+    });
+
+    return connection.url;
+  } catch (error) {
+    logAutomationConversationDeliveryEvent({
+      eventName: "sandbox_title.connection_token.failed",
+      message: "Failed to mint sandbox connection token for automation title generation",
+      telemetryContext: {
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        conversationId: input.preparedAutomationRun.conversationId,
+        deliveryTaskId: input.deliveryTaskId,
+        sandboxInstanceId: input.sandboxInstanceId,
+        webhookEventId: input.preparedAutomationRun.webhookEventId,
+        workflowRunId: input.workflowRunId,
+      },
+      err: error,
+      level: "error",
     });
     throw error;
   }

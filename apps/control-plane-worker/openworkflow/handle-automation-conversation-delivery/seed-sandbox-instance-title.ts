@@ -6,7 +6,7 @@ type SandboxInstanceTitleSeedResult = "completed" | "unsupported";
 
 async function generateAutomationConversationTitle(input: {
   runtimeId: string;
-  connectionUrl: string;
+  getConnectionUrl: () => Promise<string>;
   providerConversationId: string;
   inputText: string;
 }): Promise<string | null> {
@@ -16,7 +16,7 @@ async function generateAutomationConversationTitle(input: {
   }
 
   const result = await adapter.generateConversationTitle({
-    connectionUrl: input.connectionUrl,
+    connectionUrl: await input.getConnectionUrl(),
     providerConversationId: input.providerConversationId,
     inputText: input.inputText,
   });
@@ -32,7 +32,7 @@ export async function seedSandboxInstanceTitle(
     >;
   },
   input: {
-    connectionUrl: string;
+    getConnectionUrl: () => Promise<string>;
     inputText: string;
     organizationId: string;
     providerConversationId: string;
@@ -53,7 +53,7 @@ export async function seedSandboxInstanceTitle(
 
   const title = await generateAutomationConversationTitle({
     runtimeId: input.runtimeId,
-    connectionUrl: input.connectionUrl,
+    getConnectionUrl: input.getConnectionUrl,
     providerConversationId: input.providerConversationId,
     inputText: input.inputText,
   });

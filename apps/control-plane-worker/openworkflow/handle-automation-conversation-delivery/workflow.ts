@@ -277,6 +277,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineTracedControlP
           async () =>
             deliverConversationAutomationPayload(
               {
+                controlPlaneInternalClient,
                 db,
                 dataPlaneClient,
               },
