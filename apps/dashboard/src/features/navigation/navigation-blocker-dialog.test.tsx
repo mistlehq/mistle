@@ -12,29 +12,29 @@ afterEach(() => {
 });
 
 function GuardHarness(): React.JSX.Element {
-  const [isDirty, setIsDirty] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   return (
     <div>
-      <NavigationBlockerDialog enabled={isDirty} />
+      <NavigationBlockerDialog enabled={isBlocking} />
       <p>Current route: {location.pathname}</p>
       <button
         onClick={() => {
-          setIsDirty(true);
+          setIsBlocking(true);
         }}
         type="button"
       >
-        Mark dirty
+        Enable blocking
       </button>
       <button
         onClick={() => {
-          setIsDirty(false);
+          setIsBlocking(false);
         }}
         type="button"
       >
-        Mark clean
+        Disable blocking
       </button>
       <button
         onClick={() => {
@@ -72,7 +72,7 @@ describe("NavigationBlockerDialog", () => {
 
     render(<RouterProvider router={router} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable blocking" }));
     fireEvent.click(screen.getByRole("button", { name: "Navigate away" }));
 
     expect(screen.getByText("Discard unsaved changes?")).toBeDefined();
@@ -108,16 +108,16 @@ describe("NavigationBlockerDialog", () => {
 
     render(<RouterProvider router={router} />);
 
-    const cleanEvent = new Event("beforeunload", { cancelable: true });
-    window.dispatchEvent(cleanEvent);
-    expect(cleanEvent.defaultPrevented).toBe(false);
+    const unblockedEvent = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(unblockedEvent);
+    expect(unblockedEvent.defaultPrevented).toBe(false);
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable blocking" }));
 
-    const dirtyEvent = new Event("beforeunload", { cancelable: true });
-    window.dispatchEvent(dirtyEvent);
+    const blockedEvent = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(blockedEvent);
 
-    expect(dirtyEvent.defaultPrevented).toBe(true);
+    expect(blockedEvent.defaultPrevented).toBe(true);
   });
 
   it("resets the blocked navigation when the dialog is dismissed with escape", async () => {
@@ -139,7 +139,7 @@ describe("NavigationBlockerDialog", () => {
 
     render(<RouterProvider router={router} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark dirty" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enable blocking" }));
     fireEvent.click(screen.getByRole("button", { name: "Navigate away" }));
 
     expect(screen.getByText("Discard unsaved changes?")).toBeDefined();
