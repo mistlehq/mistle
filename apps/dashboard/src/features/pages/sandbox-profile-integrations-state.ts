@@ -192,6 +192,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
+  onIntegrationSaveErrorDismiss: () => void;
   isSubmittingIntegrationBindings: boolean;
 } {
   const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
@@ -233,6 +234,10 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 
   function setIntegrationSaveFailure(message: string): void {
     setIntegrationSaveError(message);
+  }
+
+  function onIntegrationSaveErrorDismiss(): void {
+    setIntegrationSaveError(null);
   }
 
   const putIntegrationBindingsMutation = useMutation({
@@ -426,6 +431,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
+    onIntegrationSaveErrorDismiss,
     isSubmittingIntegrationBindings: putIntegrationBindingsMutation.isPending,
   };
 }

@@ -391,6 +391,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onRemoveIntegrationBindingRow: (clientId: string) => void;
+  onIntegrationSaveErrorDismiss: () => void;
   disabled?: boolean | undefined;
 }): React.JSX.Element {
   const [isAddConnectorsDialogOpen, setIsAddConnectorsDialogOpen] = useState(false);
@@ -577,7 +578,13 @@ export function SandboxProfileIntegrationsSetupSection(input: {
       ) : null}
 
       {input.integrationSaveError ? (
-        <Notice title="Save failed" variant="alert">
+        <Notice
+          dismissible
+          onDismiss={input.onIntegrationSaveErrorDismiss}
+          resetKey={input.integrationSaveError}
+          title="Save failed"
+          variant="alert"
+        >
           {input.integrationSaveError}
         </Notice>
       ) : null}

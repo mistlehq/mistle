@@ -1923,6 +1923,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
       onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
       onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
       onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
+      onIntegrationSaveErrorDismiss={integrationsState.onIntegrationSaveErrorDismiss}
     />
   );
 }

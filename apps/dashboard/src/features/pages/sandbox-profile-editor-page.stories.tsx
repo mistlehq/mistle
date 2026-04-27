@@ -61,6 +61,7 @@ type SandboxProfileEditorPageStoryArgs = {
     directoryErrorMessage?: string;
     kind: "error";
   };
+  integrationSaveErrorMessage?: string;
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -368,6 +369,9 @@ function SandboxProfileEditorPageStoryView(
   const [integrationRows, setIntegrationRows] = useState<readonly SandboxProfileBindingEditorRow[]>(
     () => mapBindingsToEditorRows(input.initialBindings ?? StoryBindings),
   );
+  const [integrationSaveErrorMessage, setIntegrationSaveErrorMessage] = useState(
+    input.integrationSaveErrorMessage ?? null,
+  );
   const [setupScriptDraft, setSetupScriptDraft] = useState(input.setupScript ?? "");
   const [persistedSetupScript, setPersistedSetupScript] = useState(input.setupScript ?? "");
   const [setupScriptSaveStatus, setSetupScriptSaveStatus] = useState<
@@ -378,6 +382,10 @@ function SandboxProfileEditorPageStoryView(
   );
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
+
+  useEffect(() => {
+    setIntegrationSaveErrorMessage(input.integrationSaveErrorMessage ?? null);
+  }, [input.integrationSaveErrorMessage]);
 
   useEffect(() => {
     return () => {
@@ -503,7 +511,7 @@ function SandboxProfileEditorPageStoryView(
                   isPending: false,
                 }}
                 integrationRows={integrationRows}
-                integrationSaveError={null}
+                integrationSaveError={integrationSaveErrorMessage}
                 disabled={!isEditable}
                 onAddIntegrationBindingRow={async (nextBinding) => {
                   setIntegrationRows((currentRows) => [
@@ -528,6 +536,9 @@ function SandboxProfileEditorPageStoryView(
                   setIntegrationRows((currentRows) =>
                     currentRows.filter((row) => row.clientId !== clientId),
                   );
+                }}
+                onIntegrationSaveErrorDismiss={() => {
+                  setIntegrationSaveErrorMessage(null);
                 }}
               />
             );
@@ -668,6 +679,13 @@ export const SnapshotRefreshFailed: Story = {
     initialSectionId: "snapshot",
     lifecycleState: "published",
     snapshotState: "refresh-failed",
+  },
+};
+
+export const IntegrationAutosaveFailure: Story = {
+  args: {
+    integrationSaveErrorMessage:
+      "Could not save sandbox profile integrations. Changes were not applied.",
   },
 };
 
