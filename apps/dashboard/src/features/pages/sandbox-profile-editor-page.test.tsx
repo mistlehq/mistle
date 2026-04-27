@@ -329,7 +329,6 @@ function DeleteProfileDialogHarness(input: {
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
-      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -377,7 +376,6 @@ function DraftActionsHarness(input: {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
-      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -423,7 +421,6 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
-      onRefreshSnapshot={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -651,12 +648,13 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Snapshot materialization failed.")).toBeDefined();
   });
 
-  it("shows a refresh snapshot action for published versions", () => {
+  it("does not show a refresh snapshot action in the published version menu", () => {
     renderPublishedWithDraftActionsHarness();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
 
-    expect(screen.getByRole("menuitem", { name: "Refresh snapshot" })).toBeDefined();
+    expect(screen.queryByRole("menuitem", { name: "Refresh snapshot" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Discard draft" })).toBeDefined();
   });
 
   it("polls while a published version is waiting on initial snapshot materialization", () => {

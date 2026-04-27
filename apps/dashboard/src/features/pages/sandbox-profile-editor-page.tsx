@@ -45,7 +45,6 @@ import {
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
-  refreshSandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
   PublishSandboxProfileVersionResult,
@@ -749,48 +748,6 @@ function LoadedSandboxProfileEditorPage(
       );
     },
   });
-  const refreshSnapshotMutation = useMutation({
-    mutationFn: async (version: number) =>
-      refreshSandboxProfileVersion({
-        profileId: input.profileId,
-        version,
-      }),
-    onSuccess: async (result) => {
-      setVersionActionError(null);
-      queryClient.setQueryData<SandboxProfile | undefined>(
-        sandboxProfileDetailQueryKey(input.profileId),
-        (currentProfile) =>
-          applyPublishedSandboxProfileVersionToProfile({
-            profile: currentProfile,
-            result,
-          }),
-      );
-      queryClient.setQueryData<{ versions: readonly SandboxProfileVersion[] } | undefined>(
-        sandboxProfileVersionsQueryKey(input.profileId),
-        (currentVersions) => {
-          const nextVersions = applyPublishedSandboxProfileVersionToVersions({
-            versions: currentVersions?.versions,
-            result,
-          });
-
-          return nextVersions === undefined ? currentVersions : { versions: nextVersions };
-        },
-      );
-      void Promise.all([
-        input.invalidateProfileVersions(input.profileId),
-        input.invalidateSandboxProfiles(),
-        input.invalidateProfileDetail(input.profileId),
-      ]);
-    },
-    onError: (error: unknown) => {
-      setVersionActionError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not refresh sandbox profile snapshot.",
-        }),
-      );
-    },
-  });
   const deleteProfileMutation = useMutation({
     mutationFn: async () =>
       deleteSandboxProfile({
@@ -864,9 +821,6 @@ function LoadedSandboxProfileEditorPage(
       onPublish={async (version) => {
         await publishMutation.mutateAsync(version);
       }}
-      onRefreshSnapshot={(version) => {
-        refreshSnapshotMutation.mutate(version);
-      }}
       onViewActive={() => {
         setVersionActionError(null);
         void input.navigate(`/sandbox-profiles/${input.profileId}/published`);
@@ -907,10 +861,7 @@ function LoadedSandboxProfileEditorPage(
       }}
       versionActionError={versionActionError}
       versionActionIsPending={
-        publishMutation.isPending ||
-        createDraftMutation.isPending ||
-        discardDraftMutation.isPending ||
-        refreshSnapshotMutation.isPending
+        publishMutation.isPending || createDraftMutation.isPending || discardDraftMutation.isPending
       }
       invalidateSandboxProfiles={input.invalidateSandboxProfiles}
       invalidateProfileDetail={input.invalidateProfileDetail}
@@ -936,7 +887,6 @@ function ReadySandboxProfileEditorPage(input: {
   deleteProfileIsPending: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => Promise<void>;
-  onRefreshSnapshot: (version: number) => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onConfirmDeleteProfile: () => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -1006,67 +956,72 @@ function ReadySandboxProfileEditorPage(input: {
   }
 
   return (
-    <SandboxProfileEditorView
-      snapshotPreparationStatus={resolveSnapshotPreparationStatus({
-        mode: input.mode,
-        version: input.currentVersion,
-      })}
-      hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
-      hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
-      isSavingProfileName={metaState.isUpdating}
-      mode={input.mode}
-      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
-      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
-      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
-      deleteProfileError={input.deleteProfileError}
-      deleteProfileIsPending={input.deleteProfileIsPending}
-      onMakeChanges={input.onMakeChanges}
-      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
-      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
-      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
-      onPublish={(version) => {
-        void handlePublish(version);
-      }}
-      onRefreshSnapshot={input.onRefreshSnapshot}
-      onSaveProfileName={metaState.onProfileNameSave}
-      onViewActive={input.onViewActive}
-      onViewDraft={input.onViewDraft}
-      profileName={metaState.formState.displayName}
-      profileNameFallback={metaState.pageTitle}
-      publishRequestIsPending={publishRequestIsPending}
-      versionActionError={publishFlushError ?? input.versionActionError}
-      versionActionIsPending={input.versionActionIsPending}
-      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
-      renderSectionPanel={(sectionId) => {
-        if (sectionId === "configurations") {
+    <>
+      <SandboxProfileEditorHeaderActions
+        isSavingDraftChanges={input.mode.kind === "draft" && isSavingDraftChanges}
+      />
+      <SandboxProfileEditorView
+        snapshotPreparationStatus={resolveSnapshotPreparationStatus({
+          mode: input.mode,
+          version: input.currentVersion,
+        })}
+        hasUnsavedIntegrationChanges={integrationDraftState.hasUnsavedChanges}
+        hasUnsavedSetupScriptChanges={setupScriptDraftState.hasUnsavedChanges}
+        isSavingProfileName={metaState.isUpdating}
+        mode={input.mode}
+        deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+        deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+        deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+        deleteProfileError={input.deleteProfileError}
+        deleteProfileIsPending={input.deleteProfileIsPending}
+        onMakeChanges={input.onMakeChanges}
+        onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+        onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+        onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+        onPublish={(version) => {
+          void handlePublish(version);
+        }}
+        onRefreshSnapshot={input.onRefreshSnapshot}
+        onSaveProfileName={metaState.onProfileNameSave}
+        onViewActive={input.onViewActive}
+        onViewDraft={input.onViewDraft}
+        profileName={metaState.formState.displayName}
+        profileNameFallback={metaState.pageTitle}
+        publishRequestIsPending={publishRequestIsPending}
+        versionActionError={publishFlushError ?? input.versionActionError}
+        versionActionIsPending={input.versionActionIsPending}
+        isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
+        renderSectionPanel={(sectionId) => {
+          if (sectionId === "configurations") {
+            return (
+              <LoadedSandboxProfileSetupScriptSection
+                disabled={draftFieldsAreDisabled}
+                key={`${input.profileId}:${String(input.mode.version)}`}
+                loader={setupScriptLoader}
+                profileId={input.profileId}
+                invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+                onDraftStateChange={setSetupScriptDraftState}
+                version={input.mode.version}
+              />
+            );
+          }
+
           return (
-            <LoadedSandboxProfileSetupScriptSection
-              disabled={draftFieldsAreDisabled}
-              key={`${input.profileId}:${String(input.mode.version)}`}
-              loader={setupScriptLoader}
+            <LoadedSandboxProfileIntegrationSetupSection
+              key={`${input.profileId}:integration-setup`}
+              activeSectionId={sectionId}
+              loader={integrationsLoader}
+              onDraftStateChange={setIntegrationDraftState}
               profileId={input.profileId}
-              invalidateVersionSetupScript={input.invalidateVersionSetupScript}
-              onDraftStateChange={setSetupScriptDraftState}
+              disabled={draftFieldsAreDisabled}
               version={input.mode.version}
+              invalidateVersionBindings={input.invalidateVersionBindings}
             />
           );
-        }
-
-        return (
-          <LoadedSandboxProfileIntegrationSetupSection
-            key={`${input.profileId}:integration-setup`}
-            activeSectionId={sectionId}
-            loader={integrationsLoader}
-            onDraftStateChange={setIntegrationDraftState}
-            profileId={input.profileId}
-            disabled={draftFieldsAreDisabled}
-            version={input.mode.version}
-            invalidateVersionBindings={input.invalidateVersionBindings}
-          />
-        );
-      }}
-      sections={SandboxProfileEditorTabs}
-    />
+        }}
+        sections={SandboxProfileEditorTabs}
+      />
+    </>
   );
 }
 
@@ -1183,7 +1138,6 @@ export function SandboxProfileEditorView(input: {
   publishRequestIsPending?: boolean;
   isDeleteProfileDialogOpen: boolean;
   onPublish: (version: number) => void;
-  onRefreshSnapshot: (version: number) => void;
   onConfirmDeleteProfile: () => void;
   onDiscardChangesAndLeaveDraft: (input: { draftVersion: number }) => void;
   onDeleteProfileDialogOpenChange: (open: boolean) => void;
@@ -1191,7 +1145,11 @@ export function SandboxProfileEditorView(input: {
   onViewActive: () => void;
   onViewDraft: () => void;
   sections: readonly SandboxProfileEditorSection[];
+  activeSectionId?: string;
+  onActiveSectionIdChange?: (sectionId: string) => void;
   renderSectionPanel: (sectionId: SandboxProfileEditorSection["id"]) => React.JSX.Element;
+  versionStatusBadge?: React.JSX.Element;
+  versionActions?: React.JSX.Element;
   hasUnsavedIntegrationChanges?: boolean;
   hasUnsavedSetupScriptChanges?: boolean;
   isSavingProfileName?: boolean;
@@ -1228,16 +1186,6 @@ export function SandboxProfileEditorView(input: {
       Delete profile
     </DropdownMenuItem>
   );
-  const refreshSnapshotMenuItem =
-    input.mode.kind !== "active" ? null : (
-      <DropdownMenuItem
-        onClick={() => {
-          input.onRefreshSnapshot(input.mode.version);
-        }}
-      >
-        Refresh snapshot
-      </DropdownMenuItem>
-    );
   const snapshotPreparationBadge =
     input.snapshotPreparationStatus === null
       ? null
@@ -1272,64 +1220,66 @@ export function SandboxProfileEditorView(input: {
           />
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={
-              snapshotPreparationBadge !== null
-                ? snapshotPreparationBadge.className
-                : input.mode.kind === "draft"
-                  ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
-                  : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
-            }
-          >
-            {snapshotPreparationBadge?.label === "Preparing snapshot" ? (
-              <SpinnerGapIcon aria-hidden="true" className="mr-1 size-3.5 animate-spin" />
-            ) : null}
-            {snapshotPreparationBadge?.label ??
-              (input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published")}
-          </span>
-          {input.mode.kind === "draft" ? (
-            <ButtonGroup>
-              <Button
-                disabled={versionActionIsDisabled}
-                onClick={() => {
-                  input.onPublish(input.mode.version);
-                }}
-                type="button"
-              >
-                {publishRequestIsPending ? "Publishing..." : "Publish"}
-              </Button>
-              <MoreActionsMenu
-                disabled={versionActionIsDisabled}
-                triggerIconVariant="chevron-down"
-                triggerLabel="More actions"
-                triggerVariant="default"
-              >
-                {viewPublishedMenuItem}
-                {discardChangesMenuItem}
-                {deleteProfileMenuItem}
-              </MoreActionsMenu>
-            </ButtonGroup>
-          ) : (
-            <ButtonGroup>
-              <Button
-                disabled={input.versionActionIsPending}
-                onClick={input.mode.hasDraft ? input.onViewDraft : input.onMakeChanges}
-                type="button"
-              >
-                {input.mode.hasDraft ? "Resume editing" : "Edit"}
-              </Button>
-              <MoreActionsMenu
-                disabled={input.versionActionIsPending}
-                triggerIconVariant="chevron-down"
-                triggerLabel="More actions"
-                triggerVariant="default"
-              >
-                {refreshSnapshotMenuItem}
-                {discardChangesMenuItem}
-                {deleteProfileMenuItem}
-              </MoreActionsMenu>
-            </ButtonGroup>
+          {input.versionStatusBadge ?? (
+            <span
+              className={
+                snapshotPreparationBadge !== null
+                  ? snapshotPreparationBadge.className
+                  : input.mode.kind === "draft"
+                    ? "inline-flex h-6 items-center rounded-sm border border-amber-200 bg-amber-50 px-2 text-xs font-medium text-amber-700"
+                    : "inline-flex h-6 items-center rounded-sm border border-blue-200 bg-blue-50 px-2 text-xs font-medium text-blue-700"
+              }
+            >
+              {snapshotPreparationBadge?.label === "Preparing snapshot" ? (
+                <SpinnerGapIcon aria-hidden="true" className="mr-1 size-3.5 animate-spin" />
+              ) : null}
+              {snapshotPreparationBadge?.label ??
+                (input.mode.kind === "draft" ? "Viewing: Draft" : "Viewing: Published")}
+            </span>
           )}
+          {input.versionActions ??
+            (input.mode.kind === "draft" ? (
+              <ButtonGroup>
+                <Button
+                  disabled={versionActionIsDisabled}
+                  onClick={() => {
+                    input.onPublish(input.mode.version);
+                  }}
+                  type="button"
+                >
+                  {publishRequestIsPending ? "Publishing..." : "Publish"}
+                </Button>
+                <MoreActionsMenu
+                  disabled={versionActionIsDisabled}
+                  triggerIconVariant="chevron-down"
+                  triggerLabel="More actions"
+                  triggerVariant="default"
+                >
+                  {viewPublishedMenuItem}
+                  {discardChangesMenuItem}
+                  {deleteProfileMenuItem}
+                </MoreActionsMenu>
+              </ButtonGroup>
+            ) : (
+              <ButtonGroup>
+                <Button
+                  disabled={input.versionActionIsPending}
+                  onClick={input.mode.hasDraft ? input.onViewDraft : input.onMakeChanges}
+                  type="button"
+                >
+                  {input.mode.hasDraft ? "Resume editing" : "Edit"}
+                </Button>
+                <MoreActionsMenu
+                  disabled={input.versionActionIsPending}
+                  triggerIconVariant="chevron-down"
+                  triggerLabel="More actions"
+                  triggerVariant="default"
+                >
+                  {discardChangesMenuItem}
+                  {deleteProfileMenuItem}
+                </MoreActionsMenu>
+              </ButtonGroup>
+            ))}
         </div>
       </div>
 
@@ -1358,6 +1308,10 @@ export function SandboxProfileEditorView(input: {
       />
 
       <SandboxProfileEditorSections
+        {...(input.activeSectionId === undefined ? {} : { activeSectionId: input.activeSectionId })}
+        {...(input.onActiveSectionIdChange === undefined
+          ? {}
+          : { onActiveSectionIdChange: input.onActiveSectionIdChange })}
         renderPanel={input.renderSectionPanel}
         sections={input.sections}
       />
