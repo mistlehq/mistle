@@ -132,6 +132,13 @@ export type StopSandboxInstanceWorkflowInput = {
 
 export type StopSandboxInstanceWorkflowOutput = {
   sandboxInstanceId: string;
+  executed: boolean;
+  outcome:
+    | "stopped"
+    | "already_stopped"
+    | "runtime_state_fence_before_load"
+    | "runtime_state_fence_before_stop"
+    | "runtime_state_fence_before_mark";
 };
 
 export const StopSandboxInstanceWorkflowSpec = defineWorkflowSpec<
@@ -150,6 +157,17 @@ export type ReconcileSandboxInstanceWorkflowInput = {
 
 export type ReconcileSandboxInstanceWorkflowOutput = {
   sandboxInstanceId: string;
+  executed: boolean;
+  outcome:
+    | "failed"
+    | "stopped"
+    | "already_failed"
+    | "already_stopped"
+    | "already_terminal"
+    | "runtime_state_fence_before_load"
+    | "runtime_state_fence_before_inspect"
+    | "runtime_state_fence_before_stop"
+    | "runtime_state_fence_before_mark";
 };
 
 export const ReconcileSandboxInstanceWorkflowSpec = defineWorkflowSpec<
@@ -172,6 +190,22 @@ export type HandleSandboxInstanceDeadlineWorkflowOutput = {
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
   executed: boolean;
+  outcome:
+    | "executed"
+    | "deadline_missing"
+    | "deadline_cleared"
+    | "deadline_generation_mismatch"
+    | "deadline_owner_lease_mismatch"
+    | "deadline_due_at_mismatch"
+    | "action_failed"
+    | "action_stopped"
+    | "action_already_failed"
+    | "action_already_stopped"
+    | "action_already_terminal"
+    | "action_runtime_state_fence_before_load"
+    | "action_runtime_state_fence_before_stop"
+    | "action_runtime_state_fence_before_mark"
+    | "action_runtime_state_fence_before_inspect";
 };
 
 export const HandleSandboxInstanceDeadlineWorkflowSpec = defineWorkflowSpec<

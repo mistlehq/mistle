@@ -25,6 +25,8 @@ import {
   startGatewayProcess,
   type StartedGatewayProcess,
 } from "../../data-plane-api/integration/runtime-status-test-helpers.js";
+import { createDataPlaneApiRuntime } from "../../data-plane-api/src/main.js";
+import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
 import {
   createDataPlaneWorkerRuntimeConfig,
   loadDataPlaneWorkerConfig,
@@ -54,6 +56,8 @@ type DatabaseStack = {
 
 let databaseStack: DatabaseStack | undefined;
 let dbPool: Pool | undefined;
+let dataPlaneApiRuntime: Awaited<ReturnType<typeof createDataPlaneApiRuntime>> | undefined;
+let dataPlaneApiBaseUrl: string | undefined;
 let gatewayProcess: StartedGatewayProcess | undefined;
 
 function getDatabaseStack(): DatabaseStack {
@@ -78,6 +82,14 @@ function getDbPool(): Pool {
   }
 
   return dbPool;
+}
+
+function getDataPlaneApiBaseUrl(): string {
+  if (dataPlaneApiBaseUrl === undefined) {
+    throw new Error("Expected integration data-plane-api runtime to be initialized.");
+  }
+
+  return dataPlaneApiBaseUrl;
 }
 
 function createDatabase() {
@@ -192,7 +204,17 @@ async function insertActiveDeadline(input: {
       kind: input.kind,
       ownerLeaseId: input.ownerLeaseId,
       dueAt: input.dueAt,
-      ...(input.generation === undefined ? {} : { generation: input.generation }),
+      generation: input.generation ?? 1,
+      clearedAt: null,
+    })
+    .onConflictDoUpdate({
+      target: [sandboxInstanceDeadlines.sandboxInstanceId, sandboxInstanceDeadlines.kind],
+      set: {
+        ownerLeaseId: input.ownerLeaseId,
+        dueAt: input.dueAt,
+        generation: input.generation ?? 1,
+        clearedAt: null,
+      },
     });
 }
 
@@ -264,6 +286,46 @@ async function waitForRuntimeStateOwnerLeaseId(input: {
 
   throw new Error(
     `Timed out waiting for gateway runtime-state attachment for sandbox '${input.sandboxInstanceId}'.`,
+  );
+}
+
+async function waitForPersistedDeadline(input: {
+  sandboxInstanceId: string;
+  kind: "idle" | "disconnect";
+  ownerLeaseId: string;
+}): Promise<{
+  dueAt: string;
+  generation: number;
+}> {
+  const deadlineMs = systemClock.nowMs() + RuntimeStateWaitTimeoutMs;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const deadline = await createDatabase().query.sandboxInstanceDeadlines.findFirst({
+      columns: {
+        dueAt: true,
+        generation: true,
+      },
+      where: (table, { and, eq, isNull }) =>
+        and(
+          eq(table.sandboxInstanceId, input.sandboxInstanceId),
+          eq(table.kind, input.kind),
+          eq(table.ownerLeaseId, input.ownerLeaseId),
+          isNull(table.clearedAt),
+        ),
+    });
+
+    if (deadline !== undefined) {
+      return {
+        dueAt: new Date(deadline.dueAt).toISOString(),
+        generation: deadline.generation,
+      };
+    }
+
+    await systemSleeper.sleep(RuntimeStatePollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for persisted ${input.kind} deadline for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -339,15 +401,56 @@ describe("sandbox instance deadlines integration", () => {
       migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
       migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
     });
+    const workflowBackend = await createDataPlaneBackend({
+      url: databaseStack.directUrl,
+      namespaceId: "data-plane-worker-deadlines-it",
+      runMigrations: true,
+    });
+    await workflowBackend.stop();
 
     dbPool = new Pool({
       connectionString: databaseStack.directUrl,
     });
 
+    const dataPlaneApiPort = await reserveAvailablePort({ host: GatewayPortHost });
+    dataPlaneApiRuntime = await createDataPlaneApiRuntime({
+      app: {
+        server: {
+          host: GatewayPortHost,
+          port: dataPlaneApiPort,
+        },
+        database: {
+          url: databaseStack.directUrl,
+          migrationUrl: databaseStack.directUrl,
+        },
+        workflow: {
+          databaseUrl: databaseStack.directUrl,
+          migrationUrl: databaseStack.directUrl,
+          namespaceId: "data-plane-worker-deadlines-it",
+        },
+        runtimeState: {
+          gatewayBaseUrl: "http://127.0.0.1:1",
+        },
+        controlPlaneApi: {
+          baseUrl: "http://127.0.0.1:1",
+        },
+        sandbox: {
+          docker: {
+            socketPath: "/var/run/docker.sock",
+          },
+        },
+      },
+      internalAuthServiceToken: InternalAuthServiceToken,
+      sandboxProvider: "docker",
+      sandboxStorageBackend: "docker_volume",
+    });
+    await dataPlaneApiRuntime.start();
+    dataPlaneApiBaseUrl = `http://${GatewayPortHost}:${String(dataPlaneApiPort)}`;
+
     gatewayProcess = await startGatewayProcess({
       port: await reserveAvailablePort({ host: GatewayPortHost }),
       databaseUrl: databaseStack.directUrl,
-      dataPlaneApiBaseUrl: "http://127.0.0.1:1",
+      dataPlaneApiBaseUrl: getDataPlaneApiBaseUrl(),
       controlPlaneApiBaseUrl: "http://127.0.0.1:1",
       internalAuthServiceToken: InternalAuthServiceToken,
     });
@@ -355,6 +458,7 @@ describe("sandbox instance deadlines integration", () => {
 
   afterAll(async () => {
     await gatewayProcess?.stop();
+    await dataPlaneApiRuntime?.stop();
     await dbPool?.end();
     await databaseStack?.stop();
   });
@@ -398,6 +502,7 @@ describe("sandbox instance deadlines integration", () => {
         sandboxInstanceId,
         kind: SandboxInstanceDeadlineKinds.IDLE,
         executed: false,
+        outcome: "action_runtime_state_fence_before_load",
       });
     },
     IntegrationTestTimeoutMs,
@@ -429,36 +534,32 @@ describe("sandbox instance deadlines integration", () => {
           gatewayBaseUrl,
           sandboxInstanceId,
         });
+        const idleDeadline = await waitForPersistedDeadline({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.IDLE,
+          ownerLeaseId,
+        });
 
-        await createDatabase()
-          .insert(sandboxInstanceDeadlines)
-          .values([
-            {
-              sandboxInstanceId,
-              kind: SandboxInstanceDeadlineKinds.IDLE,
-              ownerLeaseId,
-              dueAt: MatchingDeadlineDueAt,
-            },
-            {
-              sandboxInstanceId,
-              kind: SandboxInstanceDeadlineKinds.DISCONNECT,
-              ownerLeaseId: `owner_disconnect_${sandboxInstanceId}`,
-              dueAt: MatchingDeadlineDueAt,
-            },
-          ]);
+        await insertActiveDeadline({
+          sandboxInstanceId,
+          kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+          ownerLeaseId: `owner_disconnect_${sandboxInstanceId}`,
+          dueAt: MatchingDeadlineDueAt,
+        });
 
         await expect(
           handleSandboxInstanceDeadline(createDeadlineExecutionContext({ gatewayBaseUrl }), {
             sandboxInstanceId,
             kind: SandboxInstanceDeadlineKinds.IDLE,
             ownerLeaseId,
-            dueAt: MatchingDeadlineDueAt,
-            generation: 1,
+            dueAt: idleDeadline.dueAt,
+            generation: idleDeadline.generation,
           }),
         ).resolves.toEqual({
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.IDLE,
           executed: true,
+          outcome: "executed",
         });
 
         const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({
@@ -511,12 +612,10 @@ describe("sandbox instance deadlines integration", () => {
           gatewayBaseUrl,
           sandboxInstanceId,
         });
-
-        await insertActiveDeadline({
+        const firstIdleDeadline = await waitForPersistedDeadline({
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.IDLE,
           ownerLeaseId: firstOwnerLeaseId,
-          dueAt: MatchingDeadlineDueAt,
         });
 
         await lockClient.query("BEGIN");
@@ -538,8 +637,8 @@ describe("sandbox instance deadlines integration", () => {
             sandboxInstanceId,
             kind: SandboxInstanceDeadlineKinds.IDLE,
             ownerLeaseId: firstOwnerLeaseId,
-            dueAt: MatchingDeadlineDueAt,
-            generation: 1,
+            dueAt: firstIdleDeadline.dueAt,
+            generation: firstIdleDeadline.generation,
           },
         );
 
@@ -566,6 +665,7 @@ describe("sandbox instance deadlines integration", () => {
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.IDLE,
           executed: false,
+          outcome: "action_runtime_state_fence_before_mark",
         });
 
         const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({
@@ -683,6 +783,7 @@ describe("sandbox instance deadlines integration", () => {
           sandboxInstanceId,
           kind: SandboxInstanceDeadlineKinds.DISCONNECT,
           executed: false,
+          outcome: "action_runtime_state_fence_before_mark",
         });
 
         const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({
@@ -745,6 +846,7 @@ describe("sandbox instance deadlines integration", () => {
       sandboxInstanceId,
       kind: SandboxInstanceDeadlineKinds.IDLE,
       executed: false,
+      outcome: "deadline_generation_mismatch",
     });
   });
 
@@ -798,6 +900,7 @@ describe("sandbox instance deadlines integration", () => {
       sandboxInstanceId,
       kind: SandboxInstanceDeadlineKinds.IDLE,
       executed: false,
+      outcome: "deadline_owner_lease_mismatch",
     });
 
     await expect(
@@ -825,6 +928,7 @@ describe("sandbox instance deadlines integration", () => {
       sandboxInstanceId,
       kind: SandboxInstanceDeadlineKinds.IDLE,
       executed: false,
+      outcome: "deadline_due_at_mismatch",
     });
   });
 
@@ -870,6 +974,7 @@ describe("sandbox instance deadlines integration", () => {
       sandboxInstanceId,
       kind: SandboxInstanceDeadlineKinds.IDLE,
       executed: false,
+      outcome: "deadline_cleared",
     });
   });
 
@@ -900,6 +1005,7 @@ describe("sandbox instance deadlines integration", () => {
         sandboxInstanceId,
         kind: SandboxInstanceDeadlineKinds.DISCONNECT,
         executed: true,
+        outcome: "executed",
       });
 
       const sandboxInstance = await createDatabase().query.sandboxInstances.findFirst({

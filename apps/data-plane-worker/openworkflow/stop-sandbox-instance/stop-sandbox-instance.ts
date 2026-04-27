@@ -24,6 +24,18 @@ type RunningSandboxInstanceStopState = {
   providerSandboxId: string;
 };
 
+export type StopSandboxInstanceOutcome =
+  | "stopped"
+  | "already_stopped"
+  | "runtime_state_fence_before_load"
+  | "runtime_state_fence_before_stop"
+  | "runtime_state_fence_before_mark";
+
+export type StopSandboxInstanceResult = {
+  executed: boolean;
+  outcome: StopSandboxInstanceOutcome;
+};
+
 /**
  * Returns `true` when the current runtime-state snapshot still permits the
  * requested fenced stop.
@@ -114,7 +126,7 @@ export async function stopSandboxInstance(
     stopReason: SandboxStopReason;
     expectedOwnerLeaseId: string;
   },
-): Promise<boolean> {
+): Promise<StopSandboxInstanceResult> {
   if (
     !(await isSandboxStopStillPermitted({
       runtimeStateReader: ctx.runtimeStateReader,
@@ -124,7 +136,10 @@ export async function stopSandboxInstance(
       expectedOwnerLeaseId: input.expectedOwnerLeaseId,
     }))
   ) {
-    return false;
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_load",
+    };
   }
 
   const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
@@ -132,7 +147,10 @@ export async function stopSandboxInstance(
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstanceState === null) {
-    return false;
+    return {
+      executed: false,
+      outcome: "already_stopped",
+    };
   }
 
   if (
@@ -144,7 +162,10 @@ export async function stopSandboxInstance(
       expectedOwnerLeaseId: input.expectedOwnerLeaseId,
     }))
   ) {
-    return false;
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_stop",
+    };
   }
 
   try {
@@ -182,5 +203,22 @@ export async function stopSandboxInstance(
       }),
   });
 
-  return markOutcome !== "fence_mismatch";
+  if (markOutcome === "fence_mismatch") {
+    return {
+      executed: false,
+      outcome: "runtime_state_fence_before_mark",
+    };
+  }
+
+  if (markOutcome === "already_stopped") {
+    return {
+      executed: false,
+      outcome: "already_stopped",
+    };
+  }
+
+  return {
+    executed: true,
+    outcome: "stopped",
+  };
 }

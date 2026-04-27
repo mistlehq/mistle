@@ -2,6 +2,7 @@ import {
   StopSandboxInstanceWorkflowSpec,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
+import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -12,8 +13,8 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   async ({ input, step }): Promise<StopSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();
 
-    await step.run({ name: "stop-sandbox-instance" }, async () => {
-      await stopSandboxInstance(
+    const result = await step.run({ name: "stop-sandbox-instance" }, async () => {
+      return stopSandboxInstance(
         {
           config: ctx.config,
           db: ctx.db,
@@ -30,8 +31,26 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     });
 
+    trace.getActiveSpan()?.addEvent("sandbox_instance_stop.outcome", {
+      "mistle.sandbox.instance_id": input.sandboxInstanceId,
+      "mistle.sandbox.stop.reason": input.stopReason,
+      "mistle.sandbox.stop.executed": result.executed,
+      "mistle.sandbox.stop.outcome": result.outcome,
+    });
+    ctx.logger.info(
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        stopReason: input.stopReason,
+        executed: result.executed,
+        outcome: result.outcome,
+      },
+      "Handled sandbox instance stop workflow.",
+    );
+
     return {
       sandboxInstanceId: input.sandboxInstanceId,
+      executed: result.executed,
+      outcome: result.outcome,
     };
   },
 );

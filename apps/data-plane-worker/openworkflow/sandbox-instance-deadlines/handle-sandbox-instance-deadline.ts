@@ -6,9 +6,29 @@ import type { HandleSandboxInstanceDeadlineWorkflowOutput } from "@mistle/workfl
 
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
-import { reconcileSandboxInstance } from "../reconcile-sandbox-instance/reconcile-sandbox-instance.js";
-import { stopSandboxInstance } from "../stop-sandbox-instance/stop-sandbox-instance.js";
+import {
+  reconcileSandboxInstance,
+  type ReconcileSandboxInstanceResult,
+} from "../reconcile-sandbox-instance/reconcile-sandbox-instance.js";
+import {
+  stopSandboxInstance,
+  type StopSandboxInstanceResult,
+} from "../stop-sandbox-instance/stop-sandbox-instance.js";
 import { findSandboxInstanceDeadline } from "./find-sandbox-instance-deadline.js";
+
+export type HandleSandboxInstanceDeadlineOutcome =
+  | "executed"
+  | "deadline_missing"
+  | "deadline_cleared"
+  | "deadline_generation_mismatch"
+  | "deadline_owner_lease_mismatch"
+  | "deadline_due_at_mismatch"
+  | `action_${StopSandboxInstanceResult["outcome"]}`
+  | `action_${ReconcileSandboxInstanceResult["outcome"]}`;
+
+export type HandleSandboxInstanceDeadlineResult = HandleSandboxInstanceDeadlineWorkflowOutput & {
+  outcome: HandleSandboxInstanceDeadlineOutcome;
+};
 
 export async function handleSandboxInstanceDeadline(
   ctx: {
@@ -26,28 +46,59 @@ export async function handleSandboxInstanceDeadline(
     dueAt: string;
     generation: number;
   },
-): Promise<HandleSandboxInstanceDeadlineWorkflowOutput> {
+): Promise<HandleSandboxInstanceDeadlineResult> {
   const deadline = await findSandboxInstanceDeadline({
     db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
     kind: input.kind,
   });
 
-  if (
-    deadline === undefined ||
-    deadline.clearedAt !== null ||
-    deadline.generation !== input.generation ||
-    deadline.ownerLeaseId !== input.ownerLeaseId ||
-    deadline.dueAt !== input.dueAt
-  ) {
+  if (deadline === undefined) {
     return {
       sandboxInstanceId: input.sandboxInstanceId,
       kind: input.kind,
       executed: false,
+      outcome: "deadline_missing",
     };
   }
 
-  const executed = await executeDeadlineAction(ctx, {
+  if (deadline.clearedAt !== null) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      executed: false,
+      outcome: "deadline_cleared",
+    };
+  }
+
+  if (deadline.generation !== input.generation) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      executed: false,
+      outcome: "deadline_generation_mismatch",
+    };
+  }
+
+  if (deadline.ownerLeaseId !== input.ownerLeaseId) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      executed: false,
+      outcome: "deadline_owner_lease_mismatch",
+    };
+  }
+
+  if (deadline.dueAt !== input.dueAt) {
+    return {
+      sandboxInstanceId: input.sandboxInstanceId,
+      kind: input.kind,
+      executed: false,
+      outcome: "deadline_due_at_mismatch",
+    };
+  }
+
+  const actionResult = await executeDeadlineAction(ctx, {
     sandboxInstanceId: input.sandboxInstanceId,
     kind: input.kind,
     ownerLeaseId: deadline.ownerLeaseId,
@@ -56,7 +107,8 @@ export async function handleSandboxInstanceDeadline(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     kind: input.kind,
-    executed,
+    executed: actionResult.executed,
+    outcome: actionResult.executed ? "executed" : `action_${actionResult.outcome}`,
   };
 }
 
@@ -74,7 +126,7 @@ async function executeDeadlineAction(
     kind: SandboxInstanceDeadlineKind;
     ownerLeaseId: string;
   },
-): Promise<boolean> {
+): Promise<StopSandboxInstanceResult | ReconcileSandboxInstanceResult> {
   switch (input.kind) {
     case "idle":
       return stopSandboxInstance(

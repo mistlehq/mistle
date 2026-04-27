@@ -2,6 +2,7 @@ import {
   ReconcileSandboxInstanceWorkflowSpec,
   type ReconcileSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
+import { trace } from "@opentelemetry/api";
 
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
@@ -12,8 +13,8 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   async ({ input, step }): Promise<ReconcileSandboxInstanceWorkflowOutput> => {
     const ctx = await getWorkflowContext();
 
-    await step.run({ name: "reconcile-sandbox-instance" }, async () => {
-      await reconcileSandboxInstance(
+    const result = await step.run({ name: "reconcile-sandbox-instance" }, async () => {
+      return reconcileSandboxInstance(
         {
           config: ctx.config,
           db: ctx.db,
@@ -30,8 +31,26 @@ export const ReconcileSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       );
     });
 
+    trace.getActiveSpan()?.addEvent("sandbox_instance_reconcile.outcome", {
+      "mistle.sandbox.instance_id": input.sandboxInstanceId,
+      "mistle.sandbox.reconcile.reason": input.reason,
+      "mistle.sandbox.reconcile.executed": result.executed,
+      "mistle.sandbox.reconcile.outcome": result.outcome,
+    });
+    ctx.logger.info(
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        reason: input.reason,
+        executed: result.executed,
+        outcome: result.outcome,
+      },
+      "Handled sandbox instance reconcile workflow.",
+    );
+
     return {
       sandboxInstanceId: input.sandboxInstanceId,
+      executed: result.executed,
+      outcome: result.outcome,
     };
   },
 );
