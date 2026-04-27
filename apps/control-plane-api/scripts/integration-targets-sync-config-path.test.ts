@@ -28,7 +28,7 @@ describe("integration-targets-sync-config-path", () => {
 
     await mkdir(scriptDirectory, { recursive: true });
     await mkdir(join(temporaryWorkspaceRoot, "config"), { recursive: true });
-    await writeFile(developmentConfigPath, "[apps.control_plane_api]\n", "utf8");
+    await writeFile(developmentConfigPath, "[services.control_plane_api]\n", "utf8");
 
     try {
       const configPath = resolveIntegrationTargetsSyncConfigPath({}, scriptDirectory);
@@ -68,7 +68,7 @@ describe("integration-targets-sync-config-path", () => {
     }
   });
 
-  it("loads the minimal sync config from development TOML without requiring migrationUrl", async () => {
+  it("loads the minimal sync config from next development TOML", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
     const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
     const developmentConfigPath = join(temporaryWorkspaceRoot, "config", "config.development.toml");
@@ -78,13 +78,13 @@ describe("integration-targets-sync-config-path", () => {
     await writeFile(
       developmentConfigPath,
       [
-        "[apps.control_plane_api.database]",
-        'url = "postgresql://user:pass@localhost:5432/mistle"',
+        "[postgres.control_plane]",
+        'pooled_url = "postgresql://user:pass@localhost:6432/mistle"',
         "",
-        "[apps.control_plane_api.integrations]",
+        "[services.control_plane_api.integrations]",
         "active_master_encryption_key_version = 1",
         "",
-        "[apps.control_plane_api.integrations.master_encryption_keys]",
+        "[services.control_plane_api.integrations.master_encryption_keys]",
         '1 = "dev-master-key"',
         "",
       ].join("\n"),
@@ -93,12 +93,14 @@ describe("integration-targets-sync-config-path", () => {
 
     try {
       const config = loadIntegrationTargetsSyncConfig({
-        environment: {},
+        environment: {
+          MISTLE_CONFIG_FORMAT: "next",
+        },
         scriptDirectory,
       });
 
       expect(config).toEqual({
-        databaseUrl: "postgresql://user:pass@localhost:5432/mistle",
+        databaseUrl: "postgresql://user:pass@localhost:6432/mistle",
         integrations: {
           activeMasterEncryptionKeyVersion: 1,
           masterEncryptionKeys: {
@@ -106,6 +108,41 @@ describe("integration-targets-sync-config-path", () => {
           },
         },
       });
+    } finally {
+      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("does not infer next format from development TOML", async () => {
+    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
+    const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
+    const developmentConfigPath = join(temporaryWorkspaceRoot, "config", "config.development.toml");
+
+    await mkdir(scriptDirectory, { recursive: true });
+    await mkdir(join(temporaryWorkspaceRoot, "config"), { recursive: true });
+    await writeFile(
+      developmentConfigPath,
+      [
+        "[postgres.control_plane]",
+        'pooled_url = "postgresql://user:pass@localhost:6432/mistle"',
+        "",
+        "[services.control_plane_api.integrations]",
+        "active_master_encryption_key_version = 1",
+        "",
+        "[services.control_plane_api.integrations.master_encryption_keys]",
+        '1 = "dev-master-key"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    try {
+      expect(() =>
+        loadIntegrationTargetsSyncConfig({
+          environment: {},
+          scriptDirectory,
+        }),
+      ).toThrow(/databaseUrl/u);
     } finally {
       await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
     }
@@ -121,13 +158,13 @@ describe("integration-targets-sync-config-path", () => {
     await writeFile(
       developmentConfigPath,
       [
-        "[apps.control_plane_api.database]",
-        'url = "postgresql://user:pass@localhost:5432/mistle"',
+        "[postgres.control_plane]",
+        'pooled_url = "postgresql://user:pass@localhost:6432/mistle"',
         "",
-        "[apps.control_plane_api.integrations]",
+        "[services.control_plane_api.integrations]",
         "active_master_encryption_key_version = 1",
         "",
-        "[apps.control_plane_api.integrations.master_encryption_keys]",
+        "[services.control_plane_api.integrations.master_encryption_keys]",
         '1 = "dev-master-key"',
         "",
       ].join("\n"),
@@ -137,6 +174,7 @@ describe("integration-targets-sync-config-path", () => {
     try {
       const config = loadIntegrationTargetsSyncConfig({
         environment: {
+          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL:
             "postgresql://override:pass@localhost:6432/mistle",
           MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "2",

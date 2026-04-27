@@ -201,8 +201,9 @@ export function loadDashboardBuildConfig(
 ): DashboardBuildConfig {
   const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
   const parsedRoot = parseTomlFile(configPath);
+  const configFormat = resolveConfigFormat({ env: environment });
 
-  if (resolveConfigFormat({ env: environment }) === "next") {
+  if (configFormat === "next") {
     const parsedConfig = NextDashboardBuildConfigSchema.parse(parsedRoot);
     const controlPlaneApiOrigin = normalizeOrigin(
       parsedConfig.services.dashboard.control_plane_api_origin,

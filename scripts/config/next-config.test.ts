@@ -1,0 +1,89 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+import { loadConfig } from "../../packages/config/src/loader.ts";
+import { AppIds } from "../../packages/config/src/modules.ts";
+import {
+  buildNextDevelopmentConfig,
+  buildNextIntegrationConfig,
+  stringifyNextConfig,
+} from "./next-config.ts";
+
+function writeTemporaryConfig(content: string): string {
+  const directory = mkdtempSync(join(tmpdir(), "mistle-next-config-"));
+  const configPath = join(directory, "config.toml");
+  writeFileSync(configPath, content, "utf8");
+  return configPath;
+}
+
+function removeTemporaryConfig(configPath: string): void {
+  rmSync(dirname(configPath), { recursive: true, force: true });
+}
+
+function loadEveryAppFromContent(content: string): void {
+  const configPath = writeTemporaryConfig(content);
+
+  try {
+    loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath, format: "next" });
+    loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath, format: "next" });
+    loadConfig({ app: AppIds.DATA_PLANE_API, configPath, format: "next" });
+    loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath, format: "next" });
+    loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath, format: "next" });
+    loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath, format: "next" });
+  } finally {
+    removeTemporaryConfig(configPath);
+  }
+}
+
+describe("next config generation", () => {
+  it("generates loadable development TOML with operator comments", () => {
+    const content = stringifyNextConfig({
+      header: "",
+      configRoot: buildNextDevelopmentConfig(),
+    });
+
+    expect(content).toContain("[services.control_plane_api]");
+    expect(content).toContain(
+      "# Use direct_url for migrations and pooled_url for app runtime traffic.",
+    );
+    loadEveryAppFromContent(content);
+  });
+
+  it("generates loadable docker integration TOML", () => {
+    const content = stringifyNextConfig({
+      header: "",
+      configRoot: buildNextIntegrationConfig({
+        provider: "docker",
+        environment: {},
+      }),
+    });
+
+    expect(content).toContain('backend = "docker_volume"');
+    loadEveryAppFromContent(content);
+  });
+
+  it("generates loadable e2b integration TOML from required env values", () => {
+    const content = stringifyNextConfig({
+      header: "",
+      configRoot: buildNextIntegrationConfig({
+        provider: "e2b",
+        e2bSandboxBaseImage: "ghcr.io/mistlehq/sandbox-base:test",
+        environment: {
+          MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "e2b-test-key",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "e2b-test-key",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-test-key",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON:
+            '[{"type":"s3-compatible","bucket":"sandbox-storage","endpoint":"https://storage.example.test","accessKeyId":"access-key","secretAccessKey":"secret-key"}]',
+        },
+      }),
+    });
+
+    expect(content).toContain('provider = "e2b"');
+    expect(content).toContain('mount_object_store = "sandbox_storage"');
+    loadEveryAppFromContent(content);
+  });
+});

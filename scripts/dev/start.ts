@@ -89,7 +89,7 @@ function readTomlConfigRoot(configPath: string): Record<string, unknown> {
 }
 
 function resolveDevTomlConfigFormat(): TomlConfigFormat {
-  return resolveConfigFormat({ env: process.env }) ?? "legacy";
+  return resolveConfigFormat({ env: process.env }) ?? "next";
 }
 
 function readRequiredIntegerTomlValue(

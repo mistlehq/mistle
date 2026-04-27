@@ -247,6 +247,14 @@ export function projectToRuntimeConfig(config: Config): AppConfig {
                 socketPath: config.sandbox.docker.socket_path,
               }
             : undefined,
+          ...(config.sandbox.e2b === undefined
+            ? {}
+            : {
+                e2b: {
+                  apiKey: config.sandbox.e2b.api_key,
+                  domain: config.sandbox.e2b.domain,
+                },
+              }),
         },
       },
       data_plane_gateway: {

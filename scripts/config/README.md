@@ -8,10 +8,11 @@ Maintainer docs for local config initialization scripts.
 - Script: `scripts/config/init-development.ts`
 - Output: `config/config.development.toml`
 - Behavior:
-  - Reads `config/config.sample.toml`.
-  - Applies development preset defaults.
-  - Applies development preset generators.
+  - Generates the next TOML shape.
+  - Generates local-only secrets at init time.
+  - Preserves generated section comments for operator-facing guidance.
   - Writes `config/config.development.toml` (overwrites on each run).
+  - Validates the result through `@mistle/config` with `format: "next"`.
 
 ## Integration Init Script
 
@@ -21,11 +22,13 @@ Maintainer docs for local config initialization scripts.
   - `config/config.integration.docker.toml`
   - `config/config.integration.e2b.toml`
 - Behavior:
-  - Reads `config/config.sample.toml`.
-  - Applies development preset defaults and generators as the integration baseline.
+  - Generates the next TOML shape.
+  - Uses the development next config as the integration baseline.
   - Shapes the config per requested sandbox provider from `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`.
-  - Overlays canonical runtime config env vars onto the generated TOML.
+  - Applies the legacy env override names that are still needed while the env surface remains stable.
+  - Preserves generated section comments for operator-facing guidance.
   - Writes one provider-specific integration config file per requested provider.
+  - Validates each result through `@mistle/config` with `format: "next"`.
 
 ## Conversion Scripts
 
@@ -48,57 +51,29 @@ Notes:
 
 - Conversion currently covers `@mistle/config` managed runtime modules (global plus control/data plane apps).
 - Unknown keys are ignored.
-- Next TOML files must be loaded with `MISTLE_CONFIG_FORMAT=next` when they are
-  supplied through `MISTLE_CONFIG_PATH`. Legacy TOML remains the default until
-  the migration is complete.
+- Generated development and integration TOML files use the next shape. Runtime
+  consumers must set `MISTLE_CONFIG_FORMAT=next` when these files are supplied
+  through `MISTLE_CONFIG_PATH`.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
-- Generated integration configs omit `global.sandbox.storage` unless a provider-specific durable storage backend is enabled.
-- If integration config generation explicitly enables Archil storage, provider
-  presets require a fully populated managed Archil profile with `api_key`,
-  `region`, and a non-empty `mounts` array.
+- Docker integration configs use `sandbox.storage.backend = "docker_volume"`.
+- E2B integration configs use Archil-backed storage and require a fully
+  populated managed Archil profile via env, including `api_key`, `region`, and
+  one S3-compatible mount.
 - Archil-backed development and test configs should point at a real remote
   S3-compatible bucket. Do not assume the local SeaweedFS object store is a
   supported Archil backing store.
 
 ## Preset Modules
 
-Development preset modules live under `scripts/config/presets/development/`.
+The shared next config builder and comment-preserving writer live in
+`scripts/config/next-config.ts`.
 
-Integration provider presets live under `scripts/config/presets/integration/`.
-
-Each module exports:
-
-- `defaults`: static values merged onto the sample config.
-- `generators`: dynamic value rules for computed values (for example secrets).
-
-`scripts/config/presets/development/index.ts` composes these modules into
-`developmentPresetModules`.
-
-## Generator Contract
-
-Each generator has this shape:
-
-- `path: string[]`
-  - Dot-path segments to the output field.
-  - Example: `["global", "auth", "key"]`
-- `when?: "missing"`
-  - `"missing"` means run only when the target value is `undefined`.
-- `generate({ config, currentValue }) => unknown`
-  - Returns the generated value written to `path`.
-
-Example:
-
-```js
-{
-  path: ["global", "auth", "key"],
-  when: "missing",
-  generate: () => randomBytes(32).toString("hex"),
-}
-```
+Integration provider metadata lives under `scripts/config/presets/integration/`.
 
 ## Conventions
 
-- Keep presets scoped by domain (`global`, app-specific modules, etc.).
-- Prefer `defaults` for deterministic values.
-- Use `generators` only for values that should be computed at init time.
+- Keep generated TOML in the next shape.
+- Keep generated comments useful for operators.
+- Keep env support limited to the existing `MISTLE_GLOBAL_*` and
+  `MISTLE_APPS_*` override names until the env surface gets its own migration.
 - Keep the init command no-arg and deterministic aside from explicit generators.

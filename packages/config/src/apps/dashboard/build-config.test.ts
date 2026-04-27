@@ -146,6 +146,15 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
+  it("does not infer next format from config/config.development.toml", () => {
+    writeWorkspaceConfigFile({
+      relativePath: "config/config.development.toml",
+      content: '[services.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+    });
+
+    expect(() => loadDashboardBuildConfig({}, "development")).toThrow(/Invalid input/u);
+  });
+
   it("loads dashboard origin from next config shape", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createNextDashboardConfigFile(),
