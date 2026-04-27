@@ -21,7 +21,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -536,7 +536,6 @@ function SlackSetupUrls(input: {
 export function IntegrationConnectionSlackAppSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const params = useParams();
-  const [searchParams] = useSearchParams();
   const { title, description } = resolvePageFrameText(pageMeta, "Set Up Slack App");
   const targetKey = params["targetKey"];
   const connectionId = params["connectionId"];
@@ -583,20 +582,12 @@ export function IntegrationConnectionSlackAppSetupPage(): React.JSX.Element {
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}
     >
-      <SlackAppSetupPane
-        connection={connection}
-        installSucceeded={searchParams.get("slackApp") === "installed"}
-        key={connection.id}
-      />
+      <SlackAppSetupPane connection={connection} key={connection.id} />
     </FormPageFrame>
   );
 }
 
-export function SlackAppSetupPane(input: {
-  connection: IntegrationConnection;
-  installSucceeded?: boolean;
-}): React.JSX.Element {
-  const navigate = useNavigate();
+export function SlackAppSetupPane(input: { connection: IntegrationConnection }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [setupMode, setSetupMode] = useState<SlackSetupMode>(() =>
     isSlackAppInstalled(input.connection) ? "existing-app" : "manifest",
@@ -855,40 +846,6 @@ export function SlackAppSetupPane(input: {
       : webhookCallbackUrl === undefined
         ? { kind: "missing" }
         : { kind: "ready", value: webhookCallbackUrl };
-
-  if (input.installSucceeded === true) {
-    return (
-      <FormPageStack>
-        <Notice title="Slack app installed" variant="success">
-          The Slack app has been installed and its bot token has been saved to this Mistle
-          connection.
-        </Notice>
-        <FormPageSection>
-          <div className="flex flex-col gap-6 p-4">
-            <div className="flex flex-col gap-1">
-              <h2 className="text-lg font-medium">Slack app is connected</h2>
-              <p className="text-muted-foreground text-sm">
-                Mistle has saved the Slack app credentials and webhook configuration for this
-                connection.
-              </p>
-            </div>
-            <FormPageActionBar>
-              <Button
-                onClick={() => {
-                  void navigate(
-                    `/integrations/${encodeURIComponent(input.connection.targetKey)}?connectionId=${encodeURIComponent(input.connection.id)}`,
-                  );
-                }}
-                type="button"
-              >
-                View connection
-              </Button>
-            </FormPageActionBar>
-          </div>
-        </FormPageSection>
-      </FormPageStack>
-    );
-  }
 
   return (
     <FormPageStack>

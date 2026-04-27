@@ -38,19 +38,12 @@ function createSlackConnection(input?: {
   };
 }
 
-function renderSlackAppSetupPane(input?: {
-  connection?: IntegrationConnection;
-  installSucceeded?: boolean;
-}) {
+function renderSlackAppSetupPane(input?: { connection?: IntegrationConnection }) {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
   const connection = input?.connection ?? createSlackConnection();
-  const paneProps =
-    input?.installSucceeded === undefined
-      ? { connection }
-      : { connection, installSucceeded: input.installSucceeded };
   const webhookSource = {
     id: "iws_slack_app_setup",
     targetKey: connection.targetKey,
@@ -69,7 +62,7 @@ function renderSlackAppSetupPane(input?: {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
-        <SlackAppSetupPane {...paneProps} />
+        <SlackAppSetupPane connection={connection} />
       </QueryClientProvider>
     </MemoryRouter>,
   );
@@ -158,17 +151,5 @@ describe("SlackAppSetupPane", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save Slack App" })).toBeNull();
-  });
-
-  it("shows installed success after Slack OAuth returns", () => {
-    renderSlackAppSetupPane({
-      installSucceeded: true,
-    });
-
-    expect(screen.getByText("Slack app installed")).toBeTruthy();
-    expect(screen.getByText("Slack app is connected")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "View connection" })).toBeTruthy();
-    expect(screen.queryByText("Choose a setup method")).toBeNull();
-    expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
   });
 });

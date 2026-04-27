@@ -1,4 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { Notice } from "@mistle/ui";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
@@ -111,93 +112,108 @@ export function IntegrationsPage() {
     directoryState.selectedDetailConnections.find(
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
+  const shouldShowSlackInstallSuccessNotice =
+    searchParams.get("slackApp") === "installed" &&
+    detailConnectionId !== null &&
+    selectedDetailConnection?.id === detailConnectionId &&
+    selectedDetailConnection.connectionMethodId === "slack-bot-token";
 
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
-      <IntegrationConnectionDetailView
-        connections={buildIntegrationConnectionDetailItems({
-          connections: directoryState.selectedDetailConnections,
-          controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
-          githubAppInstallationStateByConnectionId,
-          refreshingResourceKeys: directoryState.refreshingResourceKeys,
-          ...(directoryState.selectedDetailCard === null
-            ? {}
-            : {
-                targetConfig: Object.fromEntries(
-                  Object.entries(
-                    typeof directoryState.selectedDetailCard.target.config === "object" &&
-                      directoryState.selectedDetailCard.target.config !== null &&
-                      !Array.isArray(directoryState.selectedDetailCard.target.config)
-                      ? directoryState.selectedDetailCard.target.config
-                      : {},
+      <div className="flex flex-col gap-4">
+        {shouldShowSlackInstallSuccessNotice ? (
+          <Notice title="Slack app installed" variant="success">
+            The Slack app has been installed and its bot token has been saved to this Mistle
+            connection.
+          </Notice>
+        ) : null}
+        <IntegrationConnectionDetailView
+          connections={buildIntegrationConnectionDetailItems({
+            connections: directoryState.selectedDetailConnections,
+            controlPlaneApiOrigin: dashboardConfig.controlPlaneApiOrigin,
+            githubAppInstallationStateByConnectionId,
+            refreshingResourceKeys: directoryState.refreshingResourceKeys,
+            ...(directoryState.selectedDetailCard === null
+              ? {}
+              : {
+                  targetConfig: Object.fromEntries(
+                    Object.entries(
+                      typeof directoryState.selectedDetailCard.target.config === "object" &&
+                        directoryState.selectedDetailCard.target.config !== null &&
+                        !Array.isArray(directoryState.selectedDetailCard.target.config)
+                        ? directoryState.selectedDetailCard.target.config
+                        : {},
+                    ),
                   ),
-                ),
-                ...(directoryState.selectedDetailCard.target.connectionMethods === undefined
-                  ? {}
-                  : {
-                      targetConnectionMethods:
-                        directoryState.selectedDetailCard.target.connectionMethods,
-                    }),
-                targetFamilyId: directoryState.selectedDetailCard.target.familyId,
-                targetVariantId: directoryState.selectedDetailCard.target.variantId,
-              }),
-        })}
-        onSelectedConnectionChange={directoryState.setActiveDetailConnectionId}
-        onDeleteConnection={connectionEditors.onDeleteConnection}
-        onEditAuthentication={(connectionId) => {
-          const editingConnection =
-            directoryState.selectedDetailConnections.find(
-              (connection) => connection.id === connectionId,
-            ) ?? null;
-          if (editingConnection === null) {
-            throw new Error(`Integration connection '${connectionId}' was not found.`);
-          }
+                  ...(directoryState.selectedDetailCard.target.connectionMethods === undefined
+                    ? {}
+                    : {
+                        targetConnectionMethods:
+                          directoryState.selectedDetailCard.target.connectionMethods,
+                      }),
+                  targetFamilyId: directoryState.selectedDetailCard.target.familyId,
+                  targetVariantId: directoryState.selectedDetailCard.target.variantId,
+                }),
+          })}
+          onSelectedConnectionChange={directoryState.setActiveDetailConnectionId}
+          onDeleteConnection={connectionEditors.onDeleteConnection}
+          onEditAuthentication={(connectionId) => {
+            const editingConnection =
+              directoryState.selectedDetailConnections.find(
+                (connection) => connection.id === connectionId,
+              ) ?? null;
+            if (editingConnection === null) {
+              throw new Error(`Integration connection '${connectionId}' was not found.`);
+            }
 
-          if (editingConnection.connectionMethodId === "api-key") {
-            connectionEditors.onEditApiKey(connectionId);
-            return;
-          }
+            if (editingConnection.connectionMethodId === "api-key") {
+              connectionEditors.onEditApiKey(connectionId);
+              return;
+            }
 
-          void navigate(`/integrations/${detailTargetKey}/${connectionId}/edit${location.search}`);
-        }}
-        onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
-        onRefreshResource={directoryState.onRefreshResource}
-        selectedConnectionId={directoryState.activeDetailConnectionId}
-        selectedConnectionBody={
-          selectedDetailConnection !== undefined &&
-          isUninstalledGitHubAppConnection({
-            connectionMethodId: selectedDetailConnection.connectionMethodId,
-            config: selectedDetailConnection.config,
-            externalSubjectId: selectedDetailConnection.externalSubjectId,
-          }) ? (
-            <GitHubAppSetupPane
-              connection={selectedDetailConnection}
-              key={selectedDetailConnection.id}
-            />
-          ) : selectedDetailConnection !== undefined &&
-            isIncompleteSlackAppConnection({
+            void navigate(
+              `/integrations/${detailTargetKey}/${connectionId}/edit${location.search}`,
+            );
+          }}
+          onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
+          onRefreshResource={directoryState.onRefreshResource}
+          selectedConnectionId={directoryState.activeDetailConnectionId}
+          selectedConnectionBody={
+            selectedDetailConnection !== undefined &&
+            isUninstalledGitHubAppConnection({
               connectionMethodId: selectedDetailConnection.connectionMethodId,
-              configuredSecretNames: selectedDetailConnection.configuredSecretNames,
+              config: selectedDetailConnection.config,
+              externalSubjectId: selectedDetailConnection.externalSubjectId,
             }) ? (
-            <SlackAppSetupPane
-              connection={selectedDetailConnection}
-              key={selectedDetailConnection.id}
-            />
-          ) : undefined
-        }
-        webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
-        onCreateWebhookSource={({ connectionId }) => {
-          webhookSourceState.createWebhookSource({ connectionId });
-        }}
-        onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
-          webhookSourceState.deleteWebhookSource({
-            connectionId,
-            webhookSourceId,
-          });
-        }}
-        webhookPolicy={selectedWebhookPolicy}
-        titleEditor={connectionEditors.titleEditor}
-      />
+              <GitHubAppSetupPane
+                connection={selectedDetailConnection}
+                key={selectedDetailConnection.id}
+              />
+            ) : selectedDetailConnection !== undefined &&
+              isIncompleteSlackAppConnection({
+                connectionMethodId: selectedDetailConnection.connectionMethodId,
+                configuredSecretNames: selectedDetailConnection.configuredSecretNames,
+              }) ? (
+              <SlackAppSetupPane
+                connection={selectedDetailConnection}
+                key={selectedDetailConnection.id}
+              />
+            ) : undefined
+          }
+          webhookSourceStateByConnectionId={webhookSourceState.webhookSourceStateByConnectionId}
+          onCreateWebhookSource={({ connectionId }) => {
+            webhookSourceState.createWebhookSource({ connectionId });
+          }}
+          onDeleteWebhookSource={({ connectionId, webhookSourceId }) => {
+            webhookSourceState.deleteWebhookSource({
+              connectionId,
+              webhookSourceId,
+            });
+          }}
+          webhookPolicy={selectedWebhookPolicy}
+          titleEditor={connectionEditors.titleEditor}
+        />
+      </div>
     );
 
   return (

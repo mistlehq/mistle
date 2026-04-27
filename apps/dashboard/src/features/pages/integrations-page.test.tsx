@@ -96,6 +96,60 @@ describe("IntegrationsPage", () => {
         .hasAttribute("aria-current"),
     ).toBe(false);
   });
+
+  it("shows Slack install success on the selected connection detail route", () => {
+    globalThis.__MISTLE_RUNTIME_CONFIG__ = {
+      controlPlaneApiOrigin: "https://control-plane.example.com",
+    };
+    resetDashboardConfigForTest();
+
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SESSION_QUERY_KEY, {
+      session: {
+        activeOrganizationId: "org_mistle",
+      },
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [createSlackTarget()],
+      connections: [
+        createSlackConnection({
+          id: "icn_slack_installed",
+          displayName: "Engineering Slack",
+        }),
+      ],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            "/integrations/slack-default?connectionId=icn_slack_installed&slackApp=installed",
+          ]}
+        >
+          <Routes>
+            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Slack app installed")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The Slack app has been installed and its bot token has been saved to this Mistle connection.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Select connection Engineering Slack" })
+        .getAttribute("aria-current"),
+    ).toBe("true");
+    expect(screen.queryByText("Slack app is connected")).toBeNull();
+    expect(screen.queryByRole("button", { name: "View connection" })).toBeNull();
+  });
 });
 
 function createGitHubTarget(): IntegrationTarget {
@@ -151,5 +205,61 @@ function createGitHubConnection(input: {
     resources: [],
     createdAt: "2026-04-24T00:00:00.000Z",
     updatedAt: "2026-04-24T00:00:00.000Z",
+  };
+}
+
+function createSlackTarget(): IntegrationTarget {
+  return {
+    targetKey: "slack-default",
+    familyId: "slack",
+    variantId: "slack-default",
+    enabled: true,
+    config: {},
+    displayName: "Slack",
+    description: "Slack",
+    targetHealth: {
+      configStatus: "valid",
+    },
+    connectionMethods: [
+      {
+        id: "slack-bot-token",
+        label: "Slack app",
+        kind: "form",
+        secretFields: [
+          {
+            name: "botToken",
+            label: "Bot token",
+            inputType: "password",
+          },
+          {
+            name: "signingSecret",
+            label: "Signing secret",
+            inputType: "password",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createSlackConnection(input: { id: string; displayName: string }): IntegrationConnection {
+  return {
+    id: input.id,
+    targetKey: "slack-default",
+    displayName: input.displayName,
+    status: "active",
+    bindingCount: 0,
+    connectionMethodId: "slack-bot-token",
+    connectionMethodLabel: "Slack app",
+    externalSubjectId: "T0123456789",
+    configuredSecretNames: ["botToken", "signingSecret", "clientSecret"],
+    config: {
+      connection_method: "slack-bot-token",
+      client_id: "3555487893074.10993991013813",
+      team_id: "T0123456789",
+    },
+    resources: [],
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
   };
 }

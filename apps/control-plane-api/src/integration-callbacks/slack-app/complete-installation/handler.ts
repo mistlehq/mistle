@@ -27,7 +27,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   return ctx.redirect(
     buildDashboardUrl(
       config.dashboard.baseUrl,
-      `/integrations/${encodeURIComponent(completedConnection.targetKey)}/${encodeURIComponent(completedConnection.id)}/slack-app/setup?slackApp=installed`,
+      `/integrations/${encodeURIComponent(completedConnection.targetKey)}?connectionId=${encodeURIComponent(completedConnection.id)}&slackApp=installed`,
     ),
     302,
   );

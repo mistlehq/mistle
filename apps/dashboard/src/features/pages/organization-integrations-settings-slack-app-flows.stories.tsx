@@ -22,8 +22,10 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
+import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
 import { IntegrationConnectionSlackAppSetupPage } from "./integration-connection-slack-app-setup-page.js";
+import { IntegrationsPage } from "./integrations-page.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 const IntegrationRegistry = createBrowserIntegrationRegistry();
@@ -71,6 +73,11 @@ function createStoryQueryClient(input: {
   queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
     targets: [createSlackTargetFixture()],
     connections: [...(input.connections ?? [])],
+  });
+  queryClient.setQueryData(SESSION_QUERY_KEY, {
+    session: {
+      activeOrganizationId: "org_mistle",
+    },
   });
 
   for (const source of input.webhookSources ?? []) {
@@ -446,6 +453,51 @@ function SlackAppSetupPageStory(input: {
   );
 }
 
+function SlackInstalledDetailPageStory(): React.JSX.Element {
+  configureDashboardRuntimeForStory();
+  const [queryClient] = useState(() =>
+    createStoryQueryClient({
+      connections: [
+        createDraftSlackConnection({
+          config: {
+            client_id: "3555487893074.10993991013813",
+            team_id: "T0123456789",
+          },
+          configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
+          externalSubjectId: "T0123456789",
+        }),
+      ],
+      webhookSources: [createWebhookSourceFixture()],
+    }),
+  );
+  const [router] = useState(() =>
+    createMemoryRouter(
+      createRoutesFromElements(
+        <Route element={<Outlet />}>
+          <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
+            <Route
+              element={<IntegrationsPage />}
+              handle={ROUTE_HANDLES.integrationDetail}
+              path=":targetKey"
+            />
+          </Route>
+        </Route>,
+      ),
+      {
+        initialEntries: [
+          "/integrations/slack-default?connectionId=icn_slack_story_draft&slackApp=installed",
+        ],
+      },
+    ),
+  );
+
+  return (
+    <StoryQueryClientProvider queryClient={queryClient}>
+      <RouterProvider router={router} />
+    </StoryQueryClientProvider>
+  );
+}
+
 const pageMeta = {
   title: "Dashboard/Integrations/Slack App Flows",
   decorators: [withDashboardPageStory],
@@ -483,20 +535,9 @@ export const SetupConfiguredExistingApp: PageStory = {
   },
 };
 
-export const ManifestInstallSuccess: PageStory = {
+export const ManifestInstalledDetail: PageStory = {
   render: function RenderStory() {
-    return (
-      <SlackAppSetupPageStory
-        connection={createDraftSlackConnection({
-          config: {
-            client_id: "3555487893074.10993991013813",
-          },
-          configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
-          externalSubjectId: "T0123456789",
-        })}
-        initialEntry="/integrations/slack-default/icn_slack_story_draft/slack-app/setup?slackApp=installed"
-      />
-    );
+    return <SlackInstalledDetailPageStory />;
   },
 };
 
