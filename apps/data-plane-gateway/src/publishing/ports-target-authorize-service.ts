@@ -242,6 +242,32 @@ export class PortsTargetAuthorizeService {
     return rejectedConnectionRequests;
   }
 
+  public rejectPendingRequestsForConnection(input: {
+    clientSessionId: string;
+    sandboxInstanceId: string;
+  }): void {
+    const pendingRequests = this.#pendingRequestsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (pendingRequests === undefined) {
+      return;
+    }
+
+    for (const [requestId, pendingRequest] of pendingRequests) {
+      if (
+        pendingRequest.kind !== "connection" ||
+        pendingRequest.clientSessionId !== input.clientSessionId
+      ) {
+        continue;
+      }
+
+      this.scheduler.cancel(pendingRequest.timeoutHandle);
+      pendingRequests.delete(requestId);
+    }
+
+    if (pendingRequests.size === 0) {
+      this.#pendingRequestsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    }
+  }
+
   private setPendingRequest(input: {
     sandboxInstanceId: string;
     requestId: string;

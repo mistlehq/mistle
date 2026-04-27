@@ -399,6 +399,99 @@ describe("ports target authorize integration", () => {
     await expect(resultPromise).rejects.toBeInstanceOf(PortsTargetAuthorizeTimedOutError);
   });
 
+  vitestIt(
+    "drops connection-side pending authorize requests when that connection closes",
+    async () => {
+      const clock = createMutableClock(1_000);
+      const scheduler = createManualScheduler(clock);
+      const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+      const service = new PortsTargetAuthorizeService(relayCoordinator, scheduler);
+      const websocketPair = await createWebSocketPair();
+      openWebSocketPairs.push(websocketPair);
+
+      relayCoordinator.attachPeer({
+        ...createBootstrapTarget({
+          sandboxInstanceId: "sbi_port_access_connection_close",
+        }),
+        socket: websocketPair.peerSocket,
+      });
+
+      await service.forwardConnectionTargetAuthorize({
+        sandboxInstanceId: "sbi_port_access_connection_close",
+        clientSessionId: "conn_1",
+        request: {
+          type: "ports.target.authorize",
+          requestId: "req_conn_1",
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+        },
+      });
+      const firstForwardedRequest = JSON.parse(
+        String((await waitForWebSocketPairMessage(websocketPair.clientSocket)).data),
+      );
+
+      await service.forwardConnectionTargetAuthorize({
+        sandboxInstanceId: "sbi_port_access_connection_close",
+        clientSessionId: "conn_2",
+        request: {
+          type: "ports.target.authorize",
+          requestId: "req_conn_2",
+          target: {
+            kind: "port",
+            port: 8080,
+          },
+        },
+      });
+      const secondForwardedRequest = JSON.parse(
+        String((await waitForWebSocketPairMessage(websocketPair.clientSocket)).data),
+      );
+
+      service.rejectPendingRequestsForConnection({
+        sandboxInstanceId: "sbi_port_access_connection_close",
+        clientSessionId: "conn_1",
+      });
+
+      expect(
+        service.resolveTargetAuthorizeResult({
+          sandboxInstanceId: "sbi_port_access_connection_close",
+          result: {
+            type: "ports.target.authorize.result",
+            requestId: firstForwardedRequest.requestId,
+            authorized: true,
+            upstreamProtocol: "http",
+            websocketCapable: true,
+          },
+        }),
+      ).toBeUndefined();
+
+      expect(
+        service.resolveTargetAuthorizeResult({
+          sandboxInstanceId: "sbi_port_access_connection_close",
+          result: {
+            type: "ports.target.authorize.result",
+            requestId: secondForwardedRequest.requestId,
+            authorized: false,
+            reason: "unsupported_protocol",
+          },
+        }),
+      ).toEqual({
+        kind: "forward",
+        result: {
+          type: "ports.target.authorize.result",
+          requestId: "req_conn_2",
+          authorized: false,
+          reason: "unsupported_protocol",
+        },
+        targetConnectionSessionId: "conn_2",
+      });
+
+      clock.advanceMs(5_000);
+      expect(scheduler.runDue()).toBe(0);
+    },
+  );
+
   it("rejects pending authorize requests when the bootstrap websocket closes", async ({
     fixture,
   }) => {

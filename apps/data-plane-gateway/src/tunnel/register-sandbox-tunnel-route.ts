@@ -440,6 +440,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     );
                   });
               } else {
+                input.portsTargetAuthorizeService.rejectPendingRequestsForConnection({
+                  clientSessionId: relaySessionId,
+                  sandboxInstanceId,
+                });
                 void tunnelSessionService
                   .detachConnectionPeer({
                     attachedPeer,
