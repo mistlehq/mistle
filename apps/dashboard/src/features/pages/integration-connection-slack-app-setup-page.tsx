@@ -33,7 +33,6 @@ import {
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
   listIntegrationDirectory,
-  listIntegrationWebhookSources,
   startSlackAppManifestCreation,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -44,6 +43,10 @@ import {
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
+import {
+  type ManifestWebhookCallbackState,
+  useManifestWebhookCallbackState,
+} from "../integrations/manifest-webhook-callback-state.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   clearPendingStatusTimeouts,
@@ -392,21 +395,7 @@ function SlackExistingAppSetupPanel(input: {
 }
 
 function SlackSetupUrls(input: {
-  webhookCallbackState:
-    | {
-        kind: "loading";
-      }
-    | {
-        kind: "error";
-        message: string;
-      }
-    | {
-        kind: "ready";
-        value: string;
-      }
-    | {
-        kind: "missing";
-      };
+  webhookCallbackState: ManifestWebhookCallbackState;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
@@ -509,15 +498,9 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
-  const webhookSourcesQuery = useQuery({
+  const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: setupMode === "existing-app",
-    queryKey: ["integration-webhook-sources", input.connection.id],
-    queryFn: async ({ signal }) =>
-      listIntegrationWebhookSources({
-        connectionId: input.connection.id,
-        signal,
-      }),
-    retry: false,
+    connectionId: input.connection.id,
   });
 
   const startManifestMutation = useMutation({
@@ -721,34 +704,6 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const manifestValidation = validateManifestJsonObject(manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" && appConfigToken.trim().length > 0;
-  const webhookCallbackUrl = webhookSourcesQuery.data?.[0]?.callbackUrl;
-  const webhookCallbackState:
-    | {
-        kind: "loading";
-      }
-    | {
-        kind: "error";
-        message: string;
-      }
-    | {
-        kind: "ready";
-        value: string;
-      }
-    | {
-        kind: "missing";
-      } = webhookSourcesQuery.isPending
-    ? { kind: "loading" }
-    : webhookSourcesQuery.isError
-      ? {
-          kind: "error",
-          message: resolveApiErrorMessage({
-            error: webhookSourcesQuery.error,
-            fallbackMessage: "Could not load integration webhook sources.",
-          }),
-        }
-      : webhookCallbackUrl === undefined
-        ? { kind: "missing" }
-        : { kind: "ready", value: webhookCallbackUrl };
 
   return (
     <FormPageStack>
