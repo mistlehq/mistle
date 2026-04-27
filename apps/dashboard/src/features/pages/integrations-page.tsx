@@ -9,6 +9,10 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import {
+  ManagedWebhookSetupResultSchema,
+  type ManagedWebhookSetupResult,
+} from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
@@ -92,28 +96,16 @@ function buildGitHubAppInstallationStateByConnectionId(input: {
   );
 }
 
-function isInstalledConnectionNoticeRequested(searchParams: URLSearchParams): boolean {
-  return (
-    searchParams.get("connectionNotice") === "installed" ||
-    searchParams.get("slackApp") === "installed" ||
-    searchParams.get("githubApp") === "installed"
-  );
-}
-
 function clearUrlConnectionNoticeParams(searchParams: URLSearchParams): URLSearchParams {
   const nextSearchParams = new URLSearchParams(searchParams);
   nextSearchParams.delete("connectionNotice");
-  nextSearchParams.delete("slackApp");
-  nextSearchParams.delete("githubApp");
   return nextSearchParams;
 }
 
 function resolveUrlConnectionNotice(input: {
   detailConnectionId: string | null;
   searchParams: URLSearchParams;
-  selectedConnection:
-    | Pick<IntegrationConnection, "connectionMethodId" | "id" | "targetKey">
-    | undefined;
+  selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
 }): ConnectionNotice | null {
   if (
     input.detailConnectionId === null ||
@@ -122,7 +114,7 @@ function resolveUrlConnectionNotice(input: {
     return null;
   }
 
-  if (!isInstalledConnectionNoticeRequested(input.searchParams)) {
+  if (input.searchParams.get("connectionNotice") !== "installed") {
     return null;
   }
 
@@ -185,39 +177,13 @@ function resolveRouteStateConnectionNotice(input: {
   };
 }
 
-function resolveManagedWebhookSetupState(
-  state: unknown,
-): { status: "created" } | { message: string; status: "failed" } | null {
+function resolveManagedWebhookSetupState(state: unknown): ManagedWebhookSetupResult | null {
   if (typeof state !== "object" || state === null || !("managedWebhookSetup" in state)) {
     return null;
   }
 
-  const managedWebhookSetup = state.managedWebhookSetup;
-  if (
-    typeof managedWebhookSetup !== "object" ||
-    managedWebhookSetup === null ||
-    !("status" in managedWebhookSetup)
-  ) {
-    return null;
-  }
-
-  if (managedWebhookSetup.status === "created") {
-    return {
-      status: "created",
-    };
-  }
-
-  if (managedWebhookSetup.status !== "failed" || !("message" in managedWebhookSetup)) {
-    return null;
-  }
-
-  const message = managedWebhookSetup.message;
-  return typeof message === "string" && message.trim().length > 0
-    ? {
-        message,
-        status: "failed",
-      }
-    : null;
+  const parsed = ManagedWebhookSetupResultSchema.safeParse(state.managedWebhookSetup);
+  return parsed.success ? parsed.data : null;
 }
 
 export function IntegrationsPage() {
