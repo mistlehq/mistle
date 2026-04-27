@@ -14,6 +14,7 @@ import {
   UserExternalPrincipalStatuses,
   userExternalPrincipals,
 } from "@mistle/db/control-plane";
+import { sandboxInstances } from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { systemSleeper } from "@mistle/time";
@@ -36,6 +37,7 @@ import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 const WorkflowRunPersistTimeoutMs = 30_000;
 const WorkflowRunPersistPollIntervalMs = 100;
 const StartWorkflowName = "data-plane.sandbox-instances.start";
+const ResumeWorkflowName = "data-plane.sandbox-instances.resume";
 
 const WorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
@@ -107,6 +109,29 @@ async function waitForQueuedStartWorkflowInput(input: {
   workflowNamespaceId: string;
   sandboxInstanceId: string;
 }) {
+  return await waitForQueuedWorkflowInput({
+    ...input,
+    workflowName: StartWorkflowName,
+  });
+}
+
+async function waitForQueuedResumeWorkflowInput(input: {
+  dataPlaneDbPool: DisposableDataPlaneRuntime["dbPool"];
+  workflowNamespaceId: string;
+  sandboxInstanceId: string;
+}) {
+  return await waitForQueuedWorkflowInput({
+    ...input,
+    workflowName: ResumeWorkflowName,
+  });
+}
+
+async function waitForQueuedWorkflowInput(input: {
+  dataPlaneDbPool: DisposableDataPlaneRuntime["dbPool"];
+  workflowNamespaceId: string;
+  workflowName: string;
+  sandboxInstanceId: string;
+}) {
   const deadline = Date.now() + WorkflowRunPersistTimeoutMs;
 
   while (Date.now() < deadline) {
@@ -121,7 +146,7 @@ async function waitForQueuedStartWorkflowInput(input: {
         order by created_at desc
         limit 1
       `,
-      [input.workflowNamespaceId, StartWorkflowName, input.sandboxInstanceId],
+      [input.workflowNamespaceId, input.workflowName, input.sandboxInstanceId],
     );
     const row = result.rows[0];
     if (row !== undefined) {
@@ -132,7 +157,7 @@ async function waitForQueuedStartWorkflowInput(input: {
   }
 
   throw new Error(
-    `Timed out waiting for queued start workflow input for sandbox '${input.sandboxInstanceId}'.`,
+    `Timed out waiting for queued '${input.workflowName}' workflow input for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -241,6 +266,114 @@ describe("internal sandbox runtime", () => {
       code: "VALIDATION_ERROR",
       message: "Invalid request.",
     });
+  });
+
+  it("rejects resume-sandbox-instance requests without internal service token", async ({
+    fixture,
+  }) => {
+    const response = await fixture.request(
+      `${INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH}/resume-sandbox-instance`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          organizationId: "org_test",
+          instanceId: "sbi_test",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "Internal service authentication failed.",
+    });
+  });
+
+  it("rejects resume-sandbox-instance requests with malformed body", async ({ fixture }) => {
+    const response = await fixture.request(
+      `${INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH}/resume-sandbox-instance`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          organizationId: "org_test",
+          instanceId: "",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
+  });
+
+  it("queues sandbox resume for internal callers", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_internal_resume",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+
+    try {
+      await dataPlaneFixture.db.insert(sandboxInstances).values({
+        id: "sbi_internal_resume_001",
+        organizationId: "org_internal_resume",
+        sandboxProfileId: "sbp_internal_resume",
+        sandboxProfileVersion: 1,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-internal-resume-001",
+        status: "stopped",
+        startedByKind: "system",
+        startedById: "aru_internal_resume",
+        source: "webhook",
+        failureCode: null,
+        failureMessage: null,
+      });
+
+      const response = await fixture.request(
+        `${INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH}/resume-sandbox-instance`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+          },
+          body: JSON.stringify({
+            organizationId: "org_internal_resume",
+            instanceId: "sbi_internal_resume_001",
+            idempotencyKey: "internal-resume-test",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({
+        status: "accepted",
+        sandboxInstanceId: "sbi_internal_resume_001",
+      });
+
+      const queuedWorkflowInput = await waitForQueuedResumeWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: "sbi_internal_resume_001",
+      });
+      expect(queuedWorkflowInput).toMatchObject({
+        sandboxInstanceId: "sbi_internal_resume_001",
+      });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
   });
 
   it("starts a profile instance with acting-user git identity", async ({ fixture }) => {

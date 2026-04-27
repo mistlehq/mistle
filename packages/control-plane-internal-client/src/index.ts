@@ -55,6 +55,10 @@ export type MintSandboxConnectionTokenInput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["requestBody"]["content"]["application/json"];
 export type MintSandboxConnectionTokenOutput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResumeSandboxInstanceForConnectionInput =
+  paths["/internal/sandbox-runtime/resume-sandbox-instance"]["post"]["requestBody"]["content"]["application/json"];
+export type ResumeSandboxInstanceForConnectionOutput =
+  paths["/internal/sandbox-runtime/resume-sandbox-instance"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ResolveStoragePersistenceModeInput =
   paths["/internal/sandbox-storage/resolve-persistence-mode"]["post"]["requestBody"]["content"]["application/json"];
 export type ResolveStoragePersistenceModeOutput =
@@ -277,6 +281,23 @@ export class ControlPlaneInternalClient {
 
     throw new Error(
       `Control-plane internal sandbox connection mint failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    );
+  }
+
+  async resumeSandboxInstanceForConnection(
+    input: ResumeSandboxInstanceForConnectionInput,
+  ): Promise<ResumeSandboxInstanceForConnectionOutput> {
+    const result = await this.#client.POST("/internal/sandbox-runtime/resume-sandbox-instance", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new Error(
+      `Control-plane internal sandbox resume failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
   }
 

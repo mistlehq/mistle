@@ -52,6 +52,7 @@ export async function acquireAutomationConnection(
       const waitStartedAt = Date.now();
       const deadline = waitStartedAt + SandboxStartTimeoutMs;
       let isSandboxRunning = false;
+      let didRequestResume = false;
       let pollCount = 0;
 
       while (Date.now() < deadline) {
@@ -84,9 +85,28 @@ export async function acquireAutomationConnection(
             },
             attributes: {
               "mistle.sandbox.poll_count": pollCount,
+              "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
               "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
             },
           });
+          if (didRequestResume) {
+            logAutomationConversationDeliveryEvent({
+              eventName: "sandbox.resume_running",
+              message: "Automation conversation sandbox resumed and became running",
+              telemetryContext: {
+                automationRunId: input.preparedAutomationRun.automationRunId,
+                conversationId: input.preparedAutomationRun.conversationId,
+                deliveryTaskId: input.deliveryTaskId,
+                sandboxInstanceId: sandboxInstance.id,
+                webhookEventId: input.preparedAutomationRun.webhookEventId,
+                workflowRunId: input.workflowRunId,
+              },
+              attributes: {
+                "mistle.sandbox.poll_count": pollCount,
+                "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
+              },
+            });
+          }
           break;
         }
 
@@ -99,10 +119,11 @@ export async function acquireAutomationConnection(
           });
         }
 
-        if (sandboxInstance.status === "stopped") {
+        if (sandboxInstance.status === "stopped" && !didRequestResume) {
+          didRequestResume = true;
           logAutomationConversationDeliveryEvent({
-            eventName: "connection_token.mint_started",
-            message: "Minting sandbox connection token from stopped sandbox state",
+            eventName: "sandbox.resume_requested",
+            message: "Requesting sandbox resume before automation connection token mint",
             telemetryContext: {
               automationRunId: input.preparedAutomationRun.automationRunId,
               conversationId: input.preparedAutomationRun.conversationId,
@@ -114,20 +135,33 @@ export async function acquireAutomationConnection(
             attributes: {
               "mistle.sandbox.poll_count": pollCount,
               "mistle.sandbox.status": sandboxInstance.status,
+              "mistle.sandbox.wait_phase": "resume",
+              "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+              "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
             },
           });
 
-          const connection = await ctx.controlPlaneInternalClient.mintSandboxConnectionToken({
-            organizationId: input.preparedAutomationRun.organizationId,
-            instanceId: sandboxInstance.id,
-            ...(input.preparedAutomationRun.actingUserId === undefined
-              ? {}
-              : { actingUserId: input.preparedAutomationRun.actingUserId }),
+          const resumeResult =
+            await ctx.controlPlaneInternalClient.resumeSandboxInstanceForConnection({
+              organizationId: input.preparedAutomationRun.organizationId,
+              instanceId: sandboxInstance.id,
+              ...(input.preparedAutomationRun.actingUserId === undefined
+                ? {}
+                : { actingUserId: input.preparedAutomationRun.actingUserId }),
+              idempotencyKey: `automation-delivery-resume:${input.deliveryTaskId}:${sandboxInstance.id}`,
+            });
+
+          waitSpan.setAttributes({
+            "mistle.sandbox.resume_requested": true,
+            "mistle.sandbox.resume_workflow_run_id": resumeResult.workflowRunId,
+            "mistle.sandbox.wait_phase": "resume",
+            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+            "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
           });
 
           logAutomationConversationDeliveryEvent({
-            eventName: "connection_token.minted",
-            message: "Minted sandbox connection token from stopped sandbox state",
+            eventName: "sandbox.resume_wait_started",
+            message: "Waiting for resumed automation conversation sandbox to become running",
             telemetryContext: {
               automationRunId: input.preparedAutomationRun.automationRunId,
               conversationId: input.preparedAutomationRun.conversationId,
@@ -136,20 +170,39 @@ export async function acquireAutomationConnection(
               webhookEventId: input.preparedAutomationRun.webhookEventId,
               workflowRunId: input.workflowRunId,
             },
+            attributes: {
+              "mistle.sandbox.poll_count": pollCount,
+              "mistle.sandbox.resume_workflow_run_id": resumeResult.workflowRunId,
+              "mistle.sandbox.status": sandboxInstance.status,
+              "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+              "mistle.sandbox.poll_interval_ms": SandboxStartPollIntervalMs,
+            },
           });
-
-          return {
-            instanceId: connection.instanceId,
-            url: connection.url,
-            token: connection.token,
-            expiresAt: connection.expiresAt,
-          };
         }
 
         await systemSleeper.sleep(SandboxStartPollIntervalMs);
       }
 
       if (!isSandboxRunning) {
+        logAutomationConversationDeliveryEvent({
+          eventName: didRequestResume ? "sandbox.resume_wait_timed_out" : "sandbox.wait_timed_out",
+          message: "Automation conversation sandbox did not become running before timeout",
+          telemetryContext: {
+            automationRunId: input.preparedAutomationRun.automationRunId,
+            conversationId: input.preparedAutomationRun.conversationId,
+            deliveryTaskId: input.deliveryTaskId,
+            sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+            webhookEventId: input.preparedAutomationRun.webhookEventId,
+            workflowRunId: input.workflowRunId,
+          },
+          attributes: {
+            "mistle.sandbox.poll_count": pollCount,
+            "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
+            "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
+            "mistle.sandbox.wait_timeout_ms": SandboxStartTimeoutMs,
+          },
+          level: "warn",
+        });
         throw createAutomationRunExecutionError({
           code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
           message: `Sandbox instance '${input.ensuredAutomationSandbox.sandboxInstanceId}' did not become ready before the automation timeout elapsed.`,
