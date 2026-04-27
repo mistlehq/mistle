@@ -79,6 +79,11 @@ const NoticeDefaultLifecycleKey = Symbol("Notice default lifecycle key");
 
 type NoticeLifecycleKey = React.Key | typeof NoticeDefaultLifecycleKey;
 
+const NoticeAutoHideDurationsMs = Object.freeze({
+  MEDIUM: 5000,
+  LONG: 8000,
+});
+
 type NoticeOwnProps = {
   action?: React.ReactNode;
   autoHideAfterMs?: number | undefined;
@@ -383,5 +388,12 @@ function NoticeCloseButton({ onClick }: { onClick: React.MouseEventHandler<HTMLB
   );
 }
 
-export { Notice, NoticeAction, NoticeDescription, NoticeIcon, NoticeTitle };
+export {
+  Notice,
+  NoticeAction,
+  NoticeAutoHideDurationsMs,
+  NoticeDescription,
+  NoticeIcon,
+  NoticeTitle,
+};
 export type { NoticeProps };

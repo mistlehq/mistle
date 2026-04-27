@@ -2,9 +2,7 @@ import { InfoIcon, WarningIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { Button } from "./button.js";
-import { Notice } from "./notice.js";
-
-const DefaultStoryAutoHideAfterMs = 5_000;
+import { Notice, NoticeAutoHideDurationsMs } from "./notice.js";
 
 type NoticeStoryArgs = {
   autoHideAfterMs?: number;
@@ -55,7 +53,7 @@ const meta = {
     autoHideAfterMs: {
       control: {
         type: "number",
-        min: DefaultStoryAutoHideAfterMs,
+        min: NoticeAutoHideDurationsMs.MEDIUM,
         step: 500,
       },
     },
@@ -123,8 +121,8 @@ function resolveStoryAutoHideAfterMs(autoHideAfterMs: number | undefined): numbe
     return undefined;
   }
 
-  if (!Number.isFinite(autoHideAfterMs) || autoHideAfterMs < DefaultStoryAutoHideAfterMs) {
-    return DefaultStoryAutoHideAfterMs;
+  if (!Number.isFinite(autoHideAfterMs) || autoHideAfterMs < NoticeAutoHideDurationsMs.MEDIUM) {
+    return NoticeAutoHideDurationsMs.MEDIUM;
   }
 
   return autoHideAfterMs;

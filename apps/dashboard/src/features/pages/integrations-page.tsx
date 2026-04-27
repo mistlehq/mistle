@@ -1,6 +1,6 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
-import { Notice } from "@mistle/ui";
+import { Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
@@ -105,19 +105,21 @@ export function IntegrationsPage() {
           webhookSource: directoryState.selectedDetailCard.target.webhookSource,
         });
 
-  if (directoryState.integrationsQuery.isPending) {
-    return null;
-  }
-
   const selectedDetailConnection =
     directoryState.selectedDetailConnections.find(
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
-  const shouldShowSlackInstallSuccessNotice =
+  const slackInstallSuccessConnectionId =
     searchParams.get("slackApp") === "installed" &&
     detailConnectionId !== null &&
     selectedDetailConnection?.id === detailConnectionId &&
-    selectedDetailConnection.connectionMethodId === SlackConnectionMethodId;
+    selectedDetailConnection.connectionMethodId === SlackConnectionMethodId
+      ? detailConnectionId
+      : null;
+
+  if (directoryState.integrationsQuery.isPending) {
+    return null;
+  }
 
   const detailSurface =
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
@@ -193,8 +195,14 @@ export function IntegrationsPage() {
           ) : undefined
         }
         selectedConnectionNotice={
-          shouldShowSlackInstallSuccessNotice ? (
-            <Notice title="Slack app installed and connected" variant="success">
+          slackInstallSuccessConnectionId !== null ? (
+            <Notice
+              autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
+              dismissible
+              resetKey={slackInstallSuccessConnectionId}
+              title="Slack app installed and connected"
+              variant="success"
+            >
               The Slack app was created in Slack and connected to Mistle.
             </Notice>
           ) : undefined

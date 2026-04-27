@@ -320,7 +320,7 @@ export function IntegrationConnectionDetailView(
               : { customBody: props.selectedConnectionBody })}
             {...(props.selectedConnectionNotice === undefined
               ? {}
-              : { notice: props.selectedConnectionNotice })}
+              : { selectedConnectionNotice: props.selectedConnectionNotice })}
             {...(selectedWebhookSourceState === undefined
               ? {}
               : { webhookSourceState: selectedWebhookSourceState })}
@@ -341,7 +341,7 @@ function ConnectionDetailPane(input: {
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   customBody?: ReactNode;
-  notice?: ReactNode;
+  selectedConnectionNotice?: ReactNode;
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
@@ -356,7 +356,7 @@ function ConnectionDetailPane(input: {
 
   return (
     <section className="flex flex-col gap-8">
-      {input.notice === undefined ? null : input.notice}
+      {input.selectedConnectionNotice === undefined ? null : input.selectedConnectionNotice}
       <header className="flex flex-col gap-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 gap-3 flex flex-col items-start">

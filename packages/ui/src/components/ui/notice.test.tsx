@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Notice } from "./notice.js";
+import { Notice, NoticeAutoHideDurationsMs } from "./notice.js";
 
 describe("Notice", () => {
   afterEach(() => {
@@ -176,7 +176,7 @@ describe("Notice", () => {
     const scheduler = createManualScheduler(clock);
     const { rerender } = render(
       <Notice
-        autoHideAfterMs={5_000}
+        autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
         resetKey="first-message"
         scheduler={scheduler}
         variant="success"
@@ -188,7 +188,7 @@ describe("Notice", () => {
     clock.advanceMs(4_000);
     rerender(
       <Notice
-        autoHideAfterMs={5_000}
+        autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
         resetKey="second-message"
         scheduler={scheduler}
         variant="success"
