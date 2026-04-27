@@ -75,6 +75,10 @@ type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
 type StorySectionId = "integrations" | "resources-and-tools" | "configurations" | "snapshot";
+type StoryIntegrationSetupSectionId = Extract<
+  StorySectionId,
+  "integrations" | "resources-and-tools"
+>;
 
 const StorySections = [
   {
@@ -334,7 +338,7 @@ function SandboxProfileSnapshotStoryPanel(input: {
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
-  sectionId: StorySectionId;
+  sectionId: StoryIntegrationSetupSectionId;
   state: IntegrationsSectionState;
 }): React.JSX.Element {
   return (

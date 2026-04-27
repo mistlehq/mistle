@@ -30,14 +30,6 @@ function GuardHarness(): React.JSX.Element {
       </button>
       <button
         onClick={() => {
-          setIsBlocking(false);
-        }}
-        type="button"
-      >
-        Disable blocking
-      </button>
-      <button
-        onClick={() => {
           void navigate("/next");
         }}
         type="button"

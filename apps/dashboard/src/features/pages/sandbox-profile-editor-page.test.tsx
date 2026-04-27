@@ -270,6 +270,7 @@ function renderSandboxProfileEditor(input?: {
     };
   }[];
   integrationsLoading?: boolean;
+  routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
   view?: SandboxProfileEditorTestRouteView;
@@ -389,15 +390,13 @@ function renderSandboxProfileEditor(input?: {
       </Route>,
     ),
     {
-      initialEntries:
-        input?.routeState === undefined
-          ? [initialPath]
-          : [
-              {
-                pathname: initialPath,
-                state: input.routeState,
-              },
-            ],
+      initialEntries: [
+        {
+          pathname: initialPath,
+          search: input?.routeSearch ?? "",
+          state: input?.routeState,
+        },
+      ],
     },
   );
 
@@ -411,9 +410,7 @@ function renderSandboxProfileEditor(input?: {
 
   return {
     profileId,
-    queryClient,
     router,
-    version,
   };
 }
 
@@ -429,6 +426,7 @@ function DeleteProfileDialogHarness(input: {
 
   return (
     <SandboxProfileEditorView
+      activeSectionId="integrations"
       deleteProfileAutomationUsages={input.automationUsages ?? []}
       deleteProfileAutomationUsagesError={input.automationUsagesError ?? null}
       deleteProfileAutomationUsagesIsPending={input.automationUsagesIsPending ?? false}
@@ -448,6 +446,7 @@ function DeleteProfileDialogHarness(input: {
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onActiveSectionIdChange={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -474,6 +473,7 @@ function DraftActionsHarness(input: {
 
   return (
     <SandboxProfileEditorView
+      activeSectionId="integrations"
       deleteProfileAutomationUsages={[]}
       deleteProfileAutomationUsagesError={null}
       deleteProfileAutomationUsagesIsPending={false}
@@ -494,6 +494,7 @@ function DraftActionsHarness(input: {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onActiveSectionIdChange={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -517,6 +518,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
 
   return (
     <SandboxProfileEditorView
+      activeSectionId="integrations"
       deleteProfileAutomationUsages={[]}
       deleteProfileAutomationUsagesError={null}
       deleteProfileAutomationUsagesIsPending={false}
@@ -538,6 +540,7 @@ function PublishedWithDraftActionsHarness(): JSX.Element {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onActiveSectionIdChange={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
       onViewDraft={() => {}}
@@ -845,7 +848,8 @@ describe("SandboxProfileEditorPage", () => {
   });
 
   it("does not show the publish success notice again after it is dismissed and the panel remounts", () => {
-    renderSandboxProfileEditor({
+    const { router } = renderSandboxProfileEditor({
+      routeSearch: "?from=publish",
       routeState: {
         notice: "publish-success",
       },
@@ -854,6 +858,7 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(screen.getByText("Publish successful, creating a snapshot")).toBeDefined();
+    expect(router.state.location.search).toBe("?from=publish");
 
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));

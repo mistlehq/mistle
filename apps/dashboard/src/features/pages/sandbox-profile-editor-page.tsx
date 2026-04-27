@@ -167,6 +167,10 @@ type SandboxProfileDraftSectionState = {
   hasUnpersistedChanges: boolean;
   isSaving: boolean;
 };
+type SandboxProfileIntegrationSetupSectionId = Extract<
+  SandboxProfileEditorSectionId,
+  "integrations" | "resources-and-tools"
+>;
 
 function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
   return {
@@ -290,10 +294,9 @@ const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
 function createSandboxProfileEditorPath(input: {
   profileId: string;
   view: SandboxProfileRouteView;
-  sectionId?: SandboxProfileEditorSectionId;
+  sectionId: SandboxProfileEditorSectionId;
 }): string {
-  const sectionPath = input.sectionId === undefined ? "" : `/${input.sectionId}`;
-  return `/sandbox-profiles/${input.profileId}/${input.view}${sectionPath}`;
+  return `/sandbox-profiles/${input.profileId}/${input.view}/${input.sectionId}`;
 }
 
 export function shouldPollSandboxProfileSnapshotJobs(
@@ -764,11 +767,11 @@ function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }):
   const publishSuccessMessage = navigationState.notice === "publish-success";
   const navigate = shellContext.navigate;
   const onPublishSuccessNavigationConsumed = useCallback(() => {
-    void navigate(location.pathname, {
+    void navigate(location.pathname + location.search, {
       replace: true,
       state: null,
     });
-  }, [location.pathname, navigate]);
+  }, [location.pathname, location.search, navigate]);
 
   if (
     routeSectionId === null ||
@@ -1081,7 +1084,7 @@ function LoadedSandboxProfileEditorPage(
         to={createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "published",
-          ...(pendingSectionId === null ? {} : { sectionId: pendingSectionId }),
+          sectionId: pendingSectionId ?? SandboxProfileEditorSectionIds.INTEGRATIONS,
         })}
       />
     );
@@ -1346,15 +1349,13 @@ function ReadySandboxProfileEditorPage(input: {
           void handlePublish(version);
         }}
         onActiveSectionIdChange={(sectionId) => {
-          if (isSandboxProfileEditorSectionId(sectionId)) {
-            void input.navigate(
-              createSandboxProfileEditorPath({
-                profileId: input.profileId,
-                view: input.routeView,
-                sectionId,
-              }),
-            );
-          }
+          void input.navigate(
+            createSandboxProfileEditorPath({
+              profileId: input.profileId,
+              view: input.routeView,
+              sectionId,
+            }),
+          );
         }}
         onSaveProfileName={metaState.onProfileNameSave}
         onViewActive={input.onViewActive}
@@ -1414,13 +1415,17 @@ function SandboxProfileEditorSectionPanels(input: {
   const showIntegrationSetup =
     input.activeSectionId === SandboxProfileEditorSectionIds.INTEGRATIONS ||
     input.activeSectionId === SandboxProfileEditorSectionIds.RESOURCES_AND_TOOLS;
+  const integrationSetupSectionId =
+    input.activeSectionId === SandboxProfileEditorSectionIds.RESOURCES_AND_TOOLS
+      ? SandboxProfileEditorSectionIds.RESOURCES_AND_TOOLS
+      : SandboxProfileEditorSectionIds.INTEGRATIONS;
 
   return (
     <>
       <div hidden={!showIntegrationSetup}>
         <LoadedSandboxProfileIntegrationSetupSection
           key={`${input.profileId}:integration-setup`}
-          activeSectionId={input.activeSectionId}
+          activeSectionId={integrationSetupSectionId}
           loader={input.integrationsLoader}
           onDraftStateChange={input.onIntegrationDraftStateChange}
           profileId={input.profileId}
@@ -1828,8 +1833,8 @@ export function SandboxProfileEditorView(input: {
   onViewActive: () => void;
   onViewDraft: () => void;
   sections: readonly SandboxProfileEditorSection<SandboxProfileEditorSectionId>[];
-  activeSectionId?: SandboxProfileEditorSectionId;
-  onActiveSectionIdChange?: (sectionId: SandboxProfileEditorSectionId) => void;
+  activeSectionId: SandboxProfileEditorSectionId;
+  onActiveSectionIdChange: (sectionId: SandboxProfileEditorSectionId) => void;
   renderSectionPanel: (sectionId: SandboxProfileEditorSectionId) => React.JSX.Element;
   versionStatusBadge?: React.JSX.Element;
   versionActions?: React.JSX.Element;
@@ -1969,10 +1974,8 @@ export function SandboxProfileEditorView(input: {
       />
 
       <SandboxProfileEditorSections<SandboxProfileEditorSectionId>
-        {...(input.activeSectionId === undefined ? {} : { activeSectionId: input.activeSectionId })}
-        {...(input.onActiveSectionIdChange === undefined
-          ? {}
-          : { onActiveSectionIdChange: input.onActiveSectionIdChange })}
+        activeSectionId={input.activeSectionId}
+        onActiveSectionIdChange={input.onActiveSectionIdChange}
         renderPanel={input.renderSectionPanel}
         sections={input.sections}
       />
@@ -1999,7 +2002,7 @@ function resolveDiscardDraftInput(
 }
 
 function LoadedSandboxProfileIntegrationSetupSection(input: {
-  activeSectionId: SandboxProfileEditorSectionId;
+  activeSectionId: SandboxProfileIntegrationSetupSectionId;
   profileId: string;
   version: number;
   disabled: boolean;
@@ -2054,7 +2057,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 }
 
 export function SandboxProfileIntegrationsSetupUnavailableState(input: {
-  activeSectionId: SandboxProfileEditorSectionId;
+  activeSectionId: SandboxProfileIntegrationSetupSectionId;
   integrationBindingsError: unknown;
   integrationDirectoryError: unknown;
   isPending: boolean;
@@ -2092,7 +2095,7 @@ export function SandboxProfileIntegrationsSetupUnavailableState(input: {
 }
 
 function ReadySandboxProfileIntegrationSetupSection(input: {
-  activeSectionId: string;
+  activeSectionId: SandboxProfileIntegrationSetupSectionId;
   profileId: string;
   version: number;
   initialRows: readonly SandboxProfileBindingEditorRow[];
