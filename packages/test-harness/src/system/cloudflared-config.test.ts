@@ -54,15 +54,35 @@ describe("buildCloudflaredTunnelConfig", () => {
       buildCloudflaredTunnelConfig({
         tunnelId: "4f782921-0689-45e4-84d9-d8e6398cfef6",
         credentialsFilePath: "/etc/cloudflared/credentials.json",
-        publicHostname: "system-control.example.com",
-        serviceUrl: "http://host.docker.internal:5100",
+        ingressRules: [
+          {
+            publicHostname: "system-control.example.com",
+            serviceUrl: "http://host.docker.internal:5100",
+          },
+          {
+            publicHostname: "gateway.example.com",
+            serviceUrl: "http://host.docker.internal:5202",
+          },
+        ],
       }),
     ).toBe(`tunnel: 4f782921-0689-45e4-84d9-d8e6398cfef6
 credentials-file: /etc/cloudflared/credentials.json
 ingress:
   - hostname: system-control.example.com
     service: http://host.docker.internal:5100
+  - hostname: gateway.example.com
+    service: http://host.docker.internal:5202
   - service: http_status:404
 `);
+  });
+
+  it("rejects configs without ingress rules", () => {
+    expect(() =>
+      buildCloudflaredTunnelConfig({
+        tunnelId: "4f782921-0689-45e4-84d9-d8e6398cfef6",
+        credentialsFilePath: "/etc/cloudflared/credentials.json",
+        ingressRules: [],
+      }),
+    ).toThrow("Cloudflare tunnel config requires at least one ingress rule.");
   });
 });

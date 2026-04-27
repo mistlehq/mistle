@@ -15,10 +15,6 @@ import {
   writeTestContext,
 } from "@mistle/test-harness";
 
-import {
-  startCloudflaredTunnel,
-  type StartedCloudflaredTunnel,
-} from "./helpers/cloudflared-tunnel.js";
 import { updateGitHubAppWebhookConfig } from "./helpers/github-app-installation.js";
 import {
   SharedGitHubWebhookHarnessContextId,
@@ -84,16 +80,6 @@ function readOptionalEnvVar(name: string): string | undefined {
 
   const trimmed = value.trim();
   return trimmed.length === 0 ? undefined : trimmed;
-}
-
-function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
-  const baseUrl = new URL(controlPlaneApiBaseUrl);
-  const parsedPort = Number.parseInt(baseUrl.port, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
-    throw new Error("Control plane API base URL must include a positive numeric port.");
-  }
-
-  return parsedPort;
 }
 
 function resolveSandboxPublicGatewayTunnel(input: { provider: SystemSandboxProvider }):
@@ -276,20 +262,10 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
       tokenizerProxyEnvironment: resolveTokenizerProxyEnvironment({
         telemetryEnvironmentOverrides,
       }),
+      sharedControlPlaneTunnel: resolveSharedControlPlaneTunnel(),
     });
-    let sharedControlPlaneTunnel: StartedCloudflaredTunnel | null = null;
 
     try {
-      const controlPlaneTunnel = resolveSharedControlPlaneTunnel();
-      if (controlPlaneTunnel !== undefined) {
-        sharedControlPlaneTunnel = await startCloudflaredTunnel({
-          tunnelId: controlPlaneTunnel.tunnelId,
-          tunnelCredentialsJson: controlPlaneTunnel.tunnelCredentialsJson,
-          publicHostname: controlPlaneTunnel.publicHostname,
-          targetLocalPort: resolveControlPlaneApiLocalPort(environment.controlPlaneApi.hostBaseUrl),
-        });
-      }
-
       const gatewayLifecycle = readGatewayLifecycleOrThrow({
         environment,
       });
@@ -320,9 +296,6 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
         },
       });
     } catch (error) {
-      if (sharedControlPlaneTunnel !== null) {
-        await sharedControlPlaneTunnel.stop().catch(() => undefined);
-      }
       await removeTestContext(SharedGitHubWebhookHarnessContextId).catch(() => undefined);
       await otlpReceiver.close();
       await rm(otlpTraceCaptureFilePath, { force: true });
@@ -351,9 +324,6 @@ export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
 
       await removeTestContext(SharedGitHubWebhookHarnessContextId).catch(() => undefined);
       await removeTestContext(TestContextId);
-      if (sharedControlPlaneTunnel !== null) {
-        await sharedControlPlaneTunnel.stop().catch(() => undefined);
-      }
       await environment.stop();
       await otlpReceiver.close();
       await rm(otlpTraceCaptureFilePath, { force: true });

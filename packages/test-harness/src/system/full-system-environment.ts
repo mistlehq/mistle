@@ -74,6 +74,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+type CloudflaredPublicTunnel = {
+  tunnelId: string;
+  tunnelCredentialsJson: string;
+  publicHostname: string;
+};
+
+type CloudflaredTunnelRoute = CloudflaredPublicTunnel & {
+  targetHost: string;
+  targetPort: number;
+};
+
 type SharedPostgresOptions = Omit<
   StartPostgresWithPgBouncerInput,
   (typeof OMITTED_POSTGRES_OPTIONS)[number]
@@ -98,20 +109,9 @@ export type StartFullSystemEnvironmentInput = {
   dataPlaneWorkerEnvironment?: Record<string, string>;
   dataPlaneGatewayEnvironment?: Record<string, string>;
   tokenizerProxyEnvironment?: Record<string, string>;
-  sandboxPublicGatewayTunnel?:
-    | {
-        tunnelId: string;
-        tunnelCredentialsJson: string;
-        publicHostname: string;
-      }
-    | undefined;
-  sandboxPublicTokenizerProxyTunnel?:
-    | {
-        tunnelId: string;
-        tunnelCredentialsJson: string;
-        publicHostname: string;
-      }
-    | undefined;
+  sharedControlPlaneTunnel?: CloudflaredPublicTunnel | undefined;
+  sandboxPublicGatewayTunnel?: CloudflaredPublicTunnel | undefined;
+  sandboxPublicTokenizerProxyTunnel?: CloudflaredPublicTunnel | undefined;
 };
 
 export type StartedFullSystemEnvironment = {
@@ -266,18 +266,25 @@ async function startCloudflaredServiceTunnel(input: {
   networkName: string;
   tunnelId: string;
   tunnelCredentialsJson: string;
-  publicHostname: string;
-  targetHost: string;
-  targetPort: number;
+  ingressRules: ReadonlyArray<{
+    publicHostname: string;
+    targetHost: string;
+    targetPort: number;
+  }>;
 }): Promise<{
-  publicBaseUrl: string;
+  publicBaseUrls: ReadonlyMap<string, string>;
   stop: () => Promise<void>;
 }> {
   const configDirectory = await mkdtemp(join(tmpdir(), "mistle-cloudflared-"));
   const configPath = join(configDirectory, "config.yml");
   const credentialsPath = join(configDirectory, "credentials.json");
   const containerName = `mistle-cloudflared-${randomUUID().replaceAll("-", "")}`;
-  const publicBaseUrl = `https://${input.publicHostname}`;
+  if (input.ingressRules.length === 0) {
+    throw new Error("Cloudflared service tunnel requires at least one ingress rule.");
+  }
+  const publicBaseUrls = new Map(
+    input.ingressRules.map((rule) => [rule.publicHostname, `https://${rule.publicHostname}`]),
+  );
   parseCloudflaredTunnelCredentialsJson({
     tunnelId: input.tunnelId,
     credentialsJson: input.tunnelCredentialsJson,
@@ -285,8 +292,10 @@ async function startCloudflaredServiceTunnel(input: {
   const configContent = buildCloudflaredTunnelConfig({
     tunnelId: input.tunnelId,
     credentialsFilePath: "/etc/cloudflared/credentials.json",
-    publicHostname: input.publicHostname,
-    serviceUrl: `http://${input.targetHost}:${String(input.targetPort)}`,
+    ingressRules: input.ingressRules.map((rule) => ({
+      publicHostname: rule.publicHostname,
+      serviceUrl: `http://${rule.targetHost}:${String(rule.targetPort)}`,
+    })),
   });
 
   await writeFile(credentialsPath, input.tunnelCredentialsJson, "utf8");
@@ -322,13 +331,15 @@ async function startCloudflaredServiceTunnel(input: {
     );
     started = true;
 
-    await waitForCloudflaredHealth({
-      publicBaseUrl,
-      timeoutMs: CloudflaredTunnelStartupTimeoutMs,
-    });
+    for (const publicBaseUrl of publicBaseUrls.values()) {
+      await waitForCloudflaredHealth({
+        publicBaseUrl,
+        timeoutMs: CloudflaredTunnelStartupTimeoutMs,
+      });
+    }
 
     return {
-      publicBaseUrl,
+      publicBaseUrls,
       stop: async () => {
         if (started) {
           await execFileAsync("docker", ["stop", containerName], {
@@ -354,7 +365,7 @@ async function startCloudflaredServiceTunnel(input: {
     await rm(configDirectory, { recursive: true, force: true });
 
     throw new Error(
-      `Failed to start cloudflared gateway tunnel for ${input.publicHostname}. ${
+      `Failed to start cloudflared service tunnel for ${input.ingressRules.map((rule) => rule.publicHostname).join(", ")}. ${
         error instanceof Error ? error.message : String(error)
       } Config: ${writtenConfig} Credentials: ${writtenCredentials} Logs: ${logs}`,
     );
@@ -632,24 +643,10 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await dataPlaneGateway.stop();
     });
-    let gatewayWsUrl = DATA_PLANE_GATEWAY_TUNNEL_WS_URL;
-    if (input.sandboxPublicGatewayTunnel !== undefined) {
-      const publicGatewayTunnel = input.sandboxPublicGatewayTunnel;
-      const startedGatewayTunnel = await withStepTiming("start public gateway tunnel", async () => {
-        return startCloudflaredServiceTunnel({
-          networkName: activeNetwork.getName(),
-          tunnelId: publicGatewayTunnel.tunnelId,
-          tunnelCredentialsJson: publicGatewayTunnel.tunnelCredentialsJson,
-          publicHostname: publicGatewayTunnel.publicHostname,
-          targetHost: "data-plane-gateway",
-          targetPort: 5202,
-        });
-      });
-      cleanupTasks.unshift(async () => {
-        await startedGatewayTunnel.stop();
-      });
-      gatewayWsUrl = `${startedGatewayTunnel.publicBaseUrl.replace("https://", "wss://")}/tunnel/sandbox`;
-    }
+    const gatewayWsUrl =
+      input.sandboxPublicGatewayTunnel === undefined
+        ? DATA_PLANE_GATEWAY_TUNNEL_WS_URL
+        : `wss://${input.sandboxPublicGatewayTunnel.publicHostname}/tunnel/sandbox`;
     const controlPlaneApi = await withStepTiming("start control-plane-api", async () => {
       return startControlPlaneApi({
         buildContextHostPath: input.buildContextHostPath,
@@ -751,27 +748,10 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await withStepTiming("stop tokenizer-proxy", async () => tokenizerProxy.stop());
     });
-    let tokenizerProxyEgressBaseUrl = TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL;
-    if (input.sandboxPublicTokenizerProxyTunnel !== undefined) {
-      const publicTokenizerProxyTunnel = input.sandboxPublicTokenizerProxyTunnel;
-      const startedTokenizerProxyTunnel = await withStepTiming(
-        "start public tokenizer-proxy tunnel",
-        async () => {
-          return startCloudflaredServiceTunnel({
-            networkName: activeNetwork.getName(),
-            tunnelId: publicTokenizerProxyTunnel.tunnelId,
-            tunnelCredentialsJson: publicTokenizerProxyTunnel.tunnelCredentialsJson,
-            publicHostname: publicTokenizerProxyTunnel.publicHostname,
-            targetHost: "tokenizer-proxy",
-            targetPort: 5205,
-          });
-        },
-      );
-      cleanupTasks.unshift(async () => {
-        await startedTokenizerProxyTunnel.stop();
-      });
-      tokenizerProxyEgressBaseUrl = `${startedTokenizerProxyTunnel.publicBaseUrl}/tokenizer-proxy/egress`;
-    }
+    const tokenizerProxyEgressBaseUrl =
+      input.sandboxPublicTokenizerProxyTunnel === undefined
+        ? TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL
+        : `https://${input.sandboxPublicTokenizerProxyTunnel.publicHostname}/tokenizer-proxy/egress`;
     const dataPlaneWorker = await withStepTiming("start data-plane-worker", async () => {
       return startDataPlaneWorker({
         buildContextHostPath: input.buildContextHostPath,
@@ -813,6 +793,69 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await dataPlaneWorker.stop();
     });
+
+    const publicTunnelRoutes: CloudflaredTunnelRoute[] = [];
+    const addPublicTunnelRoute = (
+      tunnel: CloudflaredPublicTunnel | undefined,
+      targetHost: string,
+      targetPort: number,
+    ): void => {
+      if (tunnel === undefined) {
+        return;
+      }
+
+      publicTunnelRoutes.push({
+        tunnelId: tunnel.tunnelId,
+        tunnelCredentialsJson: tunnel.tunnelCredentialsJson,
+        publicHostname: tunnel.publicHostname,
+        targetHost,
+        targetPort,
+      });
+    };
+
+    addPublicTunnelRoute(input.sharedControlPlaneTunnel, "control-plane-api", 5100);
+    addPublicTunnelRoute(input.sandboxPublicGatewayTunnel, "data-plane-gateway", 5202);
+    addPublicTunnelRoute(input.sandboxPublicTokenizerProxyTunnel, "tokenizer-proxy", 5205);
+
+    const publicTunnelGroups = new Map<
+      string,
+      {
+        tunnelId: string;
+        tunnelCredentialsJson: string;
+        ingressRules: CloudflaredTunnelRoute[];
+      }
+    >();
+    for (const route of publicTunnelRoutes) {
+      const groupKey = `${route.tunnelId}:${route.tunnelCredentialsJson}`;
+      const existingGroup = publicTunnelGroups.get(groupKey);
+      if (existingGroup === undefined) {
+        publicTunnelGroups.set(groupKey, {
+          tunnelId: route.tunnelId,
+          tunnelCredentialsJson: route.tunnelCredentialsJson,
+          ingressRules: [route],
+        });
+        continue;
+      }
+
+      existingGroup.ingressRules.push(route);
+    }
+
+    for (const group of publicTunnelGroups.values()) {
+      const startedPublicTunnel = await withStepTiming(
+        `start public tunnel for ${group.ingressRules.map((route) => route.publicHostname).join(", ")}`,
+        async () => {
+          return startCloudflaredServiceTunnel({
+            networkName: activeNetwork.getName(),
+            tunnelId: group.tunnelId,
+            tunnelCredentialsJson: group.tunnelCredentialsJson,
+            ingressRules: group.ingressRules,
+          });
+        },
+      );
+      cleanupTasks.unshift(async () => {
+        await startedPublicTunnel.stop();
+      });
+    }
 
     return {
       controlPlaneApi,

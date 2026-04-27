@@ -132,8 +132,12 @@ export async function startCloudflaredTunnel(
   const configContent = buildCloudflaredTunnelConfig({
     tunnelId: input.tunnelId,
     credentialsFilePath: "/etc/cloudflared/credentials.json",
-    publicHostname: input.publicHostname,
-    serviceUrl: `http://host.docker.internal:${String(input.targetLocalPort)}`,
+    ingressRules: [
+      {
+        publicHostname: input.publicHostname,
+        serviceUrl: `http://host.docker.internal:${String(input.targetLocalPort)}`,
+      },
+    ],
   });
 
   await writeFile(credentialsPath, input.tunnelCredentialsJson, "utf8");

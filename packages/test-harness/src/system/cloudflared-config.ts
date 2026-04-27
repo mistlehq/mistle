@@ -1,8 +1,10 @@
 type BuildCloudflaredTunnelConfigInput = {
   tunnelId: string;
   credentialsFilePath: string;
-  publicHostname: string;
-  serviceUrl: string;
+  ingressRules: ReadonlyArray<{
+    publicHostname: string;
+    serviceUrl: string;
+  }>;
 };
 
 type CloudflaredTunnelCredentials = {
@@ -51,12 +53,18 @@ export function parseCloudflaredTunnelCredentialsJson(input: {
 }
 
 export function buildCloudflaredTunnelConfig(input: BuildCloudflaredTunnelConfigInput): string {
+  if (input.ingressRules.length === 0) {
+    throw new Error("Cloudflare tunnel config requires at least one ingress rule.");
+  }
+
   return [
     `tunnel: ${input.tunnelId}`,
     `credentials-file: ${input.credentialsFilePath}`,
     "ingress:",
-    `  - hostname: ${input.publicHostname}`,
-    `    service: ${input.serviceUrl}`,
+    ...input.ingressRules.flatMap((rule) => [
+      `  - hostname: ${rule.publicHostname}`,
+      `    service: ${rule.serviceUrl}`,
+    ]),
     "  - service: http_status:404",
     "",
   ].join("\n");
