@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
@@ -82,6 +82,8 @@ const DockerTargetManagedImages = new Set<string>();
 const DockerTargetImageReferenceCounts = new Map<string, number>();
 const execFileAsync = promisify(execFile);
 const TRACE_TEST_HARNESS = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
+const StartupDiagnosticLabelKey = "mistle.test_harness.startup_id";
+const StartupDiagnosticKindLabelKey = "mistle.test_harness.startup_kind";
 const HostGatewayExtraHosts = [
   {
     host: "host.docker.internal",
@@ -131,6 +133,97 @@ function traceTestHarness(message: string): void {
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function readErrorString(error: unknown, key: "stdout" | "stderr"): string {
+  if (!(error instanceof Error)) {
+    return "";
+  }
+
+  const candidate = Reflect.get(error, key);
+  return typeof candidate === "string" ? candidate : "";
+}
+
+async function runDockerCommand(args: readonly string[]): Promise<string> {
+  try {
+    const result = await execFileAsync("docker", [...args], {
+      timeout: 30_000,
+      maxBuffer: 1_000_000,
+    });
+    return result.stdout.trim().length > 0 ? result.stdout.trim() : result.stderr.trim();
+  } catch (error) {
+    const stderr = readErrorString(error, "stderr");
+    const stdout = readErrorString(error, "stdout");
+    const detail = stderr || stdout || normalizeError(error).message;
+    return `<docker ${args.join(" ")} failed: ${detail}>`;
+  }
+}
+
+async function findContainerIdentifierByLabel(labelValue: string): Promise<string | undefined> {
+  const result = await runDockerCommand([
+    "ps",
+    "-aq",
+    "--filter",
+    `label=${StartupDiagnosticLabelKey}=${labelValue}`,
+  ]);
+  const identifiers = result
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  return identifiers[0];
+}
+
+async function collectStartupDiagnostics(input: {
+  startupId: string;
+  containerName: string;
+  kind: "workspace" | "docker-target";
+  descriptor: string;
+}): Promise<string> {
+  const identifier = (await findContainerIdentifierByLabel(input.startupId)) ?? input.containerName;
+  const [psOutput, inspectOutput, logsOutput] = await Promise.all([
+    runDockerCommand([
+      "ps",
+      "-a",
+      "--filter",
+      `label=${StartupDiagnosticLabelKey}=${input.startupId}`,
+      "--format",
+      "{{.ID}} {{.Image}} {{.Status}} {{.Names}}",
+    ]),
+    runDockerCommand(["inspect", identifier, "--format", "{{json .State}}"]),
+    runDockerCommand(["logs", "--timestamps", identifier]),
+  ]);
+
+  return [
+    `kind=${input.kind}`,
+    `descriptor=${input.descriptor}`,
+    `containerName=${input.containerName}`,
+    `startupId=${input.startupId}`,
+    `dockerPs=${psOutput}`,
+    `dockerInspectState=${inspectOutput}`,
+    `dockerLogs=${logsOutput}`,
+  ].join(" ");
+}
+
+async function wrapStartupErrorWithDiagnostics(input: {
+  startupError: unknown;
+  startupId: string;
+  containerName: string;
+  kind: "workspace" | "docker-target";
+  descriptor: string;
+}): Promise<Error> {
+  const diagnostics = await collectStartupDiagnostics({
+    startupId: input.startupId,
+    containerName: input.containerName,
+    kind: input.kind,
+    descriptor: input.descriptor,
+  }).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    return `failed to collect startup diagnostics: ${message}`;
+  });
+
+  const normalizedError = normalizeError(input.startupError);
+  return new Error(`${normalizedError.message} Startup diagnostics: ${diagnostics}`);
 }
 
 function validatePositiveInteger(value: number, label: string): void {
@@ -526,6 +619,8 @@ export async function startWorkspaceApp(
   await validateAbsoluteDirectoryPath(input.projectRootHostPath, "projectRootHostPath");
 
   let container: StartedTestContainer | undefined;
+  const startupId = randomUUID();
+  const containerName = `mistle-workspace-${input.networkAlias}-${startupId.replaceAll("-", "")}`;
 
   const { network, createdNetwork } = await resolveNetwork(input.network);
 
@@ -537,6 +632,11 @@ export async function startWorkspaceApp(
     });
 
     container = await new GenericContainer(input.baseImage)
+      .withName(containerName)
+      .withLabels({
+        [StartupDiagnosticLabelKey]: startupId,
+        [StartupDiagnosticKindLabelKey]: "workspace",
+      })
       .withBindMounts([
         {
           source: input.projectRootHostPath,
@@ -563,6 +663,13 @@ export async function startWorkspaceApp(
       createdNetwork,
     });
   } catch (startupError) {
+    const startupErrorWithDiagnostics = await wrapStartupErrorWithDiagnostics({
+      startupError,
+      startupId,
+      containerName,
+      kind: "workspace",
+      descriptor: input.baseImage,
+    });
     try {
       await cleanupResources({
         container,
@@ -570,12 +677,12 @@ export async function startWorkspaceApp(
       });
     } catch (cleanupError) {
       throw new AggregateError(
-        [normalizeError(startupError), normalizeError(cleanupError)],
+        [startupErrorWithDiagnostics, normalizeError(cleanupError)],
         "Failed to start workspace app and failed during startup cleanup.",
       );
     }
 
-    throw startupError;
+    throw startupErrorWithDiagnostics;
   }
 }
 
@@ -603,6 +710,8 @@ export async function startDockerTargetApp(
 
   let container: StartedTestContainer | undefined;
   let imageName: string | undefined;
+  const startupId = randomUUID();
+  const containerName = `mistle-target-${input.networkAlias}-${startupId.replaceAll("-", "")}`;
 
   const { network, createdNetwork } = await resolveNetwork(input.network);
   const startupStartedAt = Date.now();
@@ -631,6 +740,11 @@ export async function startDockerTargetApp(
     let containerDefinition = new GenericContainer(imageName);
 
     containerDefinition = containerDefinition
+      .withName(containerName)
+      .withLabels({
+        [StartupDiagnosticLabelKey]: startupId,
+        [StartupDiagnosticKindLabelKey]: "docker-target",
+      })
       .withEnvironment(input.environment)
       .withExtraHosts(HostGatewayExtraHosts)
       .withNetwork(network)
@@ -681,6 +795,13 @@ export async function startDockerTargetApp(
         : {}),
     });
   } catch (startupError) {
+    const startupErrorWithDiagnostics = await wrapStartupErrorWithDiagnostics({
+      startupError,
+      startupId,
+      containerName,
+      kind: "docker-target",
+      descriptor: input.dockerTarget,
+    });
     try {
       await cleanupResources({
         container,
@@ -688,11 +809,11 @@ export async function startDockerTargetApp(
       });
     } catch (cleanupError) {
       throw new AggregateError(
-        [normalizeError(startupError), normalizeError(cleanupError)],
+        [startupErrorWithDiagnostics, normalizeError(cleanupError)],
         "Failed to start Docker target app and failed during startup cleanup.",
       );
     }
 
-    throw startupError;
+    throw startupErrorWithDiagnostics;
   }
 }
