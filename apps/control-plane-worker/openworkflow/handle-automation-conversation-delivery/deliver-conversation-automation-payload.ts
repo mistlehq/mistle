@@ -292,5 +292,6 @@ export async function deliverConversationAutomationPayload(
         workflowRunId: input.workflowRunId,
       },
     });
+    throw error;
   }
 }
