@@ -399,7 +399,7 @@ export const WebhookCreatedResult: PageStory = {
     return (
       <JiraAddFlowStory
         connections={[createJiraConnection()]}
-        initialEntry="/integrations/jira-default?connectionId=icn_jira_story"
+        initialEntry="/integrations/jira-default?connectionId=icn_jira_story&managedWebhookSetup=created"
         managedWebhookSetup={{
           status: "created",
           webhookSourceId: "iws_jira_story",

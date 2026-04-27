@@ -61,7 +61,7 @@ type GitHubAppInstallationState = {
 
 type GitHubAppInstallationStateEntry = [string, GitHubAppInstallationState];
 
-type InstalledAppSuccessNotice = {
+type ConnectionSuccessNotice = {
   message?: string;
   resetKey: string;
   title: string;
@@ -89,11 +89,13 @@ function buildGitHubAppInstallationStateByConnectionId(input: {
   );
 }
 
-function resolveInstalledAppSuccessNotice(input: {
+function resolveConnectionSuccessNotice(input: {
   detailConnectionId: string | null;
   searchParams: URLSearchParams;
-  selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
-}): InstalledAppSuccessNotice | null {
+  selectedConnection:
+    | Pick<IntegrationConnection, "connectionMethodId" | "id" | "targetKey">
+    | undefined;
+}): ConnectionSuccessNotice | null {
   if (
     input.detailConnectionId === null ||
     input.selectedConnection?.id !== input.detailConnectionId
@@ -106,9 +108,8 @@ function resolveInstalledAppSuccessNotice(input: {
     input.selectedConnection.connectionMethodId === SlackConnectionMethodId
   ) {
     return {
-      message: "The Slack app was created in Slack and connected to Mistle.",
       resetKey: input.detailConnectionId,
-      title: "Slack app installed and connected",
+      title: "The Slack app was created and connected to Mistle successfully",
     };
   }
 
@@ -120,6 +121,16 @@ function resolveInstalledAppSuccessNotice(input: {
     return {
       resetKey: input.detailConnectionId,
       title: "GitHub App connected to Mistle successfully",
+    };
+  }
+
+  if (
+    input.searchParams.get("managedWebhookSetup") === "created" &&
+    input.selectedConnection.targetKey === "jira-default"
+  ) {
+    return {
+      resetKey: input.detailConnectionId,
+      title: "Jira connection and webhook created successfully",
     };
   }
 
@@ -182,7 +193,7 @@ export function IntegrationsPage() {
     directoryState.selectedDetailConnections.find(
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
-  const installedAppSuccessNotice = resolveInstalledAppSuccessNotice({
+  const connectionSuccessNotice = resolveConnectionSuccessNotice({
     detailConnectionId,
     searchParams,
     selectedConnection: selectedDetailConnection,
@@ -273,15 +284,15 @@ export function IntegrationsPage() {
           ) : undefined
         }
         selectedConnectionNotice={
-          installedAppSuccessNotice !== null ? (
+          connectionSuccessNotice !== null ? (
             <Notice
               autoHideAfterMs={NoticeAutoHideDurationsMs.LONG}
               dismissible
-              resetKey={installedAppSuccessNotice.resetKey}
-              title={installedAppSuccessNotice.title}
+              resetKey={connectionSuccessNotice.resetKey}
+              title={connectionSuccessNotice.title}
               variant="success"
             >
-              {installedAppSuccessNotice.message ?? null}
+              {connectionSuccessNotice.message ?? null}
             </Notice>
           ) : shouldShowManagedWebhookSetupFailureNotice ? (
             <Notice title="Connection created, webhook setup failed" variant="alert">

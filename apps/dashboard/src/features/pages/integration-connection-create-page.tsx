@@ -172,6 +172,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
           return;
         }
 
+        detailSearchParams.set("managedWebhookSetup", "created");
         await navigate(`/integrations/${editor.targetKey}?${detailSearchParams.toString()}`);
         return;
       }

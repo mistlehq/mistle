@@ -223,11 +223,13 @@ describe("IntegrationsPage", () => {
       </QueryClientProvider>,
     );
 
-    const successNoticeTitle = screen.getByText("Slack app installed and connected");
+    const successNoticeTitle = screen.getByText(
+      "The Slack app was created and connected to Mistle successfully",
+    );
     expect(successNoticeTitle).toBeTruthy();
     expect(
-      screen.getByText("The Slack app was created in Slack and connected to Mistle."),
-    ).toBeTruthy();
+      screen.queryByText("The Slack app was created in Slack and connected to Mistle."),
+    ).toBeNull();
     const successNoticeSection = successNoticeTitle.closest("section");
     const selectedConnectionTitleSection = screen
       .getByRole("textbox", { name: "Connection name" })
@@ -299,6 +301,62 @@ describe("IntegrationsPage", () => {
     expect(
       screen
         .getByRole("button", { name: "Select connection Engineering GitHub" })
+        .getAttribute("aria-current"),
+    ).toBe("true");
+  });
+
+  it("shows Jira webhook setup success on the selected connection detail route", () => {
+    globalThis.__MISTLE_RUNTIME_CONFIG__ = {
+      controlPlaneApiOrigin: "https://control-plane.example.com",
+    };
+    resetDashboardConfigForTest();
+
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    queryClient.setQueryData(SESSION_QUERY_KEY, {
+      session: {
+        activeOrganizationId: "org_mistle",
+      },
+    });
+    queryClient.setQueryData(SETTINGS_INTEGRATIONS_QUERY_KEY, {
+      targets: [createJiraTarget()],
+      connections: [
+        createJiraConnection({
+          id: "icn_jira_created",
+          displayName: "Engineering Jira",
+        }),
+      ],
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter
+          initialEntries={[
+            "/integrations/jira-default?connectionId=icn_jira_created&managedWebhookSetup=created",
+          ]}
+        >
+          <Routes>
+            <Route element={<IntegrationsPage />} path="/integrations/:targetKey" />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const successNoticeTitle = screen.getByText("Jira connection and webhook created successfully");
+    expect(successNoticeTitle).toBeTruthy();
+    const successNoticeSection = successNoticeTitle.closest("section");
+    const selectedConnectionTitleSection = screen
+      .getByRole("textbox", { name: "Connection name" })
+      .closest("section");
+    if (successNoticeSection === null || selectedConnectionTitleSection === null) {
+      throw new Error("Expected Jira success notice to render inside the selected detail pane.");
+    }
+    expect(successNoticeSection).toBe(selectedConnectionTitleSection);
+    expect(
+      screen
+        .getByRole("button", { name: "Select connection Engineering Jira" })
         .getAttribute("aria-current"),
     ).toBe("true");
   });
@@ -515,5 +573,56 @@ function createSlackConnection(input: { id: string; displayName: string }): Inte
     resources: [],
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
+  };
+}
+
+function createJiraTarget(): IntegrationTarget {
+  return {
+    targetKey: "jira-default",
+    familyId: "jira",
+    variantId: "jira-default",
+    enabled: true,
+    config: {},
+    displayName: "Jira",
+    description: "Jira Cloud",
+    targetHealth: {
+      configStatus: "valid",
+    },
+    connectionMethods: [
+      {
+        id: "jira-personal-api-token",
+        label: "Personal API token",
+        kind: "form",
+        secretFields: [
+          {
+            name: "apiKey",
+            label: "API token",
+            inputType: "password",
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createJiraConnection(input: { id: string; displayName: string }): IntegrationConnection {
+  return {
+    id: input.id,
+    targetKey: "jira-default",
+    displayName: input.displayName,
+    status: "active",
+    bindingCount: 0,
+    connectionMethodId: "jira-personal-api-token",
+    connectionMethodLabel: "Personal API token",
+    externalSubjectId: "https://engineering.atlassian.net",
+    configuredSecretNames: ["apiKey"],
+    config: {
+      connection_method: "jira-personal-api-token",
+      site_url: "https://engineering.atlassian.net",
+      email: "ops@example.com",
+    },
+    resources: [],
+    createdAt: "2026-04-27T00:00:00.000Z",
+    updatedAt: "2026-04-27T00:00:00.000Z",
   };
 }
