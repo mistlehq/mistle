@@ -16,7 +16,7 @@ concurrency:
 jobs:
   validate:
     name: Validate release tag
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     outputs:
       release_version: ${{ steps.release.outputs.version }}
       stable_release: ${{ steps.release.outputs.stable_release }}
@@ -58,7 +58,7 @@ jobs:
   publish-services:
     name: Publish ${{ matrix.component }}
     needs: validate
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -144,7 +144,7 @@ jobs:
   publish-sandbox-base:
     name: Publish sandbox base
     needs: validate
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
@@ -216,7 +216,7 @@ jobs:
       - validate
       - publish-services
       - publish-sandbox-base
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout

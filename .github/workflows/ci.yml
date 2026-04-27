@@ -105,14 +105,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Restore pnpm store cache
-        id: static-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
         id: static-ts-turbo-cache
@@ -126,13 +126,6 @@ jobs:
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.static-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
@@ -167,14 +160,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Restore pnpm store cache
-        id: build-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
         id: build-ts-turbo-cache
@@ -188,13 +181,6 @@ jobs:
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.build-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
@@ -240,14 +226,14 @@ jobs:
           cmd-format: nix develop --command {0}
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Restore pnpm store cache
-        id: static-rust-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
         id: static-rust-turbo-cache
@@ -261,13 +247,6 @@ jobs:
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.static-rust-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
@@ -343,14 +322,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Restore pnpm store cache
-        id: test-ts-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
         id: test-ts-turbo-cache
@@ -364,13 +343,6 @@ jobs:
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.test-ts-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
@@ -407,6 +379,9 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
       - name: Restore commit-sign container cargo cache
         id: test-commit-sign-container-cargo-cache
         uses: actions/cache/restore@v5
@@ -416,24 +391,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-commit-sign-test-cargo-home-
 
-      - name: Restore pnpm store cache
-        id: test-commit-sign-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.test-commit-sign-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Build commit-sign test runner image
         uses: useblacksmith/build-push-action@v2
@@ -477,6 +442,9 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Create pnpm store parent
+        run: mkdir -p ~/.local/share/pnpm
+
       - name: Restore sandboxd container cargo cache
         id: test-sandboxd-container-cargo-cache
         uses: actions/cache/restore@v5
@@ -486,24 +454,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sandboxd-test-cargo-home-
 
-      - name: Restore pnpm store cache
-        id: test-sandboxd-pnpm-store-cache
-        uses: actions/cache/restore@v5
+      - name: Mount pnpm store sticky disk
+        uses: useblacksmith/stickydisk@v1
         with:
+          key: ${{ github.repository }}-pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
           path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
-
-      - name: Save pnpm store cache
-        if: steps.test-sandboxd-pnpm-store-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ~/.local/share/pnpm/store
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
