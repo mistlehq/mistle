@@ -222,6 +222,9 @@ importers:
       '@mistle/workflow-registry':
         specifier: workspace:*
         version: link:../../packages/workflow-registry
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
       '@openworkflow/cli':
         specifier: ^0.4.3
         version: 0.4.3(openworkflow@0.9.0(postgres@3.4.9))
@@ -250,9 +253,6 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-      '@opentelemetry/api':
-        specifier: ^1.9.0
-        version: 1.9.1
       '@opentelemetry/context-async-hooks':
         specifier: ^2.6.1
         version: 2.6.1(@opentelemetry/api@1.9.1)
