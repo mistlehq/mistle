@@ -54,12 +54,12 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { AppShellAutosaveHeaderActions } from "../shell/app-shell-autosave-indicator.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { SandboxProfileDraftSaveHeaderActions } from "./sandbox-profile-draft-save-indicator.js";
 import {
   SandboxProfileEditorSections,
   type SandboxProfileEditorSection,
@@ -1008,9 +1008,7 @@ function ReadySandboxProfileEditorPage(input: {
 
   return (
     <>
-      <SandboxProfileDraftSaveHeaderActions
-        isSavingDraftChanges={input.mode.kind === "draft" && isSavingDraftChanges}
-      />
+      <AppShellAutosaveHeaderActions active={input.mode.kind === "draft" && isSavingDraftChanges} />
       <SandboxProfileEditorView
         snapshotPreparationStatus={resolveSnapshotPreparationStatus({
           mode: input.mode,

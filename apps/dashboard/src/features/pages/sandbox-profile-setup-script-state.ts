@@ -12,6 +12,7 @@ import {
   getErrorMessage,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
+import { TopLoadingBarMeta } from "../shell/top-loading-bar-query-meta.js";
 
 type AutoSaveStatus = "idle" | "saving" | "saved" | "saved-fading";
 
@@ -83,6 +84,9 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   persistedValueRef.current = persistedValue;
 
   const saveMutation = useMutation({
+    meta: {
+      [TopLoadingBarMeta.SUPPRESS]: true,
+    },
     mutationFn: async (setupScript: string | null) =>
       putSandboxProfileVersionSetupScript({
         profileId: input.profileId,

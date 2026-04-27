@@ -8,12 +8,12 @@ import {
 import { SpinnerGapIcon } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { useAppShellHeaderActions } from "./app-shell-header-actions.js";
 
-const DraftSavingIndicatorShowDelayMs = 200;
-const DraftSavingIndicatorMinimumVisibleMs = 500;
+const AutosaveIndicatorShowDelayMs = 200;
+const AutosaveIndicatorMinimumVisibleMs = 500;
 
-export function SandboxProfileDraftSaveIndicator(): React.JSX.Element {
+export function AppShellAutosaveIndicator(): React.JSX.Element {
   return (
     <div
       aria-live="polite"
@@ -26,21 +26,21 @@ export function SandboxProfileDraftSaveIndicator(): React.JSX.Element {
   );
 }
 
-export function SandboxProfileDraftSaveHeaderActions(input: {
-  isSavingDraftChanges: boolean;
+export function AppShellAutosaveHeaderActions(input: {
+  active: boolean;
   minimumVisibleMs?: number;
   scheduler?: Scheduler;
   showDelayMs?: number;
 }): null {
   const showSavingIndicator = useDelayedMinimumVisibleFlag({
-    active: input.isSavingDraftChanges,
+    active: input.active,
     clock: systemClock,
-    minimumVisibleMs: input.minimumVisibleMs ?? DraftSavingIndicatorMinimumVisibleMs,
+    minimumVisibleMs: input.minimumVisibleMs ?? AutosaveIndicatorMinimumVisibleMs,
     scheduler: input.scheduler ?? systemScheduler,
-    showDelayMs: input.showDelayMs ?? DraftSavingIndicatorShowDelayMs,
+    showDelayMs: input.showDelayMs ?? AutosaveIndicatorShowDelayMs,
   });
   const headerActions = useMemo(
-    () => (showSavingIndicator ? <SandboxProfileDraftSaveIndicator /> : null),
+    () => (showSavingIndicator ? <AppShellAutosaveIndicator /> : null),
     [showSavingIndicator],
   );
   useAppShellHeaderActions(headerActions);

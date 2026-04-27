@@ -14,6 +14,7 @@ import {
   putSandboxProfileVersionIntegrationBindings,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { TopLoadingBarMeta } from "../shell/top-loading-bar-query-meta.js";
 import { resolveBindingConfigUiModel } from "./sandbox-profile-binding-config-editor.js";
 import type {
   IntegrationConnectionSummary,
@@ -232,6 +233,9 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   }
 
   const putIntegrationBindingsMutation = useMutation({
+    meta: {
+      [TopLoadingBarMeta.SUPPRESS]: true,
+    },
     mutationFn: async (mutationInput: {
       bindings: Array<{
         id?: string;
