@@ -74,13 +74,13 @@ jobs:
           secret-path: /integration-tests
 
       - name: Prepare scheduled system runtime
-        run: nix develop --command bash -lc "pnpm --filter @mistle/tests test:system:prepare"
+        run: nix develop --command bash -c "pnpm --filter @mistle/tests test:system:prepare"
 
       - name: Run Docker scheduled system suite
         id: system-docker
         continue-on-error: true
         run: |
-          nix develop --command bash -lc \
+          nix develop --command bash -c \
             "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=docker pnpm --filter @mistle/tests test:system:run"
 
       - name: Run E2B scheduled system suite
@@ -88,7 +88,7 @@ jobs:
         if: ${{ always() && !cancelled() && steps.system-docker.outcome != 'skipped' }}
         continue-on-error: true
         run: |
-          nix develop --command bash -lc \
+          nix develop --command bash -c \
             "MISTLE_TEST_SYSTEM_SANDBOX_PROVIDER=e2b pnpm --filter @mistle/tests test:system:run"
 
       - name: Record scheduled system results
