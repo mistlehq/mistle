@@ -1,5 +1,4 @@
 import { systemScheduler, type Scheduler } from "@mistle/time";
-import { XIcon } from "@phosphor-icons/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 
@@ -255,7 +254,9 @@ function Notice({
         {shouldRenderStructuredContent ? (
           <NoticeStructuredContent
             action={action}
-            closeButton={dismissible ? <NoticeCloseButton onClick={dismissNotice} /> : undefined}
+            dismissButton={
+              dismissible ? <NoticeDismissButton onClick={dismissNotice} /> : undefined
+            }
             icon={icon}
             title={title}
           >
@@ -285,13 +286,13 @@ function validateAutoHideAfterMs(autoHideAfterMs: number | undefined): void {
 function NoticeStructuredContent({
   action,
   children,
-  closeButton,
+  dismissButton,
   icon,
   title,
 }: {
   action?: React.ReactNode;
   children?: React.ReactNode;
-  closeButton?: React.ReactNode;
+  dismissButton?: React.ReactNode;
   icon?: React.ReactNode;
   title?: React.ReactNode;
 }) {
@@ -301,10 +302,11 @@ function NoticeStructuredContent({
     icon,
     title,
   });
-  const hasCloseButton = hasVisibleContent(closeButton);
+  const hasDismissButton = hasVisibleContent(dismissButton);
+  const hasTrailingActions = layoutState.hasAction || hasDismissButton;
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       {!layoutState.hasTitle && !layoutState.hasDescription && !layoutState.hasIcon ? null : (
         <div className="flex min-w-0 flex-1 items-center gap-2.5" data-slot="notice-main">
           {layoutState.hasIcon ? <NoticeIcon>{icon}</NoticeIcon> : null}
@@ -314,17 +316,11 @@ function NoticeStructuredContent({
               data-slot="notice-content"
             >
               {layoutState.hasTitle ? (
-                <NoticeHeaderRow closeButton={closeButton}>
-                  {layoutState.hasDescription ? (
-                    <NoticeTitle>{title}</NoticeTitle>
-                  ) : (
-                    <NoticeDescription>{title}</NoticeDescription>
-                  )}
-                </NoticeHeaderRow>
-              ) : layoutState.hasDescription && hasCloseButton ? (
-                <NoticeHeaderRow closeButton={closeButton}>
-                  <NoticeDescription>{children}</NoticeDescription>
-                </NoticeHeaderRow>
+                layoutState.hasDescription ? (
+                  <NoticeTitle>{title}</NoticeTitle>
+                ) : (
+                  <NoticeDescription>{title}</NoticeDescription>
+                )
               ) : layoutState.hasDescription ? (
                 <NoticeDescription>{children}</NoticeDescription>
               ) : null}
@@ -335,25 +331,12 @@ function NoticeStructuredContent({
           )}
         </div>
       )}
-      {layoutState.hasAction ? <NoticeAction>{action}</NoticeAction> : null}
-      {!layoutState.hasTitle && !layoutState.hasDescription && hasCloseButton ? (
-        <NoticeAction>{closeButton}</NoticeAction>
+      {hasTrailingActions ? (
+        <NoticeAction>
+          {layoutState.hasAction ? action : null}
+          {hasDismissButton ? dismissButton : null}
+        </NoticeAction>
       ) : null}
-    </div>
-  );
-}
-
-function NoticeHeaderRow({
-  children,
-  closeButton,
-}: {
-  children: React.ReactNode;
-  closeButton?: React.ReactNode;
-}) {
-  return (
-    <div className="flex min-w-0 items-start gap-2" data-slot="notice-header-row">
-      <div className="min-w-0 flex-1">{children}</div>
-      {hasVisibleContent(closeButton) ? <div className="shrink-0">{closeButton}</div> : null}
     </div>
   );
 }
@@ -388,7 +371,7 @@ function NoticeDescription({ className, ...props }: React.ComponentProps<"div">)
   return (
     <div
       className={cn(
-        "min-w-0 text-sm text-balance whitespace-normal [overflow-wrap:anywhere] md:text-pretty [&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4",
+        "min-w-0 text-sm whitespace-normal [overflow-wrap:anywhere] [&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4",
         className,
       )}
       data-slot="notice-description"
@@ -400,24 +383,26 @@ function NoticeDescription({ className, ...props }: React.ComponentProps<"div">)
 function NoticeAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn("my-auto ml-auto shrink-0", className)}
+      className={cn(
+        "flex flex-wrap justify-end gap-2 self-end sm:my-auto sm:ml-auto sm:shrink-0 sm:self-auto",
+        className,
+      )}
       data-slot="notice-action"
       {...props}
     />
   );
 }
 
-function NoticeCloseButton({ onClick }: { onClick: React.MouseEventHandler<HTMLButtonElement> }) {
+function NoticeDismissButton({ onClick }: { onClick: React.MouseEventHandler<HTMLButtonElement> }) {
   return (
     <Button
-      aria-label="Dismiss notice"
-      className="-my-1 -mr-1 text-current opacity-75 hover:bg-current/10 hover:text-current hover:opacity-100"
-      size="icon-xs"
+      className="border-current/25 bg-transparent text-current opacity-80 hover:border-current/35 hover:bg-current/10 hover:text-current hover:opacity-100"
+      size="sm"
       type="button"
-      variant="ghost"
+      variant="outline"
       onClick={onClick}
     >
-      <XIcon aria-hidden="true" />
+      Dismiss
     </Button>
   );
 }

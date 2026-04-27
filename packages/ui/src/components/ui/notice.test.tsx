@@ -73,8 +73,22 @@ describe("Notice", () => {
   it("does not render a dismiss button by default", () => {
     render(<Notice variant="success">GitHub linked successfully.</Notice>);
 
-    expect(screen.queryByRole("button", { name: "Dismiss notice" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
     expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
+  });
+
+  it("groups custom actions and dismiss actions into one trailing action area", () => {
+    const { container } = render(
+      <Notice action={<button type="button">Review</button>} dismissible variant="success">
+        GitHub linked successfully.
+      </Notice>,
+    );
+
+    const actionAreas = container.querySelectorAll('[data-slot="notice-action"]');
+
+    expect(actionAreas).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Review" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeTruthy();
   });
 
   it("hides the notice when the dismiss button is pressed", () => {
@@ -87,7 +101,7 @@ describe("Notice", () => {
       </Notice>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     const notice = screen.getByText("GitHub linked successfully.").closest('[data-slot="notice"]');
 
@@ -149,7 +163,7 @@ describe("Notice", () => {
       </Notice>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
     expect(dismissEvents).toEqual(["dismissed"]);
@@ -170,7 +184,7 @@ describe("Notice", () => {
       </Notice>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
 
     expect(screen.getByText("GitHub linked successfully.")).toBeTruthy();
 
@@ -199,7 +213,7 @@ describe("Notice", () => {
       </Notice>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     clock.advanceMs(NoticeDismissAnimationMs);
     act(() => {
       expect(scheduler.runDue()).toBe(1);

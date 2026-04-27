@@ -168,7 +168,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     render(<DismissibleSaveFailureTest />);
 
     expect(screen.getByText("Save failed")).toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText("Save failed")).toBeNull();
   });
 });

@@ -799,7 +799,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Publish successful, creating a new snapshot")).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     fireEvent.click(screen.getByRole("tab", { name: "Integrations" }));
     expect(screen.getByRole("tab", { name: "Integrations" }).getAttribute("aria-selected")).toBe(
       "true",
