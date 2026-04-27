@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 
+import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
 import { systemSleeper } from "@mistle/time";
 import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
@@ -30,6 +31,7 @@ const LocalNodeId = "dpg_test";
 const SandboxInstanceId = "sbi_port_access_transport";
 
 const openWebSocketPairs: WebSocketPair[] = [];
+const tracing = installInMemoryTracing();
 
 function toBuffer(data: RawData): Buffer {
   if (Buffer.isBuffer(data)) {
@@ -220,6 +222,7 @@ afterEach(async () => {
   while (openWebSocketPairs.length > 0) {
     await openWebSocketPairs.pop()?.closeAll();
   }
+  tracing.reset();
 });
 
 describe("port access transport helpers", () => {
@@ -351,6 +354,123 @@ describe("port access transport helpers", () => {
 });
 
 describe("port access transport session fencing", () => {
+  it("emits a completed HTTP stream span for successful port access responses", async () => {
+    tracing.reset();
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(relayCoordinator);
+    const bootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(bootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_telemetry_success",
+      }),
+      socket: bootstrap.peerSocket,
+    });
+
+    await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(bootstrap.clientSocket);
+
+    await service.handleBootstrapTransportMessage({
+      sandboxInstanceId: SandboxInstanceId,
+      sourceBootstrapSessionId: "sess_bootstrap_telemetry_success",
+      message: {
+        type: "ports.http.response.start",
+        streamId: 1,
+        status: 200,
+        headers: {},
+      },
+    });
+    await service.handleBootstrapTransportMessage({
+      sandboxInstanceId: SandboxInstanceId,
+      sourceBootstrapSessionId: "sess_bootstrap_telemetry_success",
+      message: {
+        type: "ports.http.body.end",
+        streamId: 1,
+        direction: "response",
+      },
+    });
+
+    await tracing.forceFlush();
+    const span = tracing
+      .getFinishedSpans()
+      .find((finishedSpan) => finishedSpan.name === "data_plane_gateway.port_access.http_stream");
+
+    expect(span).toBeDefined();
+    expect(span?.attributes).toMatchObject({
+      "mistle.sandbox.instance_id": SandboxInstanceId,
+      "mistle.port_access.stream_id": 1,
+      "mistle.port_access.stream_kind": "http",
+      "mistle.port_access.target_port": 5173,
+      "mistle.port_access.outcome": "completed",
+      "mistle.port_access.target_bootstrap_session_id": "sess_bootstrap_telemetry_success",
+    });
+  });
+
+  it("emits an error HTTP stream span when bootstrap disconnects before response start", async () => {
+    tracing.reset();
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(relayCoordinator);
+    const bootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(bootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_telemetry_disconnect",
+      }),
+      socket: bootstrap.peerSocket,
+    });
+
+    const handle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(bootstrap.clientSocket);
+
+    service.rejectPendingStreamsForBootstrapSession({
+      sandboxInstanceId: SandboxInstanceId,
+      targetBootstrapSessionId: "sess_bootstrap_telemetry_disconnect",
+    });
+    await expect(handle.responseStart).rejects.toBeInstanceOf(Error);
+
+    await tracing.forceFlush();
+    const span = tracing
+      .getFinishedSpans()
+      .find((finishedSpan) => finishedSpan.name === "data_plane_gateway.port_access.http_stream");
+
+    expect(span).toBeDefined();
+    expect(span?.attributes).toMatchObject({
+      "mistle.sandbox.instance_id": SandboxInstanceId,
+      "mistle.port_access.stream_id": 1,
+      "mistle.port_access.stream_kind": "http",
+      "mistle.port_access.target_port": 5173,
+      "mistle.port_access.outcome": "bootstrap_disconnected",
+      "mistle.port_access.target_bootstrap_session_id": "sess_bootstrap_telemetry_disconnect",
+    });
+    expect(span?.status.message).toContain("Sandbox bootstrap tunnel disconnected");
+  });
+
   it("does not send follow-up HTTP request body messages to a replacement bootstrap", async () => {
     const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
     const service = new PortAccessTransportService(relayCoordinator);

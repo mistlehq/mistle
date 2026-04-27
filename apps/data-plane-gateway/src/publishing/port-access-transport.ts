@@ -11,9 +11,11 @@ import {
   type PortsStreamError,
   type PortsTransportMessage,
 } from "@mistle/sandbox-session-protocol";
+import { metrics, SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetry/api";
 import type { WSContext } from "hono/ws";
 import type WebSocket from "ws";
 
+import { logger } from "../logger.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { RelayTarget } from "../tunnel/types.js";
@@ -30,10 +32,35 @@ const HopByHopHeaderNames = new Set([
   "upgrade",
 ]);
 const BootstrapDisconnectedCloseReason = "Sandbox bootstrap tunnel disconnected.";
+const PortAccessTracer = trace.getTracer("@mistle/data-plane-gateway/port-access");
+const PortAccessMeter = metrics.getMeter("@mistle/data-plane-gateway/port-access");
+const PortAccessStreamEvents = PortAccessMeter.createCounter("mistle.port_access.stream.events", {
+  description: "Port Access stream lifecycle events observed by the data-plane gateway.",
+});
+const PortAccessStreamDurationMs = PortAccessMeter.createHistogram(
+  "mistle.port_access.stream.duration",
+  {
+    description: "Port Access stream duration observed by the data-plane gateway.",
+    unit: "ms",
+  },
+);
 
 type RepeatedHeaderValues = Record<string, string[]>;
+type PortAccessStreamKind = "http" | "websocket";
+type PortAccessStreamOutcome =
+  | "opened"
+  | "response_started"
+  | "completed"
+  | "browser_closed"
+  | "browser_error"
+  | "bootstrap_disconnected"
+  | "stream_error";
 
 type ActivePortAccessHttpStream = {
+  attributes: Attributes;
+  observabilityFinished: boolean;
+  openedAtMs: number;
+  portAccessSpan: Span;
   responseStarted: boolean;
   rejectResponseStart: (error: Error) => void;
   resolveResponseStart: (responseStart: PortsHttpResponseStart) => void;
@@ -47,8 +74,12 @@ type PortAccessWebSocketPendingEvent =
 
 type ActivePortAccessWebSocketStream = {
   accepted: boolean;
+  attributes: Attributes;
   browserClosed: boolean;
+  observabilityFinished: boolean;
+  openedAtMs: number;
   pendingEvents: PortAccessWebSocketPendingEvent[];
+  portAccessSpan: Span;
   rejectAccept: (error: Error) => void;
   resolveAccept: (accept: PortsWsAccept) => void;
   socket?: WSContext<WebSocket>;
@@ -103,6 +134,104 @@ function stripPortAccessSessionCookie(cookieHeader: string): string | undefined 
   }
 
   return remainingSegments.join("; ");
+}
+
+function getPortAccessTargetAttributes(target: PortAccessTarget): Attributes {
+  if (target.kind === "port") {
+    return {
+      "mistle.port_access.target_kind": target.kind,
+      "mistle.port_access.target_port": target.port,
+    };
+  }
+
+  return {
+    "mistle.port_access.target_kind": target.kind,
+  };
+}
+
+function buildPortAccessStreamAttributes(input: {
+  sandboxInstanceId: string;
+  streamId: number;
+  streamKind: PortAccessStreamKind;
+  target: PortAccessTarget;
+  targetBootstrapSessionId: string;
+  upstreamProtocol: "http" | "https";
+}): Attributes {
+  return {
+    "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.port_access.stream_id": input.streamId,
+    "mistle.port_access.stream_kind": input.streamKind,
+    "mistle.port_access.upstream_protocol": input.upstreamProtocol,
+    "mistle.port_access.target_bootstrap_session_id": input.targetBootstrapSessionId,
+    ...getPortAccessTargetAttributes(input.target),
+  };
+}
+
+function recordPortAccessStreamEvent(input: {
+  attributes: Attributes;
+  durationMs?: number;
+  error?: Error;
+  outcome: PortAccessStreamOutcome;
+}): void {
+  const eventAttributes = {
+    ...input.attributes,
+    "mistle.port_access.outcome": input.outcome,
+    ...(input.error === undefined
+      ? {}
+      : {
+          "mistle.port_access.error_name": input.error.name,
+          "mistle.port_access.error_message": input.error.message,
+        }),
+  };
+
+  PortAccessStreamEvents.add(1, eventAttributes);
+  if (input.durationMs !== undefined) {
+    PortAccessStreamDurationMs.record(input.durationMs, eventAttributes);
+  }
+}
+
+function startPortAccessStreamSpan(input: {
+  attributes: Attributes;
+  streamKind: PortAccessStreamKind;
+}): Span {
+  return PortAccessTracer.startSpan(`data_plane_gateway.port_access.${input.streamKind}_stream`, {
+    attributes: input.attributes,
+  });
+}
+
+function finishPortAccessStream(input: {
+  attributes: Attributes;
+  durationMs: number;
+  error?: Error;
+  outcome: PortAccessStreamOutcome;
+  span: Span;
+}): void {
+  input.span.setAttributes({
+    "mistle.port_access.duration_ms": input.durationMs,
+    "mistle.port_access.outcome": input.outcome,
+    ...(input.error === undefined
+      ? {}
+      : {
+          "mistle.port_access.error_name": input.error.name,
+          "mistle.port_access.error_message": input.error.message,
+        }),
+  });
+
+  if (input.error !== undefined) {
+    input.span.recordException(input.error);
+    input.span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: input.error.message,
+    });
+  }
+
+  recordPortAccessStreamEvent({
+    attributes: input.attributes,
+    durationMs: input.durationMs,
+    ...(input.error === undefined ? {} : { error: input.error }),
+    outcome: input.outcome,
+  });
+  input.span.end();
 }
 
 export function buildPortAccessRequestHeaders(input: {
@@ -189,6 +318,30 @@ export class PortAccessTransportService {
     });
 
     const streamId = this.allocateStreamId();
+    const openedAtMs = Date.now();
+    const streamAttributes = buildPortAccessStreamAttributes({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId,
+      streamKind: "http",
+      target: input.target,
+      targetBootstrapSessionId: bootstrapTarget.sessionId,
+      upstreamProtocol: input.upstreamProtocol,
+    });
+    const portAccessSpan = startPortAccessStreamSpan({
+      attributes: streamAttributes,
+      streamKind: "http",
+    });
+    recordPortAccessStreamEvent({
+      attributes: streamAttributes,
+      outcome: "opened",
+    });
+    logger.debug(
+      {
+        ...streamAttributes,
+        eventName: "gateway.port_access.http_stream.opened",
+      },
+      "Port Access HTTP stream opened",
+    );
     const responseStream = new TransformStream<Uint8Array, Uint8Array>();
     const responseBodyWriter = responseStream.writable.getWriter();
     let resolveResponseStart: ((responseStart: PortsHttpResponseStart) => void) | undefined;
@@ -205,6 +358,10 @@ export class PortAccessTransportService {
       sandboxInstanceId: input.sandboxInstanceId,
       streamId,
       stream: {
+        attributes: streamAttributes,
+        observabilityFinished: false,
+        openedAtMs,
+        portAccessSpan,
         responseStarted: false,
         rejectResponseStart,
         resolveResponseStart,
@@ -231,16 +388,49 @@ export class PortAccessTransportService {
         streamId,
       });
       await responseBodyWriter.abort(error);
+      const streamError = error instanceof Error ? error : new Error(String(error));
+      finishPortAccessStream({
+        attributes: streamAttributes,
+        durationMs: Date.now() - openedAtMs,
+        error: streamError,
+        outcome: "stream_error",
+        span: portAccessSpan,
+      });
+      logger.warn(
+        {
+          ...streamAttributes,
+          err: streamError,
+          eventName: "gateway.port_access.http_stream.open_failed",
+        },
+        "Port Access HTTP stream failed to open",
+      );
       throw error;
     }
 
     return {
       close: async () => {
+        const activeStream = this.getActiveHttpStream({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
         this.deleteActiveHttpStream({
           sandboxInstanceId: input.sandboxInstanceId,
           streamId,
         });
         await responseBodyWriter.abort();
+        if (activeStream !== undefined) {
+          this.finishHttpStreamObservability({
+            outcome: "browser_closed",
+            stream: activeStream,
+          });
+        }
+        logger.debug(
+          {
+            ...streamAttributes,
+            eventName: "gateway.port_access.http_stream.browser_closed",
+          },
+          "Port Access HTTP stream closed by browser",
+        );
         await this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
           targetBootstrapSessionId: bootstrapTarget.sessionId,
@@ -290,6 +480,30 @@ export class PortAccessTransportService {
     });
 
     const streamId = this.allocateStreamId();
+    const openedAtMs = Date.now();
+    const streamAttributes = buildPortAccessStreamAttributes({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId,
+      streamKind: "websocket",
+      target: input.target,
+      targetBootstrapSessionId: bootstrapTarget.sessionId,
+      upstreamProtocol: input.upstreamProtocol,
+    });
+    const portAccessSpan = startPortAccessStreamSpan({
+      attributes: streamAttributes,
+      streamKind: "websocket",
+    });
+    recordPortAccessStreamEvent({
+      attributes: streamAttributes,
+      outcome: "opened",
+    });
+    logger.debug(
+      {
+        ...streamAttributes,
+        eventName: "gateway.port_access.websocket_stream.opened",
+      },
+      "Port Access websocket stream opened",
+    );
     let resolveAccept: ((accept: PortsWsAccept) => void) | undefined;
     let rejectAccept: ((error: Error) => void) | undefined;
     const accepted = new Promise<PortsWsAccept>((resolve, reject) => {
@@ -305,8 +519,12 @@ export class PortAccessTransportService {
       streamId,
       stream: {
         accepted: false,
+        attributes: streamAttributes,
         browserClosed: false,
+        observabilityFinished: false,
+        openedAtMs,
         pendingEvents: [],
+        portAccessSpan,
         rejectAccept,
         resolveAccept,
         targetBootstrapSessionId: bootstrapTarget.sessionId,
@@ -330,7 +548,23 @@ export class PortAccessTransportService {
         sandboxInstanceId: input.sandboxInstanceId,
         streamId,
       });
-      rejectAccept(error instanceof Error ? error : new Error(String(error)));
+      const streamError = error instanceof Error ? error : new Error(String(error));
+      rejectAccept(streamError);
+      finishPortAccessStream({
+        attributes: streamAttributes,
+        durationMs: Date.now() - openedAtMs,
+        error: streamError,
+        outcome: "stream_error",
+        span: portAccessSpan,
+      });
+      logger.warn(
+        {
+          ...streamAttributes,
+          err: streamError,
+          eventName: "gateway.port_access.websocket_stream.open_failed",
+        },
+        "Port Access websocket stream failed to open",
+      );
       throw error;
     }
 
@@ -398,6 +632,24 @@ export class PortAccessTransportService {
         }
         activeHttpStream.responseStarted = true;
         activeHttpStream.resolveResponseStart(input.message);
+        activeHttpStream.portAccessSpan.addEvent("gateway.port_access.http.response_start", {
+          "mistle.port_access.http.status_code": input.message.status,
+        });
+        recordPortAccessStreamEvent({
+          attributes: {
+            ...activeHttpStream.attributes,
+            "mistle.port_access.http.status_code": input.message.status,
+          },
+          outcome: "response_started",
+        });
+        logger.debug(
+          {
+            ...activeHttpStream.attributes,
+            eventName: "gateway.port_access.http_stream.response_started",
+            status: input.message.status,
+          },
+          "Port Access HTTP response started",
+        );
         return true;
       }
       case "ports.http.body.chunk": {
@@ -430,6 +682,17 @@ export class PortAccessTransportService {
           streamId: input.message.streamId,
         });
         await activeHttpStream.responseBodyWriter.close();
+        this.finishHttpStreamObservability({
+          outcome: "completed",
+          stream: activeHttpStream,
+        });
+        logger.debug(
+          {
+            ...activeHttpStream.attributes,
+            eventName: "gateway.port_access.http_stream.completed",
+          },
+          "Port Access HTTP stream completed",
+        );
         return true;
       }
       case "ports.ws.accept": {
@@ -439,6 +702,18 @@ export class PortAccessTransportService {
 
         activeWebSocketStream.accepted = true;
         activeWebSocketStream.resolveAccept(input.message);
+        activeWebSocketStream.portAccessSpan.addEvent("gateway.port_access.websocket.accepted");
+        recordPortAccessStreamEvent({
+          attributes: activeWebSocketStream.attributes,
+          outcome: "response_started",
+        });
+        logger.debug(
+          {
+            ...activeWebSocketStream.attributes,
+            eventName: "gateway.port_access.websocket_stream.accepted",
+          },
+          "Port Access websocket stream accepted",
+        );
         return true;
       }
       case "ports.ws.frame": {
@@ -493,6 +768,19 @@ export class PortAccessTransportService {
           },
           stream: activeWebSocketStream,
         });
+        this.finishWebSocketStreamObservability({
+          outcome: "completed",
+          stream: activeWebSocketStream,
+        });
+        logger.debug(
+          {
+            ...activeWebSocketStream.attributes,
+            eventName: "gateway.port_access.websocket_stream.completed",
+            closeCode: input.message.code,
+            closeReason: input.message.reason,
+          },
+          "Port Access websocket stream completed",
+        );
         return true;
       }
       case "ports.stream.error": {
@@ -549,6 +837,19 @@ export class PortAccessTransportService {
           stream.rejectResponseStart(disconnectError);
         }
         void stream.responseBodyWriter.abort(disconnectError);
+        this.finishHttpStreamObservability({
+          error: disconnectError,
+          outcome: "bootstrap_disconnected",
+          stream,
+        });
+        logger.debug(
+          {
+            ...stream.attributes,
+            err: disconnectError,
+            eventName: "gateway.port_access.http_stream.bootstrap_disconnected",
+          },
+          "Port Access HTTP stream rejected because bootstrap disconnected",
+        );
         void this.forwardMessage({
           sandboxInstanceId: input.sandboxInstanceId,
           targetBootstrapSessionId: stream.targetBootstrapSessionId,
@@ -581,6 +882,11 @@ export class PortAccessTransportService {
       );
       if (!stream.accepted) {
         stream.rejectAccept(disconnectError);
+        this.finishWebSocketStreamObservability({
+          error: disconnectError,
+          outcome: "bootstrap_disconnected",
+          stream,
+        });
         continue;
       }
 
@@ -590,6 +896,19 @@ export class PortAccessTransportService {
           reason: BootstrapDisconnectedCloseReason,
         });
       }
+      this.finishWebSocketStreamObservability({
+        error: disconnectError,
+        outcome: "bootstrap_disconnected",
+        stream,
+      });
+      logger.debug(
+        {
+          ...stream.attributes,
+          err: disconnectError,
+          eventName: "gateway.port_access.websocket_stream.bootstrap_disconnected",
+        },
+        "Port Access websocket stream rejected because bootstrap disconnected",
+      );
       void this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         targetBootstrapSessionId: stream.targetBootstrapSessionId,
@@ -622,6 +941,25 @@ export class PortAccessTransportService {
     }
   }
 
+  private finishHttpStreamObservability(input: {
+    error?: Error;
+    outcome: PortAccessStreamOutcome;
+    stream: ActivePortAccessHttpStream;
+  }): void {
+    if (input.stream.observabilityFinished) {
+      return;
+    }
+
+    input.stream.observabilityFinished = true;
+    finishPortAccessStream({
+      attributes: input.stream.attributes,
+      durationMs: Date.now() - input.stream.openedAtMs,
+      ...(input.error === undefined ? {} : { error: input.error }),
+      outcome: input.outcome,
+      span: input.stream.portAccessSpan,
+    });
+  }
+
   private async failHttpStream(input: {
     error: Error;
     sandboxInstanceId: string;
@@ -637,6 +975,19 @@ export class PortAccessTransportService {
       activeStream.rejectResponseStart(input.error);
     }
     await activeStream.responseBodyWriter.abort(input.error);
+    this.finishHttpStreamObservability({
+      error: input.error,
+      outcome: "stream_error",
+      stream: activeStream,
+    });
+    logger.warn(
+      {
+        ...activeStream.attributes,
+        err: input.error,
+        eventName: "gateway.port_access.http_stream.failed",
+      },
+      "Port Access HTTP stream failed",
+    );
   }
 
   private attachWebSocket(input: {
@@ -681,6 +1032,19 @@ export class PortAccessTransportService {
     }
 
     activeStream.browserClosed = true;
+    this.finishWebSocketStreamObservability({
+      outcome: "browser_closed",
+      stream: activeStream,
+    });
+    logger.debug(
+      {
+        ...activeStream.attributes,
+        eventName: "gateway.port_access.websocket_stream.browser_closed",
+        closeCode: input.code,
+        closeReason: input.reason,
+      },
+      "Port Access websocket stream closed by browser",
+    );
     if (input.code === 1006) {
       await this.forwardMessage({
         sandboxInstanceId: input.sandboxInstanceId,
@@ -721,6 +1085,19 @@ export class PortAccessTransportService {
     }
 
     activeStream.browserClosed = true;
+    this.finishWebSocketStreamObservability({
+      error: input.error,
+      outcome: "browser_error",
+      stream: activeStream,
+    });
+    logger.warn(
+      {
+        ...activeStream.attributes,
+        err: input.error,
+        eventName: "gateway.port_access.websocket_stream.browser_error",
+      },
+      "Port Access websocket stream failed from browser error",
+    );
     await this.forwardMessage({
       sandboxInstanceId: input.sandboxInstanceId,
       targetBootstrapSessionId: activeStream.targetBootstrapSessionId,
@@ -744,6 +1121,11 @@ export class PortAccessTransportService {
     this.deleteActiveWebSocketStream(input);
     if (!activeStream.accepted) {
       activeStream.rejectAccept(input.error);
+      this.finishWebSocketStreamObservability({
+        error: input.error,
+        outcome: "stream_error",
+        stream: activeStream,
+      });
       return;
     }
 
@@ -753,6 +1135,38 @@ export class PortAccessTransportService {
         reason: "Port Access upstream websocket failed.",
       });
     }
+    this.finishWebSocketStreamObservability({
+      error: input.error,
+      outcome: "stream_error",
+      stream: activeStream,
+    });
+    logger.warn(
+      {
+        ...activeStream.attributes,
+        err: input.error,
+        eventName: "gateway.port_access.websocket_stream.failed",
+      },
+      "Port Access websocket stream failed",
+    );
+  }
+
+  private finishWebSocketStreamObservability(input: {
+    error?: Error;
+    outcome: PortAccessStreamOutcome;
+    stream: ActivePortAccessWebSocketStream;
+  }): void {
+    if (input.stream.observabilityFinished) {
+      return;
+    }
+
+    input.stream.observabilityFinished = true;
+    finishPortAccessStream({
+      attributes: input.stream.attributes,
+      durationMs: Date.now() - input.stream.openedAtMs,
+      ...(input.error === undefined ? {} : { error: input.error }),
+      outcome: input.outcome,
+      span: input.stream.portAccessSpan,
+    });
   }
 
   private async forwardMessage(input: {
