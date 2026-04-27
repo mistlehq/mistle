@@ -126,6 +126,7 @@ const GitHubDraftManifest = JSON.stringify(
     ],
     default_permissions: {
       checks: "write",
+      contents: "write",
       issues: "write",
       metadata: "read",
       pull_requests: "write",
