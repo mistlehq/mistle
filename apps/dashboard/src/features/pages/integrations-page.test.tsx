@@ -106,12 +106,14 @@ async function startControlPlaneTestServer(input: { handler: ServerHandler }): P
 describe("IntegrationsPage", () => {
   afterEach(() => {
     cleanup();
-    globalThis.__MISTLE_RUNTIME_CONFIG__ = undefined;
+    Object.assign(import.meta.env, {
+      VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+    });
     resetDashboardConfigForTest();
   });
 
   it("selects the route-requested connection after a stale directory response refreshes", async () => {
-    configureDashboardRuntimeForTest("https://control-plane.example.com");
+    configureDashboardBuildConfigForTest("https://control-plane.example.com");
 
     const queryClient = createLoadedIntegrationsQueryClient({
       targets: [createGitHubTarget()],
@@ -168,7 +170,7 @@ describe("IntegrationsPage", () => {
   });
 
   it("shows Slack install success on the selected connection detail route", async () => {
-    configureDashboardRuntimeForTest("https://control-plane.example.com");
+    configureDashboardBuildConfigForTest("https://control-plane.example.com");
 
     const queryClient = createLoadedIntegrationsQueryClient({
       targets: [createSlackTarget()],
@@ -209,7 +211,7 @@ describe("IntegrationsPage", () => {
   });
 
   it("shows GitHub App install success on the selected connection detail route", async () => {
-    configureDashboardRuntimeForTest("https://control-plane.example.com");
+    configureDashboardBuildConfigForTest("https://control-plane.example.com");
 
     const queryClient = createLoadedIntegrationsQueryClient({
       targets: [createGitHubTarget()],
@@ -249,7 +251,7 @@ describe("IntegrationsPage", () => {
   });
 
   it("shows Jira webhook setup success on the selected connection detail route", () => {
-    configureDashboardRuntimeForTest("https://control-plane.example.com");
+    configureDashboardBuildConfigForTest("https://control-plane.example.com");
 
     const queryClient = createLoadedIntegrationsQueryClient({
       targets: [createJiraTarget()],
@@ -288,7 +290,7 @@ describe("IntegrationsPage", () => {
   });
 
   it("shows Jira webhook setup failure from route state on the selected connection detail route", () => {
-    configureDashboardRuntimeForTest("https://control-plane.example.com");
+    configureDashboardBuildConfigForTest("https://control-plane.example.com");
     const webhookSetupFailureMessage = "Jira admin webhook creation failed (403): Forbidden";
 
     const queryClient = createLoadedIntegrationsQueryClient({
@@ -363,7 +365,7 @@ describe("IntegrationsPage", () => {
     });
 
     try {
-      configureDashboardRuntimeForTest(server.origin);
+      configureDashboardBuildConfigForTest(server.origin);
 
       const queryClient = createLoadedIntegrationsQueryClient({
         targets: [createGitHubTarget()],
@@ -438,10 +440,10 @@ function renderIntegrationsPage(input: {
   );
 }
 
-function configureDashboardRuntimeForTest(controlPlaneApiOrigin: string): void {
-  globalThis.__MISTLE_RUNTIME_CONFIG__ = {
-    controlPlaneApiOrigin,
-  };
+function configureDashboardBuildConfigForTest(controlPlaneApiOrigin: string): void {
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: controlPlaneApiOrigin,
+  });
   resetDashboardConfigForTest();
 }
 

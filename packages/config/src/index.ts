@@ -18,6 +18,11 @@ export {
   type DashboardAuthMethodsConfig,
 } from "./apps/control-plane-api/dashboard-auth-methods.js";
 export {
+  loadDashboardBuildConfig,
+  type DashboardBuildConfig,
+  type DashboardBuildEnvironment,
+} from "./apps/dashboard/index.js";
+export {
   convertDotenvContentToTomlContent,
   convertEnvToTomlRecord,
   convertTomlContentToDotenvContent,

@@ -21,7 +21,7 @@ function createTempDirectory(): string {
 
 function resolveWorkspaceRootForTest(): string {
   const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-  return resolve(scriptDirectory, "../../..");
+  return resolve(scriptDirectory, "../../../../..");
 }
 
 function writeWorkspaceConfigFile(input: { relativePath: string; content: string }): void {

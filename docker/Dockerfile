@@ -17,7 +17,8 @@ FROM workspace-deps AS control-plane-api-build
 RUN pnpm --filter @mistle/control-plane-api... build
 
 FROM workspace-deps AS dashboard-build
-ENV MISTLE_CONFIG_PATH=/app/config/config.sample.toml
+ARG MISTLE_CONFIG_PATH=/app/config/config.sample.toml
+ENV MISTLE_CONFIG_PATH=${MISTLE_CONFIG_PATH}
 RUN pnpm --filter @mistle/dashboard... build
 
 FROM workspace-deps AS control-plane-worker-build

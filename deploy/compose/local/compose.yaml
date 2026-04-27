@@ -43,10 +43,9 @@ services:
       context: ../../..
       dockerfile: docker/Dockerfile
       target: dashboard-runtime
+      args:
+        MISTLE_CONFIG_PATH: /app/deploy/compose/local/config/config.local.toml
     image: mistle/dashboard:local
-    environment:
-      MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN: ${MISTLE_DASHBOARD_CONTROL_PLANE_API_ORIGIN}
-      MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE: ${MISTLE_DASHBOARD_AUTH_METHOD_GOOGLE}
     env_file:
       - ${MISTLE_LOCAL_ENV_FILE:-./.env}
     depends_on:

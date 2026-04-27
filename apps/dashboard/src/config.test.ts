@@ -13,18 +13,16 @@ function setDashboardGoogleAuthMethodFlag(value: string): void {
   });
 }
 
-function setRuntimeDashboardConfig(value: {
-  controlPlaneApiOrigin?: string;
-  authMethodGoogle?: string;
-}): void {
-  Object.assign(globalThis, {
-    __MISTLE_RUNTIME_CONFIG__: value,
+function setDashboardControlPlaneApiOrigin(value: string): void {
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: value,
   });
 }
 
 afterEach(() => {
   resetDashboardConfigForTest();
-  Reflect.deleteProperty(globalThis, "__MISTLE_RUNTIME_CONFIG__");
+  setDashboardControlPlaneApiOrigin("http://localhost:3000");
+  setDashboardGoogleAuthMethodFlag("true");
 });
 
 describe("dashboard config", () => {
@@ -54,22 +52,14 @@ describe("dashboard config", () => {
     expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
   });
 
-  it("prefers runtime-injected config over build-time env", () => {
-    Object.assign(import.meta.env, {
-      VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
-    });
-    setRuntimeDashboardConfig({
-      controlPlaneApiOrigin: "http://localhost:8080",
-    });
+  it("reads control-plane API origin from build-time env", () => {
+    setDashboardControlPlaneApiOrigin("http://localhost:8080");
 
     expect(getDashboardConfig().controlPlaneApiOrigin).toBe("http://localhost:8080");
   });
 
-  it("reads the google auth method flag from runtime-injected config when present", () => {
-    setDashboardGoogleAuthMethodFlag("false");
-    setRuntimeDashboardConfig({
-      authMethodGoogle: "true",
-    });
+  it("reads the google auth method flag from build-time env", () => {
+    setDashboardGoogleAuthMethodFlag("true");
 
     expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
   });

@@ -52,6 +52,7 @@
     "streamdown": "^2.5.0"
   },
   "devDependencies": {
+    "@mistle/config": "workspace:*",
     "@rolldown/plugin-babel": "0.2.3",
     "@storybook/react-vite": "^10.3.5",
     "@tailwindcss/vite": "^4.2.4",
@@ -62,7 +63,6 @@
     "jsdom": "^29.0.1",
     "openapi-typescript": "^7.13.0",
     "pg": "^8.20.0",
-    "smol-toml": "^1.6.1",
     "storybook": "^10.3.4",
     "vite": "^8.0.3",
     "ws": "^8.18.3",

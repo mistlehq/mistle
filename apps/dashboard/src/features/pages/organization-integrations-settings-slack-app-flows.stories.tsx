@@ -48,9 +48,9 @@ function getSlackDefinitionOrThrow(): AnyIntegrationDefinition {
 const SlackDefinition = getSlackDefinitionOrThrow();
 
 function configureDashboardRuntimeForStory(): void {
-  globalThis.__MISTLE_RUNTIME_CONFIG__ = {
-    controlPlaneApiOrigin: StoryControlPlaneApiOrigin,
-  };
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: StoryControlPlaneApiOrigin,
+  });
   resetDashboardConfigForTest();
 }
 

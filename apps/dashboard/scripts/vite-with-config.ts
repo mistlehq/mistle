@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 
-import { loadDashboardBuildConfig } from "./build-config.js";
+import { loadDashboardBuildConfig } from "@mistle/config";
 
 const supportedCommands = new Set(["dev", "build", "preview"]);
 

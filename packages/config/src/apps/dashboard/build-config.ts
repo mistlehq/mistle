@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
-import { deriveDashboardAuthMethods } from "../../../packages/config/src/apps/control-plane-api/dashboard-auth-methods.js";
+import { deriveDashboardAuthMethods } from "../control-plane-api/dashboard-auth-methods.js";
 
-type DashboardBuildEnvironment = "development" | "production";
+export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -90,7 +90,7 @@ function parseTomlFile(path: string): UnknownRecord {
 
 function resolveWorkspaceRoot(): string {
   const scriptDirectory = dirname(fileURLToPath(import.meta.url));
-  return resolve(scriptDirectory, "../../..");
+  return resolve(scriptDirectory, "../../../../..");
 }
 
 function normalizeOrigin(value: string, key: string): string {

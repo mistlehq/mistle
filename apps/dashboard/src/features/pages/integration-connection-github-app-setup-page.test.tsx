@@ -57,9 +57,9 @@ function renderGitHubAppSetupPane(input?: {
   manifestCreationSucceeded?: boolean;
   webhookSources?: readonly IntegrationWebhookSource[];
 }) {
-  globalThis.__MISTLE_RUNTIME_CONFIG__ = {
-    controlPlaneApiOrigin: "https://control-plane.example.com",
-  };
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: "https://control-plane.example.com",
+  });
   resetDashboardConfigForTest();
 
   const connection = input?.connection ?? createGitHubAppSetupConnection();
@@ -90,7 +90,9 @@ function renderGitHubAppSetupPane(input?: {
 
 describe("GitHubAppSetupPane", () => {
   afterEach(() => {
-    globalThis.__MISTLE_RUNTIME_CONFIG__ = undefined;
+    Object.assign(import.meta.env, {
+      VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+    });
     resetDashboardConfigForTest();
   });
 

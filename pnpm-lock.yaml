@@ -362,6 +362,9 @@ importers:
         specifier: ^2.5.0
         version: 2.5.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
     devDependencies:
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@rolldown/plugin-babel':
         specifier: 0.2.3
         version: 0.2.3(@babel/core@7.29.0)(@babel/runtime@7.29.2)(rolldown@1.0.0-rc.12(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1))(vite@8.0.3(@emnapi/core@1.9.1)(@emnapi/runtime@1.9.1)(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -392,9 +395,6 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
-      smol-toml:
-        specifier: ^1.6.1
-        version: 1.6.1
       storybook:
         specifier: ^10.3.4
         version: 10.3.4(@testing-library/dom@10.4.1)(prettier@3.8.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
