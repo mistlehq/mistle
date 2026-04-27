@@ -1,5 +1,4 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 
@@ -21,15 +20,11 @@ import {
   assertGitHubAppInstallationConnectionMethodOrThrow,
   parseGitHubTargetConfigOrThrow,
 } from "./installation-config.js";
-
-type GitHubAppManifestOwner =
-  | {
-      kind: "personal";
-    }
-  | {
-      kind: "organization";
-      organizationSlug: string;
-    };
+import {
+  buildGitHubAppManifest,
+  buildGitHubAppManifestSubmissionUrl,
+  type GitHubAppManifestOwner,
+} from "./manifest-builder.js";
 
 type StartGitHubAppManifestConnectionInput = {
   organizationId: string;
@@ -45,45 +40,6 @@ type StartedGitHubAppManifestConnection = {
     manifest: string;
   };
 };
-
-function buildGitHubAppManifestSubmissionUrl(input: {
-  owner: GitHubAppManifestOwner;
-  state: string;
-  webBaseUrl: string;
-}): string {
-  const path =
-    input.owner.kind === "personal"
-      ? "/settings/apps/new"
-      : `/organizations/${encodeURIComponent(input.owner.organizationSlug)}/settings/apps/new`;
-  const submissionUrl = new URL(buildUrlWithPath(input.webBaseUrl, path));
-  submissionUrl.searchParams.set("state", input.state);
-  return submissionUrl.toString();
-}
-
-function buildGitHubAppManifest(input: {
-  manifest: Record<string, unknown>;
-  controlPlaneBaseUrl: string;
-  webhookCallbackUrl: string;
-}): Record<string, unknown> {
-  return {
-    ...input.manifest,
-    hook_attributes: {
-      active: true,
-      url: input.webhookCallbackUrl,
-    },
-    redirect_url: buildUrlWithPath(
-      input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/github-app-manifest",
-    ),
-    callback_urls: [
-      buildUrlWithPath(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
-    ],
-    setup_url: buildUrlWithPath(
-      input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/github-app-installation",
-    ),
-  };
-}
 
 export async function startGitHubAppManifestConnection(
   ctx: {
