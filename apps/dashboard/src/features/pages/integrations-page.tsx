@@ -122,8 +122,8 @@ export function IntegrationsPage() {
     detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
       <div className="flex flex-col gap-4">
         {shouldShowSlackInstallSuccessNotice ? (
-          <Notice title="Slack app installed" variant="success">
-            The Slack app was created in Slack and connected to this Mistle connection.
+          <Notice title="Slack app installed and connected" variant="success">
+            The Slack app was created in Slack and connected to Mistle.
           </Notice>
         ) : null}
         <IntegrationConnectionDetailView

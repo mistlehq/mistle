@@ -136,11 +136,9 @@ describe("IntegrationsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Slack app installed")).toBeTruthy();
+    expect(screen.getByText("Slack app installed and connected")).toBeTruthy();
     expect(
-      screen.getByText(
-        "The Slack app was created in Slack and connected to this Mistle connection.",
-      ),
+      screen.getByText("The Slack app was created in Slack and connected to Mistle."),
     ).toBeTruthy();
     expect(
       screen
