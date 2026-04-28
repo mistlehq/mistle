@@ -1,0 +1,292 @@
+{
+  "baseOs": "Debian GNU/Linux 12 (bookworm)",
+  "dockerfilePath": "packages/sandboxd/Dockerfile",
+  "imageRef": "mistle/sandbox-base-inventory:local",
+  "notPreinstalled": [
+    {
+      "command": "pnpm",
+      "displayName": "pnpm"
+    },
+    {
+      "command": "yarn",
+      "displayName": "Yarn"
+    },
+    {
+      "command": "rustc",
+      "displayName": "rustc"
+    },
+    {
+      "command": "cargo",
+      "displayName": "Cargo"
+    }
+  ],
+  "runtimeBase": {
+    "os": {
+      "id": "debian",
+      "prettyName": "Debian GNU/Linux 12 (bookworm)",
+      "versionId": "12"
+    },
+    "packageManagers": ["apt-get", "apt"],
+    "shell": "/bin/bash",
+    "sudoInstalled": false,
+    "user": {
+      "name": "root",
+      "uid": 0
+    },
+    "workingDirectory": "/root"
+  },
+  "tools": [
+    {
+      "category": {
+        "id": "runtimes",
+        "title": "Runtimes"
+      },
+      "command": "node",
+      "displayName": "Node.js",
+      "version": "24.14.1"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "npm",
+      "displayName": "npm",
+      "version": "11.11.0"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "npx",
+      "displayName": "npx",
+      "version": "11.11.0"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "corepack",
+      "displayName": "Corepack",
+      "version": "0.34.6"
+    },
+    {
+      "category": {
+        "id": "runtimes",
+        "title": "Runtimes"
+      },
+      "command": "python3",
+      "displayName": "Python",
+      "version": "3.14.4"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "pip",
+      "displayName": "pip",
+      "version": "26.0.1"
+    },
+    {
+      "category": {
+        "id": "containers",
+        "title": "Containers"
+      },
+      "command": "docker",
+      "displayName": "Docker",
+      "version": "29.3.1"
+    },
+    {
+      "category": {
+        "id": "containers",
+        "title": "Containers"
+      },
+      "command": "docker-compose",
+      "displayName": "Docker Compose",
+      "version": "5.1.1"
+    },
+    {
+      "category": {
+        "id": "containers",
+        "title": "Containers"
+      },
+      "command": "containerd",
+      "displayName": "containerd",
+      "version": "2.2.2"
+    },
+    {
+      "category": {
+        "id": "containers",
+        "title": "Containers"
+      },
+      "command": "runc",
+      "displayName": "runc",
+      "version": "1.3.4"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "nix",
+      "displayName": "Nix",
+      "version": "2.34.6"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "mise",
+      "displayName": "mise",
+      "version": "2026.4.19"
+    },
+    {
+      "category": {
+        "id": "package-and-environment",
+        "title": "Package and environment"
+      },
+      "command": "archil",
+      "displayName": "Archil",
+      "version": "v0.8.9-1777069697"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "git",
+      "displayName": "Git",
+      "version": "2.39.5"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "curl",
+      "displayName": "curl",
+      "version": "7.88.1"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "jq",
+      "displayName": "jq",
+      "version": "1.6"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "rg",
+      "displayName": "ripgrep",
+      "version": "13.0.0"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "fd",
+      "displayName": "fd",
+      "version": "8.6.0"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "bat",
+      "displayName": "bat",
+      "version": "0.22.1"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "tmux",
+      "displayName": "tmux",
+      "version": "3.3a"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "vim",
+      "displayName": "Vim",
+      "version": "9.0"
+    },
+    {
+      "category": {
+        "id": "cli-utilities",
+        "title": "CLI utilities"
+      },
+      "command": "sqlite3",
+      "displayName": "SQLite",
+      "version": "3.40.1"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "make",
+      "displayName": "Make",
+      "version": "4.3"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "gdb",
+      "displayName": "gdb",
+      "version": "13.1"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "strace",
+      "displayName": "strace",
+      "version": "6.1"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "tcpdump",
+      "displayName": "tcpdump",
+      "version": "4.99.3"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "tree",
+      "displayName": "tree",
+      "version": "2.1.0"
+    },
+    {
+      "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "tini",
+      "displayName": "tini",
+      "version": "0.19.0"
+    }
+  ]
+}

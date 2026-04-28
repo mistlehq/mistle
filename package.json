@@ -49,6 +49,8 @@
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
     "test:integration:rust": "pnpm --filter @mistle/sandboxd test:integration",
     "test:integration:all": "pnpm test:integration && pnpm test:integration:rust",
+    "sandbox-base:inventory:update": "tsx ./scripts/sandbox-base/generate-inventory.ts --write",
+    "sandbox-base:inventory:check": "tsx ./scripts/sandbox-base/generate-inventory.ts --check",
     "test:sandbox-base:linux": "docker build --platform ${MISTLE_SANDBOX_BASE_CHECK_PLATFORM:-linux/amd64} --target sandbox-base -t mistle-sandbox-base-check:local -f packages/sandboxd/Dockerfile .",
     "test:system": "pnpm --filter @mistle/tests test:system",
     "test:system:docker": "pnpm --filter @mistle/tests test:system:docker",

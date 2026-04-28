@@ -1258,6 +1258,40 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(editor.textContent).toContain("pnpm install");
     expect(editor.textContent).toContain("pnpm dev:bootstrap");
+    expect(configurationsPanel.textContent).toContain("Setup script behavior");
+    expect(configurationsPanel.textContent).toContain("Environment and installed tools");
+    expect(configurationsPanel.textContent).toContain(
+      "Repositories are cloned under the working directory",
+    );
+    expect(configurationsPanel.textContent).toContain("Execution environment");
+    expect(configurationsPanel.textContent).toContain("Package manager");
+  });
+
+  it("shows selected repository locations in the setup script context", () => {
+    renderSandboxProfileEditor({
+      routeSection: "configurations",
+      bindings: [
+        {
+          id: "binding-git",
+          connectionId: "connection-github",
+          kind: "git",
+          config: {
+            repositories: ["mistlehq/mistle"],
+          },
+        },
+      ],
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Configurations",
+      hidden: false,
+    });
+
+    expect(configurationsPanel.textContent).toContain("Repository locations");
+    expect(configurationsPanel.textContent).toContain("mistlehq/mistle");
+    expect(configurationsPanel.textContent).toContain(
+      "For example, mistlehq/mistle is available at",
+    );
   });
 
   it("renders an empty setup script editor when no script is configured", () => {
