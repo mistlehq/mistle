@@ -1,11 +1,12 @@
 # Mistle
 
-Mistle is an open-source platform for building and running sandboxed coding agents.
+Mistle is an open-source platform for running and automating sandboxed coding agents.
 
 ## How Mistle Works
 
 - **Integrations** connect external systems and models such as GitHub, Slack, and OpenAI.
 - **Sandbox profiles** define the tools, permissions, and environment an agent starts with.
+- **Snapshots** capture prepared sandbox environments so sessions can start quickly with the required tools, dependencies, and configuration already in place.
 - **Sessions** start interactive agent work such as debugging, code review, and repository changes.
 - **Automations** respond to external events, such as webhook deliveries from connected systems.
 
