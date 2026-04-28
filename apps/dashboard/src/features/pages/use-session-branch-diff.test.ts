@@ -80,9 +80,22 @@ describe("useSessionBranchDiff helpers", () => {
     });
   });
 
+  it("maps unknown error kinds through the generic error path", () => {
+    expect(
+      normalizeBranchDiffError({
+        kind: "unknown_branch_diff_error",
+        message: "Unexpected branch diff error.",
+      }),
+    ).toEqual({
+      message: "Could not load changes compared with the default branch.",
+      title: "Could not load changes",
+      variant: "alert",
+    });
+  });
+
   it("maps generic git failures to an alert notice", () => {
-    expect(normalizeBranchDiffError(new Error("fatal: bad revision 'main'"))).toEqual({
-      message: "fatal: bad revision 'main'",
+    expect(normalizeBranchDiffError(new Error("fatal: bad revision 'origin/trunk'"))).toEqual({
+      message: "fatal: bad revision 'origin/trunk'",
       title: "Could not load changes",
       variant: "alert",
     });

@@ -20,6 +20,7 @@ const TestPatch = [
   ' import { Badge } from "@mistle/ui";',
   '+import { Button } from "@mistle/ui";',
 ].join("\n");
+const TestSummaryLabel = "Compared with origin/main";
 
 function createTestPendingComment(body = "Request change"): PendingSessionDiffComment {
   const parsedPatch = parseSessionDiffPatch(TestPatch);
@@ -59,7 +60,7 @@ describe("SessionDiffPanel", () => {
     render(
       <SessionDiffPanel
         patch={TestPatch}
-        summaryLabel="Compared with main"
+        summaryLabel={TestSummaryLabel}
         title="Current changes"
       />,
     );
@@ -111,7 +112,7 @@ describe("SessionDiffPanel", () => {
           }}
           patch={TestPatch}
           pendingComments={pendingComments}
-          summaryLabel="Compared with main"
+          summaryLabel={TestSummaryLabel}
           title="Current changes"
         />
       );
@@ -145,7 +146,7 @@ describe("SessionDiffPanel", () => {
           }}
           patch={TestPatch}
           pendingComments={pendingComments}
-          summaryLabel="Compared with main"
+          summaryLabel={TestSummaryLabel}
           title="Current changes"
         />
       );
@@ -180,7 +181,7 @@ describe("SessionDiffPanel", () => {
           }}
           patch={TestPatch}
           pendingComments={pendingComments}
-          summaryLabel="Compared with main"
+          summaryLabel={TestSummaryLabel}
           title="Current changes"
         />
       );

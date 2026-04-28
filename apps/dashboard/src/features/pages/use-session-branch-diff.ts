@@ -8,17 +8,21 @@ import { useQuery } from "@tanstack/react-query";
 import type { SessionWorkbenchTransportManager } from "./use-session-workbench-transport.js";
 
 const BranchDiffCommandTimeoutMs = 15_000;
+const MissingDefaultBranchMessage =
+  "Could not resolve the default branch from `origin/HEAD`. Configure the repository's origin default branch to load changes.";
 
 type BranchDiffError = {
-  kind:
-    | "command_failed"
-    | "missing_default_branch"
-    | "missing_merge_base"
-    | "missing_session_id"
-    | "not_git_repository"
-    | "timeout";
+  kind: BranchDiffErrorKind;
   message: string;
 };
+
+type BranchDiffErrorKind =
+  | "command_failed"
+  | "missing_default_branch"
+  | "missing_merge_base"
+  | "missing_session_id"
+  | "not_git_repository"
+  | "timeout";
 
 type BranchDiffErrorNotice = {
   message: string;
@@ -91,6 +95,20 @@ function formatGitFailureDetails(result: ExecCommandResult): string {
   return details;
 }
 
+function isBranchDiffErrorKind(kind: string): kind is BranchDiffErrorKind {
+  switch (kind) {
+    case "command_failed":
+    case "missing_default_branch":
+    case "missing_merge_base":
+    case "missing_session_id":
+    case "not_git_repository":
+    case "timeout":
+      return true;
+  }
+
+  return false;
+}
+
 function isBranchDiffError(error: unknown): error is BranchDiffError {
   if (typeof error !== "object" || error === null) {
     return false;
@@ -99,7 +117,11 @@ function isBranchDiffError(error: unknown): error is BranchDiffError {
   const maybeKind = "kind" in error ? error.kind : null;
   const maybeMessage = "message" in error ? error.message : null;
 
-  return typeof maybeKind === "string" && typeof maybeMessage === "string";
+  return (
+    typeof maybeKind === "string" &&
+    isBranchDiffErrorKind(maybeKind) &&
+    typeof maybeMessage === "string"
+  );
 }
 
 function resolveBranchDiffErrorNotice(error: BranchDiffError): BranchDiffErrorNotice {
@@ -131,6 +153,13 @@ function formatBranchDiffCompareLabel(compareRef: string | null): string {
   return `Compared with ${compareRef}`;
 }
 
+function createMissingDefaultBranchError(): BranchDiffError {
+  return createBranchDiffError({
+    kind: "missing_default_branch",
+    message: MissingDefaultBranchMessage,
+  });
+}
+
 async function readDefaultBranchRef(input: {
   cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
@@ -142,21 +171,9 @@ async function readDefaultBranchRef(input: {
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  if (result.exitCode !== 0) {
-    throw createBranchDiffError({
-      kind: "missing_default_branch",
-      message:
-        "Could not resolve the default branch from `origin/HEAD`. Configure the repository's origin default branch to load changes.",
-    });
-  }
-
   const defaultBranchRef = result.stdout.trim();
-  if (defaultBranchRef.length === 0) {
-    throw createBranchDiffError({
-      kind: "missing_default_branch",
-      message:
-        "Could not resolve the default branch from `origin/HEAD`. Configure the repository's origin default branch to load changes.",
-    });
+  if (result.exitCode !== 0 || defaultBranchRef.length === 0) {
+    throw createMissingDefaultBranchError();
   }
 
   return defaultBranchRef;

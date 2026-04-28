@@ -383,7 +383,7 @@ function StoryDiffWorkbench({
             patch={patch}
             pendingComments={pendingComments}
             repositoryPath={StoryRepositoryPath}
-            summaryLabel="Compared with main"
+            summaryLabel="Compared with origin/main"
             title="Current changes"
             onAddComment={addComment}
           />
