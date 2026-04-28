@@ -74,6 +74,34 @@ export const IntegrationWebhookEventDefinitionSchema = z
     providerEventType: z.string().min(1),
     displayName: z.string().min(1),
     category: z.string().min(1).optional(),
+    requiredCapabilities: z
+      .array(
+        z.discriminatedUnion("kind", [
+          z
+            .object({
+              kind: z.literal("webhook-event"),
+              providerEventType: z.string().min(1),
+              label: z.string().min(1),
+            })
+            .strict(),
+          z
+            .object({
+              kind: z.literal("oauth-scope"),
+              scope: z.string().min(1),
+              label: z.string().min(1),
+            })
+            .strict(),
+          z
+            .object({
+              kind: z.literal("github-app-permission"),
+              permission: z.string().min(1),
+              access: z.enum(["read", "write", "admin"]),
+              label: z.string().min(1),
+            })
+            .strict(),
+        ]),
+      )
+      .optional(),
     payloadReferences: z
       .array(
         z

@@ -1630,6 +1630,24 @@ export type IntegrationWebhookEventParameterDefinition =
       placeholder?: string | undefined;
     };
 
+export type IntegrationWebhookEventCapabilityRequirement =
+  | {
+      kind: "webhook-event";
+      providerEventType: string;
+      label: string;
+    }
+  | {
+      kind: "oauth-scope";
+      scope: string;
+      label: string;
+    }
+  | {
+      kind: "github-app-permission";
+      permission: string;
+      access: "read" | "write" | "admin";
+      label: string;
+    };
+
 /**
  * A normalized webhook event that an integration exposes to the rest of
  * Mistle. These definitions drive automation event pickers, payload previews,
@@ -1660,6 +1678,7 @@ export type IntegrationWebhookEventDefinition = {
       }>
     | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
+  requiredCapabilities?: ReadonlyArray<IntegrationWebhookEventCapabilityRequirement> | undefined;
 };
 
 /**

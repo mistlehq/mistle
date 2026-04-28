@@ -3779,6 +3779,28 @@ export interface paths {
                     path: string[];
                   }[];
                   providerEventType: string;
+                  requiredCapabilities?: (
+                    | {
+                        /** @enum {string} */
+                        kind: "webhook-event";
+                        label: string;
+                        providerEventType: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        kind: "oauth-scope";
+                        label: string;
+                        scope: string;
+                      }
+                    | {
+                        /** @enum {string} */
+                        access: "read" | "write" | "admin";
+                        /** @enum {string} */
+                        kind: "github-app-permission";
+                        label: string;
+                        permission: string;
+                      }
+                  )[];
                 }[];
                 targetHealth: {
                   /** @enum {string} */

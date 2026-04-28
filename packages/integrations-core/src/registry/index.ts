@@ -101,6 +101,42 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       );
     }
 
+    for (const requirement of supportedWebhookEvent.requiredCapabilities ?? []) {
+      if (requirement.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].label must be non-empty.",
+        );
+      }
+
+      if (
+        requirement.kind === "webhook-event" &&
+        requirement.providerEventType.trim().length === 0
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].providerEventType must be non-empty.",
+        );
+      }
+
+      if (requirement.kind === "oauth-scope" && requirement.scope.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].scope must be non-empty.",
+        );
+      }
+
+      if (
+        requirement.kind === "github-app-permission" &&
+        requirement.permission.trim().length === 0
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].permission must be non-empty.",
+        );
+      }
+    }
+
     for (const conversationKeyOption of supportedWebhookEvent.conversationKeyOptions ?? []) {
       if (conversationKeyOption.id.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
