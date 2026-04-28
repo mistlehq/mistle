@@ -43,6 +43,7 @@ import {
 } from "../integrations/manifest-webhook-callback-state.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
+  buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
@@ -86,6 +87,25 @@ const SlackRequiredExistingAppSecretFieldKeys = [
   "botToken",
   "signingSecret",
 ] as const satisfies readonly SlackExistingAppSecretFieldKey[];
+
+const SlackExistingAppFieldKeysSavedWithClientId = [
+  "clientId",
+] as const satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppFieldKeysSavedWithBotToken = [
+  "clientId",
+  "botToken",
+] as const satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppFieldKeysSavedWithSigningSecret = [
+  "clientId",
+  "signingSecret",
+] as const satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppFieldKeysSavedWithClientSecret = [
+  "clientId",
+  "clientSecret",
+] as const satisfies readonly SlackExistingAppFieldKey[];
 
 const SlackDraftManifest = createManifestJsonDraft(SlackAppManifestTemplate);
 
@@ -243,18 +263,22 @@ function isSlackExistingAppRequiredSecretReady(input: {
   );
 }
 
-function buildDraftWithSavedFieldValues(input: {
-  baseDraft: SlackExistingAppDraft;
-  draft: SlackExistingAppDraft;
-  fieldKey: SlackExistingAppFieldKey;
-}): SlackExistingAppDraft {
-  return {
-    ...input.baseDraft,
-    clientId: normalizeSlackExistingAppSetupValue(input.draft.clientId),
-    ...(isSlackExistingAppSecretFieldKey(input.fieldKey)
-      ? { [input.fieldKey]: normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]) }
-      : {}),
-  };
+function resolveSlackExistingAppSetupSavedFieldKeys(
+  fieldKey: SlackExistingAppFieldKey,
+): ReadonlyArray<SlackExistingAppFieldKey> {
+  if (fieldKey === "botToken") {
+    return SlackExistingAppFieldKeysSavedWithBotToken;
+  }
+
+  if (fieldKey === "signingSecret") {
+    return SlackExistingAppFieldKeysSavedWithSigningSecret;
+  }
+
+  if (fieldKey === "clientSecret") {
+    return SlackExistingAppFieldKeysSavedWithClientSecret;
+  }
+
+  return SlackExistingAppFieldKeysSavedWithClientId;
 }
 
 function SlackManifestSetupPanel(input: {
@@ -635,16 +659,19 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
       });
 
-      const nextSavedDraft = buildDraftWithSavedFieldValues({
-        baseDraft: savedExistingAppDraft,
+      const savedFieldValuePatch = buildSavedFieldValuePatch({
         draft: existingAppDraft,
-        fieldKey,
+        fieldKeys: resolveSlackExistingAppSetupSavedFieldKeys(fieldKey),
+        normalizeValue: normalizeSlackExistingAppSetupValue,
       });
-      const nextDraft = buildDraftWithSavedFieldValues({
-        baseDraft: existingAppDraft,
-        draft: existingAppDraft,
-        fieldKey,
-      });
+      const nextSavedDraft = {
+        ...savedExistingAppDraft,
+        ...savedFieldValuePatch,
+      };
+      const nextDraft = {
+        ...existingAppDraft,
+        ...savedFieldValuePatch,
+      };
 
       setSavedExistingAppDraft(nextSavedDraft);
       setExistingAppDraft(nextDraft);
