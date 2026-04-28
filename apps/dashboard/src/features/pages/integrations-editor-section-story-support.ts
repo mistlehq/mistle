@@ -97,6 +97,7 @@ export const StoryGithubConnection: IntegrationConnectionSummary = {
     connection_method: "github-app-installation",
     app_id: "123",
     app_slug: "mistle-github-app",
+    client_id: "Iv1.story-client",
     installation_id: "12345",
   },
 };
@@ -134,6 +135,7 @@ export const StoryGithubEnterpriseServerConnection: IntegrationConnectionSummary
     connection_method: "github-app-installation",
     app_id: "88421",
     app_slug: "mistle-ghes",
+    client_id: "Iv1.story-ghes-client",
     installation_id: "8842101",
   },
 };
