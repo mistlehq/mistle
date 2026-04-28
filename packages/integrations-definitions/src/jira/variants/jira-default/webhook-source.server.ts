@@ -1,15 +1,21 @@
 import { buildBasicAuthorizationHeader } from "@mistle/http";
 import type { IntegrationWebhookSourceCapability } from "@mistle/integrations-core";
-import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookSourceLifecycles,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { buildIntegrationWebhookCallbackUrl } from "../../../shared/webhook-callback-url.server.js";
+import {
+  JiraManagedWebhookEvents,
+  JiraWebhookPermissionRequirements,
+} from "../../shared/webhook-events.js";
 import {
   type JiraConnectionConfig,
   JiraPersonalApiTokenConnectionConfigSchema,
   normalizeJiraBaseUrl,
 } from "./auth.js";
-import { JiraManagedWebhookEvents } from "./supported-webhook-events.js";
 import type { JiraTargetConfig } from "./target-config-schema.js";
 import type { JiraTargetSecrets } from "./target-secret-schema.js";
 
@@ -194,6 +200,13 @@ export const JiraWebhookSourceCapability: IntegrationWebhookSourceCapability<
       providerMetadata: {
         callbackUrl,
         registeredEvents: [...JiraManagedWebhookEvents],
+        [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          events: [...JiraManagedWebhookEvents],
+          permissions: [
+            JiraWebhookPermissionRequirements.READ_WORK,
+            JiraWebhookPermissionRequirements.MANAGE_WEBHOOK,
+          ],
+        },
         self: createdWebhook.self,
       },
     };

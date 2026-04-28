@@ -1644,6 +1644,14 @@ export type IntegrationWebhookTriggerRequirements = {
   anyOf: ReadonlyArray<IntegrationWebhookTriggerRequirementSet>;
 };
 
+export const IntegrationWebhookTriggerCapabilitiesProviderMetadataKey =
+  "webhookTriggerCapabilities";
+
+export type IntegrationWebhookTriggerCapabilities = {
+  events?: ReadonlyArray<string> | undefined;
+  permissions?: ReadonlyArray<IntegrationWebhookTriggerProviderPermissionRequirement> | undefined;
+};
+
 /**
  * A normalized webhook event that an integration exposes to the rest of
  * Mistle. These definitions drive automation event pickers, payload previews,

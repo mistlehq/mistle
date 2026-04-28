@@ -2,12 +2,20 @@ import {
   integrationConnectionCredentials,
   integrationConnections,
   integrationCredentials,
+  integrationWebhookSources,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
-import { type IntegrationRegistry } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type IntegrationRegistry,
+} from "@mistle/integrations-core";
+import {
+  SlackAppManifestBotEvents,
+  SlackAppManifestBotScopes,
+  SlackConnectionMethodId,
+} from "@mistle/integrations-definitions";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -375,6 +383,19 @@ export async function startSlackAppManifestConnection(
             eq(integrationConnections.organizationId, input.organizationId),
           ),
         );
+
+      await tx
+        .update(integrationWebhookSources)
+        .set({
+          providerMetadata: {
+            ...webhookSource.providerMetadata,
+            [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+              events: [...SlackAppManifestBotEvents],
+              permissions: SlackAppManifestBotScopes.map((permission) => ({ permission })),
+            },
+          },
+        })
+        .where(eq(integrationWebhookSources.id, webhookSource.id));
     });
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
