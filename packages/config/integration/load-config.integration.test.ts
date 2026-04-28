@@ -617,6 +617,33 @@ describe("loadConfig integrations", () => {
     });
   });
 
+  it("maps existing service-specific env overrides into central resources before service selection", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      configPath: tomlConfigFixturePath,
+      env: {
+        MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "https://data-plane.internal.test",
+      },
+    });
+
+    expect(config.app.dataPlaneApi).toEqual({
+      baseUrl: "https://data-plane.internal.test",
+    });
+  });
+
+  it("rejects conflicting existing env aliases for the same central resource", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_GATEWAY,
+        configPath: tomlConfigFixturePath,
+        env: {
+          MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "https://data-plane-a.test",
+          MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "https://data-plane-b.test",
+        },
+      }),
+    ).toThrow(/Conflicting env overrides for services\.data_plane_api\.internal_url/);
+  });
+
   it("returns only app config for the toml config file fixture when includeGlobal is false", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,

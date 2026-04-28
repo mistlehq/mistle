@@ -26,6 +26,7 @@ import {
 } from "./modules.js";
 import { loadFromEnv, validateModules } from "./pipeline.js";
 import { type AppConfig, ConfigSchema } from "./schema.js";
+import { loadRootConfigFromEnv } from "./toml/load-env.js";
 import {
   selectControlPlaneApiConfig,
   selectControlPlaneWorkerConfig,
@@ -94,6 +95,10 @@ function applyModuleEnvOverrides<TSchema extends z.ZodType>(
 
 function parseTomlRoot(configPath: string): RootConfig {
   return RootConfigSchema.parse(asObjectRecord(parseToml(readFileSync(configPath, "utf8"))));
+}
+
+function applyRootEnvOverrides(rootConfig: RootConfig, env: NodeJS.ProcessEnv): RootConfig {
+  return RootConfigSchema.parse(mergeConfigRoots(rootConfig, loadRootConfigFromEnv(env)));
 }
 
 function loadValidatedEnvRoot(
@@ -303,7 +308,7 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
   const { configPath, env } = resolveLoadInputs(options);
 
   if (configPath !== undefined) {
-    const rootConfig = parseTomlRoot(configPath);
+    const rootConfig = applyRootEnvOverrides(parseTomlRoot(configPath), env);
     const appConfig = loadSelectedAppConfig(options.app, rootConfig, env);
 
     if (options.includeGlobal === false) {
