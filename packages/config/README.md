@@ -46,8 +46,9 @@ Currently supported `app` values are exposed in `AppIds`.
 There is no implicit fallback to process env.
 
 Env overrides are still applied after TOML is loaded, so the existing
-`MISTLE_GLOBAL_*` and `MISTLE_APPS_*` env variables keep their current override
-behavior.
+resource-oriented `MISTLE_*` names and the compatibility `MISTLE_GLOBAL_*` /
+`MISTLE_APPS_*` env variables keep their current override behavior. When both
+surfaces target the same config key, the resource-oriented env name wins.
 
 `includeGlobal` defaults to `true`.
 
@@ -83,12 +84,13 @@ Use module ownership to keep config changes localized:
 - `src/apps/<app-id>/*` owns the selected service config schema.
 - `src/root/schema.ts` owns the central resource-oriented config schema.
 - `src/root/selectors.ts` owns service selectors from central resources.
-- `src/root/load-env.ts` owns legacy env override compatibility into the central root.
+- `src/root/load-env.ts` owns resource-oriented env overrides and legacy env
+  override compatibility into the central root.
 - `src/apps/<app-id>/legacy-env-descriptors.ts` and
   `src/global/legacy-env-descriptors.ts` own the legacy runtime env surface used
-  by `exportServiceConfigToEnv`.
+  by `exportServiceConfigToEnv({ envSurface: "legacy" })`.
 - `src/runtime-env-export.ts` owns selected service config to runtime env export
-  while services still consume the legacy env surface.
+  for both `envSurface: "legacy"` and `envSurface: "resource"`.
 - `src/toml.ts` owns TOML parsing helpers only.
 
 ### Add A New Key To An Existing Module
@@ -98,7 +100,8 @@ Use module ownership to keep config changes localized:
    `src/root/load-env.ts`, and any service selectors in `src/root/selectors.ts`
    that consume it.
 3. If the key must still be exported to a service runtime env var, update the
-   relevant `legacy-env-descriptors.ts` file and `src/runtime-env-export.ts`.
+   relevant `legacy-env-descriptors.ts` file for legacy env output and
+   `src/runtime-env-export.ts` for resource env output.
 4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
 5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
 6. Add or update tests:

@@ -6,6 +6,7 @@ export {
   type RuntimeEnvExportEntry,
   type RuntimeEnvExportInput,
   type RuntimeEnvExportValueFormat,
+  type RuntimeEnvSurface,
 } from "./runtime-env-export.js";
 export {
   getLocalDevDockerRegistrySandboxBaseImageRef,
