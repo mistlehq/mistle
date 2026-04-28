@@ -7,6 +7,8 @@ import {
   buildSlackOAuthAccessUrl,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
+  parseSlackManifestCreateErrorResponse,
+  parseSlackManifestCreateSuccessResponse,
   parseSlackOAuthAccessErrorResponse,
   parseSlackOAuthAccessSuccessResponse,
 } from "./app-manifest.js";
@@ -182,6 +184,84 @@ describe("parseSlackOAuthAccessErrorResponse", () => {
       parseSlackOAuthAccessErrorResponse({
         ok: true,
         access_token: "xoxb-slack-bot-token",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("parseSlackManifestCreateSuccessResponse", () => {
+  it("accepts Slack manifest create success responses", () => {
+    expect(
+      parseSlackManifestCreateSuccessResponse({
+        ok: true,
+        app_id: "A123",
+        credentials: {
+          client_id: "123.456",
+          client_secret: "slack-client-secret",
+          signing_secret: "slack-signing-secret",
+          ignored_extra_field: true,
+        },
+        oauth_authorize_url: "https://slack.com/oauth/v2/authorize?client_id=123.456",
+        ignored_extra_field: true,
+      }),
+    ).toEqual({
+      ok: true,
+      app_id: "A123",
+      credentials: {
+        client_id: "123.456",
+        client_secret: "slack-client-secret",
+        signing_secret: "slack-signing-secret",
+        ignored_extra_field: true,
+      },
+      oauth_authorize_url: "https://slack.com/oauth/v2/authorize?client_id=123.456",
+      ignored_extra_field: true,
+    });
+  });
+
+  it("rejects Slack manifest create responses without credential material", () => {
+    expect(() =>
+      parseSlackManifestCreateSuccessResponse({
+        ok: true,
+        app_id: "A123",
+        credentials: {
+          client_id: "123.456",
+        },
+        oauth_authorize_url: "https://slack.com/oauth/v2/authorize?client_id=123.456",
+      }),
+    ).toThrow("Invalid input");
+  });
+});
+
+describe("parseSlackManifestCreateErrorResponse", () => {
+  it("returns Slack manifest create error responses", () => {
+    expect(
+      parseSlackManifestCreateErrorResponse({
+        ok: false,
+        error: "invalid_manifest",
+        errors: [
+          {
+            message: "required field is missing",
+            pointer: "/settings/event_subscriptions/request_url",
+          },
+        ],
+      }),
+    ).toEqual({
+      ok: false,
+      error: "invalid_manifest",
+      errors: [
+        {
+          message: "required field is missing",
+          pointer: "/settings/event_subscriptions/request_url",
+        },
+      ],
+    });
+  });
+
+  it("returns null for non-error responses", () => {
+    expect(
+      parseSlackManifestCreateErrorResponse({
+        ok: true,
+        app_id: "A123",
       }),
     ).toBeNull();
   });
