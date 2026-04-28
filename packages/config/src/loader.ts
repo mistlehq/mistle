@@ -115,7 +115,134 @@ function loadControlPlaneMaintenanceConfigFromEnvOnly(
     database: {
       migrationUrl,
     },
+    telemetry: loadControlPlaneMaintenanceTelemetryConfigFromEnvOnly(env),
   });
+}
+
+function loadControlPlaneMaintenanceTelemetryConfigFromEnvOnly(
+  env: NodeJS.ProcessEnv,
+): ControlPlaneApiMaintenanceConfig["telemetry"] {
+  const enabled = readBooleanEnvAlias({
+    env,
+    path: "telemetry.enabled",
+    newEnvVar: "MISTLE_TELEMETRY_ENABLED",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_ENABLED",
+  });
+  const debug = readBooleanEnvAlias({
+    env,
+    path: "telemetry.debug",
+    newEnvVar: "MISTLE_TELEMETRY_DEBUG",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_DEBUG",
+  });
+  const tracesEndpoint = readStringEnvAlias({
+    env,
+    path: "telemetry.traces.endpoint",
+    newEnvVar: "MISTLE_TELEMETRY_TRACES_ENDPOINT",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+  });
+  const logsEndpoint = readStringEnvAlias({
+    env,
+    path: "telemetry.logs.endpoint",
+    newEnvVar: "MISTLE_TELEMETRY_LOGS_ENDPOINT",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+  });
+  const metricsEndpoint = readStringEnvAlias({
+    env,
+    path: "telemetry.metrics.endpoint",
+    newEnvVar: "MISTLE_TELEMETRY_METRICS_ENDPOINT",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+  });
+  const resourceAttributes = readStringEnvAlias({
+    env,
+    path: "telemetry.resource_attributes",
+    newEnvVar: "MISTLE_TELEMETRY_RESOURCE_ATTRIBUTES",
+    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES",
+  });
+
+  return ControlPlaneApiMaintenanceConfigSchema.shape.telemetry.parse({
+    enabled: enabled ?? false,
+    debug: debug ?? false,
+    ...(enabled === true
+      ? {
+          traces: {
+            endpoint: tracesEndpoint,
+          },
+          logs: {
+            endpoint: logsEndpoint,
+          },
+          metrics: {
+            endpoint: metricsEndpoint,
+          },
+        }
+      : {
+          ...(tracesEndpoint === undefined
+            ? {}
+            : {
+                traces: {
+                  endpoint: tracesEndpoint,
+                },
+              }),
+          ...(logsEndpoint === undefined
+            ? {}
+            : {
+                logs: {
+                  endpoint: logsEndpoint,
+                },
+              }),
+          ...(metricsEndpoint === undefined
+            ? {}
+            : {
+                metrics: {
+                  endpoint: metricsEndpoint,
+                },
+              }),
+        }),
+    ...(resourceAttributes === undefined
+      ? {}
+      : {
+          resourceAttributes,
+        }),
+  });
+}
+
+function readBooleanEnvAlias(input: {
+  env: NodeJS.ProcessEnv;
+  path: string;
+  newEnvVar: string;
+  legacyEnvVar: string;
+}): boolean | undefined {
+  const rawValue = readStringEnvAlias(input);
+  if (rawValue === undefined) {
+    return undefined;
+  }
+
+  const normalizedValue = rawValue.trim().toLowerCase();
+  if (normalizedValue === "1" || normalizedValue === "true") {
+    return true;
+  }
+  if (normalizedValue === "0" || normalizedValue === "false") {
+    return false;
+  }
+
+  throw new Error(`${input.newEnvVar} must be one of: 1, true or 0, false.`);
+}
+
+function readStringEnvAlias(input: {
+  env: NodeJS.ProcessEnv;
+  path: string;
+  newEnvVar: string;
+  legacyEnvVar: string;
+}): string | undefined {
+  const newValue = input.env[input.newEnvVar];
+  const legacyValue = input.env[input.legacyEnvVar];
+
+  if (newValue !== undefined && legacyValue !== undefined && newValue !== legacyValue) {
+    throw new Error(
+      `Conflicting env overrides for ${input.path}. ${input.newEnvVar} tried to set a different value than ${input.legacyEnvVar}.`,
+    );
+  }
+
+  return newValue ?? legacyValue;
 }
 
 function selectAppConfig(

@@ -1,10 +1,12 @@
 import { loadControlPlaneMaintenanceConfig } from "@mistle/config";
-import { shutdownTelemetry } from "@mistle/telemetry";
+import { initializeTelemetryFromConfig, shutdownTelemetry } from "@mistle/telemetry";
 import { Pool } from "pg";
 
 import { logger } from "../logger.js";
 import { resolveMaintenanceCommand } from "./commands/index.js";
 import { runMaintenanceCommand } from "./shared/run-maintenance-command.js";
+
+let telemetryInitialized = false;
 
 async function main(): Promise<void> {
   const commandName = process.argv[2];
@@ -15,6 +17,11 @@ async function main(): Promise<void> {
   const loadedConfig = loadControlPlaneMaintenanceConfig({
     env: process.env,
   });
+  initializeTelemetryFromConfig({
+    serviceName: "@mistle/control-plane-api/maintenance",
+    config: loadedConfig.app.telemetry,
+  });
+  telemetryInitialized = true;
   const command = resolveMaintenanceCommand(commandName);
   const pool = new Pool({
     connectionString: loadedConfig.app.database.migrationUrl,
@@ -40,10 +47,18 @@ async function main(): Promise<void> {
 
 void main()
   .then(async () => {
-    await shutdownTelemetry();
+    await shutdownInitializedTelemetry();
   })
   .catch(async (error) => {
     logger.error({ err: error }, "Maintenance command failed.");
-    await shutdownTelemetry();
+    await shutdownInitializedTelemetry();
     process.exit(1);
   });
+
+async function shutdownInitializedTelemetry(): Promise<void> {
+  if (!telemetryInitialized) {
+    return;
+  }
+
+  await shutdownTelemetry();
+}

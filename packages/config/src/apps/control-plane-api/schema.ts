@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { GlobalSandboxTokenConfigSchema, SandboxStorageBackend } from "../../global/schema.js";
+import {
+  GlobalSandboxTokenConfigSchema,
+  GlobalTelemetryConfigSchema,
+  SandboxStorageBackend,
+} from "../../global/schema.js";
 
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
@@ -164,6 +168,7 @@ export const ControlPlaneApiMaintenanceConfigSchema = z
         migrationUrl: z.string().min(1),
       })
       .strict(),
+    telemetry: GlobalTelemetryConfigSchema,
   })
   .strict();
 

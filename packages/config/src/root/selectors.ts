@@ -241,6 +241,7 @@ export function selectControlPlaneApiMaintenanceConfig(
     database: {
       migrationUrl: config.postgres.control_plane.direct_url,
     },
+    telemetry: projectTelemetry(config),
   };
 }
 

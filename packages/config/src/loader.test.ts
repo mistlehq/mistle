@@ -34,6 +34,10 @@ describe("loadControlPlaneMaintenanceConfig", () => {
       database: {
         migrationUrl: "postgresql://direct.example/mistle",
       },
+      telemetry: {
+        enabled: false,
+        debug: false,
+      },
     });
   });
 
@@ -49,7 +53,78 @@ describe("loadControlPlaneMaintenanceConfig", () => {
       database: {
         migrationUrl: "postgresql://legacy-direct.example/mistle",
       },
+      telemetry: {
+        enabled: false,
+        debug: false,
+      },
     });
+  });
+
+  it("loads maintenance telemetry from the new env surface", () => {
+    const loadedConfig = loadControlPlaneMaintenanceConfig({
+      env: {
+        MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
+        MISTLE_TELEMETRY_ENABLED: "1",
+        MISTLE_TELEMETRY_DEBUG: "true",
+        MISTLE_TELEMETRY_TRACES_ENDPOINT: "http://otel.example/v1/traces",
+        MISTLE_TELEMETRY_LOGS_ENDPOINT: "http://otel.example/v1/logs",
+        MISTLE_TELEMETRY_METRICS_ENDPOINT: "http://otel.example/v1/metrics",
+        MISTLE_TELEMETRY_RESOURCE_ATTRIBUTES: "deployment.environment=staging",
+      },
+    });
+
+    expect(loadedConfig.app.telemetry).toEqual({
+      enabled: true,
+      debug: true,
+      traces: {
+        endpoint: "http://otel.example/v1/traces",
+      },
+      logs: {
+        endpoint: "http://otel.example/v1/logs",
+      },
+      metrics: {
+        endpoint: "http://otel.example/v1/metrics",
+      },
+      resourceAttributes: "deployment.environment=staging",
+    });
+  });
+
+  it("loads maintenance telemetry from the legacy env surface", () => {
+    const loadedConfig = loadControlPlaneMaintenanceConfig({
+      env: {
+        MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
+        MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
+        MISTLE_GLOBAL_TELEMETRY_DEBUG: "0",
+        MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://otel.example/v1/traces",
+        MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://otel.example/v1/logs",
+        MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://otel.example/v1/metrics",
+      },
+    });
+
+    expect(loadedConfig.app.telemetry).toEqual({
+      enabled: true,
+      debug: false,
+      traces: {
+        endpoint: "http://otel.example/v1/traces",
+      },
+      logs: {
+        endpoint: "http://otel.example/v1/logs",
+      },
+      metrics: {
+        endpoint: "http://otel.example/v1/metrics",
+      },
+    });
+  });
+
+  it("rejects enabled maintenance telemetry without endpoints", () => {
+    expect(() =>
+      loadControlPlaneMaintenanceConfig({
+        env: {
+          MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
+          MISTLE_TELEMETRY_ENABLED: "true",
+        },
+      }),
+    ).toThrow(/traces/u);
   });
 
   it("rejects conflicting maintenance database env surfaces", () => {
@@ -72,6 +147,20 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     expect(loadedConfig.app).toEqual({
       database: {
         migrationUrl: "postgresql://mistle:replace-with-password@db:5432/mistle",
+      },
+      telemetry: {
+        enabled: true,
+        debug: false,
+        traces: {
+          endpoint: "http://otel-collector:4318/v1/traces",
+        },
+        logs: {
+          endpoint: "http://otel-collector:4318/v1/logs",
+        },
+        metrics: {
+          endpoint: "http://otel-collector:4318/v1/metrics",
+        },
+        resourceAttributes: "deployment.environment=production",
       },
     });
   });
