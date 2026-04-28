@@ -45,19 +45,37 @@ function resolveGoogleAuthConfig(
   environment: NodeJS.ProcessEnv,
   parsedConfig: z.infer<typeof DashboardBuildConfigSchema>,
 ): { clientId: string; clientSecret: string } | undefined {
-  const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
-  const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
+  const googleClientId = environment.MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
+  const googleClientSecret =
+    environment.MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
 
   if (googleClientId !== undefined || googleClientSecret !== undefined) {
     if (googleClientId === undefined || googleClientSecret === undefined) {
       throw new Error(
-        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+        "Dashboard build config requires both MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
       );
     }
 
     return {
       clientId: googleClientId,
       clientSecret: googleClientSecret,
+    };
+  }
+
+  const legacyGoogleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
+  const legacyGoogleClientSecret =
+    environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
+
+  if (legacyGoogleClientId !== undefined || legacyGoogleClientSecret !== undefined) {
+    if (legacyGoogleClientId === undefined || legacyGoogleClientSecret === undefined) {
+      throw new Error(
+        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
+      );
+    }
+
+    return {
+      clientId: legacyGoogleClientId,
+      clientSecret: legacyGoogleClientSecret,
     };
   }
 
