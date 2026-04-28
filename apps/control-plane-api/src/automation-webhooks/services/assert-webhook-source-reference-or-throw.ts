@@ -5,13 +5,18 @@ import {
   type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type {
+  IntegrationRegistry,
+  IntegrationWebhookEventDefinition,
+} from "@mistle/integrations-core";
 
 import { AutomationWebhooksBadRequestCodes } from "../constants.js";
 
 export type ResolvedWebhookSourceReference = {
   webhookSourceId: string;
   integrationConnectionId: string;
+  providerMetadata: Record<string, unknown>;
+  supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 };
 
 export async function assertWebhookSourceReferenceOrThrow(
@@ -87,5 +92,7 @@ export async function assertWebhookSourceReferenceOrThrow(
   return {
     webhookSourceId: webhookSource.id,
     integrationConnectionId: connection.id,
+    providerMetadata: webhookSource.providerMetadata,
+    supportedWebhookEvents: definition.supportedWebhookEvents ?? [],
   };
 }

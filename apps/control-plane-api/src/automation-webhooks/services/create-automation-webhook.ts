@@ -12,6 +12,7 @@ import { assertPrimaryRepositoryReferenceOrThrow } from "./assert-primary-reposi
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
+import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 import {
   assertEventScopedWebhookPayloadFilterOrThrow,
@@ -64,6 +65,11 @@ export async function createAutomationWebhook(
       integrationWebhookSourceId: input.integrationWebhookSourceId,
     },
   );
+  assertWebhookTriggerRequirementsOrThrow({
+    eventTypes: input.eventTypes ?? null,
+    providerMetadata: resolvedWebhookSource.providerMetadata,
+    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+  });
   await assertSandboxProfileReferenceOrThrow(
     { db: ctx.db },
     {

@@ -1,4 +1,8 @@
 import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-core";
+import {
+  isWebhookTriggerSupportedByCapabilities,
+  parseWebhookTriggerCapabilitiesProviderMetadata,
+} from "@mistle/integrations-core";
 
 import type {
   IntegrationConnection,
@@ -16,10 +20,6 @@ import type {
   WebhookAutomationEventOption,
   WebhookAutomationEventOptionAvailability,
 } from "./webhook-automation-trigger-types.js";
-import {
-  isWebhookTriggerSupportedByCapabilities,
-  parseWebhookTriggerCapabilitiesProviderMetadata,
-} from "./webhook-trigger-capability-matcher.js";
 
 export const WebhookAutomationWorkspaceRootRepositoryOptionValue = "__workspace_root__";
 

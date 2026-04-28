@@ -9,6 +9,7 @@ export * from "./binding-validation/index.js";
 export * from "./runtime-plan/index.js";
 export * from "./compiler/index.js";
 export * from "./webhooks/index.js";
+export * from "./webhook-trigger-capabilities/index.js";
 export * from "./forms/index.js";
 export * from "./agent/index.js";
 export * from "./capabilities/index.js";

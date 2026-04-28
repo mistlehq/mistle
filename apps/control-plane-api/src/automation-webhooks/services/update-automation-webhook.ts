@@ -12,6 +12,7 @@ import { assertPrimaryRepositoryReferenceOrThrow } from "./assert-primary-reposi
 import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
 import { resolveSandboxProfileTriggerReferenceOrThrow } from "./assert-sandbox-profile-trigger-reference-or-throw.js";
 import { assertWebhookSourceReferenceOrThrow } from "./assert-webhook-source-reference-or-throw.js";
+import { assertWebhookTriggerRequirementsOrThrow } from "./assert-webhook-trigger-requirements-or-throw.js";
 import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 import {
   assertEventScopedWebhookPayloadFilterOrThrow,
@@ -56,7 +57,8 @@ export async function updateAutomationWebhook(
 
   const integrationWebhookSourceId =
     input.integrationWebhookSourceId ?? existingAutomation.integrationWebhookSourceId;
-  const eventTypes = input.eventTypes ?? existingAutomation.eventTypes;
+  const eventTypes =
+    input.eventTypes === undefined ? existingAutomation.eventTypes : input.eventTypes;
   const normalizedPayloadFilter = normalizeWebhookPayloadFilter(input.payloadFilter);
   const payloadFilter =
     normalizedPayloadFilter === undefined
@@ -80,6 +82,11 @@ export async function updateAutomationWebhook(
       integrationWebhookSourceId,
     },
   );
+  assertWebhookTriggerRequirementsOrThrow({
+    eventTypes,
+    providerMetadata: resolvedWebhookSource.providerMetadata,
+    supportedWebhookEvents: resolvedWebhookSource.supportedWebhookEvents,
+  });
   assertEventScopedWebhookPayloadFilterOrThrow({
     eventTypes,
     payloadFilter,

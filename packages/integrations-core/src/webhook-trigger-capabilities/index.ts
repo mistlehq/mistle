@@ -2,8 +2,8 @@ import type {
   IntegrationWebhookTriggerCapabilities,
   IntegrationWebhookTriggerProviderPermissionRequirement,
   IntegrationWebhookTriggerRequirements,
-} from "@mistle/integrations-core";
-import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
+} from "../types/index.js";
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "../types/index.js";
 
 function toRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

@@ -29,6 +29,7 @@ export const CreateAutomationWebhookBodySchema = z
 
 const CreateAutomationWebhookBadRequestCodeSchema = z.enum([
   AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_SOURCE_REFERENCE,
+  AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS,
   AutomationWebhooksBadRequestCodes.WEBHOOK_SOURCE_TARGET_NOT_WEBHOOK_CAPABLE,
   AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
   AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_TRIGGER_REFERENCE,
