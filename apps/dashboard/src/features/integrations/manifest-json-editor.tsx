@@ -49,6 +49,10 @@ export function formatManifestJson(value: string): string {
   return JSON.stringify(parseManifestJsonObject(value), null, 2);
 }
 
+export function createManifestJsonDraft(manifest: Record<string, unknown>): string {
+  return JSON.stringify(manifest, null, 2);
+}
+
 function createManifestFormatOnBlurExtension(
   onChange: (value: string) => void,
 ): ReturnType<typeof EditorView.domEventHandlers> {

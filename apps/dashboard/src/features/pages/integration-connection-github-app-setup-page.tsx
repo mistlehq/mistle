@@ -36,6 +36,7 @@ import type { IntegrationConnection } from "../integrations/integrations-service
 import {
   ManifestJsonEditor,
   type ManifestJsonValidation,
+  createManifestJsonDraft,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -106,7 +107,7 @@ const GitHubExistingAppSetupSecretFieldKeys = [
 
 type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
 
-const GitHubDraftManifest = JSON.stringify(GitHubAppManifestTemplate, null, 2);
+const GitHubDraftManifest = createManifestJsonDraft(GitHubAppManifestTemplate);
 
 type GitHubExistingAppSetupTimeoutRefs = Record<
   GitHubExistingAppSetupFieldKey,

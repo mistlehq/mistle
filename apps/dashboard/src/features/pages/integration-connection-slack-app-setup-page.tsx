@@ -33,6 +33,7 @@ import type { IntegrationConnection } from "../integrations/integrations-service
 import {
   ManifestJsonEditor,
   type ManifestJsonValidation,
+  createManifestJsonDraft,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -86,7 +87,7 @@ const SlackRequiredExistingAppSecretFieldKeys = [
   "signingSecret",
 ] as const satisfies readonly SlackExistingAppSecretFieldKey[];
 
-const SlackDraftManifest = JSON.stringify(SlackAppManifestTemplate, null, 2);
+const SlackDraftManifest = createManifestJsonDraft(SlackAppManifestTemplate);
 
 function normalizeInputValue(value: unknown): string {
   return typeof value === "string" ? value : "";
