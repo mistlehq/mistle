@@ -495,9 +495,9 @@ describe("integration registry", () => {
             eventType: "github.issue_comment.created",
             providerEventType: "issue_comment",
             displayName: "Issue comment created",
-            requiredCapabilities: [
+            requiredTriggerCapabilities: [
               {
-                kind: "github-app-permission",
+                kind: "provider-permission",
                 permission: "",
                 access: "read",
                 label: "Issues: read",

@@ -89,9 +89,9 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
-                requiredCapabilities: [
+                requiredTriggerCapabilities: [
                   {
-                    kind: "github-app-permission",
+                    kind: "provider-permission",
                     permission: "issues",
                     access: "read",
                     label: "Issues: read",
@@ -173,9 +173,9 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Issue comment created",
-        requiredCapabilities: [
+        requiredTriggerCapabilities: [
           {
-            kind: "github-app-permission",
+            kind: "provider-permission",
             permission: "issues",
             access: "read",
             label: "Issues: read",

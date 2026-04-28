@@ -1,4 +1,4 @@
-import type { IntegrationWebhookEventCapabilityRequirement } from "@mistle/integrations-core";
+import type { IntegrationWebhookTriggerRequirement } from "@mistle/integrations-core";
 
 export const WebhookAutomationEventOptionAvailabilities = {
   AVAILABLE: "available",
@@ -69,7 +69,7 @@ export type WebhookAutomationEventOption = {
   payloadReferences?: readonly WebhookAutomationPayloadReference[];
   conversationKeyOptions?: readonly WebhookAutomationConversationKeyOption[];
   parameters?: readonly WebhookAutomationEventParameterOption[];
-  requiredCapabilities?: readonly IntegrationWebhookEventCapabilityRequirement[];
+  requiredTriggerCapabilities?: readonly IntegrationWebhookTriggerRequirement[];
 };
 
 export type WebhookAutomationTriggerParameterValueMap = Record<string, Record<string, string>>;

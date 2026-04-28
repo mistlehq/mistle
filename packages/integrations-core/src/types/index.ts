@@ -1759,21 +1759,16 @@ export type IntegrationWebhookEventParameterDefinition =
       placeholder?: string | undefined;
     };
 
-export type IntegrationWebhookEventCapabilityRequirement =
+export type IntegrationWebhookTriggerRequirement =
   | {
-      kind: "webhook-event";
-      providerEventType: string;
+      kind: "provider-event";
+      eventType: string;
       label: string;
     }
   | {
-      kind: "oauth-scope";
-      scope: string;
-      label: string;
-    }
-  | {
-      kind: "github-app-permission";
+      kind: "provider-permission";
       permission: string;
-      access: "read" | "write" | "admin";
+      access?: string | undefined;
       label: string;
     };
 
@@ -1807,7 +1802,7 @@ export type IntegrationWebhookEventDefinition = {
       }>
     | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
-  requiredCapabilities?: ReadonlyArray<IntegrationWebhookEventCapabilityRequirement> | undefined;
+  requiredTriggerCapabilities?: ReadonlyArray<IntegrationWebhookTriggerRequirement> | undefined;
 };
 
 /**
