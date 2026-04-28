@@ -500,7 +500,6 @@ describe("integration registry", () => {
                 kind: "provider-permission",
                 permission: "",
                 access: "read",
-                label: "Issues: read",
               },
             ],
           },

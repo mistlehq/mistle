@@ -102,13 +102,6 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
     }
 
     for (const requirement of supportedWebhookEvent.requirements ?? []) {
-      if (requirement.label.trim().length === 0) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requirements[*].label must be non-empty.",
-        );
-      }
-
       if (requirement.kind === "provider-event" && requirement.eventType.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,

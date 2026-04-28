@@ -3506,13 +3506,11 @@ export interface paths {
                         eventType: string;
                         /** @enum {string} */
                         kind: "provider-event";
-                        label: string;
                       }
                     | {
                         access?: string;
                         /** @enum {string} */
                         kind: "provider-permission";
-                        label: string;
                         permission: string;
                       }
                   )[];
