@@ -2,6 +2,8 @@ import type {
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookPayloadReference,
+  IntegrationWebhookTriggerProviderPermissionRequirement,
+  IntegrationWebhookTriggerRequirements,
 } from "@mistle/integrations-core";
 
 import { createInvocationTokenParameter } from "../../shared/invocation-token-parameter.js";
@@ -192,11 +194,45 @@ const GitHubPushBranchParameter: IntegrationWebhookEventParameterDefinition = {
   placeholder: "refs/heads/main",
 };
 
+const GitHubWebhookPermissionRequirements = {
+  CHECKS_READ: {
+    permission: "checks",
+    access: "read",
+  },
+  CONTENTS_READ: {
+    permission: "contents",
+    access: "read",
+  },
+  ISSUES_READ: {
+    permission: "issues",
+    access: "read",
+  },
+  PULL_REQUESTS_READ: {
+    permission: "pull_requests",
+    access: "read",
+  },
+} as const satisfies Record<string, IntegrationWebhookTriggerProviderPermissionRequirement>;
+
+function createGitHubWebhookRequirements(
+  eventType: string,
+  permission: IntegrationWebhookTriggerProviderPermissionRequirement,
+): IntegrationWebhookTriggerRequirements {
+  return {
+    anyOf: [
+      {
+        event: eventType,
+        permissions: [permission],
+      },
+    ],
+  };
+}
+
 function createGitHubWebhookEventDefinition(input: {
   eventType: string;
   providerEventType: string;
   displayName: string;
   category: string;
+  requirements: IntegrationWebhookTriggerRequirements;
   payloadReferences?: readonly IntegrationWebhookPayloadReference[];
   conversationKeyOptions?: readonly {
     id: string;
@@ -211,6 +247,7 @@ function createGitHubWebhookEventDefinition(input: {
     providerEventType: input.providerEventType,
     displayName: input.displayName,
     category: input.category,
+    requirements: input.requirements,
     ...(input.payloadReferences === undefined
       ? {}
       : { payloadReferences: input.payloadReferences }),
@@ -227,6 +264,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue opened",
     category: "Issues",
+    requirements: createGitHubWebhookRequirements(
+      "issues",
+      GitHubWebhookPermissionRequirements.ISSUES_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
@@ -243,6 +284,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue closed",
     category: "Issues",
+    requirements: createGitHubWebhookRequirements(
+      "issues",
+      GitHubWebhookPermissionRequirements.ISSUES_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
@@ -255,6 +300,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issues",
     displayName: "Issue reopened",
     category: "Issues",
+    requirements: createGitHubWebhookRequirements(
+      "issues",
+      GitHubWebhookPermissionRequirements.ISSUES_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.ISSUE_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
@@ -267,6 +316,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "issue_comment",
     displayName: "Issue comment created",
     category: "Issues",
+    requirements: createGitHubWebhookRequirements(
+      "issue_comment",
+      GitHubWebhookPermissionRequirements.ISSUES_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.ISSUE_COMMENT_CORE,
     conversationKeyOptions: [
       GitHubIssueConversationKeyOption,
@@ -284,6 +337,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request opened",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -301,6 +358,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request closed",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -313,6 +374,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request reopened",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
     conversationKeyOptions: [
       GitHubPullRequestConversationKeyOption,
@@ -325,6 +390,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request",
     displayName: "Pull request updated",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: [
       ...GitHubPayloadReferenceGroups.PULL_REQUEST_CORE,
       GitHubPayloadReferences.PULL_REQUEST_HEAD_REF,
@@ -345,6 +414,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request_review",
     displayName: "Pull request review submitted",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request_review",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: [
       GitHubPayloadReferences.REPOSITORY_FULL_NAME,
       GitHubPayloadReferences.PULL_REQUEST_NUMBER,
@@ -368,6 +441,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "pull_request_review_comment",
     displayName: "Pull request review comment created",
     category: "Pull requests",
+    requirements: createGitHubWebhookRequirements(
+      "pull_request_review_comment",
+      GitHubWebhookPermissionRequirements.PULL_REQUESTS_READ,
+    ),
     payloadReferences: [
       GitHubPayloadReferences.REPOSITORY_FULL_NAME,
       GitHubPayloadReferences.PULL_REQUEST_NUMBER,
@@ -391,6 +468,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "push",
     displayName: "New push to branch",
     category: "Push",
+    requirements: createGitHubWebhookRequirements(
+      "push",
+      GitHubWebhookPermissionRequirements.CONTENTS_READ,
+    ),
     payloadReferences: [GitHubPayloadReferences.REPOSITORY_FULL_NAME, GitHubPayloadReferences.REF],
     conversationKeyOptions: [
       GitHubPushBranchConversationKeyOption,
@@ -403,6 +484,10 @@ export const GitHubSupportedWebhookEvents: readonly IntegrationWebhookEventDefin
     providerEventType: "check_suite",
     displayName: "CI completed",
     category: "Checks",
+    requirements: createGitHubWebhookRequirements(
+      "check_suite",
+      GitHubWebhookPermissionRequirements.CHECKS_READ,
+    ),
     payloadReferences: [GitHubPayloadReferences.REPOSITORY_FULL_NAME],
     conversationKeyOptions: [GitHubRepositoryConversationKeyOption],
     parameters: [GitHubRepositoryParameter],

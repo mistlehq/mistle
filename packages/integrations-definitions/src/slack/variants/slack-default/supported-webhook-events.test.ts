@@ -39,6 +39,14 @@ describe("SlackSupportedWebhookEvents", () => {
       providerEventType: "reaction_added",
       displayName: "Reaction added",
       category: "Reactions",
+      requirements: {
+        anyOf: [
+          {
+            event: "reaction_added",
+            permissions: [{ permission: "reactions:read" }],
+          },
+        ],
+      },
       payloadReferences: [
         {
           path: ["event", "channel"],
