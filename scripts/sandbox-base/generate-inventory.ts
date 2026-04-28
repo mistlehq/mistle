@@ -1,15 +1,14 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-type ScriptMode = "check" | "write";
+import {
+  SandboxBaseInventorySpec,
+  type SandboxBaseInventoryMissingTool,
+  type SandboxBaseInventoryToolCategory,
+  type SandboxBaseInventoryToolSpec,
+} from "./inventory-spec.js";
 
-type InventoryToolProbe = {
-  category: SandboxBaseInventoryToolCategory;
-  command: string;
-  displayName: string;
-  versionCommand: readonly string[];
-  versionParser: (output: string) => string;
-};
+type ScriptMode = "check" | "write";
 
 type SandboxBaseInventory = {
   baseOs: string;
@@ -43,262 +42,8 @@ type SandboxBaseInventoryTool = {
   version: string;
 };
 
-type SandboxBaseInventoryToolCategory = {
-  id: string;
-  title: string;
-};
-
-type SandboxBaseInventoryMissingTool = {
-  command: string;
-  displayName: string;
-};
-
 const RepoRoot = new URL("../../", import.meta.url);
-const DockerfilePath = "packages/sandboxd/Dockerfile";
-const InventoryPath = new URL(
-  "../../packages/sandboxd/sandbox-base-inventory.generated.json",
-  import.meta.url,
-);
-const DefaultImageRef = "mistle/sandbox-base-inventory:local";
-
-const ToolCategories = {
-  RUNTIMES: {
-    id: "runtimes",
-    title: "Runtimes",
-  },
-  PACKAGE_AND_ENVIRONMENT: {
-    id: "package-and-environment",
-    title: "Package and environment",
-  },
-  CONTAINERS: {
-    id: "containers",
-    title: "Containers",
-  },
-  CLI_UTILITIES: {
-    id: "cli-utilities",
-    title: "CLI utilities",
-  },
-  DEBUGGING_AND_SYSTEM: {
-    id: "debugging-and-system",
-    title: "Debugging and system",
-  },
-} satisfies Record<string, SandboxBaseInventoryToolCategory>;
-
-const ToolProbes = [
-  {
-    category: ToolCategories.RUNTIMES,
-    command: "node",
-    displayName: "Node.js",
-    versionCommand: ["node", "--version"],
-    versionParser: parseLeadingVVersion,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "npm",
-    displayName: "npm",
-    versionCommand: ["npm", "--version"],
-    versionParser: parseFirstLine,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "npx",
-    displayName: "npx",
-    versionCommand: ["npx", "--version"],
-    versionParser: parseFirstLine,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "corepack",
-    displayName: "Corepack",
-    versionCommand: ["corepack", "--version"],
-    versionParser: parseFirstLine,
-  },
-  {
-    category: ToolCategories.RUNTIMES,
-    command: "python3",
-    displayName: "Python",
-    versionCommand: ["python3", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "pip",
-    displayName: "pip",
-    versionCommand: ["pip", "--version"],
-    versionParser: parseSecondToken,
-  },
-  {
-    category: ToolCategories.CONTAINERS,
-    command: "docker",
-    displayName: "Docker",
-    versionCommand: ["docker", "--version"],
-    versionParser: parseDockerVersion,
-  },
-  {
-    category: ToolCategories.CONTAINERS,
-    command: "docker-compose",
-    displayName: "Docker Compose",
-    versionCommand: ["docker-compose", "version", "--short"],
-    versionParser: parseFirstLine,
-  },
-  {
-    category: ToolCategories.CONTAINERS,
-    command: "containerd",
-    displayName: "containerd",
-    versionCommand: ["containerd", "--version"],
-    versionParser: parseContainerdVersion,
-  },
-  {
-    category: ToolCategories.CONTAINERS,
-    command: "runc",
-    displayName: "runc",
-    versionCommand: ["runc", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "nix",
-    displayName: "Nix",
-    versionCommand: ["nix", "--version"],
-    versionParser: parseLastToken,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "mise",
-    displayName: "mise",
-    versionCommand: ["mise", "--version"],
-    versionParser: parseFirstToken,
-  },
-  {
-    category: ToolCategories.PACKAGE_AND_ENVIRONMENT,
-    command: "archil",
-    displayName: "Archil",
-    versionCommand: ["archil", "--version"],
-    versionParser: parseArchilVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "git",
-    displayName: "Git",
-    versionCommand: ["git", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "curl",
-    displayName: "curl",
-    versionCommand: ["curl", "--version"],
-    versionParser: parseSecondToken,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "jq",
-    displayName: "jq",
-    versionCommand: ["jq", "--version"],
-    versionParser: parseJqVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "rg",
-    displayName: "ripgrep",
-    versionCommand: ["rg", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "fd",
-    displayName: "fd",
-    versionCommand: ["fd", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "bat",
-    displayName: "bat",
-    versionCommand: ["bat", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "tmux",
-    displayName: "tmux",
-    versionCommand: ["tmux", "-V"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "vim",
-    displayName: "Vim",
-    versionCommand: ["vim", "--version"],
-    versionParser: parseVimVersion,
-  },
-  {
-    category: ToolCategories.CLI_UTILITIES,
-    command: "sqlite3",
-    displayName: "SQLite",
-    versionCommand: ["sqlite3", "--version"],
-    versionParser: parseFirstToken,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "make",
-    displayName: "Make",
-    versionCommand: ["make", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "gdb",
-    displayName: "gdb",
-    versionCommand: ["gdb", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "strace",
-    displayName: "strace",
-    versionCommand: ["strace", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "tcpdump",
-    displayName: "tcpdump",
-    versionCommand: ["tcpdump", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "tree",
-    displayName: "tree",
-    versionCommand: ["tree", "--version"],
-    versionParser: parseSecondTokenWithoutLeadingV,
-  },
-  {
-    category: ToolCategories.DEBUGGING_AND_SYSTEM,
-    command: "tini",
-    displayName: "tini",
-    versionCommand: ["tini", "--version"],
-    versionParser: parseTrailingVersion,
-  },
-] satisfies readonly InventoryToolProbe[];
-
-const MissingToolProbes = [
-  { command: "pnpm", displayName: "pnpm" },
-  { command: "yarn", displayName: "Yarn" },
-  { command: "rustc", displayName: "rustc" },
-  { command: "cargo", displayName: "Cargo" },
-] satisfies readonly SandboxBaseInventoryMissingTool[];
-
-const PackageManagerCommands: readonly string[] = [
-  "apt-get",
-  "apt",
-  "apk",
-  "dnf",
-  "yum",
-  "pacman",
-  "brew",
-];
+const InventoryPath = new URL(`../../${SandboxBaseInventorySpec.inventoryPath}`, import.meta.url);
 
 function parseMode(argv: readonly string[]): ScriptMode {
   if (argv.length !== 1 || (argv[0] !== "--write" && argv[0] !== "--check")) {
@@ -306,95 +51,6 @@ function parseMode(argv: readonly string[]): ScriptMode {
   }
 
   return argv[0] === "--write" ? "write" : "check";
-}
-
-function parseFirstLine(output: string): string {
-  const line = output.trim().split("\n")[0]?.trim();
-
-  if (line === undefined || line.length === 0) {
-    throw new Error("Expected version command to print at least one line.");
-  }
-
-  return line;
-}
-
-function parseFirstToken(output: string): string {
-  return parseRequiredToken(output, 0);
-}
-
-function parseSecondToken(output: string): string {
-  return parseRequiredToken(output, 1);
-}
-
-function parseSecondTokenWithoutLeadingV(output: string): string {
-  return parseSecondToken(output).replace(/^v/u, "");
-}
-
-function parseLastToken(output: string): string {
-  const tokens = parseFirstLine(output).split(/\s+/u);
-  const token = tokens[tokens.length - 1];
-
-  if (token === undefined || token.length === 0) {
-    throw new Error(`Could not parse version from output: ${output}`);
-  }
-
-  return token;
-}
-
-function parseRequiredToken(output: string, index: number): string {
-  const token = parseFirstLine(output).split(/\s+/u)[index];
-
-  if (token === undefined || token.length === 0) {
-    throw new Error(`Could not parse token ${String(index)} from output: ${output}`);
-  }
-
-  return token;
-}
-
-function parseLeadingVVersion(output: string): string {
-  return parseFirstLine(output).replace(/^v/u, "");
-}
-
-function parseTrailingVersion(output: string): string {
-  return parseLastToken(output).replace(/^v/u, "");
-}
-
-function parseDockerVersion(output: string): string {
-  return parseRequiredToken(output.replaceAll(",", ""), 2);
-}
-
-function parseContainerdVersion(output: string): string {
-  return parseRequiredToken(output, 2).replace(/^v/u, "");
-}
-
-function parseJqVersion(output: string): string {
-  return parseFirstLine(output).replace(/^jq-/u, "");
-}
-
-function parseVimVersion(output: string): string {
-  const versionMatch = /\b\d+\.\d+\b/u.exec(parseFirstLine(output));
-
-  if (versionMatch === null) {
-    throw new Error(`Could not parse Vim version from output: ${output}`);
-  }
-
-  return versionMatch[0];
-}
-
-function parseArchilVersion(output: string): string {
-  const versionMatch = /^Archil Client:\s*(\S+)/u.exec(parseFirstLine(output));
-
-  if (versionMatch === null) {
-    throw new Error(`Could not parse Archil version from output: ${output}`);
-  }
-
-  const version = versionMatch[1];
-
-  if (version === undefined) {
-    throw new Error(`Could not parse Archil version from output: ${output}`);
-  }
-
-  return version.replace(/,$/u, "");
 }
 
 function runDocker(input: readonly string[]): string {
@@ -423,7 +79,16 @@ function failMissingCommand(): never {
 function buildImage(imageRef: string): void {
   execFileSync(
     "docker",
-    ["build", "--target", "sandbox-base", "--tag", imageRef, "--file", DockerfilePath, "."],
+    [
+      "build",
+      "--target",
+      "sandbox-base",
+      "--tag",
+      imageRef,
+      "--file",
+      SandboxBaseInventorySpec.dockerfilePath,
+      ".",
+    ],
     {
       cwd: RepoRoot,
       stdio: "inherit",
@@ -485,7 +150,9 @@ function readRuntimeBase(imageRef: string): SandboxBaseInventoryRuntimeBase {
       prettyName,
       versionId,
     },
-    packageManagers: PackageManagerCommands.filter((command) => commandExists(imageRef, command)),
+    packageManagers: SandboxBaseInventorySpec.packageManagerCommands.filter((command) =>
+      commandExists(imageRef, command),
+    ),
     shell,
     sudoInstalled: commandExists(imageRef, "sudo"),
     user: {
@@ -506,7 +173,10 @@ function readRequiredLine(lines: readonly string[], index: number, label: string
   return line;
 }
 
-function collectTool(imageRef: string, probe: InventoryToolProbe): SandboxBaseInventoryTool {
+function collectTool(
+  imageRef: string,
+  probe: SandboxBaseInventoryToolSpec,
+): SandboxBaseInventoryTool {
   if (!commandExists(imageRef, probe.command)) {
     throw new Error(`Expected sandbox base image '${imageRef}' to include '${probe.command}'.`);
   }
@@ -538,17 +208,17 @@ function collectInventory(imageRef: string): SandboxBaseInventory {
   buildImage(imageRef);
   const runtimeBase = readRuntimeBase(imageRef);
 
-  for (const missingTool of MissingToolProbes) {
+  for (const missingTool of SandboxBaseInventorySpec.missingTools) {
     validateToolIsAbsent(imageRef, missingTool);
   }
 
   return {
     baseOs: runtimeBase.os.prettyName,
-    dockerfilePath: DockerfilePath,
+    dockerfilePath: SandboxBaseInventorySpec.dockerfilePath,
     imageRef,
-    notPreinstalled: MissingToolProbes,
+    notPreinstalled: SandboxBaseInventorySpec.missingTools,
     runtimeBase,
-    tools: ToolProbes.map((probe) => collectTool(imageRef, probe)),
+    tools: SandboxBaseInventorySpec.tools.map((probe) => collectTool(imageRef, probe)),
   };
 }
 
@@ -563,7 +233,8 @@ function stringifyInventory(inventory: SandboxBaseInventory): string {
 
 function main(): void {
   const mode = parseMode(process.argv.slice(2));
-  const imageRef = process.env.MISTLE_SANDBOX_BASE_INVENTORY_IMAGE ?? DefaultImageRef;
+  const imageRef =
+    process.env.MISTLE_SANDBOX_BASE_INVENTORY_IMAGE ?? SandboxBaseInventorySpec.defaultImageRef;
   const nextInventoryText = stringifyInventory(collectInventory(imageRef));
 
   if (mode === "write") {
