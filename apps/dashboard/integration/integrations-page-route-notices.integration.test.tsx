@@ -8,15 +8,15 @@ import type { ReactNode } from "react";
 import { MemoryRouter, type MemoryRouterProps, Route, Routes, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resetDashboardConfigForTest } from "../../config.js";
-import { createTestQueryClient } from "../../test-support/query-client.js";
+import { resetDashboardConfigForTest } from "../src/config.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
-} from "../integrations/integrations-service.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
-import { IntegrationsPage } from "./integrations-page.js";
-import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
+} from "../src/features/integrations/integrations-service.js";
+import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
+import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "../src/features/pages/use-integrations-directory-state.js";
+import { SESSION_QUERY_KEY } from "../src/features/shell/session-query.js";
+import { createTestQueryClient } from "../src/test-support/query-client.js";
 
 type ServerRequestRecord = {
   method: string;
