@@ -44,9 +44,10 @@ jobs:
       CACHE_MODE: ${{ matrix.cache }}
       CI: true
       GITHUB_PLATFORM_USD_PER_MIN: "0.002"
-      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      TURBO_REMOTE_CACHE: ${{ matrix.cache == 'warm' && 'enabled' || 'disabled' }}
       TURBO_TELEMETRY_DISABLED: "1"
-      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ matrix.cache == 'warm' && vars.TURBO_TEAM || '' }}
+      TURBO_TOKEN: ${{ matrix.cache == 'warm' && secrets.TURBO_TOKEN || '' }}
 
     steps:
       - name: Start benchmark timer
@@ -149,6 +150,7 @@ jobs:
             echo "| Target | ${{ matrix.target.label }} |"
             echo "| Runner | ${{ matrix.runner.runs_on }} |"
             echo "| Cache mode | $CACHE_MODE |"
+            echo "| Turbo remote cache | $TURBO_REMOTE_CACHE |"
             echo "| pnpm cache hit | ${{ steps.pnpm-store-cache.outputs.cache-hit || 'skipped' }} |"
             echo "| Turbo cache hit | ${{ steps.turbo-cache.outputs.cache-hit || 'skipped' }} |"
             echo "| Install seconds | ${INSTALL_SECONDS:-n/a} |"
