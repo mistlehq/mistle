@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSlackAppManifestCreateUrl,
   buildSlackAppManifest,
+  buildSlackOAuthAccessUrl,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
 } from "./app-manifest.js";
@@ -108,6 +109,16 @@ describe("buildSlackAppManifestCreateUrl", () => {
         apiBaseUrl: "https://slack.example.com/api/",
       }),
     ).toBe("https://slack.example.com/api/apps.manifest.create");
+  });
+});
+
+describe("buildSlackOAuthAccessUrl", () => {
+  it("builds the Slack OAuth access endpoint URL", () => {
+    expect(
+      buildSlackOAuthAccessUrl({
+        apiBaseUrl: "https://slack.example.com/api/",
+      }),
+    ).toBe("https://slack.example.com/api/oauth.v2.access");
   });
 });
 
