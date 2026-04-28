@@ -99,9 +99,7 @@ export function createGitHubProviderAppSetupCapability(
           return {
             webhookSource: {
               providerMetadata:
-                buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
-                  manifest,
-                }),
+                buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata(manifest),
             },
             start: {
               kind: "form-post",

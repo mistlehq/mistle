@@ -125,10 +125,10 @@ export function buildConvertedGitHubAppConnectionSecrets(input: {
   };
 }
 
-export function buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata(input: {
-  manifest: Record<string, unknown>;
-}): Record<string, unknown> {
-  const parsedManifest = GitHubAppManifestWebhookTriggerCapabilitiesSchema.parse(input.manifest);
+export function buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata(
+  manifest: Record<string, unknown>,
+): Record<string, unknown> {
+  const parsedManifest = GitHubAppManifestWebhookTriggerCapabilitiesSchema.parse(manifest);
 
   return {
     [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {

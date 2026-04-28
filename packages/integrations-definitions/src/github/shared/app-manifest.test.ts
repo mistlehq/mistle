@@ -62,12 +62,10 @@ describe("buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata", () 
   it("maps GitHub App manifest event subscriptions and permissions into webhook trigger capabilities", () => {
     expect(
       buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
-        manifest: {
-          default_events: ["issues", "pull_request"],
-          default_permissions: {
-            issues: "read",
-            pull_requests: "write",
-          },
+        default_events: ["issues", "pull_request"],
+        default_permissions: {
+          issues: "read",
+          pull_requests: "write",
         },
       }),
     ).toEqual({
