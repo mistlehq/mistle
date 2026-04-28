@@ -48,6 +48,12 @@ export const IntegrationTargetSchema = z
               label: z.string().min(1),
               kind: z.literal("form"),
               createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
+              setupFlow: z
+                .object({
+                  routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+                })
+                .strict()
+                .optional(),
               secretFields: z
                 .array(
                   z

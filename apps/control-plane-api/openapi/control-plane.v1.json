@@ -6911,6 +6911,17 @@
                                       "type": "string",
                                       "enum": ["single-step", "draft-then-setup"]
                                     },
+                                    "setupFlow": {
+                                      "type": "object",
+                                      "properties": {
+                                        "routeSegment": {
+                                          "type": "string",
+                                          "pattern": "^[a-z0-9][a-z0-9-]*$"
+                                        }
+                                      },
+                                      "required": ["routeSegment"],
+                                      "additionalProperties": false
+                                    },
                                     "secretFields": {
                                       "type": "array",
                                       "items": {

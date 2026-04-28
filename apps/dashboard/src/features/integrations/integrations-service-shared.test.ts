@@ -66,6 +66,9 @@ describe("IntegrationTargetSchema", () => {
           label: "Slack app",
           kind: "form",
           createBehavior: "draft-then-setup",
+          setupFlow: {
+            routeSegment: "slack-app",
+          },
           secretFields: [
             {
               name: "botToken",
@@ -84,6 +87,9 @@ describe("IntegrationTargetSchema", () => {
       id: "slack-bot-token",
       kind: "form",
       createBehavior: "draft-then-setup",
+      setupFlow: {
+        routeSegment: "slack-app",
+      },
     });
   });
 });

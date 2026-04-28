@@ -489,6 +489,10 @@ export const IntegrationFormConnectionMethodCreateBehaviors: {
   DRAFT_THEN_SETUP: "draft-then-setup",
 };
 
+export type IntegrationFormConnectionMethodSetupFlow = {
+  routeSegment: string;
+};
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -519,6 +523,7 @@ export type IntegrationFormConnectionMethodDefinition<
 > & {
   kind: "form";
   createBehavior?: IntegrationFormConnectionMethodCreateBehavior;
+  setupFlow?: IntegrationFormConnectionMethodSetupFlow;
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
   ui?: {
     create?: IntegrationConnectionMethodCreateUi;

@@ -67,6 +67,9 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
       label: "GitHub App installation",
       kind: "form",
       createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        routeSegment: "github-app",
+      },
       secretFields: [
         {
           name: "appPrivateKeyPem",
