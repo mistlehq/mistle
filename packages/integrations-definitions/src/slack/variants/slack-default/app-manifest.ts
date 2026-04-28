@@ -35,6 +35,10 @@ export function buildSlackAppManifestCreateUrl(input: { apiBaseUrl: string }): s
   return buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create");
 }
 
+export function buildSlackOAuthAccessUrl(input: { apiBaseUrl: string }): string {
+  return buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access");
+}
+
 export function buildSlackManifestConnectionConfig(input: {
   clientId: string;
 }): Record<string, string> {

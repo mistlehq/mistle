@@ -6,11 +6,13 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId, SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
-import { buildSlackAppInstallationCompleteUrl } from "@mistle/integrations-definitions/server";
+import {
+  buildSlackAppInstallationCompleteUrl,
+  buildSlackOAuthAccessUrl,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -125,7 +127,7 @@ async function completeSlackOAuthAccess(input: {
   body.set("code", input.code);
   body.set("redirect_uri", input.redirectUrl);
 
-  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access"), {
+  const response = await fetch(buildSlackOAuthAccessUrl({ apiBaseUrl: input.apiBaseUrl }), {
     method: "POST",
     headers: {
       accept: "application/json",
