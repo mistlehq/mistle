@@ -6413,6 +6413,74 @@
                                   "type": "string",
                                   "minLength": 1
                                 },
+                                "requiredCapabilities": {
+                                  "type": "array",
+                                  "items": {
+                                    "oneOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["webhook-event"]
+                                          },
+                                          "providerEventType": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "providerEventType", "label"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["oauth-scope"]
+                                          },
+                                          "scope": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "scope", "label"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["github-app-permission"]
+                                          },
+                                          "permission": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "access": {
+                                            "type": "string",
+                                            "enum": ["read", "write", "admin"]
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["kind", "permission", "access", "label"],
+                                        "additionalProperties": false
+                                      }
+                                    ]
+                                  }
+                                },
                                 "payloadReferences": {
                                   "type": "array",
                                   "items": {

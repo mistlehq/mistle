@@ -476,6 +476,44 @@ describe("integration registry", () => {
     ).toThrow(IntegrationDefinitionRegistryError);
   });
 
+  it("rejects definitions with invalid webhook event capability requirements", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        supportedWebhookEvents: [
+          {
+            eventType: "github.issue_comment.created",
+            providerEventType: "issue_comment",
+            displayName: "Issue comment created",
+            requiredCapabilities: [
+              {
+                kind: "github-app-permission",
+                permission: "",
+                access: "read",
+                label: "Issues: read",
+              },
+            ],
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
+
   it("registers definitions with webhook source capability metadata", () => {
     const registry = new IntegrationRegistry();
 

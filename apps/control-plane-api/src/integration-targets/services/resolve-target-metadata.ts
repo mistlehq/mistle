@@ -63,6 +63,24 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
+  requiredCapabilities?: (
+    | {
+        kind: "webhook-event";
+        providerEventType: string;
+        label: string;
+      }
+    | {
+        kind: "oauth-scope";
+        scope: string;
+        label: string;
+      }
+    | {
+        kind: "github-app-permission";
+        permission: string;
+        access: "read" | "write" | "admin";
+        label: string;
+      }
+  )[];
   payloadReferences?: {
     path: string[];
     description: string;
@@ -284,6 +302,13 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.requiredCapabilities === undefined
+      ? {}
+      : {
+          requiredCapabilities: eventDefinition.requiredCapabilities.map((requirement) => ({
+            ...requirement,
+          })),
+        }),
     ...(eventDefinition.payloadReferences === undefined
       ? {}
       : {
