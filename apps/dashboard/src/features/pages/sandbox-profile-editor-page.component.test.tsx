@@ -1260,8 +1260,19 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(editor.textContent).toContain("pnpm install");
     expect(editor.textContent).toContain("pnpm dev:bootstrap");
-    expect(configurationsPanel.textContent).toContain("Setup script behavior");
-    expect(configurationsPanel.textContent).toContain("Environment and installed tools");
+    const setupScriptBehaviorTrigger = within(configurationsPanel).getByRole("button", {
+      name: "Setup script behavior",
+    });
+    const environmentAndToolsTrigger = within(configurationsPanel).getByRole("button", {
+      name: "Environment and installed tools",
+    });
+
+    expect(setupScriptBehaviorTrigger.getAttribute("aria-expanded")).toBe("false");
+    expect(environmentAndToolsTrigger.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(setupScriptBehaviorTrigger);
+    fireEvent.click(environmentAndToolsTrigger);
+
     expect(configurationsPanel.textContent).toContain(
       "Repositories are cloned under the working directory",
     );
@@ -1288,6 +1299,12 @@ describe("SandboxProfileEditorPage", () => {
       name: "Configurations",
       hidden: false,
     });
+
+    fireEvent.click(
+      within(configurationsPanel).getByRole("button", {
+        name: "Setup script behavior",
+      }),
+    );
 
     expect(configurationsPanel.textContent).toContain("Repository locations");
     expect(configurationsPanel.textContent).toContain("mistlehq/mistle");

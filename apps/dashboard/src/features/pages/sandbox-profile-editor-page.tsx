@@ -2341,11 +2341,7 @@ export function SandboxProfileSetupScriptPanel(input: {
               {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
             />
             <div className="flex flex-col pt-1">
-              <Accordion
-                className="max-w-2xl"
-                defaultValue={["how-setup-script-works", "environment-and-tools"]}
-                multiple
-              >
+              <Accordion className="max-w-2xl" multiple>
                 <AccordionItem value="how-setup-script-works">
                   <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
                     Setup script behavior
