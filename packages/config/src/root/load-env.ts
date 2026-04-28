@@ -503,6 +503,11 @@ const RootEnvDescriptors: readonly RootEnvDescriptor[] = [
     path: ["sandbox", "docker", "network_name"],
   },
   {
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED",
+    path: ["sandbox", "sandboxd_test_faults_enabled"],
+    parse: parseBooleanEnv,
+  },
+  {
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
     path: ["sandbox", "e2b", "api_key"],
   },

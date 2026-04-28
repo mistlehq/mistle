@@ -66,6 +66,10 @@ export function resolveIntegrationProviders(env) {
 }
 
 export function buildPrepareEnvironment(env) {
+  const archilApiKey =
+    env.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY ??
+    env.MISTLE_TEST_ARCHIL_API_KEY;
+
   let nextEnv = {
     ...env,
     MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS: resolveIntegrationProviders(env),
@@ -84,9 +88,9 @@ export function buildPrepareEnvironment(env) {
   nextEnv = withOptionalEnv(
     nextEnv,
     "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
-    env.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY ??
-      env.MISTLE_TEST_ARCHIL_API_KEY,
+    archilApiKey,
   );
+  nextEnv = withOptionalEnv(nextEnv, "MISTLE_TEST_ARCHIL_API_KEY", archilApiKey);
   nextEnv = withOptionalEnv(
     nextEnv,
     "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",

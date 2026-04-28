@@ -471,6 +471,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
     egress: globalDevelopmentConfig.sandbox.egress,
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+    sandboxdTestFaultsEnabled: true,
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
@@ -1101,6 +1102,7 @@ describe("loadConfig integrations", () => {
         MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED: "true",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
           "http://otel-lgtm:4318/v1/traces",
       }),
@@ -1113,6 +1115,18 @@ describe("loadConfig integrations", () => {
         sandbox: dataPlaneWorkerDockerFixtureConfig.sandbox,
       },
     });
+  });
+
+  it("projects the sandboxd test faults env into data-plane-worker sandbox config", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      configPath: tomlConfigFixturePath,
+      env: {
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED: "true",
+      },
+    });
+
+    expect(config.app.sandbox.sandboxdTestFaultsEnabled).toBe(true);
   });
 
   it("loads data-plane-worker from both config file and env, with env precedence", () => {

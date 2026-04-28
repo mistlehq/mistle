@@ -380,6 +380,9 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
         tokenAudience: config.sandbox.tokens.egress.audience,
       },
       tokenizerProxyEgressBaseUrl: config.services.tokenizer_proxy.egress_url,
+      ...(config.sandbox.sandboxd_test_faults_enabled === undefined
+        ? {}
+        : { sandboxdTestFaultsEnabled: config.sandbox.sandboxd_test_faults_enabled }),
       docker:
         config.sandbox.docker === undefined
           ? undefined

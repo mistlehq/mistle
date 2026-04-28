@@ -60,6 +60,7 @@ describe("buildPrepareEnvironment", () => {
     expect(environment.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY).toBe(
       "archil-api-key",
     );
+    expect(environment.MISTLE_TEST_ARCHIL_API_KEY).toBe("archil-api-key");
     expect(environment.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION).toBe(
       "gcp-asia-southeast1",
     );
@@ -95,6 +96,7 @@ describe("buildPrepareEnvironment", () => {
     expect(environment.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY).toBe(
       "explicit-archil-key",
     );
+    expect(environment.MISTLE_TEST_ARCHIL_API_KEY).toBe("explicit-archil-key");
     expect(environment.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION).toBe(
       "explicit-region",
     );

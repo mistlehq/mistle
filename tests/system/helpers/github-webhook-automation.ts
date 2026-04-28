@@ -312,6 +312,107 @@ async function waitForGitHubAppWebhookUrl(expectedUrl: string): Promise<void> {
   });
 }
 
+function formatDiagnosticError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function buildWebhookDeliveryDiagnostics(input: {
+  fixture: SystemTestFixture;
+  githubWebhookSource: GitHubWebhookSource;
+  payloadMarker: string;
+  issueNumber: number;
+  issueCommentId: number;
+}): Promise<string> {
+  const currentWebhookConfig = await readGitHubAppWebhookConfig().catch((error: unknown) => ({
+    url: `<read failed: ${formatDiagnosticError(error)}>`,
+  }));
+  const recentEvents = await input.fixture.db.query.integrationWebhookEvents.findMany({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.targetKey, GitHubTargetKey),
+        eq(table.integrationWebhookSourceId, input.githubWebhookSource.id),
+      ),
+    orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
+    limit: 10,
+  });
+
+  return JSON.stringify({
+    webhookSourceId: input.githubWebhookSource.id,
+    endpointKey: input.githubWebhookSource.endpointKey,
+    issueNumber: input.issueNumber,
+    issueCommentId: input.issueCommentId,
+    payloadMarker: input.payloadMarker,
+    currentGitHubAppWebhookUrl: currentWebhookConfig.url,
+    recentEvents: recentEvents.map((event) => {
+      const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
+      const body = comment === null ? null : comment.body;
+      return {
+        id: event.id,
+        eventType: event.eventType,
+        status: event.status,
+        externalDeliveryId: event.externalDeliveryId,
+        finalizedAt: event.finalizedAt,
+        markerMatched: typeof body === "string" && body.includes(input.payloadMarker),
+      };
+    }),
+  });
+}
+
+async function buildAutomationRunFailureDiagnostics(input: {
+  fixture: SystemTestFixture;
+  automationRunId: string;
+  conversationId: string | null;
+}): Promise<string> {
+  const deliveryTasks = await input.fixture.db.query.automationConversationDeliveryTasks.findMany({
+    where: (table, { eq }) => eq(table.automationRunId, input.automationRunId),
+    orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+    limit: 10,
+  });
+  const routes =
+    input.conversationId === null
+      ? []
+      : await readAutomationConversationRouteDiagnostics({
+          fixture: input.fixture,
+          conversationId: input.conversationId,
+        });
+
+  return JSON.stringify({
+    automationRunId: input.automationRunId,
+    conversationId: input.conversationId,
+    deliveryTasks: deliveryTasks.map((task) => ({
+      id: task.id,
+      status: task.status,
+      attemptCount: task.attemptCount,
+      processorGeneration: task.processorGeneration,
+      failureCode: task.failureCode,
+      failureMessage: task.failureMessage,
+      claimedAt: task.claimedAt,
+      deliveryStartedAt: task.deliveryStartedAt,
+      finishedAt: task.finishedAt,
+    })),
+    routes: routes.map((route) => ({
+      id: route.id,
+      status: route.status,
+      sandboxInstanceId: route.sandboxInstanceId,
+      providerConversationId: route.providerConversationId,
+      providerExecutionId: route.providerExecutionId,
+      createdAt: route.createdAt,
+      updatedAt: route.updatedAt,
+    })),
+  });
+}
+
+async function readAutomationConversationRouteDiagnostics(input: {
+  fixture: SystemTestFixture;
+  conversationId: string;
+}) {
+  return await input.fixture.db.query.automationConversationRoutes.findMany({
+    where: (table, { eq }) => eq(table.conversationId, input.conversationId),
+    orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+    limit: 10,
+  });
+}
+
 async function readSharedGitHubWebhookAutomationHarnessFromContext(): Promise<SharedGitHubWebhookAutomationHarness | null> {
   const persisted = await readTestContext({
     id: SharedGitHubWebhookHarnessContextId,
@@ -1747,38 +1848,57 @@ export async function startGitHubWebhookAutomationConversation(input: {
       throw new Error("Expected GitHub issue comment creation to persist the webhook marker.");
     }
 
-    const webhookEvent = await waitForCondition({
-      description: "processed GitHub webhook event",
-      timeoutMs: WebhookDeliveryTimeoutMs,
-      evaluate: async () => {
-        const events = await input.fixture.db.query.integrationWebhookEvents.findMany({
-          where: (table, { and, eq }) =>
-            and(
-              eq(table.targetKey, GitHubTargetKey),
-              eq(table.integrationWebhookSourceId, githubWebhookSource.id),
-            ),
-          orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
-        });
+    let webhookEvent: Awaited<
+      ReturnType<SystemTestFixture["db"]["query"]["integrationWebhookEvents"]["findMany"]>
+    >[number];
+    try {
+      webhookEvent = await waitForCondition({
+        description: "processed GitHub webhook event",
+        timeoutMs: WebhookDeliveryTimeoutMs,
+        evaluate: async () => {
+          const events = await input.fixture.db.query.integrationWebhookEvents.findMany({
+            where: (table, { and, eq }) =>
+              and(
+                eq(table.targetKey, GitHubTargetKey),
+                eq(table.integrationWebhookSourceId, githubWebhookSource.id),
+              ),
+            orderBy: (table, { desc }) => [desc(table.finalizedAt), desc(table.id)],
+          });
 
-        for (const event of events) {
-          const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
-          const body = comment === null ? null : comment.body;
-          if (
-            event.eventType === "github.issue_comment.created" &&
-            typeof body === "string" &&
-            body.includes(payloadMarker)
-          ) {
-            if (event.status === "failed") {
-              throw new Error(`GitHub webhook event '${event.id}' failed during processing.`);
+          for (const event of events) {
+            const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
+            const body = comment === null ? null : comment.body;
+            if (
+              event.eventType === "github.issue_comment.created" &&
+              typeof body === "string" &&
+              body.includes(payloadMarker)
+            ) {
+              if (event.status === "failed") {
+                throw new Error(`GitHub webhook event '${event.id}' failed during processing.`);
+              }
+
+              return event.status === "processed" ? event : null;
             }
-
-            return event.status === "processed" ? event : null;
           }
-        }
 
-        return null;
-      },
-    });
+          return null;
+        },
+      });
+    } catch (error) {
+      const diagnostics = await buildWebhookDeliveryDiagnostics({
+        fixture: input.fixture,
+        githubWebhookSource,
+        payloadMarker,
+        issueNumber: issue.number,
+        issueCommentId: issueComment.id,
+      });
+      throw new Error(
+        `${formatDiagnosticError(error)} GitHub webhook diagnostics: ${diagnostics}`,
+        {
+          cause: error,
+        },
+      );
+    }
 
     const automationRun = await waitForCondition({
       description: "completed automation run",
@@ -1816,8 +1936,13 @@ export async function startGitHubWebhookAutomationConversation(input: {
                     },
                   },
                 });
+          const diagnostics = await buildAutomationRunFailureDiagnostics({
+            fixture: input.fixture,
+            automationRunId: run.id,
+            conversationId: run.conversationId,
+          });
           throw new Error(
-            `Automation run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)} sandbox=${JSON.stringify(sandboxInstance)}`,
+            `Automation run failed: ${run.failureCode ?? "unknown"} ${run.failureMessage ?? ""}. route=${JSON.stringify(route)} sandbox=${JSON.stringify(sandboxInstance)} diagnostics=${diagnostics}`,
           );
         }
 

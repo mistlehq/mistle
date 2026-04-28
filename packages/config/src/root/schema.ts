@@ -299,6 +299,7 @@ export const ConfigSchema = z
           })
           .strict()
           .optional(),
+        sandboxd_test_faults_enabled: z.boolean().optional(),
         e2b: z
           .object({
             api_key: z.string().trim().min(1),
