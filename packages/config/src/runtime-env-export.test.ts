@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LoadConfigResult } from "./loader.js";
 import { AppIds } from "./modules.js";
-import { exportServiceConfigToEnv, projectServiceConfigToEnv } from "./runtime-env-export.js";
+import { exportServiceConfigToEnv } from "./runtime-env-export.js";
 import type { AppConfig } from "./schema.js";
 
 const GlobalConfig = {
@@ -280,9 +280,5 @@ describe("exportServiceConfigToEnv", () => {
         config: loadedConfig,
       }),
     ).toThrow("Runtime env export requires loadConfig output that includes global config.");
-  });
-
-  it("keeps the legacy projectServiceConfigToEnv export as an alias", () => {
-    expect(projectServiceConfigToEnv).toBe(exportServiceConfigToEnv);
   });
 });

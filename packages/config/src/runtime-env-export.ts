@@ -91,11 +91,6 @@ export type RuntimeEnvExportInput<TApp extends AppConfigModuleKey = AppConfigMod
   config: LoadConfigResult<TApp>;
 };
 
-export type RuntimeEnvValueFormat = RuntimeEnvExportValueFormat;
-export type RuntimeEnvProjectionEntry = RuntimeEnvExportEntry;
-export type RuntimeEnvProjectionInput<TApp extends AppConfigModuleKey = AppConfigModuleKey> =
-  RuntimeEnvExportInput<TApp>;
-
 function exportEnvDescriptors(
   prefix: readonly string[],
   descriptors: readonly LegacyEnvSurfaceDescriptor[],
@@ -261,5 +256,3 @@ export function exportServiceConfigToEnv<TApp extends AppConfigModuleKey>(
 
   return entries;
 }
-
-export const projectServiceConfigToEnv = exportServiceConfigToEnv;

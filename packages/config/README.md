@@ -19,8 +19,6 @@ The package exports these public APIs from [`src/index.ts`](./src/index.ts):
 - `loadConfig(options)`
 - `AppIds`
 - `exportServiceConfigToEnv(input)`
-- `projectServiceConfigToEnv(input)` as a compatibility alias for
-  `exportServiceConfigToEnv`
 
 ## Usage
 
