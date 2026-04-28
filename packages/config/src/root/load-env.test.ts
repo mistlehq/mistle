@@ -308,27 +308,11 @@ describe("loadRootConfigFromEnv", () => {
     });
   });
 
-  it("lets new env names override legacy env names for the same central path", () => {
+  it("ignores legacy env names", () => {
     const rootConfig = loadRootConfigFromEnv({
-      MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: "postgresql://new/mistle",
       MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://legacy/mistle",
     });
 
-    expect(rootConfig).toEqual({
-      postgres: {
-        data_plane: {
-          pooled_url: "postgresql://new/mistle",
-        },
-      },
-    });
-  });
-
-  it("rejects conflicting legacy env aliases for the same central path", () => {
-    expect(() =>
-      loadRootConfigFromEnv({
-        MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://runtime/mistle",
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: "postgresql://workflow/mistle",
-      }),
-    ).toThrow(/Conflicting env overrides for postgres\.data_plane\.pooled_url/);
+    expect(rootConfig).toEqual({});
   });
 });

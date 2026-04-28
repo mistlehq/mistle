@@ -198,23 +198,7 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("lets new google auth env override legacy google auth env", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createDashboardConfigFile(),
-      env: {
-        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "new-google-client-id",
-        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "new-google-client-secret",
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "legacy-google-client-id",
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "legacy-google-client-secret",
-      },
-    });
-
-    expect(config.authMethods).toEqual({
-      google: true,
-    });
-  });
-
-  it("derives google auth availability from legacy env-only control-plane auth config", () => {
+  it("ignores legacy google auth env config", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createDashboardConfigFile(),
       env: {
@@ -224,7 +208,7 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.authMethods).toEqual({
-      google: true,
+      google: false,
     });
   });
 
@@ -236,14 +220,6 @@ describe("loadDashboardBuildConfig", () => {
     [
       { MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret" },
       "Dashboard build config requires both MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-    ],
-    [
-      { MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id" },
-      "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-    ],
-    [
-      { MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret" },
-      "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
     ],
   ])("fails when google env config is partial: %j", (env, message) => {
     expect(() =>

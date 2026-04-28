@@ -91,23 +91,10 @@ export function parseConfigRecord(record: unknown): RootConfig {
 function loadControlPlaneMaintenanceConfigFromEnvOnly(
   env: NodeJS.ProcessEnv,
 ): ControlPlaneApiMaintenanceConfig {
-  const legacyMigrationUrl = env.MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL;
-  const resourceMigrationUrl = env.MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL;
-
-  if (
-    legacyMigrationUrl !== undefined &&
-    resourceMigrationUrl !== undefined &&
-    legacyMigrationUrl !== resourceMigrationUrl
-  ) {
-    throw new Error(
-      "Conflicting env overrides for postgres.control_plane.direct_url. MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL tried to set a different value than MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL.",
-    );
-  }
-
-  const migrationUrl = resourceMigrationUrl ?? legacyMigrationUrl;
+  const migrationUrl = env.MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL;
   if (migrationUrl === undefined) {
     throw new Error(
-      "Missing control-plane maintenance database config. Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL or MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL.",
+      "Missing control-plane maintenance database config. Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL.",
     );
   }
 
@@ -122,42 +109,12 @@ function loadControlPlaneMaintenanceConfigFromEnvOnly(
 function loadControlPlaneMaintenanceTelemetryConfigFromEnvOnly(
   env: NodeJS.ProcessEnv,
 ): ControlPlaneApiMaintenanceConfig["telemetry"] {
-  const enabled = readBooleanEnvAlias({
-    env,
-    path: "telemetry.enabled",
-    newEnvVar: "MISTLE_TELEMETRY_ENABLED",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_ENABLED",
-  });
-  const debug = readBooleanEnvAlias({
-    env,
-    path: "telemetry.debug",
-    newEnvVar: "MISTLE_TELEMETRY_DEBUG",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_DEBUG",
-  });
-  const tracesEndpoint = readStringEnvAlias({
-    env,
-    path: "telemetry.traces.endpoint",
-    newEnvVar: "MISTLE_TELEMETRY_TRACES_ENDPOINT",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
-  });
-  const logsEndpoint = readStringEnvAlias({
-    env,
-    path: "telemetry.logs.endpoint",
-    newEnvVar: "MISTLE_TELEMETRY_LOGS_ENDPOINT",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
-  });
-  const metricsEndpoint = readStringEnvAlias({
-    env,
-    path: "telemetry.metrics.endpoint",
-    newEnvVar: "MISTLE_TELEMETRY_METRICS_ENDPOINT",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
-  });
-  const resourceAttributes = readStringEnvAlias({
-    env,
-    path: "telemetry.resource_attributes",
-    newEnvVar: "MISTLE_TELEMETRY_RESOURCE_ATTRIBUTES",
-    legacyEnvVar: "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES",
-  });
+  const enabled = readBooleanEnv(env, "MISTLE_TELEMETRY_ENABLED");
+  const debug = readBooleanEnv(env, "MISTLE_TELEMETRY_DEBUG");
+  const tracesEndpoint = env.MISTLE_TELEMETRY_TRACES_ENDPOINT;
+  const logsEndpoint = env.MISTLE_TELEMETRY_LOGS_ENDPOINT;
+  const metricsEndpoint = env.MISTLE_TELEMETRY_METRICS_ENDPOINT;
+  const resourceAttributes = env.MISTLE_TELEMETRY_RESOURCE_ATTRIBUTES;
 
   return ControlPlaneApiMaintenanceConfigSchema.shape.telemetry.parse({
     enabled: enabled ?? false,
@@ -205,13 +162,8 @@ function loadControlPlaneMaintenanceTelemetryConfigFromEnvOnly(
   });
 }
 
-function readBooleanEnvAlias(input: {
-  env: NodeJS.ProcessEnv;
-  path: string;
-  newEnvVar: string;
-  legacyEnvVar: string;
-}): boolean | undefined {
-  const rawValue = readStringEnvAlias(input);
+function readBooleanEnv(env: NodeJS.ProcessEnv, envVar: string): boolean | undefined {
+  const rawValue = env[envVar];
   if (rawValue === undefined) {
     return undefined;
   }
@@ -224,25 +176,7 @@ function readBooleanEnvAlias(input: {
     return false;
   }
 
-  throw new Error(`${input.newEnvVar} must be one of: 1, true or 0, false.`);
-}
-
-function readStringEnvAlias(input: {
-  env: NodeJS.ProcessEnv;
-  path: string;
-  newEnvVar: string;
-  legacyEnvVar: string;
-}): string | undefined {
-  const newValue = input.env[input.newEnvVar];
-  const legacyValue = input.env[input.legacyEnvVar];
-
-  if (newValue !== undefined && legacyValue !== undefined && newValue !== legacyValue) {
-    throw new Error(
-      `Conflicting env overrides for ${input.path}. ${input.newEnvVar} tried to set a different value than ${input.legacyEnvVar}.`,
-    );
-  }
-
-  return newValue ?? legacyValue;
+  throw new Error(`${envVar} must be one of: 1, true or 0, false.`);
 }
 
 function selectAppConfig(

@@ -41,25 +41,6 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     });
   });
 
-  it("loads only the control-plane migration database URL from the legacy env surface", () => {
-    const loadedConfig = loadControlPlaneMaintenanceConfig({
-      env: {
-        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL:
-          "postgresql://legacy-direct.example/mistle",
-      },
-    });
-
-    expect(loadedConfig.app).toEqual({
-      database: {
-        migrationUrl: "postgresql://legacy-direct.example/mistle",
-      },
-      telemetry: {
-        enabled: false,
-        debug: false,
-      },
-    });
-  });
-
   it("loads maintenance telemetry from the new env surface", () => {
     const loadedConfig = loadControlPlaneMaintenanceConfig({
       env: {
@@ -89,33 +70,6 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     });
   });
 
-  it("loads maintenance telemetry from the legacy env surface", () => {
-    const loadedConfig = loadControlPlaneMaintenanceConfig({
-      env: {
-        MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
-        MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
-        MISTLE_GLOBAL_TELEMETRY_DEBUG: "0",
-        MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://otel.example/v1/traces",
-        MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://otel.example/v1/logs",
-        MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://otel.example/v1/metrics",
-      },
-    });
-
-    expect(loadedConfig.app.telemetry).toEqual({
-      enabled: true,
-      debug: false,
-      traces: {
-        endpoint: "http://otel.example/v1/traces",
-      },
-      logs: {
-        endpoint: "http://otel.example/v1/logs",
-      },
-      metrics: {
-        endpoint: "http://otel.example/v1/metrics",
-      },
-    });
-  });
-
   it("rejects enabled maintenance telemetry without endpoints", () => {
     expect(() =>
       loadControlPlaneMaintenanceConfig({
@@ -127,16 +81,15 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     ).toThrow(/traces/u);
   });
 
-  it("rejects conflicting maintenance database env surfaces", () => {
+  it("rejects missing maintenance database config when only legacy env is set", () => {
     expect(() =>
       loadControlPlaneMaintenanceConfig({
         env: {
-          MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: "postgresql://direct.example/mistle",
           MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL:
             "postgresql://legacy-direct.example/mistle",
         },
       }),
-    ).toThrow(/Conflicting env overrides for postgres\.control_plane\.direct_url/u);
+    ).toThrow(/Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL/u);
   });
 
   it("loads the control-plane direct database URL from central TOML resources", () => {
@@ -198,18 +151,15 @@ describe("loadConfig", () => {
     });
   });
 
-  it("rejects conflicting env-only aliases for the same central resource", () => {
+  it("rejects env-only service config when only legacy env names are set", () => {
     expect(() =>
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         includeGlobal: false,
         env: {
-          NODE_ENV: "development",
           MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://runtime.example/mistle",
-          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL:
-            "postgresql://workflow.example/mistle",
         },
       }),
-    ).toThrow(/Conflicting env overrides for postgres\.data_plane\.pooled_url/);
+    ).toThrow(/global/u);
   });
 });

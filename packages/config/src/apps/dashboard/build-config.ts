@@ -62,23 +62,6 @@ function resolveGoogleAuthConfig(
     };
   }
 
-  const legacyGoogleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
-  const legacyGoogleClientSecret =
-    environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
-
-  if (legacyGoogleClientId !== undefined || legacyGoogleClientSecret !== undefined) {
-    if (legacyGoogleClientId === undefined || legacyGoogleClientSecret === undefined) {
-      throw new Error(
-        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-      );
-    }
-
-    return {
-      clientId: legacyGoogleClientId,
-      clientSecret: legacyGoogleClientSecret,
-    };
-  }
-
   const authConfig = parsedConfig.services.control_plane_api?.auth;
   if (authConfig === undefined || !authConfig.enabled_methods.includes("google")) {
     return undefined;

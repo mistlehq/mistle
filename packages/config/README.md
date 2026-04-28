@@ -45,10 +45,8 @@ Currently supported `app` values are exposed in `AppIds`.
 `configPath` can come from either `options.configPath` or `options.env.MISTLE_CONFIG_PATH`.
 There is no implicit fallback to process env.
 
-Env overrides are still applied after TOML is loaded, so the existing
-resource-oriented `MISTLE_*` names and the compatibility `MISTLE_GLOBAL_*` /
-`MISTLE_APPS_*` env variables keep their current override behavior. When both
-surfaces target the same config key, the resource-oriented env name wins.
+Env overrides are still applied after TOML is loaded. Supported env override
+names mirror the resource-oriented TOML paths with the `MISTLE_*` prefix.
 
 `includeGlobal` defaults to `true`.
 
@@ -84,8 +82,8 @@ Use module ownership to keep config changes localized:
 - `src/apps/<app-id>/*` owns the selected service config schema.
 - `src/root/schema.ts` owns the central resource-oriented config schema.
 - `src/root/selectors.ts` owns service selectors from central resources.
-- `src/root/load-env.ts` owns resource-oriented env overrides and legacy env
-  override compatibility into the central root.
+- `src/root/load-env.ts` owns resource-oriented env overrides into the central
+  root.
 - `src/runtime-env-export.ts` owns selected service config to resource-oriented
   runtime env export.
 - `src/toml.ts` owns TOML parsing helpers only.
