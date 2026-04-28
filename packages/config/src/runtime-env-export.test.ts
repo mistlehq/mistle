@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LoadConfigResult } from "./loader.js";
 import { AppIds } from "./modules.js";
-import { projectServiceConfigToEnv } from "./runtime-env-projection.js";
+import { exportServiceConfigToEnv, projectServiceConfigToEnv } from "./runtime-env-export.js";
 import type { AppConfig } from "./schema.js";
 
 const GlobalConfig = {
@@ -61,8 +61,8 @@ const GlobalConfig = {
   },
 } satisfies AppConfig["global"];
 
-describe("projectServiceConfigToEnv", () => {
-  it("projects global and control plane API config to runtime env entries", () => {
+describe("exportServiceConfigToEnv", () => {
+  it("exports global and control plane API config to runtime env entries", () => {
     const loadedConfig = {
       global: GlobalConfig,
       app: {
@@ -144,7 +144,7 @@ describe("projectServiceConfigToEnv", () => {
       },
     } satisfies LoadConfigResult<typeof AppIds.CONTROL_PLANE_API>;
 
-    const entries = projectServiceConfigToEnv({
+    const entries = exportServiceConfigToEnv({
       app: AppIds.CONTROL_PLANE_API,
       config: loadedConfig,
     });
@@ -171,7 +171,7 @@ describe("projectServiceConfigToEnv", () => {
     });
   });
 
-  it("projects data plane worker config without undefined optional env entries", () => {
+  it("exports data plane worker config without undefined optional env entries", () => {
     const loadedConfig = {
       global: GlobalConfig,
       app: {
@@ -221,7 +221,7 @@ describe("projectServiceConfigToEnv", () => {
       },
     } satisfies LoadConfigResult<typeof AppIds.DATA_PLANE_WORKER>;
 
-    const entries = projectServiceConfigToEnv({
+    const entries = exportServiceConfigToEnv({
       app: AppIds.DATA_PLANE_WORKER,
       config: loadedConfig,
     });
@@ -275,10 +275,14 @@ describe("projectServiceConfigToEnv", () => {
     } satisfies LoadConfigResult<typeof AppIds.TOKENIZER_PROXY>;
 
     expect(() =>
-      projectServiceConfigToEnv({
+      exportServiceConfigToEnv({
         app: AppIds.TOKENIZER_PROXY,
         config: loadedConfig,
       }),
-    ).toThrow("Runtime env projection requires loadConfig output that includes global config.");
+    ).toThrow("Runtime env export requires loadConfig output that includes global config.");
+  });
+
+  it("keeps the legacy projectServiceConfigToEnv export as an alias", () => {
+    expect(projectServiceConfigToEnv).toBe(exportServiceConfigToEnv);
   });
 });
