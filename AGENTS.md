@@ -22,9 +22,10 @@
 - Read `docs/testing/no-mocking.md` before adding or changing tests.
 - Test **everything**. Tests must be rigorous. Our intent is ensuring a new person contributing to the same code base cannot break our stuff and that nothing slips by.
 - Unless the user asks otherwise, run only the tests you added or modified instead of the entire suite to avoid wasting time.
-- For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, and `pnpm test:integration -- --project <project> <file>` for the root integration runner.
+- For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, `pnpm --filter <pkg> exec vitest run -c vitest.component.config.ts <file>` for package-local component runs, and `pnpm test:integration -- --project <project> <file>` for the root integration runner.
 - In this repo, `pnpm --filter <pkg> test:integration -- <file>` does **not** reliably scope to that file. It forwards as `vitest run -c <config> -- <file>`, and Vitest treats that differently from a positional file filter. Use the direct `exec vitest ... <file>` form when you need a single-file package-level run.
 - Unit tests should be colocated / close to the source code and scoped to pure function/class/module behavior (no external dependencies)
+- Component tests should be colocated / close to the component or hook under test, named `*.component.test.ts` or `*.component.test.tsx`, and run through the package component Vitest config / `test:component` lane.
 - Integration tests should be in a dedicated integration/ folder for a given app or package.
 - System tests should be in a tests/system/ folder.
 - E2E tests should be in a tests/e2e/ folder.
@@ -40,6 +41,16 @@
 - For bug fixes, include a regression test derived from the minimized counterexample (as a property or targeted example test).
 
 ### Test Guidance
+
+**Component tests** (`*.component.test.ts` / `*.component.test.tsx`):
+
+- Test rendered UI components, React hooks, and browser/component behavior in jsdom without starting real app services.
+- Use component tests when a test imports React Testing Library, renders React, uses `renderHook`, relies on Router or QueryClient providers, exercises browser DOM behavior, or asserts React-rendered/static component markup.
+- Component tests may use real in-process component dependencies and provider setup, but they must not start databases, containers, local HTTP services, or the control plane/data plane. Tests that require those boundaries belong in integration, system, or E2E suites.
+- Component tests must follow the no-mocking policy. Assert observable UI output, DOM state, navigation behavior, or hook state through real providers and real code paths.
+- Keep component tests out of the unit lane. If a test needs jsdom, React rendering, component cleanup, QueryClient/Router provider behavior, or browser-only libraries such as CodeMirror, name it `*.component.test.ts[x]`.
+- Run package component suites with `pnpm --filter <pkg> test:component`. For targeted runs, use `pnpm --filter <pkg> exec vitest run -c vitest.component.config.ts <file>`.
+- Example: Testing that a form component renders validation errors, updates visible state after user input, or that a hook coordinates QueryClient-backed state through a real provider.
 
 **Integration tests** (`*.integration.test.ts`):
 
@@ -72,11 +83,13 @@
 
 **When to use which:**
 
+- Use **unit tests** for pure logic only: functions/classes/modules with no React rendering, browser DOM, provider runtime, network service, database, subprocess, or container dependency
+- Use **component tests** for React components, hooks, jsdom/browser behavior, Router/QueryClient provider behavior, and rendered/static component markup that does not require external services
 - Use **integration tests** when testing a single app's functionality with its dependencies
 - Use **system tests** when testing service-to-service interactions or multi-service health
 - Use **E2E tests** when testing user-facing flows that require browser interaction
 - Use **property-based tests** for pure, input-rich logic where invariants across generated inputs provide stronger coverage than a small fixed set of examples
-- If a test requires external dependencies (database, network service, subprocess/container), it is not a unit test and should be moved to integration or above
+- If a test requires external dependencies (database, network service, subprocess/container), it is not a unit or component test and should be moved to integration or above
 
 **Infrastructure with Testcontainers:**
 
