@@ -45,6 +45,11 @@
       "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
+    "test:component": {
+      "dependsOn": ["^build", "^typecheck"],
+      "passThroughEnv": ["MISTLE_*"],
+      "outputs": []
+    },
     "test:property": {
       "dependsOn": ["^build"],
       "passThroughEnv": ["MISTLE_*"],

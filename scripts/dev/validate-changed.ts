@@ -43,6 +43,7 @@ const DEFAULT_WORKSPACE_POLICY_STEPS: readonly Step[] = ["format", "lint", "type
 const TESTS_POLICY_STEPS: readonly Step[] = ["lint", "typecheck"];
 const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format", "typecheck"]);
 const AFFECTED_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard", "@mistle/ui"]);
+const AFFECTED_COMPONENT_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard"]);
 const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
   "@mistle/config",
   "@mistle/control-plane-api",
@@ -532,6 +533,9 @@ function createValidationPlan(
   if (steps.includes("typecheck")) {
     extraCommands.typecheck.push(["pnpm", "--dir", "packages/storybook", "run", "typecheck"]);
   }
+  if (steps.includes("test") && hasComponentTestLaneConfigChange(normalizedChangedFiles)) {
+    extraCommands.test.push(["pnpm", "test:component"]);
+  }
 
   return {
     changedFiles: normalizedChangedFiles,
@@ -570,6 +574,20 @@ function buildWorkspaceTurboCommand(
 
 function isTestFilePath(filePath: string): boolean {
   return filePath.endsWith(".test.ts") || filePath.endsWith(".test.tsx");
+}
+
+function hasComponentTestLaneConfigChange(changedFiles: readonly string[]): boolean {
+  return changedFiles.some(
+    (filePath) =>
+      filePath === "package.json" ||
+      filePath === "turbo.json" ||
+      filePath === "apps/dashboard/package.json" ||
+      filePath === "apps/dashboard/vitest.component.config.ts",
+  );
+}
+
+function isComponentTestFilePath(filePath: string): boolean {
+  return filePath.endsWith(".component.test.ts") || filePath.endsWith(".component.test.tsx");
 }
 
 function isIntegrationTestFilePath(filePath: string): boolean {
@@ -619,6 +637,27 @@ function buildAffectedVitestCommand(
 
   command.push("--passWithNoTests");
   command.push(...filePaths.map((filePath) => resolve(REPO_ROOT, filePath)));
+
+  return command;
+}
+
+function buildAffectedComponentVitestCommand(
+  workspacePackage: WorkspacePackage,
+  vitestCommand: "related" | "run",
+  filePaths: readonly string[],
+): string[] {
+  const command = ["pnpm", "--dir", workspacePackage.relativePath, "exec", "vitest", vitestCommand];
+
+  if (vitestCommand === "related") {
+    command.push("--run");
+  }
+
+  command.push(
+    "-c",
+    "vitest.component.config.ts",
+    "--passWithNoTests",
+    ...filePaths.map((filePath) => resolve(REPO_ROOT, filePath)),
+  );
 
   return command;
 }
@@ -686,8 +725,15 @@ function buildAffectedTestCommands(
         isIntegrationTestFilePath(filePath) &&
         AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES.has(workspacePackage.name),
     );
+    const changedComponentTestFiles = changedExistingTestFiles.filter(
+      (filePath) =>
+        isComponentTestFilePath(filePath) &&
+        AFFECTED_COMPONENT_TEST_PACKAGE_NAMES.has(workspacePackage.name),
+    );
     const changedUnitTestFiles = changedExistingTestFiles.filter(
-      (filePath) => changedIntegrationTestFiles.includes(filePath) === false,
+      (filePath) =>
+        changedIntegrationTestFiles.includes(filePath) === false &&
+        changedComponentTestFiles.includes(filePath) === false,
     );
     const relatedFiles = relevantFiles.filter(
       (filePath) => changedTestFiles.includes(filePath) === false,
@@ -707,6 +753,12 @@ function buildAffectedTestCommands(
       );
     }
 
+    if (changedComponentTestFiles.length > 0) {
+      affectedCommands.push(
+        buildAffectedComponentVitestCommand(workspacePackage, "run", changedComponentTestFiles),
+      );
+    }
+
     if (changedIntegrationTestFiles.length > 0) {
       affectedCommands.push(
         buildAffectedIntegrationVitestCommand(workspacePackage, changedIntegrationTestFiles),
@@ -715,6 +767,11 @@ function buildAffectedTestCommands(
 
     if (relatedFiles.length > 0) {
       affectedCommands.push(buildAffectedVitestCommand(workspacePackage, "related", relatedFiles));
+      if (AFFECTED_COMPONENT_TEST_PACKAGE_NAMES.has(workspacePackage.name)) {
+        affectedCommands.push(
+          buildAffectedComponentVitestCommand(workspacePackage, "related", relatedFiles),
+        );
+      }
     }
 
     if (changedTestFiles.length === 0 && relatedFiles.length === 0) {

@@ -94,8 +94,7 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
-    include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
-    exclude: ["src/**/*.component.test.ts", "src/**/*.component.test.tsx"],
+    include: ["src/**/*.component.test.ts", "src/**/*.component.test.tsx"],
     setupFiles: ["./src/test/setup-vitest.ts"],
     server: {
       deps: {

@@ -324,7 +324,7 @@ jobs:
 
   test-ts:
     name: TS Test
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -385,6 +385,68 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
+
+  test-ts-component:
+    name: TS Component Test
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    needs:
+      - changes
+    if: needs.changes.outputs.ts == 'true'
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore pnpm store cache
+        id: test-ts-component-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Turbo local cache
+        id: test-ts-component-turbo-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.test-ts-component-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Generate integration config
+        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
+
+      - name: Run TS component tests in Nix shell
+        run: nix develop --command pnpm test:component
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.test-ts-component-turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
 
   test-commit-sign:
     name: Commit Sign Test
@@ -578,6 +640,7 @@ jobs:
       - static-ts
       - static-rust
       - test-ts
+      - test-ts-component
       - test-commit-sign
       - test-sandboxd
       - sandbox-base-linux
@@ -592,6 +655,7 @@ jobs:
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
+      TS_COMPONENT_TEST_RESULT: ${{ needs.test-ts-component.result }}
       COMMIT_SIGN_TEST_RESULT: ${{ needs.test-commit-sign.result }}
       SANDBOXD_TEST_RESULT: ${{ needs.test-sandboxd.result }}
       SANDBOX_BASE_RESULT: ${{ needs.sandbox-base-linux.result }}
@@ -621,6 +685,7 @@ jobs:
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
+              os.environ["TS_COMPONENT_TEST_RESULT"],
               os.environ["COMMIT_SIGN_TEST_RESULT"],
               os.environ["SANDBOXD_TEST_RESULT"],
           ]

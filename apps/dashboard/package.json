@@ -10,6 +10,7 @@
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
+    "test:component": "vitest run -c vitest.component.config.ts --passWithNoTests",
     "test:bench": "vitest bench src/features/automations/agent-instructions-performance.bench.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
     "openapi:generate": "tsx scripts/generate-control-plane-client.ts",
