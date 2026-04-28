@@ -5,7 +5,27 @@
     "version": "0.1.0"
   },
   "components": {
-    "schemas": {},
+    "schemas": {
+      "InternalDispatchSchedulesResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["queued"]
+          },
+          "cutoffMinute": {
+            "type": "string",
+            "minLength": 1
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["status", "cutoffMinute", "idempotencyKey"],
+        "additionalProperties": false
+      }
+    },
     "parameters": {}
   },
   "paths": {
@@ -814,6 +834,56 @@
                     "code": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/schedules/dispatch": {
+      "post": {
+        "tags": ["Internal"],
+        "responses": {
+          "202": {
+            "description": "Enqueue scheduled workflow dispatch for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalDispatchSchedulesResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
                     },
                     "message": {
                       "type": "string",
