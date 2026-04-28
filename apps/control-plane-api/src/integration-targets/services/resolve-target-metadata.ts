@@ -95,6 +95,7 @@ export type ResolvedIntegrationTargetMetadata = {
           label: string;
           placeholder?: string;
           description?: string;
+          optional: boolean;
           inputType: "password" | "text" | "textarea";
           slotKey: string;
         }[];
@@ -132,27 +133,14 @@ export type ResolvedIntegrationTargetMetadata = {
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
 
-type ResolvedSetupCompletionRequirementLeaf =
-  | {
-      kind: "connection-external-subject";
-    }
-  | {
-      field: string;
-      kind: "config-field";
-    }
-  | {
-      field: string;
-      kind: "secret-field";
-    };
-
 type ResolvedSetupCompletionRequirement =
-  | ResolvedSetupCompletionRequirementLeaf
+  | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
   | {
-      anyOf: ResolvedSetupCompletionRequirementLeaf[];
+      anyOf: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
       kind: "any-of";
     }
   | {
-      allOf: ResolvedSetupCompletionRequirementLeaf[];
+      allOf: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
       kind: "all-of";
     };
 
@@ -230,7 +218,7 @@ function cloneSetupCompletionRequirement(
 
 function cloneSetupCompletionRequirementLeaf(
   requirement: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
-): ResolvedSetupCompletionRequirementLeaf {
+): IntegrationFormConnectionMethodSetupCompletionRequirementLeaf {
   if (requirement.kind === "connection-external-subject") {
     return {
       kind: requirement.kind,

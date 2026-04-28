@@ -7,7 +7,7 @@ export const SlackAppManifestBotScopes = [
   "groups:read",
   "reactions:read",
   "users:read",
-] as const;
+] satisfies readonly string[];
 
 export const SlackAppManifestBotEvents = [
   "app_mention",
@@ -15,7 +15,7 @@ export const SlackAppManifestBotEvents = [
   "message.groups",
   "reaction_added",
   "reaction_removed",
-] as const;
+] satisfies readonly string[];
 
 export const SlackAppManifestTemplate = {
   display_information: {
@@ -46,4 +46,4 @@ export const SlackAppManifestTemplate = {
       bot: SlackAppManifestBotScopes,
     },
   },
-} as const;
+} satisfies Record<string, unknown>;

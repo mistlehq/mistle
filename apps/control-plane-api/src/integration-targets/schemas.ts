@@ -32,44 +32,36 @@ const IntegrationConnectionMethodPendingUiSchema = z
   })
   .strict();
 
+const IntegrationSetupConnectionExternalSubjectRequirementSchema = z
+  .object({
+    kind: z.literal("connection-external-subject"),
+  })
+  .strict();
+
+const IntegrationSetupConfigFieldRequirementSchema = z
+  .object({
+    kind: z.literal("config-field"),
+    field: z.string().min(1),
+  })
+  .strict();
+
+const IntegrationSetupSecretFieldRequirementSchema = z
+  .object({
+    kind: z.literal("secret-field"),
+    field: z.string().min(1),
+  })
+  .strict();
+
 const IntegrationSetupCompletionRequirementLeafSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("connection-external-subject"),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("config-field"),
-      field: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("secret-field"),
-      field: z.string().min(1),
-    })
-    .strict(),
+  IntegrationSetupConnectionExternalSubjectRequirementSchema,
+  IntegrationSetupConfigFieldRequirementSchema,
+  IntegrationSetupSecretFieldRequirementSchema,
 ]);
 
 const IntegrationSetupCompletionRequirementSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("connection-external-subject"),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("config-field"),
-      field: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("secret-field"),
-      field: z.string().min(1),
-    })
-    .strict(),
+  IntegrationSetupConnectionExternalSubjectRequirementSchema,
+  IntegrationSetupConfigFieldRequirementSchema,
+  IntegrationSetupSecretFieldRequirementSchema,
   z
     .object({
       kind: z.literal("any-of"),

@@ -84,7 +84,7 @@ const GitHubExistingAppSetupRequiredFieldLabels = {
   clientSecret: "Client secret",
   appPrivateKeyPem: "App private key",
   webhookSecret: "Webhook secret",
-} as const;
+} satisfies Record<GitHubExistingAppSetupFieldKey, string>;
 
 const GitHubExistingAppSetupFieldKeys = [
   "appId",
@@ -93,13 +93,13 @@ const GitHubExistingAppSetupFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 const GitHubExistingAppSetupConfigFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 type GitHubExistingAppSetupConfigFieldKey = (typeof GitHubExistingAppSetupConfigFieldKeys)[number];
 
@@ -107,26 +107,9 @@ const GitHubExistingAppSetupSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
-
-const GitHubExistingAppSetupFieldKeysSavedWithConfigField = GitHubExistingAppSetupConfigFieldKeys;
-
-const GitHubExistingAppSetupFieldKeysSavedWithClientSecret = [
-  ...GitHubExistingAppSetupConfigFieldKeys,
-  "clientSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
-
-const GitHubExistingAppSetupFieldKeysSavedWithAppPrivateKey = [
-  ...GitHubExistingAppSetupConfigFieldKeys,
-  "appPrivateKeyPem",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
-
-const GitHubExistingAppSetupFieldKeysSavedWithWebhookSecret = [
-  ...GitHubExistingAppSetupConfigFieldKeys,
-  "webhookSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 const GitHubDraftManifest = createManifestJsonDraft(GitHubAppManifestTemplate);
 
@@ -265,19 +248,11 @@ function shouldPersistGitHubExistingAppSetupField(input: {
 function resolveGitHubExistingAppSetupSavedFieldKeys(
   fieldKey: GitHubExistingAppSetupFieldKey,
 ): ReadonlyArray<GitHubExistingAppSetupFieldKey> {
-  if (fieldKey === "clientSecret") {
-    return GitHubExistingAppSetupFieldKeysSavedWithClientSecret;
+  if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
+    return [...GitHubExistingAppSetupConfigFieldKeys, fieldKey];
   }
 
-  if (fieldKey === "appPrivateKeyPem") {
-    return GitHubExistingAppSetupFieldKeysSavedWithAppPrivateKey;
-  }
-
-  if (fieldKey === "webhookSecret") {
-    return GitHubExistingAppSetupFieldKeysSavedWithWebhookSecret;
-  }
-
-  return GitHubExistingAppSetupFieldKeysSavedWithConfigField;
+  return GitHubExistingAppSetupConfigFieldKeys;
 }
 
 function isGitHubExistingAppSetupFieldDirty(input: {

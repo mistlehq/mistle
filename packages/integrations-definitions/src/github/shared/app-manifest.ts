@@ -73,7 +73,7 @@ export const GitHubAppManifestTemplate = {
   },
   request_oauth_on_install: false,
   setup_on_update: true,
-} as const;
+} satisfies Record<string, unknown>;
 
 export function parseGitHubAppManifestConversionResponse(
   value: unknown,

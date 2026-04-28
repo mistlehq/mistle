@@ -86,6 +86,7 @@ describe("IntegrationTargetSchema", () => {
             {
               name: "botToken",
               label: "Bot token",
+              optional: true,
               inputType: "password",
             },
           ],
@@ -100,6 +101,14 @@ describe("IntegrationTargetSchema", () => {
       id: "slack-bot-token",
       kind: "form",
       createBehavior: "draft-then-setup",
+      secretFields: [
+        {
+          name: "botToken",
+          label: "Bot token",
+          optional: true,
+          inputType: "password",
+        },
+      ],
       setupFlow: {
         completionRequirements: {
           kind: "all-of",

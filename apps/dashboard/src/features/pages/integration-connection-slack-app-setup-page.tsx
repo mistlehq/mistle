@@ -73,38 +73,28 @@ type SlackExistingAppDraft = {
 };
 
 type SlackExistingAppFieldKey = keyof SlackExistingAppDraft;
-type SlackExistingAppSecretFieldKey = "botToken" | "signingSecret" | "clientSecret";
 
 const SlackExistingAppFieldKeys = [
   "clientId",
   "botToken",
   "signingSecret",
   "clientSecret",
-] as const satisfies readonly SlackExistingAppFieldKey[];
+] satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppConfigFieldKeys = ["clientId"] satisfies readonly SlackExistingAppFieldKey[];
+
+const SlackExistingAppSecretFieldKeys = [
+  "botToken",
+  "signingSecret",
+  "clientSecret",
+] satisfies readonly SlackExistingAppFieldKey[];
+
+type SlackExistingAppSecretFieldKey = (typeof SlackExistingAppSecretFieldKeys)[number];
 
 const SlackRequiredExistingAppSecretFieldKeys = [
   "botToken",
   "signingSecret",
-] as const satisfies readonly SlackExistingAppSecretFieldKey[];
-
-const SlackExistingAppFieldKeysSavedWithClientId = [
-  "clientId",
-] as const satisfies readonly SlackExistingAppFieldKey[];
-
-const SlackExistingAppFieldKeysSavedWithBotToken = [
-  "clientId",
-  "botToken",
-] as const satisfies readonly SlackExistingAppFieldKey[];
-
-const SlackExistingAppFieldKeysSavedWithSigningSecret = [
-  "clientId",
-  "signingSecret",
-] as const satisfies readonly SlackExistingAppFieldKey[];
-
-const SlackExistingAppFieldKeysSavedWithClientSecret = [
-  "clientId",
-  "clientSecret",
-] as const satisfies readonly SlackExistingAppFieldKey[];
+] satisfies readonly SlackExistingAppSecretFieldKey[];
 
 const SlackDraftManifest = createManifestJsonDraft(SlackAppManifestTemplate);
 
@@ -141,7 +131,7 @@ function resolveConfiguredSlackSecretFieldKeys(
 ): ReadonlySet<SlackExistingAppSecretFieldKey> {
   return resolveConfiguredSetupSecretFieldKeys({
     configuredSecretNames: connection.configuredSecretNames,
-    fieldKeys: ["botToken", "signingSecret", "clientSecret"],
+    fieldKeys: SlackExistingAppSecretFieldKeys,
   });
 }
 
@@ -237,19 +227,11 @@ function isSlackExistingAppRequiredSecretReady(input: {
 function resolveSlackExistingAppSetupSavedFieldKeys(
   fieldKey: SlackExistingAppFieldKey,
 ): ReadonlyArray<SlackExistingAppFieldKey> {
-  if (fieldKey === "botToken") {
-    return SlackExistingAppFieldKeysSavedWithBotToken;
+  if (isSlackExistingAppSecretFieldKey(fieldKey)) {
+    return [...SlackExistingAppConfigFieldKeys, fieldKey];
   }
 
-  if (fieldKey === "signingSecret") {
-    return SlackExistingAppFieldKeysSavedWithSigningSecret;
-  }
-
-  if (fieldKey === "clientSecret") {
-    return SlackExistingAppFieldKeysSavedWithClientSecret;
-  }
-
-  return SlackExistingAppFieldKeysSavedWithClientId;
+  return SlackExistingAppConfigFieldKeys;
 }
 
 function SlackManifestSetupPanel(input: {
