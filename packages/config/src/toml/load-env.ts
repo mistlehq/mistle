@@ -73,6 +73,15 @@ function parseArchilMountObjectStoreEnv(
   }
 }
 
+function parseArchilMountObjectStoreSelectorEnv(
+  value: string,
+  envVar: string,
+): "sandbox_storage" | undefined {
+  return parseArchilMountObjectStoreEnv(value, envVar) === undefined
+    ? undefined
+    : "sandbox_storage";
+}
+
 function valuesAreEqual(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -298,6 +307,10 @@ const RootEnvDescriptors: readonly RootEnvDescriptor[] = [
     path: ["services", "dashboard", "public_url"],
   },
   {
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
+    path: ["services", "dashboard", "control_plane_api_origin"],
+  },
+  {
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",
     path: ["postgres", "control_plane", "pooled_url"],
   },
@@ -519,6 +532,11 @@ const RootEnvDescriptors: readonly RootEnvDescriptor[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
     path: ["object_store", "sandbox_storage"],
     parse: parseArchilMountObjectStoreEnv,
+  },
+  {
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    path: ["sandbox", "storage", "archil", "mount_object_store"],
+    parse: parseArchilMountObjectStoreSelectorEnv,
   },
   {
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",

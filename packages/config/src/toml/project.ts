@@ -59,10 +59,9 @@ function buildArchilMount(config: Config): DataPlaneWorkerSandboxStorageConfig {
   };
 }
 
-function buildSandboxStorage(config: Config): DataPlaneWorkerSandboxStorageConfig {
+function buildSandboxStorage(config: Config): DataPlaneWorkerSandboxStorageConfig | undefined {
   const dockerVolumeConfig = config.sandbox.storage?.docker_volume;
-
-  return {
+  const sandboxStorage = {
     ...buildArchilMount(config),
     ...(dockerVolumeConfig === undefined
       ? {}
@@ -72,6 +71,10 @@ function buildSandboxStorage(config: Config): DataPlaneWorkerSandboxStorageConfi
           },
         }),
   };
+
+  return sandboxStorage.archil === undefined && sandboxStorage.dockerVolume === undefined
+    ? undefined
+    : sandboxStorage;
 }
 
 function projectTelemetry(config: Config): GlobalTelemetryConfig {

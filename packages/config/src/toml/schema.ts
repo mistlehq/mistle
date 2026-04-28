@@ -29,6 +29,10 @@ const ObjectStoreSchema = z
   })
   .strict();
 
+const SandboxObjectStoreSchema = ObjectStoreSchema.extend({
+  region: z.string().trim().min(1).optional(),
+}).strict();
+
 const AuthMethodSchema = z.enum(["otp", "google"]);
 
 const KvSchema = z
@@ -58,7 +62,7 @@ const ControlPlaneApiAuthSchema = z
   .object({
     secret: z.string().trim().min(1),
     trusted_origins: z.array(UrlSchema).min(1),
-    enabled_methods: z.array(AuthMethodSchema).min(1),
+    enabled_methods: z.array(AuthMethodSchema).min(1).optional(),
     otp: z
       .object({
         length: z.number().int().min(4).max(12),
@@ -76,7 +80,7 @@ const ControlPlaneApiAuthSchema = z
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (!value.enabled_methods.includes("otp")) {
+    if (value.enabled_methods !== undefined && !value.enabled_methods.includes("otp")) {
       ctx.addIssue({
         code: "custom",
         path: ["enabled_methods"],
@@ -84,7 +88,7 @@ const ControlPlaneApiAuthSchema = z
       });
     }
 
-    if (value.enabled_methods.includes("google") && value.google === undefined) {
+    if (value.enabled_methods?.includes("google") === true && value.google === undefined) {
       ctx.addIssue({
         code: "custom",
         path: ["google"],
@@ -148,10 +152,15 @@ export const ConfigSchema = z
           sandbox_ws_public_url: UrlSchema,
           sandbox_ws_internal_url: UrlSchema,
         }).strict(),
-        tokenizer_proxy: ServiceEndpointSchema.extend({
-          public_url: UrlSchema,
-          egress_url: UrlSchema,
-        }).strict(),
+        tokenizer_proxy: z
+          .object({
+            host: z.string().trim().min(1),
+            port: z.number().int().min(1).max(65535),
+            internal_url: UrlSchema.optional(),
+            public_url: UrlSchema.optional(),
+            egress_url: UrlSchema,
+          })
+          .strict(),
         control_plane_worker: z
           .object({
             workflow_concurrency: z.number().int().min(1),
@@ -196,14 +205,14 @@ export const ConfigSchema = z
       .strict(),
     kv: z
       .object({
-        control_plane: KvSchema,
+        control_plane: KvSchema.optional(),
         data_plane: KvSchema,
       })
       .strict(),
     object_store: z
       .object({
         assets: ObjectStoreSchema,
-        sandbox_storage: ObjectStoreSchema.optional(),
+        sandbox_storage: SandboxObjectStoreSchema.optional(),
       })
       .strict(),
     email: z
@@ -221,18 +230,16 @@ export const ConfigSchema = z
           .strict(),
       })
       .strict(),
-    internal_auth: z.discriminatedUnion("method", [
-      z
-        .object({
-          method: z.literal("shared_token"),
-          shared_token: z
-            .object({
-              token: z.string().trim().min(1),
-            })
-            .strict(),
-        })
-        .strict(),
-    ]),
+    internal_auth: z
+      .object({
+        method: z.literal("shared_token").optional(),
+        shared_token: z
+          .object({
+            token: z.string().trim().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
     sandbox: z
       .object({
         provider: z.enum(["docker", "e2b"]),
@@ -263,7 +270,8 @@ export const ConfigSchema = z
                   "sandbox.storage.docker_volume is required when sandbox.storage.backend is 'docker_volume'.",
               });
             }
-          }),
+          })
+          .optional(),
         tokens: z
           .object({
             connect: TokenConfigSchema,

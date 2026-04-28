@@ -154,7 +154,7 @@ const controlPlaneApiEnvConfig = {
     port: 5000,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   objectStore: {
@@ -178,7 +178,7 @@ const controlPlaneApiEnvConfig = {
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
-    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
   },
   dataPlaneApi: {
@@ -238,9 +238,9 @@ const controlPlaneApiBaseFixtureConfig = {
 
 const controlPlaneWorkerEnvConfig = {
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
-    runMigrations: true,
+    runMigrations: false,
     concurrency: 1,
   },
   email: {
@@ -284,12 +284,12 @@ const dataPlaneApiEnvConfig = {
     port: 5002,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
-    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
   },
   runtimeState: {
@@ -336,7 +336,7 @@ const dataPlaneGatewayEnvConfig = {
     port: 5003,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
   runtimeState: {
     backend: "valkey",
@@ -381,12 +381,12 @@ const dataPlaneGatewayBaseFixtureConfig = {
 
 const dataPlaneWorkerEnvConfig = {
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
-    runMigrations: true,
+    runMigrations: false,
     concurrency: 1,
   },
   runtimeState: {
@@ -448,12 +448,12 @@ const dataPlaneWorkerBaseFixtureConfig = {
 
 const dataPlaneWorkerDockerFixtureConfig = {
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "fixture-docker",
-    runMigrations: true,
+    runMigrations: false,
     concurrency: 3,
   },
   runtimeState: {
@@ -505,7 +505,7 @@ const tokenizerProxyEnvConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
-    publicBaseUrl: "https://public-control-plane.example.test",
+    publicBaseUrl: "http://127.0.0.1:5000",
   },
   internalAuth: {
     serviceToken,
@@ -889,10 +889,14 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_API,
         env: createIntegrationEnv({
+          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
           MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: undefined,
         }),
       }),
-    ).toThrow(/controlPlaneApi/i);
+    ).toThrow(/services.*control_plane_api.*internal_url/is);
   });
 
   it("loads data-plane-api from both config file and env, with env precedence", () => {
@@ -1121,12 +1125,13 @@ describe("loadConfig integrations", () => {
         env: createIntegrationEnv({
           NODE_ENV: "production",
           MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+          MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT: undefined,
         }),
       }),
-    ).toThrow(/sandbox\.docker is required when sandbox\.provider is 'docker'/);
+    ).toThrow(/sandbox\.docker/i);
   });
 
   it("rejects data-plane-worker config when control-plane API config is missing", () => {
@@ -1134,10 +1139,14 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
+          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL: undefined,
           MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: undefined,
         }),
       }),
-    ).toThrow(/controlPlaneApi/i);
+    ).toThrow(/services.*control_plane_api.*internal_url/is);
   });
 
   it("rejects data-plane-worker config when Archil storage is enabled but worker Archil config is missing", () => {
@@ -1152,7 +1161,7 @@ describe("loadConfig integrations", () => {
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
         }),
       }),
-    ).toThrow(/sandboxStorage\.archil is required when sandbox\.storage\.backend is 'archil'/);
+    ).toThrow(/sandbox\.storage\.archil is required when sandbox\.storage\.backend is 'archil'/);
   });
 
   it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {

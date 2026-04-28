@@ -3,27 +3,18 @@ import { readFileSync } from "node:fs";
 import { parse as parseToml } from "smol-toml";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
-import { PartialControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
-import { PartialControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
-import {
-  getDataPlaneApiSandboxProviderValidationIssue,
-  PartialDataPlaneApiConfigSchema,
-} from "./apps/data-plane-api/schema.js";
+import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
-import { PartialDataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import {
   getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
-  PartialDataPlaneWorkerConfigSchema,
 } from "./apps/data-plane-worker/schema.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
-import { PartialTokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { asObjectRecord } from "./core/record.js";
-import { globalConfigModule } from "./global/index.js";
 import { AppIds, type AppConfigModuleKey, type AppConfigModuleValue } from "./modules.js";
 import { type AppConfig } from "./schema.js";
 import { loadRootConfigFromEnv } from "./toml/load-env.js";
@@ -88,125 +79,6 @@ function applyRootEnvOverrides(rootConfig: RootConfig, env: NodeJS.ProcessEnv): 
 
 export function parseConfigRecord(record: unknown): RootConfig {
   return RootConfigSchema.parse(record);
-}
-
-function loadGlobalConfigFromEnv(env: NodeJS.ProcessEnv): AppConfig["global"] {
-  return globalConfigModule.schema.parse(globalConfigModule.loadEnv(env));
-}
-
-function composeTokenizerProxyConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY> {
-  const partialAppConfig = PartialTokenizerProxyConfigSchema.parse(appConfig);
-
-  return tokenizerProxyConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: {
-      serviceToken: globalConfig.internalAuth.serviceToken,
-    },
-    egressGrant: globalConfig.sandbox.egress,
-  });
-}
-
-function composeControlPlaneApiConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API> {
-  const partialAppConfig = PartialControlPlaneApiConfigSchema.parse(appConfig);
-
-  return controlPlaneApiConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: {
-      serviceToken: globalConfig.internalAuth.serviceToken,
-    },
-    connectionToken: {
-      secret: globalConfig.sandbox.connect.tokenSecret,
-      issuer: globalConfig.sandbox.connect.tokenIssuer,
-      audience: globalConfig.sandbox.connect.tokenAudience,
-    },
-    portAccess: {
-      baseDomain: globalConfig.sandbox.publish.baseDomain,
-      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
-      access: globalConfig.sandbox.publish.access,
-    },
-    sandbox: {
-      defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
-      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
-      bootstrap: globalConfig.sandbox.bootstrap,
-      storageBackend: globalConfig.sandbox.storage?.backend,
-    },
-  });
-}
-
-function composeDataPlaneGatewayConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY> {
-  const partialAppConfig = PartialDataPlaneGatewayConfigSchema.parse(appConfig);
-
-  return dataPlaneGatewayConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: globalConfig.internalAuth,
-    sandbox: globalConfig.sandbox,
-    telemetry: globalConfig.telemetry,
-  });
-}
-
-function composeControlPlaneWorkerConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER> {
-  const partialAppConfig = PartialControlPlaneWorkerConfigSchema.parse(appConfig);
-
-  return controlPlaneWorkerConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: {
-      serviceToken: globalConfig.internalAuth.serviceToken,
-    },
-  });
-}
-
-function composeDataPlaneApiConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API> {
-  const partialAppConfig = PartialDataPlaneApiConfigSchema.parse(appConfig);
-
-  return dataPlaneApiConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: {
-      serviceToken: globalConfig.internalAuth.serviceToken,
-    },
-    sandbox: {
-      ...partialAppConfig.sandbox,
-      provider: globalConfig.sandbox.provider,
-      storage: globalConfig.sandbox.storage,
-    },
-  });
-}
-
-function composeDataPlaneWorkerConfig(
-  appConfig: unknown,
-  globalConfig: AppConfig["global"],
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER> {
-  const partialAppConfig = PartialDataPlaneWorkerConfigSchema.parse(appConfig);
-
-  return dataPlaneWorkerConfigModule.schema.parse({
-    ...partialAppConfig,
-    internalAuth: {
-      serviceToken: globalConfig.internalAuth.serviceToken,
-    },
-    telemetry: globalConfig.telemetry,
-    sandbox: {
-      ...partialAppConfig.sandbox,
-      provider: globalConfig.sandbox.provider,
-      storage: globalConfig.sandbox.storage,
-      internalGatewayWsUrl: globalConfig.sandbox.internalGatewayWsUrl,
-      bootstrap: globalConfig.sandbox.bootstrap,
-      egress: globalConfig.sandbox.egress,
-    },
-  });
 }
 
 function selectAppConfig(
@@ -312,6 +184,10 @@ function loadRootConfig(configPath: string, env: NodeJS.ProcessEnv): RootConfig 
   return applyRootEnvOverrides(parseTomlRoot(configPath), env);
 }
 
+function loadRootConfigFromEnvOnly(env: NodeJS.ProcessEnv): RootConfig {
+  return RootConfigSchema.parse(loadRootConfigFromEnv(env));
+}
+
 function loadEnvOnlyConfig(
   appId: typeof AppIds.CONTROL_PLANE_API,
   env: NodeJS.ProcessEnv,
@@ -344,66 +220,13 @@ function loadEnvOnlyConfig(
   appId: AppConfigModuleKey,
   env: NodeJS.ProcessEnv,
 ): LoadConfigResult<AppConfigModuleKey> {
-  const globalConfig = loadGlobalConfigFromEnv(env);
+  const rootConfig = loadRootConfigFromEnvOnly(env);
+  validateSelectedAppConfig(appId, rootConfig);
 
-  if (appId === AppIds.CONTROL_PLANE_API) {
-    return {
-      global: globalConfig,
-      app: composeControlPlaneApiConfig(controlPlaneApiConfigModule.loadEnv(env), globalConfig),
-    };
-  }
-
-  if (appId === AppIds.CONTROL_PLANE_WORKER) {
-    return {
-      global: globalConfig,
-      app: composeControlPlaneWorkerConfig(
-        controlPlaneWorkerConfigModule.loadEnv(env),
-        globalConfig,
-      ),
-    };
-  }
-
-  if (appId === AppIds.DATA_PLANE_API) {
-    const appConfig = composeDataPlaneApiConfig(
-      dataPlaneApiConfigModule.loadEnv(env),
-      globalConfig,
-    );
-    validateDataPlaneApiConfig(appConfig);
-
-    return {
-      global: globalConfig,
-      app: appConfig,
-    };
-  }
-
-  if (appId === AppIds.DATA_PLANE_GATEWAY) {
-    return {
-      global: globalConfig,
-      app: composeDataPlaneGatewayConfig(dataPlaneGatewayConfigModule.loadEnv(env), globalConfig),
-    };
-  }
-
-  if (appId === AppIds.DATA_PLANE_WORKER) {
-    const appConfig = composeDataPlaneWorkerConfig(
-      dataPlaneWorkerConfigModule.loadEnv(env),
-      globalConfig,
-    );
-    validateDataPlaneWorkerConfig(appConfig);
-
-    return {
-      global: globalConfig,
-      app: appConfig,
-    };
-  }
-
-  if (appId === AppIds.TOKENIZER_PROXY) {
-    return {
-      global: globalConfig,
-      app: composeTokenizerProxyConfig(tokenizerProxyConfigModule.loadEnv(env), globalConfig),
-    };
-  }
-
-  throw new Error("Unsupported app id.");
+  return {
+    global: selectGlobalConfig(rootConfig),
+    app: selectAppConfig(appId, rootConfig),
+  };
 }
 
 export function loadConfig<TApp extends AppConfigModuleKey>(
