@@ -3501,7 +3501,7 @@ export interface paths {
                     path: string[];
                   }[];
                   providerEventType: string;
-                  requiredTriggerCapabilities?: (
+                  requirements?: (
                     | {
                         eventType: string;
                         /** @enum {string} */
