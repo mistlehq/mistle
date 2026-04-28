@@ -89,6 +89,7 @@ type SessionWorkbenchState = {
   };
   diffPanelState: {
     closePanel: () => void;
+    compareLabel: string;
     errorNotice: ReturnType<typeof useSessionBranchDiff>["errorNotice"];
     isLoading: boolean;
     isVisible: boolean;
@@ -332,6 +333,7 @@ export function useSessionWorkbenchController(input: {
       terminalPanelState,
       diffPanelState: {
         closePanel: diffPanelState.closePanel,
+        compareLabel: branchDiffState.compareLabel,
         errorNotice: branchDiffState.errorNotice,
         isLoading: branchDiffState.isLoading,
         isVisible: diffPanelState.isVisible,

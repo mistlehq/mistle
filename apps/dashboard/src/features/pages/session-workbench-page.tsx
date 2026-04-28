@@ -454,7 +454,7 @@ function SessionWorkbenchPageContent(input: {
           pendingComments={pendingDiffComments}
           patch={diffPanelPatch}
           repositoryPath={primaryRepositoryPath}
-          summaryLabel="Compared with main"
+          summaryLabel={workbench.diffPanelState.compareLabel}
           title="Current changes"
         />
       }

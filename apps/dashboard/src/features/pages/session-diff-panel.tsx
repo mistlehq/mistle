@@ -185,7 +185,7 @@ export function SessionDiffPanel({
       {isLoading ? (
         <div className="text-muted-foreground flex min-h-0 flex-1 items-center gap-2 p-3 text-sm">
           <Spinner aria-label="Loading changes" className="size-4" />
-          <span>Loading changes compared with main.</span>
+          <span>Loading changes.</span>
         </div>
       ) : errorNotice !== null ? (
         <div className="min-h-0 flex-1 overflow-auto p-2">

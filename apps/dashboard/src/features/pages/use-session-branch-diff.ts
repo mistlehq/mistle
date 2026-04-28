@@ -12,7 +12,7 @@ const BranchDiffCommandTimeoutMs = 15_000;
 type BranchDiffError = {
   kind:
     | "command_failed"
-    | "missing_main"
+    | "missing_default_branch"
     | "missing_merge_base"
     | "missing_session_id"
     | "not_git_repository"
@@ -27,12 +27,14 @@ type BranchDiffErrorNotice = {
 };
 
 type SessionBranchDiffState = {
+  compareLabel: string;
   errorNotice: BranchDiffErrorNotice | null;
   isLoading: boolean;
   patch: string;
 };
 
 type BranchDiffLoadResult = {
+  compareRef: string;
   patch: string;
 };
 
@@ -102,7 +104,7 @@ function isBranchDiffError(error: unknown): error is BranchDiffError {
 
 function resolveBranchDiffErrorNotice(error: BranchDiffError): BranchDiffErrorNotice {
   switch (error.kind) {
-    case "missing_main":
+    case "missing_default_branch":
     case "not_git_repository":
       return {
         message: error.message,
@@ -121,13 +123,53 @@ function resolveBranchDiffErrorNotice(error: BranchDiffError): BranchDiffErrorNo
   }
 }
 
+function formatBranchDiffCompareLabel(compareRef: string | null): string {
+  if (compareRef === null) {
+    return "Compared with default branch";
+  }
+
+  return `Compared with ${compareRef}`;
+}
+
+async function readDefaultBranchRef(input: {
+  cwd: string | null;
+  ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
+  sandboxInstanceId: string;
+}): Promise<string> {
+  const result = await runGitCommand({
+    args: ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+    cwd: input.cwd,
+    ensureTransportConnected: input.ensureTransportConnected,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  if (result.exitCode !== 0) {
+    throw createBranchDiffError({
+      kind: "missing_default_branch",
+      message:
+        "Could not resolve the default branch from `origin/HEAD`. Configure the repository's origin default branch to load changes.",
+    });
+  }
+
+  const defaultBranchRef = result.stdout.trim();
+  if (defaultBranchRef.length === 0) {
+    throw createBranchDiffError({
+      kind: "missing_default_branch",
+      message:
+        "Could not resolve the default branch from `origin/HEAD`. Configure the repository's origin default branch to load changes.",
+    });
+  }
+
+  return defaultBranchRef;
+}
+
 async function readMergeBase(input: {
+  compareRef: string;
   cwd: string | null;
   ensureTransportConnected: SessionWorkbenchTransportManager["ensureTransportConnected"];
   sandboxInstanceId: string;
 }): Promise<string> {
   const mergeBaseResult = await runGitCommand({
-    args: ["merge-base", "main", "HEAD"],
+    args: ["merge-base", input.compareRef, "HEAD"],
     cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -143,7 +185,7 @@ async function readMergeBase(input: {
   if (mergeBase.length === 0) {
     throw createBranchDiffError({
       kind: "missing_merge_base",
-      message: "Could not resolve the merge-base with `main`.",
+      message: `Could not resolve the merge-base with \`${input.compareRef}\`.`,
     });
   }
 
@@ -237,20 +279,14 @@ async function loadBranchDiff(input: {
     });
   }
 
-  const baseCheck = await runGitCommand({
-    args: ["rev-parse", "--verify", "main"],
+  const compareRef = await readDefaultBranchRef({
     cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  if (baseCheck.exitCode !== 0) {
-    throw createBranchDiffError({
-      kind: "missing_main",
-      message: "Local branch `main` does not exist.",
-    });
-  }
 
   const mergeBase = await readMergeBase({
+    compareRef,
     cwd: input.cwd,
     ensureTransportConnected: input.ensureTransportConnected,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -282,7 +318,7 @@ async function loadBranchDiff(input: {
   const patch = [trackedDiffResult.stdout, ...untrackedDiffResults.map((result) => result.stdout)]
     .filter((value) => value.length > 0)
     .join("");
-  return { patch };
+  return { compareRef, patch };
 }
 
 function normalizeBranchDiffError(error: unknown): BranchDiffErrorNotice {
@@ -294,7 +330,7 @@ function normalizeBranchDiffError(error: unknown): BranchDiffErrorNotice {
     return resolveBranchDiffErrorNotice(
       createBranchDiffError({
         kind: "timeout",
-        message: "Timed out loading changes compared with main.",
+        message: "Timed out loading changes compared with the default branch.",
       }),
     );
   }
@@ -311,7 +347,7 @@ function normalizeBranchDiffError(error: unknown): BranchDiffErrorNotice {
   return resolveBranchDiffErrorNotice(
     createBranchDiffError({
       kind: "command_failed",
-      message: "Could not load changes compared with main.",
+      message: "Could not load changes compared with the default branch.",
     }),
   );
 }
@@ -347,10 +383,16 @@ export function useSessionBranchDiff(input: {
   });
 
   return {
+    compareLabel: formatBranchDiffCompareLabel(query.data?.compareRef ?? null),
     errorNotice: query.isError ? normalizeBranchDiffError(query.error) : null,
     isLoading: query.isLoading || query.isFetching,
     patch: query.data?.patch ?? "",
   };
 }
 
-export { BranchDiffCommandTimeoutMs, normalizeBranchDiffError, resolveBranchDiffErrorNotice };
+export {
+  BranchDiffCommandTimeoutMs,
+  formatBranchDiffCompareLabel,
+  normalizeBranchDiffError,
+  resolveBranchDiffErrorNotice,
+};

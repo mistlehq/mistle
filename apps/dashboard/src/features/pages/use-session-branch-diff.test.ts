@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BranchDiffCommandTimeoutMs,
   buildBranchDiffGitExecRequest,
+  formatBranchDiffCompareLabel,
   getSessionBranchDiffQueryKey,
   normalizeBranchDiffError,
   resolveBranchDiffErrorNotice,
@@ -26,11 +27,11 @@ describe("useSessionBranchDiff helpers", () => {
   it("omits cwd when no primary repository is selected", () => {
     expect(
       buildBranchDiffGitExecRequest({
-        args: ["rev-parse", "--verify", "main"],
+        args: ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
         cwd: null,
       }),
     ).toEqual({
-      args: ["rev-parse", "--verify", "main"],
+      args: ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
       command: "git",
       timeoutMs: BranchDiffCommandTimeoutMs,
     });
@@ -58,14 +59,22 @@ describe("useSessionBranchDiff helpers", () => {
     });
   });
 
-  it("maps missing-main errors to a non-alert notice", () => {
+  it("formats the default compare label before the compare ref is known", () => {
+    expect(formatBranchDiffCompareLabel(null)).toBe("Compared with default branch");
+  });
+
+  it("formats the resolved compare ref label", () => {
+    expect(formatBranchDiffCompareLabel("origin/trunk")).toBe("Compared with origin/trunk");
+  });
+
+  it("maps missing default branch errors to a non-alert notice", () => {
     expect(
       resolveBranchDiffErrorNotice({
-        kind: "missing_main",
-        message: "Local branch `main` does not exist.",
+        kind: "missing_default_branch",
+        message: "Could not resolve the default branch from `origin/HEAD`.",
       }),
     ).toEqual({
-      message: "Local branch `main` does not exist.",
+      message: "Could not resolve the default branch from `origin/HEAD`.",
       title: "Changes unavailable",
       variant: "default",
     });
@@ -81,7 +90,7 @@ describe("useSessionBranchDiff helpers", () => {
 
   it("maps timeout failures to an alert notice", () => {
     expect(normalizeBranchDiffError(new Error("command timed out after 15000ms"))).toEqual({
-      message: "Timed out loading changes compared with main.",
+      message: "Timed out loading changes compared with the default branch.",
       title: "Could not load changes",
       variant: "alert",
     });
