@@ -5,6 +5,7 @@ Mistle is an open-source platform for running and automating sandboxed coding ag
 ## How Mistle Works
 
 - **Integrations** connect external systems and models such as GitHub, Slack, and OpenAI.
+- **Identity attribution** links users to external accounts so work can be attributed to the right person.
 - **Sandbox profiles** define the tools, permissions, and environment an agent starts with.
 - **Snapshots** capture prepared sandbox environments so sessions can start quickly with the required tools, dependencies, and configuration already in place.
 - **Sessions** start interactive agent work such as debugging, code review, and repository changes.
@@ -57,6 +58,7 @@ Mistle is built around isolated agent execution and explicit configuration.
 - **Explicit configuration:** Sandbox profiles define the tools, permissions, environment settings, and agent configuration available to each run.
 - **Separated runtime services:** Control-plane services handle configuration and orchestration, while runtime execution is delegated to data-plane and sandbox-related services.
 - **Integration boundaries:** Access to external systems is provided through configured integrations.
+- **Linked account boundaries:** Provider principals and credentials are stored separately from organization-level integration configuration.
 - **Controlled outbound access:** External requests from runtime environments flow through the tokenizer proxy, which enforces egress grants, route policy, and credential injection before forwarding traffic upstream.
 
 ## Run Mistle Locally
