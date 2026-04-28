@@ -1,7 +1,7 @@
 import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { ExecStreamClient } from "@mistle/sandbox-session-client";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   buildRepositoryDiscoveryFindArgs,
@@ -27,6 +27,13 @@ type SessionPrimaryRepositoryState = {
   refreshRepositories: () => Promise<void>;
   selectedRepositoryPath: string | null;
   setSelectedRepositoryPath: (nextValue: string | null) => void;
+};
+
+type SelectedRepositoryState = {
+  lastAutoAppliedInitialSelection: string | null | undefined;
+  sandboxInstanceId: string | null;
+  selectedRepositoryPath: string | null;
+  userSelectionTouched: boolean;
 };
 
 async function runExecCommand(input: {
@@ -85,9 +92,32 @@ export function useSessionPrimaryRepositoryState(input: {
   initialSelectedRepositoryPath?: string | null;
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
-  const lastAutoAppliedInitialSelectionRef = useRef<string | null | undefined>(undefined);
-  const userSelectionTouchedRef = useRef(false);
-  const [selectedRepositoryPath, setSelectedRepositoryPath] = useState<string | null>(null);
+  const [selectedRepositoryState, setSelectedRepositoryState] = useState<SelectedRepositoryState>(
+    () => ({
+      lastAutoAppliedInitialSelection: input.initialSelectedRepositoryPath,
+      sandboxInstanceId: input.sandboxInstanceId,
+      selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
+      userSelectionTouched: false,
+    }),
+  );
+  const currentSandboxSelectionState =
+    selectedRepositoryState.sandboxInstanceId === input.sandboxInstanceId
+      ? selectedRepositoryState
+      : {
+          lastAutoAppliedInitialSelection: undefined,
+          sandboxInstanceId: input.sandboxInstanceId,
+          selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
+          userSelectionTouched: false,
+        };
+  const shouldApplyInitialSelection =
+    input.sandboxInstanceId !== null &&
+    input.initialSelectedRepositoryPath !== undefined &&
+    !currentSandboxSelectionState.userSelectionTouched &&
+    currentSandboxSelectionState.lastAutoAppliedInitialSelection !==
+      input.initialSelectedRepositoryPath;
+  const selectedRepositoryPath = shouldApplyInitialSelection
+    ? (input.initialSelectedRepositoryPath ?? null)
+    : currentSandboxSelectionState.selectedRepositoryPath;
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null,
     queryFn: async () => {
@@ -121,35 +151,52 @@ export function useSessionPrimaryRepositoryState(input: {
   });
 
   useEffect(() => {
-    lastAutoAppliedInitialSelectionRef.current = undefined;
-    userSelectionTouchedRef.current = false;
-    setSelectedRepositoryPath(null);
-  }, [input.sandboxInstanceId]);
+    setSelectedRepositoryState((currentState) => {
+      const currentSandboxState =
+        currentState.sandboxInstanceId === input.sandboxInstanceId
+          ? currentState
+          : {
+              lastAutoAppliedInitialSelection: undefined,
+              sandboxInstanceId: input.sandboxInstanceId,
+              selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
+              userSelectionTouched: false,
+            };
+      const shouldSyncInitialSelection =
+        input.sandboxInstanceId !== null &&
+        input.initialSelectedRepositoryPath !== undefined &&
+        !currentSandboxState.userSelectionTouched &&
+        currentSandboxState.lastAutoAppliedInitialSelection !== input.initialSelectedRepositoryPath;
 
-  useEffect(() => {
-    if (input.sandboxInstanceId === null || input.initialSelectedRepositoryPath === undefined) {
-      return;
-    }
+      if (shouldSyncInitialSelection) {
+        return {
+          ...currentSandboxState,
+          lastAutoAppliedInitialSelection: input.initialSelectedRepositoryPath,
+          selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
+        };
+      }
 
-    if (userSelectionTouchedRef.current) {
-      return;
-    }
+      if (currentSandboxState === currentState) {
+        return currentState;
+      }
 
-    if (
-      lastAutoAppliedInitialSelectionRef.current === input.initialSelectedRepositoryPath ||
-      (lastAutoAppliedInitialSelectionRef.current !== undefined && selectedRepositoryPath !== null)
-    ) {
-      return;
-    }
+      return currentSandboxState;
+    });
+  }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId]);
 
-    lastAutoAppliedInitialSelectionRef.current = input.initialSelectedRepositoryPath;
-    setSelectedRepositoryPath(input.initialSelectedRepositoryPath);
-  }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId, selectedRepositoryPath]);
-
-  const handleSetSelectedRepositoryPath = useCallback((nextValue: string | null) => {
-    userSelectionTouchedRef.current = true;
-    setSelectedRepositoryPath(nextValue);
-  }, []);
+  const handleSetSelectedRepositoryPath = useCallback(
+    (nextValue: string | null) => {
+      setSelectedRepositoryState((currentState) => ({
+        lastAutoAppliedInitialSelection:
+          currentState.sandboxInstanceId === input.sandboxInstanceId
+            ? currentState.lastAutoAppliedInitialSelection
+            : input.initialSelectedRepositoryPath,
+        sandboxInstanceId: input.sandboxInstanceId,
+        selectedRepositoryPath: nextValue,
+        userSelectionTouched: true,
+      }));
+    },
+    [input.initialSelectedRepositoryPath, input.sandboxInstanceId],
+  );
 
   return {
     errorMessage: presentation.errorMessage,
