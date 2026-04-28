@@ -15,9 +15,8 @@ import {
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
+import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import { resolveIncompleteIntegrationConnectionSetupFlow } from "./integration-connection-setup-state.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -357,13 +356,8 @@ function renderSelectedConnectionSetupBody(input: {
     return undefined;
   }
 
-  if (input.setupFlow.routeSegment === "github-app") {
-    return <GitHubAppSetupPane connection={input.connection} key={input.connection.id} />;
-  }
-
-  if (input.setupFlow.routeSegment === "slack-app") {
-    return <SlackAppSetupPane connection={input.connection} key={input.connection.id} />;
-  }
-
-  throw new Error(`Unsupported integration setup route segment '${input.setupFlow.routeSegment}'.`);
+  return renderIntegrationConnectionSetupPane({
+    connection: input.connection,
+    routeSegment: input.setupFlow.routeSegment,
+  });
 }
