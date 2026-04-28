@@ -4,6 +4,7 @@ export {
   buildConvertedGitHubAppConnectionConfig,
   buildGitHubAppInstallationUrl,
   buildGitHubAppManifest,
+  buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
   parseGitHubAppManifestConversionResponse,
   type GitHubAppManifestConversion,

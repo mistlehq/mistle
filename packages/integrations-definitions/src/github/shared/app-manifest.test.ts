@@ -6,6 +6,7 @@ import {
   buildGitHubAppInstallationUrl,
   GitHubAppManifestTemplate,
   buildGitHubAppManifest,
+  buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
   parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
@@ -160,6 +161,17 @@ describe("buildGitHubAppManifestSubmissionUrl", () => {
         webBaseUrl: "https://github.example.com",
       }),
     ).toBe("https://github.example.com/organizations/Mistle-Org/settings/apps/new?state=state_123");
+  });
+});
+
+describe("buildGitHubAppManifestConversionUrl", () => {
+  it("builds the manifest conversion endpoint URL", () => {
+    expect(
+      buildGitHubAppManifestConversionUrl({
+        apiBaseUrl: "https://api.github.example.com",
+        code: "code/with spaces",
+      }),
+    ).toBe("https://api.github.example.com/app-manifests/code%2Fwith%20spaces/conversions");
   });
 });
 
