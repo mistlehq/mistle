@@ -198,12 +198,12 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("ignores legacy google auth env config", () => {
+  it("ignores unrecognized google auth env config", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createDashboardConfigFile(),
       env: {
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
+        MISTLE_UNKNOWN_GOOGLE_CLIENT_ID: "google-client-id",
+        MISTLE_UNKNOWN_GOOGLE_CLIENT_SECRET: "google-client-secret",
       },
     });
 

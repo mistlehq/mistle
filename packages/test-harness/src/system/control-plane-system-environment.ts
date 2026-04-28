@@ -112,13 +112,12 @@ export async function startControlPlaneSystemEnvironment(
       prebuiltImageName: preparedRuntime.appImages.controlPlaneApi,
       environment: {
         ...input.controlPlaneApiEnvironment,
-        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
+        MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: containerDatabaseUrl,
+        MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: containerDatabaseUrl,
+        MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: input.workflowNamespaceId,
+        MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: input.authBaseUrl,
+        MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: input.dashboardBaseUrl,
+        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
       },
     });
     cleanupTasks.unshift(async () => {
@@ -137,14 +136,12 @@ export async function startControlPlaneSystemEnvironment(
       prebuiltImageName: preparedRuntime.appImages.controlPlaneWorker,
       environment: {
         ...input.controlPlaneWorkerEnvironment,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
-        MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
-        MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
-          CONTROL_PLANE_API_CONTAINER_BASE_URL,
+        MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: containerDatabaseUrl,
+        MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: input.workflowNamespaceId,
+        MISTLE_EMAIL_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
+        MISTLE_EMAIL_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
+        MISTLE_EMAIL_SMTP_SECURE: "false",
+        MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: CONTROL_PLANE_API_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {

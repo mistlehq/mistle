@@ -10,8 +10,8 @@ const TokenizerProxyDefinition: DockerHttpAppDefinition = {
   containerPort: 5205,
   networkAlias: "tokenizer-proxy",
   healthPath: "/__healthz",
-  hostEnvVar: "MISTLE_APPS_TOKENIZER_PROXY_HOST",
-  portEnvVar: "MISTLE_APPS_TOKENIZER_PROXY_PORT",
+  hostEnvVar: "MISTLE_SERVICES_TOKENIZER_PROXY_HOST",
+  portEnvVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT",
 };
 
 export type StartTokenizerProxyInput = StartDockerHttpAppInput;

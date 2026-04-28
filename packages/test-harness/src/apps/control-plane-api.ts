@@ -10,8 +10,8 @@ const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
   containerPort: 5100,
   networkAlias: "control-plane-api",
   healthPath: "/__healthz",
-  hostEnvVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",
-  portEnvVar: "MISTLE_APPS_CONTROL_PLANE_API_PORT",
+  hostEnvVar: "MISTLE_SERVICES_CONTROL_PLANE_API_HOST",
+  portEnvVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PORT",
 };
 
 export type StartControlPlaneApiInput = StartDockerHttpAppInput;

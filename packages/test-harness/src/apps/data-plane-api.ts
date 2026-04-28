@@ -10,8 +10,8 @@ const DataPlaneApiDefinition: DockerHttpAppDefinition = {
   containerPort: 5200,
   networkAlias: "data-plane-api",
   healthPath: "/__healthz",
-  hostEnvVar: "MISTLE_APPS_DATA_PLANE_API_HOST",
-  portEnvVar: "MISTLE_APPS_DATA_PLANE_API_PORT",
+  hostEnvVar: "MISTLE_SERVICES_DATA_PLANE_API_HOST",
+  portEnvVar: "MISTLE_SERVICES_DATA_PLANE_API_PORT",
 };
 
 export type StartDataPlaneApiInput = StartDockerHttpAppInput;

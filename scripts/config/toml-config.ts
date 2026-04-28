@@ -73,30 +73,6 @@ function readRequiredEnv(environment: NodeJS.ProcessEnv, envVar: string): string
   return value;
 }
 
-function readRequiredSharedEnv(input: {
-  environment: NodeJS.ProcessEnv;
-  envVars: readonly string[];
-  label: string;
-}): string {
-  const values = input.envVars.map((envVar) => ({
-    envVar,
-    value: readRequiredEnv(input.environment, envVar),
-  }));
-  const [firstValue] = values;
-
-  if (firstValue === undefined) {
-    throw new Error(`No environment variables configured for ${input.label}.`);
-  }
-
-  for (const value of values) {
-    if (value.value !== firstValue.value) {
-      throw new Error(`${input.label} must use the same value across ${input.envVars.join(", ")}.`);
-    }
-  }
-
-  return firstValue.value;
-}
-
 function readOptionalIntegerEnv(
   environment: NodeJS.ProcessEnv,
   envVar: string,
@@ -112,6 +88,26 @@ function readOptionalIntegerEnv(
   }
 
   return parsedValue;
+}
+
+function readOptionalBooleanEnv(
+  environment: NodeJS.ProcessEnv,
+  envVar: string,
+): boolean | undefined {
+  const value = readOptionalEnv(environment, envVar);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`Invalid value for ${envVar}. Expected 'true' or 'false'.`);
 }
 
 function deleteValueAtPath(root: ConfigRecord, path: readonly string[]): ConfigRecord {
@@ -146,81 +142,23 @@ function deleteValueAtPath(root: ConfigRecord, path: readonly string[]): ConfigR
   return updatedRoot;
 }
 
-function readRequiredStringField(input: {
-  record: Record<string, unknown>;
-  field: string;
-  envVar: string;
-}): string {
-  const value = input.record[input.field];
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(
-      `Invalid value for ${input.envVar}. Expected mount field ${input.field} to be a non-empty string.`,
-    );
-  }
-
-  return value;
-}
-
-function parseSandboxObjectStoreFromArchilMounts(environment: NodeJS.ProcessEnv): ConfigRecord {
-  const rawMounts = readRequiredEnv(
-    environment,
-    "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-  );
-  const parsedMounts = JSON.parse(rawMounts);
-
-  if (!Array.isArray(parsedMounts)) {
-    throw new Error(
-      "Invalid value for MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON. Expected an array.",
-    );
-  }
-
-  if (parsedMounts.length !== 1) {
-    throw new Error(
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON must contain exactly one mount for current TOML generation.",
-    );
-  }
-
-  const [mount] = parsedMounts;
-  if (!isObjectRecord(mount)) {
-    throw new Error(
-      "Invalid value for MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON. Expected mount objects.",
-    );
-  }
-
-  const type = readRequiredStringField({
-    record: mount,
-    field: "type",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-  });
-  if (type !== "s3-compatible") {
-    throw new Error(
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON only supports s3-compatible mounts for current TOML generation.",
-    );
-  }
-
+function readSandboxObjectStoreFromEnv(environment: NodeJS.ProcessEnv): ConfigRecord {
   return {
-    bucket_name: readRequiredStringField({
-      record: mount,
-      field: "bucket",
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    }),
-    region: "us-east-1",
-    endpoint: readRequiredStringField({
-      record: mount,
-      field: "endpoint",
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    }),
-    force_path_style: true,
-    access_key_id: readRequiredStringField({
-      record: mount,
-      field: "accessKeyId",
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    }),
-    secret_access_key: readRequiredStringField({
-      record: mount,
-      field: "secretAccessKey",
-      envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    }),
+    bucket_name: readRequiredEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME"),
+    region:
+      readOptionalEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_REGION") ?? "us-east-1",
+    endpoint: readRequiredEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT"),
+    force_path_style:
+      readOptionalBooleanEnv(environment, "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE") ??
+      true,
+    access_key_id: readRequiredEnv(
+      environment,
+      "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
+    ),
+    secret_access_key: readRequiredEnv(
+      environment,
+      "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
+    ),
   };
 }
 
@@ -484,18 +422,8 @@ export function buildIntegrationTomlConfig(input: {
     return configRoot;
   }
 
-  const e2bApiKey = readRequiredSharedEnv({
-    environment: input.environment,
-    label: "E2B sandbox API key",
-    envVars: [
-      "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
-    ],
-  });
-  const e2bDomain =
-    readOptionalEnv(input.environment, "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN") ??
-    readOptionalEnv(input.environment, "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN") ??
-    "e2b.app";
+  const e2bApiKey = readRequiredEnv(input.environment, "MISTLE_SANDBOX_E2B_API_KEY");
+  const e2bDomain = readOptionalEnv(input.environment, "MISTLE_SANDBOX_E2B_DOMAIN") ?? "e2b.app";
 
   configRoot = setValueAtPath(configRoot, ["sandbox", "provider"], "e2b");
   configRoot = setValueAtPath(
@@ -506,40 +434,24 @@ export function buildIntegrationTomlConfig(input: {
   configRoot = setValueAtPath(configRoot, ["sandbox", "storage"], {
     backend: "archil",
     archil: {
-      api_key: readRequiredEnv(
-        input.environment,
-        "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
-      ),
-      region: readRequiredEnv(
-        input.environment,
-        "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
-      ),
+      api_key: readRequiredEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY"),
+      region: readRequiredEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION"),
       name_prefix:
-        readOptionalEnv(
-          input.environment,
-          "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX",
-        ) ?? "it-system-",
+        readOptionalEnv(input.environment, "MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX") ??
+        "it-system-",
       mount_object_store: "sandbox_storage",
     },
   });
   configRoot = setValueAtPath(configRoot, ["sandbox", "e2b"], {
     api_key: e2bApiKey,
     domain: e2bDomain,
-    cpu_count:
-      readOptionalIntegerEnv(
-        input.environment,
-        "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_CPU_COUNT",
-      ) ?? 4,
-    memory_mb:
-      readOptionalIntegerEnv(
-        input.environment,
-        "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB",
-      ) ?? 8192,
+    cpu_count: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_CPU_COUNT") ?? 4,
+    memory_mb: readOptionalIntegerEnv(input.environment, "MISTLE_SANDBOX_E2B_MEMORY_MB") ?? 8192,
   });
   configRoot = setValueAtPath(
     configRoot,
     ["object_store", "sandbox_storage"],
-    parseSandboxObjectStoreFromArchilMounts(input.environment),
+    readSandboxObjectStoreFromEnv(input.environment),
   );
   configRoot = setValueAtPath(
     configRoot,
@@ -570,17 +482,17 @@ export function applyTomlConfigEnvOverrides(input: {
   configRoot = upsertOptionalValueAtPath(
     configRoot,
     ["sandbox", "provider"],
-    readOptionalEnv(input.environment, "MISTLE_GLOBAL_SANDBOX_PROVIDER"),
+    readOptionalEnv(input.environment, "MISTLE_SANDBOX_PROVIDER"),
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,
     ["sandbox", "storage", "backend"],
-    readOptionalEnv(input.environment, "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND"),
+    readOptionalEnv(input.environment, "MISTLE_SANDBOX_STORAGE_BACKEND"),
   );
 
   const dataPlaneGatewayRuntimeStateUrl = readOptionalEnv(
     input.environment,
-    "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL",
+    "MISTLE_KV_DATA_PLANE_URL",
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,
@@ -590,7 +502,7 @@ export function applyTomlConfigEnvOverrides(input: {
 
   const dataPlaneGatewayRuntimeStateKeyPrefix = readOptionalEnv(
     input.environment,
-    "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX",
+    "MISTLE_KV_DATA_PLANE_KEY_PREFIX",
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,
@@ -600,7 +512,7 @@ export function applyTomlConfigEnvOverrides(input: {
 
   const controlPlaneApiDatabaseUrl = readOptionalEnv(
     input.environment,
-    "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
+    "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL",
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,
@@ -610,13 +522,13 @@ export function applyTomlConfigEnvOverrides(input: {
   configRoot = upsertOptionalValueAtPath(
     configRoot,
     ["postgres", "control_plane", "direct_url"],
-    readOptionalEnv(input.environment, "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL") ??
+    readOptionalEnv(input.environment, "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL") ??
       controlPlaneApiDatabaseUrl,
   );
 
   const dataPlaneApiDatabaseUrl = readOptionalEnv(
     input.environment,
-    "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
+    "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL",
   );
   configRoot = upsertOptionalValueAtPath(
     configRoot,
@@ -626,7 +538,7 @@ export function applyTomlConfigEnvOverrides(input: {
   configRoot = upsertOptionalValueAtPath(
     configRoot,
     ["postgres", "data_plane", "direct_url"],
-    readOptionalEnv(input.environment, "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL") ??
+    readOptionalEnv(input.environment, "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL") ??
       dataPlaneApiDatabaseUrl,
   );
 

@@ -11,9 +11,9 @@ environment overrides.
 Use [`config/config.sample.toml`](https://github.com/mistlehq/mistle/blob/main/config/config.sample.toml)
 as the complete reference for the resource-oriented TOML shape.
 
-Set `MISTLE_CONFIG_PATH` to the TOML file path used by each service. Existing
-`MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment variables still work as
-overrides after TOML is loaded.
+Set `MISTLE_CONFIG_PATH` to the TOML file path used by each service. Current
+resource-oriented `MISTLE_*` environment variables can override TOML values
+after the file is loaded.
 
 ## Deployment Shape
 
@@ -149,10 +149,9 @@ mount_object_store = "sandbox_storage"
 TOML should be the primary authored config. Environment variables are override
 inputs for deployment systems and secret managers.
 
-- keep using existing `MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment names
 - set `MISTLE_CONFIG_PATH` to the config file path
-- do not use new `MISTLE_POSTGRES_*`, `MISTLE_KV_*`, or `MISTLE_SERVICES_*`
-  environment namespaces
+- use the current resource-oriented `MISTLE_POSTGRES_*`, `MISTLE_KV_*`,
+  `MISTLE_SERVICES_*`, and related `MISTLE_*` environment namespaces
 
 Environment overrides win when both TOML and env provide the same runtime
 setting.

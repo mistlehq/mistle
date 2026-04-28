@@ -1,12 +1,12 @@
 import { spawn, spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const controlPlaneApiDir = dirname(scriptDir);
 const workspaceRoot = resolve(controlPlaneApiDir, "..", "..");
 const commitSignDir = resolve(workspaceRoot, "packages", "commit-sign");
-const commitSignBinaryPath = resolve(commitSignDir, "target", "debug", "commit-sign");
+const commitSignBinaryDir = resolve(commitSignDir, "target", "debug");
 
 function ensureCommitSignBinary(): void {
   const result = spawnSync("cargo", ["build", "--locked", "--bin", "commit-sign"], {
@@ -25,7 +25,7 @@ function runDevServer(): void {
     stdio: "inherit",
     env: {
       ...process.env,
-      MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH: commitSignBinaryPath,
+      PATH: `${commitSignBinaryDir}${delimiter}${process.env.PATH ?? ""}`,
     },
   });
 

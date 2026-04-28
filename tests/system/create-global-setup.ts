@@ -25,8 +25,7 @@ const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const INTERNAL_AUTH_SERVICE_TOKEN = "system-internal-service-token";
-const SANDBOXD_TEST_FAULTS_ENABLED_ENV =
-  "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED";
+const SANDBOXD_TEST_FAULTS_ENABLED_ENV = "MISTLE_TEST_SANDBOXD_TEST_FAULTS_ENABLED";
 const CloudflareTunnelIdEnvVar = "CLOUDFLARE_TUNNEL_ID";
 const CloudflareTunnelCredentialsJsonEnvVar = "CLOUDFLARE_TUNNEL_CREDENTIALS_JSON";
 const DataPlaneGatewayTunnelHostnameEnvVar = "DATA_PLANE_API_TUNNEL_HOSTNAME";
@@ -170,7 +169,7 @@ function resolveTokenizerProxyEnvironment(input: {
     ...(controlPlaneTunnel === undefined
       ? {}
       : {
-          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL: `https://${controlPlaneTunnel.publicHostname}`,
+          MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: `https://${controlPlaneTunnel.publicHostname}`,
         }),
   };
 }
@@ -181,12 +180,12 @@ function createTelemetryEnvironmentOverrides(input: {
   metricsEndpoint: string;
 }): Record<string, string> {
   return {
-    MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: INTERNAL_AUTH_SERVICE_TOKEN,
-    MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
-    MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
-    MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: input.tracesEndpoint,
-    MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: input.logsEndpoint,
-    MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: input.metricsEndpoint,
+    MISTLE_INTERNAL_AUTH_SHARED_TOKEN: INTERNAL_AUTH_SERVICE_TOKEN,
+    MISTLE_TELEMETRY_ENABLED: "true",
+    MISTLE_TELEMETRY_DEBUG: "false",
+    MISTLE_TELEMETRY_TRACES_ENDPOINT: input.tracesEndpoint,
+    MISTLE_TELEMETRY_LOGS_ENDPOINT: input.logsEndpoint,
+    MISTLE_TELEMETRY_METRICS_ENDPOINT: input.metricsEndpoint,
   };
 }
 

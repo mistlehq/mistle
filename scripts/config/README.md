@@ -53,6 +53,5 @@ Integration provider metadata lives under `scripts/config/presets/integration/`.
 
 - Keep generated TOML in the resource-oriented shape.
 - Keep generated comments useful for operators.
-- Keep env support limited to the existing `MISTLE_GLOBAL_*` and
-  `MISTLE_APPS_*` override names until the env surface gets its own migration.
+- Keep generated config scripts aligned with the current resource-oriented env names.
 - Keep the init command no-arg and deterministic aside from explicit generators.

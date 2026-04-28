@@ -49,7 +49,7 @@ read_env_value() {
   ' "${ENV_FILE_PATH}"
 }
 
-configured_auth_base_url="$(read_env_value "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL")"
+configured_auth_base_url="$(read_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL")"
 image_tag="$(read_env_value "MISTLE_IMAGE_TAG")"
 
 if [[ -z "${image_tag}" ]]; then
@@ -118,19 +118,19 @@ else
 fi
 
 cp "${ENV_FILE_PATH}" "${RUNTIME_ENV_PATH}"
-if grep -q '^MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=' "${RUNTIME_ENV_PATH}"; then
+if grep -q '^MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=' "${RUNTIME_ENV_PATH}"; then
   awk -v auth_base_url="${runtime_auth_base_url}" -v sandbox_base_image="${runtime_sandbox_base_image}" '
     BEGIN {
       replaced_auth_base_url = 0
       replaced_sandbox_base_image = 0
     }
-    /^MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=/ {
-      print "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=" auth_base_url
+    /^MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=/ {
+      print "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=" auth_base_url
       replaced_auth_base_url = 1
       next
     }
-    /^MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=/ {
-      print "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
+    /^MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=/ {
+      print "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
       replaced_sandbox_base_image = 1
       next
     }
@@ -139,17 +139,17 @@ if grep -q '^MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=' "${RUNTIME_ENV_PATH}"
     }
     END {
       if (replaced_auth_base_url == 0) {
-        print "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=" auth_base_url
+        print "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=" auth_base_url
       }
       if (replaced_sandbox_base_image == 0) {
-        print "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
+        print "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
       }
     }
   ' "${RUNTIME_ENV_PATH}" >"${RUNTIME_ENV_PATH}.tmp"
   mv "${RUNTIME_ENV_PATH}.tmp" "${RUNTIME_ENV_PATH}"
 else
-  printf '\nMISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL=%s\n' "${runtime_auth_base_url}" >>"${RUNTIME_ENV_PATH}"
-  printf 'MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE=%s\n' "${runtime_sandbox_base_image}" >>"${RUNTIME_ENV_PATH}"
+  printf '\nMISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=%s\n' "${runtime_auth_base_url}" >>"${RUNTIME_ENV_PATH}"
+  printf 'MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=%s\n' "${runtime_sandbox_base_image}" >>"${RUNTIME_ENV_PATH}"
 fi
 
 echo "Starting local Compose stack..."

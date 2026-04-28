@@ -81,12 +81,11 @@ describe("loadControlPlaneMaintenanceConfig", () => {
     ).toThrow(/traces/u);
   });
 
-  it("rejects missing maintenance database config when only legacy env is set", () => {
+  it("rejects missing maintenance database config when only unrecognized env is set", () => {
     expect(() =>
       loadControlPlaneMaintenanceConfig({
         env: {
-          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL:
-            "postgresql://legacy-direct.example/mistle",
+          MISTLE_UNKNOWN_CONTROL_PLANE_DIRECT_URL: "postgresql://unknown-direct.example/mistle",
         },
       }),
     ).toThrow(/Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL/u);
@@ -151,13 +150,13 @@ describe("loadConfig", () => {
     });
   });
 
-  it("rejects env-only service config when only legacy env names are set", () => {
+  it("rejects env-only service config when required resource config is incomplete", () => {
     expect(() =>
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         includeGlobal: false,
         env: {
-          MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://runtime.example/mistle",
+          MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: "postgresql://runtime.example/mistle",
         },
       }),
     ).toThrow(/global/u);

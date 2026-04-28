@@ -49,9 +49,9 @@ Most users do not need to edit `.env`.
 The main optional overrides are:
 
 - `MISTLE_IMAGE_TAG` to choose which published backend and sandbox images to pull
-- `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`
+- `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`
 
-For `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL`:
+For `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`:
 
 - leave it blank for the default quick-tunnel flow
 - set it only when you want a stable public webhook URL instead
@@ -62,7 +62,7 @@ The dashboard always stays on `http://localhost:3000`.
 
 Webhook-style integration callbacks derive from the control-plane auth/public base URL.
 
-- If `MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL` is set, `./up.sh` uses it.
+- If `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL` is set, `./up.sh` uses it.
 - If it is blank, `./up.sh` starts a Dockerized Cloudflare quick tunnel to `http://localhost:8080`.
 - The generated public URL is injected through `.generated/runtime.env` for the current run only.
 - `./down.sh` stops the stack, force-removes worker-created Docker sandbox runtime containers attached to the local sandbox network, and removes the wrapper-managed quick tunnel container and generated files.

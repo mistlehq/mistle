@@ -820,18 +820,16 @@ function readOptionalEnvVar(name: string): string | undefined {
 
 function resolveE2BConnectionOptions(): ConnectionOpts {
   const apiKey =
-    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY") ??
-    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY") ??
-    readOptionalEnvVar("E2B_API_KEY");
+    readOptionalEnvVar("MISTLE_SANDBOX_E2B_API_KEY") ?? readOptionalEnvVar("E2B_API_KEY");
   if (apiKey === undefined) {
     throw new Error(
-      "E2B_API_KEY or a provider-specific Mistle E2B API key env var is required to clean up E2B-backed system test sandboxes.",
+      "MISTLE_SANDBOX_E2B_API_KEY or E2B_API_KEY is required to clean up E2B-backed system test sandboxes.",
     );
   }
 
   const domain =
-    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN") ??
-    readOptionalEnvVar("MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN");
+    readOptionalEnvVar("MISTLE_SANDBOX_E2B_DOMAIN") ??
+    readOptionalEnvVar("MISTLE_SANDBOX_E2B_DOMAIN");
 
   return {
     apiKey,

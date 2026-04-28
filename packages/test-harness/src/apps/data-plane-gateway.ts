@@ -10,8 +10,8 @@ const DataPlaneGatewayDefinition: DockerHttpAppDefinition = {
   containerPort: 5202,
   networkAlias: "data-plane-gateway",
   healthPath: "/__healthz",
-  hostEnvVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_HOST",
-  portEnvVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_PORT",
+  hostEnvVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST",
+  portEnvVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT",
 };
 
 export type StartDataPlaneGatewayInput = StartDockerHttpAppInput;

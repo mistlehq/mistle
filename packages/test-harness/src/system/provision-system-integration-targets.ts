@@ -36,7 +36,7 @@ export function createControlPlaneIntegrationTargetsSyncCommandInput(input: {
     cwd: input.buildContextHostPath,
     env: {
       ...createConfigPathEnv(input),
-      MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: input.hostDatabaseUrl,
     },
   };
 }
@@ -52,7 +52,7 @@ export function createControlPlaneDatabaseMigrationCommandInput(input: {
     cwd: input.buildContextHostPath,
     env: {
       ...createConfigPathEnv(input),
-      MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: input.hostDatabaseUrl,
     },
   };
 }
@@ -74,8 +74,8 @@ export function createControlPlaneWorkflowMigrationCommandInput(input: {
     cwd: input.buildContextHostPath,
     env: {
       ...createConfigPathEnv(input),
-      MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: input.hostDatabaseUrl,
-      MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_MIGRATION_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: input.hostDatabaseUrl,
     },
   };
 }
@@ -91,7 +91,7 @@ export function createDataPlaneDatabaseMigrationCommandInput(input: {
     cwd: input.buildContextHostPath,
     env: {
       ...createConfigPathEnv(input),
-      MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: input.hostDatabaseUrl,
     },
   };
 }
@@ -113,8 +113,8 @@ export function createDataPlaneWorkflowMigrationCommandInput(input: {
     cwd: input.buildContextHostPath,
     env: {
       ...createConfigPathEnv(input),
-      MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: input.hostDatabaseUrl,
-      MISTLE_APPS_DATA_PLANE_API_WORKFLOW_MIGRATION_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: input.hostDatabaseUrl,
+      MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: input.hostDatabaseUrl,
     },
   };
 }

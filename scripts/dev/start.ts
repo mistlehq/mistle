@@ -126,7 +126,7 @@ function readTokenizerProxyLocalPort(configPath: string): number {
 }
 
 function readSandboxProvider(configPath: string): SandboxProvider {
-  const configuredProvider = process.env.MISTLE_GLOBAL_SANDBOX_PROVIDER?.trim();
+  const configuredProvider = process.env.MISTLE_SANDBOX_PROVIDER?.trim();
 
   if (configuredProvider === "docker" || configuredProvider === "e2b") {
     return configuredProvider;
@@ -134,7 +134,7 @@ function readSandboxProvider(configPath: string): SandboxProvider {
 
   if (configuredProvider !== undefined && configuredProvider.length > 0) {
     throw new Error(
-      `Unsupported sandbox provider '${configuredProvider}' in MISTLE_GLOBAL_SANDBOX_PROVIDER.`,
+      `Unsupported sandbox provider '${configuredProvider}' in MISTLE_SANDBOX_PROVIDER.`,
     );
   }
 
@@ -422,7 +422,7 @@ async function start(): Promise<void> {
     DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
     TOKENIZER_PROXY_TUNNEL_HOSTNAME: tokenizerProxyTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
-    MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: controlPlaneApiPublicUrl,
+    MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;

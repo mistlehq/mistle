@@ -57,9 +57,6 @@ describe("exportServiceConfigToEnv", () => {
       },
       valueFormat: "json",
     });
-    expect(entries.map((entry) => entry.name)).not.toContain(
-      "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
-    );
   });
 
   it("exports control plane worker config to resource env entries", () => {
@@ -188,9 +185,6 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
       value: "replace-with-sandbox-storage-secret-key",
     });
-    expect(entries.map((entry) => entry.name)).not.toContain(
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
-    );
   });
 
   it("exports tokenizer proxy config to resource env entries", () => {
@@ -216,9 +210,6 @@ describe("exportServiceConfigToEnv", () => {
       name: "MISTLE_SANDBOX_TOKENS_EGRESS_SECRET",
       value: "replace-with-egress-token-secret",
     });
-    expect(entries.map((entry) => entry.name)).not.toContain(
-      "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL",
-    );
   });
 
   it("requires global config to project runtime env entries", () => {

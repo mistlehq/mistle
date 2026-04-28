@@ -22,27 +22,27 @@ type RequiredConfigValue = {
 const ArchilIntegrationRequiredConfigValues = [
   {
     path: ["sandbox", "storage", "archil", "api_key"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
   },
   {
     path: ["sandbox", "storage", "archil", "region"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
+    envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
   },
   {
     path: ["object_store", "sandbox_storage", "bucket_name"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
   },
   {
     path: ["object_store", "sandbox_storage", "endpoint"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
   },
   {
     path: ["object_store", "sandbox_storage", "access_key_id"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
   },
   {
     path: ["object_store", "sandbox_storage", "secret_access_key"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
   },
 ] as const satisfies readonly RequiredConfigValue[];
 
@@ -60,11 +60,7 @@ const DOCKER_PRESET: IntegrationProviderPreset = {
 const E2B_REQUIRED_CONFIG_VALUES = [
   {
     path: ["sandbox", "e2b", "api_key"],
-    envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
-  },
-  {
-    path: ["sandbox", "e2b", "api_key"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
+    envVar: "MISTLE_SANDBOX_E2B_API_KEY",
   },
 ] as const satisfies readonly RequiredConfigValue[];
 

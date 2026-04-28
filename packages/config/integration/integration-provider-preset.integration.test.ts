@@ -54,12 +54,13 @@ describe("integration provider presets", () => {
     const configRoot = buildIntegrationTomlConfig({
       provider: IntegrationSandboxProvider.E2B,
       environment: {
-        MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "e2b-test-key",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY: "e2b-test-key",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-test-key",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON:
-          '[{"type":"s3-compatible","bucket":"sandbox-storage","endpoint":"https://storage.example.test","accessKeyId":"access-key","secretAccessKey":"secret-key"}]',
+        MISTLE_SANDBOX_E2B_API_KEY: "e2b-test-key",
+        MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: "archil-test-key",
+        MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: "gcp-us-central1",
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME: "sandbox-storage",
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT: "https://storage.example.test",
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: "access-key",
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY: "secret-key",
       },
       e2bSandboxBaseImage,
     });
@@ -104,27 +105,27 @@ describe("integration provider presets", () => {
     expect(requiredValues).toEqual([
       {
         path: ["sandbox", "storage", "archil", "api_key"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
+        envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY",
       },
       {
         path: ["sandbox", "storage", "archil", "region"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION",
+        envVar: "MISTLE_SANDBOX_STORAGE_ARCHIL_REGION",
       },
       {
         path: ["object_store", "sandbox_storage", "bucket_name"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME",
       },
       {
         path: ["object_store", "sandbox_storage", "endpoint"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT",
       },
       {
         path: ["object_store", "sandbox_storage", "access_key_id"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID",
       },
       {
         path: ["object_store", "sandbox_storage", "secret_access_key"],
-        envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+        envVar: "MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY",
       },
     ]);
   });

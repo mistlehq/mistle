@@ -28,10 +28,7 @@ import {
   buildCloudflaredTunnelConfig,
   parseCloudflaredTunnelCredentialsJson,
 } from "./cloudflared-config.js";
-import {
-  readPreparedTestHarnessRuntime,
-  SANDBOX_SNAPSHOT_REPOSITORY_PATH,
-} from "./prepared-runtime.js";
+import { readPreparedTestHarnessRuntime } from "./prepared-runtime.js";
 import {
   createControlPlaneDatabaseMigrationCommandInput,
   createControlPlaneIntegrationTargetsSyncCommandInput,
@@ -520,7 +517,6 @@ export async function startFullSystemEnvironment(
         });
       },
     );
-    const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
     const isDockerSandboxProvider = input.sandboxProvider === SystemSandboxProvider.DOCKER;
 
     const hostDatabaseUrl = sharedInfraLease.infra.postgres.directUrl;
@@ -594,15 +590,13 @@ export async function startFullSystemEnvironment(
           : {}),
         environment: {
           ...input.dataPlaneApiEnvironment,
-          MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
-          MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL:
-            DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
+          MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: containerDatabaseUrl,
+          MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: containerDatabaseUrl,
+          MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
           ...(isDockerSandboxProvider
             ? {
-                MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+                MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
               }
             : {}),
         },
@@ -626,10 +620,10 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.dataPlaneGatewayEnvironment,
-          MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
-          MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://valkey:6379",
-          MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: containerDatabaseUrl,
+          MISTLE_KV_DATA_PLANE_BACKEND: "valkey",
+          MISTLE_KV_DATA_PLANE_URL: "redis://valkey:6379",
+          MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
         },
       });
     });
@@ -654,21 +648,19 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.controlPlaneApiEnvironment,
-          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID:
-            input.controlPlaneWorkflowNamespaceId,
-          MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
-          MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: containerDatabaseUrl,
+          MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: containerDatabaseUrl,
+          MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: input.controlPlaneWorkflowNamespaceId,
+          MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: input.authBaseUrl,
+          MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: input.dashboardBaseUrl,
+          MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
+          MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
           ...(isDockerSandboxProvider
             ? {
-                MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
+                MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
               }
             : {}),
-          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: gatewayWsUrl,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: gatewayWsUrl,
         },
       });
     });
@@ -699,19 +691,13 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.controlPlaneWorkerEnvironment,
-          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID:
-            input.controlPlaneWorkflowNamespaceId,
-          MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
-          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(
-            sharedInfraLease.infra.mailpit.smtpPort,
-          ),
-          MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
-          MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL:
-            DATA_PLANE_API_CONTAINER_BASE_URL,
-          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
-            CONTROL_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: containerDatabaseUrl,
+          MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: input.controlPlaneWorkflowNamespaceId,
+          MISTLE_EMAIL_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
+          MISTLE_EMAIL_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
+          MISTLE_EMAIL_SMTP_SECURE: "false",
+          MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: CONTROL_PLANE_API_CONTAINER_BASE_URL,
         },
       });
     });
@@ -733,8 +719,7 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.tokenizerProxyEnvironment,
-          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL:
-            CONTROL_PLANE_API_CONTAINER_BASE_URL,
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: CONTROL_PLANE_API_CONTAINER_BASE_URL,
         },
       });
     });
@@ -759,27 +744,19 @@ export async function startFullSystemEnvironment(
         network,
         environment: {
           ...input.dataPlaneWorkerEnvironment,
-          MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
-          MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-          MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL:
-            DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
+          MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: containerDatabaseUrl,
+          MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: DATA_PLANE_GATEWAY_CONTAINER_BASE_URL,
           ...(isDockerSandboxProvider
             ? {
-                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
-                  sandboxSnapshotRepository,
-                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
-                MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
-                  "http://otel-lgtm:4318/v1/traces",
+                MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+                MISTLE_SANDBOX_DOCKER_NETWORK_NAME: activeNetwork.getName(),
               }
             : {}),
-          MISTLE_GLOBAL_SANDBOX_PROVIDER: input.sandboxProvider,
-          MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: gatewayWsUrl,
-          MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: gatewayWsUrl,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
-            tokenizerProxyEgressBaseUrl,
+          MISTLE_SANDBOX_PROVIDER: input.sandboxProvider,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: gatewayWsUrl,
+          MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: gatewayWsUrl,
+          MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: tokenizerProxyEgressBaseUrl,
         },
       });
     });

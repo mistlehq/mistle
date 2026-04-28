@@ -670,7 +670,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.CONTROL_PLANE_API,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
+        MISTLE_SERVICES_CONTROL_PLANE_API_HOST: "localhost",
       },
     });
 
@@ -691,7 +691,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_GATEWAY,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "https://data-plane.internal.test",
+        MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: "https://data-plane.internal.test",
       },
     });
 
@@ -710,7 +710,7 @@ describe("loadConfig integrations", () => {
         app: AppIds.CONTROL_PLANE_API,
         configPath: tomlConfigFixturePath,
         env: {
-          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_MIGRATION_URL: controlPlaneWorkflowMigrationUrl,
+          MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: controlPlaneWorkflowMigrationUrl,
         },
       }).app.workflow.migrationUrl,
     ).toBe(controlPlaneWorkflowMigrationUrl);
@@ -719,7 +719,7 @@ describe("loadConfig integrations", () => {
         app: AppIds.DATA_PLANE_API,
         configPath: tomlConfigFixturePath,
         env: {
-          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_MIGRATION_URL: dataPlaneWorkflowMigrationUrl,
+          MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: dataPlaneWorkflowMigrationUrl,
         },
       }).app.workflow.migrationUrl,
     ).toBe(dataPlaneWorkflowMigrationUrl);
@@ -730,7 +730,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_API,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "fixture-e2b-api-key",
+        MISTLE_SANDBOX_E2B_API_KEY: "fixture-e2b-api-key",
       },
     });
 
@@ -741,19 +741,6 @@ describe("loadConfig integrations", () => {
         domain: "e2b.app",
       },
     });
-  });
-
-  it("rejects conflicting existing env aliases for the same central resource", () => {
-    expect(() =>
-      loadConfig({
-        app: AppIds.DATA_PLANE_GATEWAY,
-        configPath: tomlConfigFixturePath,
-        env: {
-          MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "https://data-plane-a.test",
-          MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "https://data-plane-b.test",
-        },
-      }),
-    ).toThrow(/Conflicting env overrides for services\.data_plane_api\.internal_url/);
   });
 
   it("returns only app config for the toml config file fixture when includeGlobal is false", () => {
@@ -785,8 +772,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.CONTROL_PLANE_API,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
-        MISTLE_APPS_CONTROL_PLANE_API_PORT: "5300",
+        MISTLE_SERVICES_CONTROL_PLANE_API_HOST: "localhost",
+        MISTLE_SERVICES_CONTROL_PLANE_API_PORT: "5300",
       }),
     });
 
@@ -807,7 +794,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.CONTROL_PLANE_API,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
+        MISTLE_SERVICES_CONTROL_PLANE_API_HOST: "localhost",
       },
     });
 
@@ -866,7 +853,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.CONTROL_PLANE_WORKER,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "override",
+        MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: "override",
       },
     });
 
@@ -911,8 +898,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_API,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_API_HOST: "localhost",
-        MISTLE_APPS_DATA_PLANE_API_PORT: "5302",
+        MISTLE_SERVICES_DATA_PLANE_API_HOST: "localhost",
+        MISTLE_SERVICES_DATA_PLANE_API_PORT: "5302",
       }),
     });
 
@@ -933,11 +920,7 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_API,
         env: createIntegrationEnv({
-          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: undefined,
         }),
       }),
     ).toThrow(/services.*control_plane_api.*internal_url/is);
@@ -948,7 +931,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_API,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: "override",
+        MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "override",
       },
     });
 
@@ -993,8 +976,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_GATEWAY,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: "localhost",
-        MISTLE_APPS_DATA_PLANE_GATEWAY_PORT: "5303",
+        MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST: "localhost",
+        MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: "5303",
       }),
     });
 
@@ -1040,7 +1023,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_GATEWAY,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: "localhost",
+        MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST: "localhost",
       },
     });
 
@@ -1099,12 +1082,10 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED: "true",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
-          "http://otel-lgtm:4318/v1/traces",
+        MISTLE_SANDBOX_PROVIDER: "docker",
+        MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+        MISTLE_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
+        MISTLE_TEST_SANDBOXD_TEST_FAULTS_ENABLED: "true",
       }),
     });
 
@@ -1122,7 +1103,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED: "true",
+        MISTLE_TEST_SANDBOXD_TEST_FAULTS_ENABLED: "true",
       },
     });
 
@@ -1134,7 +1115,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "override",
+        MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: "override",
       },
     });
 
@@ -1155,8 +1136,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
+        MISTLE_SANDBOX_PROVIDER: "docker",
+        MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
       },
     });
 
@@ -1181,11 +1162,9 @@ describe("loadConfig integrations", () => {
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
           NODE_ENV: "production",
-          MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
-          MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT: undefined,
+          MISTLE_SANDBOX_PROVIDER: "docker",
+          MISTLE_SANDBOX_DOCKER_SOCKET_PATH: undefined,
+          MISTLE_SANDBOX_DOCKER_NETWORK_NAME: undefined,
         }),
       }),
     ).toThrow(/sandbox\.docker/i);
@@ -1196,11 +1175,7 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
-          MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_GATEWAY_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: undefined,
-          MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: undefined,
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: undefined,
         }),
       }),
     ).toThrow(/services.*control_plane_api.*internal_url/is);
@@ -1211,11 +1186,11 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
-          MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: "archil",
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
-          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
+          MISTLE_SANDBOX_STORAGE_BACKEND: "archil",
+          MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
+          MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
+          MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
+          MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: undefined,
         }),
       }),
     ).toThrow(/sandbox\.storage\.archil is required when sandbox\.storage\.backend is 'archil'/);
@@ -1225,12 +1200,18 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
-        MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: undefined,
+        MISTLE_SANDBOX_STORAGE_BACKEND: undefined,
+        MISTLE_SANDBOX_STORAGE_ARCHIL_API_KEY: undefined,
+        MISTLE_SANDBOX_STORAGE_ARCHIL_REGION: undefined,
+        MISTLE_SANDBOX_STORAGE_ARCHIL_NAME_PREFIX: undefined,
+        MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_BUCKET_NAME: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_REGION: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ENDPOINT: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_FORCE_PATH_STYLE: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_ACCESS_KEY_ID: undefined,
+        MISTLE_OBJECT_STORE_SANDBOX_STORAGE_SECRET_ACCESS_KEY: undefined,
+        MISTLE_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: undefined,
       }),
     });
 
@@ -1274,8 +1255,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.TOKENIZER_PROXY,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_TOKENIZER_PROXY_HOST: "localhost",
-        MISTLE_APPS_TOKENIZER_PROXY_PORT: "5306",
+        MISTLE_SERVICES_TOKENIZER_PROXY_HOST: "localhost",
+        MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "5306",
       }),
     });
 
@@ -1296,9 +1277,8 @@ describe("loadConfig integrations", () => {
       app: AppIds.TOKENIZER_PROXY,
       configPath: tomlConfigFixturePath,
       env: {
-        MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "https://control-plane.local",
-        MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL:
-          "https://public-control-plane.local",
+        MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "https://control-plane.local",
+        MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "https://public-control-plane.local",
       },
     });
 

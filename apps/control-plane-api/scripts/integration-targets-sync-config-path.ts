@@ -100,15 +100,15 @@ function loadTomlConfig(configPath: string): PartialIntegrationTargetsSyncConfig
 function loadEnvConfig(environment: NodeJS.ProcessEnv): PartialIntegrationTargetsSyncConfig {
   const normalizedEnvConfig: PartialIntegrationTargetsSyncConfig = {};
 
-  const databaseUrl = environment.MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL;
+  const databaseUrl = environment.MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL;
   if (typeof databaseUrl === "string" && databaseUrl.length > 0) {
     normalizedEnvConfig.databaseUrl = databaseUrl;
   }
 
   const activeMasterEncryptionKeyVersion =
-    environment.MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION;
+    environment.MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION;
   const masterEncryptionKeysJson =
-    environment.MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON;
+    environment.MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON;
 
   if (
     typeof activeMasterEncryptionKeyVersion === "string" &&
@@ -121,7 +121,7 @@ function loadEnvConfig(environment: NodeJS.ProcessEnv): PartialIntegrationTarget
       parsedMasterEncryptionKeys = JSON.parse(masterEncryptionKeysJson);
     } catch (error) {
       throw new Error(
-        `Invalid MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: ${
+        `Invalid MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

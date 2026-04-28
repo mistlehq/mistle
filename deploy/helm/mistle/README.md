@@ -43,24 +43,24 @@ extra env vars, without copying the entire `env` list:
 
 ```yaml
 envOverrides:
-  MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: ghcr.io/mistlehq/sandbox-base:sha256-tag
+  MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: ghcr.io/mistlehq/sandbox-base:sha256-tag
 ```
 
 `secretEnv` is a list of Kubernetes Secret references:
 
 ```yaml
 secretEnv:
-  - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+  - name: MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL
     secretName: mistle-runtime
-    secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+    secretKey: MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL
 ```
 
 Managed deployments should run app-data migrations as explicit deployment steps
 before rolling out API workloads. Keep both database URLs wired so runtime
 traffic and migration jobs can use the right connection path:
 
-- a runtime app DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_URL`)
-- a direct migration DB URL (`MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL`, `MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL`)
+- a runtime app DB URL (`MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL`, `MISTLE_POSTGRES_DATA_PLANE_POOLED_URL`)
+- a direct migration DB URL (`MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL`, `MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL`)
 
 ## Workloads
 

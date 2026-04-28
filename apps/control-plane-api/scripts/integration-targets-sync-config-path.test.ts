@@ -137,10 +137,10 @@ describe("integration-targets-sync-config-path", () => {
     try {
       const config = loadIntegrationTargetsSyncConfig({
         environment: {
-          MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL:
+          MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL:
             "postgresql://override:pass@localhost:6432/mistle",
-          MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "2",
-          MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "2",
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
             '{"2":"env-master-key"}',
         },
         scriptDirectory,

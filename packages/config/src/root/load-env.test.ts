@@ -308,9 +308,9 @@ describe("loadRootConfigFromEnv", () => {
     });
   });
 
-  it("ignores legacy env names", () => {
+  it("ignores unrecognized env names", () => {
     const rootConfig = loadRootConfigFromEnv({
-      MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: "postgresql://legacy/mistle",
+      MISTLE_UNKNOWN_DATA_PLANE_DATABASE_URL: "postgresql://unknown/mistle",
     });
 
     expect(rootConfig).toEqual({});

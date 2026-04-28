@@ -6,9 +6,9 @@ Selected service config:
 
 Values:
 
-| Key                             | Type                  | Description                                                      | Default | ENV var                                                         |
-| ------------------------------- | --------------------- | ---------------------------------------------------------------- | ------- | --------------------------------------------------------------- |
-| `server.host`                   | `string`              | Host/interface for tokenizer-proxy bind.                         | None    | `MISTLE_APPS_TOKENIZER_PROXY_HOST`                              |
-| `server.port`                   | `number` (`1..65535`) | Port for tokenizer-proxy bind.                                   | None    | `MISTLE_APPS_TOKENIZER_PROXY_PORT`                              |
-| `controlPlaneApi.baseUrl`       | `string` (URL)        | Base URL for internal control-plane credential resolution calls. | None    | `MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL`        |
-| `controlPlaneApi.publicBaseUrl` | `string` (URL)        | Public base URL for control-plane session-link redirects.        | None    | `MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL` |
+| Key                             | Type                  | Description                                                      | Default | ENV var                                          |
+| ------------------------------- | --------------------- | ---------------------------------------------------------------- | ------- | ------------------------------------------------ |
+| `server.host`                   | `string`              | Host/interface for tokenizer-proxy bind.                         | None    | `MISTLE_SERVICES_TOKENIZER_PROXY_HOST`           |
+| `server.port`                   | `number` (`1..65535`) | Port for tokenizer-proxy bind.                                   | None    | `MISTLE_SERVICES_TOKENIZER_PROXY_PORT`           |
+| `controlPlaneApi.baseUrl`       | `string` (URL)        | Base URL for internal control-plane credential resolution calls. | None    | `MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL` |
+| `controlPlaneApi.publicBaseUrl` | `string` (URL)        | Public base URL for control-plane session-link redirects.        | None    | `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL`   |

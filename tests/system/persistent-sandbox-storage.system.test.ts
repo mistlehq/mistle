@@ -141,7 +141,7 @@ function readArchilEnvironment(): {
 } {
   const apiKey = process.env.MISTLE_TEST_ARCHIL_API_KEY;
   const region =
-    process.env.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_REGION ??
+    process.env.MISTLE_SANDBOX_STORAGE_ARCHIL_REGION ??
     process.env.MISTLE_TEST_ARCHIL_REGION ??
     "gcp-us-central1";
 
@@ -160,19 +160,14 @@ function readE2BEnvironment(): {
   apiKey: string;
   domain: string | undefined;
 } {
-  const apiKey =
-    process.env.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY ??
-    process.env.MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY ??
-    process.env.E2B_API_KEY;
+  const apiKey = process.env.MISTLE_SANDBOX_E2B_API_KEY ?? process.env.E2B_API_KEY;
   if (apiKey === undefined || apiKey.trim().length === 0) {
     throw new Error(
-      "E2B_API_KEY or a provider-specific Mistle E2B API key env var is required for E2B-backed system tests.",
+      "MISTLE_SANDBOX_E2B_API_KEY or E2B_API_KEY is required for E2B-backed system tests.",
     );
   }
 
-  const domain =
-    process.env.MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_DOMAIN ??
-    process.env.MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN;
+  const domain = process.env.MISTLE_SANDBOX_E2B_DOMAIN ?? process.env.MISTLE_SANDBOX_E2B_DOMAIN;
   return {
     apiKey,
     domain: domain === undefined || domain.trim().length === 0 ? undefined : domain,
