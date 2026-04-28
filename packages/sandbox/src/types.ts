@@ -175,9 +175,15 @@ export interface SandboxInspectResult<
   readonly raw: TRaw;
 }
 
+export interface SandboxRuntimeControlRequest {
+  readonly id: string;
+  readonly payload: Uint8Array<ArrayBufferLike>;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
 export interface SandboxRuntimeControl {
-  init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
-  resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
+  init(input: SandboxRuntimeControlRequest): Promise<void>;
+  resume(input: SandboxRuntimeControlRequest): Promise<void>;
   readOperationLog(input: { id: string; operation: "init" | "resume" }): Promise<string | null>;
   close(): Promise<void>;
 }

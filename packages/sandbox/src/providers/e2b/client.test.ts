@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import {
+  createE2BDaemonCommandOptions,
   E2BStartRateLimiter,
   isTransientE2BSourceError,
   runE2BOperationWithTransientRetries,
@@ -39,6 +40,38 @@ describe("E2BStartRateLimiter", () => {
 
     expect(secondStartMs - firstStartMs).toBe(1_000);
     expect(thirdStartMs - secondStartMs).toBe(1_000);
+  });
+});
+
+describe("createE2BDaemonCommandOptions", () => {
+  it("passes sandbox runtime env to the sandboxd daemon command", () => {
+    const options = createE2BDaemonCommandOptions({
+      MISTLE_SANDBOXD_ENABLE_TEST_FAULTS: "1",
+      SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_test",
+      SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL: "http://tokenizer-proxy:8085",
+    });
+
+    expect(options).toEqual({
+      background: true,
+      envs: {
+        MISTLE_SANDBOXD_ENABLE_TEST_FAULTS: "1",
+        SANDBOX_RUNTIME_LISTEN_ADDR: "127.0.0.1:8090",
+        SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID: "sbi_test",
+        SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL: "http://tokenizer-proxy:8085",
+      },
+      timeoutMs: 0,
+      user: "root",
+    });
+  });
+
+  it("leaves daemon command env unspecified when no runtime env is provided", () => {
+    const options = createE2BDaemonCommandOptions(undefined);
+
+    expect(options).toEqual({
+      background: true,
+      timeoutMs: 0,
+      user: "root",
+    });
   });
 });
 

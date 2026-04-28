@@ -112,8 +112,8 @@ await runtimeControl.close();
 - `SandboxAdapter.inspect({ id })` returns normalized top-level lifecycle fields plus `raw`, the actual provider inspect payload, without attaching to the runtime.
 - For E2B sandboxes created by this package, the stable template alias is available in `inspection.raw.metadata.mistle_template_alias`.
 - `SandboxResumeRequestV1` resumes provider compute against existing sandbox state using a previous sandbox `id`.
-- `SandboxRuntimeControl.init({ id, payload })` delivers one fresh-start startup payload to an already-running sandbox daemon using provider-native control paths.
-- `SandboxRuntimeControl.resume({ id, payload })` reconciles a resumed sandbox daemon using provider-native control paths.
+- `SandboxRuntimeControl.init({ id, payload, env })` delivers one fresh-start startup payload to an already-running sandbox daemon using provider-native control paths.
+- `SandboxRuntimeControl.resume({ id, payload, env })` reconciles a resumed sandbox daemon using provider-native control paths.
 - `SandboxRuntimeControl.close()` releases provider client resources held by runtime control.
 - Official providers inject the required runtime env through `withRequiredSandboxRuntimeEnv(...)` instead of relying on image-level runtime env defaults.
 - E2B uses the same shared OCI base image reference but resolves provider-native templates internally.

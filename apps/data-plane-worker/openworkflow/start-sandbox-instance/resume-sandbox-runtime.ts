@@ -8,6 +8,7 @@ import {
   type SandboxStartupMode,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
+import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
 function assertUnreachable(_value: never): never {
   throw new Error("Unsupported sandbox provider for resume startup mode resolution.");
@@ -57,5 +58,9 @@ export async function resumeSandboxRuntime(
   await ctx.sandboxRuntimeControl.resume({
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
+    env: createSandboxRuntimeEnv({
+      config: ctx.config,
+      sandboxInstanceId: input.sandboxInstanceId,
+    }),
   });
 }

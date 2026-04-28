@@ -13,6 +13,7 @@ import {
   type SandboxStartupInput,
 } from "./sandbox-startup-input.js";
 import { createSigningGrant } from "./signing-grant.js";
+import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
@@ -134,5 +135,9 @@ export async function initializeSandboxRuntime(
   await ctx.sandboxRuntimeControl.init({
     id: input.providerSandboxId,
     payload: encodeSandboxStartupInput(startupInput),
+    env: createSandboxRuntimeEnv({
+      config: ctx.config,
+      sandboxInstanceId: input.sandboxInstanceId,
+    }),
   });
 }

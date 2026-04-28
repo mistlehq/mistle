@@ -3,7 +3,7 @@ import {
   SandboxProviderNotImplementedError,
   SandboxResourceNotFoundError,
 } from "../../errors.js";
-import type { SandboxRuntimeControl } from "../../types.js";
+import type { SandboxRuntimeControl, SandboxRuntimeControlRequest } from "../../types.js";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
 
@@ -28,13 +28,14 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     this.#client = client;
   }
 
-  async init(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async init(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 
     try {
       await this.#client.init({
         sandboxId: input.id,
         payload: input.payload,
+        ...(input.env === undefined ? {} : { env: input.env }),
       });
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {
@@ -45,13 +46,14 @@ export class E2BSandboxRuntimeControl implements SandboxRuntimeControl {
     }
   }
 
-  async resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
+  async resume(input: SandboxRuntimeControlRequest): Promise<void> {
     requireSandboxId(input.id);
 
     try {
       await this.#client.resume({
         sandboxId: input.id,
         payload: input.payload,
+        ...(input.env === undefined ? {} : { env: input.env }),
       });
     } catch (error) {
       if (error instanceof E2BClientError && error.code === E2BClientErrorCodes.NOT_FOUND) {

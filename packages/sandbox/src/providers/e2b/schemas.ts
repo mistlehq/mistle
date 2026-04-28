@@ -86,6 +86,14 @@ export const E2BInitRequestSchema = z
     sandboxId: z.string().trim().min(1, {
       message: "E2B request field `sandboxId` is required.",
     }),
+    env: z
+      .record(
+        z.string().trim().min(1, {
+          message: "E2B request field `env` keys must be non-empty.",
+        }),
+        z.string(),
+      )
+      .optional(),
     payload: z.custom<Uint8Array<ArrayBufferLike>>((value) => value instanceof Uint8Array, {
       message: "E2B request field `payload` must be a Uint8Array.",
     }),

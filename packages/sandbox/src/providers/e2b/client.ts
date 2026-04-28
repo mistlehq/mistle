@@ -286,6 +286,20 @@ const defaultE2BStartRateLimiter = new E2BStartRateLimiter({
   sleeper: systemSleeper,
 });
 
+export function createE2BDaemonCommandOptions(env: Readonly<Record<string, string>> | undefined): {
+  background: true;
+  envs?: Record<string, string>;
+  timeoutMs: 0;
+  user: "root";
+} {
+  return {
+    background: true,
+    ...(env === undefined ? {} : { envs: withRequiredSandboxRuntimeEnv(env) }),
+    timeoutMs: E2BCommandTimeoutDisabledMs,
+    user: "root",
+  };
+}
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #startRateLimiter: E2BStartRateLimiter;
@@ -441,7 +455,7 @@ export class E2BApiClient implements E2BClient {
         operation: E2BClientOperationIds.CONNECT_SANDBOX,
         run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
       });
-      await this.#ensureDaemonReady(sandbox);
+      await this.#ensureDaemonReady(sandbox, parsedRequest.env);
       await this.#runStartupCommand(sandbox, {
         command: InitCommand,
         payload: parsedRequest.payload,
@@ -467,7 +481,7 @@ export class E2BApiClient implements E2BClient {
         operation: E2BClientOperationIds.CONNECT_SANDBOX,
         run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
       });
-      await this.#ensureDaemonReady(sandbox);
+      await this.#ensureDaemonReady(sandbox, parsedRequest.env);
       await this.#runStartupCommand(sandbox, {
         command: ResumeCommand,
         payload: parsedRequest.payload,
@@ -552,16 +566,17 @@ export class E2BApiClient implements E2BClient {
     }
   }
 
-  async #ensureDaemonReady(sandbox: Sandbox): Promise<void> {
+  async #ensureDaemonReady(
+    sandbox: Sandbox,
+    env: Readonly<Record<string, string>> | undefined,
+  ): Promise<void> {
     if (await this.#isDaemonReady(sandbox)) {
       return;
     }
 
     try {
       const handle = await sandbox.commands.run(StartDaemonCommand, {
-        background: true,
-        timeoutMs: E2BCommandTimeoutDisabledMs,
-        user: "root",
+        ...createE2BDaemonCommandOptions(env),
       });
       const exitPromise = handle
         .wait()
