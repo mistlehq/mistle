@@ -68,8 +68,9 @@ can use separate databases for `postgres.control_plane` and `postgres.data_plane
 
 ## KV
 
-`kv.control_plane` and `kv.data_plane` describe plane-specific Valkey
-dependencies.
+`kv.data_plane` describes the data-plane Valkey dependency used by the gateway
+runtime-state layer. `kv.control_plane` is available for future control-plane
+Valkey use, but no service requires it today.
 
 Only `valkey` is supported today:
 
@@ -206,9 +207,9 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `postgres.control_plane.pooled_url`                                            | Yes                                        | Pooled control-plane Postgres URL for runtime traffic.                                    |
 | `postgres.data_plane.direct_url`                                               | Yes                                        | Direct data-plane Postgres URL for migrations.                                            |
 | `postgres.data_plane.pooled_url`                                               | Yes                                        | Pooled data-plane Postgres URL for runtime traffic.                                       |
-| `kv.control_plane.backend`                                                     | Yes                                        | Currently `valkey`.                                                                       |
-| `kv.control_plane.url`                                                         | Yes                                        | Control-plane Valkey URL.                                                                 |
-| `kv.control_plane.key_prefix`                                                  | Yes                                        | Control-plane Valkey key prefix.                                                          |
+| `kv.control_plane.backend`                                                     | No                                         | Optional control-plane Valkey backend. Currently `valkey` when set.                       |
+| `kv.control_plane.url`                                                         | Required when `kv.control_plane` is set    | Control-plane Valkey URL.                                                                 |
+| `kv.control_plane.key_prefix`                                                  | Required when `kv.control_plane` is set    | Control-plane Valkey key prefix.                                                          |
 | `kv.data_plane.backend`                                                        | Yes                                        | Currently `valkey`.                                                                       |
 | `kv.data_plane.url`                                                            | Yes                                        | Data-plane Valkey URL.                                                                    |
 | `kv.data_plane.key_prefix`                                                     | Yes                                        | Data-plane Valkey key prefix.                                                             |
@@ -219,7 +220,7 @@ This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 | `object_store.assets.access_key_id`                                            | Yes                                        | Asset object store access key.                                                            |
 | `object_store.assets.secret_access_key`                                        | Yes                                        | Asset object store secret key.                                                            |
 | `object_store.sandbox_storage.bucket_name`                                     | Required when mounted by Archil storage    | Sandbox storage object store bucket.                                                      |
-| `object_store.sandbox_storage.region`                                          | Required when mounted by Archil storage    | Sandbox storage object store region.                                                      |
+| `object_store.sandbox_storage.region`                                          | No                                         | Sandbox storage object store region; not used by the current Archil mount payload.        |
 | `object_store.sandbox_storage.endpoint`                                        | Required when mounted by Archil storage    | Sandbox storage object store endpoint.                                                    |
 | `object_store.sandbox_storage.force_path_style`                                | No                                         | S3 path-style setting.                                                                    |
 | `object_store.sandbox_storage.access_key_id`                                   | Required when mounted by Archil storage    | Sandbox storage access key.                                                               |
