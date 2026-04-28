@@ -29,6 +29,58 @@ const IntegrationConnectionMethodPendingUiSchema = z
   })
   .strict();
 
+const IntegrationSetupCompletionRequirementLeafSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("connection-external-subject"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("config-field"),
+      field: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("secret-field"),
+      field: z.string().min(1),
+    })
+    .strict(),
+]);
+
+const IntegrationSetupCompletionRequirementSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("connection-external-subject"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("config-field"),
+      field: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("secret-field"),
+      field: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("any-of"),
+      anyOf: z.array(IntegrationSetupCompletionRequirementLeafSchema).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("all-of"),
+      allOf: z.array(IntegrationSetupCompletionRequirementLeafSchema).min(1),
+    })
+    .strict(),
+]);
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -50,6 +102,7 @@ export const IntegrationTargetSchema = z
               createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
               setupFlow: z
                 .object({
+                  completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
                   routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
                 })
                 .strict()

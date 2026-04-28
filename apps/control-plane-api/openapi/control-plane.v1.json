@@ -6914,6 +6914,171 @@
                                     "setupFlow": {
                                       "type": "object",
                                       "properties": {
+                                        "completionRequirements": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["connection-external-subject"]
+                                                }
+                                              },
+                                              "required": ["kind"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["config-field"]
+                                                },
+                                                "field": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["kind", "field"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["secret-field"]
+                                                },
+                                                "field": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["kind", "field"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["any-of"]
+                                                },
+                                                "anyOf": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["secret-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  },
+                                                  "minItems": 1
+                                                }
+                                              },
+                                              "required": ["kind", "anyOf"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["all-of"]
+                                                },
+                                                "allOf": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["secret-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  },
+                                                  "minItems": 1
+                                                }
+                                              },
+                                              "required": ["kind", "allOf"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
                                         "routeSegment": {
                                           "type": "string",
                                           "pattern": "^[a-z0-9][a-z0-9-]*$"

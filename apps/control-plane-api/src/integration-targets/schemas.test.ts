@@ -67,6 +67,19 @@ describe("IntegrationTargetSchema", () => {
           kind: "form",
           createBehavior: "draft-then-setup",
           setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "botToken",
+                },
+                {
+                  kind: "secret-field",
+                  field: "signingSecret",
+                },
+              ],
+            },
             routeSegment: "slack-app",
           },
           secretFields: [
@@ -89,6 +102,19 @@ describe("IntegrationTargetSchema", () => {
       kind: "form",
       createBehavior: "draft-then-setup",
       setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "botToken",
+            },
+            {
+              kind: "secret-field",
+              field: "signingSecret",
+            },
+          ],
+        },
         routeSegment: "slack-app",
       },
     });
