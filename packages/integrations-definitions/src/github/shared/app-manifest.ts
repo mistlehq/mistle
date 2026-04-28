@@ -88,6 +88,16 @@ export function buildGitHubAppManifestSubmissionUrl(input: {
   return submissionUrl.toString();
 }
 
+export function buildGitHubAppManifestConversionUrl(input: {
+  apiBaseUrl: string;
+  code: string;
+}): string {
+  return buildUrlWithPath(
+    input.apiBaseUrl,
+    `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
+  );
+}
+
 export function buildGitHubAppInstallationUrl(input: {
   appSlug: string;
   state: string;

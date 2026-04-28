@@ -5,7 +5,6 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
@@ -13,6 +12,7 @@ import {
 } from "@mistle/integrations-core";
 import {
   buildConvertedGitHubAppConnectionConfig,
+  buildGitHubAppManifestConversionUrl,
   parseGitHubAppManifestConversionResponse as parseGitHubAppManifestConversionResponseFromDefinitions,
   type GitHubAppManifestConversion,
 } from "@mistle/integrations-definitions/server";
@@ -86,13 +86,6 @@ function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
       "Redirect state is invalid.",
     );
   }
-}
-
-function buildGitHubAppManifestConversionUrl(input: { apiBaseUrl: string; code: string }): string {
-  return buildUrlWithPath(
-    input.apiBaseUrl,
-    `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
-  );
 }
 
 export function parseGitHubAppManifestConversionResponse(
