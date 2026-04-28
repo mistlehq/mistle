@@ -102,9 +102,6 @@ impl fmt::Display for SandboxdStateError {
 impl std::error::Error for SandboxdStateError {}
 
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
-const MANAGED_RUNTIME_PATH_ENV: &str = "PATH";
-const MANAGED_RUNTIME_PATH_VALUE: &str =
-    "/opt/mistle/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
 const SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY: &str = "/run/mistle";
 const SNAPSHOT_TRUST_STORE_CERT_PATH: &str =
@@ -1114,26 +1111,20 @@ fn merge_managed_runtime_environment(
     mut runtime_env: BTreeMap<String, String>,
     egress_proxy: Option<&EgressProxy>,
 ) -> Result<BTreeMap<String, String>, String> {
-    let mut managed_env = BTreeMap::from([(
-        MANAGED_RUNTIME_PATH_ENV.to_string(),
-        MANAGED_RUNTIME_PATH_VALUE.to_string(),
-    )]);
-    if let Some(egress_proxy) = egress_proxy {
-        for (name, value) in egress_proxy.runtime_env() {
-            managed_env.insert(name.clone(), value.clone());
-        }
-    }
+    let Some(egress_proxy) = egress_proxy else {
+        return Ok(runtime_env);
+    };
 
-    for (name, value) in managed_env {
-        match runtime_env.get(&name) {
-            Some(existing_value) if existing_value != &value => {
+    for (name, value) in egress_proxy.runtime_env() {
+        match runtime_env.get(name) {
+            Some(existing_value) if existing_value != value => {
                 return Err(format!(
                     "runtime plan artifacts define managed env '{name}', which sandboxd reserves"
                 ));
             }
             Some(_) => {}
             None => {
-                runtime_env.insert(name, value);
+                runtime_env.insert(name.clone(), value.clone());
             }
         }
     }
@@ -1397,12 +1388,11 @@ mod tests {
         RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        MANAGED_RUNTIME_PATH_ENV, MANAGED_RUNTIME_PATH_VALUE, SETUP_SCRIPT_WORKING_DIRECTORY,
-        SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, apply_runtime_startup_overrides,
-        build_setup_script_environment, collect_runtime_environment,
-        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
-        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
-        spawn_runtime_readiness_projection_thread,
+        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
+        apply_runtime_startup_overrides, build_setup_script_environment,
+        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
+        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
+        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::test_support::TestEnvVarGuard;
@@ -1805,30 +1795,27 @@ supports_websockets = false
     }
 
     #[test]
-    fn merges_managed_runtime_path_into_runtime_environment() {
+    fn leaves_runtime_environment_unchanged_without_managed_entries() {
         let runtime_env = merge_managed_runtime_environment(BTreeMap::new(), None)
             .expect("managed runtime env should merge");
 
-        assert_eq!(
-            runtime_env.get(MANAGED_RUNTIME_PATH_ENV),
-            Some(&MANAGED_RUNTIME_PATH_VALUE.to_string())
-        );
+        assert!(runtime_env.is_empty());
     }
 
     #[test]
-    fn rejects_conflicting_managed_runtime_path_values() {
-        let error = merge_managed_runtime_environment(
+    fn allows_runtime_plan_to_define_path() {
+        let runtime_env = merge_managed_runtime_environment(
             BTreeMap::from([(
-                MANAGED_RUNTIME_PATH_ENV.to_string(),
+                "PATH".to_string(),
                 "/usr/local/bin:/usr/bin:/bin".to_string(),
             )]),
             None,
         )
-        .expect_err("conflicting managed path should fail fast");
+        .expect("runtime plan path should be preserved");
 
         assert_eq!(
-            error,
-            "runtime plan artifacts define managed env 'PATH', which sandboxd reserves"
+            runtime_env.get("PATH"),
+            Some(&"/usr/local/bin:/usr/bin:/bin".to_string())
         );
     }
 

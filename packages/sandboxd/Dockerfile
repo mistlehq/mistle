@@ -51,7 +51,8 @@ EOF
 RUN mkdir -p /opt/mistle/bin
 
 COPY packages/sandboxd/scripts/cmddir /opt/mistle/bin/cmddir
-RUN chmod +x /opt/mistle/bin/cmddir
+RUN chmod +x /opt/mistle/bin/cmddir \
+  && ln -sf /opt/mistle/bin/cmddir /usr/local/bin/cmddir
 
 RUN mkdir -p \
     /run/mistle \
@@ -60,7 +61,8 @@ RUN mkdir -p \
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/opt/mistle/bin/mise" sh
 
-RUN chmod +x /opt/mistle/bin/mise
+RUN chmod +x /opt/mistle/bin/mise \
+  && ln -sf /opt/mistle/bin/mise /usr/local/bin/mise
 
 WORKDIR /root
 USER root
@@ -176,7 +178,9 @@ COPY --from=nix /etc/nix /etc/nix
 COPY --from=sandboxd-build /app/packages/sandboxd/target/release/sandboxd /opt/mistle/bin/sandboxd
 
 RUN chmod +x /opt/mistle/bin/sandboxd \
-  && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign
+  && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign \
+  && ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd \
+  && ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
 
@@ -185,6 +189,8 @@ FROM sandbox-base AS sandbox-base-system-tests
 COPY --from=sandboxd-system-tests-build /app/packages/sandboxd/target/debug/sandboxd /opt/mistle/bin/sandboxd
 
 RUN chmod +x /opt/mistle/bin/sandboxd \
-  && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign
+  && ln -sf /opt/mistle/bin/sandboxd /opt/mistle/bin/mistle-ssh-sign \
+  && ln -sf /opt/mistle/bin/sandboxd /usr/local/bin/sandboxd \
+  && ln -sf /opt/mistle/bin/mistle-ssh-sign /usr/local/bin/mistle-ssh-sign
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/mistle/bin/sandboxd"]
