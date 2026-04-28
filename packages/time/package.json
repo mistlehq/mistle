@@ -29,5 +29,8 @@
     "test": "vitest run",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "croner": "^10.0.1"
   }
 }
