@@ -1,7 +1,7 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
   IntegrationConnectionMethodDefinition,
-  IntegrationWebhookEventCapabilityRequirement,
+  IntegrationWebhookTriggerRequirement,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -62,7 +62,7 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
-  requiredCapabilities?: IntegrationWebhookEventCapabilityRequirement[];
+  requiredTriggerCapabilities?: IntegrationWebhookTriggerRequirement[];
   payloadReferences?: {
     path: string[];
     description: string;
@@ -217,12 +217,14 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
-    ...(eventDefinition.requiredCapabilities === undefined
+    ...(eventDefinition.requiredTriggerCapabilities === undefined
       ? {}
       : {
-          requiredCapabilities: eventDefinition.requiredCapabilities.map((requirement) => ({
-            ...requirement,
-          })),
+          requiredTriggerCapabilities: eventDefinition.requiredTriggerCapabilities.map(
+            (requirement) => ({
+              ...requirement,
+            }),
+          ),
         }),
     ...(eventDefinition.payloadReferences === undefined
       ? {}

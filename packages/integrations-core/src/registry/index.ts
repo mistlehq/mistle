@@ -101,38 +101,39 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       );
     }
 
-    for (const requirement of supportedWebhookEvent.requiredCapabilities ?? []) {
+    for (const requirement of supportedWebhookEvent.requiredTriggerCapabilities ?? []) {
       if (requirement.label.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].label must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].label must be non-empty.",
+        );
+      }
+
+      if (requirement.kind === "provider-event" && requirement.eventType.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].eventType must be non-empty.",
         );
       }
 
       if (
-        requirement.kind === "webhook-event" &&
-        requirement.providerEventType.trim().length === 0
-      ) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].providerEventType must be non-empty.",
-        );
-      }
-
-      if (requirement.kind === "oauth-scope" && requirement.scope.trim().length === 0) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].scope must be non-empty.",
-        );
-      }
-
-      if (
-        requirement.kind === "github-app-permission" &&
+        requirement.kind === "provider-permission" &&
         requirement.permission.trim().length === 0
       ) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredCapabilities[*].permission must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].permission must be non-empty.",
+        );
+      }
+
+      if (
+        requirement.kind === "provider-permission" &&
+        requirement.access !== undefined &&
+        requirement.access.trim().length === 0
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].access must be non-empty.",
         );
       }
     }

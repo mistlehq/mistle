@@ -6807,7 +6807,7 @@
                                   "type": "string",
                                   "minLength": 1
                                 },
-                                "requiredCapabilities": {
+                                "requiredTriggerCapabilities": {
                                   "type": "array",
                                   "items": {
                                     "oneOf": [
@@ -6816,9 +6816,9 @@
                                         "properties": {
                                           "kind": {
                                             "type": "string",
-                                            "enum": ["webhook-event"]
+                                            "enum": ["provider-event"]
                                           },
-                                          "providerEventType": {
+                                          "eventType": {
                                             "type": "string",
                                             "minLength": 1
                                           },
@@ -6827,7 +6827,7 @@
                                             "minLength": 1
                                           }
                                         },
-                                        "required": ["kind", "providerEventType", "label"],
+                                        "required": ["kind", "eventType", "label"],
                                         "additionalProperties": false
                                       },
                                       {
@@ -6835,26 +6835,7 @@
                                         "properties": {
                                           "kind": {
                                             "type": "string",
-                                            "enum": ["oauth-scope"]
-                                          },
-                                          "scope": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "label": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          }
-                                        },
-                                        "required": ["kind", "scope", "label"],
-                                        "additionalProperties": false
-                                      },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["github-app-permission"]
+                                            "enum": ["provider-permission"]
                                           },
                                           "permission": {
                                             "type": "string",
@@ -6862,14 +6843,14 @@
                                           },
                                           "access": {
                                             "type": "string",
-                                            "enum": ["read", "write", "admin"]
+                                            "minLength": 1
                                           },
                                           "label": {
                                             "type": "string",
                                             "minLength": 1
                                           }
                                         },
-                                        "required": ["kind", "permission", "access", "label"],
+                                        "required": ["kind", "permission", "label"],
                                         "additionalProperties": false
                                       }
                                     ]

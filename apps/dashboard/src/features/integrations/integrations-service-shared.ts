@@ -29,26 +29,19 @@ const IntegrationConnectionMethodPendingUiSchema = z
   })
   .strict();
 
-const IntegrationWebhookEventCapabilityRequirementSchema = z.discriminatedUnion("kind", [
+const IntegrationWebhookTriggerRequirementSchema = z.discriminatedUnion("kind", [
   z
     .object({
-      kind: z.literal("webhook-event"),
-      providerEventType: z.string().min(1),
+      kind: z.literal("provider-event"),
+      eventType: z.string().min(1),
       label: z.string().min(1),
     })
     .strict(),
   z
     .object({
-      kind: z.literal("oauth-scope"),
-      scope: z.string().min(1),
-      label: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("github-app-permission"),
+      kind: z.literal("provider-permission"),
       permission: z.string().min(1),
-      access: z.enum(["read", "write", "admin"]),
+      access: z.string().min(1).optional(),
       label: z.string().min(1),
     })
     .strict(),
@@ -133,8 +126,8 @@ export const IntegrationTargetSchema = z
             providerEventType: z.string().min(1),
             displayName: z.string().min(1),
             category: z.string().min(1).optional(),
-            requiredCapabilities: z
-              .array(IntegrationWebhookEventCapabilityRequirementSchema)
+            requiredTriggerCapabilities: z
+              .array(IntegrationWebhookTriggerRequirementSchema)
               .optional(),
             payloadReferences: z
               .array(

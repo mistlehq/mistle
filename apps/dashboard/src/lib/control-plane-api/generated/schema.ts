@@ -3779,24 +3779,17 @@ export interface paths {
                     path: string[];
                   }[];
                   providerEventType: string;
-                  requiredCapabilities?: (
+                  requiredTriggerCapabilities?: (
                     | {
+                        eventType: string;
                         /** @enum {string} */
-                        kind: "webhook-event";
+                        kind: "provider-event";
                         label: string;
-                        providerEventType: string;
                       }
                     | {
+                        access?: string;
                         /** @enum {string} */
-                        kind: "oauth-scope";
-                        label: string;
-                        scope: string;
-                      }
-                    | {
-                        /** @enum {string} */
-                        access: "read" | "write" | "admin";
-                        /** @enum {string} */
-                        kind: "github-app-permission";
+                        kind: "provider-permission";
                         label: string;
                         permission: string;
                       }
