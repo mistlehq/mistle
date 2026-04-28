@@ -16,6 +16,10 @@ import type {
   WebhookAutomationEventOption,
   WebhookAutomationEventOptionAvailability,
 } from "./webhook-automation-trigger-types.js";
+import {
+  isWebhookTriggerSupportedByCapabilities,
+  parseWebhookTriggerCapabilitiesProviderMetadata,
+} from "./webhook-trigger-capability-matcher.js";
 
 export const WebhookAutomationWorkspaceRootRepositoryOptionValue = "__workspace_root__";
 
@@ -362,7 +366,20 @@ function buildSelectableWebhookAutomationEventOptions(input: {
     }
 
     for (const source of connectionWebhookSources) {
+      const webhookTriggerCapabilities = parseWebhookTriggerCapabilitiesProviderMetadata(
+        source.providerMetadata,
+      );
+
       for (const eventDefinition of target.supportedWebhookEvents ?? []) {
+        if (
+          !isWebhookTriggerSupportedByCapabilities({
+            capabilities: webhookTriggerCapabilities,
+            requirements: eventDefinition.requirements,
+          })
+        ) {
+          continue;
+        }
+
         supportedEventOptions.push(
           createWebhookAutomationEventOption({
             eventDefinition,

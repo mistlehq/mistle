@@ -356,6 +356,9 @@ export async function startProviderAppSetup(
       ...(startedSetup.connection === undefined
         ? {}
         : { connectionUpdate: startedSetup.connection }),
+      ...(startedSetup.webhookSource === undefined
+        ? {}
+        : { webhookSourceUpdate: startedSetup.webhookSource }),
     });
   }
 
@@ -516,6 +519,9 @@ export async function completeProviderAppSetup(
     definition,
     parsedSecrets,
     ...(setupResult.connection === undefined ? {} : { connectionUpdate: setupResult.connection }),
+    ...(setupResult.webhookSource === undefined
+      ? {}
+      : { webhookSourceUpdate: setupResult.webhookSource }),
     redirectSession,
   });
 

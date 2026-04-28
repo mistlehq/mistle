@@ -3,6 +3,7 @@ import {
   integrationConnectionRedirectSessions,
   integrationConnections,
   integrationCredentials,
+  integrationWebhookSources,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
@@ -52,6 +53,9 @@ export async function persistProviderAppSetupResult(input: {
   connectionUpdate?: IntegrationProviderAppSetupConnectionUpdate;
   redirectSession?: {
     id: string;
+  };
+  webhookSourceUpdate?: {
+    providerMetadata?: Record<string, unknown>;
   };
 }): Promise<SetupPersistenceResult> {
   const organizationCredentialKey =
@@ -178,7 +182,7 @@ export async function persistProviderAppSetupResult(input: {
       }
 
       const webhookSourceCapability = input.definition.webhookSource;
-      if (
+      const supportsImplicitWebhookSource =
         webhookSourceCapability !== undefined &&
         webhookSourceCapability.lifecycle === IntegrationWebhookSourceLifecycles.IMPLICIT &&
         ((await webhookSourceCapability.supportsConnection?.({
@@ -188,14 +192,41 @@ export async function persistProviderAppSetupResult(input: {
             config: updatedConnection.config ?? {},
           },
         })) ??
-          true)
-      ) {
-        await ensureImplicitConnectionWebhookSource({
+          true);
+
+      if (input.webhookSourceUpdate !== undefined && !supportsImplicitWebhookSource) {
+        throw new Error(
+          `Provider app setup for connection '${updatedConnection.id}' returned webhook source updates, but the integration does not support an implicit webhook source.`,
+        );
+      }
+
+      if (supportsImplicitWebhookSource) {
+        const webhookSource = await ensureImplicitConnectionWebhookSource({
           db: tx,
           organizationId: input.organizationId,
           connectionId: updatedConnection.id,
           targetKey: updatedConnection.targetKey,
         });
+
+        const providerMetadata = input.webhookSourceUpdate?.providerMetadata;
+        if (providerMetadata !== undefined) {
+          const updatedSources = await tx
+            .update(integrationWebhookSources)
+            .set({
+              providerMetadata: {
+                ...webhookSource.providerMetadata,
+                ...providerMetadata,
+              },
+            })
+            .where(eq(integrationWebhookSources.id, webhookSource.id))
+            .returning({
+              id: integrationWebhookSources.id,
+            });
+
+          if (updatedSources.length !== 1) {
+            throw new Error(`Failed to update webhook source '${webhookSource.id}'.`);
+          }
+        }
       }
 
       return {

@@ -1,3 +1,4 @@
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,6 +23,8 @@ const GitHubConnectionId = "conn_github";
 const GitHubWebhookSourceId = "iws_github";
 const LinearConnectionId = "conn_linear";
 const LinearWebhookSourceId = "iws_linear";
+const SlackConnectionId = "conn_slack";
+const SlackWebhookSourceId = "iws_slack";
 
 describe("buildWebhookAutomationEventOptions", () => {
   it("returns source-scoped supported webhook events from connected integrations", () => {
@@ -310,7 +313,265 @@ describe("buildWebhookAutomationEventOptions", () => {
       },
     ]);
   });
+
+  it("filters GitHub triggers whose event or permission requirements are not granted", () => {
+    expect(
+      buildWebhookAutomationEventOptions({
+        connections: [
+          {
+            id: GitHubConnectionId,
+            targetKey: "github-cloud",
+            displayName: "GitHub Engineering",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: GitHubWebhookSourceId,
+            targetKey: "github-cloud",
+            integrationConnectionId: GitHubConnectionId,
+            displayName: "GitHub App webhook",
+            endpointKey: "ep_github",
+            callbackUrl:
+              "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github",
+            status: "active",
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: ["issues"],
+                permissions: [{ permission: "issues", access: "read" }],
+              },
+            },
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "github-cloud",
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {},
+            displayName: "GitHub",
+            description: "GitHub Cloud",
+            supportedWebhookEvents: [
+              {
+                eventType: "github.issues.opened",
+                providerEventType: "issues",
+                displayName: "Issue opened",
+                requirements: {
+                  anyOf: [
+                    {
+                      event: "issues",
+                      permissions: [{ permission: "issues", access: "read" }],
+                    },
+                  ],
+                },
+              },
+              {
+                eventType: "github.pull_request.opened",
+                providerEventType: "pull_request",
+                displayName: "Pull request opened",
+                requirements: {
+                  anyOf: [
+                    {
+                      event: "pull_request",
+                      permissions: [{ permission: "pull_requests", access: "read" }],
+                    },
+                  ],
+                },
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        selectedTriggerIds: [],
+      }).map((option) => option.eventType),
+    ).toEqual(["github.issues.opened"]);
+  });
+
+  it("allows Slack message triggers when channel message access is granted", () => {
+    expect(
+      buildSlackMessageEventTypes({
+        events: ["message.channels"],
+        permissions: [{ permission: "channels:history" }],
+      }),
+    ).toEqual(["slack:message"]);
+  });
+
+  it("allows Slack message triggers when group message access is granted", () => {
+    expect(
+      buildSlackMessageEventTypes({
+        events: ["message.groups"],
+        permissions: [{ permission: "groups:history" }],
+      }),
+    ).toEqual(["slack:message"]);
+  });
+
+  it("hides Slack message triggers when neither message requirement path is granted", () => {
+    expect(
+      buildSlackMessageEventTypes({
+        events: ["app_mention"],
+        permissions: [{ permission: "app_mentions:read" }],
+      }),
+    ).toEqual(["slack:app_mention"]);
+  });
+
+  it("requires every permission in the matching Jira trigger requirement set", () => {
+    expect(
+      buildWebhookAutomationEventOptions({
+        connections: [
+          {
+            id: "conn_jira",
+            targetKey: "jira-default",
+            displayName: "Jira Product",
+            status: "active",
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        webhookSources: [
+          {
+            id: "iws_jira",
+            targetKey: "jira-default",
+            integrationConnectionId: "conn_jira",
+            displayName: "Jira webhook",
+            endpointKey: "ep_jira",
+            status: "active",
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: ["jira:issue_created"],
+                permissions: [{ permission: "read:jira-work" }],
+              },
+            },
+            createdAt: "2026-03-16T10:00:00.000Z",
+            updatedAt: "2026-03-16T10:00:00.000Z",
+          },
+        ],
+        targets: [
+          {
+            targetKey: "jira-default",
+            familyId: "jira",
+            variantId: "jira-default",
+            enabled: true,
+            config: {},
+            displayName: "Jira",
+            description: "Jira Cloud",
+            supportedWebhookEvents: [
+              {
+                eventType: "jira:issue_created",
+                providerEventType: "jira:issue_created",
+                displayName: "Issue created",
+                requirements: {
+                  anyOf: [
+                    {
+                      event: "jira:issue_created",
+                      permissions: [
+                        { permission: "read:jira-work" },
+                        { permission: "manage:jira-webhook" },
+                      ],
+                    },
+                  ],
+                },
+              },
+            ],
+            targetHealth: {
+              configStatus: "valid",
+            },
+          },
+        ],
+        selectedTriggerIds: [],
+      }),
+    ).toEqual([]);
+  });
 });
+
+function buildSlackMessageEventTypes(input: {
+  events: readonly string[];
+  permissions: readonly { permission: string; access?: string }[];
+}): readonly string[] {
+  return buildWebhookAutomationEventOptions({
+    connections: [
+      {
+        id: SlackConnectionId,
+        targetKey: "slack-default",
+        displayName: "Slack Engineering",
+        status: "active",
+        createdAt: "2026-03-16T10:00:00.000Z",
+        updatedAt: "2026-03-16T10:00:00.000Z",
+      },
+    ],
+    webhookSources: [
+      {
+        id: SlackWebhookSourceId,
+        targetKey: "slack-default",
+        integrationConnectionId: SlackConnectionId,
+        displayName: "Slack Events API webhook",
+        endpointKey: "ep_slack",
+        status: "active",
+        providerMetadata: {
+          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+            events: input.events,
+            permissions: input.permissions,
+          },
+        },
+        createdAt: "2026-03-16T10:00:00.000Z",
+        updatedAt: "2026-03-16T10:00:00.000Z",
+      },
+    ],
+    targets: [
+      {
+        targetKey: "slack-default",
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        displayName: "Slack",
+        description: "Slack workspace",
+        supportedWebhookEvents: [
+          {
+            eventType: "slack:message",
+            providerEventType: "message",
+            displayName: "Message",
+            requirements: {
+              anyOf: [
+                {
+                  event: "message.channels",
+                  permissions: [{ permission: "channels:history" }],
+                },
+                {
+                  event: "message.groups",
+                  permissions: [{ permission: "groups:history" }],
+                },
+              ],
+            },
+          },
+          {
+            eventType: "slack:app_mention",
+            providerEventType: "app_mention",
+            displayName: "App mention",
+            requirements: {
+              anyOf: [
+                {
+                  event: "app_mention",
+                  permissions: [{ permission: "app_mentions:read" }],
+                },
+              ],
+            },
+          },
+        ],
+        targetHealth: {
+          configStatus: "valid",
+        },
+      },
+    ],
+    selectedTriggerIds: [],
+  }).map((option) => option.eventType);
+}
 
 describe("buildWebhookAutomationSandboxProfileOptions", () => {
   it("does not expose sandbox profile status as option copy", () => {

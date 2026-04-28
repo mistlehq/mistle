@@ -45,7 +45,7 @@ type JiraWebhookEventMetadata = {
   eventType: JiraWebhookEventType;
 };
 
-const JiraWebhookPermissionRequirements = {
+export const JiraWebhookPermissionRequirements = {
   READ_WORK: {
     permission: "read:jira-work",
   },

@@ -1,4 +1,7 @@
-import type { IntegrationProviderAppSetupCapability } from "@mistle/integrations-core";
+import {
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+  type IntegrationProviderAppSetupCapability,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 import {
@@ -23,6 +26,7 @@ import {
   SlackCredentialSlotKeys,
   type SlackConnectionConfig,
 } from "./auth.js";
+import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 import type { SlackTargetSecrets } from "./target-secret-schema.js";
 
@@ -155,6 +159,14 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
             clientSecret: createdManifest.credentials.client_secret,
             signingSecret: createdManifest.credentials.signing_secret,
           }),
+          webhookSource: {
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: [...SlackAppManifestBotEvents],
+                permissions: SlackAppManifestBotScopes.map((permission) => ({ permission })),
+              },
+            },
+          },
           start: {
             kind: "redirect",
             authorizationUrl: authorizationUrl.toString(),

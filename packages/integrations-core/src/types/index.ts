@@ -513,6 +513,9 @@ export type IntegrationProviderAppSetupConnectionUpdate = {
 export type IntegrationProviderAppSetupResult = {
   connection?: IntegrationProviderAppSetupConnectionUpdate;
   secrets?: Record<string, string>;
+  webhookSource?: {
+    providerMetadata?: Record<string, unknown>;
+  };
 };
 
 export type IntegrationProviderAppSetupConnectionSecretResolver = (input: {
@@ -1771,6 +1774,14 @@ export type IntegrationWebhookTriggerRequirementSet = {
 
 export type IntegrationWebhookTriggerRequirements = {
   anyOf: ReadonlyArray<IntegrationWebhookTriggerRequirementSet>;
+};
+
+export const IntegrationWebhookTriggerCapabilitiesProviderMetadataKey =
+  "webhookTriggerCapabilities";
+
+export type IntegrationWebhookTriggerCapabilities = {
+  events?: ReadonlyArray<string> | undefined;
+  permissions?: ReadonlyArray<IntegrationWebhookTriggerProviderPermissionRequirement> | undefined;
 };
 
 /**
