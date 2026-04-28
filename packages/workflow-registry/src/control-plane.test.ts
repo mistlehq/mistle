@@ -5,6 +5,7 @@ import {
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
+  ScheduleDispatchWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
@@ -22,6 +23,7 @@ describe("control-plane workflow registry", () => {
       SyncIntegrationConnectionResourcesWorkflowSpec,
       HandleAutomationRunWorkflowSpec,
       HandleAutomationConversationDeliveryWorkflowSpec,
+      ScheduleDispatchWorkflowSpec,
     ]).toEqual([
       { name: "control-plane.auth.send-verification-otp", version: "1" },
       { name: "control-plane.auth.send-organization-invitation", version: "1" },
@@ -31,6 +33,7 @@ describe("control-plane workflow registry", () => {
       { name: "control-plane.integration-connections.sync-resources", version: "1" },
       { name: "control-plane.automations.handle-run", version: "1" },
       { name: "control-plane.automation-conversations.handle-delivery", version: "1" },
+      { name: "control-plane.schedules.dispatch", version: "1" },
     ]);
   });
 });

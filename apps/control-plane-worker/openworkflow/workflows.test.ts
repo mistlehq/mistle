@@ -3,6 +3,7 @@ import {
   HandleAutomationRunWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
+  ScheduleDispatchWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
@@ -14,6 +15,7 @@ import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automatio
 import { HandleAutomationRunWorkflow } from "./handle-automation-run/workflow.js";
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event/workflow.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
+import { ScheduleDispatchWorkflow } from "./schedule-dispatch/workflow.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
 import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance/workflow.js";
@@ -62,5 +64,9 @@ describe("control-plane worker openworkflow entrypoints", () => {
     expect(SyncIntegrationConnectionResourcesWorkflow.spec).toMatchObject(
       SyncIntegrationConnectionResourcesWorkflowSpec,
     );
+  });
+
+  it("preserves the schedule dispatch workflow identity", () => {
+    expect(ScheduleDispatchWorkflow.spec).toMatchObject(ScheduleDispatchWorkflowSpec);
   });
 });

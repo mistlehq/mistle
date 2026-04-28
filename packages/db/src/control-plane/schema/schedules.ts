@@ -7,7 +7,7 @@ import { organizations } from "./organizations.js";
 
 export const ScheduleTargetTypes = {
   AUTOMATION_RUN: "automation_run",
-  SANDBOX_PROFILE_SNAPSHOT_REFRESH: "sandbox_profile_snapshot_refresh",
+  SNAPSHOT_REFRESH: "sandbox_profile_snapshot_refresh",
 } as const;
 
 export type ScheduleTargetType = (typeof ScheduleTargetTypes)[keyof typeof ScheduleTargetTypes];

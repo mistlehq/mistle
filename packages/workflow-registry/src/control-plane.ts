@@ -187,3 +187,24 @@ export const HandleAutomationConversationDeliveryWorkflowSpec = defineWorkflowSp
   name: HandleAutomationConversationDeliveryWorkflowName,
   version: HandleAutomationConversationDeliveryWorkflowVersion,
 });
+
+export const ScheduleDispatchWorkflowName = "control-plane.schedules.dispatch";
+export const ScheduleDispatchWorkflowVersion = "1";
+
+export type ScheduleDispatchWorkflowInput = {
+  cutoffMinute: string;
+};
+
+export type ScheduleDispatchWorkflowOutput = {
+  pendingScheduledActionIds: string[];
+  claimedScheduleCount: number;
+  reachedMaxBatches: boolean;
+};
+
+export const ScheduleDispatchWorkflowSpec = defineWorkflowSpec<
+  ScheduleDispatchWorkflowInput,
+  ScheduleDispatchWorkflowOutput
+>({
+  name: ScheduleDispatchWorkflowName,
+  version: ScheduleDispatchWorkflowVersion,
+});
