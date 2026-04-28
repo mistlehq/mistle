@@ -22,6 +22,11 @@ export { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 export { GitHubAppInstallationCredentialResolver } from "./credential-resolver.server.js";
 export { GitHubCredentialSlotKeys } from "./slot-keys.js";
 export {
+  buildGitHubAppManifest,
+  buildGitHubAppManifestSubmissionUrl,
+  type GitHubAppManifestOwner,
+} from "./app-manifest.js";
+export {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./resource-definitions.js";

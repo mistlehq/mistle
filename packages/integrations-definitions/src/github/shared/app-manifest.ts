@@ -24,8 +24,8 @@ export function buildGitHubAppManifestSubmissionUrl(input: {
 }
 
 export function buildGitHubAppManifest(input: {
-  manifest: Record<string, unknown>;
   controlPlaneBaseUrl: string;
+  manifest: Record<string, unknown>;
   webhookCallbackUrl: string;
 }): Record<string, unknown> {
   return {
