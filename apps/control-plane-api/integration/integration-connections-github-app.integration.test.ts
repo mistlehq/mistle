@@ -6,6 +6,7 @@ import {
   organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
 } from "@mistle/db/control-plane";
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -266,6 +267,11 @@ describe("integration connections GitHub App integration", () => {
             redirect_url: "https://example.invalid/manifest",
             callback_urls: ["https://example.invalid/oauth"],
             setup_url: "https://example.invalid/setup",
+            default_events: ["issues", "pull_request"],
+            default_permissions: {
+              issues: "read",
+              pull_requests: "write",
+            },
           },
           owner: {
             kind: "organization",
@@ -307,6 +313,11 @@ describe("integration connections GitHub App integration", () => {
         ),
       ),
     });
+    expect(manifest["default_events"]).toEqual(["issues", "pull_request"]);
+    expect(manifest["default_permissions"]).toEqual({
+      issues: "read",
+      pull_requests: "write",
+    });
 
     const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
       where: (table, { and, eq }) =>
@@ -317,6 +328,84 @@ describe("integration connections GitHub App integration", () => {
         ),
     });
     expect(redirectSession).toBeDefined();
+
+    const webhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, connectionId),
+        ),
+    });
+    expect(webhookSource).toBeDefined();
+    if (webhookSource === undefined) {
+      throw new Error("Expected GitHub App manifest webhook source.");
+    }
+
+    expect(webhookSource.providerMetadata).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issues", "pull_request"],
+        permissions: [
+          {
+            permission: "issues",
+            access: "read",
+          },
+          {
+            permission: "pull_requests",
+            access: "write",
+          },
+          {
+            permission: "pull_requests",
+            access: "read",
+          },
+        ],
+      },
+    });
+  });
+
+  it("returns 400 when GitHub App manifest trigger capabilities are missing", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-github-app-manifest-missing-capabilities@example.com",
+    });
+    const connectionId = await createGitHubAppDraftConnection(fixture, {
+      authenticatedSession,
+      displayName: "Draft GitHub",
+    });
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
+    expect(responseBody.code).toBe("INVALID_GITHUB_APP_MANIFEST_START_INPUT");
+
+    const redirectSessions = await fixture.db.query.integrationConnectionRedirectSessions.findMany({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+        ),
+    });
+    expect(redirectSessions).toEqual([]);
   });
 
   it("starts and completes GitHub Enterprise Server App installation through the generic provider app setup route", async ({

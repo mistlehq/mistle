@@ -11,6 +11,7 @@ import {
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
+  buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   GitHubAppManifestOwnerSchema,
   parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
@@ -96,6 +97,12 @@ export function createGitHubProviderAppSetupCapability(
           });
 
           return {
+            webhookSource: {
+              providerMetadata:
+                buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
+                  manifest,
+                }),
+            },
             start: {
               kind: "form-post",
               submissionUrl: buildGitHubAppManifestSubmissionUrl({

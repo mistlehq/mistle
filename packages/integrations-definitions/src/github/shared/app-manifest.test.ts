@@ -1,16 +1,18 @@
+import { IntegrationWebhookTriggerCapabilitiesProviderMetadataKey } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
   buildConvertedGitHubAppConnectionConfig,
   buildConvertedGitHubAppConnectionSecrets,
+  buildGitHubAppManifest,
+  buildGitHubAppManifestConversionUrl,
+  buildGitHubAppManifestSubmissionUrl,
+  buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   buildGitHubAppInstallationUrl,
   GitHubAppManifestConversionMissingClientSecretError,
   GitHubAppManifestOwnerSchema,
   GitHubAppManifestTemplate,
-  buildGitHubAppManifest,
-  buildGitHubAppManifestConversionUrl,
-  buildGitHubAppManifestSubmissionUrl,
   parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
 
@@ -51,6 +53,40 @@ describe("GitHubAppManifestTemplate", () => {
         issues: "write",
         metadata: "read",
         pull_requests: "write",
+      },
+    });
+  });
+});
+
+describe("buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata", () => {
+  it("maps GitHub App manifest event subscriptions and permissions into webhook trigger capabilities", () => {
+    expect(
+      buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
+        manifest: {
+          default_events: ["issues", "pull_request"],
+          default_permissions: {
+            issues: "read",
+            pull_requests: "write",
+          },
+        },
+      }),
+    ).toEqual({
+      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+        events: ["issues", "pull_request"],
+        permissions: [
+          {
+            permission: "issues",
+            access: "read",
+          },
+          {
+            permission: "pull_requests",
+            access: "write",
+          },
+          {
+            permission: "pull_requests",
+            access: "read",
+          },
+        ],
       },
     });
   });

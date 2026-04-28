@@ -345,7 +345,11 @@ export async function startProviderAppSetup(
     failureMessage: "Failed to persist provider app setup redirect session state.",
   });
 
-  if (parsedSecrets.length > 0 || startedSetup.connection !== undefined) {
+  if (
+    parsedSecrets.length > 0 ||
+    startedSetup.connection !== undefined ||
+    startedSetup.webhookSource !== undefined
+  ) {
     await persistProviderAppSetupResult({
       db: ctx.db,
       integrationsConfig: ctx.integrationsConfig,

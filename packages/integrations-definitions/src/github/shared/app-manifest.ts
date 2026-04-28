@@ -1,5 +1,8 @@
 import { buildUrlWithPath } from "@mistle/http";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 const GitHubAppManifestConversionResponseSchema = z
@@ -10,6 +13,13 @@ const GitHubAppManifestConversionResponseSchema = z
     client_secret: z.string().min(1).optional(),
     pem: z.string().min(1),
     webhook_secret: z.string().min(1),
+  })
+  .loose();
+
+const GitHubAppManifestWebhookTriggerCapabilitiesSchema = z
+  .object({
+    default_events: z.array(z.string().min(1)).min(1),
+    default_permissions: z.record(z.string().min(1), z.string().min(1)),
   })
   .loose();
 
@@ -112,6 +122,27 @@ export function buildConvertedGitHubAppConnectionSecrets(input: {
     appPrivateKeyPem: input.conversion.pem,
     webhookSecret: input.conversion.webhook_secret,
     clientSecret,
+  };
+}
+
+export function buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata(input: {
+  manifest: Record<string, unknown>;
+}): Record<string, unknown> {
+  const parsedManifest = GitHubAppManifestWebhookTriggerCapabilitiesSchema.parse(input.manifest);
+
+  return {
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      events: parsedManifest.default_events,
+      permissions: Object.entries(parsedManifest.default_permissions).flatMap(
+        ([permission, access]) =>
+          access === "write"
+            ? [
+                { permission, access: "write" },
+                { permission, access: "read" },
+              ]
+            : [{ permission, access }],
+      ),
+    },
   };
 }
 

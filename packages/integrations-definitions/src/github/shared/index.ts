@@ -28,6 +28,7 @@ export {
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
+  buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   GitHubAppManifestConversionMissingClientSecretError,
   GitHubAppManifestOwnerSchema,
   parseGitHubAppManifestConversionResponse,
