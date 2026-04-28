@@ -1,4 +1,7 @@
-import type { ControlPlaneApiConfig } from "../apps/control-plane-api/schema.js";
+import type {
+  ControlPlaneApiConfig,
+  ControlPlaneApiMaintenanceConfig,
+} from "../apps/control-plane-api/schema.js";
 import type { ControlPlaneWorkerConfig } from "../apps/control-plane-worker/schema.js";
 import type { DataPlaneApiConfig } from "../apps/data-plane-api/schema.js";
 import type { DataPlaneGatewayConfig } from "../apps/data-plane-gateway/schema.js";
@@ -227,6 +230,16 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       activeMasterEncryptionKeyVersion:
         config.services.control_plane_api.integrations.active_master_encryption_key_version,
       masterEncryptionKeys: config.services.control_plane_api.integrations.master_encryption_keys,
+    },
+  };
+}
+
+export function selectControlPlaneApiMaintenanceConfig(
+  config: Config,
+): ControlPlaneApiMaintenanceConfig {
+  return {
+    database: {
+      migrationUrl: config.postgres.control_plane.direct_url,
     },
   };
 }

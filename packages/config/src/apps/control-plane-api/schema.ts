@@ -157,6 +157,16 @@ export const ControlPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiMaintenanceConfigSchema = z
+  .object({
+    database: z
+      .object({
+        migrationUrl: z.string().min(1),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const PartialControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
@@ -176,4 +186,7 @@ export const PartialControlPlaneApiConfigSchema = z
   .strict();
 
 export type ControlPlaneApiConfig = z.infer<typeof ControlPlaneApiConfigSchema>;
+export type ControlPlaneApiMaintenanceConfig = z.infer<
+  typeof ControlPlaneApiMaintenanceConfigSchema
+>;
 export type PartialControlPlaneApiConfigInput = z.input<typeof PartialControlPlaneApiConfigSchema>;

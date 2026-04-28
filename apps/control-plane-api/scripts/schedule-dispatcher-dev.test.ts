@@ -23,12 +23,20 @@ async function waitForRequestCount(input: {
   getRequestCount: () => number;
   expectedCount: number;
 }): Promise<void> {
+  await waitForCondition({
+    description: `${String(input.expectedCount)} schedule dispatch requests`,
+    isMet: () => input.getRequestCount() >= input.expectedCount,
+  });
+}
+
+async function waitForCondition(input: {
+  description: string;
+  isMet: () => boolean;
+}): Promise<void> {
   const startedAt = Date.now();
-  while (input.getRequestCount() < input.expectedCount) {
+  while (!input.isMet()) {
     if (Date.now() - startedAt > 1_000) {
-      throw new Error(
-        `Timed out waiting for ${String(input.expectedCount)} schedule dispatch requests.`,
-      );
+      throw new Error(`Timed out waiting for ${input.description}.`);
     }
     await systemSleeper.sleep(10);
   }
@@ -152,6 +160,10 @@ describe("dev schedule dispatcher", () => {
       expectedCount: 1,
       getRequestCount: () => requestTimestamps.length,
     });
+    await waitForCondition({
+      description: "startup retry timer to be scheduled",
+      isMet: () => scheduler.pendingCount() === 1,
+    });
     expect(requestTimestamps).toEqual([Date.UTC(2026, 3, 28, 1, 0, 0)]);
     expect(scheduler.pendingCount()).toBe(1);
 
@@ -160,6 +172,10 @@ describe("dev schedule dispatcher", () => {
     await waitForRequestCount({
       expectedCount: 2,
       getRequestCount: () => requestTimestamps.length,
+    });
+    await waitForCondition({
+      description: "minute cadence timer to be scheduled",
+      isMet: () => scheduler.pendingCount() === 1,
     });
     expect(requestTimestamps).toEqual([
       Date.UTC(2026, 3, 28, 1, 0, 0),

@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { parse as parseToml } from "smol-toml";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
+import { ControlPlaneApiMaintenanceConfigSchema } from "./apps/control-plane-api/schema.js";
+import type { ControlPlaneApiMaintenanceConfig } from "./apps/control-plane-api/schema.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
@@ -20,6 +22,7 @@ import { loadRootConfigFromEnv } from "./root/load-env.js";
 import { ConfigSchema as RootConfigSchema, type Config as RootConfig } from "./root/schema.js";
 import {
   selectControlPlaneApiConfig,
+  selectControlPlaneApiMaintenanceConfig,
   selectControlPlaneWorkerConfig,
   selectDataPlaneApiConfig,
   selectDataPlaneGatewayConfig,
@@ -43,6 +46,10 @@ export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleK
 export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
   app: AppConfigModuleValue<TApp>;
   global?: AppConfig["global"];
+};
+
+export type LoadControlPlaneMaintenanceConfigResult = {
+  app: ControlPlaneApiMaintenanceConfig;
 };
 
 function resolveConfigPath(options: LoadConfigSourceOptions): string | undefined {
@@ -79,6 +86,36 @@ function applyRootEnvOverrides(rootConfig: RootConfig, env: NodeJS.ProcessEnv): 
 
 export function parseConfigRecord(record: unknown): RootConfig {
   return RootConfigSchema.parse(record);
+}
+
+function loadControlPlaneMaintenanceConfigFromEnvOnly(
+  env: NodeJS.ProcessEnv,
+): ControlPlaneApiMaintenanceConfig {
+  const legacyMigrationUrl = env.MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL;
+  const resourceMigrationUrl = env.MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL;
+
+  if (
+    legacyMigrationUrl !== undefined &&
+    resourceMigrationUrl !== undefined &&
+    legacyMigrationUrl !== resourceMigrationUrl
+  ) {
+    throw new Error(
+      "Conflicting env overrides for postgres.control_plane.direct_url. MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL tried to set a different value than MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL.",
+    );
+  }
+
+  const migrationUrl = resourceMigrationUrl ?? legacyMigrationUrl;
+  if (migrationUrl === undefined) {
+    throw new Error(
+      "Missing control-plane maintenance database config. Set MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL or MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL.",
+    );
+  }
+
+  return ControlPlaneApiMaintenanceConfigSchema.parse({
+    database: {
+      migrationUrl,
+    },
+  });
 }
 
 function selectAppConfig(
@@ -263,5 +300,25 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   return {
     global: selectGlobalConfig(rootConfig),
     app: appConfig,
+  };
+}
+
+export function loadControlPlaneMaintenanceConfig(
+  options: LoadConfigSourceOptions,
+): LoadControlPlaneMaintenanceConfigResult {
+  const { configPath, env } = resolveLoadInputs(options);
+
+  if (configPath === undefined) {
+    return {
+      app: loadControlPlaneMaintenanceConfigFromEnvOnly(env),
+    };
+  }
+
+  const rootConfig = loadRootConfig(configPath, env);
+
+  return {
+    app: ControlPlaneApiMaintenanceConfigSchema.parse(
+      selectControlPlaneApiMaintenanceConfig(rootConfig),
+    ),
   };
 }

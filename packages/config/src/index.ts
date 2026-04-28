@@ -1,4 +1,5 @@
-export { loadConfig } from "./loader.js";
+export { loadConfig, loadControlPlaneMaintenanceConfig } from "./loader.js";
+export type { LoadControlPlaneMaintenanceConfigResult } from "./loader.js";
 export { AppIds } from "./modules.js";
 export { readRepositoryVersion } from "./repository-version.js";
 export {

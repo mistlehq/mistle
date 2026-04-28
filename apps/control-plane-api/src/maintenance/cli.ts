@@ -1,4 +1,4 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { loadControlPlaneMaintenanceConfig } from "@mistle/config";
 import { shutdownTelemetry } from "@mistle/telemetry";
 import { Pool } from "pg";
 
@@ -12,10 +12,8 @@ async function main(): Promise<void> {
     throw new Error("Expected a maintenance command name.");
   }
 
-  const loadedConfig = loadConfig({
-    app: AppIds.CONTROL_PLANE_API,
+  const loadedConfig = loadControlPlaneMaintenanceConfig({
     env: process.env,
-    includeGlobal: false,
   });
   const command = resolveMaintenanceCommand(commandName);
   const pool = new Pool({
