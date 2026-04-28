@@ -1318,14 +1318,7 @@ describe("SandboxProfileEditorPage", () => {
       },
     ];
 
-    expect(
-      resolveSandboxProfileSetupScriptIntegrationRows({
-        initialRows,
-        integrationDraftState: {
-          integrationRows: draftRows,
-        },
-      }),
-    ).toBe(draftRows);
+    expect(resolveSandboxProfileSetupScriptIntegrationRows(initialRows, draftRows)).toBe(draftRows);
   });
 
   it("renders an empty setup script editor when no script is configured", () => {

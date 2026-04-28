@@ -1,29 +1,15 @@
 import SandboxBaseInventory from "../../../../../packages/sandboxd/sandbox-base-inventory.generated.json" with { type: "json" };
 
-type SandboxBaseInventoryTool = {
-  category: SandboxBaseInventoryToolCategory;
-  command: string;
-  displayName: string;
-  version: string;
-};
-
-type SandboxBaseInventoryToolCategory = {
-  id: string;
-  title: string;
-};
-
-type SandboxBaseInventoryRuntimeBase = {
+type SandboxBaseInventoryRuntimeBase = Pick<
+  typeof SandboxBaseInventory.runtimeBase,
+  "packageManagers" | "shell" | "user" | "workingDirectory"
+> & {
   os: {
     prettyName: string;
   };
-  packageManagers: readonly string[];
-  shell: string;
-  user: {
-    name: string;
-    uid: number;
-  };
-  workingDirectory: string;
 };
+
+type SandboxBaseInventoryTool = (typeof SandboxBaseInventory.tools)[number];
 
 type SandboxBaseInventoryPresentationInput = {
   repositoryHandles?: readonly string[];
@@ -34,24 +20,6 @@ type SandboxBaseInventoryPresentationInput = {
 type SandboxBaseRepositoryBindingInput = {
   config: Record<string, unknown>;
   kind: string;
-};
-
-type SandboxBaseRuntimeEnvironmentItem = {
-  id: string;
-  label: string;
-  value: string;
-};
-
-type SandboxBasePreinstalledToolItem = {
-  id: string;
-  name: string;
-  version: string;
-};
-
-type SandboxBasePreinstalledToolGroup = {
-  id: string;
-  title: string;
-  tools: readonly SandboxBasePreinstalledToolItem[];
 };
 
 type SandboxBaseSetupContextGroup = {
@@ -72,10 +40,16 @@ type SetupScriptRepositoryLocationExample = {
   path: string;
 };
 
-type MutableSandboxBasePreinstalledToolGroup = {
+type SandboxBaseSetupScriptContext = {
+  environmentAndToolGroups: readonly SandboxBaseSetupContextGroup[];
+  repositoryLocationExample: SetupScriptRepositoryLocationExample;
+  repositoryLocationGroup: SandboxBaseSetupContextGroup | null;
+};
+
+type MutableSandboxBaseSetupContextGroup = {
   id: string;
   title: string;
-  tools: SandboxBasePreinstalledToolItem[];
+  rows: SandboxBaseSetupContextRow[];
 };
 
 function readPrimaryPackageManager(input: SandboxBaseInventoryRuntimeBase): string {
@@ -88,42 +62,47 @@ function readPrimaryPackageManager(input: SandboxBaseInventoryRuntimeBase): stri
   return packageManager;
 }
 
-export function createSandboxBaseRuntimeEnvironmentItems(
+function createExecutionEnvironmentRows(
   input: SandboxBaseInventoryRuntimeBase,
-): readonly SandboxBaseRuntimeEnvironmentItem[] {
+): readonly SandboxBaseSetupContextRow[] {
   return [
     {
       id: "os",
       label: "OS",
       value: input.os.prettyName,
+      valueKind: "text",
     },
     {
       id: "user",
       label: "User",
       value: `${input.user.name} (uid ${String(input.user.uid)})`,
+      valueKind: "text",
     },
     {
       id: "shell",
       label: "Shell",
       value: input.shell,
+      valueKind: "text",
     },
     {
       id: "working-directory",
       label: "Working directory",
       value: input.workingDirectory,
+      valueKind: "text",
     },
     {
       id: "package-manager",
       label: "Package manager",
       value: readPrimaryPackageManager(input),
+      valueKind: "text",
     },
   ];
 }
 
-export function createSandboxBasePreinstalledToolGroups(
+function createToolContextGroups(
   tools: readonly SandboxBaseInventoryTool[],
-): readonly SandboxBasePreinstalledToolGroup[] {
-  const groups: MutableSandboxBasePreinstalledToolGroup[] = [];
+): readonly SandboxBaseSetupContextGroup[] {
+  const groups: MutableSandboxBaseSetupContextGroup[] = [];
 
   for (const tool of tools) {
     let group = groups.find((candidate) => candidate.id === tool.category.id);
@@ -131,16 +110,17 @@ export function createSandboxBasePreinstalledToolGroups(
     if (group === undefined) {
       group = {
         id: tool.category.id,
+        rows: [],
         title: tool.category.title,
-        tools: [],
       };
       groups.push(group);
     }
 
-    group.tools.push({
+    group.rows.push({
       id: tool.command,
-      name: tool.displayName,
-      version: tool.version,
+      label: tool.displayName,
+      value: tool.version,
+      valueKind: "version",
     });
   }
 
@@ -175,58 +155,29 @@ function createRepositoryLocationGroup(
   };
 }
 
-export function createSandboxBaseSetupContextGroups(
+export function createSandboxBaseSetupScriptContext(
   input: SandboxBaseInventoryPresentationInput,
-): readonly SandboxBaseSetupContextGroup[] {
+): SandboxBaseSetupScriptContext {
   const repositoryLocationGroup = createRepositoryLocationGroup(
     input.repositoryHandles,
     input.runtimeBase.workingDirectory,
   );
-  const groups: SandboxBaseSetupContextGroup[] = [
-    {
-      id: "execution-environment",
-      title: "Execution environment",
-      rows: createSandboxBaseRuntimeEnvironmentItems(input.runtimeBase).map(
-        (item): SandboxBaseSetupContextRow => ({
-          id: item.id,
-          label: item.label,
-          value: item.value,
-          valueKind: "text",
-        }),
-      ),
-    },
-  ];
 
-  if (repositoryLocationGroup !== null) {
-    groups.push(repositoryLocationGroup);
-  }
-
-  groups.push(
-    ...createSandboxBasePreinstalledToolGroups(input.tools).map((group) => ({
-      id: group.id,
-      title: group.title,
-      rows: group.tools.map(
-        (tool): SandboxBaseSetupContextRow => ({
-          id: tool.id,
-          label: tool.name,
-          value: tool.version,
-          valueKind: "version",
-        }),
-      ),
-    })),
-  );
-
-  return groups;
-}
-
-export function createSandboxBaseSetupContextGroupsFromGeneratedInventory(
-  repositoryHandles?: readonly string[],
-): readonly SandboxBaseSetupContextGroup[] {
-  return createSandboxBaseSetupContextGroups({
-    runtimeBase: SandboxBaseInventory.runtimeBase,
-    tools: SandboxBaseInventory.tools,
-    ...(repositoryHandles === undefined ? {} : { repositoryHandles }),
-  });
+  return {
+    environmentAndToolGroups: [
+      {
+        id: "execution-environment",
+        title: "Execution environment",
+        rows: createExecutionEnvironmentRows(input.runtimeBase),
+      },
+      ...createToolContextGroups(input.tools),
+    ],
+    repositoryLocationExample: createSetupScriptRepositoryLocationExample(
+      input.runtimeBase.workingDirectory,
+      input.repositoryHandles,
+    ),
+    repositoryLocationGroup,
+  };
 }
 
 function createSetupScriptRepositoryLocationExample(
@@ -241,13 +192,14 @@ function createSetupScriptRepositoryLocationExample(
   };
 }
 
-export function createSetupScriptRepositoryLocationExampleFromGeneratedInventory(
+export function createSandboxBaseSetupScriptContextFromGeneratedInventory(
   repositoryHandles?: readonly string[],
-): SetupScriptRepositoryLocationExample {
-  return createSetupScriptRepositoryLocationExample(
-    SandboxBaseInventory.runtimeBase.workingDirectory,
-    repositoryHandles,
-  );
+): SandboxBaseSetupScriptContext {
+  return createSandboxBaseSetupScriptContext({
+    runtimeBase: SandboxBaseInventory.runtimeBase,
+    tools: SandboxBaseInventory.tools,
+    ...(repositoryHandles === undefined ? {} : { repositoryHandles }),
+  });
 }
 
 export function resolveSandboxBaseRepositoryHandles(

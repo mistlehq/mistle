@@ -115,29 +115,30 @@ function validateDockerfileAssertion(
   facts: ParsedDockerfileFacts,
   assertion: SandboxBaseDockerfileAssertion,
 ): string | null {
-  if (findStage(facts, assertion.stageName) === null) {
+  const stage = findStage(facts, assertion.stageName);
+  if (stage === null) {
     return `stage '${assertion.stageName}' does not exist`;
   }
 
   if (assertion.kind === "apt-package") {
-    return hasAptPackage(facts, assertion.stageName, assertion.packageName)
+    return hasAptPackage(stage, assertion.packageName)
       ? null
       : `expected apt package '${assertion.packageName}' in stage '${assertion.stageName}'`;
   }
 
   if (assertion.kind === "copy-from-stage") {
-    return hasCopyFromStage(facts, assertion)
+    return hasCopyFromStage(stage, assertion)
       ? null
       : `expected COPY --from=${assertion.fromStageName} ${assertion.sourcePath} ${assertion.targetPath} in stage '${assertion.stageName}'`;
   }
 
   if (assertion.kind === "run-contains") {
-    return hasRunContainingText(facts, assertion.stageName, assertion.expectedText)
+    return hasRunContainingText(stage, assertion.expectedText)
       ? null
       : `expected RUN containing '${assertion.expectedText}' in stage '${assertion.stageName}'`;
   }
 
-  return hasSymlink(facts, assertion.stageName, assertion.sourcePath, assertion.targetPath)
+  return hasSymlink(stage, assertion.sourcePath, assertion.targetPath)
     ? null
     : `expected symlink '${assertion.sourcePath}' -> '${assertion.targetPath}' in stage '${assertion.stageName}'`;
 }
@@ -146,12 +147,8 @@ function findStage(facts: ParsedDockerfileFacts, stageName: string): ParsedDocke
   return facts.stages.find((stage) => stage.name === stageName) ?? null;
 }
 
-function hasAptPackage(
-  facts: ParsedDockerfileFacts,
-  stageName: string,
-  packageName: string,
-): boolean {
-  return stageInstructions(facts, stageName).some(
+function hasAptPackage(stage: ParsedDockerfileStage, packageName: string): boolean {
+  return stage.instructions.some(
     (instruction) =>
       instruction.kind === "RUN" &&
       instruction.value.includes("apt-get install") &&
@@ -160,10 +157,10 @@ function hasAptPackage(
 }
 
 function hasCopyFromStage(
-  facts: ParsedDockerfileFacts,
+  stage: ParsedDockerfileStage,
   assertion: Extract<SandboxBaseDockerfileAssertion, { kind: "copy-from-stage" }>,
 ): boolean {
-  return stageInstructions(facts, assertion.stageName).some((instruction) => {
+  return stage.instructions.some((instruction) => {
     if (instruction.kind !== "COPY") {
       return false;
     }
@@ -177,23 +174,14 @@ function hasCopyFromStage(
   });
 }
 
-function hasRunContainingText(
-  facts: ParsedDockerfileFacts,
-  stageName: string,
-  text: string,
-): boolean {
-  return stageInstructions(facts, stageName).some(
+function hasRunContainingText(stage: ParsedDockerfileStage, text: string): boolean {
+  return stage.instructions.some(
     (instruction) => instruction.kind === "RUN" && instruction.value.includes(text),
   );
 }
 
-function hasSymlink(
-  facts: ParsedDockerfileFacts,
-  stageName: string,
-  sourcePath: string,
-  targetPath: string,
-): boolean {
-  return stageInstructions(facts, stageName).some((instruction) => {
+function hasSymlink(stage: ParsedDockerfileStage, sourcePath: string, targetPath: string): boolean {
+  return stage.instructions.some((instruction) => {
     if (instruction.kind !== "RUN") {
       return false;
     }
@@ -211,14 +199,6 @@ function hasSymlink(
 
     return false;
   });
-}
-
-function stageInstructions(
-  facts: ParsedDockerfileFacts,
-  stageName: string,
-): readonly ParsedDockerfileInstruction[] {
-  const stage = findStage(facts, stageName);
-  return stage?.instructions ?? [];
 }
 
 function splitShellTokens(input: string): readonly string[] {

@@ -88,8 +88,7 @@ import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
-  createSandboxBaseSetupContextGroupsFromGeneratedInventory,
-  createSetupScriptRepositoryLocationExampleFromGeneratedInventory,
+  createSandboxBaseSetupScriptContextFromGeneratedInventory,
   resolveSandboxBaseRepositoryHandles,
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
@@ -1453,10 +1452,10 @@ function SandboxProfileEditorSectionPanels(input: {
         <LoadedSandboxProfileSetupScriptSection
           disabled={input.draftFieldsAreDisabled}
           key={`${input.profileId}:${String(input.mode.version)}:setup-script`}
-          integrationRows={resolveSandboxProfileSetupScriptIntegrationRows({
-            initialRows: input.integrationsLoader.initialRows,
-            integrationDraftState: input.integrationDraftState,
-          })}
+          integrationRows={resolveSandboxProfileSetupScriptIntegrationRows(
+            input.integrationsLoader.initialRows,
+            input.integrationDraftState.integrationRows,
+          )}
           loader={input.setupScriptLoader}
           profileId={input.profileId}
           invalidateVersionSetupScript={input.invalidateVersionSetupScript}
@@ -1480,11 +1479,11 @@ function SandboxProfileEditorSectionPanels(input: {
   );
 }
 
-export function resolveSandboxProfileSetupScriptIntegrationRows(input: {
-  initialRows: readonly SandboxProfileBindingEditorRow[] | null;
-  integrationDraftState: Pick<SandboxProfileDraftSectionState, "integrationRows">;
-}): readonly SandboxProfileBindingEditorRow[] | null {
-  return input.integrationDraftState.integrationRows ?? input.initialRows;
+export function resolveSandboxProfileSetupScriptIntegrationRows(
+  initialRows: readonly SandboxProfileBindingEditorRow[] | null,
+  draftRows: readonly SandboxProfileBindingEditorRow[] | null | undefined,
+): readonly SandboxProfileBindingEditorRow[] | null {
+  return draftRows ?? initialRows;
 }
 
 const SandboxProfileEditorTabs = [
@@ -2275,8 +2274,8 @@ function ReadySandboxProfileSetupScriptSection(input: {
 }
 
 type SetupScriptContextGroup = ReturnType<
-  typeof createSandboxBaseSetupContextGroupsFromGeneratedInventory
->[number];
+  typeof createSandboxBaseSetupScriptContextFromGeneratedInventory
+>["environmentAndToolGroups"][number];
 
 function SetupScriptContextGroupRows(input: { group: SetupScriptContextGroup }): React.JSX.Element {
   return (
@@ -2316,16 +2315,9 @@ export function SandboxProfileSetupScriptPanel(input: {
       : input.saveStatus === "saved" || input.saveStatus === "saved-fading"
         ? "Saved"
         : "";
-  const setupContextGroups = createSandboxBaseSetupContextGroupsFromGeneratedInventory(
+  const setupScriptContext = createSandboxBaseSetupScriptContextFromGeneratedInventory(
     input.repositoryHandles,
   );
-  const repositoryLocationGroup =
-    setupContextGroups.find((group) => group.id === "repository-locations") ?? null;
-  const environmentAndToolGroups = setupContextGroups.filter(
-    (group) => group.id !== "repository-locations",
-  );
-  const repositoryLocationExample =
-    createSetupScriptRepositoryLocationExampleFromGeneratedInventory(input.repositoryHandles);
 
   return (
     <div className="max-w-5xl">
@@ -2367,16 +2359,20 @@ export function SandboxProfileSetupScriptPanel(input: {
                           <InlineCode variant="muted">owner/repository</InlineCode> path.
                           {" For example, "}
                           <InlineCode variant="muted">
-                            {repositoryLocationExample.handle}
+                            {setupScriptContext.repositoryLocationExample.handle}
                           </InlineCode>
                           {" is available at "}
-                          <InlineCode variant="muted">{repositoryLocationExample.path}</InlineCode>
+                          <InlineCode variant="muted">
+                            {setupScriptContext.repositoryLocationExample.path}
+                          </InlineCode>
                           {"."}
                         </FieldDescription>
                       </div>
 
-                      {repositoryLocationGroup === null ? null : (
-                        <SetupScriptContextGroupRows group={repositoryLocationGroup} />
+                      {setupScriptContext.repositoryLocationGroup === null ? null : (
+                        <SetupScriptContextGroupRows
+                          group={setupScriptContext.repositoryLocationGroup}
+                        />
                       )}
                     </div>
                   </AccordionContent>
@@ -2388,7 +2384,7 @@ export function SandboxProfileSetupScriptPanel(input: {
                   </AccordionTrigger>
                   <AccordionContent className="pb-3">
                     <div className="gap-5 flex flex-col">
-                      {environmentAndToolGroups.map((group) => (
+                      {setupScriptContext.environmentAndToolGroups.map((group) => (
                         <SetupScriptContextGroupRows group={group} key={group.id} />
                       ))}
                     </div>
