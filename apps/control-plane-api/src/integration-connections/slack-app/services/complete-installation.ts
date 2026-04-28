@@ -10,6 +10,7 @@ import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId, SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
+import { buildSlackAppInstallationCompleteUrl } from "@mistle/integrations-definitions/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -39,7 +40,6 @@ import {
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
-import { buildSlackAppInstallationCompleteUrl } from "./manifest-builder.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
