@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildSlackAppManifestCreateUrl,
   buildSlackAppManifest,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
@@ -97,6 +98,16 @@ describe("buildSlackAppManifest", () => {
         },
       },
     });
+  });
+});
+
+describe("buildSlackAppManifestCreateUrl", () => {
+  it("builds the Slack manifest create endpoint URL", () => {
+    expect(
+      buildSlackAppManifestCreateUrl({
+        apiBaseUrl: "https://slack.example.com/api/",
+      }),
+    ).toBe("https://slack.example.com/api/apps.manifest.create");
   });
 });
 

@@ -4,13 +4,13 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
 import {
   buildSlackAppInstallationCompleteUrl,
   buildSlackAppManifest,
+  buildSlackAppManifestCreateUrl,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
 } from "@mistle/integrations-definitions/server";
@@ -96,7 +96,7 @@ async function createSlackManifest(input: {
   appConfigToken: string;
   manifest: Record<string, unknown>;
 }): Promise<SlackManifestCreateSuccessResponse> {
-  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create"), {
+  const response = await fetch(buildSlackAppManifestCreateUrl({ apiBaseUrl: input.apiBaseUrl }), {
     method: "POST",
     headers: {
       accept: "application/json",
