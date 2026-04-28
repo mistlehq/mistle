@@ -1,10 +1,8 @@
 import { BadRequestError } from "@mistle/http/errors.js";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import {
   buildConvertedConnectionSecrets,
-  buildConvertedGitHubAppConnectionConfig,
   parseGitHubAppManifestConversionResponse,
 } from "./complete-manifest.js";
 
@@ -20,28 +18,6 @@ function createGitHubAppManifestConversionFixture(input?: { clientSecret?: strin
 }
 
 describe("parseGitHubAppManifestConversionResponse", () => {
-  it("accepts GitHub manifest conversion responses with numeric ids", () => {
-    const conversion = parseGitHubAppManifestConversionResponse({
-      id: 123,
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      client_secret: "manifest-client-secret",
-      pem: "-----BEGIN PRIVATE KEY-----\nmanifest\n-----END PRIVATE KEY-----",
-      webhook_secret: "manifest-webhook-secret",
-      ignored_extra_field: true,
-    });
-
-    expect(conversion).toEqual({
-      id: 123,
-      slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-      client_secret: "manifest-client-secret",
-      pem: "-----BEGIN PRIVATE KEY-----\nmanifest\n-----END PRIVATE KEY-----",
-      webhook_secret: "manifest-webhook-secret",
-      ignored_extra_field: true,
-    });
-  });
-
   it("rejects conversion responses missing required credential material", () => {
     let thrownError: unknown = null;
 
@@ -62,19 +38,6 @@ describe("parseGitHubAppManifestConversionResponse", () => {
     }
     expect(thrownError.code).toBe("INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT");
     expect(thrownError.message).toBe("GitHub App manifest conversion response is invalid.");
-  });
-});
-
-describe("buildConvertedGitHubAppConnectionConfig", () => {
-  it("maps conversion metadata into GitHub App installation config", () => {
-    const conversion = createGitHubAppManifestConversionFixture();
-
-    expect(buildConvertedGitHubAppConnectionConfig({ conversion })).toEqual({
-      connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      app_id: "123",
-      app_slug: "mistle-github-app",
-      client_id: "Iv1.manifestclientid",
-    });
   });
 });
 

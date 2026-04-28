@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
+  buildConvertedGitHubAppConnectionConfig,
   buildGitHubAppInstallationUrl,
   GitHubAppManifestTemplate,
   buildGitHubAppManifest,
   buildGitHubAppManifestSubmissionUrl,
+  parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
+
+function createGitHubAppManifestConversionFixture(input?: { clientSecret?: string }) {
+  return parseGitHubAppManifestConversionResponse({
+    id: "123",
+    slug: "mistle-github-app",
+    client_id: "Iv1.manifestclientid",
+    ...(input?.clientSecret === undefined ? {} : { client_secret: input.clientSecret }),
+    pem: "private-key",
+    webhook_secret: "webhook-secret",
+  });
+}
 
 describe("GitHubAppManifestTemplate", () => {
   it("includes the default GitHub App permissions and event subscriptions", () => {
@@ -34,6 +48,60 @@ describe("GitHubAppManifestTemplate", () => {
         metadata: "read",
         pull_requests: "write",
       },
+    });
+  });
+});
+
+describe("parseGitHubAppManifestConversionResponse", () => {
+  it("accepts GitHub manifest conversion responses with numeric ids", () => {
+    const conversion = parseGitHubAppManifestConversionResponse({
+      id: 123,
+      slug: "mistle-github-app",
+      client_id: "Iv1.manifestclientid",
+      client_secret: "manifest-client-secret",
+      pem: "-----BEGIN PRIVATE KEY-----\nmanifest\n-----END PRIVATE KEY-----",
+      webhook_secret: "manifest-webhook-secret",
+      ignored_extra_field: true,
+    });
+
+    expect(conversion).toEqual({
+      id: 123,
+      slug: "mistle-github-app",
+      client_id: "Iv1.manifestclientid",
+      client_secret: "manifest-client-secret",
+      pem: "-----BEGIN PRIVATE KEY-----\nmanifest\n-----END PRIVATE KEY-----",
+      webhook_secret: "manifest-webhook-secret",
+      ignored_extra_field: true,
+    });
+  });
+
+  it("rejects conversion responses missing required credential material", () => {
+    let thrownError: unknown = null;
+
+    try {
+      parseGitHubAppManifestConversionResponse({
+        id: 123,
+        slug: "mistle-github-app",
+        client_id: "Iv1.manifestclientid",
+        webhook_secret: "manifest-webhook-secret",
+      });
+    } catch (error) {
+      thrownError = error;
+    }
+
+    expect(thrownError).toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe("buildConvertedGitHubAppConnectionConfig", () => {
+  it("maps conversion metadata into GitHub App installation config", () => {
+    const conversion = createGitHubAppManifestConversionFixture();
+
+    expect(buildConvertedGitHubAppConnectionConfig({ conversion })).toEqual({
+      connection_method: "github-app-installation",
+      app_id: "123",
+      app_slug: "mistle-github-app",
+      client_id: "Iv1.manifestclientid",
     });
   });
 });

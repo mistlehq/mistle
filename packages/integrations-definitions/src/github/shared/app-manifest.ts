@@ -1,4 +1,6 @@
 import { buildUrlWithPath } from "@mistle/http";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { z } from "zod";
 
 export type GitHubAppManifestOwner =
   | {
@@ -8,6 +10,21 @@ export type GitHubAppManifestOwner =
       kind: "organization";
       organizationSlug: string;
     };
+
+const GitHubAppManifestConversionResponseSchema = z
+  .object({
+    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    slug: z.string().min(1),
+    client_id: z.string().min(1),
+    client_secret: z.string().min(1).optional(),
+    pem: z.string().min(1),
+    webhook_secret: z.string().min(1),
+  })
+  .loose();
+
+export type GitHubAppManifestConversion = z.output<
+  typeof GitHubAppManifestConversionResponseSchema
+>;
 
 export const GitHubAppManifestTemplate = {
   name: "Mistle GitHub App",
@@ -39,6 +56,23 @@ export const GitHubAppManifestTemplate = {
   request_oauth_on_install: false,
   setup_on_update: true,
 } as const;
+
+export function parseGitHubAppManifestConversionResponse(
+  value: unknown,
+): GitHubAppManifestConversion {
+  return GitHubAppManifestConversionResponseSchema.parse(value);
+}
+
+export function buildConvertedGitHubAppConnectionConfig(input: {
+  conversion: GitHubAppManifestConversion;
+}): Record<string, string> {
+  return {
+    connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    app_id: input.conversion.id.toString(),
+    app_slug: input.conversion.slug,
+    client_id: input.conversion.client_id,
+  };
+}
 
 export function buildGitHubAppManifestSubmissionUrl(input: {
   owner: GitHubAppManifestOwner;
