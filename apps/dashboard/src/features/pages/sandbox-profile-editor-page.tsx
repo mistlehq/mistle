@@ -2341,9 +2341,9 @@ export function SandboxProfileSetupScriptPanel(input: {
               {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
             />
             <div className="flex flex-col pt-1">
-              <Accordion className="max-w-2xl" multiple>
-                <AccordionItem value="how-setup-script-works">
-                  <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+              <Accordion className="border-border/70 w-full border-y" multiple>
+                <AccordionItem className="border-border/70" value="how-setup-script-works">
+                  <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
                     Setup script behavior
                   </AccordionTrigger>
                   <AccordionContent className="pb-3">
@@ -2374,8 +2374,8 @@ export function SandboxProfileSetupScriptPanel(input: {
                   </AccordionContent>
                 </AccordionItem>
 
-                <AccordionItem value="environment-and-tools">
-                  <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+                <AccordionItem className="border-border/70" value="environment-and-tools">
+                  <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
                     Environment and installed tools
                   </AccordionTrigger>
                   <AccordionContent className="pb-3">
