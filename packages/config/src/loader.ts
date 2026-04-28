@@ -26,7 +26,16 @@ import {
 } from "./modules.js";
 import { loadFromEnv, validateModules } from "./pipeline.js";
 import { type AppConfig, ConfigSchema } from "./schema.js";
-import * as tomlConfig from "./toml/index.js";
+import {
+  selectControlPlaneApiConfig,
+  selectControlPlaneWorkerConfig,
+  selectDataPlaneApiConfig,
+  selectDataPlaneGatewayConfig,
+  selectDataPlaneWorkerConfig,
+  selectGlobalConfig,
+  selectTokenizerProxyConfig,
+} from "./toml/project.js";
+import { ConfigSchema as RootConfigSchema, type Config as RootConfig } from "./toml/schema.js";
 
 export type LoadConfigSourceOptions = {
   configPath?: string;
@@ -75,19 +84,24 @@ function parseModuleValue<TSchema extends z.ZodType>(
   return module.schema.parse(getValueAtPath(root, module.namespace));
 }
 
-function loadValidatedRoot(
+function applyModuleEnvOverrides<TSchema extends z.ZodType>(
+  module: ConfigModule<TSchema>,
+  baseValue: z.output<TSchema>,
+  env: NodeJS.ProcessEnv,
+): z.output<TSchema> {
+  return module.schema.parse(mergeConfigRoots(baseValue, module.loadEnv(env)));
+}
+
+function parseTomlRoot(configPath: string): RootConfig {
+  return RootConfigSchema.parse(asObjectRecord(parseToml(readFileSync(configPath, "utf8"))));
+}
+
+function loadValidatedEnvRoot(
   modules: readonly ConfigModule[],
-  options: LoadConfigSourceOptions,
+  env: NodeJS.ProcessEnv,
 ): Record<string, unknown> {
-  const { configPath, env } = resolveLoadInputs(options);
-
-  const parsedTomlRoot =
-    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
-
-  const tomlLoadedRoot = configPath === undefined ? {} : tomlConfig.loadFromToml(parsedTomlRoot);
   const envLoadedRoot = loadFromEnv(modules, env);
-  const mergedRoot = mergeConfigRoots(tomlLoadedRoot, envLoadedRoot);
-  return validateModules(modules, mergedRoot);
+  return validateModules(modules, envLoadedRoot);
 }
 
 export function parseConfigRecord(record: unknown): AppConfig {
@@ -153,20 +167,174 @@ function parseAppConfig(
   throw new Error("Unsupported app id.");
 }
 
+function loadSelectedAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_API,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
+function loadSelectedAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_WORKER,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
+function loadSelectedAppConfig(
+  appId: typeof AppIds.DATA_PLANE_API,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
+function loadSelectedAppConfig(
+  appId: typeof AppIds.DATA_PLANE_GATEWAY,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
+function loadSelectedAppConfig(
+  appId: typeof AppIds.DATA_PLANE_WORKER,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
+function loadSelectedAppConfig(
+  appId: typeof AppIds.TOKENIZER_PROXY,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
+function loadSelectedAppConfig<TApp extends AppConfigModuleKey>(
+  appId: TApp,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<TApp>;
+function loadSelectedAppConfig(
+  appId: AppConfigModuleKey,
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): AppConfigModuleValue<AppConfigModuleKey> {
+  if (appId === AppIds.CONTROL_PLANE_API) {
+    return applyModuleEnvOverrides(
+      controlPlaneApiConfigModule,
+      selectControlPlaneApiConfig(rootConfig),
+      env,
+    );
+  }
+
+  if (appId === AppIds.CONTROL_PLANE_WORKER) {
+    return applyModuleEnvOverrides(
+      controlPlaneWorkerConfigModule,
+      selectControlPlaneWorkerConfig(rootConfig),
+      env,
+    );
+  }
+
+  if (appId === AppIds.DATA_PLANE_API) {
+    return applyModuleEnvOverrides(
+      dataPlaneApiConfigModule,
+      selectDataPlaneApiConfig(rootConfig),
+      env,
+    );
+  }
+
+  if (appId === AppIds.DATA_PLANE_GATEWAY) {
+    return applyModuleEnvOverrides(
+      dataPlaneGatewayConfigModule,
+      selectDataPlaneGatewayConfig(rootConfig),
+      env,
+    );
+  }
+
+  if (appId === AppIds.DATA_PLANE_WORKER) {
+    return applyModuleEnvOverrides(
+      dataPlaneWorkerConfigModule,
+      selectDataPlaneWorkerConfig(rootConfig),
+      env,
+    );
+  }
+
+  if (appId === AppIds.TOKENIZER_PROXY) {
+    return applyModuleEnvOverrides(
+      tokenizerProxyConfigModule,
+      selectTokenizerProxyConfig(rootConfig),
+      env,
+    );
+  }
+
+  throw new Error("Unsupported app id.");
+}
+
+function validateSelectedAppConfig(
+  appId: AppConfigModuleKey,
+  globalConfig: AppConfig["global"],
+  rootConfig: RootConfig,
+  env: NodeJS.ProcessEnv,
+): void {
+  if (appId === AppIds.DATA_PLANE_API) {
+    const dataPlaneApiConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_API, rootConfig, env);
+    const issue = getDataPlaneApiSandboxProviderValidationIssue({
+      globalSandboxProvider: globalConfig.sandbox.provider,
+      appSandbox: dataPlaneApiConfig.sandbox,
+    });
+
+    if (issue !== null) {
+      throw new Error(issue.message);
+    }
+  } else if (appId === AppIds.DATA_PLANE_WORKER) {
+    const dataPlaneWorkerConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_WORKER, rootConfig, env);
+    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
+      globalSandboxProvider: globalConfig.sandbox.provider,
+      appSandbox: dataPlaneWorkerConfig.sandbox,
+    });
+
+    if (issue !== null) {
+      throw new Error(issue.message);
+    }
+
+    const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
+      globalSandboxStorageConfig: globalConfig.sandbox.storage,
+      appConfig: dataPlaneWorkerConfig,
+    });
+
+    if (persistentIssue !== null) {
+      throw new Error(persistentIssue.message);
+    }
+  }
+}
+
 export function loadConfig<TApp extends AppConfigModuleKey>(
   options: LoadConfigOptions<TApp>,
 ): LoadConfigResult<TApp> {
   const appModule = appConfigModules[options.app];
+  const { configPath, env } = resolveLoadInputs(options);
+
+  if (configPath !== undefined) {
+    const rootConfig = parseTomlRoot(configPath);
+    const appConfig = loadSelectedAppConfig(options.app, rootConfig, env);
+
+    if (options.includeGlobal === false) {
+      return {
+        app: appConfig,
+      };
+    }
+
+    const globalConfig = applyModuleEnvOverrides(
+      globalConfigModule,
+      selectGlobalConfig(rootConfig),
+      env,
+    );
+
+    validateSelectedAppConfig(options.app, globalConfig, rootConfig, env);
+
+    return {
+      global: globalConfig,
+      app: appConfig,
+    };
+  }
 
   if (options.includeGlobal === false) {
-    const validatedRoot = loadValidatedRoot([appModule], options);
+    const validatedRoot = loadValidatedEnvRoot([appModule], env);
     const appConfig = parseAppConfig(options.app, validatedRoot);
     return {
       app: appConfig,
     };
   }
 
-  const validatedRoot = loadValidatedRoot([globalConfigModule, appModule], options);
+  const validatedRoot = loadValidatedEnvRoot([globalConfigModule, appModule], env);
   const globalConfig = parseModuleValue(globalConfigModule, validatedRoot);
   const appConfig = parseAppConfig(options.app, validatedRoot);
 
