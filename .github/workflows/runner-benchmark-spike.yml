@@ -1,0 +1,169 @@
+name: Runner Benchmark Spike
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - spike/blacksmith-runner-benchmark
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-benchmark-spike-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: ${{ matrix.target.label }} / ${{ matrix.runner.label }} / ${{ matrix.cache }} cache
+    runs-on: ${{ matrix.runner.runs_on }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - name: ts-test
+            label: TS Test
+          - name: ts-component-test
+            label: TS Component Test
+        runner:
+          - label: 2vcpu
+            runs_on: blacksmith-2vcpu-ubuntu-2404
+            compute_usd_per_min: "0.004"
+          - label: 4vcpu
+            runs_on: blacksmith-4vcpu-ubuntu-2404
+            compute_usd_per_min: "0.008"
+          - label: 8vcpu
+            runs_on: blacksmith-8vcpu-ubuntu-2404
+            compute_usd_per_min: "0.016"
+        cache:
+          - cold
+          - warm
+    env:
+      BENCHMARK_TARGET: ${{ matrix.target.name }}
+      BLACKSMITH_COMPUTE_USD_PER_MIN: ${{ matrix.runner.compute_usd_per_min }}
+      CACHE_MODE: ${{ matrix.cache }}
+      CI: true
+      GITHUB_PLATFORM_USD_PER_MIN: "0.002"
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+      TURBO_TELEMETRY_DISABLED: "1"
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+
+    steps:
+      - name: Start benchmark timer
+        id: benchmark-start
+        run: echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Restore pnpm store cache
+        id: pnpm-store-cache
+        if: matrix.cache == 'warm'
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Restore Turbo local cache
+        id: turbo-cache
+        if: matrix.cache == 'warm'
+        uses: actions/cache/restore@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ matrix.target.name }}-${{ matrix.runner.label }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-${{ matrix.target.name }}-${{ matrix.runner.label }}-
+            ${{ runner.os }}-turbo-${{ github.workflow }}-${{ matrix.target.name }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies in Nix shell
+        id: install
+        run: |
+          started_at=$(date +%s)
+          nix develop --command pnpm install --frozen-lockfile
+          completed_at=$(date +%s)
+          echo "seconds=$((completed_at - started_at))" >> "$GITHUB_OUTPUT"
+
+      - name: Save pnpm store cache
+        if: matrix.cache == 'warm' && steps.pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Generate integration config
+        id: config
+        run: |
+          started_at=$(date +%s)
+          nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
+          completed_at=$(date +%s)
+          echo "seconds=$((completed_at - started_at))" >> "$GITHUB_OUTPUT"
+
+      - name: Run benchmark target
+        id: target
+        run: |
+          started_at=$(date +%s)
+
+          case "$BENCHMARK_TARGET" in
+            ts-test)
+              nix develop --command pnpm turbo run test --output-logs=full --filter=!@mistle/sandboxd --filter=!@mistle/commit-sign
+              ;;
+            ts-component-test)
+              nix develop --command pnpm test:component
+              ;;
+            *)
+              echo "Unknown benchmark target: $BENCHMARK_TARGET" >&2
+              exit 1
+              ;;
+          esac
+
+          completed_at=$(date +%s)
+          echo "seconds=$((completed_at - started_at))" >> "$GITHUB_OUTPUT"
+
+      - name: Write benchmark summary
+        if: always()
+        env:
+          CONFIG_SECONDS: ${{ steps.config.outputs.seconds }}
+          INSTALL_SECONDS: ${{ steps.install.outputs.seconds }}
+          TARGET_SECONDS: ${{ steps.target.outputs.seconds }}
+        run: |
+          completed_at=$(date +%s)
+          total_seconds=$((completed_at - ${{ steps.benchmark-start.outputs.epoch }}))
+
+          estimated_total_usd=$(awk \
+            -v seconds="$total_seconds" \
+            -v compute_rate="$BLACKSMITH_COMPUTE_USD_PER_MIN" \
+            -v platform_rate="$GITHUB_PLATFORM_USD_PER_MIN" \
+            'BEGIN { printf "%.6f", (seconds / 60) * (compute_rate + platform_rate) }')
+
+          {
+            echo "## Runner benchmark"
+            echo
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Target | ${{ matrix.target.label }} |"
+            echo "| Runner | ${{ matrix.runner.runs_on }} |"
+            echo "| Cache mode | $CACHE_MODE |"
+            echo "| pnpm cache hit | ${{ steps.pnpm-store-cache.outputs.cache-hit || 'skipped' }} |"
+            echo "| Turbo cache hit | ${{ steps.turbo-cache.outputs.cache-hit || 'skipped' }} |"
+            echo "| Install seconds | ${INSTALL_SECONDS:-n/a} |"
+            echo "| Config seconds | ${CONFIG_SECONDS:-n/a} |"
+            echo "| Target seconds | ${TARGET_SECONDS:-n/a} |"
+            echo "| Measured job seconds | $total_seconds |"
+            echo "| Estimated USD | $estimated_total_usd |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save Turbo local cache
+        if: matrix.cache == 'warm' && always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ matrix.target.name }}-${{ matrix.runner.label }}-${{ github.sha }}
