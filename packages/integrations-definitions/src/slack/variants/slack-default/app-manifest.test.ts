@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildSlackAppManifestCreateUrl,
   buildSlackAppManifest,
+  buildSlackOAuthAccessConnectionSecrets,
   buildSlackOAuthAccessUrl,
   buildSlackManifestConnectionConfig,
   buildSlackManifestConnectionSecrets,
+  parseSlackOAuthAccessErrorResponse,
+  parseSlackOAuthAccessSuccessResponse,
 } from "./app-manifest.js";
 import { SlackAppManifestTemplate } from "./manifest.js";
 
@@ -119,6 +122,80 @@ describe("buildSlackOAuthAccessUrl", () => {
         apiBaseUrl: "https://slack.example.com/api/",
       }),
     ).toBe("https://slack.example.com/api/oauth.v2.access");
+  });
+});
+
+describe("parseSlackOAuthAccessSuccessResponse", () => {
+  it("accepts Slack OAuth access success responses", () => {
+    expect(
+      parseSlackOAuthAccessSuccessResponse({
+        ok: true,
+        access_token: "xoxb-slack-bot-token",
+        token_type: "bot",
+        app_id: "A123",
+        bot_user_id: "U123",
+        team: {
+          id: "T123",
+          name: "Mistle",
+        },
+        ignored_extra_field: true,
+      }),
+    ).toEqual({
+      ok: true,
+      access_token: "xoxb-slack-bot-token",
+      token_type: "bot",
+      app_id: "A123",
+      bot_user_id: "U123",
+      team: {
+        id: "T123",
+        name: "Mistle",
+      },
+      ignored_extra_field: true,
+    });
+  });
+
+  it("rejects Slack OAuth access responses without bot token material", () => {
+    expect(() =>
+      parseSlackOAuthAccessSuccessResponse({
+        ok: true,
+        app_id: "A123",
+      }),
+    ).toThrow("Invalid input");
+  });
+});
+
+describe("parseSlackOAuthAccessErrorResponse", () => {
+  it("returns Slack OAuth access error responses", () => {
+    expect(
+      parseSlackOAuthAccessErrorResponse({
+        ok: false,
+        error: "invalid_code",
+      }),
+    ).toEqual({
+      ok: false,
+      error: "invalid_code",
+    });
+  });
+
+  it("returns null for non-error responses", () => {
+    expect(
+      parseSlackOAuthAccessErrorResponse({
+        ok: true,
+        access_token: "xoxb-slack-bot-token",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("buildSlackOAuthAccessConnectionSecrets", () => {
+  it("maps Slack OAuth access tokens into connection secrets", () => {
+    expect(
+      buildSlackOAuthAccessConnectionSecrets({
+        accessToken: "xoxb-slack-bot-token",
+      }),
+    ).toEqual({
+      botToken: "xoxb-slack-bot-token",
+    });
   });
 });
 

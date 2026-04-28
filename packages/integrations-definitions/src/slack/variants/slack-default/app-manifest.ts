@@ -1,7 +1,38 @@
 import { buildUrlWithPath } from "@mistle/http";
+import { z } from "zod";
 
 import { SlackConnectionMethodId } from "./auth.js";
 import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
+
+const SlackOAuthAccessSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    access_token: z.string().min(1),
+    token_type: z.literal("bot").optional(),
+    app_id: z.string().min(1).optional(),
+    bot_user_id: z.string().min(1).optional(),
+    team: z
+      .object({
+        id: z.string().min(1),
+        name: z.string().min(1).optional(),
+      })
+      .loose()
+      .optional(),
+  })
+  .loose();
+
+const SlackOAuthAccessErrorResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string().min(1),
+  })
+  .loose();
+
+export type SlackOAuthAccessSuccessResponse = z.output<
+  typeof SlackOAuthAccessSuccessResponseSchema
+>;
+
+export type SlackOAuthAccessErrorResponse = z.output<typeof SlackOAuthAccessErrorResponseSchema>;
 
 function mergeUniqueStrings(input: {
   existing: unknown;
@@ -37,6 +68,27 @@ export function buildSlackAppManifestCreateUrl(input: { apiBaseUrl: string }): s
 
 export function buildSlackOAuthAccessUrl(input: { apiBaseUrl: string }): string {
   return buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access");
+}
+
+export function parseSlackOAuthAccessSuccessResponse(
+  value: unknown,
+): SlackOAuthAccessSuccessResponse {
+  return SlackOAuthAccessSuccessResponseSchema.parse(value);
+}
+
+export function parseSlackOAuthAccessErrorResponse(
+  value: unknown,
+): SlackOAuthAccessErrorResponse | null {
+  const parsed = SlackOAuthAccessErrorResponseSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function buildSlackOAuthAccessConnectionSecrets(input: {
+  accessToken: string;
+}): Record<string, string> {
+  return {
+    botToken: input.accessToken,
+  };
 }
 
 export function buildSlackManifestConnectionConfig(input: {
