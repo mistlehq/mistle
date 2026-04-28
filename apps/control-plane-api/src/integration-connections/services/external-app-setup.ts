@@ -1,6 +1,8 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import type {
+  IntegrationConnectionMethodId,
   IntegrationExternalAppSetupFlowCapability,
   IntegrationExternalAppSetupStartResult,
   IntegrationRegistry,
@@ -72,6 +74,34 @@ function resolveSetupFlowOrThrow(input: {
   }
 
   return flow;
+}
+
+function assertConnectionMethodMatchesSetupFlow(input: {
+  connectionId: string;
+  config: Record<string, unknown>;
+  methodId: IntegrationConnectionMethodId;
+  routeSegment: string;
+}): void {
+  const connectionMethod = input.config["connection_method"];
+  if (connectionMethod === input.methodId) {
+    return;
+  }
+
+  if (input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
+    throw new BadRequestError(
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+      `Integration connection '${input.connectionId}' does not use GitHub App installation auth.`,
+    );
+  }
+
+  const receivedMethod =
+    typeof connectionMethod === "string" && connectionMethod.length > 0
+      ? connectionMethod
+      : "missing";
+  throw new BadRequestError(
+    IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+    `Integration setup flow '${input.routeSegment}' requires connection method '${input.methodId}', received '${receivedMethod}'.`,
+  );
 }
 
 async function resolveConnectionSecretValue(input: {
@@ -222,6 +252,12 @@ export async function startExternalAppSetup(
     config: connection.config,
   });
   const parsedConnectionConfig = UnknownRecordSchema.parse(connectionConfig);
+  assertConnectionMethodMatchesSetupFlow({
+    connectionId: connection.id,
+    config: parsedConnectionConfig,
+    methodId: flow.methodId,
+    routeSegment: input.routeSegment,
+  });
   const parsedTargetConfig = UnknownRecordSchema.parse(
     definition.targetConfigSchema.parse(connection.target.config),
   );
@@ -405,6 +441,12 @@ export async function completeExternalAppSetup(
     config: connection.config,
   });
   const parsedConnectionConfig = UnknownRecordSchema.parse(connectionConfig);
+  assertConnectionMethodMatchesSetupFlow({
+    connectionId: connection.id,
+    config: parsedConnectionConfig,
+    methodId: flow.methodId,
+    routeSegment: stateMetadata.routeSegment,
+  });
   const parsedTargetConfig = UnknownRecordSchema.parse(
     definition.targetConfigSchema.parse(connection.target.config),
   );

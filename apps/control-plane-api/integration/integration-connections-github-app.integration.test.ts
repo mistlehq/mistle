@@ -24,13 +24,19 @@ import {
   StartGitHubAppInstallationConnectionNotFoundResponseSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
 } from "../src/integration-connections/github-app/start-installation/schema.js";
-import { StartGitHubAppManifestConnectionResponseSchema } from "../src/integration-connections/github-app/start-manifest/schema.js";
+import {
+  StartGitHubAppManifestConnectionBadRequestResponseSchema,
+  StartGitHubAppManifestConnectionResponseSchema,
+} from "../src/integration-connections/github-app/start-manifest/schema.js";
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import {
   CreatedFormIntegrationConnectionSchema,
   IntegrationConnectionSchema,
 } from "../src/integration-connections/schemas.js";
-import { StartedExternalAppSetupResponseSchema } from "../src/integration-connections/start-external-app-setup/schema.js";
+import {
+  StartExternalAppSetupBadRequestResponseSchema,
+  StartedExternalAppSetupResponseSchema,
+} from "../src/integration-connections/start-external-app-setup/schema.js";
 import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -38,6 +44,11 @@ import { it } from "./test-context.js";
 const GitHubCloudTargetConfig = {
   api_base_url: "https://api.github.com",
   web_base_url: "https://github.com",
+} as const;
+
+const GitHubEnterpriseServerTargetConfig = {
+  api_base_url: "https://github.enterprise.example.com/api/v3",
+  web_base_url: "https://github.enterprise.example.com",
 } as const;
 
 async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
@@ -57,6 +68,29 @@ async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixtur
         variantId: "github-cloud",
         enabled: true,
         config: GitHubCloudTargetConfig,
+      },
+    });
+}
+
+async function ensureGithubEnterpriseServerTarget(
+  fixture: ControlPlaneApiIntegrationFixture,
+): Promise<void> {
+  await fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: "github-enterprise-server",
+      familyId: "github",
+      variantId: "github-enterprise-server",
+      enabled: true,
+      config: GitHubEnterpriseServerTargetConfig,
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "github",
+        variantId: "github-enterprise-server",
+        enabled: true,
+        config: GitHubEnterpriseServerTargetConfig,
       },
     });
 }
@@ -315,6 +349,167 @@ describe("integration connections GitHub App integration", () => {
     expect(state).toContain(".");
   });
 
+  it("starts and completes GitHub Enterprise Server App installation through the generic external app setup route", async ({
+    fixture,
+  }) => {
+    await ensureGithubEnterpriseServerTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubEnterpriseServerAppConnection(
+      fixture,
+      {
+        email: "integration-connections-github-enterprise-app-installation-generic@example.com",
+        displayName: "GitHub Enterprise",
+      },
+    );
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${connectionId}/setup/github-app-installation/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({}),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = StartedExternalAppSetupResponseSchema.parse(await response.json());
+    expect(responseBody.kind).toBe("redirect");
+    if (responseBody.kind !== "redirect") {
+      throw new Error("Expected redirect start response.");
+    }
+
+    const authorizationUrl = new URL(responseBody.authorizationUrl);
+    expect(authorizationUrl.origin).toBe("https://github.enterprise.example.com");
+    expect(authorizationUrl.pathname).toBe(
+      "/github-apps/mistle-github-enterprise-app/installations/select_target",
+    );
+    const state = authorizationUrl.searchParams.get("state");
+    if (state === null || state.length === 0) {
+      throw new Error("Expected redirect state in authorization URL.");
+    }
+
+    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-enterprise-server"),
+          eq(table.state, state),
+        ),
+    });
+    expect(redirectSession).toBeDefined();
+
+    const completeResponse = await fixture.request(
+      createGitHubAppInstallationCompletePath({
+        query: {
+          state,
+          installation_id: "98765",
+          setup_action: "install",
+        },
+      }),
+      {
+        method: "GET",
+        redirect: "manual",
+      },
+    );
+
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-enterprise-server", {
+        connectionId,
+        connectionNotice: "installed",
+      }),
+    );
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.id, connectionId),
+        ),
+    });
+    expect(persistedConnection).toBeDefined();
+    if (persistedConnection === undefined) {
+      throw new Error("Expected persisted GitHub Enterprise Server connection.");
+    }
+
+    expect(persistedConnection.externalSubjectId).toBe("98765");
+    expect(persistedConnection.config).toEqual({
+      connection_method: "github-app-installation",
+      app_id: "456",
+      app_slug: "mistle-github-enterprise-app",
+      client_id: "Iv1.enterpriseclient123",
+      installation_id: "98765",
+      setup_action: "install",
+    });
+  });
+
+  it("returns 400 when GitHub App manifest start connection uses API key auth", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-github-app-manifest-api-key-start@example.com",
+    });
+    const connectionId = await createGitHubApiKeyConnection(fixture, {
+      authenticatedSession,
+      displayName: "GitHub API key",
+    });
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${connectionId}/github-app-manifest/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = StartGitHubAppManifestConnectionBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+
+    const genericResponse = await fixture.request(
+      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+
+    expect(genericResponse.status).toBe(400);
+    const genericResponseBody = StartExternalAppSetupBadRequestResponseSchema.parse(
+      await genericResponse.json(),
+    );
+    expect(genericResponseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+  });
+
   it("returns the documented GitHub App manifest completion code when the callback code is missing", async ({
     fixture,
   }) => {
@@ -368,6 +563,76 @@ describe("integration connections GitHub App integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT");
     expect(responseBody.message).toContain("must include `code`");
+  });
+
+  it("returns 400 when GitHub App manifest completion connection no longer uses GitHub App installation auth", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-github-app-manifest-api-key-complete@example.com",
+    });
+    const connectionId = await createGitHubAppDraftConnection(fixture, {
+      authenticatedSession,
+      displayName: "Draft GitHub",
+    });
+    const startResponse = await fixture.request(
+      `/v1/integration/connections/${connectionId}/github-app-manifest/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startResponseBody = StartGitHubAppManifestConnectionResponseSchema.parse(
+      await startResponse.json(),
+    );
+    const state = resolveGitHubAppManifestSubmissionState(new URL(startResponseBody.submissionUrl));
+
+    await fixture.db
+      .update(integrationConnections)
+      .set({
+        config: {
+          connection_method: "api-key",
+        },
+      })
+      .where(eq(integrationConnections.id, connectionId));
+
+    const response = await fixture.request(
+      createGitHubAppManifestCompletePath({
+        query: {
+          state,
+        },
+      }),
+      {
+        method: "GET",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = CompleteGitHubAppManifestConnectionBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq: equals }) => equals(table.id, connectionId),
+    });
+    expect(persistedConnection?.config).toEqual({
+      connection_method: "api-key",
+    });
   });
 
   it("fails to start installation when a draft connection is still missing required GitHub App credentials", async ({
@@ -910,6 +1175,54 @@ async function createGitHubAppConnection(
   };
 }
 
+async function createGitHubEnterpriseServerAppConnection(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    email: string;
+    displayName: string;
+  },
+): Promise<{
+  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
+  connectionId: string;
+}> {
+  const authenticatedSession = await fixture.authSession({
+    email: input.email,
+  });
+
+  const response = await fixture.request(
+    "/v1/integration/connections/github-enterprise-server/form",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: "github-app-installation",
+        config: {
+          connection_method: "github-app-installation",
+          app_id: "456",
+          app_slug: "mistle-github-enterprise-app",
+          client_id: "Iv1.enterpriseclient123",
+        },
+        secrets: {
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nenterprise\n-----END PRIVATE KEY-----",
+          webhookSecret: "github-enterprise-webhook-secret",
+        },
+      }),
+    },
+  );
+
+  expect(response.status).toBe(201);
+  const createdConnection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
+
+  return {
+    authenticatedSession,
+    connectionId: createdConnection.id,
+  };
+}
+
 async function createGitHubAppDraftConnection(
   fixture: ControlPlaneApiIntegrationFixture,
   input: {
@@ -933,6 +1246,36 @@ async function createGitHubAppDraftConnection(
 
   expect(response.status).toBe(201);
   const createdConnection = IntegrationConnectionSchema.parse(await response.json());
+  return createdConnection.id;
+}
+
+async function createGitHubApiKeyConnection(
+  fixture: ControlPlaneApiIntegrationFixture,
+  input: {
+    authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
+    displayName: string;
+  },
+): Promise<string> {
+  const response = await fixture.request("/v1/integration/connections/github-cloud/form", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.authenticatedSession.cookie,
+    },
+    body: JSON.stringify({
+      displayName: input.displayName,
+      methodId: "api-key",
+      config: {
+        connection_method: "api-key",
+      },
+      secrets: {
+        apiKey: "github-api-key",
+      },
+    }),
+  });
+
+  expect(response.status).toBe(201);
+  const createdConnection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
   return createdConnection.id;
 }
 

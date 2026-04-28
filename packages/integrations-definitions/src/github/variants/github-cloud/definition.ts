@@ -1,7 +1,7 @@
 import { GitHubCredentialResolverKeys } from "../../shared/credential-resolver-keys.js";
 import { GitHubAppInstallationCredentialResolver } from "../../shared/credential-resolver.server.js";
 import { AppendSessionLinkToGitHubMarkdownRequestMiddleware } from "../../shared/egress-request-middleware.server.js";
-import { GitHubExternalAppSetupCapability } from "../../shared/external-app-setup.server.js";
+import { GitHubCloudExternalAppSetupCapability } from "../../shared/external-app-setup.server.js";
 import { GitHubIdentityLinkingCapability } from "../../shared/identity-linking.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
 import {
@@ -20,7 +20,7 @@ import { GitHubCloudWebhookHandler } from "./webhook.server.js";
 export const GitHubCloudDefinition: GitHubCloudBaseIntegrationDefinition = {
   ...GitHubCloudBaseDefinition,
   identityLinking: GitHubIdentityLinkingCapability,
-  externalAppSetup: GitHubExternalAppSetupCapability,
+  externalAppSetup: GitHubCloudExternalAppSetupCapability,
   egressRequestMiddleware: [AppendSessionLinkToGitHubMarkdownRequestMiddleware],
   resolveEgressCredentialResolver: resolveGitHubUserAttributedEgressCredentialResolver,
   credentialResolvers: {

@@ -2296,6 +2296,7 @@ export interface paths {
                   /** @enum {string} */
                   code:
                     | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                     | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
                     | "INVALID_GITHUB_APP_MANIFEST_START_INPUT"
                     | "INVALID_SLACK_APP_MANIFEST_START_INPUT"

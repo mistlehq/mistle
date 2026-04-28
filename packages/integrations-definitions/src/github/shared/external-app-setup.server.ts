@@ -17,8 +17,22 @@ import {
 } from "./app-manifest.js";
 import type { GitHubConnectionConfig } from "./auth.js";
 import { parseGitHubAppInstallationConnectionConfig } from "./auth.js";
+import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
+
+type GitHubExternalAppSetupCapabilityOptions = {
+  requiredInstallationSecrets: ReadonlyArray<{
+    secretKind: "api_key" | "oauth2_client_secret";
+    slotKey:
+      | typeof GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM
+      | typeof GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET
+      | typeof GitHubCredentialSlotKeys.GITHUB_CLOUD_WEBHOOK_SECRET
+      | typeof GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM
+      | typeof GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET;
+  }>;
+  supportsClientSecret: boolean;
+};
 
 const GitHubAppManifestStartBodySchema = z
   .object({
@@ -55,46 +69,124 @@ async function convertGitHubAppManifest(input: {
   return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
-export const GitHubExternalAppSetupCapability: IntegrationExternalAppSetupCapability<
+export function createGitHubExternalAppSetupCapability(
+  options: GitHubExternalAppSetupCapabilityOptions,
+): IntegrationExternalAppSetupCapability<
   GitHubTargetConfig,
   GitHubTargetSecrets,
   GitHubConnectionConfig
-> = {
-  flows: [
-    {
-      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      routeSegment: "github-app",
-      async start(input) {
-        const body = GitHubAppManifestStartBodySchema.parse(input.body);
-        if (input.webhookCallbackUrl === undefined) {
-          throw new Error(
-            `GitHub App manifest setup for connection '${input.connection.id}' requires a webhook callback URL.`,
-          );
-        }
+> {
+  return {
+    flows: [
+      {
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        routeSegment: "github-app",
+        async start(input) {
+          const body = GitHubAppManifestStartBodySchema.parse(input.body);
+          if (input.webhookCallbackUrl === undefined) {
+            throw new Error(
+              `GitHub App manifest setup for connection '${input.connection.id}' requires a webhook callback URL.`,
+            );
+          }
 
-        const manifest = buildGitHubAppManifest({
-          manifest: body.manifest,
-          controlPlaneBaseUrl: input.controlPlaneBaseUrl,
-          webhookCallbackUrl: input.webhookCallbackUrl,
-        });
+          const manifest = buildGitHubAppManifest({
+            manifest: body.manifest,
+            controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+            webhookCallbackUrl: input.webhookCallbackUrl,
+          });
 
-        return {
-          start: {
-            kind: "form-post",
-            submissionUrl: buildGitHubAppManifestSubmissionUrl({
-              owner: body.owner,
-              webBaseUrl: input.target.config.webBaseUrl,
-              state: input.redirectState,
-            }),
-            fields: {
-              manifest: JSON.stringify(manifest),
+          return {
+            start: {
+              kind: "form-post",
+              submissionUrl: buildGitHubAppManifestSubmissionUrl({
+                owner: body.owner,
+                webBaseUrl: input.target.config.webBaseUrl,
+                state: input.redirectState,
+              }),
+              fields: {
+                manifest: JSON.stringify(manifest),
+              },
             },
-          },
-        };
+          };
+        },
+        async complete(input) {
+          const installationId = input.query.get("installation_id");
+          if (installationId !== null && installationId.length > 0) {
+            const setupAction = input.query.get("setup_action");
+            const parsedConfig = parseGitHubAppInstallationConnectionConfig(
+              input.connection.config,
+            );
+
+            return {
+              connection: {
+                externalSubjectId: installationId,
+                config: {
+                  ...parsedConfig,
+                  installation_id: installationId,
+                  ...(setupAction === null ? {} : { setup_action: setupAction }),
+                },
+              },
+            };
+          }
+
+          const code = input.query.get("code");
+          if (code === null || code.length === 0) {
+            throw new Error("GitHub App setup callback query must include `code`.");
+          }
+
+          const conversion = await convertGitHubAppManifest({
+            apiBaseUrl: input.target.config.apiBaseUrl,
+            code,
+          });
+
+          try {
+            return {
+              connection: {
+                config: buildConvertedGitHubAppConnectionConfig({ conversion }),
+              },
+              secrets: buildConvertedGitHubAppConnectionSecrets({
+                conversion,
+                supportsClientSecret: options.supportsClientSecret,
+              }),
+            };
+          } catch (error) {
+            if (error instanceof GitHubAppManifestConversionMissingClientSecretError) {
+              throw error;
+            }
+
+            throw error;
+          }
+        },
       },
-      async complete(input) {
-        const installationId = input.query.get("installation_id");
-        if (installationId !== null && installationId.length > 0) {
+      {
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        routeSegment: "github-app-installation",
+        async start(input) {
+          const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
+          for (const secret of options.requiredInstallationSecrets) {
+            await input.resolveConnectionSecret(secret);
+          }
+
+          return {
+            start: {
+              kind: "redirect",
+              authorizationUrl: buildGitHubAppInstallationUrl({
+                appSlug: parsedConfig.app_slug,
+                state: input.redirectState,
+                variantId: input.target.variantId,
+                webBaseUrl: input.target.config.webBaseUrl,
+              }),
+            },
+          };
+        },
+        async complete(input) {
+          const installationId = input.query.get("installation_id");
+          if (installationId === null || installationId.length === 0) {
+            throw new Error(
+              "GitHub App installation callback query must include `installation_id`.",
+            );
+          }
+
           const setupAction = input.query.get("setup_action");
           const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
 
@@ -108,79 +200,41 @@ export const GitHubExternalAppSetupCapability: IntegrationExternalAppSetupCapabi
               },
             },
           };
-        }
-
-        const code = input.query.get("code");
-        if (code === null || code.length === 0) {
-          throw new Error("GitHub App setup callback query must include `code`.");
-        }
-
-        const conversion = await convertGitHubAppManifest({
-          apiBaseUrl: input.target.config.apiBaseUrl,
-          code,
-        });
-
-        try {
-          return {
-            connection: {
-              config: buildConvertedGitHubAppConnectionConfig({ conversion }),
-            },
-            secrets: buildConvertedGitHubAppConnectionSecrets({
-              conversion,
-              supportsClientSecret: true,
-            }),
-          };
-        } catch (error) {
-          if (error instanceof GitHubAppManifestConversionMissingClientSecretError) {
-            throw error;
-          }
-
-          throw error;
-        }
+        },
       },
+    ],
+  };
+}
+
+export const GitHubCloudExternalAppSetupCapability = createGitHubExternalAppSetupCapability({
+  requiredInstallationSecrets: [
+    {
+      slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM,
+      secretKind: "api_key",
     },
     {
-      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      routeSegment: "github-app-installation",
-      async start(input) {
-        const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
-        await input.resolveConnectionSecret({
-          slotKey: "github.github-cloud.github-app-installation.app-private-key-pem",
-          secretKind: "api_key",
-        });
-
-        return {
-          start: {
-            kind: "redirect",
-            authorizationUrl: buildGitHubAppInstallationUrl({
-              appSlug: parsedConfig.app_slug,
-              state: input.redirectState,
-              variantId: input.target.variantId,
-              webBaseUrl: input.target.config.webBaseUrl,
-            }),
-          },
-        };
-      },
-      async complete(input) {
-        const installationId = input.query.get("installation_id");
-        if (installationId === null || installationId.length === 0) {
-          throw new Error("GitHub App installation callback query must include `installation_id`.");
-        }
-
-        const setupAction = input.query.get("setup_action");
-        const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
-
-        return {
-          connection: {
-            externalSubjectId: installationId,
-            config: {
-              ...parsedConfig,
-              installation_id: installationId,
-              ...(setupAction === null ? {} : { setup_action: setupAction }),
-            },
-          },
-        };
-      },
+      slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_CLIENT_SECRET,
+      secretKind: "oauth2_client_secret",
+    },
+    {
+      slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_WEBHOOK_SECRET,
+      secretKind: "api_key",
     },
   ],
-};
+  supportsClientSecret: true,
+});
+
+export const GitHubEnterpriseServerExternalAppSetupCapability =
+  createGitHubExternalAppSetupCapability({
+    requiredInstallationSecrets: [
+      {
+        slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,
+        secretKind: "api_key",
+      },
+      {
+        slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_WEBHOOK_SECRET,
+        secretKind: "api_key",
+      },
+    ],
+    supportsClientSecret: false,
+  });
