@@ -1,3 +1,5 @@
+import type { IntegrationWebhookEventCapabilityRequirement } from "@mistle/integrations-core";
+
 export const WebhookAutomationEventOptionAvailabilities = {
   AVAILABLE: "available",
   MISSING_INTEGRATION: "missing_integration",
@@ -53,24 +55,6 @@ export type WebhookAutomationPayloadReference = {
   description: string;
 };
 
-export type WebhookAutomationEventCapabilityRequirement =
-  | {
-      kind: "webhook-event";
-      providerEventType: string;
-      label: string;
-    }
-  | {
-      kind: "oauth-scope";
-      scope: string;
-      label: string;
-    }
-  | {
-      kind: "github-app-permission";
-      permission: string;
-      access: "read" | "write" | "admin";
-      label: string;
-    };
-
 export type WebhookAutomationEventOption = {
   id: string;
   eventType: string;
@@ -85,7 +69,7 @@ export type WebhookAutomationEventOption = {
   payloadReferences?: readonly WebhookAutomationPayloadReference[];
   conversationKeyOptions?: readonly WebhookAutomationConversationKeyOption[];
   parameters?: readonly WebhookAutomationEventParameterOption[];
-  requiredCapabilities?: readonly WebhookAutomationEventCapabilityRequirement[];
+  requiredCapabilities?: readonly IntegrationWebhookEventCapabilityRequirement[];
 };
 
 export type WebhookAutomationTriggerParameterValueMap = Record<string, Record<string, string>>;
