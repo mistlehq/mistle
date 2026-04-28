@@ -43,6 +43,22 @@ const DEFAULT_WORKSPACE_POLICY_STEPS: readonly Step[] = ["format", "lint", "type
 const TESTS_POLICY_STEPS: readonly Step[] = ["lint", "typecheck"];
 const ROOT_REPO_CHECK_STEPS = new Set<Step>(["format", "typecheck"]);
 const AFFECTED_TEST_PACKAGE_NAMES = new Set(["@mistle/dashboard", "@mistle/ui"]);
+const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
+  "@mistle/config",
+  "@mistle/control-plane-api",
+  "@mistle/control-plane-worker",
+  "@mistle/dashboard",
+  "@mistle/data-plane-api",
+  "@mistle/data-plane-gateway",
+  "@mistle/data-plane-worker",
+  "@mistle/db",
+  "@mistle/emails",
+  "@mistle/integrations-core",
+  "@mistle/object-store",
+  "@mistle/sandbox",
+  "@mistle/test-harness",
+  "@mistle/tokenizer-proxy",
+]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 
@@ -556,6 +572,13 @@ function isTestFilePath(filePath: string): boolean {
   return filePath.endsWith(".test.ts") || filePath.endsWith(".test.tsx");
 }
 
+function isIntegrationTestFilePath(filePath: string): boolean {
+  return (
+    (filePath.endsWith(".integration.test.ts") || filePath.endsWith(".integration.test.tsx")) &&
+    filePath.includes("/integration/")
+  );
+}
+
 function isSupportedAffectedTestInputFilePath(filePath: string): boolean {
   return /\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/.test(filePath);
 }
@@ -600,6 +623,24 @@ function buildAffectedVitestCommand(
   return command;
 }
 
+function buildAffectedIntegrationVitestCommand(
+  workspacePackage: WorkspacePackage,
+  filePaths: readonly string[],
+): string[] {
+  return [
+    "pnpm",
+    "--dir",
+    workspacePackage.relativePath,
+    "exec",
+    "vitest",
+    "run",
+    "-c",
+    "vitest.integration.config.ts",
+    "--passWithNoTests",
+    ...filePaths.map((filePath) => resolve(REPO_ROOT, filePath)),
+  ];
+}
+
 function buildAffectedTestCommands(
   plan: ValidationPlan,
   workspacePackages: readonly WorkspacePackage[],
@@ -637,6 +678,17 @@ function buildAffectedTestCommands(
       (filePath) =>
         filePath.startsWith(`${workspacePackage.relativePath}/`) && isTestFilePath(filePath),
     );
+    const changedExistingTestFiles = changedTestFiles.filter((filePath) =>
+      existsSync(resolve(REPO_ROOT, filePath)),
+    );
+    const changedIntegrationTestFiles = changedExistingTestFiles.filter(
+      (filePath) =>
+        isIntegrationTestFilePath(filePath) &&
+        AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES.has(workspacePackage.name),
+    );
+    const changedUnitTestFiles = changedExistingTestFiles.filter(
+      (filePath) => changedIntegrationTestFiles.includes(filePath) === false,
+    );
     const relatedFiles = relevantFiles.filter(
       (filePath) => changedTestFiles.includes(filePath) === false,
     );
@@ -649,8 +701,16 @@ function buildAffectedTestCommands(
       continue;
     }
 
-    if (changedTestFiles.length > 0) {
-      affectedCommands.push(buildAffectedVitestCommand(workspacePackage, "run", changedTestFiles));
+    if (changedUnitTestFiles.length > 0) {
+      affectedCommands.push(
+        buildAffectedVitestCommand(workspacePackage, "run", changedUnitTestFiles),
+      );
+    }
+
+    if (changedIntegrationTestFiles.length > 0) {
+      affectedCommands.push(
+        buildAffectedIntegrationVitestCommand(workspacePackage, changedIntegrationTestFiles),
+      );
     }
 
     if (relatedFiles.length > 0) {

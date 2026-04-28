@@ -4,9 +4,9 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { resetDashboardConfigForTest } from "../../config.js";
-import { resetAuthClientForTest } from "../../lib/auth/client.js";
-import { createSandboxInstancePortAccess } from "./sessions-service.js";
+import { resetDashboardConfigForTest } from "../src/config.js";
+import { createSandboxInstancePortAccess } from "../src/features/sessions/sessions-service.js";
+import { resetAuthClientForTest } from "../src/lib/auth/client.js";
 
 type RequestRecord = {
   method: string;
