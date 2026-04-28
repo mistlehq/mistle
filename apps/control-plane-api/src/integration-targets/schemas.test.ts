@@ -50,4 +50,41 @@ describe("IntegrationTargetSchema", () => {
       },
     ]);
   });
+
+  it("parses draft-then-setup form connection method metadata", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "slack-default",
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {},
+      displayName: "Slack",
+      description: "Slack integration",
+      connectionMethods: [
+        {
+          id: "slack-bot-token",
+          label: "Slack app",
+          kind: "form",
+          createBehavior: "draft-then-setup",
+          secretFields: [
+            {
+              name: "botToken",
+              label: "Bot token",
+              inputType: "password",
+              slotKey: "slack.slack-default.slack-bot-token.bot-token",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.connectionMethods?.[0]).toMatchObject({
+      id: "slack-bot-token",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+    });
+  });
 });

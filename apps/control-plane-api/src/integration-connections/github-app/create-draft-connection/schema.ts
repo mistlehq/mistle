@@ -25,6 +25,7 @@ export const CreateGitHubAppDraftConnectionBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
     ]),
   ),

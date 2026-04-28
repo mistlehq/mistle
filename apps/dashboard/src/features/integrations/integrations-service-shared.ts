@@ -47,6 +47,7 @@ export const IntegrationTargetSchema = z
               id: z.string().min(1),
               label: z.string().min(1),
               kind: z.literal("form"),
+              createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
               secretFields: z
                 .array(
                   z

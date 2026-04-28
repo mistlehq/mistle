@@ -83,6 +83,7 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "form";
+        createBehavior?: "single-step" | "draft-then-setup";
         secretFields: {
           name: string;
           label: string;
@@ -133,6 +134,7 @@ function resolveConnectionMethod(
       id: method.id,
       label: method.label,
       kind: "form",
+      ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
       secretFields: method.secretFields.map((field) => ({
         name: field.name,
         label: field.label,

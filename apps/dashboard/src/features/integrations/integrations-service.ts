@@ -10,9 +10,8 @@ export {
 } from "./integration-webhook-sources-service.js";
 export {
   cancelDeviceAuthorizationAttempt,
+  createDraftFormIntegrationConnection,
   createFormIntegrationConnection,
-  createGitHubAppDraftIntegrationConnection,
-  createSlackAppDraftIntegrationConnection,
   createApiKeyIntegrationConnection,
   deleteIntegrationConnection,
   getDeviceAuthorizationAttempt,

@@ -167,6 +167,7 @@ function gitHubAppCreateEditorInput() {
         id: "github-app-installation",
         label: "GitHub App installation",
         kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
         secretFields: [
           {
             name: "appPrivateKeyPem",
@@ -199,6 +200,7 @@ function slackAppCreateEditorInput() {
         id: "slack-bot-token",
         label: "Slack app",
         kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
         secretFields: [
           {
             name: "botToken",
@@ -600,7 +602,7 @@ describe("useIntegrationConnectionEditorState", () => {
     server.setHandler((request) => {
       if (
         request.method === "POST" &&
-        request.pathname === "/v1/integration/connections/slack-default/slack-app/draft"
+        request.pathname === "/v1/integration/connections/slack-default/slack-bot-token/draft"
       ) {
         return {
           status: 201,
@@ -653,7 +655,7 @@ describe("useIntegrationConnectionEditorState", () => {
     expect(server.requests).toEqual([
       {
         method: "POST",
-        pathname: "/v1/integration/connections/slack-default/slack-app/draft",
+        pathname: "/v1/integration/connections/slack-default/slack-bot-token/draft",
         body: {
           displayName: "Engineering Slack",
         },

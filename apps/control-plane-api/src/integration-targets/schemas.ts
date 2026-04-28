@@ -38,6 +38,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("form"),
+      createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
       secretFields: z.array(IntegrationConnectionMethodSecretFieldSchema).min(1),
     })
     .strict(),

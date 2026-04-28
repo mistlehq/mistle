@@ -479,6 +479,16 @@ export type IntegrationConnectionMethodPendingUi = {
   description?: string;
 };
 
+export type IntegrationFormConnectionMethodCreateBehavior = "single-step" | "draft-then-setup";
+
+export const IntegrationFormConnectionMethodCreateBehaviors: {
+  SINGLE_STEP: IntegrationFormConnectionMethodCreateBehavior;
+  DRAFT_THEN_SETUP: IntegrationFormConnectionMethodCreateBehavior;
+} = {
+  SINGLE_STEP: "single-step",
+  DRAFT_THEN_SETUP: "draft-then-setup",
+};
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -508,6 +518,7 @@ export type IntegrationFormConnectionMethodDefinition<
   TConnectionConfig
 > & {
   kind: "form";
+  createBehavior?: IntegrationFormConnectionMethodCreateBehavior;
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
   ui?: {
     create?: IntegrationConnectionMethodCreateUi;
