@@ -34,7 +34,6 @@ const IntegrationWebhookTriggerRequirementSchema = z.discriminatedUnion("kind", 
     .object({
       kind: z.literal("provider-event"),
       eventType: z.string().min(1),
-      label: z.string().min(1),
     })
     .strict(),
   z
@@ -42,7 +41,6 @@ const IntegrationWebhookTriggerRequirementSchema = z.discriminatedUnion("kind", 
       kind: z.literal("provider-permission"),
       permission: z.string().min(1),
       access: z.string().min(1).optional(),
-      label: z.string().min(1),
     })
     .strict(),
 ]);

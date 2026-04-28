@@ -1634,13 +1634,11 @@ export type IntegrationWebhookTriggerRequirement =
   | {
       kind: "provider-event";
       eventType: string;
-      label: string;
     }
   | {
       kind: "provider-permission";
       permission: string;
       access?: string | undefined;
-      label: string;
     };
 
 /**
