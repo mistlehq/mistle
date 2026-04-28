@@ -1,84 +1,14 @@
-import {
-  ControlPlaneApiAuthEnvDescriptors,
-  ControlPlaneApiAuthGoogleEnvDescriptors,
-  ControlPlaneApiCommitSignEnvDescriptors,
-  ControlPlaneApiDashboardEnvDescriptors,
-  ControlPlaneApiDatabaseEnvDescriptors,
-  ControlPlaneApiDataPlaneApiEnvDescriptors,
-  ControlPlaneApiIntegrationsEnvDescriptors,
-  ControlPlaneApiObjectStoreEnvDescriptors,
-  ControlPlaneApiServerEnvDescriptors,
-  ControlPlaneApiWorkflowEnvDescriptors,
-} from "./apps/control-plane-api/legacy-env-descriptors.js";
-import {
-  ControlPlaneWorkerControlPlaneApiEnvDescriptors,
-  ControlPlaneWorkerDataPlaneApiEnvDescriptors,
-  ControlPlaneWorkerEmailEnvDescriptors,
-  ControlPlaneWorkerWorkflowEnvDescriptors,
-} from "./apps/control-plane-worker/legacy-env-descriptors.js";
-import {
-  DataPlaneApiControlPlaneApiEnvDescriptors,
-  DataPlaneApiDatabaseEnvDescriptors,
-  DataPlaneApiRuntimeStateEnvDescriptors,
-  DataPlaneApiSandboxDockerEnvDescriptors,
-  DataPlaneApiSandboxE2BEnvDescriptors,
-  DataPlaneApiServerEnvDescriptors,
-  DataPlaneApiWorkflowEnvDescriptors,
-} from "./apps/data-plane-api/legacy-env-descriptors.js";
-import {
-  DataPlaneGatewayControlPlaneApiEnvDescriptors,
-  DataPlaneGatewayDatabaseEnvDescriptors,
-  DataPlaneGatewayDataPlaneApiEnvDescriptors,
-  DataPlaneGatewayRuntimeStateEnvDescriptors,
-  DataPlaneGatewayRuntimeStateValkeyEnvDescriptors,
-  DataPlaneGatewayServerEnvDescriptors,
-} from "./apps/data-plane-gateway/legacy-env-descriptors.js";
-import {
-  DataPlaneWorkerControlPlaneApiEnvDescriptors,
-  DataPlaneWorkerDatabaseEnvDescriptors,
-  DataPlaneWorkerRuntimeStateEnvDescriptors,
-  DataPlaneWorkerSandboxDockerEnvDescriptors,
-  DataPlaneWorkerSandboxE2BEnvDescriptors,
-  DataPlaneWorkerSandboxEnvDescriptors,
-  DataPlaneWorkerSandboxStorageArchilEnvDescriptors,
-  DataPlaneWorkerSandboxStorageDockerVolumeEnvDescriptors,
-  DataPlaneWorkerWorkflowEnvDescriptors,
-} from "./apps/data-plane-worker/legacy-env-descriptors.js";
-import {
-  TokenizerProxyControlPlaneApiEnvDescriptors,
-  TokenizerProxyServerEnvDescriptors,
-} from "./apps/tokenizer-proxy/legacy-env-descriptors.js";
 import type { EnvValueFormat } from "./core/load-env.js";
 import { asObjectRecord, getValueAtPath } from "./core/record.js";
-import {
-  GlobalEnvDescriptors,
-  GlobalSandboxBootstrapTokenEnvDescriptors,
-  GlobalSandboxConnectTokenEnvDescriptors,
-  GlobalSandboxEgressTokenEnvDescriptors,
-  GlobalSandboxEnvDescriptors,
-  GlobalSandboxPublishAccessTokenEnvDescriptors,
-  GlobalSandboxPublishEnvDescriptors,
-  GlobalSandboxPublishSessionEnvDescriptors,
-  GlobalSandboxStorageEnvDescriptors,
-  GlobalTelemetryEnvDescriptors,
-} from "./global/legacy-env-descriptors.js";
 import type { LoadConfigResult } from "./loader.js";
 import { AppIds, type AppConfigModuleKey } from "./modules.js";
 
 export type RuntimeEnvExportValueFormat = EnvValueFormat;
-export type RuntimeEnvSurface = "legacy" | "resource";
 
 export type RuntimeEnvExportEntry = {
   name: string;
   value: unknown;
   valueFormat?: RuntimeEnvExportValueFormat;
-};
-
-type LegacyEnvSurfaceDescriptor = {
-  key: string;
-  envVar: string;
-  valueFormat?: RuntimeEnvExportValueFormat;
-  projectionPath?: readonly string[];
 };
 
 type RuntimeEnvExportDescriptor = {
@@ -91,38 +21,7 @@ type RuntimeEnvExportDescriptor = {
 export type RuntimeEnvExportInput<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
   app: TApp;
   config: LoadConfigResult<TApp>;
-  envSurface?: RuntimeEnvSurface;
 };
-
-function exportEnvDescriptors(
-  prefix: readonly string[],
-  descriptors: readonly LegacyEnvSurfaceDescriptor[],
-): RuntimeEnvExportDescriptor[] {
-  return descriptors.map((descriptor) => ({
-    path: [...prefix, ...(descriptor.projectionPath ?? [descriptor.key])],
-    envVar: descriptor.envVar,
-    ...(descriptor.valueFormat === undefined ? {} : { valueFormat: descriptor.valueFormat }),
-  }));
-}
-
-const GlobalRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors([], GlobalEnvDescriptors),
-  ...exportEnvDescriptors(["telemetry"], GlobalTelemetryEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox"], GlobalSandboxEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "storage"], GlobalSandboxStorageEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "bootstrap"], GlobalSandboxBootstrapTokenEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "connect"], GlobalSandboxConnectTokenEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "egress"], GlobalSandboxEgressTokenEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "publish"], GlobalSandboxPublishEnvDescriptors),
-  ...exportEnvDescriptors(
-    ["sandbox", "publish", "access"],
-    GlobalSandboxPublishAccessTokenEnvDescriptors,
-  ),
-  ...exportEnvDescriptors(
-    ["sandbox", "publish", "session"],
-    GlobalSandboxPublishSessionEnvDescriptors,
-  ),
-];
 
 const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["env"], envVar: "MISTLE_ENV" },
@@ -208,19 +107,6 @@ const GlobalResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   },
 ];
 
-const ControlPlaneApiRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["server"], ControlPlaneApiServerEnvDescriptors),
-  ...exportEnvDescriptors(["database"], ControlPlaneApiDatabaseEnvDescriptors),
-  ...exportEnvDescriptors(["objectStore"], ControlPlaneApiObjectStoreEnvDescriptors),
-  ...exportEnvDescriptors(["auth"], ControlPlaneApiAuthEnvDescriptors),
-  ...exportEnvDescriptors(["auth", "google"], ControlPlaneApiAuthGoogleEnvDescriptors),
-  ...exportEnvDescriptors(["dashboard"], ControlPlaneApiDashboardEnvDescriptors),
-  ...exportEnvDescriptors(["workflow"], ControlPlaneApiWorkflowEnvDescriptors),
-  ...exportEnvDescriptors(["dataPlaneApi"], ControlPlaneApiDataPlaneApiEnvDescriptors),
-  ...exportEnvDescriptors(["commitSign"], ControlPlaneApiCommitSignEnvDescriptors),
-  ...exportEnvDescriptors(["integrations"], ControlPlaneApiIntegrationsEnvDescriptors),
-];
-
 const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["server", "host"], envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_HOST" },
   { path: ["server", "port"], envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PORT" },
@@ -282,13 +168,6 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   },
 ];
 
-const ControlPlaneWorkerRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["workflow"], ControlPlaneWorkerWorkflowEnvDescriptors),
-  ...exportEnvDescriptors(["email"], ControlPlaneWorkerEmailEnvDescriptors),
-  ...exportEnvDescriptors(["dataPlaneApi"], ControlPlaneWorkerDataPlaneApiEnvDescriptors),
-  ...exportEnvDescriptors(["controlPlaneApi"], ControlPlaneWorkerControlPlaneApiEnvDescriptors),
-];
-
 const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["workflow", "databaseUrl"], envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID" },
@@ -308,16 +187,6 @@ const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDesc
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-];
-
-const DataPlaneApiRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["server"], DataPlaneApiServerEnvDescriptors),
-  ...exportEnvDescriptors(["database"], DataPlaneApiDatabaseEnvDescriptors),
-  ...exportEnvDescriptors(["workflow"], DataPlaneApiWorkflowEnvDescriptors),
-  ...exportEnvDescriptors(["runtimeState"], DataPlaneApiRuntimeStateEnvDescriptors),
-  ...exportEnvDescriptors(["controlPlaneApi"], DataPlaneApiControlPlaneApiEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "docker"], DataPlaneApiSandboxDockerEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "e2b"], DataPlaneApiSandboxE2BEnvDescriptors),
 ];
 
 const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
@@ -341,18 +210,6 @@ const DataPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor
   { path: ["sandbox", "e2b", "domain"], envVar: "MISTLE_SANDBOX_E2B_DOMAIN" },
 ];
 
-const DataPlaneGatewayRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["server"], DataPlaneGatewayServerEnvDescriptors),
-  ...exportEnvDescriptors(["database"], DataPlaneGatewayDatabaseEnvDescriptors),
-  ...exportEnvDescriptors(["runtimeState"], DataPlaneGatewayRuntimeStateEnvDescriptors),
-  ...exportEnvDescriptors(
-    ["runtimeState", "valkey"],
-    DataPlaneGatewayRuntimeStateValkeyEnvDescriptors,
-  ),
-  ...exportEnvDescriptors(["dataPlaneApi"], DataPlaneGatewayDataPlaneApiEnvDescriptors),
-  ...exportEnvDescriptors(["controlPlaneApi"], DataPlaneGatewayControlPlaneApiEnvDescriptors),
-];
-
 const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["server", "host"], envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST" },
   { path: ["server", "port"], envVar: "MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT" },
@@ -365,24 +222,6 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
-];
-
-const DataPlaneWorkerRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["database"], DataPlaneWorkerDatabaseEnvDescriptors),
-  ...exportEnvDescriptors(["workflow"], DataPlaneWorkerWorkflowEnvDescriptors),
-  ...exportEnvDescriptors(["runtimeState"], DataPlaneWorkerRuntimeStateEnvDescriptors),
-  ...exportEnvDescriptors(["controlPlaneApi"], DataPlaneWorkerControlPlaneApiEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox"], DataPlaneWorkerSandboxEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "docker"], DataPlaneWorkerSandboxDockerEnvDescriptors),
-  ...exportEnvDescriptors(["sandbox", "e2b"], DataPlaneWorkerSandboxE2BEnvDescriptors),
-  ...exportEnvDescriptors(
-    ["sandboxStorage", "archil"],
-    DataPlaneWorkerSandboxStorageArchilEnvDescriptors,
-  ),
-  ...exportEnvDescriptors(
-    ["sandboxStorage", "dockerVolume"],
-    DataPlaneWorkerSandboxStorageDockerVolumeEnvDescriptors,
-  ),
 ];
 
 function readFirstArchilMountField(root: unknown, field: string): unknown {
@@ -496,11 +335,6 @@ const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
   },
 ];
 
-const TokenizerProxyRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  ...exportEnvDescriptors(["server"], TokenizerProxyServerEnvDescriptors),
-  ...exportEnvDescriptors(["controlPlaneApi"], TokenizerProxyControlPlaneApiEnvDescriptors),
-];
-
 const TokenizerProxyResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["server", "host"], envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_HOST" },
   { path: ["server", "port"], envVar: "MISTLE_SERVICES_TOKENIZER_PROXY_PORT" },
@@ -517,44 +351,29 @@ const TokenizerProxyResourceRuntimeEnvExports: readonly RuntimeEnvExportDescript
   { path: ["egressGrant", "tokenAudience"], envVar: "MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE" },
 ];
 
-function getAppRuntimeEnvExports(
-  app: AppConfigModuleKey,
-  envSurface: RuntimeEnvSurface,
-): readonly RuntimeEnvExportDescriptor[] {
+function getAppRuntimeEnvExports(app: AppConfigModuleKey): readonly RuntimeEnvExportDescriptor[] {
   if (app === AppIds.CONTROL_PLANE_API) {
-    return envSurface === "legacy"
-      ? ControlPlaneApiRuntimeEnvExports
-      : ControlPlaneApiResourceRuntimeEnvExports;
+    return ControlPlaneApiResourceRuntimeEnvExports;
   }
 
   if (app === AppIds.CONTROL_PLANE_WORKER) {
-    return envSurface === "legacy"
-      ? ControlPlaneWorkerRuntimeEnvExports
-      : ControlPlaneWorkerResourceRuntimeEnvExports;
+    return ControlPlaneWorkerResourceRuntimeEnvExports;
   }
 
   if (app === AppIds.DATA_PLANE_API) {
-    return envSurface === "legacy"
-      ? DataPlaneApiRuntimeEnvExports
-      : DataPlaneApiResourceRuntimeEnvExports;
+    return DataPlaneApiResourceRuntimeEnvExports;
   }
 
   if (app === AppIds.DATA_PLANE_GATEWAY) {
-    return envSurface === "legacy"
-      ? DataPlaneGatewayRuntimeEnvExports
-      : DataPlaneGatewayResourceRuntimeEnvExports;
+    return DataPlaneGatewayResourceRuntimeEnvExports;
   }
 
   if (app === AppIds.DATA_PLANE_WORKER) {
-    return envSurface === "legacy"
-      ? DataPlaneWorkerRuntimeEnvExports
-      : DataPlaneWorkerResourceRuntimeEnvExports;
+    return DataPlaneWorkerResourceRuntimeEnvExports;
   }
 
   if (app === AppIds.TOKENIZER_PROXY) {
-    return envSurface === "legacy"
-      ? TokenizerProxyRuntimeEnvExports
-      : TokenizerProxyResourceRuntimeEnvExports;
+    return TokenizerProxyResourceRuntimeEnvExports;
   }
 
   throw new Error("Unsupported app id.");
@@ -601,19 +420,16 @@ export function exportServiceConfigToEnv<TApp extends AppConfigModuleKey>(
     throw new Error("Runtime env export requires loadConfig output that includes global config.");
   }
 
-  const envSurface = input.envSurface ?? "legacy";
   const entries: RuntimeEnvExportEntry[] = [];
-  const globalDescriptors =
-    envSurface === "legacy" ? GlobalRuntimeEnvExports : GlobalResourceRuntimeEnvExports;
 
-  for (const descriptor of globalDescriptors) {
+  for (const descriptor of GlobalResourceRuntimeEnvExports) {
     const entry = exportDescriptor(input.config.global, descriptor);
     if (entry !== undefined) {
       appendEntry(entries, entry);
     }
   }
 
-  for (const descriptor of getAppRuntimeEnvExports(input.app, envSurface)) {
+  for (const descriptor of getAppRuntimeEnvExports(input.app)) {
     const entry = exportDescriptor(input.config.app, descriptor);
     if (entry !== undefined) {
       appendEntry(entries, entry);

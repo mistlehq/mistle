@@ -86,11 +86,8 @@ Use module ownership to keep config changes localized:
 - `src/root/selectors.ts` owns service selectors from central resources.
 - `src/root/load-env.ts` owns resource-oriented env overrides and legacy env
   override compatibility into the central root.
-- `src/apps/<app-id>/legacy-env-descriptors.ts` and
-  `src/global/legacy-env-descriptors.ts` own the legacy runtime env surface used
-  by `exportServiceConfigToEnv({ envSurface: "legacy" })`.
-- `src/runtime-env-export.ts` owns selected service config to runtime env export
-  for both `envSurface: "legacy"` and `envSurface: "resource"`.
+- `src/runtime-env-export.ts` owns selected service config to resource-oriented
+  runtime env export.
 - `src/toml.ts` owns TOML parsing helpers only.
 
 ### Add A New Key To An Existing Module
@@ -99,9 +96,8 @@ Use module ownership to keep config changes localized:
 2. If the key is operator-facing config, update `src/root/schema.ts`,
    `src/root/load-env.ts`, and any service selectors in `src/root/selectors.ts`
    that consume it.
-3. If the key must still be exported to a service runtime env var, update the
-   relevant `legacy-env-descriptors.ts` file for legacy env output and
-   `src/runtime-env-export.ts` for resource env output.
+3. If the key must still be exported to a service runtime env var, update
+   `src/runtime-env-export.ts`.
 4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
 5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
 6. Add or update tests:
@@ -112,7 +108,6 @@ Use module ownership to keep config changes localized:
 
 1. Create `src/apps/<app-id>/` with:
    - `schema.ts`
-   - `legacy-env-descriptors.ts` if the service still needs runtime env export
    - `index.ts` (exports the `ConfigModule`)
    - `README.md` (single config table)
 2. Register the app in `src/modules.ts`:
