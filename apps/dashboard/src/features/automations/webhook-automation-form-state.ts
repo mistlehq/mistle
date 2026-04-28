@@ -1,8 +1,44 @@
 import { buildAgentInstructionTokenCatalog } from "./agent-instructions-token-catalog.js";
 import { resolveConversationKeyFieldOptions } from "./webhook-automation-conversation-key-field.js";
 import { isWebhookAutomationEventOptionUnavailable } from "./webhook-automation-event-option-availability.js";
+import type {
+  WebhookAutomationFormOption,
+  WebhookAutomationFormValues,
+} from "./webhook-automation-form-types.js";
+import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker-state.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
+
+export function resolveWebhookAutomationFormPresentation(input: {
+  mode: "create" | "edit";
+  values: Pick<WebhookAutomationFormValues, "primaryRepositoryId" | "sandboxProfileId">;
+  primaryRepositoryOptions: readonly WebhookAutomationFormOption[] | undefined;
+}): {
+  submitLabel: string;
+  shouldShowAutomationEnabledField: boolean;
+  shouldShowCreateNameField: boolean;
+  shouldShowPrimaryRepositoryField: boolean;
+  selectedPrimaryRepositoryPath: string | null;
+  selectedWorkspaceRoot: boolean;
+} {
+  const selectedPrimaryRepositoryOption = input.primaryRepositoryOptions?.find(
+    (option) => option.value === input.values.primaryRepositoryId,
+  );
+  const selectedPrimaryRepositoryPath = selectedPrimaryRepositoryOption?.path ?? null;
+  const selectedWorkspaceRoot =
+    selectedPrimaryRepositoryOption?.value === WebhookAutomationWorkspaceRootRepositoryOptionValue;
+
+  return {
+    submitLabel: input.mode === "create" ? "Create" : "Save",
+    shouldShowAutomationEnabledField: input.mode === "edit",
+    shouldShowCreateNameField: input.mode === "create",
+    shouldShowPrimaryRepositoryField:
+      input.values.sandboxProfileId.trim().length > 0 &&
+      (input.primaryRepositoryOptions?.length ?? 0) > 0,
+    selectedPrimaryRepositoryPath,
+    selectedWorkspaceRoot,
+  };
+}
 
 export function resolveWebhookAutomationFormState(input: {
   webhookEventOptions: readonly WebhookAutomationEventOption[];

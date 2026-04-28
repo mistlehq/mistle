@@ -1,13 +1,132 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveWebhookAutomationFormState } from "./webhook-automation-form-state.js";
-import { createWebhookAutomationTriggerId } from "./webhook-automation-option-builders.js";
+import {
+  resolveWebhookAutomationFormPresentation,
+  resolveWebhookAutomationFormState,
+} from "./webhook-automation-form-state.js";
+import type { WebhookAutomationFormOption } from "./webhook-automation-form-types.js";
+import {
+  createWebhookAutomationTriggerId,
+  WebhookAutomationWorkspaceRootRepositoryOptionValue,
+} from "./webhook-automation-option-builders.js";
 import {
   createGithubIssueCommentCreatedEventOption,
   createGithubPullRequestOpenedEventOption,
   GitHubConnectionId,
   GitHubWebhookSourceId,
 } from "./webhook-automation-test-fixtures.js";
+
+const PrimaryRepositoryOptions: readonly WebhookAutomationFormOption[] = [
+  {
+    value: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+    label: "None",
+    path: "workspace root",
+  },
+  {
+    value: "mistlehq/platform",
+    label: "mistlehq/platform",
+    path: "/root/mistlehq/platform",
+  },
+];
+
+describe("resolveWebhookAutomationFormPresentation", () => {
+  it("shows create-only and edit-only controls based on mode", () => {
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: "mistlehq/platform",
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }),
+    ).toMatchObject({
+      submitLabel: "Create",
+      shouldShowAutomationEnabledField: false,
+      shouldShowCreateNameField: true,
+    });
+
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "edit",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: "mistlehq/platform",
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }),
+    ).toMatchObject({
+      submitLabel: "Save",
+      shouldShowAutomationEnabledField: true,
+      shouldShowCreateNameField: false,
+    });
+  });
+
+  it("shows the primary repository field only when a profile and repository options exist", () => {
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: "mistlehq/platform",
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }).shouldShowPrimaryRepositoryField,
+    ).toBe(true);
+
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "",
+          primaryRepositoryId: "",
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }).shouldShowPrimaryRepositoryField,
+    ).toBe(false);
+
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: "",
+        },
+        primaryRepositoryOptions: [],
+      }).shouldShowPrimaryRepositoryField,
+    ).toBe(false);
+  });
+
+  it("resolves selected primary repository path and workspace-root presentation", () => {
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: "mistlehq/platform",
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }),
+    ).toMatchObject({
+      selectedPrimaryRepositoryPath: "/root/mistlehq/platform",
+      selectedWorkspaceRoot: false,
+    });
+
+    expect(
+      resolveWebhookAutomationFormPresentation({
+        mode: "create",
+        values: {
+          sandboxProfileId: "sbp_repo",
+          primaryRepositoryId: WebhookAutomationWorkspaceRootRepositoryOptionValue,
+        },
+        primaryRepositoryOptions: PrimaryRepositoryOptions,
+      }),
+    ).toMatchObject({
+      selectedPrimaryRepositoryPath: "workspace root",
+      selectedWorkspaceRoot: true,
+    });
+  });
+});
 
 describe("resolveWebhookAutomationFormState", () => {
   it("derives the selected connection id when all selected triggers share a connection", () => {

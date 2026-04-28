@@ -177,30 +177,6 @@ describe("WebhookAutomationForm", () => {
     expect(screen.queryByText(RepoMaintainerSandboxProfileId)).toBeNull();
   });
 
-  it("shows the primary repository field once a sandbox profile is selected", () => {
-    renderFormWithOptions({
-      mode: "create",
-      primaryRepositoryOptions: PrimaryRepositoryOptions,
-      values: buildFormValues(),
-    });
-
-    expect(screen.getByRole("combobox", { name: "Primary repository" })).toBeDefined();
-    expect(screen.getByText("/root/mistlehq/platform")).toBeDefined();
-  });
-
-  it("hides the primary repository field when no sandbox profile is selected", () => {
-    renderFormWithOptions({
-      mode: "create",
-      primaryRepositoryOptions: PrimaryRepositoryOptions,
-      values: buildFormValues({
-        sandboxProfileId: "",
-        primaryRepositoryId: "",
-      }),
-    });
-
-    expect(screen.queryByRole("combobox", { name: "Primary repository" })).toBeNull();
-  });
-
   it("shows selected trigger event labels instead of raw event types", () => {
     renderFormWithOptions({
       mode: "create",
@@ -209,18 +185,6 @@ describe("WebhookAutomationForm", () => {
 
     expect(screen.getAllByText("Issue comment created").length).toBeGreaterThan(0);
     expect(screen.queryByText("github.issue_comment.created")).toBeNull();
-  });
-
-  it("hides the automation enabled field on create", () => {
-    renderForm("create");
-
-    expect(screen.queryByLabelText("Automation enabled")).toBeNull();
-  });
-
-  it("shows the automation enabled field on edit", () => {
-    renderForm("edit");
-
-    expect(screen.getByRole("switch", { name: "Automation enabled" })).toBeDefined();
   });
 
   it("shows connector-defined conversation grouping choices", () => {

@@ -21,14 +21,16 @@ import { TrashIcon } from "@phosphor-icons/react";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
-import { resolveWebhookAutomationFormState } from "./webhook-automation-form-state.js";
+import {
+  resolveWebhookAutomationFormPresentation,
+  resolveWebhookAutomationFormState,
+} from "./webhook-automation-form-state.js";
 import {
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValueKey,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form-types.js";
 import { DefaultWebhookAutomationMessageTemplate } from "./webhook-automation-input-template.js";
-import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { type WebhookAutomationTriggerPickerDisabledState } from "./webhook-automation-trigger-picker-state.js";
 import {
@@ -145,16 +147,11 @@ function SelectField(input: {
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const inputTemplateLabelId = "automation-input-template-label";
   const instructionsLabelId = "automation-instructions-label";
-  const submitLabel = input.mode === "create" ? "Create" : "Save";
-  const selectedPrimaryRepositoryOption = input.primaryRepositoryOptions?.find(
-    (option) => option.value === input.values.primaryRepositoryId,
-  );
-  const selectedPrimaryRepositoryPath = selectedPrimaryRepositoryOption?.path ?? null;
-  const selectedWorkspaceRoot =
-    selectedPrimaryRepositoryOption?.value === WebhookAutomationWorkspaceRootRepositoryOptionValue;
-  const shouldShowPrimaryRepositoryField =
-    input.values.sandboxProfileId.trim().length > 0 &&
-    (input.primaryRepositoryOptions?.length ?? 0) > 0;
+  const presentation = resolveWebhookAutomationFormPresentation({
+    mode: input.mode,
+    values: input.values,
+    primaryRepositoryOptions: input.primaryRepositoryOptions,
+  });
   const formState = resolveWebhookAutomationFormState({
     webhookEventOptions: input.webhookEventOptions,
     selectedTriggerIds: input.values.triggerIds,
@@ -206,7 +203,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       )}
 
       <FormPageSection>
-        {input.mode === "edit" ? (
+        {presentation.shouldShowAutomationEnabledField ? (
           <div className="border-b px-4 py-4">
             <div className="flex min-h-10 items-center justify-between gap-3">
               <div className="space-y-1">
@@ -224,7 +221,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           </div>
         ) : null}
 
-        {input.mode === "create" ? (
+        {presentation.shouldShowCreateNameField ? (
           <div className="p-4">
             <Field orientation="horizontal">
               <FieldHeader>
@@ -268,7 +265,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             value={input.values.sandboxProfileId}
           />
         </div>
-        {shouldShowPrimaryRepositoryField ? (
+        {presentation.shouldShowPrimaryRepositoryField ? (
           <div className="border-t p-4">
             <Field contentWidth="fill" orientation="horizontal">
               <FieldHeader>
@@ -300,16 +297,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                       : input.values.primaryRepositoryId
                   }
                 />
-                {selectedPrimaryRepositoryPath === null ? null : (
+                {presentation.selectedPrimaryRepositoryPath === null ? null : (
                   <div className="text-muted-foreground mt-2 flex flex-col gap-1 text-sm">
                     <p>
-                      {selectedWorkspaceRoot ? (
+                      {presentation.selectedWorkspaceRoot ? (
                         "The agent will start its session at the workspace root."
                       ) : (
                         <>
                           The agent will start its session in{" "}
                           <span className="font-mono text-foreground">
-                            {selectedPrimaryRepositoryPath}
+                            {presentation.selectedPrimaryRepositoryPath}
                           </span>
                           .
                         </>
@@ -513,7 +510,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           onClick={input.onSubmit}
           type="button"
         >
-          {input.isSaving ? "Saving..." : submitLabel}
+          {input.isSaving ? "Saving..." : presentation.submitLabel}
         </Button>
       </FormPageFooter>
     </FormPageStack>
