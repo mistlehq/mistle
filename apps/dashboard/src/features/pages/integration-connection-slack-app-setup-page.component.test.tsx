@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { SlackAppManifestTemplate } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
@@ -10,10 +11,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import {
-  SlackAppSetupPane,
-  SlackDraftManifest,
-} from "./integration-connection-slack-app-setup-page.js";
+import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
 
 function createSlackConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -102,36 +100,21 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("includes the Slack app permissions and event subscriptions in the default manifest", () => {
-    const manifest = JSON.parse(SlackDraftManifest) as {
-      settings: {
-        event_subscriptions: {
-          request_url: string;
-          bot_events: readonly string[];
-        };
-      };
-      oauth_config: {
-        redirect_urls: readonly string[];
-        scopes: {
-          bot: readonly string[];
-        };
-      };
-    };
-
-    expect(manifest.settings.event_subscriptions.request_url).toBe(
+    expect(SlackAppManifestTemplate.settings.event_subscriptions.request_url).toBe(
       "https://mistle.example.com/api/integrations/slack/webhook",
     );
-    expect(manifest.settings.event_subscriptions.bot_events).toEqual([
+    expect(SlackAppManifestTemplate.settings.event_subscriptions.bot_events).toEqual([
       "app_mention",
       "message.channels",
       "message.groups",
       "reaction_added",
       "reaction_removed",
     ]);
-    expect(manifest.oauth_config.redirect_urls).toEqual([
+    expect(SlackAppManifestTemplate.oauth_config.redirect_urls).toEqual([
       "https://mistle.example.com/api/integrations/slack/install/callback",
       "https://mistle.example.com/api/identity-linking/slack/callback",
     ]);
-    expect(manifest.oauth_config.scopes.bot).toEqual([
+    expect(SlackAppManifestTemplate.oauth_config.scopes.bot).toEqual([
       "app_mentions:read",
       "channels:history",
       "channels:read",

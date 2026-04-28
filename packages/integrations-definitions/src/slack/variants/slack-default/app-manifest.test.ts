@@ -1,6 +1,44 @@
 import { describe, expect, it } from "vitest";
 
 import { buildSlackAppManifest } from "./app-manifest.js";
+import { SlackAppManifestTemplate } from "./manifest.js";
+
+describe("SlackAppManifestTemplate", () => {
+  it("includes the default Slack app permissions and event subscriptions", () => {
+    expect(SlackAppManifestTemplate).toMatchObject({
+      settings: {
+        event_subscriptions: {
+          request_url: "https://mistle.example.com/api/integrations/slack/webhook",
+          bot_events: [
+            "app_mention",
+            "message.channels",
+            "message.groups",
+            "reaction_added",
+            "reaction_removed",
+          ],
+        },
+      },
+      oauth_config: {
+        redirect_urls: [
+          "https://mistle.example.com/api/integrations/slack/install/callback",
+          "https://mistle.example.com/api/identity-linking/slack/callback",
+        ],
+        scopes: {
+          bot: [
+            "app_mentions:read",
+            "channels:history",
+            "channels:read",
+            "chat:write",
+            "groups:history",
+            "groups:read",
+            "reactions:read",
+            "users:read",
+          ],
+        },
+      },
+    });
+  });
+});
 
 describe("buildSlackAppManifest", () => {
   it("injects Mistle Slack request URLs, bot events, and OAuth scopes", () => {
