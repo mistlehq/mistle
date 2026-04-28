@@ -1,5 +1,5 @@
-import { sandboxProfiles, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { and, eq } from "drizzle-orm";
+import { type ControlPlaneDatabase, sandboxProfiles, schedules } from "@mistle/db/control-plane";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 export async function deleteSandboxProfile(
   ctx: {
@@ -7,12 +7,35 @@ export async function deleteSandboxProfile(
   },
   input: { organizationId: string; profileId: string },
 ): Promise<void> {
-  await ctx.db
-    .delete(sandboxProfiles)
-    .where(
-      and(
-        eq(sandboxProfiles.id, input.profileId),
-        eq(sandboxProfiles.organizationId, input.organizationId),
-      ),
-    );
+  await ctx.db.transaction(async (tx) => {
+    const refreshScheduleTargets =
+      await tx.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({
+        columns: {
+          scheduleId: true,
+        },
+        where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
+      });
+    const refreshScheduleIds = refreshScheduleTargets.map((target) => target.scheduleId);
+
+    if (refreshScheduleIds.length > 0) {
+      await tx
+        .update(schedules)
+        .set({
+          enabled: false,
+          nextScheduledAt: null,
+          deletedAt: sql`now()`,
+          updatedAt: sql`now()`,
+        })
+        .where(inArray(schedules.id, refreshScheduleIds));
+    }
+
+    await tx
+      .delete(sandboxProfiles)
+      .where(
+        and(
+          eq(sandboxProfiles.id, input.profileId),
+          eq(sandboxProfiles.organizationId, input.organizationId),
+        ),
+      );
+  });
 }

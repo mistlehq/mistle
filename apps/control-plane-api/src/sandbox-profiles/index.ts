@@ -46,6 +46,8 @@ export { route as getSandboxProfileVersionSetupScriptRoute } from "./get-sandbox
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
 export { route as publishSandboxProfileVersionRoute } from "./publish-sandbox-profile-version/route.js";
 export { route as refreshSandboxProfileVersionRoute } from "./refresh-sandbox-profile-version/route.js";
+export { route as putSandboxProfileVersionRefreshScheduleRoute } from "./put-sandbox-profile-version-refresh-schedule/route.js";
+export { route as deleteSandboxProfileVersionRefreshScheduleRoute } from "./delete-sandbox-profile-version-refresh-schedule/route.js";
 export { route as discardSandboxProfileVersionDraftRoute } from "./discard-sandbox-profile-version-draft/route.js";
 export { route as putSandboxProfileVersionIntegrationBindingsRoute } from "./put-sandbox-profile-version-integration-bindings/route.js";
 export { route as putSandboxProfileVersionSetupScriptRoute } from "./put-sandbox-profile-version-setup-script/route.js";
@@ -71,6 +73,11 @@ export {
   conflictResponseSchema as RefreshSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as RefreshSandboxProfileVersionNotFoundResponseSchema,
 } from "./refresh-sandbox-profile-version/schema.js";
+export {
+  badRequestResponseSchema as PutSandboxProfileVersionRefreshScheduleBadRequestResponseSchema,
+  notFoundResponseSchema as PutSandboxProfileVersionRefreshScheduleNotFoundResponseSchema,
+} from "./put-sandbox-profile-version-refresh-schedule/schema.js";
+export { notFoundResponseSchema as DeleteSandboxProfileVersionRefreshScheduleNotFoundResponseSchema } from "./delete-sandbox-profile-version-refresh-schedule/schema.js";
 export {
   conflictResponseSchema as DiscardSandboxProfileVersionDraftConflictResponseSchema,
   notFoundResponseSchema as DiscardSandboxProfileVersionDraftNotFoundResponseSchema,

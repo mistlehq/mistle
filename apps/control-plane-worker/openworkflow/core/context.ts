@@ -17,6 +17,7 @@ export type WorkflowContext = {
   dbPool: Pool;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
+  defaultBaseImage: string;
   emailDelivery: ControlPlaneWorkerEmailDelivery;
   integrationRegistry: IntegrationRegistry;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
@@ -60,6 +61,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       dataPlaneClient,
       db,
       dbPool,
+      defaultBaseImage: workerConfig.sandbox.defaultBaseImage,
       emailDelivery,
       integrationRegistry,
       openWorkflow,

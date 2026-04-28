@@ -8588,6 +8588,215 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            cronExpression: string;
+            name?: string;
+            timezone: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Create or replace the refresh schedule for a sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              cronExpression: string;
+              enabled: boolean;
+              name: string;
+              nextScheduledAt: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
+              scheduleId: string;
+              timezone: string;
+            };
+          };
+        };
+        /** @description Invalid refresh schedule request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_REFRESH_SCHEDULE";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete the refresh schedule for a sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              deleted: boolean;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script": {
     parameters: {
       query?: never;

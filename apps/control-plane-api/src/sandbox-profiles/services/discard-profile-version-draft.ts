@@ -7,6 +7,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import { softDeleteSnapshotRefreshSchedulesForProfileVersion } from "./delete-profile-version-refresh-schedule.js";
 import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -68,6 +69,11 @@ export async function discardProfileVersionDraft(
         `Sandbox profile version '${String(input.profileVersion)}' is not a draft.`,
       );
     }
+
+    await softDeleteSnapshotRefreshSchedulesForProfileVersion(tx, {
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    });
 
     const [deletedVersion] = await tx
       .delete(sandboxProfileVersions)

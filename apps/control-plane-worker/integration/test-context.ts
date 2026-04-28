@@ -198,6 +198,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
         internalAuth: {
           serviceToken: sharedInfraConfig.internalAuthServiceToken,
         },
+        sandbox: {
+          defaultBaseImage: "test-default-base-image",
+        },
       };
 
       try {

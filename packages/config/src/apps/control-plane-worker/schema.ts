@@ -39,6 +39,12 @@ export const ControlPlaneWorkerInternalAuthConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneWorkerSandboxConfigSchema = z
+  .object({
+    defaultBaseImage: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneWorkerConfigSchema = z
   .object({
     workflow: ControlPlaneWorkerWorkflowConfigSchema,
@@ -46,6 +52,7 @@ export const ControlPlaneWorkerConfigSchema = z
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema,
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema,
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema,
+    sandbox: ControlPlaneWorkerSandboxConfigSchema,
   })
   .strict();
 
@@ -56,6 +63,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
     internalAuth: ControlPlaneWorkerInternalAuthConfigSchema.partial().optional(),
+    sandbox: ControlPlaneWorkerSandboxConfigSchema.partial().optional(),
   })
   .strict();
 

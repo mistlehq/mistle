@@ -5,6 +5,7 @@ import type { AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_PROFILES_ROUTE_BASE_PATH } from "./constants.js";
 import * as createSandboxProfileVersion from "./create-sandbox-profile-version/index.js";
 import * as createSandboxProfile from "./create-sandbox-profile/index.js";
+import * as deleteSandboxProfileVersionRefreshSchedule from "./delete-sandbox-profile-version-refresh-schedule/index.js";
 import * as deleteSandboxProfile from "./delete-sandbox-profile/index.js";
 import * as discardSandboxProfileVersionDraft from "./discard-sandbox-profile-version-draft/index.js";
 import * as getSandboxProfileVersionAutomationConfig from "./get-sandbox-profile-version-automation-config/index.js";
@@ -17,6 +18,7 @@ import * as listSandboxProfileVersions from "./list-sandbox-profile-versions/ind
 import * as listSandboxProfiles from "./list-sandbox-profiles/index.js";
 import * as publishSandboxProfileVersion from "./publish-sandbox-profile-version/index.js";
 import * as putSandboxProfileVersionIntegrationBindings from "./put-sandbox-profile-version-integration-bindings/index.js";
+import * as putSandboxProfileVersionRefreshSchedule from "./put-sandbox-profile-version-refresh-schedule/index.js";
 import * as putSandboxProfileVersionSetupScript from "./put-sandbox-profile-version-setup-script/index.js";
 import * as refreshSandboxProfileVersion from "./refresh-sandbox-profile-version/index.js";
 import * as startSandboxProfileInstance from "./start-sandbox-profile-instance/index.js";
@@ -58,6 +60,14 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
   routes.openapi(
     putSandboxProfileVersionSetupScript.route,
     putSandboxProfileVersionSetupScript.handler,
+  );
+  routes.openapi(
+    putSandboxProfileVersionRefreshSchedule.route,
+    putSandboxProfileVersionRefreshSchedule.handler,
+  );
+  routes.openapi(
+    deleteSandboxProfileVersionRefreshSchedule.route,
+    deleteSandboxProfileVersionRefreshSchedule.handler,
   );
   routes.openapi(
     discardSandboxProfileVersionDraft.route,

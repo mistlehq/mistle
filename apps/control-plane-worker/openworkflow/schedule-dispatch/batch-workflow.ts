@@ -21,7 +21,7 @@ export const ScheduleDispatchBatchWorkflow = defineTracedControlPlaneWorkflow(
 
     const dispatchClaimKey = createScheduleDispatchBatchIdempotencyKey(sortedActionIds);
     const staleDispatchingBefore = new Date(run.createdAt.getTime() - StaleScheduleDispatchAfterMs);
-    const { db } = await getWorkflowContext();
+    const { dataPlaneClient, db, defaultBaseImage } = await getWorkflowContext();
 
     for (let index = 0; index < sortedActionIds.length; index += ScheduleDispatchChildConcurrency) {
       const scheduledActionSlice = sortedActionIds.slice(
@@ -37,7 +37,9 @@ export const ScheduleDispatchBatchWorkflow = defineTracedControlPlaneWorkflow(
             async () =>
               dispatchScheduledAction(
                 {
+                  dataPlaneClient,
                   db,
+                  defaultBaseImage,
                 },
                 {
                   scheduledActionId,

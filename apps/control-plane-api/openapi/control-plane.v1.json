@@ -15221,6 +15221,382 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule": {
+      "put": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cronExpression": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["cronExpression", "timezone"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Create or replace the refresh schedule for a sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scheduleId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cronExpression": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextScheduledAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "scheduleId",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "name",
+                    "cronExpression",
+                    "timezone",
+                    "enabled",
+                    "nextScheduledAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid refresh schedule request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_REFRESH_SCHEDULE"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete the refresh schedule for a sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["sandboxProfileId", "sandboxProfileVersion", "deleted"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/discard": {
       "post": {
         "tags": ["Sandbox Profiles"],

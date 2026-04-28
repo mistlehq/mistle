@@ -1,0 +1,260 @@
+import {
+  type ControlPlaneTransaction,
+  sandboxProfileSnapshotRefreshScheduleTargets,
+  schedules,
+  ScheduleTargetTypes,
+} from "@mistle/db/control-plane";
+import { findNextScheduleOccurrence } from "@mistle/time";
+import { and, eq, sql } from "drizzle-orm";
+
+import {
+  SandboxProfilesBadRequestCodes,
+  SandboxProfilesBadRequestError,
+  SandboxProfilesNotFoundCodes,
+  SandboxProfilesNotFoundError,
+} from "../errors.js";
+import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
+import type { CreateSandboxProfilesServiceInput } from "./types.js";
+
+const DefaultRefreshScheduleName = "Sandbox profile version refresh";
+
+export type PutProfileVersionRefreshScheduleInput = {
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  name?: string | undefined;
+  cronExpression: string;
+  timezone: string;
+  now: Date;
+};
+
+export type ProfileVersionRefreshSchedule = {
+  scheduleId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  name: string;
+  cronExpression: string;
+  timezone: string;
+  enabled: boolean;
+  nextScheduledAt: string | null;
+};
+
+type ExistingRefreshSchedule = {
+  scheduleId: string;
+};
+
+export async function putProfileVersionRefreshSchedule(
+  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  input: PutProfileVersionRefreshScheduleInput,
+): Promise<ProfileVersionRefreshSchedule> {
+  const occurrence = resolveInitialOccurrence(input);
+
+  return db.transaction(async (tx) => {
+    await lockProfileAndVersion(tx, input);
+    const existingSchedule = await findRefreshScheduleForProfileVersion(tx, input);
+
+    if (existingSchedule === null) {
+      return createRefreshSchedule(tx, {
+        ...input,
+        nextScheduledAt: occurrence.scheduledAt.toISOString(),
+      });
+    }
+
+    return updateRefreshSchedule(tx, {
+      ...input,
+      scheduleId: existingSchedule.scheduleId,
+      nextScheduledAt: occurrence.scheduledAt.toISOString(),
+    });
+  });
+}
+
+function resolveInitialOccurrence(input: PutProfileVersionRefreshScheduleInput): {
+  scheduledAt: Date;
+} {
+  try {
+    const occurrence = findNextScheduleOccurrence({
+      after: input.now,
+      cronExpression: input.cronExpression,
+      timezone: input.timezone,
+    });
+    if (occurrence === null) {
+      throw new Error("Schedule has no next occurrence.");
+    }
+
+    return {
+      scheduledAt: occurrence.scheduledAt,
+    };
+  } catch (error) {
+    throw new SandboxProfilesBadRequestError(
+      SandboxProfilesBadRequestCodes.INVALID_REFRESH_SCHEDULE,
+      error instanceof Error ? error.message : "Invalid refresh schedule.",
+    );
+  }
+}
+
+async function lockProfileAndVersion(
+  tx: ControlPlaneTransaction,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<void> {
+  const profile = await tx.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, input.profileId),
+        whereEq(table.organizationId, input.organizationId),
+      ),
+  });
+
+  if (profile === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+      "Sandbox profile was not found.",
+    );
+  }
+
+  await lockProfileVersionForUpdateOrThrow({
+    db: tx,
+    profileId: input.profileId,
+    profileVersion: input.profileVersion,
+  });
+}
+
+async function findRefreshScheduleForProfileVersion(
+  tx: ControlPlaneTransaction,
+  input: {
+    profileId: string;
+    profileVersion: number;
+  },
+): Promise<ExistingRefreshSchedule | null> {
+  const [target] = await tx
+    .select({
+      scheduleId: sandboxProfileSnapshotRefreshScheduleTargets.scheduleId,
+    })
+    .from(sandboxProfileSnapshotRefreshScheduleTargets)
+    .where(
+      and(
+        eq(sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileId, input.profileId),
+        eq(
+          sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileVersion,
+          input.profileVersion,
+        ),
+      ),
+    )
+    .limit(1);
+
+  return target ?? null;
+}
+
+async function createRefreshSchedule(
+  tx: ControlPlaneTransaction,
+  input: PutProfileVersionRefreshScheduleInput & {
+    nextScheduledAt: string;
+  },
+): Promise<ProfileVersionRefreshSchedule> {
+  const name = input.name ?? DefaultRefreshScheduleName;
+  const [schedule] = await tx
+    .insert(schedules)
+    .values({
+      organizationId: input.organizationId,
+      targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+      name,
+      cronExpression: input.cronExpression,
+      timezone: input.timezone,
+      enabled: true,
+      nextScheduledAt: input.nextScheduledAt,
+    })
+    .returning({
+      id: schedules.id,
+      name: schedules.name,
+      cronExpression: schedules.cronExpression,
+      timezone: schedules.timezone,
+      enabled: schedules.enabled,
+      nextScheduledAt: schedules.nextScheduledAt,
+    });
+
+  if (schedule === undefined) {
+    throw new Error("Expected snapshot refresh schedule to be created.");
+  }
+
+  await tx.insert(sandboxProfileSnapshotRefreshScheduleTargets).values({
+    scheduleId: schedule.id,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.profileVersion,
+  });
+
+  return toRefreshScheduleResponse({
+    schedule,
+    profileId: input.profileId,
+    profileVersion: input.profileVersion,
+  });
+}
+
+async function updateRefreshSchedule(
+  tx: ControlPlaneTransaction,
+  input: PutProfileVersionRefreshScheduleInput & {
+    scheduleId: string;
+    nextScheduledAt: string;
+  },
+): Promise<ProfileVersionRefreshSchedule> {
+  const name = input.name ?? DefaultRefreshScheduleName;
+  const [schedule] = await tx
+    .update(schedules)
+    .set({
+      name,
+      cronExpression: input.cronExpression,
+      timezone: input.timezone,
+      enabled: true,
+      nextScheduledAt: input.nextScheduledAt,
+      deletedAt: null,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(schedules.id, input.scheduleId))
+    .returning({
+      id: schedules.id,
+      name: schedules.name,
+      cronExpression: schedules.cronExpression,
+      timezone: schedules.timezone,
+      enabled: schedules.enabled,
+      nextScheduledAt: schedules.nextScheduledAt,
+    });
+
+  if (schedule === undefined) {
+    throw new Error(`Expected snapshot refresh schedule '${input.scheduleId}' to be updated.`);
+  }
+
+  return toRefreshScheduleResponse({
+    schedule,
+    profileId: input.profileId,
+    profileVersion: input.profileVersion,
+  });
+}
+
+function toRefreshScheduleResponse(input: {
+  schedule: {
+    id: string;
+    name: string;
+    cronExpression: string;
+    timezone: string;
+    enabled: boolean;
+    nextScheduledAt: string | null;
+  };
+  profileId: string;
+  profileVersion: number;
+}): ProfileVersionRefreshSchedule {
+  return {
+    scheduleId: input.schedule.id,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.profileVersion,
+    name: input.schedule.name,
+    cronExpression: input.schedule.cronExpression,
+    timezone: input.schedule.timezone,
+    enabled: input.schedule.enabled,
+    nextScheduledAt: input.schedule.nextScheduledAt,
+  };
+}

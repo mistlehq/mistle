@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   type ControlPlaneDatabase,
   scheduledActions,
@@ -8,6 +9,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 
 import { claimScheduledActionForDispatch } from "./claim-scheduled-action.js";
+import { dispatchSnapshotRefreshScheduledAction } from "./dispatch-snapshot-refresh.js";
 
 export type ScheduleDispatchTargetHandlerInput = Readonly<{
   scheduledActionId: string;
@@ -17,17 +19,8 @@ export type ScheduleDispatchTargetHandlerInput = Readonly<{
 }>;
 
 export type ScheduleDispatchTargetHandlerResult = Readonly<{
-  targetWorkflowId: string;
+  targetWorkflowId: string | null;
 }>;
-
-export type ScheduleDispatchTargetHandler = (
-  input: ScheduleDispatchTargetHandlerInput,
-) => Promise<ScheduleDispatchTargetHandlerResult>;
-
-const ScheduleDispatchTargetHandlers: ReadonlyMap<
-  ScheduleTargetType,
-  ScheduleDispatchTargetHandler
-> = new Map();
 
 export type DispatchScheduledActionResult = Readonly<{
   scheduledActionId: string;
@@ -37,6 +30,8 @@ export type DispatchScheduledActionResult = Readonly<{
 export async function dispatchScheduledAction(
   ctx: {
     db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
+    defaultBaseImage: string;
   },
   input: {
     scheduledActionId: string;
@@ -77,12 +72,7 @@ export async function dispatchScheduledAction(
     };
   }
 
-  const handler = ScheduleDispatchTargetHandlers.get(targetType);
-  if (handler === undefined) {
-    throw new Error(`No schedule dispatch target handler is registered for ${targetType}.`);
-  }
-
-  const targetResult = await handler({
+  const targetResult = await dispatchScheduleTarget(ctx, targetType, {
     scheduledActionId: claim.scheduledActionId,
     organizationId: claim.organizationId,
     scheduleId: claim.scheduleId,
@@ -97,6 +87,22 @@ export async function dispatchScheduledAction(
     scheduledActionId: claim.scheduledActionId,
     status: "dispatched",
   };
+}
+
+async function dispatchScheduleTarget(
+  ctx: {
+    db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
+    defaultBaseImage: string;
+  },
+  targetType: ScheduleTargetType,
+  input: ScheduleDispatchTargetHandlerInput,
+): Promise<ScheduleDispatchTargetHandlerResult> {
+  if (targetType === ScheduleTargetTypes.SNAPSHOT_REFRESH) {
+    return dispatchSnapshotRefreshScheduledAction(ctx, input);
+  }
+
+  throw new Error(`No schedule dispatch target handler is registered for ${targetType}.`);
 }
 
 function parseScheduleTargetType(targetType: string): ScheduleTargetType | null {

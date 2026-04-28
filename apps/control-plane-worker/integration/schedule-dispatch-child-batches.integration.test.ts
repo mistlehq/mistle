@@ -1,9 +1,15 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationKinds,
   automations,
   CONTROL_PLANE_SCHEMA_NAME,
   createControlPlaneDatabase,
   organizations,
+  sandboxProfiles,
+  sandboxProfileVersionSnapshotJobs,
+  SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
+  sandboxProfileVersions,
   scheduleAutomations,
   scheduledActions,
   ScheduledActionStatuses,
@@ -28,6 +34,17 @@ import { claimScheduledActionForDispatch } from "../openworkflow/schedule-dispat
 import { dispatchScheduledAction } from "../openworkflow/schedule-dispatch/dispatch-scheduled-action.js";
 import { startScheduleDispatchChildBatches } from "../openworkflow/schedule-dispatch/start-child-batches.js";
 import { it } from "./test-context.js";
+
+function createDispatchTestContext(input: { db: ReturnType<typeof createControlPlaneDatabase> }) {
+  return {
+    db: input.db,
+    dataPlaneClient: createDataPlaneSandboxInstancesClient({
+      baseUrl: "http://127.0.0.1:1",
+      serviceToken: "unused-schedule-dispatch-test-token",
+    }),
+    defaultBaseImage: "test-default-base-image",
+  };
+}
 
 async function createTestDatabase(input: { databaseUrl: string }) {
   await runControlPlaneMigrations({
@@ -134,6 +151,55 @@ async function seedScheduledAction(input: {
     dispatchingAt: input.dispatchingAt,
     targetWorkflowId: input.targetWorkflowId,
     targetWorkflowStartedAt: input.targetWorkflowStartedAt,
+  });
+}
+
+async function seedSnapshotRefreshScheduledAction(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  scheduleId: string;
+  scheduledActionId: string;
+}) {
+  await input.db.insert(organizations).values({
+    id: input.organizationId,
+    name: input.organizationId,
+    slug: input.organizationId,
+  });
+  await input.db.insert(sandboxProfiles).values({
+    id: input.profileId,
+    organizationId: input.organizationId,
+    displayName: input.profileId,
+    status: "active",
+  });
+  await input.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.profileId,
+    version: input.profileVersion,
+  });
+  await input.db.insert(schedules).values({
+    id: input.scheduleId,
+    organizationId: input.organizationId,
+    targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+    name: input.scheduleId,
+    cronExpression: "0 9 * * *",
+    timezone: "Asia/Singapore",
+    enabled: true,
+    nextScheduledAt: "2026-04-29T01:00:00.000Z",
+  });
+  await input.db.insert(scheduledActions).values({
+    id: input.scheduledActionId,
+    scheduleId: input.scheduleId,
+    organizationId: input.organizationId,
+    targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+    targetPayload: {
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
+    },
+    scheduledAt: "2026-04-28T01:00:00.000Z",
+    localScheduledDate: "2026-04-28",
+    localScheduledTime: "09:00",
+    status: ScheduledActionStatuses.PENDING,
   });
 }
 
@@ -503,16 +569,11 @@ describe("schedule dispatch child batches", () => {
         ["sca_schedule_batch_unsupported"],
       );
 
-      const result = await dispatchScheduledAction(
-        {
-          db: database.db,
-        },
-        {
-          scheduledActionId: "sca_schedule_batch_unsupported",
-          dispatchClaimKey: "schedule-dispatch-batch:unsupported",
-          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
-        },
-      );
+      const result = await dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+        scheduledActionId: "sca_schedule_batch_unsupported",
+        dispatchClaimKey: "schedule-dispatch-batch:unsupported",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
 
       expect(result).toEqual({
         scheduledActionId: "sca_schedule_batch_unsupported",
@@ -567,16 +628,11 @@ describe("schedule dispatch child batches", () => {
         ["sca_schedule_batch_same_child_retry"],
       );
 
-      const result = await dispatchScheduledAction(
-        {
-          db: database.db,
-        },
-        {
-          scheduledActionId: "sca_schedule_batch_same_child_retry",
-          dispatchClaimKey: "schedule-dispatch-batch:same-child",
-          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
-        },
-      );
+      const result = await dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+        scheduledActionId: "sca_schedule_batch_same_child_retry",
+        dispatchClaimKey: "schedule-dispatch-batch:same-child",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
 
       expect(result).toEqual({
         scheduledActionId: "sca_schedule_batch_same_child_retry",
@@ -622,16 +678,11 @@ describe("schedule dispatch child batches", () => {
       });
 
       await expect(
-        dispatchScheduledAction(
-          {
-            db: database.db,
-          },
-          {
-            scheduledActionId: "sca_schedule_batch_missing_handler",
-            dispatchClaimKey: "schedule-dispatch-batch:missing-handler",
-            staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
-          },
-        ),
+        dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+          scheduledActionId: "sca_schedule_batch_missing_handler",
+          dispatchClaimKey: "schedule-dispatch-batch:missing-handler",
+          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+        }),
       ).rejects.toThrow(
         `No schedule dispatch target handler is registered for ${ScheduleTargetTypes.AUTOMATION_RUN}.`,
       );
@@ -676,16 +727,11 @@ describe("schedule dispatch child batches", () => {
         targetWorkflowStartedAt: "2026-04-28T00:41:00.000Z",
       });
 
-      const result = await dispatchScheduledAction(
-        {
-          db: database.db,
-        },
-        {
-          scheduledActionId: "sca_schedule_batch_reconcile",
-          dispatchClaimKey: "schedule-dispatch-batch:fresh-reconcile",
-          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
-        },
-      );
+      const result = await dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+        scheduledActionId: "sca_schedule_batch_reconcile",
+        dispatchClaimKey: "schedule-dispatch-batch:fresh-reconcile",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
 
       expect(result).toEqual({
         scheduledActionId: "sca_schedule_batch_reconcile",
@@ -703,6 +749,116 @@ describe("schedule dispatch child batches", () => {
         }),
       );
       expect(persistedAction?.dispatchedAt).not.toBeNull();
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("marks snapshot refresh actions dispatched when the profile version already has an active snapshot job", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      await seedSnapshotRefreshScheduledAction({
+        db: database.db,
+        organizationId: "org_schedule_batch_snapshot_conflict",
+        profileId: "sbp_schedule_batch_snapshot_conflict",
+        profileVersion: 1,
+        scheduleId: "sch_schedule_batch_snapshot_conflict",
+        scheduledActionId: "sca_schedule_batch_snapshot_conflict",
+      });
+      await database.db.insert(sandboxProfileVersionSnapshotJobs).values({
+        id: "ssj_schedule_batch_snapshot_conflict",
+        sandboxProfileId: "sbp_schedule_batch_snapshot_conflict",
+        sandboxProfileVersion: 1,
+        workflowRunId: "wfr_schedule_batch_snapshot_conflict",
+        trigger: SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH,
+        state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      });
+
+      const result = await dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+        scheduledActionId: "sca_schedule_batch_snapshot_conflict",
+        dispatchClaimKey: "schedule-dispatch-batch:snapshot-conflict",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
+
+      expect(result).toEqual({
+        scheduledActionId: "sca_schedule_batch_snapshot_conflict",
+        status: "dispatched",
+      });
+
+      const snapshotJobs = await database.db.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { eq }) =>
+          eq(table.sandboxProfileId, "sbp_schedule_batch_snapshot_conflict"),
+      });
+      expect(snapshotJobs).toHaveLength(1);
+      const persistedAction = await database.db.query.scheduledActions.findFirst({
+        where: (table, { eq }) => eq(table.id, "sca_schedule_batch_snapshot_conflict"),
+      });
+      expect(persistedAction).toEqual(
+        expect.objectContaining({
+          status: ScheduledActionStatuses.DISPATCHED,
+          targetWorkflowId: "wfr_schedule_batch_snapshot_conflict",
+        }),
+      );
+      expect(persistedAction?.dispatchedAt).not.toBeNull();
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("creates one snapshot job per scheduled refresh action before data-plane handoff", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      await seedSnapshotRefreshScheduledAction({
+        db: database.db,
+        organizationId: "org_schedule_batch_snapshot_create",
+        profileId: "sbp_schedule_batch_snapshot_create",
+        profileVersion: 1,
+        scheduleId: "sch_schedule_batch_snapshot_create",
+        scheduledActionId: "sca_schedule_batch_snapshot_create",
+      });
+
+      await expect(
+        dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+          scheduledActionId: "sca_schedule_batch_snapshot_create",
+          dispatchClaimKey: "schedule-dispatch-batch:snapshot-create",
+          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+        }),
+      ).rejects.toThrow("fetch failed");
+
+      await expect(
+        dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
+          scheduledActionId: "sca_schedule_batch_snapshot_create",
+          dispatchClaimKey: "schedule-dispatch-batch:snapshot-create",
+          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+        }),
+      ).rejects.toThrow("without a workflow handoff");
+
+      const snapshotJobs = await database.db.query.sandboxProfileVersionSnapshotJobs.findMany({
+        where: (table, { eq }) =>
+          eq(table.sourceScheduledActionId, "sca_schedule_batch_snapshot_create"),
+      });
+      expect(snapshotJobs).toHaveLength(1);
+      expect(snapshotJobs[0]).toEqual(
+        expect.objectContaining({
+          sandboxProfileId: "sbp_schedule_batch_snapshot_create",
+          sandboxProfileVersion: 1,
+          trigger: SandboxProfileVersionSnapshotJobTriggers.SCHEDULED_REFRESH,
+          state: SandboxProfileVersionSnapshotJobStates.FAILED,
+          sourceScheduledActionId: "sca_schedule_batch_snapshot_create",
+          workflowRunId: null,
+          errorCode: "snapshot_materialization_enqueue_failed",
+        }),
+      );
     } finally {
       await database.stop();
     }

@@ -3,10 +3,13 @@ import {
   integrationTargets,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  sandboxProfileSnapshotRefreshScheduleTargets,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
   SandboxProfileVersionStates,
+  schedules,
+  ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
@@ -80,6 +83,21 @@ describe("sandbox profile versions discard integration", () => {
         kind: IntegrationBindingKinds.AGENT,
       }),
     );
+    await fixture.db.insert(schedules).values({
+      id: "sch_version_discard_refresh",
+      organizationId: authenticatedSession.organizationId,
+      targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+      name: "Discard refresh",
+      cronExpression: "0 9 * * *",
+      timezone: "Asia/Singapore",
+      enabled: true,
+      nextScheduledAt: "2026-04-28T01:00:00.000Z",
+    });
+    await fixture.db.insert(sandboxProfileSnapshotRefreshScheduleTargets).values({
+      scheduleId: "sch_version_discard_refresh",
+      sandboxProfileId: "sbp_version_discard_001",
+      sandboxProfileVersion: 2,
+    });
 
     const response = await fixture.request(
       "/v1/sandbox/profiles/sbp_version_discard_001/versions/2/discard",
@@ -113,10 +131,20 @@ describe("sandbox profile versions discard integration", () => {
           eq(table.sandboxProfileVersion, 2),
         ),
     });
+    const refreshSchedule = await fixture.db.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, "sch_version_discard_refresh"),
+    });
 
     expect(discardedVersion).toBeUndefined();
     expect(activeVersion?.state).toBe(SandboxProfileVersionStates.PUBLISHED);
     expect(draftBindings).toEqual([]);
+    expect(refreshSchedule).toEqual(
+      expect.objectContaining({
+        enabled: false,
+        nextScheduledAt: null,
+      }),
+    );
+    expect(refreshSchedule?.deletedAt).not.toBeNull();
   });
 
   it("rejects discarding a published version", async ({ fixture }) => {

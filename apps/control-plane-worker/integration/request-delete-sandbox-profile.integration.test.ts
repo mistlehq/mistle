@@ -4,8 +4,12 @@ import {
   AutomationKinds,
   createControlPlaneDatabase,
   organizations,
+  sandboxProfileSnapshotRefreshScheduleTargets,
   sandboxProfiles,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
+  schedules,
+  ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -60,6 +64,25 @@ describe("request delete sandbox profile", () => {
         displayName: "Delete Profile Worker",
         status: "active",
       });
+      await database.db.insert(sandboxProfileVersions).values({
+        sandboxProfileId: "sbp_delete_profile_worker",
+        version: 1,
+      });
+      await database.db.insert(schedules).values({
+        id: "sch_delete_profile_worker_refresh",
+        organizationId: "org_delete_profile_worker",
+        targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
+        name: "Delete Profile Worker Refresh",
+        cronExpression: "0 9 * * *",
+        timezone: "Asia/Singapore",
+        enabled: true,
+        nextScheduledAt: "2026-04-28T01:00:00.000Z",
+      });
+      await database.db.insert(sandboxProfileSnapshotRefreshScheduleTargets).values({
+        scheduleId: "sch_delete_profile_worker_refresh",
+        sandboxProfileId: "sbp_delete_profile_worker",
+        sandboxProfileVersion: 1,
+      });
       await database.db.insert(automations).values({
         id: "atm_delete_profile_worker",
         organizationId: "org_delete_profile_worker",
@@ -93,6 +116,9 @@ describe("request delete sandbox profile", () => {
       const persistedTarget = await database.db.query.automationTargets.findFirst({
         where: (table, { eq }) => eq(table.id, "atg_delete_profile_worker"),
       });
+      const persistedSchedule = await database.db.query.schedules.findFirst({
+        where: (table, { eq }) => eq(table.id, "sch_delete_profile_worker_refresh"),
+      });
 
       expect(persistedProfile).toBeUndefined();
       expect(persistedAutomation).toEqual(
@@ -101,6 +127,13 @@ describe("request delete sandbox profile", () => {
         }),
       );
       expect(persistedTarget).toBeUndefined();
+      expect(persistedSchedule).toEqual(
+        expect.objectContaining({
+          enabled: false,
+          nextScheduledAt: null,
+        }),
+      );
+      expect(persistedSchedule?.deletedAt).not.toBeNull();
     } finally {
       await database.stop();
     }

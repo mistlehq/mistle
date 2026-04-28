@@ -220,6 +220,35 @@ export const getSandboxProfileVersionSetupScriptResponseSchema =
 export const putSandboxProfileVersionSetupScriptResponseSchema =
   sandboxProfileVersionSetupScriptSchema;
 
+export const putSandboxProfileVersionRefreshScheduleBodySchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+  })
+  .strict();
+
+export const sandboxProfileVersionRefreshScheduleResponseSchema = z
+  .object({
+    scheduleId: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    name: z.string().min(1),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+    enabled: z.boolean(),
+    nextScheduledAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const deleteSandboxProfileVersionRefreshScheduleResponseSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    deleted: z.boolean(),
+  })
+  .strict();
+
 export const createSandboxProfileBodySchema = z
   .object({
     displayName: z.string().min(1),

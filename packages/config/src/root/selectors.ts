@@ -257,6 +257,9 @@ export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWork
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
     },
+    sandbox: {
+      defaultBaseImage: config.sandbox.default_base_image,
+    },
   };
 }
 
