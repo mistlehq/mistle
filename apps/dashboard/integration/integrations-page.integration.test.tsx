@@ -432,12 +432,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
         if (
           request.method === "POST" &&
           requestUrl.pathname ===
-            "/v1/integration/connections/icn_install/github-app-installation/start"
+            "/v1/integration/connections/icn_install/setup/github-app-installation/start"
         ) {
           startRequestCount += 1;
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
+              kind: "redirect",
               authorizationUrl: new URL("#install-github-app", globalThis.location.href).toString(),
             }),
           );

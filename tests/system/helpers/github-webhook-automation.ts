@@ -1290,7 +1290,7 @@ async function completeGitHubInstallation(input: {
 }): Promise<void> {
   const githubOauthStart = await requestJsonOrThrow({
     request: input.fixture.request,
-    path: `/v1/integration/connections/${encodeURIComponent(input.githubConnectionId)}/github-app-installation/start`,
+    path: `/v1/integration/connections/${encodeURIComponent(input.githubConnectionId)}/setup/github-app-installation/start`,
     expectedStatus: 200,
     description: "GitHub App installation start",
     schema: StartRedirectConnectionResponseSchema,

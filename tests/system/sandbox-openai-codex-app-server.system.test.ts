@@ -2704,7 +2704,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
             action: async () => {
               const startResponse = await requestWithTimeout({
                 request: fixture.request,
-                path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/github-app-installation/start`,
+                path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/setup/github-app-installation/start`,
                 timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
                 description: "GitHub App installation start",
                 init: {

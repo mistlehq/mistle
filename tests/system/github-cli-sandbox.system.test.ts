@@ -794,7 +794,7 @@ describeIf("system github cli sandbox", () => {
 
       const githubOauthStart = await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/github-app-installation/start`,
+        path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/setup/github-app-installation/start`,
         expectedStatus: 200,
         description: "GitHub App installation start",
         schema: StartRedirectConnectionResponseSchema,

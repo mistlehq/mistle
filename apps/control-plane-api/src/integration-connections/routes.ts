@@ -12,14 +12,11 @@ import * as deleteIntegrationConnection from "./delete-integration-connection/in
 import * as deleteIntegrationWebhookSource from "./delete-integration-webhook-source/index.js";
 import * as getDeviceAuthorizationAttempt from "./get-device-authorization-attempt/index.js";
 import * as getIntegrationWebhookSource from "./get-integration-webhook-source/index.js";
-import * as startGitHubAppInstallationConnection from "./github-app/start-installation/index.js";
-import * as startGitHubAppManifestConnection from "./github-app/start-manifest/index.js";
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
 import * as listIntegrationWebhookSources from "./list-integration-webhook-sources/index.js";
 import * as refreshAllIntegrationConnectionResources from "./refresh-all-integration-connection-resources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
-import * as startSlackAppManifestConnection from "./slack-app/start-manifest/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
 import * as startExternalAppSetup from "./start-external-app-setup/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
@@ -96,18 +93,6 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(updateFormConnection.route.path, requireAuthSession);
   routes.openapi(updateFormConnection.route, updateFormConnection.handler);
-
-  routes.use(startGitHubAppInstallationConnection.route.path, requireAuthSession);
-  routes.openapi(
-    startGitHubAppInstallationConnection.route,
-    startGitHubAppInstallationConnection.handler,
-  );
-
-  routes.use(startGitHubAppManifestConnection.route.path, requireAuthSession);
-  routes.openapi(startGitHubAppManifestConnection.route, startGitHubAppManifestConnection.handler);
-
-  routes.use(startSlackAppManifestConnection.route.path, requireAuthSession);
-  routes.openapi(startSlackAppManifestConnection.route, startSlackAppManifestConnection.handler);
 
   routes.use(startExternalAppSetup.route.path, requireAuthSession);
   routes.openapi(startExternalAppSetup.route, startExternalAppSetup.handler);
