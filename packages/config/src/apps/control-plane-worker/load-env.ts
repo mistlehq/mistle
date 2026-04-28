@@ -8,7 +8,7 @@ import {
   PartialControlPlaneWorkerConfigSchema,
 } from "./schema.js";
 
-const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneWorkerWorkflowConfigSchema>([
+export const ControlPlaneWorkerWorkflowEnvDescriptors = [
   {
     key: "databaseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL",
@@ -28,9 +28,9 @@ const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneWorkerWorkflowConfigS
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneWorkerWorkflowConfigSchema>>[0];
 
-const loadEmailEnv = createEnvLoader<typeof ControlPlaneWorkerEmailConfigSchema>([
+export const ControlPlaneWorkerEmailEnvDescriptors = [
   {
     key: "fromAddress",
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_ADDRESS",
@@ -61,23 +61,38 @@ const loadEmailEnv = createEnvLoader<typeof ControlPlaneWorkerEmailConfigSchema>
     key: "smtpPassword",
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneWorkerEmailConfigSchema>>[0];
 
-const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneWorkerDataPlaneApiConfigSchema>([
+export const ControlPlaneWorkerDataPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL",
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof ControlPlaneWorkerDataPlaneApiConfigSchema>
+>[0];
 
-const loadControlPlaneApiEnv = createEnvLoader<
-  typeof ControlPlaneWorkerControlPlaneApiConfigSchema
->([
+export const ControlPlaneWorkerControlPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof ControlPlaneWorkerControlPlaneApiConfigSchema>
+>[0];
+
+const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneWorkerWorkflowConfigSchema>(
+  ControlPlaneWorkerWorkflowEnvDescriptors,
+);
+const loadEmailEnv = createEnvLoader<typeof ControlPlaneWorkerEmailConfigSchema>(
+  ControlPlaneWorkerEmailEnvDescriptors,
+);
+const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneWorkerDataPlaneApiConfigSchema>(
+  ControlPlaneWorkerDataPlaneApiEnvDescriptors,
+);
+const loadControlPlaneApiEnv = createEnvLoader<
+  typeof ControlPlaneWorkerControlPlaneApiConfigSchema
+>(ControlPlaneWorkerControlPlaneApiEnvDescriptors);
 
 export function loadControlPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,

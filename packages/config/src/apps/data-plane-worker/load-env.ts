@@ -15,14 +15,14 @@ import {
   PartialDataPlaneWorkerSandboxConfigSchema,
 } from "./schema.js";
 
-const loadDatabaseEnv = createEnvLoader<typeof DataPlaneWorkerDatabaseConfigSchema>([
+export const DataPlaneWorkerDatabaseEnvDescriptors = [
   {
     key: "url",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneWorkerDatabaseConfigSchema>>[0];
 
-const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSchema>([
+export const DataPlaneWorkerWorkflowEnvDescriptors = [
   {
     key: "databaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL",
@@ -42,23 +42,27 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSche
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSchema>>[0];
 
-const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneWorkerRuntimeStateConfigSchema>([
+export const DataPlaneWorkerRuntimeStateEnvDescriptors = [
   {
     key: "gatewayBaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof PartialDataPlaneWorkerRuntimeStateConfigSchema>
+>[0];
 
-const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneWorkerControlPlaneApiConfigSchema>([
+export const DataPlaneWorkerControlPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof DataPlaneWorkerControlPlaneApiConfigSchema>
+>[0];
 
-const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>([
+export const DataPlaneWorkerSandboxDockerEnvDescriptors = [
   {
     key: "socketPath",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",
@@ -67,9 +71,9 @@ const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDocker
     key: "networkName",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>>[0];
 
-const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfigSchema>([
+export const DataPlaneWorkerSandboxE2BEnvDescriptors = [
   {
     key: "apiKey",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_API_KEY",
@@ -88,9 +92,9 @@ const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfig
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_E2B_MEMORY_MB",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfigSchema>>[0];
 
-const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>([
+export const DataPlaneWorkerSandboxEnvDescriptors = [
   {
     key: "tokenizerProxyEgressBaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
@@ -101,11 +105,9 @@ const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfi
     parse: (value) =>
       parseBooleanEnv(value, "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_SANDBOXD_TEST_FAULTS_ENABLED"),
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>>[0];
 
-const loadSandboxStorageArchilEnv = createEnvLoader<
-  typeof DataPlaneWorkerSandboxStorageArchilConfigSchema
->([
+export const DataPlaneWorkerSandboxStorageArchilEnvDescriptors = [
   {
     key: "apiKey",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_API_KEY",
@@ -121,6 +123,7 @@ const loadSandboxStorageArchilEnv = createEnvLoader<
   {
     key: "mounts",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON",
+    valueFormat: "json",
     parse: (value) => {
       try {
         const parsedValue = JSON.parse(value);
@@ -148,16 +151,46 @@ const loadSandboxStorageArchilEnv = createEnvLoader<
       }
     },
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof DataPlaneWorkerSandboxStorageArchilConfigSchema>
+>[0];
 
-const loadSandboxStorageDockerVolumeEnv = createEnvLoader<
-  typeof DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema
->([
+export const DataPlaneWorkerSandboxStorageDockerVolumeEnvDescriptors = [
   {
     key: "namePrefix",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX",
   },
-]);
+] satisfies Parameters<
+  typeof createEnvLoader<typeof DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema>
+>[0];
+
+const loadDatabaseEnv = createEnvLoader<typeof DataPlaneWorkerDatabaseConfigSchema>(
+  DataPlaneWorkerDatabaseEnvDescriptors,
+);
+const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSchema>(
+  DataPlaneWorkerWorkflowEnvDescriptors,
+);
+const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneWorkerRuntimeStateConfigSchema>(
+  DataPlaneWorkerRuntimeStateEnvDescriptors,
+);
+const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneWorkerControlPlaneApiConfigSchema>(
+  DataPlaneWorkerControlPlaneApiEnvDescriptors,
+);
+const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>(
+  DataPlaneWorkerSandboxDockerEnvDescriptors,
+);
+const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneWorkerSandboxE2BConfigSchema>(
+  DataPlaneWorkerSandboxE2BEnvDescriptors,
+);
+const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>(
+  DataPlaneWorkerSandboxEnvDescriptors,
+);
+const loadSandboxStorageArchilEnv = createEnvLoader<
+  typeof DataPlaneWorkerSandboxStorageArchilConfigSchema
+>(DataPlaneWorkerSandboxStorageArchilEnvDescriptors);
+const loadSandboxStorageDockerVolumeEnv = createEnvLoader<
+  typeof DataPlaneWorkerSandboxStorageDockerVolumeConfigSchema
+>(DataPlaneWorkerSandboxStorageDockerVolumeEnvDescriptors);
 
 export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,

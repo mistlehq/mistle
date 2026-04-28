@@ -14,7 +14,7 @@ import {
   PartialControlPlaneApiConfigSchema,
 } from "./schema.js";
 
-const loadServerEnv = createEnvLoader<typeof ControlPlaneApiServerConfigSchema>([
+export const ControlPlaneApiServerEnvDescriptors = [
   {
     key: "host",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",
@@ -24,9 +24,9 @@ const loadServerEnv = createEnvLoader<typeof ControlPlaneApiServerConfigSchema>(
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_PORT",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiServerConfigSchema>>[0];
 
-const loadDatabaseEnv = createEnvLoader<typeof ControlPlaneApiDatabaseConfigSchema>([
+export const ControlPlaneApiDatabaseEnvDescriptors = [
   {
     key: "url",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
@@ -35,9 +35,9 @@ const loadDatabaseEnv = createEnvLoader<typeof ControlPlaneApiDatabaseConfigSche
     key: "migrationUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiDatabaseConfigSchema>>[0];
 
-const loadObjectStoreEnv = createEnvLoader<typeof ControlPlaneApiObjectStoreConfigSchema>([
+export const ControlPlaneApiObjectStoreEnvDescriptors = [
   {
     key: "bucketName",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_BUCKET_NAME",
@@ -63,9 +63,9 @@ const loadObjectStoreEnv = createEnvLoader<typeof ControlPlaneApiObjectStoreConf
     key: "secretAccessKey",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_OBJECT_STORE_SECRET_ACCESS_KEY",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiObjectStoreConfigSchema>>[0];
 
-const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
+export const ControlPlaneApiAuthEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
@@ -77,6 +77,7 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
   {
     key: "trustedOrigins",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS",
+    valueFormat: "csv",
     parse: (value) =>
       value
         .split(",")
@@ -98,16 +99,27 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>>[0];
 
-const loadDashboardEnv = createEnvLoader<typeof ControlPlaneApiDashboardConfigSchema>([
+export const ControlPlaneApiAuthGoogleEnvDescriptors = [
+  {
+    key: "clientId",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID",
+  },
+  {
+    key: "clientSecret",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET",
+  },
+] satisfies readonly { key: string; envVar: string }[];
+
+export const ControlPlaneApiDashboardEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiDashboardConfigSchema>>[0];
 
-const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSchema>([
+export const ControlPlaneApiWorkflowEnvDescriptors = [
   {
     key: "databaseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",
@@ -116,23 +128,23 @@ const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSche
     key: "namespaceId",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiWorkflowConfigSchema>>[0];
 
-const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneApiDataPlaneApiConfigSchema>([
+export const ControlPlaneApiDataPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiDataPlaneApiConfigSchema>>[0];
 
-const loadCommitSignEnv = createEnvLoader<typeof ControlPlaneApiCommitSignConfigSchema>([
+export const ControlPlaneApiCommitSignEnvDescriptors = [
   {
     key: "binaryPath",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_COMMIT_SIGN_BINARY_PATH",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiCommitSignConfigSchema>>[0];
 
-const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>([
+export const ControlPlaneApiIntegrationsEnvDescriptors = [
   {
     key: "activeMasterEncryptionKeyVersion",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
@@ -141,6 +153,7 @@ const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsCo
   {
     key: "masterEncryptionKeys",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
+    valueFormat: "json",
     parse: (value): Record<string, string> => {
       try {
         const parsedValue = asObjectRecord(JSON.parse(value));
@@ -166,7 +179,35 @@ const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsCo
       }
     },
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>>[0];
+
+const loadServerEnv = createEnvLoader<typeof ControlPlaneApiServerConfigSchema>(
+  ControlPlaneApiServerEnvDescriptors,
+);
+const loadDatabaseEnv = createEnvLoader<typeof ControlPlaneApiDatabaseConfigSchema>(
+  ControlPlaneApiDatabaseEnvDescriptors,
+);
+const loadObjectStoreEnv = createEnvLoader<typeof ControlPlaneApiObjectStoreConfigSchema>(
+  ControlPlaneApiObjectStoreEnvDescriptors,
+);
+const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>(
+  ControlPlaneApiAuthEnvDescriptors,
+);
+const loadDashboardEnv = createEnvLoader<typeof ControlPlaneApiDashboardConfigSchema>(
+  ControlPlaneApiDashboardEnvDescriptors,
+);
+const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSchema>(
+  ControlPlaneApiWorkflowEnvDescriptors,
+);
+const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneApiDataPlaneApiConfigSchema>(
+  ControlPlaneApiDataPlaneApiEnvDescriptors,
+);
+const loadCommitSignEnv = createEnvLoader<typeof ControlPlaneApiCommitSignConfigSchema>(
+  ControlPlaneApiCommitSignEnvDescriptors,
+);
+const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>(
+  ControlPlaneApiIntegrationsEnvDescriptors,
+);
 
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,

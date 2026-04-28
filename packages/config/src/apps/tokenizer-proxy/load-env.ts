@@ -6,7 +6,7 @@ import {
   TokenizerProxyServerConfigSchema,
 } from "./schema.js";
 
-const loadServerEnv = createEnvLoader<typeof TokenizerProxyServerConfigSchema>([
+export const TokenizerProxyServerEnvDescriptors = [
   {
     key: "host",
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_HOST",
@@ -16,9 +16,9 @@ const loadServerEnv = createEnvLoader<typeof TokenizerProxyServerConfigSchema>([
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_PORT",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof TokenizerProxyServerConfigSchema>>[0];
 
-const loadControlPlaneApiEnv = createEnvLoader<typeof TokenizerProxyControlPlaneApiConfigSchema>([
+export const TokenizerProxyControlPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL",
@@ -27,7 +27,14 @@ const loadControlPlaneApiEnv = createEnvLoader<typeof TokenizerProxyControlPlane
     key: "publicBaseUrl",
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof TokenizerProxyControlPlaneApiConfigSchema>>[0];
+
+const loadServerEnv = createEnvLoader<typeof TokenizerProxyServerConfigSchema>(
+  TokenizerProxyServerEnvDescriptors,
+);
+const loadControlPlaneApiEnv = createEnvLoader<typeof TokenizerProxyControlPlaneApiConfigSchema>(
+  TokenizerProxyControlPlaneApiEnvDescriptors,
+);
 
 export function loadTokenizerProxyFromEnv(
   env: NodeJS.ProcessEnv,

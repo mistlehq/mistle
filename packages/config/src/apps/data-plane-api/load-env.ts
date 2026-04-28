@@ -11,7 +11,7 @@ import {
   PartialDataPlaneApiConfigSchema,
 } from "./schema.js";
 
-const loadServerEnv = createEnvLoader<typeof DataPlaneApiServerConfigSchema>([
+export const DataPlaneApiServerEnvDescriptors = [
   {
     key: "host",
     envVar: "MISTLE_APPS_DATA_PLANE_API_HOST",
@@ -21,9 +21,9 @@ const loadServerEnv = createEnvLoader<typeof DataPlaneApiServerConfigSchema>([
     envVar: "MISTLE_APPS_DATA_PLANE_API_PORT",
     parse: Number,
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiServerConfigSchema>>[0];
 
-const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>([
+export const DataPlaneApiDatabaseEnvDescriptors = [
   {
     key: "url",
     envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
@@ -32,9 +32,9 @@ const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>
     key: "migrationUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>>[0];
 
-const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>([
+export const DataPlaneApiWorkflowEnvDescriptors = [
   {
     key: "databaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
@@ -43,30 +43,30 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>
     key: "namespaceId",
     envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>>[0];
 
-const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>([
+export const DataPlaneApiRuntimeStateEnvDescriptors = [
   {
     key: "gatewayBaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>>[0];
 
-const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneApiControlPlaneApiConfigSchema>([
+export const DataPlaneApiControlPlaneApiEnvDescriptors = [
   {
     key: "baseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiControlPlaneApiConfigSchema>>[0];
 
-const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneApiSandboxDockerConfigSchema>([
+export const DataPlaneApiSandboxDockerEnvDescriptors = [
   {
     key: "socketPath",
     envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_DOCKER_SOCKET_PATH",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiSandboxDockerConfigSchema>>[0];
 
-const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneApiSandboxE2BConfigSchema>([
+export const DataPlaneApiSandboxE2BEnvDescriptors = [
   {
     key: "apiKey",
     envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY",
@@ -75,7 +75,29 @@ const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneApiSandboxE2BConfigSch
     key: "domain",
     envVar: "MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_DOMAIN",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof DataPlaneApiSandboxE2BConfigSchema>>[0];
+
+const loadServerEnv = createEnvLoader<typeof DataPlaneApiServerConfigSchema>(
+  DataPlaneApiServerEnvDescriptors,
+);
+const loadDatabaseEnv = createEnvLoader<typeof DataPlaneApiDatabaseConfigSchema>(
+  DataPlaneApiDatabaseEnvDescriptors,
+);
+const loadWorkflowEnv = createEnvLoader<typeof DataPlaneApiWorkflowConfigSchema>(
+  DataPlaneApiWorkflowEnvDescriptors,
+);
+const loadRuntimeStateEnv = createEnvLoader<typeof DataPlaneApiRuntimeStateConfigSchema>(
+  DataPlaneApiRuntimeStateEnvDescriptors,
+);
+const loadControlPlaneApiEnv = createEnvLoader<typeof DataPlaneApiControlPlaneApiConfigSchema>(
+  DataPlaneApiControlPlaneApiEnvDescriptors,
+);
+const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneApiSandboxDockerConfigSchema>(
+  DataPlaneApiSandboxDockerEnvDescriptors,
+);
+const loadSandboxE2BEnv = createEnvLoader<typeof DataPlaneApiSandboxE2BConfigSchema>(
+  DataPlaneApiSandboxE2BEnvDescriptors,
+);
 
 export function loadDataPlaneApiFromEnv(env: NodeJS.ProcessEnv): PartialDataPlaneApiConfigInput {
   const partialConfig: PartialDataPlaneApiConfigInput = {};

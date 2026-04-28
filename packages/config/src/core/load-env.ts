@@ -1,5 +1,7 @@
 import type { z } from "zod";
 
+export type EnvValueFormat = "csv" | "json";
+
 type InputOf<TSchema extends z.ZodType> = z.input<TSchema>;
 type InputKey<TSchema extends z.ZodType> = Extract<keyof InputOf<TSchema>, string>;
 type StringInputKey<TSchema extends z.ZodType> = {
@@ -8,22 +10,29 @@ type StringInputKey<TSchema extends z.ZodType> = {
     : never;
 }[InputKey<TSchema>];
 
-type EnvFieldDescriptorWithParse<TSchema extends z.ZodType, Key extends InputKey<TSchema>> = {
+export type EnvFieldDescriptorWithParse<
+  TSchema extends z.ZodType,
+  Key extends InputKey<TSchema>,
+> = {
   key: Key;
   envVar: string;
+  valueFormat?: EnvValueFormat;
+  projectionPath?: readonly string[];
   parse: (value: string) => InputOf<TSchema>[Key];
 };
 
-type EnvFieldDescriptorWithoutParse<
+export type EnvFieldDescriptorWithoutParse<
   TSchema extends z.ZodType,
   Key extends StringInputKey<TSchema>,
 > = {
   key: Key;
   envVar: string;
+  valueFormat?: EnvValueFormat;
+  projectionPath?: readonly string[];
   parse?: undefined;
 };
 
-type EnvFieldDescriptor<TSchema extends z.ZodType> =
+export type EnvFieldDescriptor<TSchema extends z.ZodType> =
   | EnvFieldDescriptorWithParse<TSchema, InputKey<TSchema>>
   | EnvFieldDescriptorWithoutParse<TSchema, StringInputKey<TSchema>>;
 

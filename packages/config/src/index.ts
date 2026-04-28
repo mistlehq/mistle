@@ -2,6 +2,12 @@ export { loadConfig } from "./loader.js";
 export { AppIds } from "./modules.js";
 export { readRepositoryVersion } from "./repository-version.js";
 export {
+  projectServiceConfigToEnv,
+  type RuntimeEnvProjectionEntry,
+  type RuntimeEnvProjectionInput,
+  type RuntimeEnvValueFormat,
+} from "./runtime-env-projection.js";
+export {
   getLocalDevDockerRegistrySandboxBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
   getLocalTestSandboxBaseImageRef,

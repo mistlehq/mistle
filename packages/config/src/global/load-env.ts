@@ -10,7 +10,7 @@ import {
   type PartialGlobalConfigInput,
 } from "./schema.js";
 
-const loadGlobalEnv = createEnvLoader<typeof PartialGlobalConfigSchema>([
+export const GlobalEnvDescriptors = [
   {
     key: "env",
     envVar: "NODE_ENV",
@@ -19,13 +19,14 @@ const loadGlobalEnv = createEnvLoader<typeof PartialGlobalConfigSchema>([
   {
     key: "internalAuth",
     envVar: "MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",
+    projectionPath: ["internalAuth", "serviceToken"],
     parse: (value) => ({
       serviceToken: value,
     }),
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialGlobalConfigSchema>>[0];
 
-const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSchema>([
+export const GlobalTelemetryEnvDescriptors = [
   {
     key: "enabled",
     envVar: "MISTLE_GLOBAL_TELEMETRY_ENABLED",
@@ -39,6 +40,7 @@ const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSche
   {
     key: "traces",
     envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+    projectionPath: ["traces", "endpoint"],
     parse: (value) => ({
       endpoint: value,
     }),
@@ -46,6 +48,7 @@ const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSche
   {
     key: "logs",
     envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+    projectionPath: ["logs", "endpoint"],
     parse: (value) => ({
       endpoint: value,
     }),
@@ -53,6 +56,7 @@ const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSche
   {
     key: "metrics",
     envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+    projectionPath: ["metrics", "endpoint"],
     parse: (value) => ({
       endpoint: value,
     }),
@@ -61,9 +65,9 @@ const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSche
     key: "resourceAttributes",
     envVar: "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialGlobalTelemetryConfigSchema>>[0];
 
-const loadSandboxBootstrapTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
+export const GlobalSandboxBootstrapTokenEnvDescriptors = [
   {
     key: "tokenSecret",
     envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET",
@@ -76,9 +80,9 @@ const loadSandboxBootstrapTokenEnv = createEnvLoader<typeof GlobalSandboxTokenCo
     key: "tokenAudience",
     envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof GlobalSandboxTokenConfigSchema>>[0];
 
-const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
+export const GlobalSandboxConnectTokenEnvDescriptors = [
   {
     key: "tokenSecret",
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
@@ -91,9 +95,9 @@ const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConf
     key: "tokenAudience",
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof GlobalSandboxTokenConfigSchema>>[0];
 
-const loadSandboxEgressTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
+export const GlobalSandboxEgressTokenEnvDescriptors = [
   {
     key: "tokenSecret",
     envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET",
@@ -106,9 +110,9 @@ const loadSandboxEgressTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfi
     key: "tokenAudience",
     envVar: "MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof GlobalSandboxTokenConfigSchema>>[0];
 
-const loadSandboxPublishAccessTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
+export const GlobalSandboxPublishAccessTokenEnvDescriptors = [
   {
     key: "tokenSecret",
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET",
@@ -121,25 +125,23 @@ const loadSandboxPublishAccessTokenEnv = createEnvLoader<typeof GlobalSandboxTok
     key: "tokenAudience",
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof GlobalSandboxTokenConfigSchema>>[0];
 
-const loadSandboxPublishSessionEnv = createEnvLoader<
-  typeof GlobalSandboxPublishSessionConfigSchema
->([
+export const GlobalSandboxPublishSessionEnvDescriptors = [
   {
     key: "cookieSigningSecret",
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof GlobalSandboxPublishSessionConfigSchema>>[0];
 
-const loadSandboxPublishEnv = createEnvLoader<typeof PartialGlobalSandboxPublishConfigSchema>([
+export const GlobalSandboxPublishEnvDescriptors = [
   {
     key: "baseDomain",
     envVar: "MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialGlobalSandboxPublishConfigSchema>>[0];
 
-const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>([
+export const GlobalSandboxEnvDescriptors = [
   {
     key: "provider",
     envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
@@ -156,14 +158,43 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
     key: "internalGatewayWsUrl",
     envVar: "MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialGlobalSandboxConfigSchema>>[0];
 
-const loadSandboxStorageEnv = createEnvLoader<typeof PartialGlobalSandboxStorageConfigSchema>([
+export const GlobalSandboxStorageEnvDescriptors = [
   {
     key: "backend",
     envVar: "MISTLE_GLOBAL_SANDBOX_STORAGE_BACKEND",
   },
-]);
+] satisfies Parameters<typeof createEnvLoader<typeof PartialGlobalSandboxStorageConfigSchema>>[0];
+
+const loadGlobalEnv = createEnvLoader<typeof PartialGlobalConfigSchema>(GlobalEnvDescriptors);
+const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSchema>(
+  GlobalTelemetryEnvDescriptors,
+);
+const loadSandboxBootstrapTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>(
+  GlobalSandboxBootstrapTokenEnvDescriptors,
+);
+const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>(
+  GlobalSandboxConnectTokenEnvDescriptors,
+);
+const loadSandboxEgressTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>(
+  GlobalSandboxEgressTokenEnvDescriptors,
+);
+const loadSandboxPublishAccessTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>(
+  GlobalSandboxPublishAccessTokenEnvDescriptors,
+);
+const loadSandboxPublishSessionEnv = createEnvLoader<
+  typeof GlobalSandboxPublishSessionConfigSchema
+>(GlobalSandboxPublishSessionEnvDescriptors);
+const loadSandboxPublishEnv = createEnvLoader<typeof PartialGlobalSandboxPublishConfigSchema>(
+  GlobalSandboxPublishEnvDescriptors,
+);
+const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
+  GlobalSandboxEnvDescriptors,
+);
+const loadSandboxStorageEnv = createEnvLoader<typeof PartialGlobalSandboxStorageConfigSchema>(
+  GlobalSandboxStorageEnvDescriptors,
+);
 
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
