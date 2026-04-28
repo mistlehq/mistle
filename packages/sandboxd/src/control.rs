@@ -251,6 +251,7 @@ struct ControlServerState {
     init_phase: InitPhase,
     startup_input: Option<StartupInput>,
     sandboxd_state: Option<SandboxdState>,
+    global_git_config_path: PathBuf,
     shutdown_after_init: bool,
 }
 
@@ -366,6 +367,23 @@ pub fn start_control_server<S>(
 where
     S: Sleeper + 'static,
 {
+    start_control_server_with_global_git_config_path(
+        socket_path,
+        sleeper,
+        accept_poll_interval,
+        Path::new(crate::sandboxd_state::DEFAULT_GLOBAL_GIT_CONFIG_PATH),
+    )
+}
+
+pub fn start_control_server_with_global_git_config_path<S>(
+    socket_path: &Path,
+    sleeper: S,
+    accept_poll_interval: Duration,
+    global_git_config_path: &Path,
+) -> Result<ControlServer, ControlError>
+where
+    S: Sleeper + 'static,
+{
     start_control_server_with_health_endpoint(
         socket_path,
         DEFAULT_HEALTH_ENDPOINT_ADDR
@@ -373,6 +391,7 @@ where
             .expect("default health endpoint address should parse"),
         sleeper,
         accept_poll_interval,
+        global_git_config_path,
     )
 }
 
@@ -381,6 +400,7 @@ fn start_control_server_with_health_endpoint<S>(
     health_endpoint_addr: SocketAddr,
     sleeper: S,
     accept_poll_interval: Duration,
+    global_git_config_path: &Path,
 ) -> Result<ControlServer, ControlError>
 where
     S: Sleeper + 'static,
@@ -423,6 +443,7 @@ where
         init_phase: InitPhase::Uninitialized,
         startup_input: None,
         sandboxd_state: None,
+        global_git_config_path: global_git_config_path.to_path_buf(),
         shutdown_after_init: false,
     }));
     let init_thread: SharedInitThread = Arc::new(Mutex::new(None));
@@ -926,6 +947,11 @@ fn begin_init(
     }
 
     let state_for_thread = state.clone();
+    let global_git_config_path = state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .global_git_config_path
+        .clone();
     let diagnostics_logger = StartupDiagnosticsLogger::initialize(
         StartupOperation::Init,
         &startup_input.tunnel_gateway_ws_url,
@@ -939,6 +965,7 @@ fn begin_init(
     *init_thread_guard = Some(thread::spawn(move || {
         let result = SandboxdState::initialize(
             &startup_input,
+            &global_git_config_path,
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             diagnostics_logger.clone(),
@@ -1023,9 +1050,18 @@ fn begin_resume(
             }
         }
     };
+    let global_git_config_path = state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .global_git_config_path
+        .clone();
 
     let resume_result = sandboxd_state
-        .resume(&startup_input, diagnostics_logger.clone())
+        .resume(
+            &startup_input,
+            &global_git_config_path,
+            diagnostics_logger.clone(),
+        )
         .map_err(|error| {
             let error_text = error.to_string();
             if let Some(logger) = &diagnostics_logger
@@ -1731,8 +1767,17 @@ mod tests {
             health_endpoint_addr,
             sleeper,
             accept_poll_interval,
+            &test_global_git_config_path(socket_path),
         )
         .expect("control server should start")
+    }
+
+    fn test_global_git_config_path(socket_path: &std::path::Path) -> std::path::PathBuf {
+        socket_path
+            .parent()
+            .expect("test control socket should have a parent")
+            .join("home")
+            .join(".gitconfig")
     }
 
     fn fetch_health_response(health_endpoint_addr: SocketAddr) -> (u16, serde_json::Value) {

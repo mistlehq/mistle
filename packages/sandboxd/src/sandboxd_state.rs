@@ -104,6 +104,8 @@ impl fmt::Display for SandboxdStateError {
 impl std::error::Error for SandboxdStateError {}
 
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+pub(crate) const GLOBAL_GIT_CONFIG_ENV_NAME: &str = "GIT_CONFIG_GLOBAL";
+pub(crate) const DEFAULT_GLOBAL_GIT_CONFIG_PATH: &str = "/root/.gitconfig";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
 const SETUP_SCRIPT_FILE_MODE: u32 = 0o700;
 const SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY: &str = "/run/mistle";
@@ -137,6 +139,7 @@ impl SandboxdState {
     /// Initializes the sandbox runtime from one accepted startup input.
     pub fn initialize(
         startup_input: &StartupInput,
+        global_git_config_path: &Path,
         clock: Arc<dyn Clock>,
         sleeper: Arc<dyn Sleeper>,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
@@ -169,17 +172,18 @@ impl SandboxdState {
         let execution_mode = startup_input.execution_mode;
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         if !startup_input.is_snapshot() {
-            runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "apply_git_identity",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.clone()),
-                    )]),
-                );
-                SandboxdStateError::ApplyGitIdentity(error)
-            })?;
+            runtime::git_identity::apply_git_identity(startup_input, global_git_config_path)
+                .map_err(|error| {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "apply_git_identity",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.clone()),
+                        )]),
+                    );
+                    SandboxdStateError::ApplyGitIdentity(error)
+                })?;
         }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if !uses_pre_materialized_snapshot {
@@ -435,6 +439,7 @@ impl SandboxdState {
     pub fn resume(
         &mut self,
         startup_input: &StartupInput,
+        global_git_config_path: &Path,
         diagnostics_logger: Option<StartupDiagnosticsLogger>,
     ) -> Result<(), SandboxdStateError> {
         if self.execution_mode == StartupExecutionMode::Snapshot || startup_input.is_snapshot() {
@@ -444,17 +449,19 @@ impl SandboxdState {
         }
 
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
-        runtime::git_identity::apply_git_identity(startup_input).map_err(|error| {
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "apply_git_identity",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.clone()),
-                )]),
-            );
-            SandboxdStateError::ApplyGitIdentity(error)
-        })?;
+        runtime::git_identity::apply_git_identity(startup_input, global_git_config_path).map_err(
+            |error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "apply_git_identity",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.clone()),
+                    )]),
+                );
+                SandboxdStateError::ApplyGitIdentity(error)
+            },
+        )?;
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
@@ -1114,25 +1121,39 @@ fn merge_managed_runtime_environment(
     mut runtime_env: BTreeMap<String, String>,
     egress_proxy: Option<&EgressProxy>,
 ) -> Result<BTreeMap<String, String>, String> {
-    let Some(egress_proxy) = egress_proxy else {
-        return Ok(runtime_env);
-    };
+    insert_managed_runtime_environment(
+        &mut runtime_env,
+        GLOBAL_GIT_CONFIG_ENV_NAME,
+        DEFAULT_GLOBAL_GIT_CONFIG_PATH,
+    )?;
 
-    for (name, value) in egress_proxy.runtime_env() {
-        match runtime_env.get(name) {
-            Some(existing_value) if existing_value != value => {
-                return Err(format!(
-                    "runtime plan artifacts define managed env '{name}', which sandboxd reserves"
-                ));
-            }
-            Some(_) => {}
-            None => {
-                runtime_env.insert(name.clone(), value.clone());
-            }
+    if let Some(egress_proxy) = egress_proxy {
+        for (name, value) in egress_proxy.runtime_env() {
+            insert_managed_runtime_environment(&mut runtime_env, name, value)?;
         }
     }
 
     Ok(runtime_env)
+}
+
+fn insert_managed_runtime_environment(
+    runtime_env: &mut BTreeMap<String, String>,
+    name: &str,
+    value: &str,
+) -> Result<(), String> {
+    match runtime_env.get(name) {
+        Some(existing_value) if existing_value != value => {
+            return Err(format!(
+                "runtime plan artifacts define managed env '{name}', which sandboxd reserves"
+            ));
+        }
+        Some(_) => {}
+        None => {
+            runtime_env.insert(name.to_string(), value.to_string());
+        }
+    }
+
+    Ok(())
 }
 
 fn scrub_snapshot_runtime_artifacts() -> Result<(), String> {
@@ -1433,6 +1454,7 @@ fn join_url_path(base_path: &str, suffix_path: &str) -> String {
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::net::TcpListener;
+    use std::path::Path;
     use std::sync::atomic::AtomicBool;
     use std::sync::{Arc, Mutex};
     use std::thread;
@@ -1450,11 +1472,12 @@ mod tests {
         RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
-        apply_runtime_startup_overrides, build_setup_script_environment,
-        collect_runtime_environment, merge_managed_runtime_environment, run_setup_script,
-        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
-        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
+        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY,
+        SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, apply_runtime_startup_overrides,
+        build_setup_script_environment, collect_runtime_environment,
+        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
+        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
+        spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::test_support::TestEnvVarGuard;
@@ -1857,11 +1880,17 @@ supports_websockets = false
     }
 
     #[test]
-    fn leaves_runtime_environment_unchanged_without_managed_entries() {
+    fn adds_default_global_git_config_to_managed_runtime_environment() {
         let runtime_env = merge_managed_runtime_environment(BTreeMap::new(), None)
             .expect("managed runtime env should merge");
 
-        assert!(runtime_env.is_empty());
+        assert_eq!(
+            runtime_env,
+            BTreeMap::from([(
+                GLOBAL_GIT_CONFIG_ENV_NAME.to_string(),
+                DEFAULT_GLOBAL_GIT_CONFIG_PATH.to_string(),
+            )])
+        );
     }
 
     #[test]
@@ -1878,6 +1907,27 @@ supports_websockets = false
         assert_eq!(
             runtime_env.get("PATH"),
             Some(&"/usr/local/bin:/usr/bin:/bin".to_string())
+        );
+        assert_eq!(
+            runtime_env.get(GLOBAL_GIT_CONFIG_ENV_NAME),
+            Some(&DEFAULT_GLOBAL_GIT_CONFIG_PATH.to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_runtime_plan_global_git_config_override() {
+        let error = merge_managed_runtime_environment(
+            BTreeMap::from([(
+                GLOBAL_GIT_CONFIG_ENV_NAME.to_string(),
+                "/tmp/not-sandboxd-owned".to_string(),
+            )]),
+            None,
+        )
+        .expect_err("managed global git config should be reserved");
+
+        assert_eq!(
+            error,
+            "runtime plan artifacts define managed env 'GIT_CONFIG_GLOBAL', which sandboxd reserves"
         );
     }
 
@@ -2232,6 +2282,7 @@ supports_websockets = false
                 }),
                 None,
             ),
+            Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             None,
@@ -2262,6 +2313,7 @@ supports_websockets = false
                 minimal_runtime_plan_json(),
                 None,
             ),
+            Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
             None,
@@ -2277,6 +2329,7 @@ supports_websockets = false
                     minimal_runtime_plan_json(),
                     None,
                 ),
+                Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
                 None,
             )
             .expect_err("snapshot materialization state should reject resume");

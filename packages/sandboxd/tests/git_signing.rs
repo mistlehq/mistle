@@ -82,10 +82,11 @@ fn git_commit_s_succeeds_via_the_real_sandboxd_signer_alias() {
         .expect("signer alias symlink should be creatable");
 
     let gateway = start_signing_gateway();
-    let server = control::start_control_server(
+    let server = start_test_control_server(
         &control_socket_path,
         ThreadSleeper,
         control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        &global_git_config_path,
     )
     .expect("control server should start");
     control::submit_init(
@@ -183,10 +184,11 @@ fn snapshot_materialization_init_does_not_write_global_git_identity_config() {
     fs::create_dir_all(&home_dir).expect("home dir should be creatable");
 
     let control_socket_path = test_dir.join("control.sock");
-    let server = control::start_control_server(
+    let server = start_test_control_server(
         &control_socket_path,
         ThreadSleeper,
         control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
+        &global_git_config_path,
     )
     .expect("control server should start");
     let mut startup_input = valid_signing_startup_input(
@@ -521,6 +523,21 @@ fn create_temp_test_dir(prefix: &str) -> PathBuf {
     fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
     path
+}
+
+#[cfg(target_os = "linux")]
+fn start_test_control_server<S: Sleeper + 'static>(
+    socket_path: &Path,
+    sleeper: S,
+    accept_poll_interval: Duration,
+    global_git_config_path: &Path,
+) -> Result<control::ControlServer, control::ControlError> {
+    control::start_control_server_with_global_git_config_path(
+        socket_path,
+        sleeper,
+        accept_poll_interval,
+        global_git_config_path,
+    )
 }
 
 #[cfg(target_os = "linux")]

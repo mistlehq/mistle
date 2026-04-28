@@ -295,12 +295,11 @@ mod tests {
         let test_dir = create_temp_test_dir("sign_ok");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
-        let server = control::start_control_server(
+        let server = start_test_control_server(
             &control_socket_path,
             ThreadSleeper,
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
-        )
-        .expect("control server should start");
+        );
 
         control::submit_init(
             &control_socket_path,
@@ -397,12 +396,11 @@ mod tests {
         let test_dir = create_temp_test_dir("sign_missing_config");
         let control_socket_path = test_dir.join("control.sock");
         let gateway = start_signing_gateway();
-        let server = control::start_control_server(
+        let server = start_test_control_server(
             &control_socket_path,
             ThreadSleeper,
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
-        )
-        .expect("control server should start");
+        );
 
         control::submit_init(
             &control_socket_path,
@@ -601,5 +599,27 @@ mod tests {
         fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
+    }
+
+    fn start_test_control_server<S: Sleeper + 'static>(
+        socket_path: &Path,
+        sleeper: S,
+        accept_poll_interval: std::time::Duration,
+    ) -> crate::control::ControlServer {
+        control::start_control_server_with_global_git_config_path(
+            socket_path,
+            sleeper,
+            accept_poll_interval,
+            &test_global_git_config_path(socket_path),
+        )
+        .expect("control server should start")
+    }
+
+    fn test_global_git_config_path(socket_path: &Path) -> PathBuf {
+        socket_path
+            .parent()
+            .expect("test control socket should have a parent")
+            .join("home")
+            .join(".gitconfig")
     }
 }

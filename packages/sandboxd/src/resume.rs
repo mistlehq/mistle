@@ -162,12 +162,11 @@ mod tests {
         .expect("resume input should serialize");
         let mut init_stdout = Vec::new();
         let mut resume_stdout = Vec::new();
-        let server = control::start_control_server(
+        let server = start_test_control_server(
             &control_socket_path,
             ThreadSleeper,
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
-        )
-        .expect("control server should start");
+        );
 
         crate::init::run_init(
             &mut init_request.as_bytes(),
@@ -218,12 +217,11 @@ mod tests {
         ))
         .expect("resume input should serialize");
         let mut stdout = Vec::new();
-        let server = control::start_control_server(
+        let server = start_test_control_server(
             &control_socket_path,
             ThreadSleeper,
             control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
-        )
-        .expect("control server should start");
+        );
 
         let error = run_resume(&mut request.as_bytes(), &mut stdout, &control_socket_path)
             .expect_err("resume should fail before daemon init");
@@ -296,6 +294,28 @@ mod tests {
         fs::create_dir_all(&path).expect("temp test dir should be creatable");
 
         path
+    }
+
+    fn start_test_control_server<S: Sleeper + 'static>(
+        socket_path: &std::path::Path,
+        sleeper: S,
+        accept_poll_interval: std::time::Duration,
+    ) -> crate::control::ControlServer {
+        control::start_control_server_with_global_git_config_path(
+            socket_path,
+            sleeper,
+            accept_poll_interval,
+            &test_global_git_config_path(socket_path),
+        )
+        .expect("control server should start")
+    }
+
+    fn test_global_git_config_path(socket_path: &std::path::Path) -> std::path::PathBuf {
+        socket_path
+            .parent()
+            .expect("test control socket should have a parent")
+            .join("home")
+            .join(".gitconfig")
     }
 
     struct BootstrapGateway {
