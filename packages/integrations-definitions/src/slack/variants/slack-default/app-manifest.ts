@@ -31,6 +31,10 @@ export function buildSlackAppInstallationCompleteUrl(input: {
   );
 }
 
+export function buildSlackAppManifestCreateUrl(input: { apiBaseUrl: string }): string {
+  return buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create");
+}
+
 export function buildSlackManifestConnectionConfig(input: {
   clientId: string;
 }): Record<string, string> {
