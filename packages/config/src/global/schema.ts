@@ -175,5 +175,6 @@ export const PartialGlobalConfigSchema = z
   .strict();
 
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
+export type GlobalTelemetryConfig = z.infer<typeof GlobalTelemetryConfigSchema>;
 export type GlobalConfigInput = z.input<typeof GlobalConfigSchema>;
 export type PartialGlobalConfigInput = z.input<typeof PartialGlobalConfigSchema>;

@@ -1,8 +1,8 @@
 # Control Plane Worker Config Module
 
-Namespace in final config:
+Selected service config:
 
-- `apps.control_plane_worker`
+- `control-plane-worker`
 
 ## Config Keys
 

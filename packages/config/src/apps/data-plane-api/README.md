@@ -1,8 +1,8 @@
 # Data Plane API Config Module
 
-Namespace in final config:
+Selected service config:
 
-- `apps.data_plane_api`
+- `data-plane-api`
 
 ## Config Keys
 

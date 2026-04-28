@@ -184,6 +184,29 @@ const controlPlaneApiEnvConfig = {
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
+  internalAuth: {
+    serviceToken,
+  },
+  connectionToken: {
+    secret: sandboxConnectTokenSecret,
+    issuer: sandboxConnectTokenIssuer,
+    audience: sandboxConnectTokenAudience,
+  },
+  portAccess: {
+    baseDomain: sandboxPublishBaseDomain,
+    gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,
+    access: {
+      tokenSecret: sandboxPublishAccessTokenSecret,
+      tokenIssuer: sandboxPublishAccessTokenIssuer,
+      tokenAudience: sandboxPublishAccessTokenAudience,
+    },
+  },
+  sandbox: {
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+    gatewayWsUrl: globalDevelopmentConfig.sandbox.gatewayWsUrl,
+    bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
+    storageBackend: "archil",
+  },
   integrations: {
     activeMasterEncryptionKeyVersion: 1,
     masterEncryptionKeys: {
@@ -235,6 +258,9 @@ const controlPlaneWorkerEnvConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
   },
+  internalAuth: {
+    serviceToken,
+  },
 } as const;
 
 const controlPlaneWorkerBaseFixtureConfig = {
@@ -272,7 +298,14 @@ const dataPlaneApiEnvConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
   },
+  internalAuth: {
+    serviceToken,
+  },
   sandbox: {
+    provider: "docker",
+    storage: {
+      backend: "archil",
+    },
     docker: {
       socketPath: "/var/run/docker.sock",
     },
@@ -363,12 +396,23 @@ const dataPlaneWorkerEnvConfig = {
     baseUrl: "http://127.0.0.1:5000",
   },
   sandbox: {
+    provider: "docker",
+    storage: {
+      backend: "archil",
+    },
+    internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
+    bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
+    egress: globalDevelopmentConfig.sandbox.egress,
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },
   },
+  internalAuth: {
+    serviceToken,
+  },
+  telemetry: globalDevelopmentConfig.telemetry,
   sandboxStorage: {
     archil: {
       apiKey: "fixture-archil-api-key",
@@ -419,12 +463,23 @@ const dataPlaneWorkerDockerFixtureConfig = {
     baseUrl: "http://127.0.0.1:5100",
   },
   sandbox: {
+    provider: "docker",
+    storage: {
+      backend: "archil",
+    },
+    internalGatewayWsUrl: globalDevelopmentConfig.sandbox.internalGatewayWsUrl,
+    bootstrap: globalDevelopmentConfig.sandbox.bootstrap,
+    egress: globalDevelopmentConfig.sandbox.egress,
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
       networkName: "mistle-sandbox-dev",
     },
   },
+  internalAuth: {
+    serviceToken,
+  },
+  telemetry: globalDevelopmentConfig.telemetry,
   sandboxStorage: {
     archil: {
       apiKey: "fixture-archil-api-key",
@@ -1071,9 +1126,7 @@ describe("loadConfig integrations", () => {
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT: undefined,
         }),
       }),
-    ).toThrow(
-      /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
-    );
+    ).toThrow(/sandbox\.docker is required when sandbox\.provider is 'docker'/);
   });
 
   it("rejects data-plane-worker config when control-plane API config is missing", () => {
@@ -1099,9 +1152,7 @@ describe("loadConfig integrations", () => {
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON: undefined,
         }),
       }),
-    ).toThrow(
-      /apps\.data_plane_worker\.sandbox_storage\.archil is required when global\.sandbox\.storage\.backend is 'archil'/,
-    );
+    ).toThrow(/sandboxStorage\.archil is required when sandbox\.storage\.backend is 'archil'/);
   });
 
   it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {

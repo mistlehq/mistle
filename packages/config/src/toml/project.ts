@@ -1,9 +1,16 @@
-import { type AppConfig, ConfigSchema as RuntimeConfigSchema } from "../schema.js";
+import type { ControlPlaneApiConfig } from "../apps/control-plane-api/schema.js";
+import type { ControlPlaneWorkerConfig } from "../apps/control-plane-worker/schema.js";
+import type { DataPlaneApiConfig } from "../apps/data-plane-api/schema.js";
+import type { DataPlaneGatewayConfig } from "../apps/data-plane-gateway/schema.js";
+import type {
+  DataPlaneWorkerConfig,
+  DataPlaneWorkerSandboxStorageConfig,
+} from "../apps/data-plane-worker/schema.js";
+import type { TokenizerProxyConfig } from "../apps/tokenizer-proxy/schema.js";
+import type { GlobalConfig, GlobalTelemetryConfig } from "../global/schema.js";
 import { type Config } from "./schema.js";
 
-function buildArchilMount(
-  config: Config,
-): AppConfig["apps"]["data_plane_worker"]["sandboxStorage"] {
+function buildArchilMount(config: Config): DataPlaneWorkerSandboxStorageConfig {
   const archilConfig = config.sandbox.storage?.archil;
 
   if (archilConfig === undefined) {
@@ -52,9 +59,7 @@ function buildArchilMount(
   };
 }
 
-function buildSandboxStorage(
-  config: Config,
-): AppConfig["apps"]["data_plane_worker"]["sandboxStorage"] {
+function buildSandboxStorage(config: Config): DataPlaneWorkerSandboxStorageConfig {
   const dockerVolumeConfig = config.sandbox.storage?.docker_volume;
 
   return {
@@ -69,7 +74,7 @@ function buildSandboxStorage(
   };
 }
 
-function projectTelemetry(config: Config): AppConfig["global"]["telemetry"] {
+function projectTelemetry(config: Config): GlobalTelemetryConfig {
   if (config.telemetry.enabled) {
     return {
       enabled: true,
@@ -91,7 +96,7 @@ function projectTelemetry(config: Config): AppConfig["global"]["telemetry"] {
   };
 }
 
-export function selectGlobalConfig(config: Config): AppConfig["global"] {
+export function selectGlobalConfig(config: Config): GlobalConfig {
   const sandboxStorage =
     config.sandbox.storage === undefined
       ? undefined
@@ -141,9 +146,7 @@ export function selectGlobalConfig(config: Config): AppConfig["global"] {
   };
 }
 
-export function selectControlPlaneApiConfig(
-  config: Config,
-): AppConfig["apps"]["control_plane_api"] {
+export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConfig {
   const googleAuth = config.services.control_plane_api.auth.google;
 
   return {
@@ -225,9 +228,7 @@ export function selectControlPlaneApiConfig(
   };
 }
 
-export function selectControlPlaneWorkerConfig(
-  config: Config,
-): AppConfig["apps"]["control_plane_worker"] {
+export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWorkerConfig {
   return {
     workflow: {
       databaseUrl: config.postgres.control_plane.pooled_url,
@@ -256,7 +257,7 @@ export function selectControlPlaneWorkerConfig(
   };
 }
 
-export function selectDataPlaneApiConfig(config: Config): AppConfig["apps"]["data_plane_api"] {
+export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
   return {
     server: {
       host: config.services.data_plane_api.host,
@@ -305,9 +306,7 @@ export function selectDataPlaneApiConfig(config: Config): AppConfig["apps"]["dat
   };
 }
 
-export function selectDataPlaneGatewayConfig(
-  config: Config,
-): AppConfig["apps"]["data_plane_gateway"] {
+export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayConfig {
   const globalConfig = selectGlobalConfig(config);
 
   return {
@@ -339,9 +338,7 @@ export function selectDataPlaneGatewayConfig(
   };
 }
 
-export function selectDataPlaneWorkerConfig(
-  config: Config,
-): AppConfig["apps"]["data_plane_worker"] {
+export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConfig {
   const sandboxStorage =
     config.sandbox.storage === undefined
       ? undefined
@@ -387,15 +384,16 @@ export function selectDataPlaneWorkerConfig(
               socketPath: config.sandbox.docker.socket_path,
               networkName: config.sandbox.docker.network_name,
             },
-      e2b:
-        config.sandbox.e2b === undefined
-          ? undefined
-          : {
+      ...(config.sandbox.e2b === undefined
+        ? {}
+        : {
+            e2b: {
               apiKey: config.sandbox.e2b.api_key,
               domain: config.sandbox.e2b.domain,
               cpuCount: config.sandbox.e2b.cpu_count,
               memoryMb: config.sandbox.e2b.memory_mb,
             },
+          }),
     },
     sandboxStorage: buildSandboxStorage(config),
     internalAuth: {
@@ -405,7 +403,7 @@ export function selectDataPlaneWorkerConfig(
   };
 }
 
-export function selectTokenizerProxyConfig(config: Config): AppConfig["apps"]["tokenizer_proxy"] {
+export function selectTokenizerProxyConfig(config: Config): TokenizerProxyConfig {
   return {
     server: {
       host: config.services.tokenizer_proxy.host,
@@ -424,20 +422,4 @@ export function selectTokenizerProxyConfig(config: Config): AppConfig["apps"]["t
       tokenAudience: config.sandbox.tokens.egress.audience,
     },
   };
-}
-
-export function projectToRuntimeConfig(config: Config): AppConfig {
-  const runtimeConfig: AppConfig = {
-    global: selectGlobalConfig(config),
-    apps: {
-      control_plane_api: selectControlPlaneApiConfig(config),
-      control_plane_worker: selectControlPlaneWorkerConfig(config),
-      data_plane_api: selectDataPlaneApiConfig(config),
-      data_plane_gateway: selectDataPlaneGatewayConfig(config),
-      data_plane_worker: selectDataPlaneWorkerConfig(config),
-      tokenizer_proxy: selectTokenizerProxyConfig(config),
-    },
-  };
-
-  return RuntimeConfigSchema.parse(runtimeConfig);
 }

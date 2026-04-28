@@ -1,8 +1,8 @@
 # Tokenizer Proxy config module
 
-Namespace:
+Selected service config:
 
-- `apps.tokenizer_proxy`
+- `tokenizer-proxy`
 
 Values:
 

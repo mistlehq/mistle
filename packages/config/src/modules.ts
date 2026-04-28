@@ -6,8 +6,6 @@ import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
-import type { ConfigModule } from "./core/module.js";
-import { globalConfigModule } from "./global/index.js";
 
 export const AppIds = {
   CONTROL_PLANE_API: "control-plane-api",
@@ -40,8 +38,3 @@ type AppConfigById = {
 };
 
 export type AppConfigModuleValue<TApp extends AppConfigModuleKey> = AppConfigById[TApp];
-
-export const configModules: readonly ConfigModule[] = [
-  globalConfigModule,
-  ...Object.values(appConfigModules),
-];

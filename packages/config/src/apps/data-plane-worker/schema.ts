@@ -201,16 +201,14 @@ export const PartialDataPlaneWorkerConfigSchema = z
   .strict();
 
 const DataPlaneWorkerProviderRequirementMessages = {
-  DOCKER:
-    "apps.data_plane_worker.sandbox.docker is required when apps.data_plane_worker.sandbox.provider is 'docker'.",
-  E2B: "apps.data_plane_worker.sandbox.e2b is required when apps.data_plane_worker.sandbox.provider is 'e2b'.",
+  DOCKER: "sandbox.docker is required when sandbox.provider is 'docker'.",
+  E2B: "sandbox.e2b is required when sandbox.provider is 'e2b'.",
 } as const;
 
 const DataPlaneWorkerPersistentSandboxRequirementMessages = {
-  ARCHIL:
-    "apps.data_plane_worker.sandbox_storage.archil is required when apps.data_plane_worker.sandbox.storage.backend is 'archil'.",
+  ARCHIL: "sandboxStorage.archil is required when sandbox.storage.backend is 'archil'.",
   DOCKER_VOLUME:
-    "apps.data_plane_worker.sandbox_storage.docker_volume is required when apps.data_plane_worker.sandbox.storage.backend is 'docker_volume'.",
+    "sandboxStorage.dockerVolume is required when sandbox.storage.backend is 'docker_volume'.",
 } as const;
 
 export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
@@ -264,4 +262,7 @@ export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
 }
 
 export type DataPlaneWorkerConfig = z.infer<typeof DataPlaneWorkerConfigSchema>;
+export type DataPlaneWorkerSandboxStorageConfig = z.infer<
+  typeof DataPlaneWorkerSandboxStorageConfigSchema
+>;
 export type PartialDataPlaneWorkerConfigInput = z.input<typeof PartialDataPlaneWorkerConfigSchema>;

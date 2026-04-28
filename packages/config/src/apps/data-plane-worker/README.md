@@ -1,8 +1,8 @@
 # Data Plane Worker Config Module
 
-Namespace in final config:
+Selected service config:
 
-- `apps.data_plane_worker`
+- `data-plane-worker`
 
 ## Config Keys
 
@@ -37,10 +37,10 @@ Namespace in final config:
 
 Notes:
 
-- Sandbox provider selection is projected into `apps.data_plane_worker.sandbox.provider`.
+- Sandbox provider selection is selected into `sandbox.provider`.
 - Managed deployments should set `workflow.runMigrations` to `false` and run OpenWorkflow migrations separately.
-- `apps.data_plane_worker.sandbox` carries the runtime sandbox dependencies the worker consumes.
-- `sandboxStorage.dockerVolume` is only used when `apps.data_plane_worker.sandbox.storage.backend = "docker_volume"`.
+- `sandbox` carries the runtime sandbox dependencies the worker consumes.
+- `sandboxStorage.dockerVolume` is only used when `sandbox.storage.backend = "docker_volume"`.
 - `sandbox.sandboxdTestFaultsEnabled` is intended only for non-release/test environments where sandboxd fault injection must be enabled explicitly.
 - Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `2` vCPU and `4096` MB.
 - `sandboxStorage.archil.mounts` currently supports only `s3-compatible` and must contain at most one entry.

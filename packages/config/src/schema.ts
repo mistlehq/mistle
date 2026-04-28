@@ -1,71 +1,7 @@
-import { z } from "zod";
+import type { z } from "zod";
 
-import { ControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
-import { ControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
-import {
-  DataPlaneApiConfigSchema,
-  getDataPlaneApiSandboxProviderValidationIssue,
-} from "./apps/data-plane-api/schema.js";
-import { DataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
-import {
-  DataPlaneWorkerConfigSchema,
-  getDataPlaneWorkerPersistentSandboxValidationIssue,
-  getDataPlaneWorkerSandboxProviderValidationIssue,
-} from "./apps/data-plane-worker/schema.js";
-import { TokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
 import { GlobalConfigSchema } from "./global/schema.js";
 
-export const ConfigSchema = z
-  .object({
-    global: GlobalConfigSchema,
-    apps: z
-      .object({
-        control_plane_api: ControlPlaneApiConfigSchema,
-        control_plane_worker: ControlPlaneWorkerConfigSchema,
-        data_plane_api: DataPlaneApiConfigSchema,
-        data_plane_gateway: DataPlaneGatewayConfigSchema,
-        data_plane_worker: DataPlaneWorkerConfigSchema,
-        tokenizer_proxy: TokenizerProxyConfigSchema,
-      })
-      .strict(),
-  })
-  .superRefine((value, ctx) => {
-    const dataPlaneApiIssue = getDataPlaneApiSandboxProviderValidationIssue({
-      appSandbox: value.apps.data_plane_api.sandbox,
-    });
-
-    if (dataPlaneApiIssue !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["apps", "data_plane_api", ...dataPlaneApiIssue.path],
-        message: dataPlaneApiIssue.message,
-      });
-    }
-
-    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      appSandbox: value.apps.data_plane_worker.sandbox,
-    });
-
-    if (issue !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["apps", "data_plane_worker", ...issue.path],
-        message: issue.message,
-      });
-    }
-
-    const dataPlaneWorkerPersistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      appConfig: value.apps.data_plane_worker,
-    });
-
-    if (dataPlaneWorkerPersistentIssue !== null) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["apps", "data_plane_worker", ...dataPlaneWorkerPersistentIssue.path],
-        message: dataPlaneWorkerPersistentIssue.message,
-      });
-    }
-  })
-  .strict();
-
-export type AppConfig = z.infer<typeof ConfigSchema>;
+export type AppConfig = {
+  global: z.infer<typeof GlobalConfigSchema>;
+};

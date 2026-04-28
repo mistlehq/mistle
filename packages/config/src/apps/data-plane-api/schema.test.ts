@@ -102,8 +102,7 @@ describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
 
     expect(issue).toEqual({
       path: ["sandbox", "docker"],
-      message:
-        "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
+      message: "sandbox.docker is required when sandbox.provider is 'docker'.",
     });
   });
 });
