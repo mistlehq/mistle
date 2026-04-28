@@ -727,7 +727,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               persistenceMode: resumableSandboxState.persistenceMode,
               runtimeProvider: replacementRuntimeProvider,
               providerSandboxId: replacementProviderSandboxId,
-              lifecycle: "start",
+              lifecycle: "resume",
             },
           );
         });

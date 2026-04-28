@@ -454,7 +454,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
           runtimeProvider: SandboxProvider.DOCKER,
           providerSandboxId: replacedSandbox.providerSandboxId,
-          lifecycle: "start",
+          lifecycle: "resume",
         },
       );
 
@@ -636,7 +636,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
             persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
             runtimeProvider: SandboxProvider.DOCKER,
             providerSandboxId: replacementSandbox.providerSandboxId,
-            lifecycle: "start",
+            lifecycle: "resume",
           },
         );
 
