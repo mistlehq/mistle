@@ -1,5 +1,6 @@
 import { buildUrlWithPath } from "@mistle/http";
 
+import { SlackConnectionMethodId } from "./auth.js";
 import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
 
 function mergeUniqueStrings(input: {
@@ -28,6 +29,25 @@ export function buildSlackAppInstallationCompleteUrl(input: {
     input.controlPlaneBaseUrl,
     "/p/integration/callbacks/slack-app-installation",
   );
+}
+
+export function buildSlackManifestConnectionConfig(input: {
+  clientId: string;
+}): Record<string, string> {
+  return {
+    connection_method: SlackConnectionMethodId,
+    client_id: input.clientId,
+  };
+}
+
+export function buildSlackManifestConnectionSecrets(input: {
+  clientSecret: string;
+  signingSecret: string;
+}): Record<string, string> {
+  return {
+    clientSecret: input.clientSecret,
+    signingSecret: input.signingSecret,
+  };
 }
 
 export function buildSlackAppManifest(input: {

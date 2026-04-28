@@ -11,6 +11,8 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
 import {
   buildSlackAppInstallationCompleteUrl,
   buildSlackAppManifest,
+  buildSlackManifestConnectionConfig,
+  buildSlackManifestConnectionSecrets,
 } from "@mistle/integrations-definitions/server";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -142,23 +144,6 @@ async function createSlackManifest(input: {
 
     throw error;
   }
-}
-
-function buildSlackManifestConnectionConfig(input: { clientId: string }): Record<string, string> {
-  return {
-    connection_method: SlackConnectionMethodId,
-    client_id: input.clientId,
-  };
-}
-
-function buildSlackManifestConnectionSecrets(input: {
-  clientSecret: string;
-  signingSecret: string;
-}): Record<string, string> {
-  return {
-    clientSecret: input.clientSecret,
-    signingSecret: input.signingSecret,
-  };
 }
 
 export async function startSlackAppManifestConnection(

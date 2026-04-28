@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlackAppManifest } from "./app-manifest.js";
+import {
+  buildSlackAppManifest,
+  buildSlackManifestConnectionConfig,
+  buildSlackManifestConnectionSecrets,
+} from "./app-manifest.js";
 import { SlackAppManifestTemplate } from "./manifest.js";
 
 describe("SlackAppManifestTemplate", () => {
@@ -92,6 +96,33 @@ describe("buildSlackAppManifest", () => {
           ]),
         },
       },
+    });
+  });
+});
+
+describe("buildSlackManifestConnectionConfig", () => {
+  it("maps Slack manifest credentials into connection config", () => {
+    expect(
+      buildSlackManifestConnectionConfig({
+        clientId: "123.456",
+      }),
+    ).toEqual({
+      connection_method: "slack-bot-token",
+      client_id: "123.456",
+    });
+  });
+});
+
+describe("buildSlackManifestConnectionSecrets", () => {
+  it("maps Slack manifest credentials into connection secrets", () => {
+    expect(
+      buildSlackManifestConnectionSecrets({
+        clientSecret: "slack-client-secret",
+        signingSecret: "slack-signing-secret",
+      }),
+    ).toEqual({
+      clientSecret: "slack-client-secret",
+      signingSecret: "slack-signing-secret",
     });
   });
 });
