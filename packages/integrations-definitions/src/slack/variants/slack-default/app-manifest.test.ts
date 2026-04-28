@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSlackAppManifest } from "./manifest-builder.js";
+import { buildSlackAppManifest } from "./app-manifest.js";
 
 describe("buildSlackAppManifest", () => {
   it("injects Mistle Slack request URLs, bot events, and OAuth scopes", () => {

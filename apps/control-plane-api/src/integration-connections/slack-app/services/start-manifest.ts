@@ -8,6 +8,10 @@ import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
+import {
+  buildSlackAppInstallationCompleteUrl,
+  buildSlackAppManifest,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -34,7 +38,6 @@ import {
   resolveConnectionWithTargetOrThrow,
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
-import { buildSlackAppInstallationCompleteUrl, buildSlackAppManifest } from "./manifest-builder.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,

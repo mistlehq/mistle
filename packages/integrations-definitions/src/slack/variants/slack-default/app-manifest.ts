@@ -1,8 +1,6 @@
 import { buildUrlWithPath } from "@mistle/http";
-import {
-  SlackAppManifestBotEvents,
-  SlackAppManifestBotScopes,
-} from "@mistle/integrations-definitions";
+
+import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
 
 function mergeUniqueStrings(input: {
   existing: unknown;
@@ -33,8 +31,8 @@ export function buildSlackAppInstallationCompleteUrl(input: {
 }
 
 export function buildSlackAppManifest(input: {
-  manifest: Record<string, unknown>;
   controlPlaneBaseUrl: string;
+  manifest: Record<string, unknown>;
   webhookCallbackUrl: string;
 }): Record<string, unknown> {
   const settings = toRecord(input.manifest["settings"]);
