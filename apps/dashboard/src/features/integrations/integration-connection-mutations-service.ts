@@ -1,4 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import type { GitHubAppManifestOwner } from "@mistle/integrations-definitions/browser";
 
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
@@ -356,14 +357,7 @@ export async function startGitHubAppInstallation(input: {
 export async function startGitHubAppManifestCreation(input: {
   connectionId: string;
   manifest: Record<string, unknown>;
-  owner:
-    | {
-        kind: "personal";
-      }
-    | {
-        kind: "organization";
-        organizationSlug: string;
-      };
+  owner: GitHubAppManifestOwner;
 }): Promise<StartedGitHubAppManifestConnection> {
   try {
     const response = await requestControlPlane({

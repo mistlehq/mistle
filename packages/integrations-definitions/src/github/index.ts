@@ -8,6 +8,7 @@ export {
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
   GitHubAppManifestConversionMissingClientSecretError,
+  GitHubAppManifestOwnerSchema,
   parseGitHubAppManifestConversionResponse,
   type GitHubAppManifestConversion,
   type GitHubAppManifestOwner,

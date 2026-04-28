@@ -3,6 +3,7 @@ import {
   createCodeMessageErrorSchema,
   ValidationErrorResponseSchema,
 } from "@mistle/http/errors.js";
+import { GitHubAppManifestOwnerSchema } from "@mistle/integrations-definitions/server";
 
 import {
   IntegrationConnectionsBadRequestCodes,
@@ -14,24 +15,6 @@ export const StartGitHubAppManifestConnectionParamsSchema = z
     connectionId: z.string().min(1),
   })
   .strict();
-
-const GitHubAppManifestOwnerSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("personal"),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("organization"),
-      organizationSlug: z
-        .string()
-        .trim()
-        .min(1)
-        .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/),
-    })
-    .strict(),
-]);
 
 export const StartGitHubAppManifestConnectionBodySchema = z
   .object({
