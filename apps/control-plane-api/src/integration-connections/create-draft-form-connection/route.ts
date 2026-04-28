@@ -1,32 +1,32 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
-import { IntegrationConnectionSchema } from "../../schemas.js";
+import { IntegrationConnectionSchema } from "../schemas.js";
 import {
-  CreateSlackAppDraftConnectionBadRequestResponseSchema,
-  CreateSlackAppDraftConnectionBodySchema,
-  CreateSlackAppDraftConnectionNotFoundResponseSchema,
-  CreateSlackAppDraftConnectionParamsSchema,
+  CreateDraftFormConnectionBadRequestResponseSchema,
+  CreateDraftFormConnectionBodySchema,
+  CreateDraftFormConnectionNotFoundResponseSchema,
+  CreateDraftFormConnectionParamsSchema,
 } from "./schema.js";
 
 export const route = createRoute({
   method: "post",
-  path: "/:targetKey/slack-app/draft",
+  path: "/:targetKey/:methodId/draft",
   tags: ["Integrations"],
   request: {
-    params: CreateSlackAppDraftConnectionParamsSchema,
+    params: CreateDraftFormConnectionParamsSchema,
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: CreateSlackAppDraftConnectionBodySchema,
+          schema: CreateDraftFormConnectionBodySchema,
         },
       },
     },
   },
   responses: {
     201: {
-      description: "Create a draft Slack app manifest connection.",
+      description: "Create a draft form-backed integration connection.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,
@@ -37,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: CreateSlackAppDraftConnectionBadRequestResponseSchema,
+          schema: CreateDraftFormConnectionBadRequestResponseSchema,
         },
       },
     },
@@ -61,7 +61,7 @@ export const route = createRoute({
       description: "Integration target was not found.",
       content: {
         "application/json": {
-          schema: CreateSlackAppDraftConnectionNotFoundResponseSchema,
+          schema: CreateDraftFormConnectionNotFoundResponseSchema,
         },
       },
     },

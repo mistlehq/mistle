@@ -32,12 +32,64 @@ const IntegrationConnectionMethodPendingUiSchema = z
   })
   .strict();
 
+const IntegrationSetupConnectionExternalSubjectRequirementSchema = z
+  .object({
+    kind: z.literal("connection-external-subject"),
+  })
+  .strict();
+
+const IntegrationSetupConfigFieldRequirementSchema = z
+  .object({
+    kind: z.literal("config-field"),
+    field: z.string().min(1),
+  })
+  .strict();
+
+const IntegrationSetupSecretFieldRequirementSchema = z
+  .object({
+    kind: z.literal("secret-field"),
+    field: z.string().min(1),
+  })
+  .strict();
+
+const IntegrationSetupCompletionRequirementLeafSchema = z.discriminatedUnion("kind", [
+  IntegrationSetupConnectionExternalSubjectRequirementSchema,
+  IntegrationSetupConfigFieldRequirementSchema,
+  IntegrationSetupSecretFieldRequirementSchema,
+]);
+
+const IntegrationSetupCompletionRequirementSchema = z.discriminatedUnion("kind", [
+  IntegrationSetupConnectionExternalSubjectRequirementSchema,
+  IntegrationSetupConfigFieldRequirementSchema,
+  IntegrationSetupSecretFieldRequirementSchema,
+  z
+    .object({
+      kind: z.literal("any-of"),
+      anyOf: z.array(IntegrationSetupCompletionRequirementLeafSchema).min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("all-of"),
+      allOf: z.array(IntegrationSetupCompletionRequirementLeafSchema).min(1),
+    })
+    .strict(),
+]);
+
 const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
   z
     .object({
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("form"),
+      createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
+      setupFlow: z
+        .object({
+          completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
+          routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+        })
+        .strict()
+        .optional(),
       secretFields: z.array(IntegrationConnectionMethodSecretFieldSchema).min(1),
     })
     .strict(),

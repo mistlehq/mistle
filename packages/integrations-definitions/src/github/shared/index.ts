@@ -22,6 +22,19 @@ export { GitHubCredentialResolverKeys } from "./credential-resolver-keys.js";
 export { GitHubAppInstallationCredentialResolver } from "./credential-resolver.server.js";
 export { GitHubCredentialSlotKeys } from "./slot-keys.js";
 export {
+  buildConvertedGitHubAppConnectionConfig,
+  buildConvertedGitHubAppConnectionSecrets,
+  buildGitHubAppInstallationUrl,
+  buildGitHubAppManifest,
+  buildGitHubAppManifestConversionUrl,
+  buildGitHubAppManifestSubmissionUrl,
+  GitHubAppManifestConversionMissingClientSecretError,
+  GitHubAppManifestOwnerSchema,
+  parseGitHubAppManifestConversionResponse,
+  type GitHubAppManifestConversion,
+  type GitHubAppManifestOwner,
+} from "./app-manifest.js";
+export {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "./resource-definitions.js";

@@ -1,5 +1,6 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { GitHubAppManifestTemplate } from "@mistle/integrations-definitions/browser";
+import { systemScheduler } from "@mistle/time";
 import {
   Button,
   CopyableValue,
@@ -11,10 +12,6 @@ import {
   Notice,
   RadioGroup,
   RadioGroupItem,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,6 +36,7 @@ import type { IntegrationConnection } from "../integrations/integrations-service
 import {
   ManifestJsonEditor,
   type ManifestJsonValidation,
+  createManifestJsonDraft,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -48,13 +46,22 @@ import {
 } from "../integrations/manifest-webhook-callback-state.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
+  buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
+  createAutoSaveFieldTimeoutRefs,
+  resolveAutoSaveFieldTimeoutRefs,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SectionHeader } from "../shared/section-header.js";
+import {
+  IntegrationConnectionSetupModeTabs,
+  IntegrationConnectionSetupWebhookCallbackValue,
+  type IntegrationConnectionSetupMode,
+} from "./integration-connection-setup-flow.js";
+import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubExistingAppSetupDraft = {
@@ -67,7 +74,7 @@ type GitHubExistingAppSetupDraft = {
 };
 
 type GitHubExistingAppSetupFieldKey = keyof GitHubExistingAppSetupDraft;
-type GitHubAppSetupMode = "manifest" | "existing-app";
+type GitHubAppSetupMode = IntegrationConnectionSetupMode;
 type GitHubManifestAppOwnerKind = "personal" | "organization";
 
 const GitHubExistingAppSetupRequiredFieldLabels = {
@@ -77,7 +84,7 @@ const GitHubExistingAppSetupRequiredFieldLabels = {
   clientSecret: "Client secret",
   appPrivateKeyPem: "App private key",
   webhookSecret: "Webhook secret",
-} as const;
+} satisfies Record<GitHubExistingAppSetupFieldKey, string>;
 
 const GitHubExistingAppSetupFieldKeys = [
   "appId",
@@ -86,13 +93,13 @@ const GitHubExistingAppSetupFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 const GitHubExistingAppSetupConfigFieldKeys = [
   "appId",
   "appSlug",
   "clientId",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 type GitHubExistingAppSetupConfigFieldKey = (typeof GitHubExistingAppSetupConfigFieldKeys)[number];
 
@@ -100,52 +107,11 @@ const GitHubExistingAppSetupSecretFieldKeys = [
   "clientSecret",
   "appPrivateKeyPem",
   "webhookSecret",
-] as const satisfies readonly GitHubExistingAppSetupFieldKey[];
+] satisfies readonly GitHubExistingAppSetupFieldKey[];
 
 type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
 
-const GitHubDraftManifest = JSON.stringify(
-  {
-    name: "Mistle GitHub App",
-    url: "https://github.com/mistlehq/mistle",
-    description: "Used in Mistle for sandbox agents",
-    hook_attributes: {
-      active: true,
-      url: "https://mistle.example.com/api/integrations/github/webhook",
-    },
-    redirect_url: "https://mistle.example.com/api/integrations/github/manifest/callback",
-    callback_urls: ["https://mistle.example.com/api/integrations/github/install/callback"],
-    setup_url: "https://mistle.example.com/api/integrations/github/setup",
-    public: false,
-    default_events: [
-      "issues",
-      "issue_comment",
-      "pull_request",
-      "pull_request_review_comment",
-      "check_run",
-      "check_suite",
-    ],
-    default_permissions: {
-      checks: "write",
-      contents: "write",
-      issues: "write",
-      metadata: "read",
-      pull_requests: "write",
-    },
-    request_oauth_on_install: false,
-    setup_on_update: true,
-  },
-  null,
-  2,
-);
-
-type GitHubExistingAppSetupTimeoutRefs = Record<
-  GitHubExistingAppSetupFieldKey,
-  {
-    fadeStartTimeoutRef: { current: TimerHandle | null };
-    fadeEndTimeoutRef: { current: TimerHandle | null };
-  }
->;
+const GitHubDraftManifest = createManifestJsonDraft(GitHubAppManifestTemplate);
 
 function isGitHubExistingAppSetupSecretFieldKey(
   fieldKey: string,
@@ -174,18 +140,13 @@ function createInitialDraft(connection: IntegrationConnection): GitHubExistingAp
   };
 }
 
-function resolveConfiguredSecretFieldKeys(
+function resolveConfiguredGitHubSecretFieldKeys(
   connection: IntegrationConnection,
 ): ReadonlySet<GitHubExistingAppSetupSecretFieldKey> {
-  const configuredSecretFieldKeys = new Set<GitHubExistingAppSetupSecretFieldKey>();
-
-  for (const configuredSecretName of connection.configuredSecretNames ?? []) {
-    if (isGitHubExistingAppSetupSecretFieldKey(configuredSecretName)) {
-      configuredSecretFieldKeys.add(configuredSecretName);
-    }
-  }
-
-  return configuredSecretFieldKeys;
+  return resolveConfiguredSetupSecretFieldKeys({
+    configuredSecretNames: connection.configuredSecretNames,
+    fieldKeys: GitHubExistingAppSetupSecretFieldKeys,
+  });
 }
 
 function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
@@ -206,35 +167,6 @@ function createInitialFieldStates(): Record<GitHubExistingAppSetupFieldKey, Savi
     clientSecret: { status: "idle", errorMessage: null },
     appPrivateKeyPem: { status: "idle", errorMessage: null },
     webhookSecret: { status: "idle", errorMessage: null },
-  };
-}
-
-function createFieldTimeoutRefs(): GitHubExistingAppSetupTimeoutRefs {
-  return {
-    appId: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    appSlug: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    clientId: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    clientSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    appPrivateKeyPem: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    webhookSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
   };
 }
 
@@ -313,24 +245,14 @@ function shouldPersistGitHubExistingAppSetupField(input: {
   return normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]).length > 0;
 }
 
-function buildDraftWithSavedFieldValues(input: {
-  baseDraft: GitHubExistingAppSetupDraft;
-  draft: GitHubExistingAppSetupDraft;
-  fieldKey: GitHubExistingAppSetupFieldKey;
-}): GitHubExistingAppSetupDraft {
-  const nextDraft: GitHubExistingAppSetupDraft = {
-    ...input.baseDraft,
-  };
-
-  for (const configFieldKey of GitHubExistingAppSetupConfigFieldKeys) {
-    nextDraft[configFieldKey] = normalizeGitHubExistingAppSetupValue(input.draft[configFieldKey]);
+function resolveGitHubExistingAppSetupSavedFieldKeys(
+  fieldKey: GitHubExistingAppSetupFieldKey,
+): ReadonlyArray<GitHubExistingAppSetupFieldKey> {
+  if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
+    return [...GitHubExistingAppSetupConfigFieldKeys, fieldKey];
   }
 
-  if (isGitHubExistingAppSetupSecretFieldKey(input.fieldKey)) {
-    nextDraft[input.fieldKey] = normalizeGitHubExistingAppSetupValue(input.draft[input.fieldKey]);
-  }
-
-  return nextDraft;
+  return GitHubExistingAppSetupConfigFieldKeys;
 }
 
 function isGitHubExistingAppSetupFieldDirty(input: {
@@ -616,19 +538,13 @@ function GitHubSetupUrls(input: {
       />
       <div className="flex flex-col gap-4">
         <CopyableValue label="Post-installation setup URL" value={input.setupCallbackUrl} />
-        {input.webhookCallbackState.kind === "loading" ? (
-          <CopyableValue label="Webhook callback URL" loading />
-        ) : input.webhookCallbackState.kind === "error" ? (
-          <Notice title="Could not load webhook URL" variant="alert">
-            {input.webhookCallbackState.message}
-          </Notice>
-        ) : input.webhookCallbackState.kind === "missing" ? (
-          <Notice title="Webhook URL is not available yet" variant="alert">
-            GitHub setup requires a webhook callback URL, but this connection does not have one yet.
-          </Notice>
-        ) : (
-          <CopyableValue label="Webhook callback URL" value={input.webhookCallbackState.value} />
-        )}
+        <IntegrationConnectionSetupWebhookCallbackValue
+          errorTitle="Could not load webhook URL"
+          label="Webhook callback URL"
+          missingMessage="GitHub setup requires a webhook callback URL, but this connection does not have one yet."
+          missingTitle="Webhook URL is not available yet"
+          webhookCallbackState={input.webhookCallbackState}
+        />
       </div>
     </div>
   );
@@ -796,13 +712,17 @@ export function GitHubAppSetupPane(input: {
     useState<GitHubManifestAppOwnerKind | null>(null);
   const [manifestOrganizationSlug, setManifestOrganizationSlug] = useState("");
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
-    resolveConfiguredSecretFieldKeys(input.connection),
+    resolveConfiguredGitHubSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
+  const fieldTimeoutRefs = useRef(
+    createAutoSaveFieldTimeoutRefs({
+      fieldKeys: GitHubExistingAppSetupFieldKeys,
+    }),
+  );
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: setupMode === "existing-app",
     connectionId: input.connection.id,
@@ -898,9 +818,13 @@ export function GitHubAppSetupPane(input: {
   useEffect(() => {
     return () => {
       for (const fieldKey of GitHubExistingAppSetupFieldKeys) {
+        const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+          timeoutRefs: fieldTimeoutRefs.current,
+          fieldKey,
+        });
         clearPendingStatusTimeouts({
-          fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-          fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+          fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+          fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
           scheduler: systemScheduler,
         });
       }
@@ -908,9 +832,13 @@ export function GitHubAppSetupPane(input: {
   }, []);
 
   function resetFieldFeedback(fieldKey: GitHubExistingAppSetupFieldKey): void {
+    const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+      timeoutRefs: fieldTimeoutRefs.current,
+      fieldKey,
+    });
     clearPendingStatusTimeouts({
-      fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-      fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+      fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+      fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
       scheduler: systemScheduler,
     });
     setFieldStates((currentFieldStates) => ({
@@ -1005,21 +933,24 @@ export function GitHubAppSetupPane(input: {
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
       });
 
-      const nextSavedDraft = buildDraftWithSavedFieldValues({
-        baseDraft: savedDraft,
+      const savedFieldValuePatch = buildSavedFieldValuePatch({
         draft: currentDraft,
-        fieldKey,
+        fieldKeys: resolveGitHubExistingAppSetupSavedFieldKeys(fieldKey),
+        normalizeValue: normalizeGitHubExistingAppSetupValue,
       });
-      const nextDraft = buildDraftWithSavedFieldValues({
-        baseDraft: currentDraft,
-        draft: currentDraft,
-        fieldKey,
-      });
+      const nextSavedDraft = {
+        ...savedDraft,
+        ...savedFieldValuePatch,
+      };
+      const nextDraft = {
+        ...currentDraft,
+        ...savedFieldValuePatch,
+      };
 
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
       if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
-        setConfiguredSecretFieldKeys(resolveConfiguredSecretFieldKeys(updatedConnection));
+        setConfiguredSecretFieldKeys(resolveConfiguredGitHubSecretFieldKeys(updatedConnection));
       }
       setActionErrorMessage(null);
       setFieldStates((currentFieldStates) => ({
@@ -1030,9 +961,13 @@ export function GitHubAppSetupPane(input: {
         },
       }));
 
+      const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+        timeoutRefs: fieldTimeoutRefs.current,
+        fieldKey,
+      });
       scheduleSavedStateReset({
-        fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-        fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+        fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+        fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
         onFadeEnd: () => {
           setFieldStates((currentFieldStates) => ({
             ...currentFieldStates,
@@ -1143,60 +1078,24 @@ export function GitHubAppSetupPane(input: {
 
   return (
     <FormPageStack>
-      <Tabs
-        onValueChange={(nextValue) => {
-          if (nextValue === "manifest" || nextValue === "existing-app") {
-            setSetupMode(nextValue);
-          }
-        }}
-        value={setupMode}
-      >
-        <SectionHeader
-          className="px-1"
-          description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
-          size="large"
-          title="Choose a setup method"
-        />
-
-        <FormPageSection>
-          <div className="flex flex-col gap-6 p-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="manifest">Create from manifest</TabsTrigger>
-              <TabsTrigger value="existing-app">Use existing app</TabsTrigger>
-            </TabsList>
-
-            {actionErrorMessage === null ? null : (
-              <Notice title="Could not continue setup" variant="alert">
-                {actionErrorMessage}
-              </Notice>
-            )}
-
-            <TabsContent value="manifest">
-              <GitHubManifestSetupPanel
-                appOwnerKind={manifestAppOwnerKind}
-                manifestValidation={manifestValidation}
-                manifestValue={manifestValue}
-                onAppOwnerKindChange={setManifestAppOwnerKind}
-                onManifestChange={setManifestValue}
-                onOrganizationSlugChange={setManifestOrganizationSlug}
-                organizationSlug={manifestOrganizationSlug}
-              />
-            </TabsContent>
-
-            <TabsContent value="existing-app">
-              <GitHubExistingAppSetupPanel
-                configuredSecretFieldKeys={configuredSecretFieldKeys}
-                draft={draft}
-                fieldStates={fieldStates}
-                onCommitField={(fieldKey) => {
-                  void commitField(fieldKey);
-                }}
-                onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-                onRevertSecretReplacement={revertSecretReplacement}
-                onUpdateFieldDraft={updateFieldDraft}
-              />
-            </TabsContent>
-
+      <IntegrationConnectionSetupModeTabs
+        actionErrorMessage={actionErrorMessage}
+        description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
+        existingAppContent={
+          <GitHubExistingAppSetupPanel
+            configuredSecretFieldKeys={configuredSecretFieldKeys}
+            draft={draft}
+            fieldStates={fieldStates}
+            onCommitField={(fieldKey) => {
+              void commitField(fieldKey);
+            }}
+            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
+            onRevertSecretReplacement={revertSecretReplacement}
+            onUpdateFieldDraft={updateFieldDraft}
+          />
+        }
+        footer={
+          <>
             {setupMode === "existing-app" ? (
               <GitHubSetupUrls
                 setupCallbackUrl={new URL(
@@ -1228,9 +1127,23 @@ export function GitHubAppSetupPane(input: {
                 startInstallationMutation.isPending || isRedirectingToInstallation
               }
             />
-          </div>
-        </FormPageSection>
-      </Tabs>
+          </>
+        }
+        manifestContent={
+          <GitHubManifestSetupPanel
+            appOwnerKind={manifestAppOwnerKind}
+            manifestValidation={manifestValidation}
+            manifestValue={manifestValue}
+            onAppOwnerKindChange={setManifestAppOwnerKind}
+            onManifestChange={setManifestValue}
+            onOrganizationSlugChange={setManifestOrganizationSlug}
+            organizationSlug={manifestOrganizationSlug}
+          />
+        }
+        onModeChange={setSetupMode}
+        title="Choose a setup method"
+        value={setupMode}
+      />
     </FormPageStack>
   );
 }

@@ -1,5 +1,6 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import {
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationKinds,
   IntegrationRegistry,
   IntegrationWebhookSourceLifecycles,
@@ -8,6 +9,7 @@ import {
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
+import { createDraftFormConnection } from "../src/integration-connections/services/create-draft-form-connection.js";
 import { createFormConnection } from "../src/integration-connections/services/create-form-connection.js";
 import { it } from "./test-context.js";
 
@@ -15,9 +17,13 @@ const TestTargetConfigSchema = z.object({}).strict();
 const TestTargetSecretSchema = z.object({}).strict();
 const TestBindingConfigSchema = z.object({}).strict();
 const TestConnectionMethodId = "test-path-token";
+const TestDraftConnectionMethodId = "test-draft-path-token";
 const TestConnectionConfigSchema = z
   .object({
-    connection_method: z.literal(TestConnectionMethodId),
+    connection_method: z.union([
+      z.literal(TestConnectionMethodId),
+      z.literal(TestDraftConnectionMethodId),
+    ]),
   })
   .strict();
 
@@ -47,6 +53,22 @@ const ImplicitPathWebhookDefinition: IntegrationDefinition<
           inputType: "password",
           secretType: "api_key",
           slotKey: "test-slack-shape.test-path-webhook-source.test-path-token.api-key",
+        },
+      ],
+      configSchema: TestConnectionConfigSchema,
+    },
+    {
+      id: TestDraftConnectionMethodId,
+      label: "Draft path token",
+      kind: "form",
+      createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      secretFields: [
+        {
+          name: "apiKey",
+          label: "API key",
+          inputType: "password",
+          secretType: "api_key",
+          slotKey: "test-slack-shape.test-path-webhook-source.test-draft-path-token.api-key",
         },
       ],
       configSchema: TestConnectionConfigSchema,
@@ -109,6 +131,61 @@ describe("create form connection implicit webhook source integration", () => {
         },
       },
     );
+
+    const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.integrationConnectionId, createdConnection.id),
+          eq(table.targetKey, targetKey),
+        ),
+    });
+
+    expect(persistedSource).toBeDefined();
+    if (persistedSource === undefined) {
+      throw new Error("Expected implicit webhook source to be created.");
+    }
+
+    expect(typeof persistedSource.endpointKey).toBe("string");
+    expect(persistedSource.endpointKey.length).toBeGreaterThan(0);
+  });
+
+  it("creates a draft form connection and implicit webhook source for draft-then-setup methods", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-draft-form-implicit-webhook-source@example.com",
+    });
+    const targetKey = "test-draft-path-webhook-source-target";
+    const registry = new IntegrationRegistry();
+    registry.register(ImplicitPathWebhookDefinition);
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey,
+      familyId: ImplicitPathWebhookDefinition.familyId,
+      variantId: ImplicitPathWebhookDefinition.variantId,
+      enabled: true,
+      config: {},
+      secrets: null,
+    });
+
+    const createdConnection = await createDraftFormConnection(
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        targetKey,
+        methodId: TestDraftConnectionMethodId,
+        displayName: "Draft implicit path source connection",
+      },
+    );
+
+    expect(createdConnection.config).toEqual({
+      connection_method: TestDraftConnectionMethodId,
+    });
+    expect(createdConnection.configuredSecretNames).toBeUndefined();
 
     const persistedSource = await fixture.db.query.integrationWebhookSources.findFirst({
       where: (table, { and, eq }) =>

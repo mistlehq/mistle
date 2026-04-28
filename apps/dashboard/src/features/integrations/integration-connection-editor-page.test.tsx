@@ -49,6 +49,7 @@ const createEditor: IntegrationConnectionEditorState = {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "form",
+      createBehavior: "draft-then-setup",
       secretFields: [
         {
           name: "setupSecret",

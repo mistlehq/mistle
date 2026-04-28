@@ -6,10 +6,17 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId, SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
+import {
+  buildSlackAppInstallationCompleteUrl,
+  buildSlackOAuthAccessConnectionSecrets,
+  buildSlackOAuthAccessUrl,
+  parseSlackOAuthAccessErrorResponse,
+  parseSlackOAuthAccessSuccessResponse,
+  type SlackOAuthAccessSuccessResponse,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -32,14 +39,13 @@ import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
   resolveRequiredRedirectQueryParamOrThrow,
-  resolveSlackAppInstallationConnectionId,
+  resolveConnectionRedirectStateConnectionId,
 } from "../../services/redirect-flow.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
-import { buildSlackAppInstallationCompleteUrl } from "./manifest-builder.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -54,32 +60,6 @@ type CompletedSlackAppInstallation = {
   id: string;
   targetKey: string;
 };
-
-const SlackOAuthAccessSuccessResponseSchema = z
-  .object({
-    ok: z.literal(true),
-    access_token: z.string().min(1),
-    token_type: z.literal("bot").optional(),
-    app_id: z.string().min(1).optional(),
-    bot_user_id: z.string().min(1).optional(),
-    team: z
-      .object({
-        id: z.string().min(1),
-        name: z.string().min(1).optional(),
-      })
-      .loose()
-      .optional(),
-  })
-  .loose();
-
-const SlackOAuthAccessErrorResponseSchema = z
-  .object({
-    ok: z.literal(false),
-    error: z.string().min(1),
-  })
-  .loose();
-
-type SlackOAuthAccessSuccessResponse = z.output<typeof SlackOAuthAccessSuccessResponseSchema>;
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return resolveRequiredRedirectQueryParamOrThrow({
@@ -103,7 +83,7 @@ function resolveAuthorizationCodeOrThrow(params: URLSearchParams): string {
 
 function resolveSlackAppInstallationConnectionIdOrThrow(state: string): string {
   try {
-    return resolveSlackAppInstallationConnectionId(state);
+    return resolveConnectionRedirectStateConnectionId(state);
   } catch {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
@@ -125,7 +105,7 @@ async function completeSlackOAuthAccess(input: {
   body.set("code", input.code);
   body.set("redirect_uri", input.redirectUrl);
 
-  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "oauth.v2.access"), {
+  const response = await fetch(buildSlackOAuthAccessUrl({ apiBaseUrl: input.apiBaseUrl }), {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -142,16 +122,16 @@ async function completeSlackOAuthAccess(input: {
     );
   }
 
-  const errorResult = SlackOAuthAccessErrorResponseSchema.safeParse(responseJson);
-  if (errorResult.success) {
+  const errorResult = parseSlackOAuthAccessErrorResponse(responseJson);
+  if (errorResult !== null) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT,
-      `Slack OAuth installation failed: ${errorResult.data.error}.`,
+      `Slack OAuth installation failed: ${errorResult.error}.`,
     );
   }
 
   try {
-    return SlackOAuthAccessSuccessResponseSchema.parse(responseJson);
+    return parseSlackOAuthAccessSuccessResponse(responseJson);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(
@@ -260,9 +240,9 @@ export async function completeSlackAppInstallation(
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
-    secrets: {
-      botToken: slackOAuthAccess.access_token,
-    },
+    secrets: buildSlackOAuthAccessConnectionSecrets({
+      accessToken: slackOAuthAccess.access_token,
+    }),
     invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT,
   });

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 
 import { parse as parseToml } from "smol-toml";
-import type { z } from "zod";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { PartialControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
@@ -23,17 +22,10 @@ import {
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { PartialTokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
 import { mergeConfigRoots } from "./core/merge.js";
-import { type ConfigModule } from "./core/module.js";
-import { asObjectRecord, getValueAtPath } from "./core/record.js";
+import { asObjectRecord } from "./core/record.js";
 import { globalConfigModule } from "./global/index.js";
-import {
-  AppIds,
-  appConfigModules,
-  type AppConfigModuleKey,
-  type AppConfigModuleValue,
-} from "./modules.js";
-import { loadFromEnv, validateModules } from "./pipeline.js";
-import { type AppConfig, ConfigSchema } from "./schema.js";
+import { AppIds, type AppConfigModuleKey, type AppConfigModuleValue } from "./modules.js";
+import { type AppConfig } from "./schema.js";
 import { loadRootConfigFromEnv } from "./toml/load-env.js";
 import {
   selectControlPlaneApiConfig,
@@ -86,21 +78,6 @@ function resolveLoadInputs(options: LoadConfigSourceOptions): {
   return { configPath, env };
 }
 
-function parseModuleValue<TSchema extends z.ZodType>(
-  module: ConfigModule<TSchema>,
-  root: Record<string, unknown>,
-): z.output<TSchema> {
-  return module.schema.parse(getValueAtPath(root, module.namespace));
-}
-
-function applyModuleEnvOverrides<TSchema extends z.ZodType>(
-  module: ConfigModule<TSchema>,
-  baseValue: z.output<TSchema>,
-  env: NodeJS.ProcessEnv,
-): z.output<TSchema> {
-  return module.schema.parse(mergeConfigRoots(baseValue, module.loadEnv(env)));
-}
-
 function parseTomlRoot(configPath: string): RootConfig {
   return RootConfigSchema.parse(asObjectRecord(parseToml(readFileSync(configPath, "utf8"))));
 }
@@ -109,75 +86,12 @@ function applyRootEnvOverrides(rootConfig: RootConfig, env: NodeJS.ProcessEnv): 
   return RootConfigSchema.parse(mergeConfigRoots(rootConfig, loadRootConfigFromEnv(env)));
 }
 
-function loadValidatedEnvRoot(
-  modules: readonly ConfigModule[],
-  env: NodeJS.ProcessEnv,
-): Record<string, unknown> {
-  const envLoadedRoot = loadFromEnv(modules, env);
-  return validateModules(modules, envLoadedRoot);
+export function parseConfigRecord(record: unknown): RootConfig {
+  return RootConfigSchema.parse(record);
 }
 
-export function parseConfigRecord(record: unknown): AppConfig {
-  return ConfigSchema.parse(record);
-}
-
-function parseAppConfig(
-  appId: typeof AppIds.CONTROL_PLANE_API,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-function parseAppConfig(
-  appId: typeof AppIds.CONTROL_PLANE_WORKER,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
-function parseAppConfig(
-  appId: typeof AppIds.DATA_PLANE_API,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
-function parseAppConfig(
-  appId: typeof AppIds.DATA_PLANE_GATEWAY,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
-function parseAppConfig(
-  appId: typeof AppIds.DATA_PLANE_WORKER,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
-function parseAppConfig(
-  appId: typeof AppIds.TOKENIZER_PROXY,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
-function parseAppConfig<TApp extends AppConfigModuleKey>(
-  appId: TApp,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<TApp>;
-function parseAppConfig(
-  appId: AppConfigModuleKey,
-  root: Record<string, unknown>,
-): AppConfigModuleValue<AppConfigModuleKey> {
-  if (appId === AppIds.CONTROL_PLANE_API) {
-    return parseModuleValue(controlPlaneApiConfigModule, root);
-  }
-
-  if (appId === AppIds.CONTROL_PLANE_WORKER) {
-    return parseModuleValue(controlPlaneWorkerConfigModule, root);
-  }
-
-  if (appId === AppIds.DATA_PLANE_API) {
-    return parseModuleValue(dataPlaneApiConfigModule, root);
-  }
-
-  if (appId === AppIds.DATA_PLANE_GATEWAY) {
-    return parseModuleValue(dataPlaneGatewayConfigModule, root);
-  }
-
-  if (appId === AppIds.DATA_PLANE_WORKER) {
-    return parseModuleValue(dataPlaneWorkerConfigModule, root);
-  }
-
-  if (appId === AppIds.TOKENIZER_PROXY) {
-    return parseModuleValue(tokenizerProxyConfigModule, root);
-  }
-
-  throw new Error("Unsupported app id.");
+function loadGlobalConfigFromEnv(env: NodeJS.ProcessEnv): AppConfig["global"] {
+  return globalConfigModule.schema.parse(globalConfigModule.loadEnv(env));
 }
 
 function composeTokenizerProxyConfig(
@@ -295,99 +209,90 @@ function composeDataPlaneWorkerConfig(
   });
 }
 
-function loadControlPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, controlPlaneApiConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeControlPlaneApiConfig(
-    getValueAtPath(envLoadedRoot, controlPlaneApiConfigModule.namespace),
-    globalConfig,
-  );
+function selectAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_API,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
+function selectAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_WORKER,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
+function selectAppConfig(
+  appId: typeof AppIds.DATA_PLANE_API,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
+function selectAppConfig(
+  appId: typeof AppIds.DATA_PLANE_GATEWAY,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
+function selectAppConfig(
+  appId: typeof AppIds.DATA_PLANE_WORKER,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
+function selectAppConfig(
+  appId: typeof AppIds.TOKENIZER_PROXY,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
+function selectAppConfig<TApp extends AppConfigModuleKey>(
+  appId: TApp,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<TApp>;
+function selectAppConfig(
+  appId: AppConfigModuleKey,
+  rootConfig: RootConfig,
+): AppConfigModuleValue<AppConfigModuleKey> {
+  if (appId === AppIds.CONTROL_PLANE_API) {
+    return controlPlaneApiConfigModule.schema.parse(selectControlPlaneApiConfig(rootConfig));
+  }
 
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
+  if (appId === AppIds.CONTROL_PLANE_WORKER) {
+    return controlPlaneWorkerConfigModule.schema.parse(selectControlPlaneWorkerConfig(rootConfig));
+  }
+
+  if (appId === AppIds.DATA_PLANE_API) {
+    return dataPlaneApiConfigModule.schema.parse(selectDataPlaneApiConfig(rootConfig));
+  }
+
+  if (appId === AppIds.DATA_PLANE_GATEWAY) {
+    return dataPlaneGatewayConfigModule.schema.parse(selectDataPlaneGatewayConfig(rootConfig));
+  }
+
+  if (appId === AppIds.DATA_PLANE_WORKER) {
+    return dataPlaneWorkerConfigModule.schema.parse(selectDataPlaneWorkerConfig(rootConfig));
+  }
+
+  if (appId === AppIds.TOKENIZER_PROXY) {
+    return tokenizerProxyConfigModule.schema.parse(selectTokenizerProxyConfig(rootConfig));
+  }
+
+  throw new Error("Unsupported app id.");
 }
 
-function loadControlPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, controlPlaneWorkerConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeControlPlaneWorkerConfig(
-    getValueAtPath(envLoadedRoot, controlPlaneWorkerConfigModule.namespace),
-    globalConfig,
-  );
-
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
+function validateSelectedAppConfig(appId: AppConfigModuleKey, rootConfig: RootConfig): void {
+  if (appId === AppIds.DATA_PLANE_API) {
+    validateDataPlaneApiConfig(selectAppConfig(AppIds.DATA_PLANE_API, rootConfig));
+  } else if (appId === AppIds.DATA_PLANE_WORKER) {
+    validateDataPlaneWorkerConfig(selectAppConfig(AppIds.DATA_PLANE_WORKER, rootConfig));
+  }
 }
 
-function loadDataPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneApiConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeDataPlaneApiConfig(
-    getValueAtPath(envLoadedRoot, dataPlaneApiConfigModule.namespace),
-    globalConfig,
-  );
+function validateDataPlaneApiConfig(
+  config: AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>,
+): void {
   const issue = getDataPlaneApiSandboxProviderValidationIssue({
-    appSandbox: appConfig.sandbox,
+    appSandbox: config.sandbox,
   });
 
   if (issue !== null) {
     throw new Error(issue.message);
   }
-
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
 }
 
-function loadDataPlaneGatewayConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneGatewayConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeDataPlaneGatewayConfig(
-    getValueAtPath(envLoadedRoot, dataPlaneGatewayConfigModule.namespace),
-    globalConfig,
-  );
-
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
-}
-
-function loadDataPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneWorkerConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeDataPlaneWorkerConfig(
-    getValueAtPath(envLoadedRoot, dataPlaneWorkerConfigModule.namespace),
-    globalConfig,
-  );
-
+function validateDataPlaneWorkerConfig(
+  config: AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>,
+): void {
   const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-    appSandbox: appConfig.sandbox,
+    appSandbox: config.sandbox,
   });
 
   if (issue !== null) {
@@ -395,210 +300,75 @@ function loadDataPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
   }
 
   const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-    appConfig,
+    appConfig: config,
   });
 
   if (persistentIssue !== null) {
     throw new Error(persistentIssue.message);
   }
-
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
 }
 
-function loadTokenizerProxyConfigFromEnv(env: NodeJS.ProcessEnv): {
-  app: AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
-  global: AppConfig["global"];
-} {
-  const envLoadedRoot = loadFromEnv([globalConfigModule, tokenizerProxyConfigModule], env);
-  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
-  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
-  const appConfig = composeTokenizerProxyConfig(
-    getValueAtPath(envLoadedRoot, tokenizerProxyConfigModule.namespace),
-    globalConfig,
-  );
-
-  return {
-    global: globalConfig,
-    app: appConfig,
-  };
+function loadRootConfig(configPath: string, env: NodeJS.ProcessEnv): RootConfig {
+  return applyRootEnvOverrides(parseTomlRoot(configPath), env);
 }
 
-function loadSelectedAppConfig(
+function loadEnvOnlyConfig(
   appId: typeof AppIds.CONTROL_PLANE_API,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-function loadSelectedAppConfig(
+): LoadConfigResult<typeof AppIds.CONTROL_PLANE_API>;
+function loadEnvOnlyConfig(
   appId: typeof AppIds.CONTROL_PLANE_WORKER,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
-function loadSelectedAppConfig(
+): LoadConfigResult<typeof AppIds.CONTROL_PLANE_WORKER>;
+function loadEnvOnlyConfig(
   appId: typeof AppIds.DATA_PLANE_API,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
-function loadSelectedAppConfig(
+): LoadConfigResult<typeof AppIds.DATA_PLANE_API>;
+function loadEnvOnlyConfig(
   appId: typeof AppIds.DATA_PLANE_GATEWAY,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
-function loadSelectedAppConfig(
+): LoadConfigResult<typeof AppIds.DATA_PLANE_GATEWAY>;
+function loadEnvOnlyConfig(
   appId: typeof AppIds.DATA_PLANE_WORKER,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
-function loadSelectedAppConfig(
+): LoadConfigResult<typeof AppIds.DATA_PLANE_WORKER>;
+function loadEnvOnlyConfig(
   appId: typeof AppIds.TOKENIZER_PROXY,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
-function loadSelectedAppConfig<TApp extends AppConfigModuleKey>(
+): LoadConfigResult<typeof AppIds.TOKENIZER_PROXY>;
+function loadEnvOnlyConfig<TApp extends AppConfigModuleKey>(
   appId: TApp,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<TApp>;
-function loadSelectedAppConfig(
+): LoadConfigResult<TApp>;
+function loadEnvOnlyConfig(
   appId: AppConfigModuleKey,
-  rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
-): AppConfigModuleValue<AppConfigModuleKey> {
-  if (appId === AppIds.CONTROL_PLANE_API) {
-    const globalConfig = applyModuleEnvOverrides(
-      globalConfigModule,
-      selectGlobalConfig(rootConfig),
-      env,
-    );
-    const selectedConfig = composeControlPlaneApiConfig(
-      selectControlPlaneApiConfig(rootConfig),
-      globalConfig,
-    );
+): LoadConfigResult<AppConfigModuleKey> {
+  const globalConfig = loadGlobalConfigFromEnv(env);
 
-    return applyModuleEnvOverrides(controlPlaneApiConfigModule, selectedConfig, env);
+  if (appId === AppIds.CONTROL_PLANE_API) {
+    return {
+      global: globalConfig,
+      app: composeControlPlaneApiConfig(controlPlaneApiConfigModule.loadEnv(env), globalConfig),
+    };
   }
 
   if (appId === AppIds.CONTROL_PLANE_WORKER) {
-    const globalConfig = applyModuleEnvOverrides(
-      globalConfigModule,
-      selectGlobalConfig(rootConfig),
-      env,
-    );
-    const selectedConfig = composeControlPlaneWorkerConfig(
-      selectControlPlaneWorkerConfig(rootConfig),
-      globalConfig,
-    );
-
-    return applyModuleEnvOverrides(controlPlaneWorkerConfigModule, selectedConfig, env);
+    return {
+      global: globalConfig,
+      app: composeControlPlaneWorkerConfig(
+        controlPlaneWorkerConfigModule.loadEnv(env),
+        globalConfig,
+      ),
+    };
   }
 
   if (appId === AppIds.DATA_PLANE_API) {
-    const globalConfig = applyModuleEnvOverrides(
-      globalConfigModule,
-      selectGlobalConfig(rootConfig),
-      env,
-    );
-    const selectedConfig = composeDataPlaneApiConfig(
-      selectDataPlaneApiConfig(rootConfig),
+    const appConfig = composeDataPlaneApiConfig(
+      dataPlaneApiConfigModule.loadEnv(env),
       globalConfig,
     );
-
-    return applyModuleEnvOverrides(dataPlaneApiConfigModule, selectedConfig, env);
-  }
-
-  if (appId === AppIds.DATA_PLANE_GATEWAY) {
-    return applyModuleEnvOverrides(
-      dataPlaneGatewayConfigModule,
-      selectDataPlaneGatewayConfig(rootConfig),
-      env,
-    );
-  }
-
-  if (appId === AppIds.DATA_PLANE_WORKER) {
-    const globalConfig = applyModuleEnvOverrides(
-      globalConfigModule,
-      selectGlobalConfig(rootConfig),
-      env,
-    );
-    const selectedConfig = composeDataPlaneWorkerConfig(
-      selectDataPlaneWorkerConfig(rootConfig),
-      globalConfig,
-    );
-
-    return applyModuleEnvOverrides(dataPlaneWorkerConfigModule, selectedConfig, env);
-  }
-
-  if (appId === AppIds.TOKENIZER_PROXY) {
-    return applyModuleEnvOverrides(
-      tokenizerProxyConfigModule,
-      selectTokenizerProxyConfig(rootConfig),
-      env,
-    );
-  }
-
-  throw new Error("Unsupported app id.");
-}
-
-function validateSelectedAppConfig(
-  appId: AppConfigModuleKey,
-  rootConfig: RootConfig,
-  env: NodeJS.ProcessEnv,
-): void {
-  if (appId === AppIds.DATA_PLANE_API) {
-    const dataPlaneApiConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_API, rootConfig, env);
-    const issue = getDataPlaneApiSandboxProviderValidationIssue({
-      appSandbox: dataPlaneApiConfig.sandbox,
-    });
-
-    if (issue !== null) {
-      throw new Error(issue.message);
-    }
-  } else if (appId === AppIds.DATA_PLANE_WORKER) {
-    const dataPlaneWorkerConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_WORKER, rootConfig, env);
-    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      appSandbox: dataPlaneWorkerConfig.sandbox,
-    });
-
-    if (issue !== null) {
-      throw new Error(issue.message);
-    }
-
-    const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      appConfig: dataPlaneWorkerConfig,
-    });
-
-    if (persistentIssue !== null) {
-      throw new Error(persistentIssue.message);
-    }
-  }
-}
-
-export function loadConfig<TApp extends AppConfigModuleKey>(
-  options: LoadConfigOptions<TApp>,
-): LoadConfigResult<TApp>;
-export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): LoadConfigResult {
-  const appModule = appConfigModules[options.app];
-  const { configPath, env } = resolveLoadInputs(options);
-
-  if (configPath !== undefined) {
-    const rootConfig = applyRootEnvOverrides(parseTomlRoot(configPath), env);
-    const appConfig = loadSelectedAppConfig(options.app, rootConfig, env);
-
-    if (options.includeGlobal === false) {
-      return {
-        app: appConfig,
-      };
-    }
-
-    const globalConfig = applyModuleEnvOverrides(
-      globalConfigModule,
-      selectGlobalConfig(rootConfig),
-      env,
-    );
-
-    validateSelectedAppConfig(options.app, rootConfig, env);
+    validateDataPlaneApiConfig(appConfig);
 
     return {
       global: globalConfig,
@@ -606,92 +376,69 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     };
   }
 
+  if (appId === AppIds.DATA_PLANE_GATEWAY) {
+    return {
+      global: globalConfig,
+      app: composeDataPlaneGatewayConfig(dataPlaneGatewayConfigModule.loadEnv(env), globalConfig),
+    };
+  }
+
+  if (appId === AppIds.DATA_PLANE_WORKER) {
+    const appConfig = composeDataPlaneWorkerConfig(
+      dataPlaneWorkerConfigModule.loadEnv(env),
+      globalConfig,
+    );
+    validateDataPlaneWorkerConfig(appConfig);
+
+    return {
+      global: globalConfig,
+      app: appConfig,
+    };
+  }
+
+  if (appId === AppIds.TOKENIZER_PROXY) {
+    return {
+      global: globalConfig,
+      app: composeTokenizerProxyConfig(tokenizerProxyConfigModule.loadEnv(env), globalConfig),
+    };
+  }
+
+  throw new Error("Unsupported app id.");
+}
+
+export function loadConfig<TApp extends AppConfigModuleKey>(
+  options: LoadConfigOptions<TApp>,
+): LoadConfigResult<TApp>;
+export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): LoadConfigResult {
+  const { configPath, env } = resolveLoadInputs(options);
+
+  if (configPath === undefined) {
+    const envOnlyConfig = loadEnvOnlyConfig(options.app, env);
+
+    if (options.includeGlobal === false) {
+      return {
+        app: envOnlyConfig.app,
+      };
+    }
+
+    return envOnlyConfig;
+  }
+
+  const rootConfig = loadRootConfig(configPath, env);
+  const appConfig = selectAppConfig(options.app, rootConfig);
+
   if (options.includeGlobal === false) {
-    if (options.app === AppIds.CONTROL_PLANE_API) {
-      const { app: appConfig } = loadControlPlaneApiConfigFromEnv(env);
+    validateSelectedAppConfig(options.app, rootConfig);
 
-      return {
-        app: appConfig,
-      };
-    }
-
-    if (options.app === AppIds.CONTROL_PLANE_WORKER) {
-      const { app: appConfig } = loadControlPlaneWorkerConfigFromEnv(env);
-
-      return {
-        app: appConfig,
-      };
-    }
-
-    if (options.app === AppIds.DATA_PLANE_API) {
-      const { app: appConfig } = loadDataPlaneApiConfigFromEnv(env);
-
-      return {
-        app: appConfig,
-      };
-    }
-
-    if (options.app === AppIds.DATA_PLANE_GATEWAY) {
-      const { app: appConfig } = loadDataPlaneGatewayConfigFromEnv(env);
-
-      return {
-        app: appConfig,
-      };
-    }
-
-    if (options.app === AppIds.DATA_PLANE_WORKER) {
-      const { app: appConfig } = loadDataPlaneWorkerConfigFromEnv(env);
-
-      return {
-        app: appConfig,
-      };
-    }
-
-    if (options.app === AppIds.TOKENIZER_PROXY) {
-      const { app: appConfig } = loadTokenizerProxyConfigFromEnv(env);
-
-      return {
-        app: appConfig,
-      };
-    }
-
-    const validatedRoot = loadValidatedEnvRoot([appModule], env);
-    const appConfig = parseAppConfig(options.app, validatedRoot);
     return {
       app: appConfig,
     };
   }
 
-  if (options.app === AppIds.CONTROL_PLANE_API) {
-    return loadControlPlaneApiConfigFromEnv(env);
-  }
-
-  if (options.app === AppIds.CONTROL_PLANE_WORKER) {
-    return loadControlPlaneWorkerConfigFromEnv(env);
-  }
-
-  if (options.app === AppIds.DATA_PLANE_API) {
-    return loadDataPlaneApiConfigFromEnv(env);
-  }
-
-  if (options.app === AppIds.DATA_PLANE_GATEWAY) {
-    return loadDataPlaneGatewayConfigFromEnv(env);
-  }
-
-  if (options.app === AppIds.DATA_PLANE_WORKER) {
-    return loadDataPlaneWorkerConfigFromEnv(env);
-  }
-
-  if (options.app === AppIds.TOKENIZER_PROXY) {
-    return loadTokenizerProxyConfigFromEnv(env);
-  }
-
-  const validatedRoot = loadValidatedEnvRoot([globalConfigModule, appModule], env);
-  const globalConfig = parseModuleValue(globalConfigModule, validatedRoot);
-  const appConfig = parseAppConfig(options.app, validatedRoot);
+  validateSelectedAppConfig(options.app, rootConfig);
 
   return {
-    global: globalConfig,
+    global: selectGlobalConfig(rootConfig),
     app: appConfig,
   };
 }

@@ -12,6 +12,11 @@ export {
 } from "./shared/auth.js";
 export { GitHubSupportedWebhookEvents } from "./shared/supported-webhook-events.js";
 export {
+  GitHubAppManifestOwnerSchema,
+  GitHubAppManifestTemplate,
+  type GitHubAppManifestOwner,
+} from "./shared/app-manifest.js";
+export {
   GitHubBindingConfigSchema,
   type GitHubBindingConfig,
 } from "./shared/binding-config-schema.js";

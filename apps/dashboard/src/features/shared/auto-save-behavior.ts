@@ -5,6 +5,38 @@ export type AutoSaveErrorState = {
   message: string;
 };
 
+export type AutoSaveFieldTimeoutRefs = {
+  fadeStartTimeoutRef: { current: TimerHandle | null };
+  fadeEndTimeoutRef: { current: TimerHandle | null };
+};
+
+export function createAutoSaveFieldTimeoutRefs(input: {
+  fieldKeys: ReadonlyArray<string>;
+}): Record<string, AutoSaveFieldTimeoutRefs> {
+  const timeoutRefs: Record<string, AutoSaveFieldTimeoutRefs> = {};
+
+  for (const fieldKey of input.fieldKeys) {
+    timeoutRefs[fieldKey] = {
+      fadeStartTimeoutRef: { current: null },
+      fadeEndTimeoutRef: { current: null },
+    };
+  }
+
+  return timeoutRefs;
+}
+
+export function resolveAutoSaveFieldTimeoutRefs(input: {
+  timeoutRefs: Record<string, AutoSaveFieldTimeoutRefs>;
+  fieldKey: string;
+}): AutoSaveFieldTimeoutRefs {
+  const timeoutRefs = input.timeoutRefs[input.fieldKey];
+  if (timeoutRefs === undefined) {
+    throw new Error(`Auto-save timeout refs are missing for field '${input.fieldKey}'.`);
+  }
+
+  return timeoutRefs;
+}
+
 export function scheduleSavedStateReset(input: {
   successVisibleDurationMs: number;
   successFadeDurationMs: number;
@@ -42,6 +74,25 @@ export function clearPendingStatusTimeouts(input: {
     input.scheduler.cancel(input.fadeEndTimeoutRef.current);
     input.fadeEndTimeoutRef.current = null;
   }
+}
+
+export function buildSavedFieldValuePatch(input: {
+  draft: Record<string, string>;
+  fieldKeys: ReadonlyArray<string>;
+  normalizeValue: (value: string) => string;
+}): Record<string, string> {
+  const patch: Record<string, string> = {};
+
+  for (const fieldKey of input.fieldKeys) {
+    const value = input.draft[fieldKey];
+    if (value === undefined) {
+      throw new Error(`Draft field '${fieldKey}' is missing.`);
+    }
+
+    patch[fieldKey] = input.normalizeValue(value);
+  }
+
+  return patch;
 }
 
 export function getErrorMessage(error: unknown): string {

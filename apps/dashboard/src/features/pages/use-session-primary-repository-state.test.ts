@@ -15,6 +15,32 @@ function createWrapper(queryClient: QueryClient) {
 }
 
 describe("useSessionPrimaryRepositoryState", () => {
+  it("exposes the runtime-plan repository on the initial render", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+    const sandboxInstanceId = "sbi_initial_runtime_plan";
+    const repositoryPath = "/root/acme/repo-1";
+
+    const { result } = renderHook(
+      () =>
+        useSessionPrimaryRepositoryState({
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          initialSelectedRepositoryPath: repositoryPath,
+          sandboxInstanceId,
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    expect(result.current.selectedRepositoryPath).toBe(repositoryPath);
+  });
+
   it("adopts the runtime-plan repository once it becomes available after repository discovery", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
@@ -99,5 +125,42 @@ describe("useSessionPrimaryRepositoryState", () => {
     });
 
     expect(result.current.selectedRepositoryPath).toBe("/root/acme/repo-2");
+  });
+
+  it("resets to the new runtime-plan repository when the sandbox changes", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    const { result, rerender } = renderHook(
+      (props: { initialSelectedRepositoryPath: string | null; sandboxInstanceId: string }) =>
+        useSessionPrimaryRepositoryState({
+          enabled: true,
+          ensureTransportConnected: async () => {
+            throw new Error("ensureTransportConnected should not be called in this test.");
+          },
+          initialSelectedRepositoryPath: props.initialSelectedRepositoryPath,
+          sandboxInstanceId: props.sandboxInstanceId,
+        }),
+      {
+        initialProps: {
+          initialSelectedRepositoryPath: "/root/acme/repo-1",
+          sandboxInstanceId: "sbi_first",
+        },
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.setSelectedRepositoryPath("/root/acme/repo-2");
+    });
+
+    rerender({
+      initialSelectedRepositoryPath: "/root/acme/repo-3",
+      sandboxInstanceId: "sbi_second",
+    });
+
+    expect(result.current.selectedRepositoryPath).toBe("/root/acme/repo-3");
   });
 });

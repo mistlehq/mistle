@@ -479,6 +479,45 @@ export type IntegrationConnectionMethodPendingUi = {
   description?: string;
 };
 
+export type IntegrationFormConnectionMethodCreateBehavior = "single-step" | "draft-then-setup";
+
+export const IntegrationFormConnectionMethodCreateBehaviors: {
+  SINGLE_STEP: IntegrationFormConnectionMethodCreateBehavior;
+  DRAFT_THEN_SETUP: IntegrationFormConnectionMethodCreateBehavior;
+} = {
+  SINGLE_STEP: "single-step",
+  DRAFT_THEN_SETUP: "draft-then-setup",
+};
+
+export type IntegrationFormConnectionMethodSetupFlow = {
+  completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement;
+  routeSegment: string;
+};
+
+export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
+  | {
+      kind: "connection-external-subject";
+    }
+  | {
+      field: string;
+      kind: "config-field";
+    }
+  | {
+      field: string;
+      kind: "secret-field";
+    };
+
+export type IntegrationFormConnectionMethodSetupCompletionRequirement =
+  | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
+  | {
+      anyOf: readonly IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "any-of";
+    }
+  | {
+      allOf: readonly IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "all-of";
+    };
+
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -508,6 +547,8 @@ export type IntegrationFormConnectionMethodDefinition<
   TConnectionConfig
 > & {
   kind: "form";
+  createBehavior?: IntegrationFormConnectionMethodCreateBehavior;
+  setupFlow?: IntegrationFormConnectionMethodSetupFlow;
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
   ui?: {
     create?: IntegrationConnectionMethodCreateUi;

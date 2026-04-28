@@ -15,8 +15,8 @@ import {
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
+import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
+import { resolveIncompleteIntegrationConnectionSetupFlow } from "./integration-connection-setup-state.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -28,36 +28,6 @@ import {
   SETTINGS_INTEGRATIONS_QUERY_KEY,
   useIntegrationsDirectoryState,
 } from "./use-integrations-directory-state.js";
-
-function isUninstalledGitHubAppConnection(input: {
-  connectionMethodId: string | undefined;
-  config: Record<string, unknown> | undefined;
-  externalSubjectId: string | undefined;
-}): boolean {
-  if (input.connectionMethodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
-    return false;
-  }
-
-  const installationId =
-    typeof input.config?.["installation_id"] === "string"
-      ? input.config["installation_id"]
-      : typeof input.externalSubjectId === "string"
-        ? input.externalSubjectId
-        : null;
-
-  return installationId === null;
-}
-
-function isIncompleteSlackAppConnection(input: {
-  connectionMethodId: string | undefined;
-  configuredSecretNames: readonly string[] | undefined;
-}): boolean {
-  return (
-    input.connectionMethodId === SlackConnectionMethodId &&
-    (!(input.configuredSecretNames?.includes("botToken") ?? false) ||
-      !(input.configuredSecretNames?.includes("signingSecret") ?? false))
-  );
-}
 
 type GitHubAppInstallationState = {
   errorMessage?: string;
@@ -244,6 +214,13 @@ export function IntegrationsPage() {
     (urlConnectionNotice?.connectionId === selectedDetailConnection?.id
       ? urlConnectionNotice
       : null);
+  const selectedDetailConnectionSetupFlow =
+    selectedDetailConnection === undefined
+      ? null
+      : resolveIncompleteIntegrationConnectionSetupFlow({
+          connection: selectedDetailConnection,
+          connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
+        });
 
   useEffect(() => {
     const resolvedUrlNotice = resolveUrlConnectionNotice({
@@ -316,28 +293,10 @@ export function IntegrationsPage() {
         onStartGitHubAppInstallation={connectionEditors.githubAppInstallation.onStartInstallation}
         onRefreshResource={directoryState.onRefreshResource}
         selectedConnectionId={directoryState.activeDetailConnectionId}
-        selectedConnectionBody={
-          selectedDetailConnection !== undefined &&
-          isUninstalledGitHubAppConnection({
-            connectionMethodId: selectedDetailConnection.connectionMethodId,
-            config: selectedDetailConnection.config,
-            externalSubjectId: selectedDetailConnection.externalSubjectId,
-          }) ? (
-            <GitHubAppSetupPane
-              connection={selectedDetailConnection}
-              key={selectedDetailConnection.id}
-            />
-          ) : selectedDetailConnection !== undefined &&
-            isIncompleteSlackAppConnection({
-              connectionMethodId: selectedDetailConnection.connectionMethodId,
-              configuredSecretNames: selectedDetailConnection.configuredSecretNames,
-            }) ? (
-            <SlackAppSetupPane
-              connection={selectedDetailConnection}
-              key={selectedDetailConnection.id}
-            />
-          ) : undefined
-        }
+        selectedConnectionBody={renderSelectedConnectionSetupBody({
+          connection: selectedDetailConnection,
+          setupFlow: selectedDetailConnectionSetupFlow,
+        })}
         selectedConnectionNotice={
           connectionNotice !== null ? (
             <Notice
@@ -387,4 +346,18 @@ export function IntegrationsPage() {
       }
     />
   );
+}
+
+function renderSelectedConnectionSetupBody(input: {
+  connection: IntegrationConnection | undefined;
+  setupFlow: { routeSegment: string } | null;
+}): React.JSX.Element | undefined {
+  if (input.connection === undefined || input.setupFlow === null) {
+    return undefined;
+  }
+
+  return renderIntegrationConnectionSetupPane({
+    connection: input.connection,
+    routeSegment: input.setupFlow.routeSegment,
+  });
 }

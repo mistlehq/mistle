@@ -1,8 +1,8 @@
 # Control Plane API Config Module
 
-Namespace in final config:
+Selected service config:
 
-- `apps.control_plane_api`
+- `control-plane-api`
 
 ## Config Keys
 

@@ -1,9 +1,9 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import { withRequiredSession } from "../../../middleware/with-required-session.js";
-import type { AppContextBindings, AppSession } from "../../../types.js";
-import { createGitHubAppDraftConnection } from "../services/create-draft-connection.js";
+import { withRequiredSession } from "../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../types.js";
+import { createDraftFormConnection } from "../services/create-draft-form-connection.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -12,10 +12,10 @@ const routeHandler = async (
 ) => {
   const db = ctx.get("db");
   const integrationRegistry = ctx.get("integrationRegistry");
-  const { targetKey } = ctx.req.valid("param");
+  const { methodId, targetKey } = ctx.req.valid("param");
   const { displayName } = ctx.req.valid("json");
 
-  const createdConnection = await createGitHubAppDraftConnection(
+  const createdConnection = await createDraftFormConnection(
     {
       db,
       integrationRegistry,
@@ -23,6 +23,7 @@ const routeHandler = async (
     {
       organizationId: session.activeOrganizationId,
       targetKey,
+      methodId,
       displayName,
     },
   );

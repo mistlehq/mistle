@@ -2765,6 +2765,139 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:targetKey/:methodId/draft": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          methodId: string;
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            displayName: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Create a draft form-backed integration connection. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              automationCount?: number;
+              bindingCount?: number;
+              config?: {
+                [key: string]: unknown;
+              };
+              configuredSecretNames?: string[];
+              connectionMethodId?: string;
+              connectionMethodLabel?: string;
+              createdAt: string;
+              displayName: string;
+              externalSubjectId?: string;
+              id: string;
+              isIdentityLinked?: boolean;
+              resources?: {
+                count: number;
+                kind: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
+              /** @enum {string} */
+              status: "active" | "error" | "revoked";
+              supportsWebhookSources?: boolean;
+              targetKey: string;
+              targetSnapshotConfig?: {
+                [key: string]: unknown;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_CREATE_CONNECTION_INPUT" | "FORM_CONNECTION_METHOD_NOT_SUPPORTED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:targetKey/device-authorization/attempts": {
     parameters: {
       query?: never;
@@ -3265,138 +3398,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/github-app-installation/draft": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            displayName: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Create a draft GitHub App installation connection. */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              automationCount?: number;
-              bindingCount?: number;
-              config?: {
-                [key: string]: unknown;
-              };
-              configuredSecretNames?: string[];
-              connectionMethodId?: string;
-              connectionMethodLabel?: string;
-              createdAt: string;
-              displayName: string;
-              externalSubjectId?: string;
-              id: string;
-              isIdentityLinked?: boolean;
-              resources?: {
-                count: number;
-                kind: string;
-                lastSyncedAt?: string;
-                /** @enum {string} */
-                selectionMode: "single" | "multi";
-                /** @enum {string} */
-                syncState: "never-synced" | "syncing" | "ready" | "error";
-              }[];
-              /** @enum {string} */
-              status: "active" | "error" | "revoked";
-              supportsWebhookSources?: boolean;
-              targetKey: string;
-              targetSnapshotConfig?: {
-                [key: string]: unknown;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_CREATE_CONNECTION_INPUT" | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Integration target was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/v1/integration/connections/:targetKey/oauth2-authorization-code/start": {
     parameters: {
       query?: never;
@@ -3507,138 +3508,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/slack-app/draft": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          targetKey: string;
-        };
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          "application/json": {
-            displayName: string;
-          };
-        };
-      };
-      responses: {
-        /** @description Create a draft Slack app manifest connection. */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              automationCount?: number;
-              bindingCount?: number;
-              config?: {
-                [key: string]: unknown;
-              };
-              configuredSecretNames?: string[];
-              connectionMethodId?: string;
-              connectionMethodLabel?: string;
-              createdAt: string;
-              displayName: string;
-              externalSubjectId?: string;
-              id: string;
-              isIdentityLinked?: boolean;
-              resources?: {
-                count: number;
-                kind: string;
-                lastSyncedAt?: string;
-                /** @enum {string} */
-                selectionMode: "single" | "multi";
-                /** @enum {string} */
-                syncState: "never-synced" | "syncing" | "ready" | "error";
-              }[];
-              /** @enum {string} */
-              status: "active" | "error" | "revoked";
-              supportsWebhookSources?: boolean;
-              targetKey: string;
-              targetSnapshotConfig?: {
-                [key: string]: unknown;
-              };
-              updatedAt: string;
-            };
-          };
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code: "INVALID_CREATE_CONNECTION_INPUT" | "SLACK_APP_MANIFEST_NOT_SUPPORTED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "FORBIDDEN";
-              message: string;
-            };
-          };
-        };
-        /** @description Integration target was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   "/v1/integration/targets": {
     parameters: {
       query?: never;
@@ -3672,6 +3541,8 @@ export interface paths {
                 };
                 connectionMethods?: (
                   | {
+                      /** @enum {string} */
+                      createBehavior?: "single-step" | "draft-then-setup";
                       id: string;
                       /** @enum {string} */
                       kind: "form";
@@ -3686,6 +3557,64 @@ export interface paths {
                         placeholder?: string;
                         slotKey: string;
                       }[];
+                      setupFlow?: {
+                        completionRequirements?:
+                          | {
+                              /** @enum {string} */
+                              kind: "connection-external-subject";
+                            }
+                          | {
+                              field: string;
+                              /** @enum {string} */
+                              kind: "config-field";
+                            }
+                          | {
+                              field: string;
+                              /** @enum {string} */
+                              kind: "secret-field";
+                            }
+                          | {
+                              anyOf: (
+                                | {
+                                    /** @enum {string} */
+                                    kind: "connection-external-subject";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "config-field";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "secret-field";
+                                  }
+                              )[];
+                              /** @enum {string} */
+                              kind: "any-of";
+                            }
+                          | {
+                              allOf: (
+                                | {
+                                    /** @enum {string} */
+                                    kind: "connection-external-subject";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "config-field";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "secret-field";
+                                  }
+                              )[];
+                              /** @enum {string} */
+                              kind: "all-of";
+                            };
+                        routeSegment: string;
+                      };
                     }
                   | {
                       id: string;

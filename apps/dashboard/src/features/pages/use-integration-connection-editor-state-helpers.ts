@@ -3,10 +3,7 @@ import {
   IntegrationConnectionMethodIds,
   resolveIntegrationForm,
 } from "@mistle/integrations-core";
-import {
-  createBrowserDefinitionsBundle,
-  SlackConnectionMethodId,
-} from "@mistle/integrations-definitions/browser";
+import { createBrowserDefinitionsBundle } from "@mistle/integrations-definitions/browser";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 
@@ -463,14 +460,7 @@ export function resolveIntegrationConnectionEditorValidationError(input: {
   }
 
   if (input.editor.mode === "create") {
-    if (
-      input.editor.targetFamilyId === "github" &&
-      input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-    ) {
-      return null;
-    }
-
-    if (input.editor.targetFamilyId === "slack" && input.methodId === SlackConnectionMethodId) {
+    if (selectedMethod.createBehavior === "draft-then-setup") {
       return null;
     }
 

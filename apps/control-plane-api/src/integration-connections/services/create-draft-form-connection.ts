@@ -5,30 +5,33 @@ import {
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationWebhookSourceLifecycles,
+  type IntegrationConnectionMethodId,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
 
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../../constants.js";
-import { buildIntegrationConnectionResponse } from "../../services/build-integration-connection-response.js";
-import { ensureImplicitConnectionWebhookSource } from "../../services/webhook-sources.js";
+} from "../constants.js";
+import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
+import { resolveFormConnectionMethodOrThrow } from "./form-connection-methods.js";
+import { ensureImplicitConnectionWebhookSource } from "./webhook-sources.js";
 
-type CreateSlackAppDraftConnectionInput = {
+type CreateDraftFormConnectionInput = {
   organizationId: string;
   targetKey: string;
+  methodId: IntegrationConnectionMethodId;
   displayName: string;
 };
 
-export async function createSlackAppDraftConnection(
+export async function createDraftFormConnection(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
-  input: CreateSlackAppDraftConnectionInput,
+  input: CreateDraftFormConnectionInput,
 ): Promise<ReturnType<typeof buildIntegrationConnectionResponse>> {
   const target = await ctx.db.query.integrationTargets.findFirst({
     where: (table, { and, eq }) =>
@@ -53,24 +56,26 @@ export async function createSlackAppDraftConnection(
     );
   }
 
-  if (definition.familyId !== "slack") {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.SLACK_APP_MANIFEST_NOT_SUPPORTED,
-      `Integration target '${input.targetKey}' does not support Slack app manifest drafts.`,
-    );
-  }
+  const formMethod = resolveFormConnectionMethodOrThrow({
+    targetKey: input.targetKey,
+    methodId: input.methodId,
+    connectionMethods: definition.connectionMethods,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  });
 
-  const slackAppMethod = definition.connectionMethods.find(
-    (method) => method.id === SlackConnectionMethodId,
-  );
-  if (slackAppMethod === undefined || slackAppMethod.kind !== "form") {
+  if (
+    formMethod.createBehavior !== IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP
+  ) {
     throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.SLACK_APP_MANIFEST_NOT_SUPPORTED,
-      `Integration target '${input.targetKey}' does not support Slack app auth.`,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
+      `Integration connection method '${input.methodId}' does not support draft creation.`,
     );
   }
 
   return await ctx.db.transaction(async (tx) => {
+    const config = {
+      connection_method: input.methodId,
+    };
     const [createdConnection] = await tx
       .insert(integrationConnections)
       .values({
@@ -78,15 +83,13 @@ export async function createSlackAppDraftConnection(
         targetKey: input.targetKey,
         displayName: input.displayName,
         status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: SlackConnectionMethodId,
-        },
+        config,
         targetSnapshotConfig: target.config,
       })
       .returning();
 
     if (createdConnection === undefined) {
-      throw new Error("Failed to create Slack integration connection.");
+      throw new Error("Failed to create draft integration connection.");
     }
 
     const webhookSourceCapability = definition.webhookSource;
@@ -96,9 +99,7 @@ export async function createSlackAppDraftConnection(
         connection: {
           id: createdConnection.id,
           status: createdConnection.status,
-          config: {
-            connection_method: SlackConnectionMethodId,
-          },
+          config,
         },
       })) ??
         true)

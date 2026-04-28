@@ -3913,7 +3913,7 @@
         }
       }
     },
-    "/v1/integration/connections/:targetKey/github-app-installation/draft": {
+    "/v1/integration/connections/:targetKey/:methodId/draft": {
       "post": {
         "tags": ["Integrations"],
         "parameters": [
@@ -3924,6 +3924,15 @@
             },
             "required": true,
             "name": "targetKey",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "methodId",
             "in": "path"
           }
         ],
@@ -3947,7 +3956,7 @@
         },
         "responses": {
           "201": {
-            "description": "Create a draft GitHub App installation connection.",
+            "description": "Create a draft form-backed integration connection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4075,269 +4084,7 @@
                           "type": "string",
                           "enum": [
                             "INVALID_CREATE_CONNECTION_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                          ]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["VALIDATION_ERROR"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["FORBIDDEN"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Integration target was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["TARGET_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/integration/connections/:targetKey/slack-app/draft": {
-      "post": {
-        "tags": ["Integrations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": true,
-            "name": "targetKey",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "displayName": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "required": ["displayName"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Create a draft Slack app manifest connection.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "targetKey": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "displayName": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["active", "error", "revoked"]
-                    },
-                    "bindingCount": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "automationCount": {
-                      "type": "integer",
-                      "minimum": 0
-                    },
-                    "isIdentityLinked": {
-                      "type": "boolean"
-                    },
-                    "externalSubjectId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "config": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "targetSnapshotConfig": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "connectionMethodId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "connectionMethodLabel": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "configuredSecretNames": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1
-                      }
-                    },
-                    "resources": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "selectionMode": {
-                            "type": "string",
-                            "enum": ["single", "multi"]
-                          },
-                          "count": {
-                            "type": "integer",
-                            "minimum": 0
-                          },
-                          "syncState": {
-                            "type": "string",
-                            "enum": ["never-synced", "syncing", "ready", "error"]
-                          },
-                          "lastSyncedAt": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": ["kind", "selectionMode", "count", "syncState"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "supportsWebhookSources": {
-                      "type": "boolean"
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "targetKey",
-                    "displayName",
-                    "status",
-                    "createdAt",
-                    "updatedAt"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": [
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "SLACK_APP_MANIFEST_NOT_SUPPORTED"
+                            "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
                           ]
                         },
                         "message": {
@@ -6633,6 +6380,186 @@
                                     "kind": {
                                       "type": "string",
                                       "enum": ["form"]
+                                    },
+                                    "createBehavior": {
+                                      "type": "string",
+                                      "enum": ["single-step", "draft-then-setup"]
+                                    },
+                                    "setupFlow": {
+                                      "type": "object",
+                                      "properties": {
+                                        "completionRequirements": {
+                                          "oneOf": [
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["connection-external-subject"]
+                                                }
+                                              },
+                                              "required": ["kind"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["config-field"]
+                                                },
+                                                "field": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["kind", "field"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["secret-field"]
+                                                },
+                                                "field": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["kind", "field"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["any-of"]
+                                                },
+                                                "anyOf": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["secret-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  },
+                                                  "minItems": 1
+                                                }
+                                              },
+                                              "required": ["kind", "anyOf"],
+                                              "additionalProperties": false
+                                            },
+                                            {
+                                              "type": "object",
+                                              "properties": {
+                                                "kind": {
+                                                  "type": "string",
+                                                  "enum": ["all-of"]
+                                                },
+                                                "allOf": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["secret-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  },
+                                                  "minItems": 1
+                                                }
+                                              },
+                                              "required": ["kind", "allOf"],
+                                              "additionalProperties": false
+                                            }
+                                          ]
+                                        },
+                                        "routeSegment": {
+                                          "type": "string",
+                                          "pattern": "^[a-z0-9][a-z0-9-]*$"
+                                        }
+                                      },
+                                      "required": ["routeSegment"],
+                                      "additionalProperties": false
                                     },
                                     "secretFields": {
                                       "type": "array",

@@ -1,6 +1,8 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
   IntegrationConnectionMethodDefinition,
+  IntegrationFormConnectionMethodSetupCompletionRequirement,
+  IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -83,11 +85,17 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "form";
+        createBehavior?: "single-step" | "draft-then-setup";
+        setupFlow?: {
+          completionRequirements?: ResolvedSetupCompletionRequirement;
+          routeSegment: string;
+        };
         secretFields: {
           name: string;
           label: string;
           placeholder?: string;
           description?: string;
+          optional: boolean;
           inputType: "password" | "text" | "textarea";
           slotKey: string;
         }[];
@@ -125,6 +133,17 @@ export type ResolvedIntegrationTargetMetadata = {
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
 
+type ResolvedSetupCompletionRequirement =
+  | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
+  | {
+      anyOf: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "any-of";
+    }
+  | {
+      allOf: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "all-of";
+    };
+
 function resolveConnectionMethod(
   method: IntegrationConnectionMethodDefinition,
 ): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
@@ -133,6 +152,21 @@ function resolveConnectionMethod(
       id: method.id,
       label: method.label,
       kind: "form",
+      ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
+      ...(method.setupFlow === undefined
+        ? {}
+        : {
+            setupFlow: {
+              ...(method.setupFlow.completionRequirements === undefined
+                ? {}
+                : {
+                    completionRequirements: cloneSetupCompletionRequirement(
+                      method.setupFlow.completionRequirements,
+                    ),
+                  }),
+              routeSegment: method.setupFlow.routeSegment,
+            },
+          }),
       secretFields: method.secretFields.map((field) => ({
         name: field.name,
         label: field.label,
@@ -159,6 +193,41 @@ function resolveConnectionMethod(
     label: method.label,
     kind: "redirect",
     ui: method.ui,
+  };
+}
+
+function cloneSetupCompletionRequirement(
+  requirement: IntegrationFormConnectionMethodSetupCompletionRequirement,
+): ResolvedSetupCompletionRequirement {
+  if (requirement.kind === "any-of") {
+    return {
+      kind: requirement.kind,
+      anyOf: requirement.anyOf.map(cloneSetupCompletionRequirementLeaf),
+    };
+  }
+
+  if (requirement.kind === "all-of") {
+    return {
+      kind: requirement.kind,
+      allOf: requirement.allOf.map(cloneSetupCompletionRequirementLeaf),
+    };
+  }
+
+  return cloneSetupCompletionRequirementLeaf(requirement);
+}
+
+function cloneSetupCompletionRequirementLeaf(
+  requirement: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
+): IntegrationFormConnectionMethodSetupCompletionRequirementLeaf {
+  if (requirement.kind === "connection-external-subject") {
+    return {
+      kind: requirement.kind,
+    };
+  }
+
+  return {
+    kind: requirement.kind,
+    field: requirement.field,
   };
 }
 

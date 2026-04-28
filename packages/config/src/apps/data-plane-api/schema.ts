@@ -121,9 +121,8 @@ export const PartialDataPlaneApiConfigSchema = z
   .strict();
 
 const DataPlaneApiProviderRequirementMessages = {
-  DOCKER:
-    "apps.data_plane_api.sandbox.docker is required when global.sandbox.provider is 'docker'.",
-  E2B: "apps.data_plane_api.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
+  DOCKER: "sandbox.docker is required when sandbox.provider is 'docker'.",
+  E2B: "sandbox.e2b is required when sandbox.provider is 'e2b'.",
 } as const;
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {

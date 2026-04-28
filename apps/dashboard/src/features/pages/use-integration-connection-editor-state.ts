@@ -1,8 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import {
-  JiraConnectionMethodIds,
-  SlackConnectionMethodId,
-} from "@mistle/integrations-definitions/browser";
+import { JiraConnectionMethodIds } from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -20,9 +17,8 @@ import type {
 } from "../integrations/integrations-service-shared.js";
 import {
   cancelDeviceAuthorizationAttempt,
+  createDraftFormIntegrationConnection,
   createFormIntegrationConnection,
-  createGitHubAppDraftIntegrationConnection,
-  createSlackAppDraftIntegrationConnection,
   getDeviceAuthorizationAttempt,
   startDeviceAuthorizationIntegrationConnection,
   startRedirectIntegrationConnection,
@@ -112,14 +108,12 @@ export function useIntegrationConnectionEditorState(
     }) => createFormIntegrationConnection(mutationInput),
   });
 
-  const createGitHubAppDraftMutation = useMutation({
-    mutationFn: async (mutationInput: { targetKey: string; displayName: string }) =>
-      createGitHubAppDraftIntegrationConnection(mutationInput),
-  });
-
-  const createSlackAppDraftMutation = useMutation({
-    mutationFn: async (mutationInput: { targetKey: string; displayName: string }) =>
-      createSlackAppDraftIntegrationConnection(mutationInput),
+  const createDraftFormMutation = useMutation({
+    mutationFn: async (mutationInput: {
+      targetKey: string;
+      methodId: IntegrationConnectionMethodId;
+      displayName: string;
+    }) => createDraftFormIntegrationConnection(mutationInput),
   });
 
   const startRedirectMutation = useMutation({
@@ -168,8 +162,7 @@ export function useIntegrationConnectionEditorState(
     });
   const submitPending =
     createFormMutation.isPending ||
-    createGitHubAppDraftMutation.isPending ||
-    createSlackAppDraftMutation.isPending ||
+    createDraftFormMutation.isPending ||
     startDeviceAuthorizationMutation.isPending ||
     startRedirectMutation.isPending ||
     updateConnectionMutation.isPending ||
@@ -364,30 +357,10 @@ export function useIntegrationConnectionEditorState(
         });
         return;
       } else {
-        if (
-          editor.targetFamilyId === "github" &&
-          draft.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-        ) {
-          const createdConnection = await createGitHubAppDraftMutation.mutateAsync({
+        if (selectedMethod.createBehavior === "draft-then-setup") {
+          const createdConnection = await createDraftFormMutation.mutateAsync({
             targetKey: editor.targetKey,
-            displayName: normalizedConnectionDisplayName,
-          });
-
-          await queryClient.invalidateQueries({
-            queryKey: input.queryKey,
-          });
-
-          await handleSubmitSuccess({
-            connectionId: createdConnection.id,
-            editor,
             methodId: draft.methodId,
-          });
-          return;
-        }
-
-        if (editor.targetFamilyId === "slack" && draft.methodId === SlackConnectionMethodId) {
-          const createdConnection = await createSlackAppDraftMutation.mutateAsync({
-            targetKey: editor.targetKey,
             displayName: normalizedConnectionDisplayName,
           });
 

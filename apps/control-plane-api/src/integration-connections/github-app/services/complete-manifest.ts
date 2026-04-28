@@ -5,12 +5,19 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
+import {
+  buildConvertedGitHubAppConnectionConfig,
+  buildConvertedGitHubAppConnectionSecrets as buildConvertedGitHubAppConnectionSecretsFromDefinitions,
+  buildGitHubAppManifestConversionUrl,
+  GitHubAppManifestConversionMissingClientSecretError,
+  parseGitHubAppManifestConversionResponse as parseGitHubAppManifestConversionResponseFromDefinitions,
+  type GitHubAppManifestConversion,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -31,7 +38,7 @@ import {
 import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
-  resolveGitHubAppManifestConnectionId,
+  resolveConnectionRedirectStateConnectionId,
   resolveRequiredRedirectQueryParamOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -51,19 +58,6 @@ type CompletedConnection = {
   id: string;
   targetKey: string;
 };
-
-const GitHubAppManifestConversionResponseSchema = z
-  .object({
-    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
-    slug: z.string().min(1),
-    client_id: z.string().min(1),
-    client_secret: z.string().min(1).optional(),
-    pem: z.string().min(1),
-    webhook_secret: z.string().min(1),
-  })
-  .loose();
-
-type GitHubAppManifestConversion = z.output<typeof GitHubAppManifestConversionResponseSchema>;
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return resolveRequiredRedirectQueryParamOrThrow({
@@ -87,7 +81,7 @@ function resolveManifestCodeOrThrow(params: URLSearchParams): string {
 
 function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
   try {
-    return resolveGitHubAppManifestConnectionId(state);
+    return resolveConnectionRedirectStateConnectionId(state);
   } catch {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
@@ -96,18 +90,11 @@ function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
   }
 }
 
-function buildGitHubAppManifestConversionUrl(input: { apiBaseUrl: string; code: string }): string {
-  return buildUrlWithPath(
-    input.apiBaseUrl,
-    `/app-manifests/${encodeURIComponent(input.code)}/conversions`,
-  );
-}
-
 export function parseGitHubAppManifestConversionResponse(
   value: unknown,
 ): GitHubAppManifestConversion {
   try {
-    return GitHubAppManifestConversionResponseSchema.parse(value);
+    return parseGitHubAppManifestConversionResponseFromDefinitions(value);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(
@@ -149,41 +136,22 @@ async function convertGitHubAppManifest(input: {
   return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
-export function buildConvertedGitHubAppConnectionConfig(input: {
-  conversion: GitHubAppManifestConversion;
-}): Record<string, string> {
-  return {
-    connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-    app_id: input.conversion.id.toString(),
-    app_slug: input.conversion.slug,
-    client_id: input.conversion.client_id,
-  };
-}
-
 export function buildConvertedConnectionSecrets(input: {
   conversion: GitHubAppManifestConversion;
   supportsClientSecret: boolean;
 }): Record<string, string> {
-  if (!input.supportsClientSecret) {
-    return {
-      appPrivateKeyPem: input.conversion.pem,
-      webhookSecret: input.conversion.webhook_secret,
-    };
-  }
+  try {
+    return buildConvertedGitHubAppConnectionSecretsFromDefinitions(input);
+  } catch (error) {
+    if (error instanceof GitHubAppManifestConversionMissingClientSecretError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+        error.message,
+      );
+    }
 
-  const clientSecret = input.conversion.client_secret;
-  if (clientSecret === undefined) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-      "GitHub App manifest conversion response is missing `client_secret`.",
-    );
+    throw error;
   }
-
-  return {
-    appPrivateKeyPem: input.conversion.pem,
-    webhookSecret: input.conversion.webhook_secret,
-    clientSecret,
-  };
 }
 
 export async function completeGitHubAppManifestConnection(

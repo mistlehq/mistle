@@ -241,8 +241,7 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
 
     expect(issue).toEqual({
       path: ["sandbox", "e2b"],
-      message:
-        "apps.data_plane_worker.sandbox.e2b is required when apps.data_plane_worker.sandbox.provider is 'e2b'.",
+      message: "sandbox.e2b is required when sandbox.provider is 'e2b'.",
     });
   });
 });
@@ -261,8 +260,7 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
 
     expect(issue).toEqual({
       path: ["sandboxStorage", "archil"],
-      message:
-        "apps.data_plane_worker.sandbox_storage.archil is required when apps.data_plane_worker.sandbox.storage.backend is 'archil'.",
+      message: "sandboxStorage.archil is required when sandbox.storage.backend is 'archil'.",
     });
   });
 
@@ -280,7 +278,7 @@ describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
     expect(issue).toEqual({
       path: ["sandboxStorage", "dockerVolume"],
       message:
-        "apps.data_plane_worker.sandbox_storage.docker_volume is required when apps.data_plane_worker.sandbox.storage.backend is 'docker_volume'.",
+        "sandboxStorage.dockerVolume is required when sandbox.storage.backend is 'docker_volume'.",
     });
   });
 });

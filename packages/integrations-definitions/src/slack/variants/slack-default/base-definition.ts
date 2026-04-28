@@ -1,4 +1,8 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationFormConnectionMethodCreateBehaviors,
+  IntegrationKinds,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 
 import {
   type SlackConnectionConfig,
@@ -41,6 +45,23 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
       id: SlackConnectionMethodId,
       label: "Slack app",
       kind: "form",
+      createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "botToken",
+            },
+            {
+              kind: "secret-field",
+              field: "signingSecret",
+            },
+          ],
+        },
+        routeSegment: "slack-app",
+      },
       secretFields: [
         {
           name: "botToken",

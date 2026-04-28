@@ -50,4 +50,81 @@ describe("IntegrationTargetSchema", () => {
       },
     ]);
   });
+
+  it("parses draft-then-setup form connection method metadata", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "slack-default",
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {},
+      displayName: "Slack",
+      description: "Slack",
+      connectionMethods: [
+        {
+          id: "slack-bot-token",
+          label: "Slack app",
+          kind: "form",
+          createBehavior: "draft-then-setup",
+          setupFlow: {
+            completionRequirements: {
+              kind: "all-of",
+              allOf: [
+                {
+                  kind: "secret-field",
+                  field: "botToken",
+                },
+                {
+                  kind: "secret-field",
+                  field: "signingSecret",
+                },
+              ],
+            },
+            routeSegment: "slack-app",
+          },
+          secretFields: [
+            {
+              name: "botToken",
+              label: "Bot token",
+              optional: true,
+              inputType: "password",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.connectionMethods?.[0]).toMatchObject({
+      id: "slack-bot-token",
+      kind: "form",
+      createBehavior: "draft-then-setup",
+      secretFields: [
+        {
+          name: "botToken",
+          label: "Bot token",
+          optional: true,
+          inputType: "password",
+        },
+      ],
+      setupFlow: {
+        completionRequirements: {
+          kind: "all-of",
+          allOf: [
+            {
+              kind: "secret-field",
+              field: "botToken",
+            },
+            {
+              kind: "secret-field",
+              field: "signingSecret",
+            },
+          ],
+        },
+        routeSegment: "slack-app",
+      },
+    });
+  });
 });

@@ -412,6 +412,13 @@ where
             error,
         }
     })?;
+    let health_endpoint_addr =
+        health_listener
+            .local_addr()
+            .map_err(|error| ControlError::BindHealthEndpoint {
+                address: health_endpoint_addr,
+                error,
+            })?;
     health_listener
         .set_nonblocking(true)
         .map_err(|error| ControlError::BindHealthEndpoint {
@@ -1719,16 +1726,11 @@ mod tests {
         sleeper: S,
         accept_poll_interval: Duration,
     ) -> crate::control::ControlServer {
-        let probe_listener =
-            TcpListener::bind("127.0.0.1:0").expect("health probe listener should bind");
-        let health_endpoint_addr = probe_listener
-            .local_addr()
-            .expect("health probe listener should expose a local addr");
-        drop(probe_listener);
-
         start_control_server_with_health_endpoint(
             socket_path,
-            health_endpoint_addr,
+            "127.0.0.1:0"
+                .parse()
+                .expect("test health endpoint address should parse"),
             sleeper,
             accept_poll_interval,
         )

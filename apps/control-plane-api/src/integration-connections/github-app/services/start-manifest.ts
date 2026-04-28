@@ -1,13 +1,18 @@
 import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
+import {
+  buildGitHubAppManifest,
+  buildGitHubAppManifestSubmissionUrl,
+  type GitHubAppManifestOwner,
+} from "@mistle/integrations-definitions/server";
 
 import type { AppContext } from "../../../types.js";
 import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
-  encodeGitHubAppManifestStateMetadata,
+  encodeConnectionRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -20,11 +25,6 @@ import {
   assertGitHubAppInstallationConnectionMethodOrThrow,
   parseGitHubTargetConfigOrThrow,
 } from "./installation-config.js";
-import {
-  buildGitHubAppManifest,
-  buildGitHubAppManifestSubmissionUrl,
-  type GitHubAppManifestOwner,
-} from "./manifest-builder.js";
 
 type StartGitHubAppManifestConnectionInput = {
   organizationId: string;
@@ -124,7 +124,7 @@ export async function startGitHubAppManifestConnection(
     );
   }
 
-  const state = encodeGitHubAppManifestStateMetadata({
+  const state = encodeConnectionRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
   });

@@ -1,8 +1,8 @@
 # Data Plane Gateway config module
 
-Namespace:
+Selected service config:
 
-- `apps.data_plane_gateway`
+- `data-plane-gateway`
 
 Values:
 

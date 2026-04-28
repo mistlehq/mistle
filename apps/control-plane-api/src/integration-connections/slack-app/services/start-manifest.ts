@@ -4,10 +4,19 @@ import {
   integrationCredentials,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions";
+import {
+  buildSlackAppInstallationCompleteUrl,
+  buildSlackAppManifest,
+  buildSlackAppManifestCreateUrl,
+  buildSlackManifestConnectionConfig,
+  buildSlackManifestConnectionSecrets,
+  parseSlackManifestCreateErrorResponse,
+  parseSlackManifestCreateSuccessResponse,
+  type SlackManifestCreateSuccessResponse,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -25,7 +34,7 @@ import {
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
-  encodeSlackAppInstallationStateMetadata,
+  encodeConnectionRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -34,7 +43,6 @@ import {
   resolveConnectionWithTargetOrThrow,
   resolveWebhookSourceCapabilityOrThrow,
 } from "../../services/webhook-sources.js";
-import { buildSlackAppInstallationCompleteUrl, buildSlackAppManifest } from "./manifest-builder.js";
 import {
   assertSlackAppConnectionMethodOrThrow,
   parseSlackTargetConfigOrThrow,
@@ -52,46 +60,12 @@ type StartedSlackAppManifestConnection = {
   authorizationUrl: string;
 };
 
-const SlackManifestCreateSuccessResponseSchema = z
-  .object({
-    ok: z.literal(true),
-    app_id: z.string().min(1),
-    credentials: z
-      .object({
-        client_id: z.string().min(1),
-        client_secret: z.string().min(1),
-        signing_secret: z.string().min(1),
-      })
-      .loose(),
-    oauth_authorize_url: z.url(),
-  })
-  .loose();
-
-const SlackManifestCreateErrorResponseSchema = z
-  .object({
-    ok: z.literal(false),
-    error: z.string().min(1),
-    errors: z
-      .array(
-        z
-          .object({
-            message: z.string().min(1),
-            pointer: z.string().min(1).optional(),
-          })
-          .loose(),
-      )
-      .optional(),
-  })
-  .loose();
-
-type SlackManifestCreateSuccessResponse = z.output<typeof SlackManifestCreateSuccessResponseSchema>;
-
 async function createSlackManifest(input: {
   apiBaseUrl: string;
   appConfigToken: string;
   manifest: Record<string, unknown>;
 }): Promise<SlackManifestCreateSuccessResponse> {
-  const response = await fetch(buildUrlWithPath(input.apiBaseUrl, "apps.manifest.create"), {
+  const response = await fetch(buildSlackAppManifestCreateUrl({ apiBaseUrl: input.apiBaseUrl }), {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -111,24 +85,24 @@ async function createSlackManifest(input: {
     );
   }
 
-  const errorResult = SlackManifestCreateErrorResponseSchema.safeParse(responseJson);
-  if (errorResult.success) {
+  const errorResult = parseSlackManifestCreateErrorResponse(responseJson);
+  if (errorResult !== null) {
     const details =
-      errorResult.data.errors === undefined
+      errorResult.errors === undefined
         ? ""
-        : ` ${errorResult.data.errors
+        : ` ${errorResult.errors
             .map((entry) =>
               entry.pointer === undefined ? entry.message : `${entry.pointer}: ${entry.message}`,
             )
             .join(" ")}`;
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_MANIFEST_START_INPUT,
-      `Slack app manifest creation failed: ${errorResult.data.error}.${details}`,
+      `Slack app manifest creation failed: ${errorResult.error}.${details}`,
     );
   }
 
   try {
-    return SlackManifestCreateSuccessResponseSchema.parse(responseJson);
+    return parseSlackManifestCreateSuccessResponse(responseJson);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(
@@ -139,23 +113,6 @@ async function createSlackManifest(input: {
 
     throw error;
   }
-}
-
-function buildSlackManifestConnectionConfig(input: { clientId: string }): Record<string, string> {
-  return {
-    connection_method: SlackConnectionMethodId,
-    client_id: input.clientId,
-  };
-}
-
-function buildSlackManifestConnectionSecrets(input: {
-  clientSecret: string;
-  signingSecret: string;
-}): Record<string, string> {
-  return {
-    clientSecret: input.clientSecret,
-    signingSecret: input.signingSecret,
-  };
 }
 
 export async function startSlackAppManifestConnection(
@@ -249,7 +206,7 @@ export async function startSlackAppManifestConnection(
     );
   }
 
-  const state = encodeSlackAppInstallationStateMetadata({
+  const state = encodeConnectionRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
   });

@@ -171,6 +171,10 @@ function gitHubAppCreateEditorInput() {
         id: "github-app-installation",
         label: "GitHub App installation",
         kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
+        setupFlow: {
+          routeSegment: "github-app",
+        },
         secretFields: [
           {
             name: "appPrivateKeyPem",
@@ -248,6 +252,10 @@ function slackAppCreateEditorInput() {
         id: "slack-bot-token",
         label: "Slack app",
         kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
+        setupFlow: {
+          routeSegment: "slack-app",
+        },
         secretFields: [
           {
             name: "botToken",
@@ -269,6 +277,36 @@ function slackAppCreateEditorInput() {
     targetFamilyId: "slack",
     targetKey: "slack-default",
     targetVariantId: "slack-default",
+  };
+}
+
+function genericDraftThenSetupCreateEditorInput() {
+  return {
+    mode: "create" as const,
+    methods: [
+      {
+        id: "custom-app",
+        label: "Custom app",
+        kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
+        setupFlow: {
+          routeSegment: "custom-app",
+        },
+        secretFields: [
+          {
+            name: "clientSecret",
+            label: "Client secret",
+            inputType: "password" as const,
+            slotKey: "custom.custom-default.custom-app.client-secret",
+          },
+        ],
+      },
+    ],
+    targetConfig: {},
+    targetDisplayName: "Custom",
+    targetFamilyId: "custom",
+    targetKey: "custom-default",
+    targetVariantId: "custom-default",
   };
 }
 
@@ -722,7 +760,7 @@ describe("useIntegrationConnectionEditorState", () => {
     server.setHandler((request) => {
       if (
         request.method === "POST" &&
-        request.pathname === "/v1/integration/connections/slack-default/slack-app/draft"
+        request.pathname === "/v1/integration/connections/slack-default/slack-bot-token/draft"
       ) {
         return {
           status: 201,
@@ -775,9 +813,74 @@ describe("useIntegrationConnectionEditorState", () => {
     expect(server.requests).toEqual([
       {
         method: "POST",
-        pathname: "/v1/integration/connections/slack-default/slack-app/draft",
+        pathname: "/v1/integration/connections/slack-default/slack-bot-token/draft",
         body: {
           displayName: "Engineering Slack",
+        },
+      },
+    ]);
+  });
+
+  it("creates a generic draft-then-setup form connection without requiring create-time secrets", async () => {
+    server.setHandler((request) => {
+      if (
+        request.method === "POST" &&
+        request.pathname === "/v1/integration/connections/custom-default/custom-app/draft"
+      ) {
+        return {
+          status: 201,
+          body: {
+            id: "icn_custom_draft",
+            targetKey: "custom-default",
+            displayName: "Custom app",
+            status: "active",
+            config: {
+              connection_method: "custom-app",
+            },
+            connectionMethodId: "custom-app",
+            connectionMethodLabel: "Custom app",
+            createdAt: "2026-04-28T00:00:00.000Z",
+            updatedAt: "2026-04-28T00:00:00.000Z",
+          },
+        };
+      }
+
+      throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
+    });
+
+    const queryClient = createTestQueryClient();
+    let submittedConnectionId: string | null = null;
+    const { result } = renderHook(
+      () =>
+        useIntegrationConnectionEditorState({
+          initialEditorInput: genericDraftThenSetupCreateEditorInput(),
+          onSubmitSuccess: ({ connectionId }) => {
+            submittedConnectionId = connectionId;
+          },
+          queryKey: ["integrations"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    act(() => {
+      result.current.onConnectionDisplayNameChange("Custom app");
+    });
+    act(() => {
+      result.current.submitEditor();
+    });
+
+    await waitFor(() => {
+      expect(submittedConnectionId).toBe("icn_custom_draft");
+    });
+
+    expect(server.requests).toEqual([
+      {
+        method: "POST",
+        pathname: "/v1/integration/connections/custom-default/custom-app/draft",
+        body: {
+          displayName: "Custom app",
         },
       },
     ]);

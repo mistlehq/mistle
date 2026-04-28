@@ -401,6 +401,9 @@ async function start(): Promise<void> {
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneGatewayTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
   const tokenizerProxyTunnelHostname = readRequiredEnv("TOKENIZER_PROXY_TUNNEL_HOSTNAME");
+  const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
+  const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
+  const tokenizerProxyPublicUrl = `https://${tokenizerProxyTunnelHostname}`;
 
   writeCloudflaredConfig({
     controlPlaneApiTunnelHostname,
@@ -419,6 +422,7 @@ async function start(): Promise<void> {
     DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneGatewayTunnelHostname,
     TOKENIZER_PROXY_TUNNEL_HOSTNAME: tokenizerProxyTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
+    MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: controlPlaneApiPublicUrl,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -550,10 +554,6 @@ async function start(): Promise<void> {
     args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", TUNNEL_SERVICE_NAME],
     env: sharedDevEnv,
   });
-
-  const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
-  const dataPlaneGatewayPublicUrl = `https://${dataPlaneGatewayTunnelHostname}`;
-  const tokenizerProxyPublicUrl = `https://${tokenizerProxyTunnelHostname}`;
 
   console.log("");
   console.log("Public tunnel URLs:");
