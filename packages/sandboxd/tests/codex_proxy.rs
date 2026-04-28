@@ -20,6 +20,18 @@ use sandboxd::time::{Duration, Sleeper, ThreadSleeper};
 static REQUEST_ID_COUNTER: AtomicU64 = AtomicU64::new(100);
 const LIVE_RETAIN_FAILURE_ATTEMPTS: usize = 200;
 
+fn assert_metadata_only_thread_resume_request(request: &Value, thread_id: &str) {
+    assert_eq!(
+        request["method"],
+        Value::String("thread/resume".to_string())
+    );
+    assert_eq!(
+        request["params"]["threadId"],
+        Value::String(thread_id.to_string())
+    );
+    assert_eq!(request["params"]["excludeTurns"], Value::Bool(true));
+}
+
 #[test]
 fn proxy_relays_json_rpc_and_monitor_tracks_active_threads() {
     let raw_listener = TcpListener::bind("127.0.0.1:0").expect("raw listener should bind");
@@ -170,14 +182,7 @@ fn session_manager_retain_and_release_manage_subscriptions() {
         respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
-        assert_eq!(
-            retain_request["params"]["threadId"],
-            Value::String("thr_123".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_123");
         manager_socket
             .send(Message::Text(
                 json!({
@@ -283,10 +288,7 @@ fn session_manager_auto_releases_when_resume_returns_non_active_status() {
         respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_idle");
         manager_socket
             .send(Message::Text(
                 json!({
@@ -391,10 +393,7 @@ fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
         respond_to_manager_bootstrap(&mut first_socket, Vec::new());
 
         let retain_request = read_json_text_message(&mut first_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_release_error");
         first_socket
             .send(Message::Text(
                 json!({
@@ -441,14 +440,7 @@ fn session_manager_preserves_retained_state_when_release_unsubscribe_fails() {
         respond_to_manager_bootstrap(&mut second_socket, Vec::new());
 
         let replay_request = read_json_text_message(&mut second_socket);
-        assert_eq!(
-            replay_request["method"],
-            Value::String("thread/resume".to_string())
-        );
-        assert_eq!(
-            replay_request["params"]["threadId"],
-            Value::String("thr_release_error".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&replay_request, "thr_release_error");
         second_socket
             .send(Message::Text(
                 json!({
@@ -546,10 +538,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
         respond_to_manager_bootstrap(&mut first_socket, Vec::new());
 
         let first_retain = read_json_text_message(&mut first_socket);
-        assert_eq!(
-            first_retain["method"],
-            Value::String("thread/resume".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&first_retain, "thr_missing");
         first_socket
             .send(Message::Text(
                 json!({
@@ -577,10 +566,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
         respond_to_manager_bootstrap(&mut second_socket, Vec::new());
 
         let replay_request = read_json_text_message(&mut second_socket);
-        assert_eq!(
-            replay_request["method"],
-            Value::String("thread/resume".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&replay_request, "thr_missing");
         second_socket
             .send(Message::Text(
                 json!({
@@ -599,14 +585,7 @@ fn session_manager_reconnect_replay_removes_missing_rollout_and_allows_retain_ag
             .expect("second connection ready signal should send");
 
         let second_retain = read_json_text_message(&mut second_socket);
-        assert_eq!(
-            second_retain["method"],
-            Value::String("thread/resume".to_string())
-        );
-        assert_eq!(
-            second_retain["params"]["threadId"],
-            Value::String("thr_missing".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&second_retain, "thr_missing");
         second_socket
             .send(Message::Text(
                 json!({
@@ -695,10 +674,7 @@ fn session_manager_auto_releases_retained_threads_on_non_active_status() {
         respond_to_manager_bootstrap(&mut manager_socket, Vec::new());
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_456");
         manager_socket
             .send(Message::Text(
                 json!({
@@ -885,14 +861,7 @@ fn automation_turn_start_buffers_success_until_retention_succeeds() {
             .expect("notification should send");
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
-        assert_eq!(
-            retain_request["params"]["threadId"],
-            Value::String("thr_automation".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_automation");
 
         release_retention_receiver
             .recv()
@@ -1049,10 +1018,7 @@ fn automation_turn_start_returns_proxy_error_when_retention_fails() {
 
         for _ in 0..LIVE_RETAIN_FAILURE_ATTEMPTS {
             let retain_request = read_json_text_message(&mut manager_socket);
-            assert_eq!(
-                retain_request["method"],
-                Value::String("thread/resume".to_string())
-            );
+            assert_metadata_only_thread_resume_request(&retain_request, "thr_failure");
             manager_socket
                 .send(Message::Text(
                     json!({
@@ -1212,14 +1178,7 @@ fn automation_turn_steer_buffers_success_until_retention_succeeds() {
             .expect("notification should send");
 
         let retain_request = read_json_text_message(&mut manager_socket);
-        assert_eq!(
-            retain_request["method"],
-            Value::String("thread/resume".to_string())
-        );
-        assert_eq!(
-            retain_request["params"]["threadId"],
-            Value::String("thr_steer".to_string())
-        );
+        assert_metadata_only_thread_resume_request(&retain_request, "thr_steer");
 
         release_retention_receiver
             .recv()

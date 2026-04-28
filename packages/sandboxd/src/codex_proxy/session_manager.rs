@@ -1014,7 +1014,8 @@ async fn resume_thread_subscription(
             "method": THREAD_RESUME_METHOD,
             "id": request_id,
             "params": {
-                "threadId": thread_id
+                "threadId": thread_id,
+                "excludeTurns": true
             }
         }),
     )
