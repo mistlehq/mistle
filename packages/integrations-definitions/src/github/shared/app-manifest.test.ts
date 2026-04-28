@@ -3,7 +3,9 @@ import { z } from "zod";
 
 import {
   buildConvertedGitHubAppConnectionConfig,
+  buildConvertedGitHubAppConnectionSecrets,
   buildGitHubAppInstallationUrl,
+  GitHubAppManifestConversionMissingClientSecretError,
   GitHubAppManifestTemplate,
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
@@ -104,6 +106,50 @@ describe("buildConvertedGitHubAppConnectionConfig", () => {
       app_slug: "mistle-github-app",
       client_id: "Iv1.manifestclientid",
     });
+  });
+});
+
+describe("buildConvertedGitHubAppConnectionSecrets", () => {
+  it("maps required GitHub credential material into connection secrets", () => {
+    const conversion = createGitHubAppManifestConversionFixture({
+      clientSecret: "manifest-client-secret",
+    });
+
+    expect(
+      buildConvertedGitHubAppConnectionSecrets({
+        conversion,
+        supportsClientSecret: true,
+      }),
+    ).toEqual({
+      appPrivateKeyPem: "private-key",
+      webhookSecret: "webhook-secret",
+      clientSecret: "manifest-client-secret",
+    });
+  });
+
+  it("omits client secret when the target method does not support it", () => {
+    const conversion = createGitHubAppManifestConversionFixture();
+
+    expect(
+      buildConvertedGitHubAppConnectionSecrets({
+        conversion,
+        supportsClientSecret: false,
+      }),
+    ).toEqual({
+      appPrivateKeyPem: "private-key",
+      webhookSecret: "webhook-secret",
+    });
+  });
+
+  it("fails fast when a supported client secret is missing from the conversion", () => {
+    const conversion = createGitHubAppManifestConversionFixture();
+
+    expect(() =>
+      buildConvertedGitHubAppConnectionSecrets({
+        conversion,
+        supportsClientSecret: true,
+      }),
+    ).toThrow(GitHubAppManifestConversionMissingClientSecretError);
   });
 });
 
