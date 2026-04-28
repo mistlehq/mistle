@@ -11,7 +11,7 @@ import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
-  encodeGitHubAppInstallationStateMetadata,
+  encodeConnectionRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -106,7 +106,7 @@ export async function startGitHubAppInstallationConnection(
     invalidInputCode:
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
   });
-  const state = encodeGitHubAppInstallationStateMetadata({
+  const state = encodeConnectionRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
   });

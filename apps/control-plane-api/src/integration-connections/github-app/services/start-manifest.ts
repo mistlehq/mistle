@@ -12,7 +12,7 @@ import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
-  encodeGitHubAppManifestStateMetadata,
+  encodeConnectionRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -124,7 +124,7 @@ export async function startGitHubAppManifestConnection(
     );
   }
 
-  const state = encodeGitHubAppManifestStateMetadata({
+  const state = encodeConnectionRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
   });
