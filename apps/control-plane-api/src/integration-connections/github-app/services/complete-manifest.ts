@@ -11,6 +11,11 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationRegistry,
 } from "@mistle/integrations-core";
+import {
+  buildConvertedGitHubAppConnectionConfig,
+  parseGitHubAppManifestConversionResponse as parseGitHubAppManifestConversionResponseFromDefinitions,
+  type GitHubAppManifestConversion,
+} from "@mistle/integrations-definitions/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -51,19 +56,6 @@ type CompletedConnection = {
   id: string;
   targetKey: string;
 };
-
-const GitHubAppManifestConversionResponseSchema = z
-  .object({
-    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
-    slug: z.string().min(1),
-    client_id: z.string().min(1),
-    client_secret: z.string().min(1).optional(),
-    pem: z.string().min(1),
-    webhook_secret: z.string().min(1),
-  })
-  .loose();
-
-type GitHubAppManifestConversion = z.output<typeof GitHubAppManifestConversionResponseSchema>;
 
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return resolveRequiredRedirectQueryParamOrThrow({
@@ -107,7 +99,7 @@ export function parseGitHubAppManifestConversionResponse(
   value: unknown,
 ): GitHubAppManifestConversion {
   try {
-    return GitHubAppManifestConversionResponseSchema.parse(value);
+    return parseGitHubAppManifestConversionResponseFromDefinitions(value);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new BadRequestError(
@@ -147,17 +139,6 @@ async function convertGitHubAppManifest(input: {
 
   const responseJson: unknown = await response.json();
   return parseGitHubAppManifestConversionResponse(responseJson);
-}
-
-export function buildConvertedGitHubAppConnectionConfig(input: {
-  conversion: GitHubAppManifestConversion;
-}): Record<string, string> {
-  return {
-    connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-    app_id: input.conversion.id.toString(),
-    app_slug: input.conversion.slug,
-    client_id: input.conversion.client_id,
-  };
 }
 
 export function buildConvertedConnectionSecrets(input: {
