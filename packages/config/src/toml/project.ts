@@ -190,6 +190,33 @@ export function selectControlPlaneApiConfig(
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
+    connectionToken: {
+      secret: config.sandbox.tokens.connect.secret,
+      issuer: config.sandbox.tokens.connect.issuer,
+      audience: config.sandbox.tokens.connect.audience,
+    },
+    portAccess: {
+      baseDomain: config.sandbox.publish_base_domain,
+      gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
+      access: {
+        tokenSecret: config.sandbox.publish.access_token.secret,
+        tokenIssuer: config.sandbox.publish.access_token.issuer,
+        tokenAudience: config.sandbox.publish.access_token.audience,
+      },
+    },
+    sandbox: {
+      defaultBaseImage: config.sandbox.default_base_image,
+      gatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_public_url,
+      bootstrap: {
+        tokenSecret: config.sandbox.tokens.bootstrap.secret,
+        tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
+        tokenAudience: config.sandbox.tokens.bootstrap.audience,
+      },
+      storageBackend: config.sandbox.storage?.backend,
+    },
     integrations: {
       activeMasterEncryptionKeyVersion:
         config.services.control_plane_api.integrations.active_master_encryption_key_version,

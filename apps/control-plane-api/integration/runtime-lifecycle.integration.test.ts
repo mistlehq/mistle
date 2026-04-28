@@ -1,24 +1,10 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/main.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
-import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it } from "./test-context.js";
-
-const IntegrationConnectionTokenConfig = {
-  secret: "integration-connection-secret",
-  issuer: "integration-issuer",
-  audience: "integration-audience",
-} as const;
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
-
-const IntegrationSandboxRuntimeConfig = {
-  defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-  gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-} as const;
 
 function createRuntimeConfigWithPort(input: {
   config: ControlPlaneApiConfig;
@@ -52,10 +38,6 @@ describe("runtime lifecycle integration", () => {
         host,
         port,
       }),
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: IntegrationConnectionTokenConfig,
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: IntegrationSandboxRuntimeConfig,
     });
 
     try {
@@ -86,10 +68,6 @@ describe("runtime lifecycle integration", () => {
         host,
         port,
       }),
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: IntegrationConnectionTokenConfig,
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: IntegrationSandboxRuntimeConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
@@ -111,10 +89,6 @@ describe("runtime lifecycle integration", () => {
   it("releases runtime resources after stop", async ({ fixture }) => {
     const runtime = await createControlPlaneApiRuntime({
       app: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: IntegrationConnectionTokenConfig,
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: IntegrationSandboxRuntimeConfig,
     });
 
     await runtime.db.execute(sql`select 1`);

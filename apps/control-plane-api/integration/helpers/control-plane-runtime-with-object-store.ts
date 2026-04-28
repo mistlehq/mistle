@@ -1,24 +1,10 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { startSeaweedfsS3 } from "@mistle/test-harness";
 
 import { createControlPlaneApiRuntime } from "../../src/main.js";
 import type { ControlPlaneApiConfig } from "../../src/types.js";
-import { IntegrationPortAccessConfig } from "./port-access-config.js";
-
-const IntegrationConnectionTokenConfig = {
-  secret: "integration-connection-secret",
-  issuer: "integration-issuer",
-  audience: "integration-audience",
-} as const;
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
-const IntegrationSandboxRuntimeConfig = {
-  defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-  gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-} as const;
 
 export async function createRuntimeWithObjectStore(input: {
   config: ControlPlaneApiConfig;
-  internalAuthServiceToken: string;
   seaweedfs: Awaited<ReturnType<typeof startSeaweedfsS3>>;
 }) {
   return createControlPlaneApiRuntime({
@@ -33,9 +19,5 @@ export async function createRuntimeWithObjectStore(input: {
         secretAccessKey: input.seaweedfs.secretAccessKey,
       },
     },
-    internalAuthServiceToken: input.internalAuthServiceToken,
-    connectionToken: IntegrationConnectionTokenConfig,
-    portAccess: IntegrationPortAccessConfig,
-    sandbox: IntegrationSandboxRuntimeConfig,
   });
 }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GlobalSandboxTokenConfigSchema, SandboxStorageBackend } from "../../global/schema.js";
+
 const ControlPlaneApiAuthGoogleConfigSchema = z
   .object({
     clientId: z.string().min(1),
@@ -72,6 +74,39 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
+  })
+  .strict();
+
+export const ControlPlaneApiConnectionTokenConfigSchema = z
+  .object({
+    secret: z.string().trim().min(1),
+    issuer: z.string().trim().min(1),
+    audience: z.string().trim().min(1),
+  })
+  .strict();
+
+export const ControlPlaneApiPortAccessConfigSchema = z
+  .object({
+    baseDomain: z.string().trim().min(1),
+    gatewayWsUrl: z.string().trim().min(1),
+    access: GlobalSandboxTokenConfigSchema,
+  })
+  .strict();
+
+export const ControlPlaneApiSandboxRuntimeConfigSchema = z
+  .object({
+    defaultBaseImage: z.string().trim().min(1),
+    gatewayWsUrl: z.string().trim().min(1),
+    bootstrap: GlobalSandboxTokenConfigSchema.optional(),
+    storageBackend: z
+      .enum([SandboxStorageBackend.ARCHIL, SandboxStorageBackend.DOCKER_VOLUME])
+      .optional(),
+  })
+  .strict();
+
 export const ControlPlaneApiCommitSignConfigSchema = z
   .object({
     binaryPath: z.string().min(1),
@@ -113,6 +148,10 @@ export const ControlPlaneApiConfigSchema = z
     dashboard: ControlPlaneApiDashboardConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
+    internalAuth: ControlPlaneApiInternalAuthConfigSchema,
+    connectionToken: ControlPlaneApiConnectionTokenConfigSchema,
+    portAccess: ControlPlaneApiPortAccessConfigSchema,
+    sandbox: ControlPlaneApiSandboxRuntimeConfigSchema,
     commitSign: ControlPlaneApiCommitSignConfigSchema.optional(),
     integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
@@ -127,6 +166,10 @@ export const PartialControlPlaneApiConfigSchema = z
     dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigObjectSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
+    internalAuth: ControlPlaneApiInternalAuthConfigSchema.partial().optional(),
+    connectionToken: ControlPlaneApiConnectionTokenConfigSchema.partial().optional(),
+    portAccess: ControlPlaneApiPortAccessConfigSchema.partial().optional(),
+    sandbox: ControlPlaneApiSandboxRuntimeConfigSchema.partial().optional(),
     commitSign: ControlPlaneApiCommitSignConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),
   })

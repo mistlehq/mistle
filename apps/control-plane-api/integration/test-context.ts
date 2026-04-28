@@ -262,6 +262,32 @@ export const it = vitestIt.extend<{
           dataPlaneApi: {
             baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
           },
+          internalAuth: {
+            serviceToken: sharedInfraConfig.internalAuthServiceToken,
+          },
+          connectionToken: {
+            secret: "integration-connection-secret",
+            issuer: "integration-issuer",
+            audience: "integration-audience",
+          },
+          portAccess: {
+            baseDomain: "mistle.localhost",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            access: {
+              tokenSecret: "integration-port-access-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+          },
+          sandbox: {
+            defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrap: {
+              tokenSecret: "integration-bootstrap-token-secret",
+              tokenIssuer: "integration-data-plane-worker",
+              tokenAudience: "integration-data-plane-gateway",
+            },
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -286,30 +312,6 @@ export const it = vitestIt.extend<{
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
-          connectionToken: {
-            secret: "integration-connection-secret",
-            issuer: "integration-issuer",
-            audience: "integration-audience",
-          },
-          portAccess: {
-            baseDomain: "mistle.localhost",
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-            access: {
-              tokenSecret: "integration-port-access-secret",
-              tokenIssuer: "integration-control-plane-api",
-              tokenAudience: "integration-data-plane-gateway",
-            },
-          },
-          sandbox: {
-            defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-            bootstrap: {
-              tokenSecret: "integration-bootstrap-token-secret",
-              tokenIssuer: "integration-data-plane-worker",
-              tokenAudience: "integration-data-plane-gateway",
-            },
-          },
         });
         cleanupTasks.unshift(async () => {
           await runtime.stop();

@@ -73,6 +73,33 @@ async function main(): Promise<void> {
       dataPlaneApi: {
         baseUrl: env.MISTLE_TEST_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL,
       },
+      internalAuth: {
+        serviceToken: env.MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN,
+      },
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      portAccess: {
+        baseDomain: "sandbox.local",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+        access: {
+          tokenSecret: "integration-port-access-secret",
+          tokenIssuer: "integration-port-access-issuer",
+          tokenAudience: "integration-port-access-audience",
+        },
+      },
+      sandbox: {
+        defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+        bootstrap: {
+          tokenSecret: "integration-bootstrap-token-secret",
+          tokenIssuer: "integration-data-plane-worker",
+          tokenAudience: "integration-data-plane-gateway",
+        },
+        storageBackend: env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
+      },
       integrations: {
         activeMasterEncryptionKeyVersion: 1,
         masterEncryptionKeys: {
@@ -97,31 +124,6 @@ async function main(): Promise<void> {
               binaryPath: process.env.MISTLE_TEST_COMMIT_SIGN_BINARY_PATH,
             },
           }),
-    },
-    internalAuthServiceToken: env.MISTLE_TEST_CONTROL_PLANE_API_INTERNAL_AUTH_SERVICE_TOKEN,
-    connectionToken: {
-      secret: "integration-connection-secret",
-      issuer: "integration-issuer",
-      audience: "integration-audience",
-    },
-    portAccess: {
-      baseDomain: "sandbox.local",
-      gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      access: {
-        tokenSecret: "integration-port-access-secret",
-        tokenIssuer: "integration-port-access-issuer",
-        tokenAudience: "integration-port-access-audience",
-      },
-    },
-    sandbox: {
-      defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
-      gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      bootstrap: {
-        tokenSecret: "integration-bootstrap-token-secret",
-        tokenIssuer: "integration-data-plane-worker",
-        tokenAudience: "integration-data-plane-gateway",
-      },
-      storageBackend: env.MISTLE_TEST_CONTROL_PLANE_API_SANDBOX_STORAGE_BACKEND,
     },
   });
 

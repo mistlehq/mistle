@@ -149,6 +149,32 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          connectionToken: {
+            secret: "test-connection-token-secret",
+            issuer: "control-plane-api",
+            audience: "data-plane-gateway",
+          },
+          portAccess: {
+            baseDomain: "mistle.example.test",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
+          sandbox: {
+            defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrap: {
+              tokenSecret: "test-bootstrap-token-secret",
+              tokenIssuer: "data-plane-worker",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -375,6 +401,32 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          connectionToken: {
+            secret: "test-connection-token-secret",
+            issuer: "control-plane-api",
+            audience: "data-plane-gateway",
+          },
+          portAccess: {
+            baseDomain: "mistle.example.test",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
+          sandbox: {
+            defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrap: {
+              tokenSecret: "test-bootstrap-token-secret",
+              tokenIssuer: "data-plane-worker",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -600,6 +652,32 @@ describe("parseConfigRecord", () => {
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:5200",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          connectionToken: {
+            secret: "test-connection-token-secret",
+            issuer: "control-plane-api",
+            audience: "data-plane-gateway",
+          },
+          portAccess: {
+            baseDomain: "mistle.example.test",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            access: {
+              tokenSecret: "test-publish-token-secret",
+              tokenIssuer: "control-plane-api",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
+          sandbox: {
+            defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrap: {
+              tokenSecret: "test-bootstrap-token-secret",
+              tokenIssuer: "data-plane-worker",
+              tokenAudience: "data-plane-gateway",
+            },
+          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -811,6 +889,32 @@ describe("parseConfigRecord", () => {
             },
             dataPlaneApi: {
               baseUrl: "http://127.0.0.1:5200",
+            },
+            internalAuth: {
+              serviceToken: "test-service-token",
+            },
+            connectionToken: {
+              secret: "test-connection-token-secret",
+              issuer: "control-plane-api",
+              audience: "data-plane-gateway",
+            },
+            portAccess: {
+              baseDomain: "mistle.example.test",
+              gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+              access: {
+                tokenSecret: "test-publish-token-secret",
+                tokenIssuer: "control-plane-api",
+                tokenAudience: "data-plane-gateway",
+              },
+            },
+            sandbox: {
+              defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+              gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+              bootstrap: {
+                tokenSecret: "test-bootstrap-token-secret",
+                tokenIssuer: "data-plane-worker",
+                tokenAudience: "data-plane-gateway",
+              },
             },
             integrations: {
               activeMasterEncryptionKeyVersion: 1,

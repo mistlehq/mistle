@@ -27,7 +27,6 @@ describe("organization members integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);

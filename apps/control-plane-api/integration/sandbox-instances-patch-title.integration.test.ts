@@ -1,4 +1,3 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
@@ -10,12 +9,9 @@ import {
   createDisposableDataPlaneRuntime,
   type DisposableDataPlaneRuntime,
 } from "./helpers/disposable-data-plane-runtime.js";
-import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
-
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
     const fixture = startedDataPlaneFixtures.pop();
@@ -68,17 +64,6 @@ describe("sandbox instance title patch integration", () => {
         baseConfig: fixture.config,
         dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
       }),
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: {
-        secret: "integration-connection-secret",
-        issuer: "integration-issuer",
-        audience: "integration-audience",
-      },
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: {
-        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      },
     });
 
     try {
@@ -160,17 +145,6 @@ describe("sandbox instance title patch integration", () => {
         baseConfig: fixture.config,
         dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
       }),
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: {
-        secret: "integration-connection-secret",
-        issuer: "integration-issuer",
-        audience: "integration-audience",
-      },
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: {
-        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      },
     });
 
     try {
@@ -247,17 +221,6 @@ describe("sandbox instance title patch integration", () => {
         baseConfig: fixture.config,
         dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
       }),
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      connectionToken: {
-        secret: "integration-connection-secret",
-        issuer: "integration-issuer",
-        audience: "integration-audience",
-      },
-      portAccess: IntegrationPortAccessConfig,
-      sandbox: {
-        defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-      },
     });
 
     try {

@@ -16,36 +16,11 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
-export type ControlPlaneApiConnectionTokenConfig = {
-  secret: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenSecret"];
-  issuer: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenIssuer"];
-  audience: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenAudience"];
-};
-export type ControlPlaneApiPortAccessConfig = {
-  baseDomain: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["baseDomain"];
-  gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
-  access: {
-    tokenSecret: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenSecret"];
-    tokenIssuer: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenIssuer"];
-    tokenAudience: ControlPlaneApiGlobalConfig["sandbox"]["publish"]["access"]["tokenAudience"];
-  };
-};
-export type ControlPlaneApiSandboxRuntimeConfig = {
-  defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
-  gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
-  bootstrap?: {
-    tokenSecret: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenSecret"];
-    tokenIssuer: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenIssuer"];
-    tokenAudience: ControlPlaneApiGlobalConfig["sandbox"]["bootstrap"]["tokenAudience"];
-  };
-  storageBackend?: NonNullable<ControlPlaneApiGlobalConfig["sandbox"]["storage"]>["backend"];
-};
+export type ControlPlaneApiConnectionTokenConfig = ControlPlaneApiConfig["connectionToken"];
+export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"];
+export type ControlPlaneApiSandboxRuntimeConfig = ControlPlaneApiConfig["sandbox"];
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
-  internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
-  connectionToken: ControlPlaneApiConnectionTokenConfig;
-  portAccess: ControlPlaneApiPortAccessConfig;
-  sandbox: ControlPlaneApiSandboxRuntimeConfig;
 };
 
 export type AppContextBindings = {

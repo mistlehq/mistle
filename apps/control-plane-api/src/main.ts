@@ -17,7 +17,7 @@ export async function createControlPlaneApiRuntime(
   const resources = await createAppResources(runtimeConfig.app);
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
-    serviceToken: runtimeConfig.internalAuthServiceToken,
+    serviceToken: runtimeConfig.app.internalAuth.serviceToken,
   });
   const { app: config } = runtimeConfig;
   let app: ControlPlaneApp;
@@ -43,14 +43,14 @@ export async function createControlPlaneApiRuntime(
 
     app = createApp({
       config,
-      sandboxConfig: runtimeConfig.sandbox,
-      internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+      sandboxConfig: config.sandbox,
+      internalAuthServiceToken: config.internalAuth.serviceToken,
       db: resources.db,
       objectStore: resources.objectStore,
       integrationRegistry: resources.integrationRegistry,
       dataPlaneClient,
-      connectionTokenConfig: runtimeConfig.connectionToken,
-      portAccessConfig: runtimeConfig.portAccess,
+      connectionTokenConfig: config.connectionToken,
+      portAccessConfig: config.portAccess,
       openWorkflow: resources.openWorkflow,
       auth,
     });

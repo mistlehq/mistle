@@ -1,37 +1,12 @@
 import { shutdownTelemetry } from "@mistle/telemetry";
 
-import { appConfig, globalConfig } from "./instrument.js";
+import { appConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createControlPlaneApiRuntime } from "./main.js";
 
 async function startControlPlaneApi(): Promise<void> {
   const runtime = await createControlPlaneApiRuntime({
     app: appConfig,
-    internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
-    connectionToken: {
-      secret: globalConfig.sandbox.connect.tokenSecret,
-      issuer: globalConfig.sandbox.connect.tokenIssuer,
-      audience: globalConfig.sandbox.connect.tokenAudience,
-    },
-    portAccess: {
-      baseDomain: globalConfig.sandbox.publish.baseDomain,
-      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
-      access: {
-        tokenSecret: globalConfig.sandbox.publish.access.tokenSecret,
-        tokenIssuer: globalConfig.sandbox.publish.access.tokenIssuer,
-        tokenAudience: globalConfig.sandbox.publish.access.tokenAudience,
-      },
-    },
-    sandbox: {
-      defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
-      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
-      bootstrap: {
-        tokenSecret: globalConfig.sandbox.bootstrap.tokenSecret,
-        tokenIssuer: globalConfig.sandbox.bootstrap.tokenIssuer,
-        tokenAudience: globalConfig.sandbox.bootstrap.tokenAudience,
-      },
-      storageBackend: globalConfig.sandbox.storage?.backend,
-    },
   });
 
   await runtime.start();

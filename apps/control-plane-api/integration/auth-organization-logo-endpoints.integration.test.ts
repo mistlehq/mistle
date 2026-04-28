@@ -22,7 +22,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -56,7 +55,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -161,7 +159,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -196,7 +193,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -246,7 +242,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -299,7 +294,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -334,7 +328,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -395,7 +388,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -470,7 +462,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -513,7 +504,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -560,7 +550,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -625,7 +614,6 @@ describe("organization logo endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);

@@ -4,6 +4,7 @@ import { parse as parseToml } from "smol-toml";
 import type { z } from "zod";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
+import { PartialControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { PartialControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
@@ -193,6 +194,36 @@ function composeTokenizerProxyConfig(
   });
 }
 
+function composeControlPlaneApiConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API> {
+  const partialAppConfig = PartialControlPlaneApiConfigSchema.parse(appConfig);
+
+  return controlPlaneApiConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: {
+      serviceToken: globalConfig.internalAuth.serviceToken,
+    },
+    connectionToken: {
+      secret: globalConfig.sandbox.connect.tokenSecret,
+      issuer: globalConfig.sandbox.connect.tokenIssuer,
+      audience: globalConfig.sandbox.connect.tokenAudience,
+    },
+    portAccess: {
+      baseDomain: globalConfig.sandbox.publish.baseDomain,
+      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
+      access: globalConfig.sandbox.publish.access,
+    },
+    sandbox: {
+      defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
+      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
+      bootstrap: globalConfig.sandbox.bootstrap,
+      storageBackend: globalConfig.sandbox.storage?.backend,
+    },
+  });
+}
+
 function composeDataPlaneGatewayConfig(
   appConfig: unknown,
   globalConfig: AppConfig["global"],
@@ -238,6 +269,24 @@ function composeDataPlaneApiConfig(
       storage: globalConfig.sandbox.storage,
     },
   });
+}
+
+function loadControlPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, controlPlaneApiConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeControlPlaneApiConfig(
+    getValueAtPath(envLoadedRoot, controlPlaneApiConfigModule.namespace),
+    globalConfig,
+  );
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
 }
 
 function loadControlPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
@@ -360,11 +409,17 @@ function loadSelectedAppConfig(
   env: NodeJS.ProcessEnv,
 ): AppConfigModuleValue<AppConfigModuleKey> {
   if (appId === AppIds.CONTROL_PLANE_API) {
-    return applyModuleEnvOverrides(
-      controlPlaneApiConfigModule,
-      selectControlPlaneApiConfig(rootConfig),
+    const globalConfig = applyModuleEnvOverrides(
+      globalConfigModule,
+      selectGlobalConfig(rootConfig),
       env,
     );
+    const selectedConfig = composeControlPlaneApiConfig(
+      selectControlPlaneApiConfig(rootConfig),
+      globalConfig,
+    );
+
+    return applyModuleEnvOverrides(controlPlaneApiConfigModule, selectedConfig, env);
   }
 
   if (appId === AppIds.CONTROL_PLANE_WORKER) {
@@ -491,6 +546,14 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   }
 
   if (options.includeGlobal === false) {
+    if (options.app === AppIds.CONTROL_PLANE_API) {
+      const { app: appConfig } = loadControlPlaneApiConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     if (options.app === AppIds.CONTROL_PLANE_WORKER) {
       const { app: appConfig } = loadControlPlaneWorkerConfigFromEnv(env);
 
@@ -528,6 +591,10 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     return {
       app: appConfig,
     };
+  }
+
+  if (options.app === AppIds.CONTROL_PLANE_API) {
+    return loadControlPlaneApiConfigFromEnv(env);
   }
 
   if (options.app === AppIds.CONTROL_PLANE_WORKER) {

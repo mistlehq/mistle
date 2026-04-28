@@ -21,7 +21,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -55,7 +54,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -157,7 +155,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -192,7 +189,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -242,7 +238,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -295,7 +290,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
 
@@ -330,7 +324,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);
@@ -391,7 +384,6 @@ describe("user avatar endpoints integration", () => {
     });
     const runtime = await createRuntimeWithObjectStore({
       config: fixture.config,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
       seaweedfs,
     });
     const objectStore = createTestObjectStore(seaweedfs);

@@ -105,6 +105,33 @@ describe("projectServiceConfigToEnv", () => {
         dataPlaneApi: {
           baseUrl: "http://data-plane-api:8082",
         },
+        internalAuth: {
+          serviceToken: "secret://MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",
+        },
+        connectionToken: {
+          secret: "connect-token-secret",
+          issuer: "control-plane-api",
+          audience: "data-plane-gateway",
+        },
+        portAccess: {
+          baseDomain: "mistle.example",
+          gatewayWsUrl: "wss://gateway.mistle.example/tunnel/sandbox",
+          access: {
+            tokenSecret: "publish-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+        },
+        sandbox: {
+          defaultBaseImage: "ghcr.io/mistlehq/sandbox-base:staging",
+          gatewayWsUrl: "wss://gateway.mistle.example/tunnel/sandbox",
+          bootstrap: {
+            tokenSecret: "bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
+          storageBackend: "archil",
+        },
         commitSign: {
           binaryPath: "/app/bin/commit-sign",
         },
