@@ -8,7 +8,7 @@ import { Pool } from "pg";
 import { logger } from "../../logger.js";
 import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
-import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
+import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 import {
   createSandboxRuntimeAdapter,
@@ -53,12 +53,8 @@ function createDefaultTunnelReadinessPolicy(): {
 }
 
 async function createWorkflowContext(): Promise<WorkflowContext> {
-  const { globalConfig, workerConfig } = await getOpenWorkflowRuntime();
-  const config: DataPlaneWorkerRuntimeConfig = {
-    app: workerConfig,
-    sandbox: globalConfig.sandbox,
-    telemetry: globalConfig.telemetry,
-  };
+  const { workerConfig } = await getOpenWorkflowRuntime();
+  const config = createDataPlaneWorkerRuntimeConfig({ app: workerConfig });
   const dbPool = new Pool({
     connectionString: workerConfig.database.url,
   });
@@ -68,7 +64,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
     sandboxRuntimeControl = createSandboxRuntimeControl(config);
     const controlPlaneInternalClient = new ControlPlaneInternalClient({
       baseUrl: workerConfig.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+      internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
     });
 
     return {
@@ -80,7 +76,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       sandboxRuntimeControl,
       runtimeStateReader: createSandboxRuntimeStateReader({
         gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
-        serviceToken: globalConfig.internalAuth.serviceToken,
+        serviceToken: workerConfig.internalAuth.serviceToken,
       }),
       controlPlaneInternalClient,
       tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),

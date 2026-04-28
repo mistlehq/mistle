@@ -43,7 +43,6 @@ export const ConfigSchema = z
     }
 
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      globalSandboxProvider: value.global.sandbox.provider,
       appSandbox: value.apps.data_plane_worker.sandbox,
     });
 
@@ -56,7 +55,6 @@ export const ConfigSchema = z
     }
 
     const dataPlaneWorkerPersistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageConfig: value.global.sandbox.storage,
       appConfig: value.apps.data_plane_worker,
     });
 

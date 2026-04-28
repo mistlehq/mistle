@@ -1,82 +1,66 @@
-import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { describe, expect, it } from "vitest";
 
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
-const LocalTestSandboxBaseImageRef = getLocalTestSandboxBaseImageRef();
+function createTestRuntimeConfig(input: {
+  sandboxdTestFaultsEnabled?: boolean;
+}): DataPlaneWorkerRuntimeConfig {
+  const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
+    provider: "docker",
+    internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
+    bootstrap: {
+      tokenSecret: "bootstrap-secret",
+      tokenIssuer: "issuer",
+      tokenAudience: "audience",
+    },
+    egress: {
+      tokenSecret: "egress-secret",
+      tokenIssuer: "issuer",
+      tokenAudience: "audience",
+    },
+    tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
+    ...(input.sandboxdTestFaultsEnabled === undefined
+      ? {}
+      : { sandboxdTestFaultsEnabled: input.sandboxdTestFaultsEnabled }),
+  };
+  const telemetry: DataPlaneWorkerRuntimeConfig["telemetry"] = {
+    enabled: false,
+    debug: false,
+  };
+
+  return {
+    app: {
+      database: {
+        url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+      },
+      workflow: {
+        databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+        namespaceId: "development",
+        runMigrations: false,
+        concurrency: 1,
+      },
+      runtimeState: {
+        gatewayBaseUrl: "http://127.0.0.1:5202",
+      },
+      controlPlaneApi: {
+        baseUrl: "http://127.0.0.1:5100",
+      },
+      sandbox,
+      internalAuth: {
+        serviceToken: "internal-service-token",
+      },
+      telemetry,
+    },
+    sandbox,
+    telemetry,
+  };
+}
 
 describe("createSandboxRuntimeEnv", () => {
   it("includes the sandboxd test faults env when the worker config enables it", () => {
     const runtimeEnv = createSandboxRuntimeEnv({
-      config: {
-        app: {
-          database: {
-            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
-          },
-          workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
-            namespaceId: "development",
-            runMigrations: false,
-            concurrency: 1,
-          },
-          runtimeState: {
-            gatewayBaseUrl: "http://127.0.0.1:5202",
-          },
-          controlPlaneApi: {
-            baseUrl: "http://127.0.0.1:5100",
-          },
-          sandbox: {
-            tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
-            sandboxdTestFaultsEnabled: true,
-          },
-        },
-        sandbox: {
-          provider: "docker",
-          defaultBaseImage: LocalTestSandboxBaseImageRef,
-          gatewayWsUrl: "ws://gateway/tunnel/sandbox",
-          internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
-          connect: {
-            tokenSecret: "connect-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          bootstrap: {
-            tokenSecret: "bootstrap-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          egress: {
-            tokenSecret: "egress-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          publish: {
-            baseDomain: "mistle.example.test",
-            access: {
-              tokenSecret: "publish-secret",
-              tokenIssuer: "issuer",
-              tokenAudience: "audience",
-            },
-            session: {
-              cookieSigningSecret: "cookie-secret",
-            },
-          },
-        },
-        telemetry: {
-          enabled: false,
-          debug: false,
-          traces: {
-            endpoint: "http://127.0.0.1:4318/v1/traces",
-          },
-          logs: {
-            endpoint: "http://127.0.0.1:4318/v1/logs",
-          },
-          metrics: {
-            endpoint: "http://127.0.0.1:4318/v1/metrics",
-          },
-          resourceAttributes: "",
-        },
-      },
+      config: createTestRuntimeConfig({ sandboxdTestFaultsEnabled: true }),
       sandboxInstanceId: "sbi_123",
     });
 
@@ -90,74 +74,7 @@ describe("createSandboxRuntimeEnv", () => {
 
   it("omits the sandboxd test faults env when the worker config leaves it disabled", () => {
     const runtimeEnv = createSandboxRuntimeEnv({
-      config: {
-        app: {
-          database: {
-            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
-          },
-          workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
-            namespaceId: "development",
-            runMigrations: false,
-            concurrency: 1,
-          },
-          runtimeState: {
-            gatewayBaseUrl: "http://127.0.0.1:5202",
-          },
-          controlPlaneApi: {
-            baseUrl: "http://127.0.0.1:5100",
-          },
-          sandbox: {
-            tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
-          },
-        },
-        sandbox: {
-          provider: "docker",
-          defaultBaseImage: LocalTestSandboxBaseImageRef,
-          gatewayWsUrl: "ws://gateway/tunnel/sandbox",
-          internalGatewayWsUrl: "ws://gateway/tunnel/sandbox",
-          connect: {
-            tokenSecret: "connect-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          bootstrap: {
-            tokenSecret: "bootstrap-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          egress: {
-            tokenSecret: "egress-secret",
-            tokenIssuer: "issuer",
-            tokenAudience: "audience",
-          },
-          publish: {
-            baseDomain: "mistle.example.test",
-            access: {
-              tokenSecret: "publish-secret",
-              tokenIssuer: "issuer",
-              tokenAudience: "audience",
-            },
-            session: {
-              cookieSigningSecret: "cookie-secret",
-            },
-          },
-        },
-        telemetry: {
-          enabled: false,
-          debug: false,
-          traces: {
-            endpoint: "http://127.0.0.1:4318/v1/traces",
-          },
-          logs: {
-            endpoint: "http://127.0.0.1:4318/v1/logs",
-          },
-          metrics: {
-            endpoint: "http://127.0.0.1:4318/v1/metrics",
-          },
-          resourceAttributes: "",
-        },
-      },
+      config: createTestRuntimeConfig({}),
       sandboxInstanceId: "sbi_123",
     });
 

@@ -191,6 +191,11 @@ describe("projectServiceConfigToEnv", () => {
           baseUrl: "http://control-plane-api:8080",
         },
         sandbox: {
+          provider: GlobalConfig.sandbox.provider,
+          storage: GlobalConfig.sandbox.storage,
+          internalGatewayWsUrl: GlobalConfig.sandbox.internalGatewayWsUrl,
+          bootstrap: GlobalConfig.sandbox.bootstrap,
+          egress: GlobalConfig.sandbox.egress,
           tokenizerProxyEgressBaseUrl: "https://api.mistle.example/tokenizer-proxy/egress",
           docker: {
             socketPath: "/var/run/docker.sock",
@@ -211,6 +216,8 @@ describe("projectServiceConfigToEnv", () => {
             ],
           },
         },
+        internalAuth: GlobalConfig.internalAuth,
+        telemetry: GlobalConfig.telemetry,
       },
     } satisfies LoadConfigResult<typeof AppIds.DATA_PLANE_WORKER>;
 

@@ -1,14 +1,8 @@
 import { createDataPlaneBackend } from "./client.js";
-import {
-  loadDataPlaneWorkerConfig,
-  requireDataPlaneWorkerGlobalConfig,
-  type DataPlaneWorkerConfig,
-  type DataPlaneWorkerGlobalConfig,
-} from "./config.js";
+import { loadDataPlaneWorkerConfig, type DataPlaneWorkerConfig } from "./config.js";
 
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
-  globalConfig: DataPlaneWorkerGlobalConfig;
   workerConfig: DataPlaneWorkerConfig;
 };
 
@@ -23,11 +17,9 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
   openWorkflowRuntimePromise = Promise.resolve()
     .then(async () => {
       const loadedConfig = loadDataPlaneWorkerConfig(process.env);
-      requireDataPlaneWorkerGlobalConfig(loadedConfig, "data-plane-worker workflows");
 
       return {
         workerConfig: loadedConfig.app,
-        globalConfig: loadedConfig.global,
         backend: await createDataPlaneBackend({
           url: loadedConfig.app.workflow.databaseUrl,
           namespaceId: loadedConfig.app.workflow.namespaceId,

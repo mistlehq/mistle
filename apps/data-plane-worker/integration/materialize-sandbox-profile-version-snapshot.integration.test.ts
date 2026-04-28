@@ -49,7 +49,6 @@ import { logger as dataPlaneWorkerLogger } from "../logger.js";
 import {
   createDataPlaneWorkerRuntimeConfig,
   loadDataPlaneWorkerConfig,
-  requireDataPlaneWorkerGlobalConfig,
 } from "../openworkflow/core/config.js";
 import {
   executeMaterializeSandboxProfileVersionSnapshot,
@@ -269,11 +268,8 @@ function createWorkerRuntimeConfig(input: {
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-pr4-snapshot-",
   });
-  requireDataPlaneWorkerGlobalConfig(loadedConfig, "snapshot materialization integration");
-
   return createDataPlaneWorkerRuntimeConfig({
     app: loadedConfig.app,
-    global: loadedConfig.global,
   });
 }
 

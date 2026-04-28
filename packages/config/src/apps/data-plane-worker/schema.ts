@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { SandboxStorageBackend, type GlobalConfig } from "../../global/schema.js";
+import {
+  GlobalSandboxStorageConfigSchema,
+  GlobalSandboxTokenConfigSchema,
+  GlobalTelemetryConfigSchema,
+  SandboxStorageBackend,
+} from "../../global/schema.js";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
@@ -76,6 +81,11 @@ const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) 
 
 export const DataPlaneWorkerSandboxConfigSchema = z
   .object({
+    provider: z.enum(SandboxProviders),
+    storage: GlobalSandboxStorageConfigSchema.optional(),
+    internalGatewayWsUrl: z.string().trim().min(1),
+    bootstrap: GlobalSandboxTokenConfigSchema,
+    egress: GlobalSandboxTokenConfigSchema,
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
@@ -85,6 +95,11 @@ export const DataPlaneWorkerSandboxConfigSchema = z
 
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
+    provider: z.enum(SandboxProviders).optional(),
+    storage: GlobalSandboxStorageConfigSchema.partial().optional(),
+    internalGatewayWsUrl: z.string().trim().min(1).optional(),
+    bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
+    egress: GlobalSandboxTokenConfigSchema.partial().optional(),
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
     sandboxdTestFaultsEnabled: z.boolean().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
@@ -153,6 +168,12 @@ export const PartialDataPlaneWorkerSandboxStorageConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
+  })
+  .strict();
+
 export const DataPlaneWorkerConfigSchema = z
   .object({
     database: DataPlaneWorkerDatabaseConfigSchema,
@@ -161,6 +182,8 @@ export const DataPlaneWorkerConfigSchema = z
     sandbox: DataPlaneWorkerSandboxConfigSchema,
     controlPlaneApi: DataPlaneWorkerControlPlaneApiConfigSchema,
     sandboxStorage: DataPlaneWorkerSandboxStorageConfigSchema.optional(),
+    internalAuth: DataPlaneWorkerInternalAuthConfigSchema,
+    telemetry: GlobalTelemetryConfigSchema,
   })
   .strict();
 
@@ -172,37 +195,38 @@ export const PartialDataPlaneWorkerConfigSchema = z
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
     controlPlaneApi: PartialDataPlaneWorkerControlPlaneApiConfigSchema.optional(),
     sandboxStorage: PartialDataPlaneWorkerSandboxStorageConfigSchema.optional(),
+    internalAuth: DataPlaneWorkerInternalAuthConfigSchema.partial().optional(),
+    telemetry: GlobalTelemetryConfigSchema.optional(),
   })
   .strict();
 
 const DataPlaneWorkerProviderRequirementMessages = {
   DOCKER:
-    "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
-  E2B: "apps.data_plane_worker.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
+    "apps.data_plane_worker.sandbox.docker is required when apps.data_plane_worker.sandbox.provider is 'docker'.",
+  E2B: "apps.data_plane_worker.sandbox.e2b is required when apps.data_plane_worker.sandbox.provider is 'e2b'.",
 } as const;
 
 const DataPlaneWorkerPersistentSandboxRequirementMessages = {
   ARCHIL:
-    "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
+    "apps.data_plane_worker.sandbox_storage.archil is required when apps.data_plane_worker.sandbox.storage.backend is 'archil'.",
   DOCKER_VOLUME:
-    "apps.data_plane_worker.sandbox_storage.docker_volume is required when global.sandbox.storage.backend is 'docker_volume'.",
+    "apps.data_plane_worker.sandbox_storage.docker_volume is required when apps.data_plane_worker.sandbox.storage.backend is 'docker_volume'.",
 } as const;
 
 export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
-  globalSandboxProvider: (typeof SandboxProviders)[number];
   appSandbox: DataPlaneWorkerConfig["sandbox"];
 }): {
   path: readonly ["sandbox", "docker"] | readonly ["sandbox", "e2b"];
   message: string;
 } | null {
-  if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
+  if (input.appSandbox.provider === "docker" && input.appSandbox.docker === undefined) {
     return {
       path: ["sandbox", "docker"],
       message: DataPlaneWorkerProviderRequirementMessages.DOCKER,
     };
   }
 
-  if (input.globalSandboxProvider === "e2b" && input.appSandbox.e2b === undefined) {
+  if (input.appSandbox.provider === "e2b" && input.appSandbox.e2b === undefined) {
     return {
       path: ["sandbox", "e2b"],
       message: DataPlaneWorkerProviderRequirementMessages.E2B,
@@ -213,13 +237,12 @@ export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
 }
 
 export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
-  globalSandboxStorageConfig: GlobalConfig["sandbox"]["storage"] | undefined;
   appConfig: DataPlaneWorkerConfig;
 }): {
   path: readonly ["sandboxStorage", "archil"] | readonly ["sandboxStorage", "dockerVolume"];
   message: string;
 } | null {
-  if (input.globalSandboxStorageConfig?.backend === SandboxStorageBackend.ARCHIL) {
+  if (input.appConfig.sandbox.storage?.backend === SandboxStorageBackend.ARCHIL) {
     if (input.appConfig.sandboxStorage?.archil === undefined) {
       return {
         path: ["sandboxStorage", "archil"],
@@ -228,7 +251,7 @@ export function getDataPlaneWorkerPersistentSandboxValidationIssue(input: {
     }
   }
 
-  if (input.globalSandboxStorageConfig?.backend === SandboxStorageBackend.DOCKER_VOLUME) {
+  if (input.appConfig.sandbox.storage?.backend === SandboxStorageBackend.DOCKER_VOLUME) {
     if (input.appConfig.sandboxStorage?.dockerVolume === undefined) {
       return {
         path: ["sandboxStorage", "dockerVolume"],

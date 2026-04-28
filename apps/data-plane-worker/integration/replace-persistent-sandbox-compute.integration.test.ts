@@ -30,7 +30,6 @@ import WebSocket, { WebSocketServer } from "ws";
 import {
   createDataPlaneWorkerRuntimeConfig,
   loadDataPlaneWorkerConfig,
-  requireDataPlaneWorkerGlobalConfig,
 } from "../openworkflow/core/config.js";
 import { markSandboxInstanceStarting } from "../openworkflow/resume-sandbox-instance/mark-sandbox-instance-starting.js";
 import { persistSandboxInstanceComputeReplacement } from "../openworkflow/resume-sandbox-instance/persist-sandbox-instance-compute-replacement.js";
@@ -230,14 +229,8 @@ function createWorkerRuntimeConfig(input: { websocketBaseUrl: string }) {
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-pr15-",
   });
-  requireDataPlaneWorkerGlobalConfig(
-    loadedConfig,
-    "replace persistent sandbox compute integration",
-  );
-
   return createDataPlaneWorkerRuntimeConfig({
     app: loadedConfig.app,
-    global: loadedConfig.global,
   });
 }
 

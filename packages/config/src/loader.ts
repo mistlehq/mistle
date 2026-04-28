@@ -18,6 +18,7 @@ import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import {
   getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
+  PartialDataPlaneWorkerConfigSchema,
 } from "./apps/data-plane-worker/schema.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { PartialTokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
@@ -271,6 +272,29 @@ function composeDataPlaneApiConfig(
   });
 }
 
+function composeDataPlaneWorkerConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER> {
+  const partialAppConfig = PartialDataPlaneWorkerConfigSchema.parse(appConfig);
+
+  return dataPlaneWorkerConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: {
+      serviceToken: globalConfig.internalAuth.serviceToken,
+    },
+    telemetry: globalConfig.telemetry,
+    sandbox: {
+      ...partialAppConfig.sandbox,
+      provider: globalConfig.sandbox.provider,
+      storage: globalConfig.sandbox.storage,
+      internalGatewayWsUrl: globalConfig.sandbox.internalGatewayWsUrl,
+      bootstrap: globalConfig.sandbox.bootstrap,
+      egress: globalConfig.sandbox.egress,
+    },
+  });
+}
+
 function loadControlPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
   app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
   global: AppConfig["global"];
@@ -343,6 +367,40 @@ function loadDataPlaneGatewayConfigFromEnv(env: NodeJS.ProcessEnv): {
     getValueAtPath(envLoadedRoot, dataPlaneGatewayConfigModule.namespace),
     globalConfig,
   );
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
+}
+
+function loadDataPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneWorkerConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeDataPlaneWorkerConfig(
+    getValueAtPath(envLoadedRoot, dataPlaneWorkerConfigModule.namespace),
+    globalConfig,
+  );
+
+  const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
+    appSandbox: appConfig.sandbox,
+  });
+
+  if (issue !== null) {
+    throw new Error(issue.message);
+  }
+
+  const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
+    appConfig,
+  });
+
+  if (persistentIssue !== null) {
+    throw new Error(persistentIssue.message);
+  }
 
   return {
     global: globalConfig,
@@ -459,11 +517,17 @@ function loadSelectedAppConfig(
   }
 
   if (appId === AppIds.DATA_PLANE_WORKER) {
-    return applyModuleEnvOverrides(
-      dataPlaneWorkerConfigModule,
-      selectDataPlaneWorkerConfig(rootConfig),
+    const globalConfig = applyModuleEnvOverrides(
+      globalConfigModule,
+      selectGlobalConfig(rootConfig),
       env,
     );
+    const selectedConfig = composeDataPlaneWorkerConfig(
+      selectDataPlaneWorkerConfig(rootConfig),
+      globalConfig,
+    );
+
+    return applyModuleEnvOverrides(dataPlaneWorkerConfigModule, selectedConfig, env);
   }
 
   if (appId === AppIds.TOKENIZER_PROXY) {
@@ -479,7 +543,6 @@ function loadSelectedAppConfig(
 
 function validateSelectedAppConfig(
   appId: AppConfigModuleKey,
-  globalConfig: AppConfig["global"],
   rootConfig: RootConfig,
   env: NodeJS.ProcessEnv,
 ): void {
@@ -495,7 +558,6 @@ function validateSelectedAppConfig(
   } else if (appId === AppIds.DATA_PLANE_WORKER) {
     const dataPlaneWorkerConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_WORKER, rootConfig, env);
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      globalSandboxProvider: globalConfig.sandbox.provider,
       appSandbox: dataPlaneWorkerConfig.sandbox,
     });
 
@@ -504,7 +566,6 @@ function validateSelectedAppConfig(
     }
 
     const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageConfig: globalConfig.sandbox.storage,
       appConfig: dataPlaneWorkerConfig,
     });
 
@@ -537,7 +598,7 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
       env,
     );
 
-    validateSelectedAppConfig(options.app, globalConfig, rootConfig, env);
+    validateSelectedAppConfig(options.app, rootConfig, env);
 
     return {
       global: globalConfig,
@@ -578,6 +639,14 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
       };
     }
 
+    if (options.app === AppIds.DATA_PLANE_WORKER) {
+      const { app: appConfig } = loadDataPlaneWorkerConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     if (options.app === AppIds.TOKENIZER_PROXY) {
       const { app: appConfig } = loadTokenizerProxyConfigFromEnv(env);
 
@@ -609,6 +678,10 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     return loadDataPlaneGatewayConfigFromEnv(env);
   }
 
+  if (options.app === AppIds.DATA_PLANE_WORKER) {
+    return loadDataPlaneWorkerConfigFromEnv(env);
+  }
+
   if (options.app === AppIds.TOKENIZER_PROXY) {
     return loadTokenizerProxyConfigFromEnv(env);
   }
@@ -616,26 +689,6 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   const validatedRoot = loadValidatedEnvRoot([globalConfigModule, appModule], env);
   const globalConfig = parseModuleValue(globalConfigModule, validatedRoot);
   const appConfig = parseAppConfig(options.app, validatedRoot);
-
-  if (options.app === AppIds.DATA_PLANE_WORKER) {
-    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      globalSandboxProvider: globalConfig.sandbox.provider,
-      appSandbox: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot).sandbox,
-    });
-
-    if (issue !== null) {
-      throw new Error(issue.message);
-    }
-
-    const persistentIssue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageConfig: globalConfig.sandbox.storage,
-      appConfig: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot),
-    });
-
-    if (persistentIssue !== null) {
-      throw new Error(persistentIssue.message);
-    }
-  }
 
   return {
     global: globalConfig,

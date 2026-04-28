@@ -100,6 +100,21 @@ function createArchilStorageBackendAdapter(input: {
         baseUrl: "http://127.0.0.1:5100",
       },
       sandbox: {
+        provider: "e2b",
+        storage: {
+          backend: "archil",
+        },
+        internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+        bootstrap: {
+          tokenSecret: "integration-bootstrap-secret",
+          tokenIssuer: "integration-data-plane-worker",
+          tokenAudience: "integration-data-plane-gateway",
+        },
+        egress: {
+          tokenSecret: "integration-egress-secret",
+          tokenIssuer: "integration-data-plane-worker",
+          tokenAudience: "integration-tokenizer-proxy",
+        },
         tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
       },
       sandboxStorage: {
@@ -107,6 +122,13 @@ function createArchilStorageBackendAdapter(input: {
           apiKey: "managed-api-key",
           region: "aws-us-east-1",
         },
+      },
+      internalAuth: {
+        serviceToken: "integration-service-token",
+      },
+      telemetry: {
+        enabled: false,
+        debug: false,
       },
     },
     runtimeProvider: SandboxProvider.E2B,

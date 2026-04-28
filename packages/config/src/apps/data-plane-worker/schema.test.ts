@@ -2,15 +2,68 @@ import { describe, expect, it } from "vitest";
 
 import {
   DataPlaneWorkerConfigSchema,
+  type DataPlaneWorkerConfig,
   DataPlaneWorkerSandboxConfigSchema,
   DataPlaneWorkerSandboxStorageArchilConfigSchema,
   getDataPlaneWorkerPersistentSandboxValidationIssue,
   getDataPlaneWorkerSandboxProviderValidationIssue,
 } from "./schema.js";
 
+const SandboxTokenConfig: DataPlaneWorkerConfig["sandbox"]["bootstrap"] = {
+  tokenSecret: "sandbox-token-secret",
+  tokenIssuer: "mistle",
+  tokenAudience: "sandbox",
+};
+
+const DisabledTelemetryConfig: DataPlaneWorkerConfig["telemetry"] = {
+  enabled: false,
+  debug: false,
+};
+
+function createWorkerConfig(input: {
+  sandbox?: Partial<DataPlaneWorkerConfig["sandbox"]>;
+  sandboxStorage?: DataPlaneWorkerConfig["sandboxStorage"];
+}): DataPlaneWorkerConfig {
+  return {
+    database: {
+      url: "postgresql://127.0.0.1/mistle",
+    },
+    workflow: {
+      databaseUrl: "postgresql://127.0.0.1/mistle",
+      namespaceId: "development",
+      runMigrations: true,
+      concurrency: 1,
+    },
+    runtimeState: {
+      gatewayBaseUrl: "http://127.0.0.1:5202",
+    },
+    controlPlaneApi: {
+      baseUrl: "http://127.0.0.1:5100",
+    },
+    sandbox: {
+      provider: "docker",
+      storage: undefined,
+      internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      ...input.sandbox,
+    },
+    sandboxStorage: input.sandboxStorage,
+    internalAuth: {
+      serviceToken: "internal-service-token",
+    },
+    telemetry: DisabledTelemetryConfig,
+  };
+}
+
 describe("DataPlaneWorkerSandboxConfigSchema", () => {
   it("defaults the E2B domain to the hosted cloud domain", () => {
     const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
+      provider: "e2b",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
@@ -18,6 +71,10 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
     });
 
     expect(parsed).toEqual({
+      provider: "e2b",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       e2b: {
         apiKey: "test-api-key",
@@ -30,6 +87,10 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
 
   it("parses E2B sandbox settings", () => {
     const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
+      provider: "e2b",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
       e2b: {
@@ -41,6 +102,10 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
     });
 
     expect(parsed).toEqual({
+      provider: "e2b",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
       e2b: {
@@ -54,11 +119,19 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
 
   it("accepts the optional sandboxd test faults toggle", () => {
     const parsed = DataPlaneWorkerSandboxConfigSchema.parse({
+      provider: "docker",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
     });
 
     expect(parsed).toEqual({
+      provider: "docker",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: SandboxTokenConfig,
+      egress: SandboxTokenConfig,
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       sandboxdTestFaultsEnabled: true,
     });
@@ -80,8 +153,16 @@ describe("DataPlaneWorkerSandboxConfigSchema", () => {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
         sandbox: {
+          provider: "docker",
+          internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+          bootstrap: SandboxTokenConfig,
+          egress: SandboxTokenConfig,
           tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
         },
+        internalAuth: {
+          serviceToken: "internal-service-token",
+        },
+        telemetry: DisabledTelemetryConfig,
       }),
     ).toThrow(/controlPlaneApi/);
   });
@@ -147,10 +228,13 @@ describe("DataPlaneWorkerSandboxStorageArchilConfigSchema", () => {
 });
 
 describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
-  it("requires E2B settings when the global provider is e2b", () => {
+  it("requires E2B settings when the worker provider is e2b", () => {
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
-      globalSandboxProvider: "e2b",
       appSandbox: {
+        provider: "e2b",
+        internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+        bootstrap: SandboxTokenConfig,
+        egress: SandboxTokenConfig,
         tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       },
     });
@@ -158,7 +242,7 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
     expect(issue).toEqual({
       path: ["sandbox", "e2b"],
       message:
-        "apps.data_plane_worker.sandbox.e2b is required when global.sandbox.provider is 'e2b'.",
+        "apps.data_plane_worker.sandbox.e2b is required when apps.data_plane_worker.sandbox.provider is 'e2b'.",
     });
   });
 });
@@ -166,69 +250,37 @@ describe("getDataPlaneWorkerSandboxProviderValidationIssue", () => {
 describe("getDataPlaneWorkerPersistentSandboxValidationIssue", () => {
   it("requires Archil worker config when Archil storage is enabled", () => {
     const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageConfig: {
-        backend: "archil",
-      },
-      appConfig: {
-        database: {
-          url: "postgresql://127.0.0.1/mistle",
-        },
-        workflow: {
-          databaseUrl: "postgresql://127.0.0.1/mistle",
-          namespaceId: "development",
-          runMigrations: true,
-          concurrency: 1,
-        },
-        runtimeState: {
-          gatewayBaseUrl: "http://127.0.0.1:5202",
-        },
-        controlPlaneApi: {
-          baseUrl: "http://127.0.0.1:5100",
-        },
+      appConfig: createWorkerConfig({
         sandbox: {
-          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+          storage: {
+            backend: "archil",
+          },
         },
-      },
+      }),
     });
 
     expect(issue).toEqual({
       path: ["sandboxStorage", "archil"],
       message:
-        "apps.data_plane_worker.sandbox_storage.archil is required when global.sandbox.storage.backend is 'archil'.",
+        "apps.data_plane_worker.sandbox_storage.archil is required when apps.data_plane_worker.sandbox.storage.backend is 'archil'.",
     });
   });
 
   it("requires docker volume worker config when Docker volume storage is enabled", () => {
     const issue = getDataPlaneWorkerPersistentSandboxValidationIssue({
-      globalSandboxStorageConfig: {
-        backend: "docker_volume",
-      },
-      appConfig: {
-        database: {
-          url: "postgresql://127.0.0.1/mistle",
-        },
-        workflow: {
-          databaseUrl: "postgresql://127.0.0.1/mistle",
-          namespaceId: "development",
-          runMigrations: true,
-          concurrency: 1,
-        },
-        runtimeState: {
-          gatewayBaseUrl: "http://127.0.0.1:5202",
-        },
-        controlPlaneApi: {
-          baseUrl: "http://127.0.0.1:5100",
-        },
+      appConfig: createWorkerConfig({
         sandbox: {
-          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+          storage: {
+            backend: "docker_volume",
+          },
         },
-      },
+      }),
     });
 
     expect(issue).toEqual({
       path: ["sandboxStorage", "dockerVolume"],
       message:
-        "apps.data_plane_worker.sandbox_storage.docker_volume is required when global.sandbox.storage.backend is 'docker_volume'.",
+        "apps.data_plane_worker.sandbox_storage.docker_volume is required when apps.data_plane_worker.sandbox.storage.backend is 'docker_volume'.",
     });
   });
 });

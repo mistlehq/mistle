@@ -1,12 +1,10 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { verifySigningGrant } from "@mistle/sandbox-signing-auth";
 import { describe, expect, it } from "vitest";
 
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { createSigningGrant } from "./signing-grant.js";
 
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
-
-const TestConfig = {
+const TestConfig: DataPlaneWorkerRuntimeConfig = {
   app: {
     database: {
       url: "postgresql://unused",
@@ -24,34 +22,35 @@ const TestConfig = {
       baseUrl: "http://127.0.0.1:5100",
     },
     sandbox: {
+      provider: "docker",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-bootstrap-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-data-plane-gateway",
+      },
+      egress: {
+        tokenSecret: "integration-egress-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-tokenizer-proxy",
+      },
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       docker: {
         socketPath: "/var/run/docker.sock",
         networkName: "mistle-sandbox-dev",
       },
     },
+    internalAuth: {
+      serviceToken: "internal-service-token",
+    },
+    telemetry: {
+      enabled: false,
+      debug: false,
+    },
   },
   sandbox: {
     provider: "docker",
-    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-    publish: {
-      baseDomain: "mistle.example.test",
-      access: {
-        tokenSecret: "integration-publish-token-secret",
-        tokenIssuer: "integration-control-plane-api",
-        tokenAudience: "integration-data-plane-gateway",
-      },
-      session: {
-        cookieSigningSecret: "integration-publish-cookie-secret",
-      },
-    },
-    connect: {
-      tokenSecret: "integration-connect-secret",
-      tokenIssuer: "integration-control-plane-api",
-      tokenAudience: "integration-data-plane-gateway",
-    },
     bootstrap: {
       tokenSecret: "integration-bootstrap-secret",
       tokenIssuer: "integration-data-plane-worker",
@@ -62,12 +61,17 @@ const TestConfig = {
       tokenIssuer: "integration-data-plane-worker",
       tokenAudience: "integration-tokenizer-proxy",
     },
+    tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+    docker: {
+      socketPath: "/var/run/docker.sock",
+      networkName: "mistle-sandbox-dev",
+    },
   },
   telemetry: {
     enabled: false,
     debug: false,
   },
-} as const;
+};
 
 describe("createSigningGrant", () => {
   it("mints a signed startup signing grant from git signing config", async () => {

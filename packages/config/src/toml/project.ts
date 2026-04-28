@@ -342,6 +342,13 @@ export function selectDataPlaneGatewayConfig(
 export function selectDataPlaneWorkerConfig(
   config: Config,
 ): AppConfig["apps"]["data_plane_worker"] {
+  const sandboxStorage =
+    config.sandbox.storage === undefined
+      ? undefined
+      : {
+          backend: config.sandbox.storage.backend,
+        };
+
   return {
     database: {
       url: config.postgres.data_plane.pooled_url,
@@ -359,6 +366,19 @@ export function selectDataPlaneWorkerConfig(
       baseUrl: config.services.control_plane_api.internal_url,
     },
     sandbox: {
+      provider: config.sandbox.provider,
+      storage: sandboxStorage,
+      internalGatewayWsUrl: config.services.data_plane_gateway.sandbox_ws_internal_url,
+      bootstrap: {
+        tokenSecret: config.sandbox.tokens.bootstrap.secret,
+        tokenIssuer: config.sandbox.tokens.bootstrap.issuer,
+        tokenAudience: config.sandbox.tokens.bootstrap.audience,
+      },
+      egress: {
+        tokenSecret: config.sandbox.tokens.egress.secret,
+        tokenIssuer: config.sandbox.tokens.egress.issuer,
+        tokenAudience: config.sandbox.tokens.egress.audience,
+      },
       tokenizerProxyEgressBaseUrl: config.services.tokenizer_proxy.egress_url,
       docker:
         config.sandbox.docker === undefined
@@ -378,6 +398,10 @@ export function selectDataPlaneWorkerConfig(
             },
     },
     sandboxStorage: buildSandboxStorage(config),
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
+    telemetry: projectTelemetry(config),
   };
 }
 

@@ -1,10 +1,8 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { verifyEgressGrant } from "@mistle/sandbox-egress-auth";
 import { describe, expect, it } from "vitest";
 
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { createEgressGrantByRuleId } from "./egress-grants.js";
-
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
 
 function decodeJwtPayload(token: string): Record<string, unknown> {
   const [, payload] = token.split(".");
@@ -15,71 +13,79 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
 }
 
+const TestConfig: DataPlaneWorkerRuntimeConfig = {
+  app: {
+    database: {
+      url: "postgresql://unused",
+    },
+    workflow: {
+      databaseUrl: "postgresql://unused",
+      namespaceId: "development",
+      runMigrations: false,
+      concurrency: 1,
+    },
+    runtimeState: {
+      gatewayBaseUrl: "http://127.0.0.1:5003",
+    },
+    controlPlaneApi: {
+      baseUrl: "http://127.0.0.1:5100",
+    },
+    sandbox: {
+      provider: "docker",
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-bootstrap-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-data-plane-gateway",
+      },
+      egress: {
+        tokenSecret: "integration-egress-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-tokenizer-proxy",
+      },
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      docker: {
+        socketPath: "/var/run/docker.sock",
+        networkName: "mistle-sandbox-dev",
+      },
+    },
+    internalAuth: {
+      serviceToken: "internal-service-token",
+    },
+    telemetry: {
+      enabled: false,
+      debug: false,
+    },
+  },
+  sandbox: {
+    provider: "docker",
+    internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    bootstrap: {
+      tokenSecret: "integration-bootstrap-secret",
+      tokenIssuer: "integration-data-plane-worker",
+      tokenAudience: "integration-data-plane-gateway",
+    },
+    egress: {
+      tokenSecret: "integration-egress-secret",
+      tokenIssuer: "integration-data-plane-worker",
+      tokenAudience: "integration-tokenizer-proxy",
+    },
+    tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+    docker: {
+      socketPath: "/var/run/docker.sock",
+      networkName: "mistle-sandbox-dev",
+    },
+  },
+  telemetry: {
+    enabled: false,
+    debug: false,
+  },
+};
+
 describe("createEgressGrantByRuleId", () => {
   it("mints a signed grant per egress route keyed by egressRuleId", async () => {
     const egressGrantByRuleId = await createEgressGrantByRuleId({
-      config: {
-        app: {
-          database: {
-            url: "postgresql://unused",
-          },
-          workflow: {
-            databaseUrl: "postgresql://unused",
-            namespaceId: "development",
-            runMigrations: false,
-            concurrency: 1,
-          },
-          runtimeState: {
-            gatewayBaseUrl: "http://127.0.0.1:5003",
-          },
-          controlPlaneApi: {
-            baseUrl: "http://127.0.0.1:5100",
-          },
-          sandbox: {
-            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-            docker: {
-              socketPath: "/var/run/docker.sock",
-              networkName: "mistle-sandbox-dev",
-            },
-          },
-        },
-        sandbox: {
-          provider: "docker",
-          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-          gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          publish: {
-            baseDomain: "mistle.example.test",
-            access: {
-              tokenSecret: "integration-publish-token-secret",
-              tokenIssuer: "integration-control-plane-api",
-              tokenAudience: "integration-data-plane-gateway",
-            },
-            session: {
-              cookieSigningSecret: "integration-publish-cookie-secret",
-            },
-          },
-          connect: {
-            tokenSecret: "integration-connect-secret",
-            tokenIssuer: "integration-control-plane-api",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          bootstrap: {
-            tokenSecret: "integration-bootstrap-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          egress: {
-            tokenSecret: "integration-egress-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-tokenizer-proxy",
-          },
-        },
-        telemetry: {
-          enabled: false,
-          debug: false,
-        },
-      },
+      config: TestConfig,
       organizationId: "org_123",
       sandboxInstanceId: "sbi_123",
       actingUserId: "usr_123",
@@ -207,68 +213,7 @@ describe("createEgressGrantByRuleId", () => {
 
   it("mints aws sigv4 grants with flattened service and region claims", async () => {
     const egressGrantByRuleId = await createEgressGrantByRuleId({
-      config: {
-        app: {
-          database: {
-            url: "postgresql://unused",
-          },
-          workflow: {
-            databaseUrl: "postgresql://unused",
-            namespaceId: "development",
-            runMigrations: false,
-            concurrency: 1,
-          },
-          runtimeState: {
-            gatewayBaseUrl: "http://127.0.0.1:5003",
-          },
-          controlPlaneApi: {
-            baseUrl: "http://127.0.0.1:5100",
-          },
-          sandbox: {
-            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-            docker: {
-              socketPath: "/var/run/docker.sock",
-              networkName: "mistle-sandbox-dev",
-            },
-          },
-        },
-        sandbox: {
-          provider: "docker",
-          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-          gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          publish: {
-            baseDomain: "mistle.example.test",
-            access: {
-              tokenSecret: "integration-publish-token-secret",
-              tokenIssuer: "integration-control-plane-api",
-              tokenAudience: "integration-data-plane-gateway",
-            },
-            session: {
-              cookieSigningSecret: "integration-publish-cookie-secret",
-            },
-          },
-          connect: {
-            tokenSecret: "integration-connect-secret",
-            tokenIssuer: "integration-control-plane-api",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          bootstrap: {
-            tokenSecret: "integration-bootstrap-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          egress: {
-            tokenSecret: "integration-egress-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-tokenizer-proxy",
-          },
-        },
-        telemetry: {
-          enabled: false,
-          debug: false,
-        },
-      },
+      config: TestConfig,
       organizationId: "org_123",
       sandboxInstanceId: "sbi_aws_123",
       runtimePlan: {
@@ -343,68 +288,7 @@ describe("createEgressGrantByRuleId", () => {
 
   it("mints linked-principal grants with acting-user identity claims", async () => {
     const egressGrantByRuleId = await createEgressGrantByRuleId({
-      config: {
-        app: {
-          database: {
-            url: "postgresql://unused",
-          },
-          workflow: {
-            databaseUrl: "postgresql://unused",
-            namespaceId: "development",
-            runMigrations: false,
-            concurrency: 1,
-          },
-          runtimeState: {
-            gatewayBaseUrl: "http://127.0.0.1:5003",
-          },
-          controlPlaneApi: {
-            baseUrl: "http://127.0.0.1:5100",
-          },
-          sandbox: {
-            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-            docker: {
-              socketPath: "/var/run/docker.sock",
-              networkName: "mistle-sandbox-dev",
-            },
-          },
-        },
-        sandbox: {
-          provider: "docker",
-          defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-          gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-          publish: {
-            baseDomain: "mistle.example.test",
-            access: {
-              tokenSecret: "integration-publish-token-secret",
-              tokenIssuer: "integration-control-plane-api",
-              tokenAudience: "integration-data-plane-gateway",
-            },
-            session: {
-              cookieSigningSecret: "integration-publish-cookie-secret",
-            },
-          },
-          connect: {
-            tokenSecret: "integration-connect-secret",
-            tokenIssuer: "integration-control-plane-api",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          bootstrap: {
-            tokenSecret: "integration-bootstrap-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-data-plane-gateway",
-          },
-          egress: {
-            tokenSecret: "integration-egress-secret",
-            tokenIssuer: "integration-data-plane-worker",
-            tokenAudience: "integration-tokenizer-proxy",
-          },
-        },
-        telemetry: {
-          enabled: false,
-          debug: false,
-        },
-      },
+      config: TestConfig,
       organizationId: "org_123",
       sandboxInstanceId: "sbi_github_123",
       actingUserId: "usr_123",

@@ -30,7 +30,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import {
   createDataPlaneWorkerRuntimeConfig,
   loadDataPlaneWorkerConfig,
-  requireDataPlaneWorkerGlobalConfig,
   type DataPlaneWorkerConfig,
 } from "../openworkflow/core/config.js";
 import { destroySandbox } from "../openworkflow/shared/destroy-sandbox.js";
@@ -98,6 +97,21 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       baseUrl: "http://127.0.0.1:5100",
     },
     sandbox: {
+      provider: "docker",
+      storage: {
+        backend: "docker_volume",
+      },
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-bootstrap-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-data-plane-gateway",
+      },
+      egress: {
+        tokenSecret: "integration-egress-secret",
+        tokenIssuer: "integration-data-plane-worker",
+        tokenAudience: "integration-tokenizer-proxy",
+      },
       tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
       docker: {
         socketPath: DockerSocketPath,
@@ -107,6 +121,13 @@ function createWorkerConfig(): DataPlaneWorkerConfig {
       dockerVolume: {
         namePrefix: "it-pr12-",
       },
+    },
+    internalAuth: {
+      serviceToken: "integration-service-token",
+    },
+    telemetry: {
+      enabled: false,
+      debug: false,
     },
   };
 }
@@ -149,11 +170,8 @@ function createWorkerRuntimeConfig() {
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_DOCKER_VOLUME_NAME_PREFIX: "it-pr12-",
   });
-  requireDataPlaneWorkerGlobalConfig(loadedConfig, "docker volume sandbox storage integration");
-
   return createDataPlaneWorkerRuntimeConfig({
     app: loadedConfig.app,
-    global: loadedConfig.global,
   });
 }
 

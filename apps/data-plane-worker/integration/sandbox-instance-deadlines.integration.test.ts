@@ -30,7 +30,6 @@ import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/in
 import {
   createDataPlaneWorkerRuntimeConfig,
   loadDataPlaneWorkerConfig,
-  requireDataPlaneWorkerGlobalConfig,
 } from "../openworkflow/core/config.js";
 import { createSandboxRuntimeAdapter } from "../openworkflow/core/sandbox-runtime-adapter.js";
 import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -153,11 +152,8 @@ function createWorkerRuntimeConfig(input: { gatewayBaseUrl: string }) {
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
     MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
   });
-  requireDataPlaneWorkerGlobalConfig(loadedConfig, "data-plane-worker deadline integration tests");
-
   return createDataPlaneWorkerRuntimeConfig({
     app: loadedConfig.app,
-    global: loadedConfig.global,
   });
 }
 

@@ -15,6 +15,13 @@ Namespace in final config:
 | `workflow.concurrency`                   | `number` (`>=1`)    | OpenWorkflow worker concurrency for data-plane workflows.          | None      | `MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY` (`Number`)           |
 | `runtimeState.gatewayBaseUrl`            | `string`            | Internal gateway base URL used for worker runtime-state reads.     | None      | `MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL`            |
 | `controlPlaneApi.baseUrl`                | `string`            | Required internal control-plane API base URL used by worker flows. | None      | `MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL`                |
+| `internalAuth.serviceToken`              | `string`            | Internal service token used by worker service-to-service calls.    | None      | Projected from global config                                              |
+| `telemetry`                              | `object`            | Worker telemetry config.                                           | None      | Projected from global config                                              |
+| `sandbox.provider`                       | `docker`/`e2b`      | Sandbox runtime provider selected for worker execution.            | None      | Projected from global config                                              |
+| `sandbox.storage.backend`                | `string` (optional) | Optional persistent sandbox storage backend selected for workers.  | None      | Projected from global config                                              |
+| `sandbox.internalGatewayWsUrl`           | `string`            | Internal gateway websocket URL used by sandbox bootstraps.         | None      | Projected from global config                                              |
+| `sandbox.bootstrap`                      | `object`            | Sandbox bootstrap token signing config.                            | None      | Projected from global config                                              |
+| `sandbox.egress`                         | `object`            | Sandbox egress grant signing config.                               | None      | Projected from global config                                              |
 | `sandbox.tokenizerProxyEgressBaseUrl`    | `string`            | Base URL used for sandbox-runtime tokenizer proxy egress hops.     | None      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL`   |
 | `sandbox.docker.socketPath`              | `string`            | Docker daemon socket path used when provider is docker.            | None      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH`                |
 | `sandbox.docker.networkName`             | `string` (optional) | Optional Docker network name that sandbox containers join.         | None      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME`               |
@@ -30,12 +37,11 @@ Namespace in final config:
 
 Notes:
 
-- Sandbox provider selection now comes from `global.sandbox.provider`.
+- Sandbox provider selection is projected into `apps.data_plane_worker.sandbox.provider`.
 - Managed deployments should set `workflow.runMigrations` to `false` and run OpenWorkflow migrations separately.
-- `apps.data_plane_worker.sandbox` only carries provider-specific runtime settings plus `tokenizer_proxy_egress_base_url`.
-- `sandboxStorage.dockerVolume` is only used when `global.sandbox.storage.backend = "docker_volume"`.
+- `apps.data_plane_worker.sandbox` carries the runtime sandbox dependencies the worker consumes.
+- `sandboxStorage.dockerVolume` is only used when `apps.data_plane_worker.sandbox.storage.backend = "docker_volume"`.
 - `sandbox.sandboxdTestFaultsEnabled` is intended only for non-release/test environments where sandboxd fault injection must be enabled explicitly.
-- Docker and E2B both consume the same `global.sandbox.defaultBaseImage` OCI reference.
 - Omitting `sandbox.e2b.cpuCount` or `sandbox.e2b.memoryMb` keeps the built-in E2B defaults of `2` vCPU and `4096` MB.
 - `sandboxStorage.archil.mounts` currently supports only `s3-compatible` and must contain at most one entry.
 - Archil-backed development and test configs should use a real remote

@@ -5,11 +5,10 @@ export type LoadDataPlaneWorkerConfigResult = ReturnType<
 >;
 
 export type DataPlaneWorkerConfig = LoadDataPlaneWorkerConfigResult["app"];
-export type DataPlaneWorkerGlobalConfig = NonNullable<LoadDataPlaneWorkerConfigResult["global"]>;
 export type DataPlaneWorkerRuntimeConfig = {
   app: DataPlaneWorkerConfig;
-  sandbox: DataPlaneWorkerGlobalConfig["sandbox"];
-  telemetry: DataPlaneWorkerGlobalConfig["telemetry"];
+  sandbox: DataPlaneWorkerConfig["sandbox"];
+  telemetry: DataPlaneWorkerConfig["telemetry"];
 };
 
 export function loadDataPlaneWorkerConfig(env: NodeJS.ProcessEnv): LoadDataPlaneWorkerConfigResult {
@@ -19,24 +18,12 @@ export function loadDataPlaneWorkerConfig(env: NodeJS.ProcessEnv): LoadDataPlane
   });
 }
 
-export function requireDataPlaneWorkerGlobalConfig(
-  loadedConfig: LoadDataPlaneWorkerConfigResult,
-  consumer: string,
-): asserts loadedConfig is LoadDataPlaneWorkerConfigResult & {
-  global: DataPlaneWorkerGlobalConfig;
-} {
-  if (loadedConfig.global === undefined) {
-    throw new Error(`Expected global config to be loaded for ${consumer}.`);
-  }
-}
-
 export function createDataPlaneWorkerRuntimeConfig(input: {
   app: DataPlaneWorkerConfig;
-  global: DataPlaneWorkerGlobalConfig;
 }): DataPlaneWorkerRuntimeConfig {
   return {
     app: input.app,
-    sandbox: input.global.sandbox,
-    telemetry: input.global.telemetry,
+    sandbox: input.app.sandbox,
+    telemetry: input.app.telemetry,
   };
 }

@@ -55,7 +55,42 @@ const DataPlaneGatewaySharedAppConfig = {
     },
     resourceAttributes: "deployment.environment=test",
   },
-} as const;
+};
+
+const DataPlaneWorkerSharedSandboxConfig = {
+  provider: "docker",
+  internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+  bootstrap: {
+    tokenSecret: "test-bootstrap-token-secret",
+    tokenIssuer: "data-plane-worker",
+    tokenAudience: "data-plane-gateway",
+  },
+  egress: {
+    tokenSecret: "test-egress-token-secret",
+    tokenIssuer: "data-plane-worker",
+    tokenAudience: "tokenizer-proxy",
+  },
+};
+
+const DataPlaneWorkerSharedAppConfig = {
+  internalAuth: {
+    serviceToken: "test-service-token",
+  },
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
+};
 
 describe("parseConfigRecord", () => {
   it("parses a minimal config record", () => {
@@ -254,7 +289,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          ...DataPlaneWorkerSharedAppConfig,
           sandbox: {
+            ...DataPlaneWorkerSharedSandboxConfig,
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -506,7 +543,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          ...DataPlaneWorkerSharedAppConfig,
           sandbox: {
+            ...DataPlaneWorkerSharedSandboxConfig,
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -756,7 +795,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          ...DataPlaneWorkerSharedAppConfig,
           sandbox: {
+            ...DataPlaneWorkerSharedSandboxConfig,
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
           },
         },
@@ -805,7 +846,7 @@ describe("parseConfigRecord", () => {
     };
 
     expect(() => parseConfigRecord(configRecord)).toThrow(
-      /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
+      /apps\.data_plane_worker\.sandbox\.docker is required when apps\.data_plane_worker\.sandbox\.provider is 'docker'/,
     );
   });
 
@@ -991,7 +1032,9 @@ describe("parseConfigRecord", () => {
             controlPlaneApi: {
               baseUrl: "http://127.0.0.1:5000",
             },
+            ...DataPlaneWorkerSharedAppConfig,
             sandbox: {
+              ...DataPlaneWorkerSharedSandboxConfig,
               tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
               docker: {
                 socketPath: "/var/run/docker.sock",
@@ -1057,5 +1100,82 @@ describe("loadConfig", () => {
         app: AppIds.CONTROL_PLANE_API,
       }),
     ).toThrow(/Missing config source/);
+  });
+
+  it("loads data-plane worker env config by composing shared dependencies into the app config", () => {
+    const loadedConfig = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      includeGlobal: false,
+      env: {
+        NODE_ENV: "development",
+        MISTLE_GLOBAL_TELEMETRY_ENABLED: "false",
+        MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
+        MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: "test-service-token",
+        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+        MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: LocalDevDockerRegistrySandboxBaseImageRef,
+        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: "ws://127.0.0.1:5202/tunnel/sandbox",
+        MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:5202/tunnel/sandbox",
+        MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "test-connection-token-secret",
+        MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
+        MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
+        MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "test-bootstrap-token-secret",
+        MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
+        MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+        MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_SECRET: "test-egress-token-secret",
+        MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_ISSUER: "data-plane-worker",
+        MISTLE_GLOBAL_SANDBOX_EGRESS_TOKEN_AUDIENCE: "tokenizer-proxy",
+        MISTLE_GLOBAL_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
+        MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "test-publish-token-secret",
+        MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "control-plane-api",
+        MISTLE_GLOBAL_SANDBOX_PUBLISH_ACCESS_TOKEN_AUDIENCE: "data-plane-gateway",
+        MISTLE_GLOBAL_SANDBOX_PUBLISH_SESSION_COOKIE_SIGNING_SECRET: "test-publish-cookie-secret",
+        MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL:
+          "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL:
+          "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "development",
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "1",
+        MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
+        MISTLE_APPS_DATA_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
+          "http://127.0.0.1:5004/tokenizer-proxy/egress",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+      },
+    });
+
+    expect(loadedConfig).toEqual({
+      app: {
+        database: {
+          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+        },
+        workflow: {
+          databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+          namespaceId: "development",
+          runMigrations: false,
+          concurrency: 1,
+        },
+        runtimeState: {
+          gatewayBaseUrl: "http://127.0.0.1:5202",
+        },
+        controlPlaneApi: {
+          baseUrl: "http://127.0.0.1:5100",
+        },
+        sandbox: {
+          ...DataPlaneWorkerSharedSandboxConfig,
+          tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+          docker: {
+            socketPath: "/var/run/docker.sock",
+          },
+        },
+        internalAuth: {
+          serviceToken: "test-service-token",
+        },
+        telemetry: {
+          enabled: false,
+          debug: false,
+        },
+      },
+    });
   });
 });
