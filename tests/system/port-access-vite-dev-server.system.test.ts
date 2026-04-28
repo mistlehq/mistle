@@ -7,8 +7,9 @@ import { readFile, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import { describe, expect } from "vitest";
-import WebSocket from "ws";
+import WebSocket, { type RawData } from "ws";
 import { z } from "zod";
 
 import { runSandboxExecCommandInSandbox } from "./helpers/codex-sandbox.js";
@@ -29,7 +30,6 @@ import {
   waitForCondition,
   waitForSandboxInstanceRunning,
   waitForWebSocketOpen,
-  waitForWebSocketTextMessage,
   WebSocketMessageTimeoutMs,
   WebSocketOpenTimeoutMs,
   withTimeout,
@@ -82,6 +82,15 @@ type OpenVitePortAccessSession = {
   sessionCookie: string;
   tunnelSocket: WebSocket;
 };
+type HmrMessagePump = {
+  close: () => void;
+  waitForTextMessage: (timeoutMs: number) => Promise<string>;
+};
+type PendingHmrMessageWaiter = {
+  reject: (error: Error) => void;
+  resolve: (message: string) => void;
+  timeout: TimerHandle;
+};
 
 function shellQuote(input: string): string {
   return `'${input.replaceAll("'", `'\\''`)}'`;
@@ -116,6 +125,107 @@ function requireMatchedValue(input: {
   }
 
   return value;
+}
+
+function decodeWebSocketText(data: RawData): string {
+  if (typeof data === "string") {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString("utf8");
+  }
+  if (Buffer.isBuffer(data)) {
+    return data.toString("utf8");
+  }
+
+  return Buffer.concat(data).toString("utf8");
+}
+
+function createHmrMessagePump(socket: WebSocket): HmrMessagePump {
+  const queuedMessages: string[] = [];
+  const waiters: PendingHmrMessageWaiter[] = [];
+  let closed = false;
+
+  const removeWaiter = (waiter: PendingHmrMessageWaiter): void => {
+    systemScheduler.cancel(waiter.timeout);
+    const waiterIndex = waiters.indexOf(waiter);
+    if (waiterIndex !== -1) {
+      waiters.splice(waiterIndex, 1);
+    }
+  };
+
+  const rejectAll = (error: Error): void => {
+    closed = true;
+    while (waiters.length > 0) {
+      const waiter = waiters.shift();
+      if (waiter === undefined) {
+        continue;
+      }
+      systemScheduler.cancel(waiter.timeout);
+      waiter.reject(error);
+    }
+  };
+
+  const onMessage = (data: RawData, isBinary: boolean): void => {
+    if (isBinary) {
+      rejectAll(new Error("Expected a text Vite HMR websocket message."));
+      return;
+    }
+
+    const message = decodeWebSocketText(data);
+    const waiter = waiters.shift();
+    if (waiter === undefined) {
+      queuedMessages.push(message);
+      return;
+    }
+
+    systemScheduler.cancel(waiter.timeout);
+    waiter.resolve(message);
+  };
+
+  const onError = (): void => {
+    rejectAll(new Error("Vite HMR websocket emitted an error while waiting for a message."));
+  };
+
+  const onClose = (): void => {
+    rejectAll(new Error("Vite HMR websocket closed while waiting for a message."));
+  };
+
+  socket.on("message", onMessage);
+  socket.on("error", onError);
+  socket.on("close", onClose);
+
+  return {
+    close: () => {
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+      socket.off("close", onClose);
+      rejectAll(new Error("Vite HMR message pump was closed."));
+    },
+    waitForTextMessage: async (timeoutMs) => {
+      const queuedMessage = queuedMessages.shift();
+      if (queuedMessage !== undefined) {
+        return queuedMessage;
+      }
+      if (closed) {
+        throw new Error("Vite HMR websocket is closed.");
+      }
+
+      return await new Promise<string>((resolve, reject) => {
+        const waiter: PendingHmrMessageWaiter = {
+          reject,
+          resolve,
+          timeout: systemScheduler.schedule(() => {
+            removeWaiter(waiter);
+            reject(
+              new Error(`Timed out after ${String(timeoutMs)}ms waiting for Vite HMR message.`),
+            );
+          }, timeoutMs),
+        };
+        waiters.push(waiter);
+      });
+    },
+  };
 }
 
 function extractHmrPath(viteClientSource: string): string {
@@ -509,14 +619,13 @@ async function openVitePortAccessSession(input: {
 }
 
 async function waitForHmrUpdateMessage(input: {
-  socket: WebSocket;
+  messagePump: HmrMessagePump;
   timeoutMs: number;
 }): Promise<z.infer<typeof HmrUpdateMessageSchema>> {
   const deadlineEpochMs = Date.now() + input.timeoutMs;
 
   while (Date.now() < deadlineEpochMs) {
-    const message = await waitForWebSocketTextMessage(
-      input.socket,
+    const message = await input.messagePump.waitForTextMessage(
       Math.max(1, deadlineEpochMs - Date.now()),
     );
     const parsedMessage: unknown = JSON.parse(message);
@@ -787,17 +896,41 @@ describe("system port access vite dev server", () => {
         );
 
         try {
-          await waitForWebSocketOpen(hmrSocket, WebSocketOpenTimeoutMs);
-          const connectedMessage = await waitForWebSocketTextMessage(
-            hmrSocket,
-            WebSocketMessageTimeoutMs,
+          const hmrMessagePump = createHmrMessagePump(hmrSocket);
+          await waitForWebSocketOpen(hmrSocket, WebSocketOpenTimeoutMs).catch(
+            async (error: unknown) => {
+              throw new Error(
+                `Timed out opening Vite HMR websocket. TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog(
+                  {
+                    fixture,
+                    authenticatedSession: session,
+                    sandboxInstanceId,
+                  },
+                )}`,
+                { cause: error },
+              );
+            },
           );
+          const connectedMessage = await hmrMessagePump
+            .waitForTextMessage(WebSocketMessageTimeoutMs)
+            .catch(async (error: unknown) => {
+              throw new Error(
+                `Timed out waiting for Vite HMR connected message. HmrSocketState=${String(
+                  hmrSocket.readyState,
+                )} TunnelClose=${readTunnelCloseDescription()} ViteLog=${await readViteLog({
+                  fixture,
+                  authenticatedSession: session,
+                  sandboxInstanceId,
+                })}`,
+                { cause: error },
+              );
+            });
           const connectedPayload = HmrConnectedMessageSchema.parse(JSON.parse(connectedMessage));
           expect(connectedPayload.type).toBe("connected");
 
           const hmrMarker = `hmr-${randomUUID()}`;
           const updateMessagePromise = waitForHmrUpdateMessage({
-            socket: hmrSocket,
+            messagePump: hmrMessagePump,
             timeoutMs: WebSocketMessageTimeoutMs,
           });
           await expectSuccessfulSandboxCommand({
@@ -819,7 +952,33 @@ describe("system port access vite dev server", () => {
             ],
           });
 
-          const updateMessage = await updateMessagePromise;
+          const updateMessage = await updateMessagePromise.catch(async (error: unknown) => {
+            const updatedStylesheetResponse = await withTimeout({
+              operation: sendGatewayHttpRequest({
+                baseUrl: fixture.dataPlaneGatewayBaseUrl,
+                path: "/src/styles.css",
+                method: "GET",
+                headers: {
+                  cookie: sessionCookie,
+                  host: bootstrap.host,
+                },
+              }),
+              timeoutMs: ViteRequestTimeoutMs,
+              description: "Vite stylesheet request after HMR timeout",
+            });
+            throw new Error(
+              `Timed out waiting for Vite HMR update. UpdatedStylesheetStatus=${String(
+                updatedStylesheetResponse.status,
+              )} UpdatedStylesheetContainsMarker=${String(
+                updatedStylesheetResponse.body.includes(`--hmr-marker-${hmrMarker}`),
+              )} ViteLog=${await readViteLog({
+                fixture,
+                authenticatedSession: session,
+                sandboxInstanceId,
+              })}`,
+              { cause: error },
+            );
+          });
           expect(
             updateMessage.updates.some((update) => update.path.includes("/src/styles.css")),
           ).toBe(true);
@@ -846,6 +1005,7 @@ describe("system port access vite dev server", () => {
           });
           expect(updatedStylesheetResponse.status).toBe(200);
           expect(updatedStylesheetResponse.body).toContain(`--hmr-marker-${hmrMarker}`);
+          hmrMessagePump.close();
         } finally {
           await closeWebSocketIfOpen(hmrSocket);
         }

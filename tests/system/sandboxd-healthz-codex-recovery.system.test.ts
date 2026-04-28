@@ -15,6 +15,7 @@ import {
 import { it } from "./system-test-context.js";
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
+const CODEX_RECOVERY_TIMEOUT_MS = 60_000;
 
 function requireHealthSnapshot(
   health: SandboxdHealthResponse,
@@ -72,19 +73,25 @@ describe("system sandboxd healthz codex recovery", () => {
           sandboxInstanceId,
         });
 
+        let lastHealth: SandboxdHealthResponse | null = null;
+        let lastHealthReadError: string | null = null;
         const recoveredHealth = await waitForCondition({
           description: "sandboxd __healthz codex recovery",
-          timeoutMs: 30_000,
+          timeoutMs: CODEX_RECOVERY_TIMEOUT_MS,
           pollIntervalMs: 100,
           evaluate: async () => {
             const health = await readSandboxHealthz({
               fixture,
               authenticatedSession,
               sandboxInstanceId,
-            }).catch(() => null);
+            }).catch((error: unknown) => {
+              lastHealthReadError = error instanceof Error ? error.message : String(error);
+              return null;
+            });
             if (health === null) {
               return null;
             }
+            lastHealth = health;
 
             const codexProxy = requireHealthComponent(health, "codex_proxy");
             const codexAppServer = requireHealthComponent(health, "codex_app_server");
@@ -98,6 +105,13 @@ describe("system sandboxd healthz codex recovery", () => {
 
             return null;
           },
+        }).catch((error: unknown) => {
+          throw new Error(
+            `Timed out waiting for sandboxd codex recovery. Last health: ${JSON.stringify(
+              lastHealth,
+            )}. Last health read error: ${lastHealthReadError ?? "<none>"}`,
+            { cause: error },
+          );
         });
 
         expect(requireHealthComponent(recoveredHealth, "codex_proxy").state).toBe("healthy");

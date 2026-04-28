@@ -1,11 +1,23 @@
-import { systemSleeper } from "@mistle/time";
-import { CommandExitError, Sandbox, Template, type ConnectionOpts } from "e2b";
+import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
+import {
+  AuthenticationError,
+  BuildError,
+  CommandExitError,
+  InvalidArgumentError,
+  RateLimitError,
+  Sandbox,
+  SandboxNotFoundError,
+  Template,
+  TemplateError,
+  type ConnectionOpts,
+} from "e2b";
 
 import { withRequiredSandboxRuntimeEnv } from "../../runtime-env.js";
 import { SandboxInspectDispositions, SandboxInspectStates } from "../../types.js";
 import {
   E2BClientError,
   E2BClientErrorCodes,
+  type E2BClientOperation,
   E2BClientOperationIds,
   mapE2BClientError,
 } from "./client-errors.js";
@@ -44,6 +56,9 @@ const DaemonReadinessPollAttempts = 100;
 // E2B treats `timeoutMs: 0` as "disable request lifetime timeout".
 const E2BCommandTimeoutDisabledMs = 0;
 const E2BInitCommandTimeoutMs = 2 * 60 * 1000;
+const E2BCreateSandboxMinIntervalMs = 1_500;
+const E2BTransientRetryAttempts = 3;
+const E2BTransientRetryDelayMs = 1_000;
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -135,6 +150,78 @@ async function sleep(ms: number): Promise<void> {
   await systemSleeper.sleep(ms);
 }
 
+function isExplicitNonRetryableE2BError(error: unknown): boolean {
+  return (
+    error instanceof AuthenticationError ||
+    error instanceof BuildError ||
+    error instanceof CommandExitError ||
+    error instanceof E2BClientError ||
+    error instanceof InvalidArgumentError ||
+    error instanceof RateLimitError ||
+    error instanceof SandboxNotFoundError ||
+    error instanceof TemplateError
+  );
+}
+
+function isTransientE2BMessage(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes("fetch failed") ||
+    normalizedMessage.includes("econnreset") ||
+    normalizedMessage.includes("connection reset") ||
+    normalizedMessage.includes("deadline_exceeded") ||
+    normalizedMessage.includes("deadline exceeded") ||
+    normalizedMessage.includes("service unavailable") ||
+    normalizedMessage.includes("upstream request timeout")
+  );
+}
+
+export function isTransientE2BSourceError(error: unknown, remainingCauseDepth = 3): boolean {
+  if (isExplicitNonRetryableE2BError(error)) {
+    return false;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  if (isTransientE2BMessage(error.message)) {
+    return true;
+  }
+
+  if (remainingCauseDepth <= 0) {
+    return false;
+  }
+
+  return isTransientE2BSourceError(error.cause, remainingCauseDepth - 1);
+}
+
+export async function runE2BOperationWithTransientRetries<Result>(input: {
+  operation: E2BClientOperation;
+  run: () => Promise<Result>;
+  maxAttempts?: number;
+  retryDelayMs?: number;
+  sleeper?: Sleeper;
+}): Promise<Result> {
+  const maxAttempts = input.maxAttempts ?? E2BTransientRetryAttempts;
+  const retryDelayMs = input.retryDelayMs ?? E2BTransientRetryDelayMs;
+  const sleeper = input.sleeper ?? systemSleeper;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await input.run();
+    } catch (error) {
+      if (attempt >= maxAttempts || !isTransientE2BSourceError(error)) {
+        throw error;
+      }
+
+      await sleeper.sleep(retryDelayMs * attempt);
+    }
+  }
+
+  throw new Error("E2B transient retry loop exited without returning or throwing.");
+}
+
 function normalizeE2BInspectState(state: "running" | "paused"): E2BSandboxInspectResult["state"] {
   switch (state) {
     case "running":
@@ -157,15 +244,60 @@ function normalizeE2BInspectDisposition(
   }
 }
 
+export class E2BStartRateLimiter {
+  readonly #clock: Clock;
+  readonly #minIntervalMs: number;
+  readonly #sleeper: Sleeper;
+  #nextStartEpochMs: number;
+  #tail: Promise<void>;
+
+  constructor(input: { clock: Clock; minIntervalMs: number; sleeper: Sleeper }) {
+    if (input.minIntervalMs <= 0) {
+      throw new Error("E2B start rate limiter interval must be positive.");
+    }
+
+    this.#clock = input.clock;
+    this.#minIntervalMs = input.minIntervalMs;
+    this.#sleeper = input.sleeper;
+    this.#nextStartEpochMs = 0;
+    this.#tail = Promise.resolve();
+  }
+
+  async waitForTurn(): Promise<void> {
+    const previous = this.#tail.catch(() => undefined);
+    const current = previous.then(async () => {
+      const waitMs = Math.max(0, this.#nextStartEpochMs - this.#clock.nowMs());
+      if (waitMs > 0) {
+        await this.#sleeper.sleep(waitMs);
+      }
+
+      const startEpochMs = Math.max(this.#clock.nowMs(), this.#nextStartEpochMs);
+      this.#nextStartEpochMs = startEpochMs + this.#minIntervalMs;
+    });
+
+    this.#tail = current;
+    await current;
+  }
+}
+
+const defaultE2BStartRateLimiter = new E2BStartRateLimiter({
+  clock: systemClock,
+  minIntervalMs: E2BCreateSandboxMinIntervalMs,
+  sleeper: systemSleeper,
+});
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
+  readonly #startRateLimiter: E2BStartRateLimiter;
   readonly #templateRegistry: E2BTemplateRegistry;
 
   constructor(input: {
     config: ValidatedE2BSandboxConfig;
+    startRateLimiter?: E2BStartRateLimiter;
     templateRegistry?: E2BTemplateRegistry;
   }) {
     this.#connectionOptions = createE2BConnectionOptions(input.config);
+    this.#startRateLimiter = input.startRateLimiter ?? defaultE2BStartRateLimiter;
     this.#templateRegistry =
       input.templateRegistry ??
       new E2BApiTemplateRegistry(this.#connectionOptions, {
@@ -179,14 +311,20 @@ export class E2BApiClient implements E2BClient {
     const templateAlias = await this.#resolveStartTemplateRef(parsedRequest.imageRef);
 
     try {
-      const sandbox = await Sandbox.create(
-        templateAlias,
-        createE2BSandboxCreateOptions({
-          connectionOptions: this.#connectionOptions,
-          templateAlias,
-          envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
-        }),
-      );
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CREATE_SANDBOX,
+        run: async () => {
+          await this.#startRateLimiter.waitForTurn();
+          return Sandbox.create(
+            templateAlias,
+            createE2BSandboxCreateOptions({
+              connectionOptions: this.#connectionOptions,
+              templateAlias,
+              envs: withRequiredSandboxRuntimeEnv(parsedRequest.env),
+            }),
+          );
+        },
+      });
 
       return {
         sandboxId: sandbox.sandboxId,
@@ -200,7 +338,10 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BInspectSandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.getInfo(parsedRequest.sandboxId, this.#connectionOptions);
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.GET_SANDBOX_INFO,
+        run: async () => Sandbox.getInfo(parsedRequest.sandboxId, this.#connectionOptions),
+      });
 
       return {
         provider: "e2b",
@@ -221,10 +362,14 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BResumeSandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(
-        parsedRequest.sandboxId,
-        createE2BSandboxConnectOptions(this.#connectionOptions),
-      );
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () =>
+          Sandbox.connect(
+            parsedRequest.sandboxId,
+            createE2BSandboxConnectOptions(this.#connectionOptions),
+          ),
+      });
       return {
         sandboxId: sandbox.sandboxId,
       };
@@ -239,8 +384,14 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BCaptureSandboxSnapshotRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
-      const snapshot = await sandbox.createSnapshot();
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
+      const snapshot = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CREATE_SNAPSHOT,
+        run: async () => sandbox.createSnapshot(),
+      });
 
       return {
         snapshotId: snapshot.snapshotId,
@@ -254,8 +405,14 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BStopSandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
-      await sandbox.pause();
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
+      await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.PAUSE_SANDBOX,
+        run: async () => sandbox.pause(),
+      });
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.PAUSE_SANDBOX, error);
     }
@@ -265,8 +422,12 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BDestroySandboxRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
-      await sandbox.kill();
+      await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.KILL_SANDBOX,
+        run: async () => {
+          await Sandbox.kill(parsedRequest.sandboxId, this.#connectionOptions);
+        },
+      });
     } catch (error) {
       throw mapE2BClientError(E2BClientOperationIds.KILL_SANDBOX, error);
     }
@@ -276,7 +437,10 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BInitRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
       await this.#ensureDaemonReady(sandbox);
       await this.#runStartupCommand(sandbox, {
         command: InitCommand,
@@ -299,7 +463,10 @@ export class E2BApiClient implements E2BClient {
     const parsedRequest = E2BInitRequestSchema.parse(request);
 
     try {
-      const sandbox = await Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions);
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(parsedRequest.sandboxId, this.#connectionOptions),
+      });
       await this.#ensureDaemonReady(sandbox);
       await this.#runStartupCommand(sandbox, {
         command: ResumeCommand,
@@ -329,12 +496,19 @@ export class E2BApiClient implements E2BClient {
     timeoutMs?: number;
   }): Promise<{ stdout: string; stderr: string }> {
     try {
-      const sandbox = await Sandbox.connect(request.sandboxId, this.#connectionOptions);
-      const result = await sandbox.commands.run(request.command, {
-        user: request.user ?? "root",
-        ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
-        ...(request.env === undefined ? {} : { envs: request.env }),
-        ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+      const sandbox = await runE2BOperationWithTransientRetries({
+        operation: E2BClientOperationIds.CONNECT_SANDBOX,
+        run: async () => Sandbox.connect(request.sandboxId, this.#connectionOptions),
+      });
+      const result = await runE2BOperationWithTransientRetries({
+        operation: request.operation,
+        run: async () =>
+          sandbox.commands.run(request.command, {
+            user: request.user ?? "root",
+            ...(request.cwd === undefined ? {} : { cwd: request.cwd }),
+            ...(request.env === undefined ? {} : { envs: request.env }),
+            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+          }),
       });
 
       return {
@@ -451,12 +625,16 @@ export class E2BApiClient implements E2BClient {
   }
 
   async #checkDaemonReady(sandbox: Sandbox): Promise<boolean> {
-    const result = await sandbox.commands.run(
-      `if test -S '${DaemonSocketPath}'; then printf ready; else printf not-ready; fi`,
-      {
-        user: "root",
-      },
-    );
+    const result = await runE2BOperationWithTransientRetries({
+      operation: E2BClientOperationIds.ENSURE_DAEMON_READY,
+      run: async () =>
+        sandbox.commands.run(
+          `if test -S '${DaemonSocketPath}'; then printf ready; else printf not-ready; fi`,
+          {
+            user: "root",
+          },
+        ),
+    });
 
     return result.stdout.trim() === "ready";
   }

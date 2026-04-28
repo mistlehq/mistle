@@ -57,6 +57,13 @@ const StopSandboxInstanceAcceptedResponseSchema = z
   })
   .strict();
 
+class RetryableWaitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableWaitError";
+  }
+}
+
 const ResumeSandboxInstanceAcceptedResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -382,7 +389,7 @@ export async function waitForSandboxStatus(input: {
       );
       const bodyText = await response.text().catch(() => "");
       if (response.status !== 200) {
-        throw new Error(
+        throw new RetryableWaitError(
           `sandbox status lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
         );
       }
@@ -422,7 +429,7 @@ export async function waitForSandboxConnectable(input: {
       );
       const bodyText = await response.text().catch(() => "");
       if (response.status !== 200) {
-        throw new Error(
+        throw new RetryableWaitError(
           `sandbox connectable lookup failed with status ${String(response.status)}. Response body: ${bodyText}`,
         );
       }
@@ -508,16 +515,28 @@ export async function waitForCondition<T>(input: {
 }): Promise<T> {
   const deadlineEpochMs = Date.now() + input.timeoutMs;
   const pollIntervalMs = input.pollIntervalMs ?? POLL_INTERVAL_MS;
+  let lastRetryableError: RetryableWaitError | undefined;
 
   while (true) {
-    const result = await input.evaluate();
-    if (result !== null) {
-      return result;
+    try {
+      const result = await input.evaluate();
+      if (result !== null) {
+        return result;
+      }
+    } catch (error) {
+      if (!(error instanceof RetryableWaitError)) {
+        throw error;
+      }
+      lastRetryableError = error;
     }
 
     const remainingMs = deadlineEpochMs - Date.now();
     if (remainingMs <= 0) {
-      throw new Error(`Timed out waiting for ${input.description}.`);
+      const suffix =
+        lastRetryableError === undefined
+          ? ""
+          : ` Last retryable error: ${lastRetryableError.message}`;
+      throw new Error(`Timed out waiting for ${input.description}.${suffix}`);
     }
 
     await systemSleeper.sleep(Math.min(pollIntervalMs, remainingMs));
@@ -731,7 +750,7 @@ async function runSandboxExecCommand(input: {
   }
 }
 
-async function runSandboxPtyCommand(input: {
+export async function runSandboxPtyCommand(input: {
   fixture: SystemTestFixture;
   authenticatedSession: AuthenticatedSession;
   sandboxInstanceId: string;
@@ -765,43 +784,42 @@ async function runSandboxPtyCommand(input: {
     });
 
     await ptyClient.connect();
-    let cleanupPtyListeners = (): void => {};
-    const waitForExit = new Promise<{ exitCode: number }>((resolve, reject) => {
-      const timeoutSignal = AbortSignal.timeout(input.timeoutMs ?? 30_000);
-      const removeExitListener = ptyClient.onExit((exitInfo) => {
-        cleanup();
-        resolve({
-          exitCode: exitInfo.exitCode,
+    const waitForExit = (): Promise<{ exitCode: number }> =>
+      new Promise<{ exitCode: number }>((resolve, reject) => {
+        const timeoutSignal = AbortSignal.timeout(input.timeoutMs ?? 30_000);
+        const removeExitListener = ptyClient.onExit((exitInfo) => {
+          cleanup();
+          resolve({
+            exitCode: exitInfo.exitCode,
+          });
         });
-      });
-      const removeErrorListener = ptyClient.onError((error) => {
-        cleanup();
-        reject(error);
-      });
-      const removeResetListener = ptyClient.onReset((resetInfo) => {
-        cleanup();
-        reject(new Error(`Sandbox PTY reset (${resetInfo.code}): ${resetInfo.message}`));
-      });
+        const removeErrorListener = ptyClient.onError((error) => {
+          cleanup();
+          reject(error);
+        });
+        const removeResetListener = ptyClient.onReset((resetInfo) => {
+          cleanup();
+          reject(new Error(`Sandbox PTY reset (${resetInfo.code}): ${resetInfo.message}`));
+        });
 
-      const onTimeout = (): void => {
-        cleanup();
-        reject(
-          new Error(
-            `Timed out after ${String(input.timeoutMs ?? 30_000)}ms waiting for PTY command exit.`,
-          ),
-        );
-      };
+        const onTimeout = (): void => {
+          cleanup();
+          reject(
+            new Error(
+              `Timed out after ${String(input.timeoutMs ?? 30_000)}ms waiting for PTY command exit.`,
+            ),
+          );
+        };
 
-      const cleanup = (): void => {
-        removeExitListener();
-        removeErrorListener();
-        removeResetListener();
-        timeoutSignal.removeEventListener("abort", onTimeout);
-      };
-      cleanupPtyListeners = cleanup;
+        const cleanup = (): void => {
+          removeExitListener();
+          removeErrorListener();
+          removeResetListener();
+          timeoutSignal.removeEventListener("abort", onTimeout);
+        };
 
-      timeoutSignal.addEventListener("abort", onTimeout, { once: true });
-    });
+        timeoutSignal.addEventListener("abort", onTimeout, { once: true });
+      });
     let exit;
 
     try {
@@ -814,10 +832,13 @@ async function runSandboxPtyCommand(input: {
         ...(input.args === undefined ? {} : { args: input.args }),
       });
 
-      exit = await waitForExit;
+      exit = await waitForExit();
     } catch (error) {
-      cleanupPtyListeners();
-      throw error;
+      throw new Error(
+        `Sandbox PTY command failed before exit. Partial output: ${output}. Cause: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
     }
 
     return {

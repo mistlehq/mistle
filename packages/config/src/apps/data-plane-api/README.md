@@ -13,6 +13,7 @@ Selected service config:
 | `database.url`                | `string`              | Runtime Postgres connection URL for data-plane API data.                | None      | `MISTLE_APPS_DATA_PLANE_API_DATABASE_URL`                   |
 | `database.migrationUrl`       | `string`              | Direct Postgres connection URL used by data-plane API migration jobs.   | None      | `MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL`         |
 | `workflow.databaseUrl`        | `string`              | Postgres URL used by OpenWorkflow producer in data-plane.               | None      | `MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL`          |
+| `workflow.migrationUrl`       | `string`              | Direct Postgres connection URL used by data-plane workflow migrations.  | None      | `MISTLE_APPS_DATA_PLANE_API_WORKFLOW_MIGRATION_URL`         |
 | `workflow.namespaceId`        | `string`              | OpenWorkflow namespace id used when enqueueing runs.                    | None      | `MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID`          |
 | `runtimeState.gatewayBaseUrl` | `string`              | Internal gateway base URL used for runtime-state reads.                 | None      | `MISTLE_APPS_DATA_PLANE_API_RUNTIME_STATE_GATEWAY_BASE_URL` |
 | `controlPlaneApi.baseUrl`     | `string`              | Required internal control-plane API base URL used by data-plane API.    | None      | `MISTLE_APPS_DATA_PLANE_API_CONTROL_PLANE_API_BASE_URL`     |

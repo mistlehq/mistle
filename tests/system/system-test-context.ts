@@ -985,14 +985,11 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
       const controlPlaneApiBaseUrl = systemTestContext.controlPlaneApiBaseUrl;
       const controlPlaneApiClient = createControlPlaneApiClient(controlPlaneApiBaseUrl);
       const request = createRequestFn(controlPlaneApiBaseUrl);
-      let currentDataPlaneGatewayBaseUrl = systemTestContext.dataPlaneGatewayBaseUrl;
-      if (systemTestContext.sandboxProvider === "docker") {
-        currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
-          containerId: systemTestContext.dataPlaneGatewayContainerId,
-          containerPort: 5202,
-          currentBaseUrl: currentDataPlaneGatewayBaseUrl,
-        });
-      }
+      let currentDataPlaneGatewayBaseUrl = await resolveContainerHostBaseUrl({
+        containerId: systemTestContext.dataPlaneGatewayContainerId,
+        containerPort: 5202,
+        currentBaseUrl: systemTestContext.dataPlaneGatewayBaseUrl,
+      });
       const databasePool = new Pool({
         connectionString: systemTestContext.controlPlaneDatabaseUrl,
       });
@@ -1280,14 +1277,23 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           description: `sandbox '${sandboxInstanceId}' to reach status '${status}'`,
           timeoutMs: options?.timeoutMs ?? SandboxReadyTimeoutMs,
           evaluate: async () => {
-            const response = await request(
-              `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}`,
-              {
-                headers: {
-                  cookie: sandboxContext.session.cookie,
+            let response: Response;
+            try {
+              response = await request(
+                `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}`,
+                {
+                  headers: {
+                    cookie: sandboxContext.session.cookie,
+                  },
                 },
-              },
-            );
+              );
+            } catch (error) {
+              throw new RetryableWaitError(
+                `sandbox status lookup request failed: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
             const bodyText = await response.text().catch(() => "");
             if (response.status !== 200) {
               throw new RetryableWaitError(
@@ -1325,14 +1331,23 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           description: `sandbox '${sandboxInstanceId}' connectable=${String(connectable)}`,
           timeoutMs: SandboxReadyTimeoutMs,
           evaluate: async () => {
-            const response = await request(
-              `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}`,
-              {
-                headers: {
-                  cookie: sandboxContext.session.cookie,
+            let response: Response;
+            try {
+              response = await request(
+                `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}`,
+                {
+                  headers: {
+                    cookie: sandboxContext.session.cookie,
+                  },
                 },
-              },
-            );
+              );
+            } catch (error) {
+              throw new RetryableWaitError(
+                `sandbox connectable lookup request failed: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              );
+            }
             const bodyText = await response.text().catch(() => "");
             if (response.status !== 200) {
               throw new RetryableWaitError(
@@ -1644,8 +1659,12 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
             containerId: systemTestContext.dataPlaneGatewayContainerId,
             tail: 160,
           });
+          const controlPlaneApiLogs = await readContainerLogsTail({
+            containerId: systemTestContext.controlPlaneApiContainerId,
+            tail: 160,
+          });
           throw new Error(
-            `PTY command failed for sandbox '${input.sandboxInstanceId}'. Runtime state: ${typeof runtimeState === "string" ? runtimeState : JSON.stringify(runtimeState)}. Sandbox diagnostics: ${sandboxDiagnostics}. Gateway logs: ${gatewayLogs}. Cause: ${
+            `PTY command failed for sandbox '${input.sandboxInstanceId}'. Runtime state: ${typeof runtimeState === "string" ? runtimeState : JSON.stringify(runtimeState)}. Sandbox diagnostics: ${sandboxDiagnostics}. Gateway logs: ${gatewayLogs}. Control-plane API logs: ${controlPlaneApiLogs}. Cause: ${
               error instanceof Error ? error.message : String(error)
             }`,
           );

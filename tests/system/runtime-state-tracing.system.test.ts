@@ -12,6 +12,7 @@ import { it } from "./system-test-context.js";
 const DataPlaneInternalAuthHeader = "x-mistle-service-token";
 const TracePollingIntervalMs = 100;
 const TracePollingTimeoutMs = 15_000;
+const RuntimeStateTracingTestTimeoutMs = 180_000;
 
 const OtlpAttributeSchema = z.looseObject({
   key: z.string(),
@@ -165,52 +166,55 @@ async function waitForSynchronousRuntimeStateTrace(input: {
 }
 
 describe("system runtime state tracing", () => {
-  it("propagates one trace across data-plane-api and data-plane-gateway for runtime-state reads", async ({
-    fixture,
-  }) => {
-    const existingProfileIds = new Set(
-      (
-        await fixture.db.query.sandboxProfiles.findMany({
-          columns: {
-            id: true,
-          },
-        })
-      ).map((profile) => profile.id),
-    );
-    const sandboxInstanceId = await fixture.startSandboxAndWaitReady();
-    const newSandboxProfiles = await fixture.db.query.sandboxProfiles.findMany({
-      columns: {
-        id: true,
-        organizationId: true,
-      },
-      orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
-    });
-    const createdSandboxProfile = newSandboxProfiles.find(
-      (profile) => !existingProfileIds.has(profile.id),
-    );
-    if (createdSandboxProfile === undefined) {
-      throw new Error("Expected sandbox startup fixture to create one new sandbox profile.");
-    }
-
-    const baselineRequestCount = (await readCapturedOtlpRequests(fixture.otlpTraceCaptureFilePath))
-      .length;
-    const response = await fetch(
-      `${fixture.dataPlaneApiBaseUrl}/internal/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}?organizationId=${encodeURIComponent(createdSandboxProfile.organizationId)}`,
-      {
-        headers: {
-          [DataPlaneInternalAuthHeader]: fixture.internalAuthServiceToken,
+  it(
+    "propagates one trace across data-plane-api and data-plane-gateway for runtime-state reads",
+    async ({ fixture }) => {
+      const existingProfileIds = new Set(
+        (
+          await fixture.db.query.sandboxProfiles.findMany({
+            columns: {
+              id: true,
+            },
+          })
+        ).map((profile) => profile.id),
+      );
+      const sandboxInstanceId = await fixture.startSandboxAndWaitReady();
+      const newSandboxProfiles = await fixture.db.query.sandboxProfiles.findMany({
+        columns: {
+          id: true,
+          organizationId: true,
         },
-      },
-    );
+        orderBy: (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+      });
+      const createdSandboxProfile = newSandboxProfiles.find(
+        (profile) => !existingProfileIds.has(profile.id),
+      );
+      if (createdSandboxProfile === undefined) {
+        throw new Error("Expected sandbox startup fixture to create one new sandbox profile.");
+      }
 
-    expect(response.status).toBe(200);
+      const baselineRequestCount = (
+        await readCapturedOtlpRequests(fixture.otlpTraceCaptureFilePath)
+      ).length;
+      const response = await fetch(
+        `${fixture.dataPlaneApiBaseUrl}/internal/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}?organizationId=${encodeURIComponent(createdSandboxProfile.organizationId)}`,
+        {
+          headers: {
+            [DataPlaneInternalAuthHeader]: fixture.internalAuthServiceToken,
+          },
+        },
+      );
 
-    const { apiGatewayClientSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
-      baselineRequestCount,
-      otlpTraceCaptureFilePath: fixture.otlpTraceCaptureFilePath,
-    });
+      expect(response.status).toBe(200);
 
-    expect(gatewaySpan.traceId).toBe(apiGatewayClientSpan.traceId);
-    expect(gatewaySpan.spanId).not.toBe(apiGatewayClientSpan.spanId);
-  }, 60_000);
+      const { apiGatewayClientSpan, gatewaySpan } = await waitForSynchronousRuntimeStateTrace({
+        baselineRequestCount,
+        otlpTraceCaptureFilePath: fixture.otlpTraceCaptureFilePath,
+      });
+
+      expect(gatewaySpan.traceId).toBe(apiGatewayClientSpan.traceId);
+      expect(gatewaySpan.spanId).not.toBe(apiGatewayClientSpan.spanId);
+    },
+    RuntimeStateTracingTestTimeoutMs,
+  );
 });

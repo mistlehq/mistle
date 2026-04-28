@@ -125,6 +125,10 @@ export const ControlPlaneApiWorkflowEnvDescriptors = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",
   },
   {
+    key: "migrationUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_MIGRATION_URL",
+  },
+  {
     key: "namespaceId",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },

@@ -483,28 +483,6 @@ async function writeDurableState(input: {
   sandboxInstanceId: string;
   marker: string;
 }): Promise<void> {
-  if (input.fixture.sandboxProvider === SystemSandboxProvider.E2B) {
-    const sandboxInstanceState = await readSandboxInstanceState({
-      fixture: input.fixture,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (sandboxInstanceState.providerSandboxId === null) {
-      throw new Error(
-        `Expected sandbox '${input.sandboxInstanceId}' to have a provider sandbox id before E2B file writes.`,
-      );
-    }
-
-    const e2bEnvironment = readE2BEnvironment();
-    const sandbox = await Sandbox.connect(sandboxInstanceState.providerSandboxId, {
-      apiKey: e2bEnvironment.apiKey,
-      ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
-    });
-    await sandbox.files.makeDir("/etc/codex");
-    await sandbox.files.write("/root/persistent-marker.txt", input.marker);
-    await sandbox.files.write("/etc/codex/persistent-marker.txt", input.marker);
-    return;
-  }
-
   const command = [
     "mkdir -p /etc/codex",
     `printf '%s' '${input.marker}' > /root/persistent-marker.txt`,
@@ -526,30 +504,6 @@ async function readDurableState(input: {
   authenticatedSession: AuthenticatedSession;
   sandboxInstanceId: string;
 }): Promise<string> {
-  if (input.fixture.sandboxProvider === SystemSandboxProvider.E2B) {
-    const sandboxInstanceState = await readSandboxInstanceState({
-      fixture: input.fixture,
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-    if (sandboxInstanceState.providerSandboxId === null) {
-      throw new Error(
-        `Expected sandbox '${input.sandboxInstanceId}' to have a provider sandbox id before E2B file reads.`,
-      );
-    }
-
-    const e2bEnvironment = readE2BEnvironment();
-    const sandbox = await Sandbox.connect(sandboxInstanceState.providerSandboxId, {
-      apiKey: e2bEnvironment.apiKey,
-      ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
-    });
-    const [rootMarker, codexMarker] = await Promise.all([
-      sandbox.files.read("/root/persistent-marker.txt"),
-      sandbox.files.read("/etc/codex/persistent-marker.txt"),
-    ]);
-
-    return [rootMarker, codexMarker].join("\n");
-  }
-
   const result = await runSandboxShellCommand({
     fixture: input.fixture,
     authenticatedSession: input.authenticatedSession,
@@ -596,11 +550,10 @@ async function deleteProviderCompute(input: {
   }
 
   const e2bEnvironment = readE2BEnvironment();
-  const sandbox = await Sandbox.connect(input.providerSandboxId, {
+  await Sandbox.kill(input.providerSandboxId, {
     apiKey: e2bEnvironment.apiKey,
     ...(e2bEnvironment.domain === undefined ? {} : { domain: e2bEnvironment.domain }),
   });
-  await sandbox.kill();
 }
 
 async function tryDeleteProviderCompute(input: {
@@ -1391,7 +1344,7 @@ describe("persistent sandbox storage", () => {
           authenticatedSession,
           sandboxInstanceId,
         });
-        expect(contents).toBe([marker, marker, marker].join("\n"));
+        expect(contents).toBe([marker, marker].join("\n"));
       } catch (error) {
         testError = error;
       } finally {

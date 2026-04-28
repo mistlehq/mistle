@@ -20,6 +20,7 @@ import {
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
+import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -30,7 +31,7 @@ import {
   waitForSandboxConnectable,
   waitForSandboxStatus,
 } from "./helpers/codex-sandbox.js";
-import { it, type SystemTestFixture } from "./system-test-context.js";
+import { it, type AuthenticatedSession, type SystemTestFixture } from "./system-test-context.js";
 
 const execFileAsync = promisify(execFile);
 const InternalAuthServiceTokenHeader = "x-mistle-service-token";
@@ -43,6 +44,8 @@ const requestedSystemSandboxProvider =
 const itForE2B = requestedSystemSandboxProvider === SystemSandboxProvider.E2B ? it : it.skip;
 const TestTimeoutMs = 10 * 60_000;
 const GitHubAppInstallationConnectionMethodId = "github-app-installation";
+const GitSigningCommandAttempts = 4;
+const GitSigningCommandRetryDelayMs = 2_000;
 
 const InternalMintConnectionTokenResponseSchema = z
   .object({
@@ -126,30 +129,13 @@ describe("system internal mint connection token restores git signing", () => {
           sandboxInstanceId,
           expectedConnectable: true,
         });
+        await fixture.waitForSandboxRuntimeAttachment(sandboxInstanceId, true);
+        await fixture.waitForSandboxRuntimeReady(sandboxInstanceId, true);
 
-        const commandResult = await runSandboxExecCommandInSandbox({
+        const commandResult = await runGitSigningAssertionCommand({
           fixture,
           authenticatedSession,
           sandboxInstanceId,
-          command: "sh",
-          args: [
-            "-lc",
-            [
-              "set -e",
-              'printf "program=%s\\n" "$(git config --global --get gpg.ssh.program)"',
-              'printf "signingkey=%s\\n" "$(git config --global --get user.signingkey)"',
-              'workdir="$(mktemp -d)"',
-              'cd "$workdir"',
-              "git init -q",
-              'printf "hello\\n" > README.md',
-              "git add README.md",
-              'git commit -q -S -m "signed commit after internal resume"',
-              'commit_sha="$(git rev-parse HEAD)"',
-              'printf "commit=%s\\n" "$commit_sha"',
-              'git cat-file commit "$commit_sha"',
-            ].join("; "),
-          ],
-          timeoutMs: 120_000,
         });
 
         expect(commandResult.exitCode).toBe(0);
@@ -163,6 +149,59 @@ describe("system internal mint connection token restores git signing", () => {
     TestTimeoutMs,
   );
 });
+
+async function runGitSigningAssertionCommand(input: {
+  fixture: SystemTestFixture;
+  authenticatedSession: AuthenticatedSession;
+  sandboxInstanceId: string;
+}): Promise<{ exitCode: number; stdout: string; stderr: string; truncated: boolean }> {
+  let lastOpenError: Error | undefined;
+
+  for (let attempt = 1; attempt <= GitSigningCommandAttempts; attempt += 1) {
+    try {
+      return await runSandboxExecCommandInSandbox({
+        fixture: input.fixture,
+        authenticatedSession: input.authenticatedSession,
+        sandboxInstanceId: input.sandboxInstanceId,
+        command: "sh",
+        args: [
+          "-lc",
+          [
+            "set -e",
+            'printf "program=%s\\n" "$(git config --global --get gpg.ssh.program)"',
+            'printf "signingkey=%s\\n" "$(git config --global --get user.signingkey)"',
+            'workdir="$(mktemp -d)"',
+            'cd "$workdir"',
+            "git init -q",
+            'printf "hello\\n" > README.md',
+            "git add README.md",
+            'git commit -q -S -m "signed commit after internal resume"',
+            'commit_sha="$(git rev-parse HEAD)"',
+            'printf "commit=%s\\n" "$commit_sha"',
+            'git cat-file commit "$commit_sha"',
+          ].join("; "),
+        ],
+        timeoutMs: 120_000,
+      });
+    } catch (error) {
+      if (!isStreamOpenAcknowledgementError(error) || attempt === GitSigningCommandAttempts) {
+        throw error;
+      }
+
+      lastOpenError = error;
+      await systemSleeper.sleep(GitSigningCommandRetryDelayMs);
+    }
+  }
+
+  throw lastOpenError ?? new Error("Git signing assertion command did not run.");
+}
+
+function isStreamOpenAcknowledgementError(error: unknown): error is Error {
+  return (
+    error instanceof Error &&
+    error.message.includes("Timed out waiting for stream.open acknowledgement")
+  );
+}
 
 async function generateGitSshPrivateKey(input: { email: string }): Promise<{
   directory: string;

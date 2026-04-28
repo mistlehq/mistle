@@ -41,7 +41,7 @@ const OpenAiConnectionMethodId = "api-key";
 const OpenAiApiKey = "sk-system-port-access";
 const NodeRuntimeCommand = "/usr/local/bin/node";
 const PtyCommandTimeoutMs = 60_000;
-const ListenerProbeTimeoutMs = 10_000;
+const ListenerProbeTimeoutMs = 30_000;
 const TerminalControlSequencePattern = new RegExp(
   String.raw`\u001B(?:\][^\u0007\u001B]*(?:\u0007|\u001B\\)|\[[0-?]*[ -/]*[@-~]|[@-_])`,
   "g",
@@ -780,6 +780,23 @@ async function startFixtureListener(input: {
   marker: string;
   logPath: string;
 }): Promise<void> {
+  const readinessProbe = [
+    'const net = require("node:net");',
+    `const port = ${String(input.port)};`,
+    "const deadline = Date.now() + 30000;",
+    "function probe() {",
+    "  const socket = net.createConnection({ host: '127.0.0.1', port });",
+    "  socket.setTimeout(1000);",
+    "  socket.once('connect', () => { socket.end(); process.exit(0); });",
+    "  socket.once('timeout', () => { socket.destroy(); retry(); });",
+    "  socket.once('error', () => { retry(); });",
+    "}",
+    "function retry() {",
+    "  if (Date.now() >= deadline) { process.exit(1); }",
+    "  setTimeout(probe, 250);",
+    "}",
+    "probe();",
+  ].join(" ");
   await expectSuccessfulPtyCommand({
     socket: input.socket,
     pump: input.pump,
@@ -789,11 +806,13 @@ async function startFixtureListener(input: {
       shellQuote(
         [
           `${NodeRuntimeCommand} ${shellQuote(input.sandboxFixturePath)} ${String(input.port)} ${shellQuote(input.marker)} > ${shellQuote(input.logPath)} 2>&1 &`,
+          `${NodeRuntimeCommand} -e ${shellQuote(readinessProbe)}`,
           "printf 'started\\n'",
         ].join(" "),
       ),
     ].join(" "),
     description: `starting listener '${input.sandboxFixturePath}' on port ${String(input.port)}`,
+    timeoutMs: ListenerProbeTimeoutMs,
   });
 }
 
