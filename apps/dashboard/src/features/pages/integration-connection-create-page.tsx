@@ -1,19 +1,16 @@
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { Button, Notice } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
-import {
-  IntegrationConnectionEditorPage,
-  IntegrationConnectionMethodIds,
-} from "../integrations/integration-connection-editor.js";
+import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
+import { resolveDraftThenSetupConnectionPath } from "./integration-connection-post-create-navigation.js";
 import {
   appendIntegrationConnectionReturnParams,
   resolveIntegrationConnectionReturnPath,
@@ -119,25 +116,13 @@ function LoadedIntegrationConnectionCreatePage(input: {
     initialEditorInput: input.initialEditorInput,
     onClose: () => navigate(input.returnPath ?? "/integrations"),
     onSubmitSuccess: async ({ connectionId, editor, managedWebhookSetup, methodId }) => {
-      if (
-        connectionId !== null &&
-        editor.targetFamilyId === "github" &&
-        methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-      ) {
-        await navigate(
-          `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/github-app/setup`,
-        );
-        return;
-      }
-
-      if (
-        connectionId !== null &&
-        editor.targetFamilyId === "slack" &&
-        methodId === SlackConnectionMethodId
-      ) {
-        await navigate(
-          `/integrations/${editor.targetKey}/${encodeURIComponent(connectionId)}/slack-app/setup`,
-        );
+      const draftSetupPath = resolveDraftThenSetupConnectionPath({
+        connectionId,
+        editor,
+        methodId,
+      });
+      if (draftSetupPath !== null) {
+        await navigate(draftSetupPath);
         return;
       }
 

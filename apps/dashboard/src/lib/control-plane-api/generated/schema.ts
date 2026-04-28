@@ -3827,6 +3827,9 @@ export interface paths {
                         placeholder?: string;
                         slotKey: string;
                       }[];
+                      setupFlow?: {
+                        routeSegment: string;
+                      };
                     }
                   | {
                       id: string;

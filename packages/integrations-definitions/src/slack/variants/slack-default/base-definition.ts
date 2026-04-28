@@ -46,6 +46,9 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
       label: "Slack app",
       kind: "form",
       createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
+      setupFlow: {
+        routeSegment: "slack-app",
+      },
       secretFields: [
         {
           name: "botToken",
