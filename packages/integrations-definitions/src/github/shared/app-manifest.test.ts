@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildGitHubAppManifest, buildGitHubAppManifestSubmissionUrl } from "./manifest-builder.js";
+import { buildGitHubAppManifest, buildGitHubAppManifestSubmissionUrl } from "./app-manifest.js";
 
 describe("buildGitHubAppManifest", () => {
   it("injects Mistle GitHub manifest callback URLs and webhook settings", () => {
