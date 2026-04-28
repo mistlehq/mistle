@@ -1630,16 +1630,19 @@ export type IntegrationWebhookEventParameterDefinition =
       placeholder?: string | undefined;
     };
 
-export type IntegrationWebhookTriggerRequirement =
-  | {
-      kind: "provider-event";
-      eventType: string;
-    }
-  | {
-      kind: "provider-permission";
-      permission: string;
-      access?: string | undefined;
-    };
+export type IntegrationWebhookTriggerProviderPermissionRequirement = {
+  permission: string;
+  access?: string | undefined;
+};
+
+export type IntegrationWebhookTriggerRequirementSet = {
+  event?: string | undefined;
+  permissions?: ReadonlyArray<IntegrationWebhookTriggerProviderPermissionRequirement> | undefined;
+};
+
+export type IntegrationWebhookTriggerRequirements = {
+  anyOf: ReadonlyArray<IntegrationWebhookTriggerRequirementSet>;
+};
 
 /**
  * A normalized webhook event that an integration exposes to the rest of
@@ -1671,7 +1674,7 @@ export type IntegrationWebhookEventDefinition = {
       }>
     | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
-  requirements?: ReadonlyArray<IntegrationWebhookTriggerRequirement> | undefined;
+  requirements?: IntegrationWebhookTriggerRequirements | undefined;
 };
 
 /**

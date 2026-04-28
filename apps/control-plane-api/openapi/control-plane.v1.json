@@ -6808,45 +6808,43 @@
                                   "minLength": 1
                                 },
                                 "requirements": {
-                                  "type": "array",
-                                  "items": {
-                                    "oneOf": [
-                                      {
+                                  "type": "object",
+                                  "properties": {
+                                    "anyOf": {
+                                      "type": "array",
+                                      "items": {
                                         "type": "object",
                                         "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["provider-event"]
-                                          },
-                                          "eventType": {
+                                          "event": {
                                             "type": "string",
                                             "minLength": 1
+                                          },
+                                          "permissions": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "permission": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "access": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["permission"],
+                                              "additionalProperties": false
+                                            }
                                           }
                                         },
-                                        "required": ["kind", "eventType"],
                                         "additionalProperties": false
                                       },
-                                      {
-                                        "type": "object",
-                                        "properties": {
-                                          "kind": {
-                                            "type": "string",
-                                            "enum": ["provider-permission"]
-                                          },
-                                          "permission": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          },
-                                          "access": {
-                                            "type": "string",
-                                            "minLength": 1
-                                          }
-                                        },
-                                        "required": ["kind", "permission"],
-                                        "additionalProperties": false
-                                      }
-                                    ]
-                                  }
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "required": ["anyOf"],
+                                  "additionalProperties": false
                                 },
                                 "payloadReferences": {
                                   "type": "array",

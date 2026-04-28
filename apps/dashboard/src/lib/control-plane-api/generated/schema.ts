@@ -3779,19 +3779,15 @@ export interface paths {
                     path: string[];
                   }[];
                   providerEventType: string;
-                  requirements?: (
-                    | {
-                        eventType: string;
-                        /** @enum {string} */
-                        kind: "provider-event";
-                      }
-                    | {
+                  requirements?: {
+                    anyOf: {
+                      event?: string;
+                      permissions?: {
                         access?: string;
-                        /** @enum {string} */
-                        kind: "provider-permission";
                         permission: string;
-                      }
-                  )[];
+                      }[];
+                    }[];
+                  };
                 }[];
                 targetHealth: {
                   /** @enum {string} */

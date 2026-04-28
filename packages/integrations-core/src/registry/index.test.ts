@@ -495,13 +495,18 @@ describe("integration registry", () => {
             eventType: "github.issue_comment.created",
             providerEventType: "issue_comment",
             displayName: "Issue comment created",
-            requirements: [
-              {
-                kind: "provider-permission",
-                permission: "",
-                access: "read",
-              },
-            ],
+            requirements: {
+              anyOf: [
+                {
+                  permissions: [
+                    {
+                      permission: "",
+                      access: "read",
+                    },
+                  ],
+                },
+              ],
+            },
           },
         ],
         compileBinding: () => ({

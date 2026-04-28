@@ -101,33 +101,45 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       );
     }
 
-    for (const requirement of supportedWebhookEvent.requirements ?? []) {
-      if (requirement.kind === "provider-event" && requirement.eventType.trim().length === 0) {
+    if (
+      supportedWebhookEvent.requirements !== undefined &&
+      supportedWebhookEvent.requirements.anyOf.length === 0
+    ) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].requirements.anyOf must contain at least one requirement set.",
+      );
+    }
+
+    for (const requirementSet of supportedWebhookEvent.requirements?.anyOf ?? []) {
+      if (requirementSet.event === undefined && (requirementSet.permissions?.length ?? 0) === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requirements[*].eventType must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements.anyOf[*] must contain an event or permission.",
         );
       }
 
-      if (
-        requirement.kind === "provider-permission" &&
-        requirement.permission.trim().length === 0
-      ) {
+      if (requirementSet.event !== undefined && requirementSet.event.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requirements[*].permission must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements.anyOf[*].event must be non-empty.",
         );
       }
 
-      if (
-        requirement.kind === "provider-permission" &&
-        requirement.access !== undefined &&
-        requirement.access.trim().length === 0
-      ) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requirements[*].access must be non-empty.",
-        );
+      for (const permission of requirementSet.permissions ?? []) {
+        if (permission.permission.trim().length === 0) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].requirements.anyOf[*].permissions[*].permission must be non-empty.",
+          );
+        }
+
+        if (permission.access !== undefined && permission.access.trim().length === 0) {
+          throw new IntegrationDefinitionRegistryError(
+            DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+            "Integration definition supportedWebhookEvents[*].requirements.anyOf[*].permissions[*].access must be non-empty.",
+          );
+        }
       }
     }
 

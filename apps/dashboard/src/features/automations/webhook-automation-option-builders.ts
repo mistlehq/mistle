@@ -121,9 +121,19 @@ export function createWebhookAutomationEventOption(input: {
     ...(input.eventDefinition.requirements === undefined
       ? {}
       : {
-          requirements: input.eventDefinition.requirements.map((requirement) => ({
-            ...requirement,
-          })),
+          requirements: {
+            anyOf: input.eventDefinition.requirements.anyOf.map((requirementSet) => ({
+              ...(requirementSet.event === undefined ? {} : { event: requirementSet.event }),
+              ...(requirementSet.permissions === undefined
+                ? {}
+                : {
+                    permissions: requirementSet.permissions.map((permission) => ({
+                      permission: permission.permission,
+                      ...(permission.access === undefined ? {} : { access: permission.access }),
+                    })),
+                  }),
+            })),
+          },
         }),
     ...(category === undefined ? {} : { category }),
     ...(input.eventDefinition.parameters === undefined
