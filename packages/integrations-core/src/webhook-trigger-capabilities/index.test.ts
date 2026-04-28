@@ -71,6 +71,25 @@ describe("webhook trigger capabilities", () => {
     ).toBe(false);
   });
 
+  it("allows any permission access when access is not required", () => {
+    expect(
+      isWebhookTriggerSupportedByCapabilities({
+        capabilities: {
+          events: ["issues"],
+          permissions: [{ permission: "issues", access: "read" }],
+        },
+        requirements: {
+          anyOf: [
+            {
+              event: "issues",
+              permissions: [{ permission: "issues" }],
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
   it("parses capability provider metadata", () => {
     expect(
       parseWebhookTriggerCapabilitiesProviderMetadata({

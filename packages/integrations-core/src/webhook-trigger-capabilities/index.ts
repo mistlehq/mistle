@@ -108,7 +108,7 @@ function hasPermissionCapability(input: {
     input.capabilities.permissions?.some(
       (candidate) =>
         candidate.permission === input.permission.permission &&
-        candidate.access === input.permission.access,
+        (input.permission.access === undefined || candidate.access === input.permission.access),
     ) ?? false
   );
 }
