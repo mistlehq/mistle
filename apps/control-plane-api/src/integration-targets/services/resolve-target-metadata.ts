@@ -3,7 +3,6 @@ import type {
   IntegrationConnectionMethodDefinition,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
-  IntegrationWebhookTriggerRequirement,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -64,7 +63,15 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
-  requirements?: IntegrationWebhookTriggerRequirement[];
+  requirements?: {
+    anyOf: {
+      event?: string;
+      permissions?: {
+        permission: string;
+        access?: string;
+      }[];
+    }[];
+  };
   payloadReferences?: {
     path: string[];
     description: string;
@@ -289,9 +296,19 @@ function cloneWebhookEvents(
     ...(eventDefinition.requirements === undefined
       ? {}
       : {
-          requirements: eventDefinition.requirements.map((requirement) => ({
-            ...requirement,
-          })),
+          requirements: {
+            anyOf: eventDefinition.requirements.anyOf.map((requirementSet) => ({
+              ...(requirementSet.event === undefined ? {} : { event: requirementSet.event }),
+              ...(requirementSet.permissions === undefined
+                ? {}
+                : {
+                    permissions: requirementSet.permissions.map((permission) => ({
+                      permission: permission.permission,
+                      ...(permission.access === undefined ? {} : { access: permission.access }),
+                    })),
+                  }),
+            })),
+          },
         }),
     ...(eventDefinition.payloadReferences === undefined
       ? {}
