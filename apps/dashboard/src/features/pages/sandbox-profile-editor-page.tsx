@@ -90,6 +90,7 @@ import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
   createSandboxBaseSetupContextGroupsFromGeneratedInventory,
   createSetupScriptRepositoryLocationExampleFromGeneratedInventory,
+  resolveSandboxBaseRepositoryHandles,
   SetupScriptTimingDescription,
 } from "./sandbox-base-inventory-copy.js";
 import type {
@@ -2253,42 +2254,9 @@ function ReadySandboxProfileSetupScriptSection(input: {
       saveStatus={setupScriptState.saveStatus}
       value={setupScriptState.draftValue}
       disabled={input.disabled}
-      repositoryHandles={resolveSetupScriptRepositoryHandles(input.integrationRows)}
+      repositoryHandles={resolveSandboxBaseRepositoryHandles(input.integrationRows)}
     />
   );
-}
-
-function resolveSetupScriptRepositoryHandles(
-  integrationRows: readonly SandboxProfileBindingEditorRow[] | null,
-): readonly string[] {
-  if (integrationRows === null) {
-    return [];
-  }
-
-  const handles: string[] = [];
-  const seenHandles = new Set<string>();
-
-  for (const row of integrationRows) {
-    if (row.kind !== "git") {
-      continue;
-    }
-
-    const repositories = row.config["repositories"];
-    if (!Array.isArray(repositories)) {
-      continue;
-    }
-
-    for (const repository of repositories) {
-      if (typeof repository !== "string" || seenHandles.has(repository)) {
-        continue;
-      }
-
-      seenHandles.add(repository);
-      handles.push(repository);
-    }
-  }
-
-  return handles;
 }
 
 type SetupScriptContextGroup = ReturnType<
@@ -2325,7 +2293,7 @@ export function SandboxProfileSetupScriptPanel(input: {
   errorMessage?: string | null;
   onChange?: (nextValue: string) => void;
   onBlur?: () => void;
-  repositoryHandles?: readonly string[] | undefined;
+  repositoryHandles?: readonly string[];
 }): React.JSX.Element {
   const liveMessage =
     input.errorMessage !== null && input.errorMessage !== undefined
@@ -2333,18 +2301,16 @@ export function SandboxProfileSetupScriptPanel(input: {
       : input.saveStatus === "saved" || input.saveStatus === "saved-fading"
         ? "Saved"
         : "";
-  const setupContextGroups = createSandboxBaseSetupContextGroupsFromGeneratedInventory({
-    repositoryHandles: input.repositoryHandles ?? [],
-  });
+  const setupContextGroups = createSandboxBaseSetupContextGroupsFromGeneratedInventory(
+    input.repositoryHandles,
+  );
   const repositoryLocationGroup =
     setupContextGroups.find((group) => group.id === "repository-locations") ?? null;
   const environmentAndToolGroups = setupContextGroups.filter(
     (group) => group.id !== "repository-locations",
   );
   const repositoryLocationExample =
-    createSetupScriptRepositoryLocationExampleFromGeneratedInventory({
-      repositoryHandles: input.repositoryHandles ?? [],
-    });
+    createSetupScriptRepositoryLocationExampleFromGeneratedInventory(input.repositoryHandles);
 
   return (
     <div className="max-w-5xl">

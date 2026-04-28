@@ -27,6 +27,7 @@ import {
   StoryPlanetScaleConnection,
   StorySlackConnection,
 } from "./integrations-editor-section-story-support.js";
+import { resolveSandboxBaseRepositoryHandles } from "./sandbox-base-inventory-copy.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -581,6 +582,7 @@ function SandboxProfileEditorPageStoryView(
               onBlur={handleSetupScriptBlur}
               onChange={setSetupScriptDraft}
               disabled={!isEditable}
+              repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
               saveStatus={setupScriptSaveStatus}
               value={setupScriptDraft}
             />

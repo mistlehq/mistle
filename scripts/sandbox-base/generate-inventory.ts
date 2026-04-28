@@ -432,12 +432,23 @@ function buildImage(imageRef: string): void {
 }
 
 function commandExists(imageRef: string, command: string): boolean {
-  try {
-    runInImage(imageRef, ["/bin/bash", "-lc", `command -v ${command} >/dev/null`]);
+  const result = runInImage(imageRef, [
+    "/bin/bash",
+    "-lc",
+    'if command -v "$1" >/dev/null 2>&1; then printf found; else printf missing; fi',
+    "command-exists",
+    command,
+  ]).trim();
+
+  if (result === "found") {
     return true;
-  } catch {
+  }
+
+  if (result === "missing") {
     return false;
   }
+
+  throw new Error(`Unexpected command probe result for '${command}': ${result}`);
 }
 
 function readRuntimeBase(imageRef: string): SandboxBaseInventoryRuntimeBase {
@@ -515,7 +526,7 @@ function collectTool(imageRef: string, probe: InventoryToolProbe): SandboxBaseIn
   };
 }
 
-function collectMissingTool(imageRef: string, tool: SandboxBaseInventoryMissingTool): void {
+function validateToolIsAbsent(imageRef: string, tool: SandboxBaseInventoryMissingTool): void {
   if (commandExists(imageRef, tool.command)) {
     throw new Error(
       `Expected '${tool.command}' to be absent from sandbox base image '${imageRef}', but it is installed.`,
@@ -528,7 +539,7 @@ function collectInventory(imageRef: string): SandboxBaseInventory {
   const runtimeBase = readRuntimeBase(imageRef);
 
   for (const missingTool of MissingToolProbes) {
-    collectMissingTool(imageRef, missingTool);
+    validateToolIsAbsent(imageRef, missingTool);
   }
 
   return {

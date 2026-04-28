@@ -4,7 +4,7 @@ import {
   createSandboxBasePreinstalledToolGroups,
   createSandboxBaseRuntimeEnvironmentItems,
   createSandboxBaseSetupContextGroups,
-  createSetupScriptRepositoryLocationDescription,
+  resolveSandboxBaseRepositoryHandles,
 } from "./sandbox-base-inventory-copy.js";
 
 const TestToolCategories = {
@@ -64,28 +64,26 @@ describe("sandbox base inventory copy", () => {
 
   it("groups preinstalled tools by generated inventory category", () => {
     expect(
-      createSandboxBasePreinstalledToolGroups({
-        tools: [
-          {
-            category: TestToolCategories.RUNTIMES,
-            command: "node",
-            displayName: "Node.js",
-            version: "24.14.1",
-          },
-          {
-            category: TestToolCategories.RUNTIMES,
-            command: "python3",
-            displayName: "Python",
-            version: "3.14.4",
-          },
-          {
-            category: TestToolCategories.CONTAINERS,
-            command: "docker",
-            displayName: "Docker",
-            version: "29.3.1",
-          },
-        ],
-      }),
+      createSandboxBasePreinstalledToolGroups([
+        {
+          category: TestToolCategories.RUNTIMES,
+          command: "node",
+          displayName: "Node.js",
+          version: "24.14.1",
+        },
+        {
+          category: TestToolCategories.RUNTIMES,
+          command: "python3",
+          displayName: "Python",
+          version: "3.14.4",
+        },
+        {
+          category: TestToolCategories.CONTAINERS,
+          command: "docker",
+          displayName: "Docker",
+          version: "29.3.1",
+        },
+      ]),
     ).toEqual([
       {
         id: "runtimes",
@@ -224,25 +222,26 @@ describe("sandbox base inventory copy", () => {
     ]);
   });
 
-  it("describes repository locations with a selected repository example", () => {
+  it("resolves unique repository handles from git bindings", () => {
     expect(
-      createSetupScriptRepositoryLocationDescription({
-        repositoryHandles: ["mistlehq/mistle"],
-        workingDirectory: "/root",
-      }),
-    ).toBe(
-      "Repositories are cloned under the working directory, using their owner/repository path. For example, mistlehq/mistle is available at /root/mistlehq/mistle.",
-    );
-  });
-
-  it("describes repository locations without an example when no repository is selected", () => {
-    expect(
-      createSetupScriptRepositoryLocationDescription({
-        repositoryHandles: [],
-        workingDirectory: "/root",
-      }),
-    ).toBe(
-      "Repositories are cloned under the working directory, using their owner/repository path. For example, acme/web is available at /root/acme/web.",
-    );
+      resolveSandboxBaseRepositoryHandles([
+        {
+          kind: "agent",
+          config: {
+            repositories: ["ignored/agent"],
+          },
+        },
+        {
+          kind: "git",
+          config: {
+            repositories: ["mistlehq/mistle", "mistlehq/mistle", "mistlehq/dashboard", 42],
+          },
+        },
+        {
+          kind: "git",
+          config: {},
+        },
+      ]),
+    ).toEqual(["mistlehq/mistle", "mistlehq/dashboard"]);
   });
 });

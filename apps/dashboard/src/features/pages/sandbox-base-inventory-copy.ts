@@ -26,9 +26,14 @@ type SandboxBaseInventoryRuntimeBase = {
 };
 
 type SandboxBaseInventoryPresentationInput = {
-  repositoryHandles?: readonly string[] | undefined;
+  repositoryHandles?: readonly string[];
   runtimeBase: SandboxBaseInventoryRuntimeBase;
   tools: readonly SandboxBaseInventoryTool[];
+};
+
+type SandboxBaseRepositoryBindingInput = {
+  config: Record<string, unknown>;
+  kind: string;
 };
 
 type SandboxBaseRuntimeEnvironmentItem = {
@@ -116,11 +121,11 @@ export function createSandboxBaseRuntimeEnvironmentItems(
 }
 
 export function createSandboxBasePreinstalledToolGroups(
-  input: Pick<SandboxBaseInventoryPresentationInput, "tools">,
+  tools: readonly SandboxBaseInventoryTool[],
 ): readonly SandboxBasePreinstalledToolGroup[] {
   const groups: MutableSandboxBasePreinstalledToolGroup[] = [];
 
-  for (const tool of input.tools) {
+  for (const tool of tools) {
     let group = groups.find((candidate) => candidate.id === tool.category.id);
 
     if (group === undefined) {
@@ -142,23 +147,17 @@ export function createSandboxBasePreinstalledToolGroups(
   return groups;
 }
 
-function createRepositoryPath(input: {
-  workingDirectory: string;
-  repositoryHandle: string;
-}): string {
-  const root = input.workingDirectory.endsWith("/")
-    ? input.workingDirectory.slice(0, -1)
-    : input.workingDirectory;
+function createRepositoryPath(workingDirectory: string, repositoryHandle: string): string {
+  const root = workingDirectory.endsWith("/") ? workingDirectory.slice(0, -1) : workingDirectory;
 
-  return `${root}/${input.repositoryHandle}`;
+  return `${root}/${repositoryHandle}`;
 }
 
 function createRepositoryLocationGroup(
-  input: Pick<SandboxBaseInventoryPresentationInput, "repositoryHandles" | "runtimeBase">,
+  repositoryHandles: readonly string[] | undefined,
+  workingDirectory: string,
 ): SandboxBaseSetupContextGroup | null {
-  const repositoryHandles = input.repositoryHandles ?? [];
-
-  if (repositoryHandles.length === 0) {
+  if (repositoryHandles === undefined || repositoryHandles.length === 0) {
     return null;
   }
 
@@ -169,10 +168,7 @@ function createRepositoryLocationGroup(
       (repositoryHandle): SandboxBaseSetupContextRow => ({
         id: `repository-${repositoryHandle}`,
         label: repositoryHandle,
-        value: createRepositoryPath({
-          repositoryHandle,
-          workingDirectory: input.runtimeBase.workingDirectory,
-        }),
+        value: createRepositoryPath(workingDirectory, repositoryHandle),
         valueKind: "path",
       }),
     ),
@@ -182,7 +178,10 @@ function createRepositoryLocationGroup(
 export function createSandboxBaseSetupContextGroups(
   input: SandboxBaseInventoryPresentationInput,
 ): readonly SandboxBaseSetupContextGroup[] {
-  const repositoryLocationGroup = createRepositoryLocationGroup(input);
+  const repositoryLocationGroup = createRepositoryLocationGroup(
+    input.repositoryHandles,
+    input.runtimeBase.workingDirectory,
+  );
   const groups: SandboxBaseSetupContextGroup[] = [
     {
       id: "execution-environment",
@@ -203,7 +202,7 @@ export function createSandboxBaseSetupContextGroups(
   }
 
   groups.push(
-    ...createSandboxBasePreinstalledToolGroups(input).map((group) => ({
+    ...createSandboxBasePreinstalledToolGroups(input.tools).map((group) => ({
       id: group.id,
       title: group.title,
       rows: group.tools.map(
@@ -220,68 +219,69 @@ export function createSandboxBaseSetupContextGroups(
   return groups;
 }
 
-export function createSandboxBaseSetupContextGroupsFromGeneratedInventory(input: {
-  repositoryHandles?: readonly string[] | undefined;
-}): readonly SandboxBaseSetupContextGroup[] {
+export function createSandboxBaseSetupContextGroupsFromGeneratedInventory(
+  repositoryHandles?: readonly string[],
+): readonly SandboxBaseSetupContextGroup[] {
   return createSandboxBaseSetupContextGroups({
-    ...SandboxBaseInventory,
-    ...(input.repositoryHandles === undefined
-      ? {}
-      : { repositoryHandles: input.repositoryHandles }),
+    runtimeBase: SandboxBaseInventory.runtimeBase,
+    tools: SandboxBaseInventory.tools,
+    ...(repositoryHandles === undefined ? {} : { repositoryHandles }),
   });
 }
 
-export function createSetupScriptRepositoryLocationExample(input: {
-  repositoryHandles?: readonly string[] | undefined;
-  workingDirectory: string;
-}): SetupScriptRepositoryLocationExample {
-  const handle = input.repositoryHandles?.[0] ?? "acme/web";
+function createSetupScriptRepositoryLocationExample(
+  workingDirectory: string,
+  repositoryHandles?: readonly string[],
+): SetupScriptRepositoryLocationExample {
+  const handle = repositoryHandles?.[0] ?? "acme/web";
 
   return {
     handle,
-    path: createRepositoryPath({
-      repositoryHandle: handle,
-      workingDirectory: input.workingDirectory,
-    }),
+    path: createRepositoryPath(workingDirectory, handle),
   };
 }
 
-export function createSetupScriptRepositoryLocationExampleFromGeneratedInventory(input: {
-  repositoryHandles?: readonly string[] | undefined;
-}): SetupScriptRepositoryLocationExample {
-  return createSetupScriptRepositoryLocationExample({
-    repositoryHandles: input.repositoryHandles ?? [],
-    workingDirectory: SandboxBaseInventory.runtimeBase.workingDirectory,
-  });
+export function createSetupScriptRepositoryLocationExampleFromGeneratedInventory(
+  repositoryHandles?: readonly string[],
+): SetupScriptRepositoryLocationExample {
+  return createSetupScriptRepositoryLocationExample(
+    SandboxBaseInventory.runtimeBase.workingDirectory,
+    repositoryHandles,
+  );
 }
 
-export function createSetupScriptRepositoryLocationDescription(input: {
-  repositoryHandles?: readonly string[] | undefined;
-  workingDirectory: string;
-}): string {
-  const example = createSetupScriptRepositoryLocationExample(input);
+export function resolveSandboxBaseRepositoryHandles(
+  bindings: readonly SandboxBaseRepositoryBindingInput[] | null,
+): readonly string[] {
+  if (bindings === null) {
+    return [];
+  }
 
-  return `Repositories are cloned under the working directory, using their owner/repository path. For example, ${example.handle} is available at ${example.path}.`;
-}
+  const handles: string[] = [];
+  const seenHandles = new Set<string>();
 
-export function createSetupScriptRepositoryLocationDescriptionFromGeneratedInventory(input: {
-  repositoryHandles?: readonly string[] | undefined;
-}): string {
-  return createSetupScriptRepositoryLocationDescription({
-    repositoryHandles: input.repositoryHandles ?? [],
-    workingDirectory: SandboxBaseInventory.runtimeBase.workingDirectory,
-  });
+  for (const binding of bindings) {
+    if (binding.kind !== "git") {
+      continue;
+    }
+
+    const repositories = binding.config["repositories"];
+    if (!Array.isArray(repositories)) {
+      continue;
+    }
+
+    for (const repository of repositories) {
+      if (typeof repository !== "string" || seenHandles.has(repository)) {
+        continue;
+      }
+
+      seenHandles.add(repository);
+      handles.push(repository);
+    }
+  }
+
+  return handles;
 }
 
 export const SetupScriptTimingDescription =
   "Runs once during sandbox setup after repositories, resources, and CLI tools are ready. Use it for project bootstrap steps such as dependency install, local config generation, or repo-specific setup commands.";
-export const SetupScriptRepositoryLocationDescription =
-  createSetupScriptRepositoryLocationDescriptionFromGeneratedInventory({});
-
-export const SandboxBaseRuntimeEnvironmentItems = createSandboxBaseRuntimeEnvironmentItems(
-  SandboxBaseInventory.runtimeBase,
-);
-export const SandboxBasePreinstalledToolGroups =
-  createSandboxBasePreinstalledToolGroups(SandboxBaseInventory);
-export const SandboxBaseSetupContextGroups =
-  createSandboxBaseSetupContextGroupsFromGeneratedInventory({});
