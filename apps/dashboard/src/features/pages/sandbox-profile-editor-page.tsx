@@ -2353,16 +2353,20 @@ export function SandboxProfileSetupScriptPanel(input: {
                         <FieldDescription>
                           Repositories are cloned under the working directory, using their
                           <InlineCode variant="muted">owner/repository</InlineCode> path.
-                          {" For example, "}
-                          <InlineCode variant="muted">
-                            {setupScriptContext.repositoryLocationExample.handle}
-                          </InlineCode>
-                          {" is available at "}
-                          <InlineCode variant="muted">
-                            {setupScriptContext.repositoryLocationExample.path}
-                          </InlineCode>
-                          {"."}
                         </FieldDescription>
+                        {setupScriptContext.repositoryLocationGroup === null ? (
+                          <FieldDescription>
+                            For example,{" "}
+                            <InlineCode variant="muted">
+                              {setupScriptContext.repositoryLocationExample.handle}
+                            </InlineCode>{" "}
+                            is available at{" "}
+                            <InlineCode variant="muted">
+                              {setupScriptContext.repositoryLocationExample.path}
+                            </InlineCode>
+                            .
+                          </FieldDescription>
+                        ) : null}
                       </div>
 
                       {setupScriptContext.repositoryLocationGroup === null ? null : (

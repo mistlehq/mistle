@@ -2,24 +2,6 @@
   "baseOs": "Debian GNU/Linux 12 (bookworm)",
   "dockerfilePath": "packages/sandboxd/Dockerfile",
   "imageRef": "mistle/sandbox-base-inventory:local",
-  "notPreinstalled": [
-    {
-      "command": "pnpm",
-      "displayName": "pnpm"
-    },
-    {
-      "command": "yarn",
-      "displayName": "Yarn"
-    },
-    {
-      "command": "rustc",
-      "displayName": "rustc"
-    },
-    {
-      "command": "cargo",
-      "displayName": "Cargo"
-    }
-  ],
   "runtimeBase": {
     "os": {
       "id": "debian",
@@ -28,7 +10,6 @@
     },
     "packageManagers": ["apt-get", "apt"],
     "shell": "/bin/bash",
-    "sudoInstalled": false,
     "user": {
       "name": "root",
       "uid": 0

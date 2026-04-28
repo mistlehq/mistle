@@ -1276,6 +1276,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(configurationsPanel.textContent).toContain(
       "Repositories are cloned under the working directory",
     );
+    expect(configurationsPanel.textContent).toContain("For example, acme/web is available at");
     expect(configurationsPanel.textContent).toContain("Execution environment");
     expect(configurationsPanel.textContent).toContain("Package manager");
   });
@@ -1308,9 +1309,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(configurationsPanel.textContent).toContain("Repository locations");
     expect(configurationsPanel.textContent).toContain("mistlehq/mistle");
-    expect(configurationsPanel.textContent).toContain(
-      "For example, mistlehq/mistle is available at",
-    );
+    expect(configurationsPanel.textContent).not.toContain("For example");
   });
 
   it("uses draft integration rows for setup script repository context", () => {

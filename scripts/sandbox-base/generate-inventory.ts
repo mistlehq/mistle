@@ -3,7 +3,6 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 import {
   SandboxBaseInventorySpec,
-  type SandboxBaseInventoryMissingTool,
   type SandboxBaseInventoryToolCategory,
   type SandboxBaseInventoryToolSpec,
 } from "./inventory-spec.js";
@@ -16,7 +15,6 @@ type SandboxBaseInventory = {
   imageRef: string;
   runtimeBase: SandboxBaseInventoryRuntimeBase;
   tools: readonly SandboxBaseInventoryTool[];
-  notPreinstalled: readonly SandboxBaseInventoryMissingTool[];
 };
 
 type SandboxBaseInventoryRuntimeBase = {
@@ -27,7 +25,6 @@ type SandboxBaseInventoryRuntimeBase = {
   };
   packageManagers: readonly string[];
   shell: string;
-  sudoInstalled: boolean;
   user: {
     name: string;
     uid: number;
@@ -154,7 +151,6 @@ function readRuntimeBase(imageRef: string): SandboxBaseInventoryRuntimeBase {
       commandExists(imageRef, command),
     ),
     shell,
-    sudoInstalled: commandExists(imageRef, "sudo"),
     user: {
       name: userName,
       uid,
@@ -196,27 +192,14 @@ function collectTool(
   };
 }
 
-function validateToolIsAbsent(imageRef: string, tool: SandboxBaseInventoryMissingTool): void {
-  if (commandExists(imageRef, tool.command)) {
-    throw new Error(
-      `Expected '${tool.command}' to be absent from sandbox base image '${imageRef}', but it is installed.`,
-    );
-  }
-}
-
 function collectInventory(imageRef: string): SandboxBaseInventory {
   buildImage(imageRef);
   const runtimeBase = readRuntimeBase(imageRef);
-
-  for (const missingTool of SandboxBaseInventorySpec.missingTools) {
-    validateToolIsAbsent(imageRef, missingTool);
-  }
 
   return {
     baseOs: runtimeBase.os.prettyName,
     dockerfilePath: SandboxBaseInventorySpec.dockerfilePath,
     imageRef,
-    notPreinstalled: SandboxBaseInventorySpec.missingTools,
     runtimeBase,
     tools: SandboxBaseInventorySpec.tools.map((probe) => collectTool(imageRef, probe)),
   };

@@ -12,11 +12,6 @@ export type SandboxBaseInventoryToolSpec = {
   versionParser: (output: string) => string;
 };
 
-export type SandboxBaseInventoryMissingTool = {
-  command: string;
-  displayName: string;
-};
-
 export type SandboxBaseDockerfileAssertion =
   | {
       kind: "apt-package";
@@ -46,7 +41,6 @@ export type SandboxBaseInventorySpec = {
   defaultImageRef: string;
   dockerfilePath: string;
   inventoryPath: string;
-  missingTools: readonly SandboxBaseInventoryMissingTool[];
   packageManagerCommands: readonly string[];
   tools: readonly SandboxBaseInventoryToolSpec[];
 };
@@ -81,12 +75,6 @@ export const SandboxBaseInventorySpec = {
   defaultImageRef: "mistle/sandbox-base-inventory:local",
   dockerfilePath: "packages/sandboxd/Dockerfile",
   inventoryPath: "packages/sandboxd/sandbox-base-inventory.generated.json",
-  missingTools: [
-    { command: "pnpm", displayName: "pnpm" },
-    { command: "yarn", displayName: "Yarn" },
-    { command: "rustc", displayName: "rustc" },
-    { command: "cargo", displayName: "Cargo" },
-  ],
   packageManagerCommands: ["apt-get", "apt", "apk", "dnf", "yum", "pacman", "brew"],
   tools: [
     {
