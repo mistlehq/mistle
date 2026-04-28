@@ -2,7 +2,7 @@ import {
   SlackAppManifestTemplate,
   SlackConnectionMethodId,
 } from "@mistle/integrations-definitions/browser";
-import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { systemScheduler } from "@mistle/time";
 import {
   Button,
   Field,
@@ -45,6 +45,8 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
+  createAutoSaveFieldTimeoutRefs,
+  resolveAutoSaveFieldTimeoutRefs,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
@@ -72,13 +74,6 @@ type SlackExistingAppDraft = {
 
 type SlackExistingAppFieldKey = keyof SlackExistingAppDraft;
 type SlackExistingAppSecretFieldKey = "botToken" | "signingSecret" | "clientSecret";
-type SlackExistingAppTimeoutRefs = Record<
-  SlackExistingAppFieldKey,
-  {
-    fadeStartTimeoutRef: { current: TimerHandle | null };
-    fadeEndTimeoutRef: { current: TimerHandle | null };
-  }
->;
 
 const SlackExistingAppFieldKeys = [
   "clientId",
@@ -138,27 +133,6 @@ function createInitialFieldStates(): Record<SlackExistingAppFieldKey, SavingFiel
     botToken: { status: "idle", errorMessage: null },
     signingSecret: { status: "idle", errorMessage: null },
     clientSecret: { status: "idle", errorMessage: null },
-  };
-}
-
-function createFieldTimeoutRefs(): SlackExistingAppTimeoutRefs {
-  return {
-    clientId: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    botToken: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    signingSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    clientSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
   };
 }
 
@@ -524,7 +498,11 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
+  const fieldTimeoutRefs = useRef(
+    createAutoSaveFieldTimeoutRefs({
+      fieldKeys: SlackExistingAppFieldKeys,
+    }),
+  );
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: setupMode === "existing-app",
     connectionId: input.connection.id,
@@ -557,9 +535,13 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   useEffect(() => {
     return () => {
       for (const fieldKey of SlackExistingAppFieldKeys) {
+        const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+          timeoutRefs: fieldTimeoutRefs.current,
+          fieldKey,
+        });
         clearPendingStatusTimeouts({
-          fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-          fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+          fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+          fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
           scheduler: systemScheduler,
         });
       }
@@ -567,9 +549,13 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   }, []);
 
   function resetFieldFeedback(fieldKey: SlackExistingAppFieldKey): void {
+    const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+      timeoutRefs: fieldTimeoutRefs.current,
+      fieldKey,
+    });
     clearPendingStatusTimeouts({
-      fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-      fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+      fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+      fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
       scheduler: systemScheduler,
     });
     setFieldStates((currentFieldStates) => ({
@@ -684,9 +670,13 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
         },
       }));
 
+      const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+        timeoutRefs: fieldTimeoutRefs.current,
+        fieldKey,
+      });
       scheduleSavedStateReset({
-        fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-        fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+        fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+        fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
         onFadeEnd: () => {
           setFieldStates((currentFieldStates) => ({
             ...currentFieldStates,

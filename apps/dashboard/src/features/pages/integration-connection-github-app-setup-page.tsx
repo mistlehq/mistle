@@ -1,6 +1,6 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { GitHubAppManifestTemplate } from "@mistle/integrations-definitions/browser";
-import { systemScheduler, type TimerHandle } from "@mistle/time";
+import { systemScheduler } from "@mistle/time";
 import {
   Button,
   CopyableValue,
@@ -48,6 +48,8 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
+  createAutoSaveFieldTimeoutRefs,
+  resolveAutoSaveFieldTimeoutRefs,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
@@ -128,14 +130,6 @@ const GitHubExistingAppSetupFieldKeysSavedWithWebhookSecret = [
 
 const GitHubDraftManifest = createManifestJsonDraft(GitHubAppManifestTemplate);
 
-type GitHubExistingAppSetupTimeoutRefs = Record<
-  GitHubExistingAppSetupFieldKey,
-  {
-    fadeStartTimeoutRef: { current: TimerHandle | null };
-    fadeEndTimeoutRef: { current: TimerHandle | null };
-  }
->;
-
 function isGitHubExistingAppSetupSecretFieldKey(
   fieldKey: string,
 ): fieldKey is GitHubExistingAppSetupSecretFieldKey {
@@ -190,35 +184,6 @@ function createInitialFieldStates(): Record<GitHubExistingAppSetupFieldKey, Savi
     clientSecret: { status: "idle", errorMessage: null },
     appPrivateKeyPem: { status: "idle", errorMessage: null },
     webhookSecret: { status: "idle", errorMessage: null },
-  };
-}
-
-function createFieldTimeoutRefs(): GitHubExistingAppSetupTimeoutRefs {
-  return {
-    appId: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    appSlug: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    clientId: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    clientSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    appPrivateKeyPem: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
-    webhookSecret: {
-      fadeStartTimeoutRef: { current: null },
-      fadeEndTimeoutRef: { current: null },
-    },
   };
 }
 
@@ -778,7 +743,11 @@ export function GitHubAppSetupPane(input: {
   const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const fieldTimeoutRefs = useRef(createFieldTimeoutRefs());
+  const fieldTimeoutRefs = useRef(
+    createAutoSaveFieldTimeoutRefs({
+      fieldKeys: GitHubExistingAppSetupFieldKeys,
+    }),
+  );
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: setupMode === "existing-app",
     connectionId: input.connection.id,
@@ -874,9 +843,13 @@ export function GitHubAppSetupPane(input: {
   useEffect(() => {
     return () => {
       for (const fieldKey of GitHubExistingAppSetupFieldKeys) {
+        const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+          timeoutRefs: fieldTimeoutRefs.current,
+          fieldKey,
+        });
         clearPendingStatusTimeouts({
-          fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-          fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+          fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+          fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
           scheduler: systemScheduler,
         });
       }
@@ -884,9 +857,13 @@ export function GitHubAppSetupPane(input: {
   }, []);
 
   function resetFieldFeedback(fieldKey: GitHubExistingAppSetupFieldKey): void {
+    const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+      timeoutRefs: fieldTimeoutRefs.current,
+      fieldKey,
+    });
     clearPendingStatusTimeouts({
-      fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-      fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+      fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+      fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
       scheduler: systemScheduler,
     });
     setFieldStates((currentFieldStates) => ({
@@ -1009,9 +986,13 @@ export function GitHubAppSetupPane(input: {
         },
       }));
 
+      const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
+        timeoutRefs: fieldTimeoutRefs.current,
+        fieldKey,
+      });
       scheduleSavedStateReset({
-        fadeEndTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeEndTimeoutRef,
-        fadeStartTimeoutRef: fieldTimeoutRefs.current[fieldKey].fadeStartTimeoutRef,
+        fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
+        fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
         onFadeEnd: () => {
           setFieldStates((currentFieldStates) => ({
             ...currentFieldStates,
