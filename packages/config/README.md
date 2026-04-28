@@ -18,6 +18,9 @@ The package exports these public APIs from [`src/index.ts`](./src/index.ts):
 
 - `loadConfig(options)`
 - `AppIds`
+- `exportServiceConfigToEnv(input)`
+- `projectServiceConfigToEnv(input)` as a compatibility alias for
+  `exportServiceConfigToEnv`
 
 ## Usage
 
@@ -83,13 +86,21 @@ Use module ownership to keep config changes localized:
 - `src/root/schema.ts` owns the central resource-oriented config schema.
 - `src/root/selectors.ts` owns service selectors from central resources.
 - `src/root/load-env.ts` owns legacy env override compatibility into the central root.
+- `src/apps/<app-id>/legacy-env-descriptors.ts` and
+  `src/global/legacy-env-descriptors.ts` own the legacy runtime env surface used
+  by `exportServiceConfigToEnv`.
+- `src/runtime-env-export.ts` owns selected service config to runtime env export
+  while services still consume the legacy env surface.
 - `src/toml.ts` owns TOML parsing helpers only.
 
 ### Add A New Key To An Existing Module
 
 1. Update the module schema in `schema.ts` (source of truth for runtime validation and types).
-2. Update `load-env.ts` with the env mapping and parsing logic for the new key.
-3. If the key is operator-facing config, update `src/root/schema.ts` and any service selectors in `src/root/selectors.ts` that consume it.
+2. If the key is operator-facing config, update `src/root/schema.ts`,
+   `src/root/load-env.ts`, and any service selectors in `src/root/selectors.ts`
+   that consume it.
+3. If the key must still be exported to a service runtime env var, update the
+   relevant `legacy-env-descriptors.ts` file and `src/runtime-env-export.ts`.
 4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
 5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
 6. Add or update tests:
@@ -100,7 +111,7 @@ Use module ownership to keep config changes localized:
 
 1. Create `src/apps/<app-id>/` with:
    - `schema.ts`
-   - `load-env.ts`
+   - `legacy-env-descriptors.ts` if the service still needs runtime env export
    - `index.ts` (exports the `ConfigModule`)
    - `README.md` (single config table)
 2. Register the app in `src/modules.ts`:
