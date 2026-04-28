@@ -54,6 +54,21 @@ export function buildGitHubAppManifestSubmissionUrl(input: {
   return submissionUrl.toString();
 }
 
+export function buildGitHubAppInstallationUrl(input: {
+  appSlug: string;
+  state: string;
+  variantId: string;
+  webBaseUrl: string;
+}): string {
+  const installationPath =
+    input.variantId === "github-enterprise-server"
+      ? `/github-apps/${input.appSlug}/installations/select_target`
+      : `/apps/${input.appSlug}/installations/select_target`;
+  const installUrl = new URL(installationPath, input.webBaseUrl);
+  installUrl.searchParams.set("state", input.state);
+  return installUrl.toString();
+}
+
 export function buildGitHubAppManifest(input: {
   controlPlaneBaseUrl: string;
   manifest: Record<string, unknown>;

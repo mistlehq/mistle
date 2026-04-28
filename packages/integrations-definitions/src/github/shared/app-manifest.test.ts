@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGitHubAppInstallationUrl,
   GitHubAppManifestTemplate,
   buildGitHubAppManifest,
   buildGitHubAppManifestSubmissionUrl,
@@ -91,5 +92,33 @@ describe("buildGitHubAppManifestSubmissionUrl", () => {
         webBaseUrl: "https://github.example.com",
       }),
     ).toBe("https://github.example.com/organizations/Mistle-Org/settings/apps/new?state=state_123");
+  });
+});
+
+describe("buildGitHubAppInstallationUrl", () => {
+  it("builds the GitHub Cloud app installation URL", () => {
+    expect(
+      buildGitHubAppInstallationUrl({
+        appSlug: "mistle-github-app",
+        state: "state_123",
+        variantId: "github-cloud",
+        webBaseUrl: "https://github.example.com",
+      }),
+    ).toBe(
+      "https://github.example.com/apps/mistle-github-app/installations/select_target?state=state_123",
+    );
+  });
+
+  it("builds the GitHub Enterprise Server app installation URL", () => {
+    expect(
+      buildGitHubAppInstallationUrl({
+        appSlug: "mistle-github-app",
+        state: "state_123",
+        variantId: "github-enterprise-server",
+        webBaseUrl: "https://github.example.com",
+      }),
+    ).toBe(
+      "https://github.example.com/github-apps/mistle-github-app/installations/select_target?state=state_123",
+    );
   });
 });
