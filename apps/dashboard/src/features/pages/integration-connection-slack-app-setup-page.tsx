@@ -6,18 +6,12 @@ import {
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
-  CopyableValue,
   Field,
   FieldContent,
   FieldDescription,
   FieldHeader,
   FieldLabel,
   Input,
-  Notice,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
   TextLink,
 } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -52,12 +46,17 @@ import {
   clearPendingStatusTimeouts,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
-import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SectionHeader } from "../shared/section-header.js";
+import {
+  IntegrationConnectionSetupModeTabs,
+  IntegrationConnectionSetupWebhookCallbackValue,
+  type IntegrationConnectionSetupMode,
+} from "./integration-connection-setup-flow.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
-type SlackSetupMode = "manifest" | "existing-app";
+type SlackSetupMode = IntegrationConnectionSetupMode;
 
 type SlackExistingAppDraft = {
   clientId: string;
@@ -451,20 +450,13 @@ function SlackSetupUrls(input: {
         title="Slack app URLs"
       />
       <div className="flex flex-col gap-4">
-        {input.webhookCallbackState.kind === "loading" ? (
-          <CopyableValue label="Events API Request URL" loading />
-        ) : input.webhookCallbackState.kind === "error" ? (
-          <Notice title="Could not load Events API Request URL" variant="alert">
-            {input.webhookCallbackState.message}
-          </Notice>
-        ) : input.webhookCallbackState.kind === "missing" ? (
-          <Notice title="Events API Request URL is not available yet" variant="alert">
-            Slack setup requires an Events API Request URL, but this connection does not have one
-            yet.
-          </Notice>
-        ) : (
-          <CopyableValue label="Events API Request URL" value={input.webhookCallbackState.value} />
-        )}
+        <IntegrationConnectionSetupWebhookCallbackValue
+          errorTitle="Could not load Events API Request URL"
+          label="Events API Request URL"
+          missingMessage="Slack setup requires an Events API Request URL, but this connection does not have one yet."
+          missingTitle="Events API Request URL is not available yet"
+          webhookCallbackState={input.webhookCallbackState}
+        />
       </div>
     </div>
   );
@@ -776,58 +768,24 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
 
   return (
     <FormPageStack>
-      <Tabs
-        onValueChange={(nextValue) => {
-          if (nextValue === "manifest" || nextValue === "existing-app") {
-            setSetupMode(nextValue);
-          }
-        }}
-        value={setupMode}
-      >
-        <SectionHeader
-          className="px-1"
-          description="Create a new Slack app with a manifest or connect an app you've already configured in Slack."
-          size="large"
-          title="Choose a setup method"
-        />
-
-        <FormPageSection>
-          <div className="flex flex-col gap-6 p-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="manifest">Create from manifest</TabsTrigger>
-              <TabsTrigger value="existing-app">Use existing app</TabsTrigger>
-            </TabsList>
-
-            {actionErrorMessage === null ? null : (
-              <Notice title="Could not continue setup" variant="alert">
-                {actionErrorMessage}
-              </Notice>
-            )}
-
-            <TabsContent value="manifest">
-              <SlackManifestSetupPanel
-                appConfigToken={appConfigToken}
-                manifestValidation={manifestValidation}
-                manifestValue={manifestValue}
-                onAppConfigTokenChange={setAppConfigToken}
-                onManifestChange={setManifestValue}
-              />
-            </TabsContent>
-
-            <TabsContent value="existing-app">
-              <SlackExistingAppSetupPanel
-                configuredSecretFieldKeys={configuredSecretFieldKeys}
-                draft={existingAppDraft}
-                fieldStates={fieldStates}
-                onCommitField={(fieldKey) => {
-                  void persistExistingAppField(fieldKey);
-                }}
-                onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-                onRevertSecretReplacement={revertSecretReplacement}
-                onUpdateFieldDraft={updateExistingAppFieldDraft}
-              />
-            </TabsContent>
-
+      <IntegrationConnectionSetupModeTabs
+        actionErrorMessage={actionErrorMessage}
+        description="Create a new Slack app with a manifest or connect an app you've already configured in Slack."
+        existingAppContent={
+          <SlackExistingAppSetupPanel
+            configuredSecretFieldKeys={configuredSecretFieldKeys}
+            draft={existingAppDraft}
+            fieldStates={fieldStates}
+            onCommitField={(fieldKey) => {
+              void persistExistingAppField(fieldKey);
+            }}
+            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
+            onRevertSecretReplacement={revertSecretReplacement}
+            onUpdateFieldDraft={updateExistingAppFieldDraft}
+          />
+        }
+        footer={
+          <>
             {setupMode === "existing-app" ? (
               <SlackSetupUrls webhookCallbackState={webhookCallbackState} />
             ) : null}
@@ -857,9 +815,21 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
                 </Button>
               </FormPageActionBar>
             ) : null}
-          </div>
-        </FormPageSection>
-      </Tabs>
+          </>
+        }
+        manifestContent={
+          <SlackManifestSetupPanel
+            appConfigToken={appConfigToken}
+            manifestValidation={manifestValidation}
+            manifestValue={manifestValue}
+            onAppConfigTokenChange={setAppConfigToken}
+            onManifestChange={setManifestValue}
+          />
+        }
+        onModeChange={setSetupMode}
+        title="Choose a setup method"
+        value={setupMode}
+      />
     </FormPageStack>
   );
 }

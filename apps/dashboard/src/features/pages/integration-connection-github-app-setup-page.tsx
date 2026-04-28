@@ -11,10 +11,6 @@ import {
   Notice,
   RadioGroup,
   RadioGroupItem,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -55,6 +51,11 @@ import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SectionHeader } from "../shared/section-header.js";
+import {
+  IntegrationConnectionSetupModeTabs,
+  IntegrationConnectionSetupWebhookCallbackValue,
+  type IntegrationConnectionSetupMode,
+} from "./integration-connection-setup-flow.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubExistingAppSetupDraft = {
@@ -67,7 +68,7 @@ type GitHubExistingAppSetupDraft = {
 };
 
 type GitHubExistingAppSetupFieldKey = keyof GitHubExistingAppSetupDraft;
-type GitHubAppSetupMode = "manifest" | "existing-app";
+type GitHubAppSetupMode = IntegrationConnectionSetupMode;
 type GitHubManifestAppOwnerKind = "personal" | "organization";
 
 const GitHubExistingAppSetupRequiredFieldLabels = {
@@ -616,19 +617,13 @@ function GitHubSetupUrls(input: {
       />
       <div className="flex flex-col gap-4">
         <CopyableValue label="Post-installation setup URL" value={input.setupCallbackUrl} />
-        {input.webhookCallbackState.kind === "loading" ? (
-          <CopyableValue label="Webhook callback URL" loading />
-        ) : input.webhookCallbackState.kind === "error" ? (
-          <Notice title="Could not load webhook URL" variant="alert">
-            {input.webhookCallbackState.message}
-          </Notice>
-        ) : input.webhookCallbackState.kind === "missing" ? (
-          <Notice title="Webhook URL is not available yet" variant="alert">
-            GitHub setup requires a webhook callback URL, but this connection does not have one yet.
-          </Notice>
-        ) : (
-          <CopyableValue label="Webhook callback URL" value={input.webhookCallbackState.value} />
-        )}
+        <IntegrationConnectionSetupWebhookCallbackValue
+          errorTitle="Could not load webhook URL"
+          label="Webhook callback URL"
+          missingMessage="GitHub setup requires a webhook callback URL, but this connection does not have one yet."
+          missingTitle="Webhook URL is not available yet"
+          webhookCallbackState={input.webhookCallbackState}
+        />
       </div>
     </div>
   );
@@ -1143,60 +1138,24 @@ export function GitHubAppSetupPane(input: {
 
   return (
     <FormPageStack>
-      <Tabs
-        onValueChange={(nextValue) => {
-          if (nextValue === "manifest" || nextValue === "existing-app") {
-            setSetupMode(nextValue);
-          }
-        }}
-        value={setupMode}
-      >
-        <SectionHeader
-          className="px-1"
-          description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
-          size="large"
-          title="Choose a setup method"
-        />
-
-        <FormPageSection>
-          <div className="flex flex-col gap-6 p-4">
-            <TabsList className="w-full">
-              <TabsTrigger value="manifest">Create from manifest</TabsTrigger>
-              <TabsTrigger value="existing-app">Use existing app</TabsTrigger>
-            </TabsList>
-
-            {actionErrorMessage === null ? null : (
-              <Notice title="Could not continue setup" variant="alert">
-                {actionErrorMessage}
-              </Notice>
-            )}
-
-            <TabsContent value="manifest">
-              <GitHubManifestSetupPanel
-                appOwnerKind={manifestAppOwnerKind}
-                manifestValidation={manifestValidation}
-                manifestValue={manifestValue}
-                onAppOwnerKindChange={setManifestAppOwnerKind}
-                onManifestChange={setManifestValue}
-                onOrganizationSlugChange={setManifestOrganizationSlug}
-                organizationSlug={manifestOrganizationSlug}
-              />
-            </TabsContent>
-
-            <TabsContent value="existing-app">
-              <GitHubExistingAppSetupPanel
-                configuredSecretFieldKeys={configuredSecretFieldKeys}
-                draft={draft}
-                fieldStates={fieldStates}
-                onCommitField={(fieldKey) => {
-                  void commitField(fieldKey);
-                }}
-                onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-                onRevertSecretReplacement={revertSecretReplacement}
-                onUpdateFieldDraft={updateFieldDraft}
-              />
-            </TabsContent>
-
+      <IntegrationConnectionSetupModeTabs
+        actionErrorMessage={actionErrorMessage}
+        description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
+        existingAppContent={
+          <GitHubExistingAppSetupPanel
+            configuredSecretFieldKeys={configuredSecretFieldKeys}
+            draft={draft}
+            fieldStates={fieldStates}
+            onCommitField={(fieldKey) => {
+              void commitField(fieldKey);
+            }}
+            onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
+            onRevertSecretReplacement={revertSecretReplacement}
+            onUpdateFieldDraft={updateFieldDraft}
+          />
+        }
+        footer={
+          <>
             {setupMode === "existing-app" ? (
               <GitHubSetupUrls
                 setupCallbackUrl={new URL(
@@ -1228,9 +1187,23 @@ export function GitHubAppSetupPane(input: {
                 startInstallationMutation.isPending || isRedirectingToInstallation
               }
             />
-          </div>
-        </FormPageSection>
-      </Tabs>
+          </>
+        }
+        manifestContent={
+          <GitHubManifestSetupPanel
+            appOwnerKind={manifestAppOwnerKind}
+            manifestValidation={manifestValidation}
+            manifestValue={manifestValue}
+            onAppOwnerKindChange={setManifestAppOwnerKind}
+            onManifestChange={setManifestValue}
+            onOrganizationSlugChange={setManifestOrganizationSlug}
+            organizationSlug={manifestOrganizationSlug}
+          />
+        }
+        onModeChange={setSetupMode}
+        title="Choose a setup method"
+        value={setupMode}
+      />
     </FormPageStack>
   );
 }
