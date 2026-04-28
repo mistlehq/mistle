@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
@@ -6,6 +7,7 @@ import { automationTargets } from "./automation-targets.js";
 import { automations } from "./automations.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { controlPlaneSchema } from "./namespace.js";
+import { scheduledActions } from "./scheduled-actions.js";
 
 export const AutomationRunStatuses = {
   QUEUED: "queued",
@@ -33,6 +35,12 @@ export const automationRuns = controlPlaneSchema.table(
     }),
     sourceWebhookEventId: text("source_webhook_event_id").references(
       () => integrationWebhookEvents.id,
+      {
+        onDelete: "set null",
+      },
+    ),
+    sourceScheduledActionId: text("source_scheduled_action_id").references(
+      () => scheduledActions.id,
       {
         onDelete: "set null",
       },
@@ -67,6 +75,9 @@ export const automationRuns = controlPlaneSchema.table(
     index("automation_runs_automation_id_idx").on(table.automationId),
     index("automation_runs_automation_target_id_idx").on(table.automationTargetId),
     index("automation_runs_source_webhook_event_id_idx").on(table.sourceWebhookEventId),
+    uniqueIndex("automation_runs_source_scheduled_action_id_uidx")
+      .on(table.sourceScheduledActionId)
+      .where(sql`${table.sourceScheduledActionId} is not null`),
     index("automation_runs_conversation_id_idx").on(table.conversationId),
     index("automation_runs_status_idx").on(table.status),
     index("automation_runs_created_at_idx").on(table.createdAt),

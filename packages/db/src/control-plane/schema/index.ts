@@ -14,6 +14,20 @@ export {
   type AutomationRunStatus,
 } from "./automation-runs.js";
 export {
+  scheduledActions,
+  ScheduledActionStatuses,
+  type InsertScheduledAction,
+  type ScheduledAction,
+  type ScheduledActionStatus,
+} from "./scheduled-actions.js";
+export {
+  schedules,
+  ScheduleTargetTypes,
+  type InsertSchedule,
+  type Schedule,
+  type ScheduleTargetType,
+} from "./schedules.js";
+export {
   automationTargets,
   type InsertAutomationTarget,
   type AutomationTarget,
@@ -187,6 +201,11 @@ export type {
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
 } from "./sandbox-profile-version-snapshot-jobs.js";
+export {
+  sandboxProfileSnapshotRefreshScheduleTargets,
+  type InsertSandboxProfileSnapshotRefreshScheduleTarget,
+  type SandboxProfileSnapshotRefreshScheduleTarget,
+} from "./sandbox-profile-snapshot-refresh-schedule-targets.js";
 export {
   sandboxProfileVersionIntegrationBindings,
   IntegrationBindingKinds,

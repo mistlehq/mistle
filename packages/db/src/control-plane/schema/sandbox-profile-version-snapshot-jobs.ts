@@ -12,6 +12,7 @@ import { typeid } from "typeid-js";
 
 import { controlPlaneSchema } from "./namespace.js";
 import { sandboxProfileVersions } from "./sandbox-profile-versions.js";
+import { scheduledActions } from "./scheduled-actions.js";
 
 export const SandboxProfileVersionSnapshotJobTriggers = {
   PUBLISH: "publish",
@@ -43,6 +44,12 @@ export const sandboxProfileVersionSnapshotJobs = controlPlaneSchema.table(
       mode: "number",
     }).notNull(),
     workflowRunId: text("workflow_run_id"),
+    sourceScheduledActionId: text("source_scheduled_action_id").references(
+      () => scheduledActions.id,
+      {
+        onDelete: "set null",
+      },
+    ),
     trigger: text("trigger").notNull().$type<SandboxProfileVersionSnapshotJobTrigger>(),
     state: text("state").notNull().$type<SandboxProfileVersionSnapshotJobState>(),
     candidateImageProvider: text("candidate_image_provider"),
@@ -71,6 +78,9 @@ export const sandboxProfileVersionSnapshotJobs = controlPlaneSchema.table(
     uniqueIndex("spv_snapshot_jobs_active_job_per_version_uidx")
       .on(table.sandboxProfileId, table.sandboxProfileVersion)
       .where(sql`${table.state} in ('queued', 'running')`),
+    uniqueIndex("spv_snapshot_jobs_source_scheduled_action_id_uidx")
+      .on(table.sourceScheduledActionId)
+      .where(sql`${table.sourceScheduledActionId} is not null`),
     index("spv_snapshot_jobs_profile_version_created_idx").on(
       table.sandboxProfileId,
       table.sandboxProfileVersion,
