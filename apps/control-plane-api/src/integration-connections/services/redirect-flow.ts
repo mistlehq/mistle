@@ -115,10 +115,7 @@ export function encodeConnectionSetupRedirectStateMetadata(input: {
   ).toString("base64url")}`;
 }
 
-export function resolveConnectionRedirectStateMetadata(input: {
-  state: string;
-  compatibilityRouteSegment?: string;
-}): {
+export function resolveConnectionRedirectStateMetadata(input: { state: string }): {
   connectionId: string;
   routeSegment: string;
 } {
@@ -129,30 +126,19 @@ export function resolveConnectionRedirectStateMetadata(input: {
 
   const encodedMetadata = input.state.slice(separatorIndex + 1);
   const decodedMetadata = Buffer.from(encodedMetadata, "base64url").toString("utf8").trim();
-  try {
-    const parsedJson = z
-      .object({
-        connectionId: z.string().min(1),
-        routeSegment: z.string().min(1),
-      })
-      .strict()
-      .safeParse(JSON.parse(decodedMetadata));
+  const parsedJson = z
+    .object({
+      connectionId: z.string().min(1),
+      routeSegment: z.string().min(1),
+    })
+    .strict()
+    .safeParse(JSON.parse(decodedMetadata));
 
-    if (parsedJson.success) {
-      return parsedJson.data;
-    }
-  } catch {
-    // Compatibility with redirect states created before setup flow metadata was encoded.
+  if (parsedJson.success) {
+    return parsedJson.data;
   }
 
-  if (input.compatibilityRouteSegment === undefined) {
-    throw new Error("Connection redirect state is missing setup flow metadata.");
-  }
-
-  return {
-    connectionId: decodedMetadata,
-    routeSegment: input.compatibilityRouteSegment,
-  };
+  throw new Error("Connection redirect state is missing setup flow metadata.");
 }
 
 export function resolveConnectionRedirectStateConnectionId(state: string): string {

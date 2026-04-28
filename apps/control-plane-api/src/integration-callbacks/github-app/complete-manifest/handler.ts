@@ -22,7 +22,6 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
     {
       query,
-      routeSegment: "github-app",
       missingStateCode:
         IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
       invalidInputCode:

@@ -41,8 +41,6 @@ import {
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 
-type StartedExternalAppSetup = IntegrationExternalAppSetupStartResult;
-
 type CompletedExternalAppSetup = {
   id: string;
   targetKey: string;
@@ -214,8 +212,9 @@ export async function startExternalAppSetup(
     routeSegment: string;
     body: Record<string, unknown>;
     invalidInputCode?: ExternalAppSetupStartInvalidInputCode;
+    missingCredentialsMessage?: string;
   },
-): Promise<StartedExternalAppSetup> {
+): Promise<IntegrationExternalAppSetupStartResult> {
   const invalidInputCode =
     input.invalidInputCode ?? IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
   const connection = await resolveConnectionWithTargetOrThrow({
@@ -316,6 +315,17 @@ export async function startExternalAppSetup(
       throw error;
     }
 
+    if (
+      error instanceof InternalIntegrationCredentialsError &&
+      error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
+    ) {
+      throw new BadRequestError(
+        invalidInputCode,
+        input.missingCredentialsMessage ??
+          `Integration connection '${connection.id}' is missing required setup credentials.`,
+      );
+    }
+
     throw new BadRequestError(
       invalidInputCode,
       error instanceof Error ? error.message : "External app setup start failed.",
@@ -369,7 +379,6 @@ export async function completeExternalAppSetup(
   },
   input: {
     query: Record<string, string>;
-    routeSegment?: string;
     missingStateCode?:
       | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
       | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
@@ -397,10 +406,7 @@ export async function completeExternalAppSetup(
     alreadyUsedCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
     expiredCode: IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
   });
-  const stateMetadata = resolveConnectionRedirectStateMetadata({
-    state,
-    ...(input.routeSegment === undefined ? {} : { compatibilityRouteSegment: input.routeSegment }),
-  });
+  const stateMetadata = resolveConnectionRedirectStateMetadata({ state });
   const connection = await resolveConnectionWithTargetOrThrow({
     db: ctx.db,
     organizationId: redirectSession.organizationId,
