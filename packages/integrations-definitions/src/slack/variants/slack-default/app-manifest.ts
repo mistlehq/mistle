@@ -28,11 +28,51 @@ const SlackOAuthAccessErrorResponseSchema = z
   })
   .loose();
 
+const SlackManifestCreateSuccessResponseSchema = z
+  .object({
+    ok: z.literal(true),
+    app_id: z.string().min(1),
+    credentials: z
+      .object({
+        client_id: z.string().min(1),
+        client_secret: z.string().min(1),
+        signing_secret: z.string().min(1),
+      })
+      .loose(),
+    oauth_authorize_url: z.url(),
+  })
+  .loose();
+
+const SlackManifestCreateErrorResponseSchema = z
+  .object({
+    ok: z.literal(false),
+    error: z.string().min(1),
+    errors: z
+      .array(
+        z
+          .object({
+            message: z.string().min(1),
+            pointer: z.string().min(1).optional(),
+          })
+          .loose(),
+      )
+      .optional(),
+  })
+  .loose();
+
 export type SlackOAuthAccessSuccessResponse = z.output<
   typeof SlackOAuthAccessSuccessResponseSchema
 >;
 
 export type SlackOAuthAccessErrorResponse = z.output<typeof SlackOAuthAccessErrorResponseSchema>;
+
+export type SlackManifestCreateSuccessResponse = z.output<
+  typeof SlackManifestCreateSuccessResponseSchema
+>;
+
+export type SlackManifestCreateErrorResponse = z.output<
+  typeof SlackManifestCreateErrorResponseSchema
+>;
 
 function mergeUniqueStrings(input: {
   existing: unknown;
@@ -80,6 +120,19 @@ export function parseSlackOAuthAccessErrorResponse(
   value: unknown,
 ): SlackOAuthAccessErrorResponse | null {
   const parsed = SlackOAuthAccessErrorResponseSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function parseSlackManifestCreateSuccessResponse(
+  value: unknown,
+): SlackManifestCreateSuccessResponse {
+  return SlackManifestCreateSuccessResponseSchema.parse(value);
+}
+
+export function parseSlackManifestCreateErrorResponse(
+  value: unknown,
+): SlackManifestCreateErrorResponse | null {
+  const parsed = SlackManifestCreateErrorResponseSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }
 
