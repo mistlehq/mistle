@@ -1025,7 +1025,7 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           timeoutMs: 15_000,
           description: `OTP email for ${input.email}`,
           matcher: ({ message }) =>
-            message.Subject === "Your sign-in code" &&
+            message.Subject === "Your Mistle sign-in code" &&
             message.To.some((address) => address.Address === input.email),
         });
         const message = await mailpitInbox.getMessageSummary(listItem.ID);

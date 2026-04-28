@@ -37,11 +37,11 @@ describe("smtp-email-sender integration", () => {
 
     const received = await mailpitService.waitForMessage({
       timeoutMs: 10_000,
-      description: "otp subject: Your sign-in code",
-      matcher: ({ message }) => message.Subject === "Your sign-in code",
+      description: "otp subject: Your Mistle sign-in code",
+      matcher: ({ message }) => message.Subject === "Your Mistle sign-in code",
     });
 
-    expect(received.Subject).toBe("Your sign-in code");
+    expect(received.Subject).toBe("Your Mistle sign-in code");
     expect(received.To.map((address) => address.Address)).toContain("user@mistle.dev");
   });
 

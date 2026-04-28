@@ -2,20 +2,18 @@ import { PreviewMetadataLayout } from "../preview-support/preview-metadata.js";
 import { EmailOTPTemplate, type EmailOTPTemplateProps } from "../src/templates/otp/template.js";
 
 export const templateName = "OTP Sign In";
-const subject = "Your sign-in code";
-const preview = "Use this code to sign in to Mistle. Expires in 5 minutes.";
+const subject = "Your Mistle sign-in code";
+const title = "Your sign-in code";
 
 export const previewProps: EmailOTPTemplateProps = {
-  bodyMessage: "Use this code to sign in to Mistle",
   otp: "123456",
   expiresInSeconds: 300,
-  preview,
-  title: subject,
+  title,
 };
 
 export function Template(props: EmailOTPTemplateProps) {
   return (
-    <PreviewMetadataLayout preview={preview} subject={subject} templateName={templateName}>
+    <PreviewMetadataLayout subject={subject} templateName={templateName}>
       <EmailOTPTemplate {...props} />
     </PreviewMetadataLayout>
   );

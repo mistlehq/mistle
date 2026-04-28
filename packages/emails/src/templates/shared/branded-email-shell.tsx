@@ -62,7 +62,7 @@ const footerLinkStyle: CSSProperties = {
 };
 
 type BrandedEmailShellProps = {
-  preview: string;
+  preview?: string;
   title: string;
   children: ReactNode;
 };
@@ -74,7 +74,7 @@ export function BrandedEmailShell(props: BrandedEmailShellProps): ReactElement {
         <meta content="light dark" name="color-scheme" />
         <meta content="light dark" name="supported-color-schemes" />
       </Head>
-      <Preview>{props.preview}</Preview>
+      {props.preview !== undefined ? <Preview>{props.preview}</Preview> : null}
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
           <Section style={contentStyle}>

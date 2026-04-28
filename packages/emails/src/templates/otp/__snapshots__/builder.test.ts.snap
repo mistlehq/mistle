@@ -18,8 +18,6 @@ exports[`emails otp > matches snapshot for a stable OTP template output 1`] = `
   </head>
 
   <body style="background-color:#f3f1eb;font-family:Helvetica, Arial, sans-serif;margin:0;padding:32px 0">
-    <div data-skip="true" style="display:none;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">Use this code to sign in to Mistle. Expires in 5 minutes.<div> ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿</div>
-    </div>
     <div style="table-layout:fixed;width:100%">
       <div style="margin:0 auto;max-width:600px"><span><!--[if mso]><table align="center" width="600" style="border-spacing: 0; width:600px;" role="presentation"><tr><td><![endif]--></span>
         <table align="center" width="100%" role="presentation" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background-color:#fdfcf9;border:1px solid #ded8cc;border-radius:16px;margin:0 auto;overflow:hidden">
@@ -38,7 +36,6 @@ exports[`emails otp > matches snapshot for a stable OTP template output 1`] = `
                           </tbody>
                         </table>
                         <p style="font-size:24px;line-height:32px;margin:0 0 18px;color:#1f2937;font-weight:700;text-align:center">Your sign-in code</p>
-                        <p style="font-size:15px;line-height:22px;margin:0 0 16px;color:#4b5563;text-align:center">Use this code to sign in to Mistle</p>
                         <table align="center" width="100%" style="background-color:#f5f1e8;border:1px solid #ded8cc;border-radius:10px;margin:12px 0 18px;padding:16px" border="0" cellpadding="0" cellspacing="0" role="presentation">
                           <tbody>
                             <tr>
@@ -65,14 +62,11 @@ exports[`emails otp > matches snapshot for a stable OTP template output 1`] = `
 
 </html>",
   "metadata": {
-    "preview": "Use this code to sign in to Mistle. Expires in 5 minutes.",
-    "subject": "Your sign-in code",
+    "subject": "Your Mistle sign-in code",
     "templateName": "OTP",
   },
-  "subject": "Your sign-in code",
+  "subject": "Your Mistle sign-in code",
   "text": "Your sign-in code
-
-Use this code to sign in to Mistle
 
 123456
 

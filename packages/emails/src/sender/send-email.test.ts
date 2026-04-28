@@ -36,7 +36,7 @@ describe("send-email", () => {
       return;
     }
 
-    expect(sentMessage.subject).toBe("Your sign-in code");
+    expect(sentMessage.subject).toBe("Your Mistle sign-in code");
     expect(sentMessage.html).toContain("123456");
     expect(sentMessage.text).toContain("123456");
   });

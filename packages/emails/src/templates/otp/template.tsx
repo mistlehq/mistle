@@ -4,10 +4,10 @@ import type { CSSProperties, ReactElement } from "react";
 import { BrandedEmailShell } from "../shared/branded-email-shell.js";
 
 export type EmailOTPTemplateProps = {
-  bodyMessage: string;
+  bodyMessage?: string;
   otp: string;
   expiresInSeconds: number;
-  preview: string;
+  preview?: string;
   title: string;
 };
 
@@ -57,10 +57,9 @@ export function EmailOTPTemplate({
   title,
 }: EmailOTPTemplateProps): ReactElement {
   const expiryMinutes = toDisplayMinutes(expiresInSeconds);
-
-  return (
-    <BrandedEmailShell preview={preview} title={title}>
-      <Text style={paragraphStyle}>{bodyMessage}</Text>
+  const content = (
+    <>
+      {bodyMessage !== undefined ? <Text style={paragraphStyle}>{bodyMessage}</Text> : null}
       <Section style={otpCodeContainerStyle}>
         <Text style={otpCodeStyle}>{otp}</Text>
       </Section>
@@ -68,6 +67,16 @@ export function EmailOTPTemplate({
         {`This code expires in ${expiryMinutes} minute${expiryMinutes === 1 ? "" : "s"}.`}
       </Text>
       <Text style={footerStyle}>If you did not request this code, you can ignore this email.</Text>
+    </>
+  );
+
+  if (preview === undefined) {
+    return <BrandedEmailShell title={title}>{content}</BrandedEmailShell>;
+  }
+
+  return (
+    <BrandedEmailShell preview={preview} title={title}>
+      {content}
     </BrandedEmailShell>
   );
 }

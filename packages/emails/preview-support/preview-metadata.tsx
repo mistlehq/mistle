@@ -48,7 +48,7 @@ const valueStyle: CSSProperties = {
 type PreviewMetadataLayoutProps = {
   templateName: string;
   subject: string;
-  preview: string;
+  preview?: string;
   children: ReactNode;
 };
 
@@ -65,10 +65,12 @@ export function PreviewMetadataLayout(props: PreviewMetadataLayoutProps): ReactE
           <span style={labelStyle}>Subject</span>
           <p style={valueStyle}>{props.subject}</p>
         </div>
-        <div style={rowStyle}>
-          <span style={labelStyle}>Preview Text</span>
-          <p style={valueStyle}>{props.preview}</p>
-        </div>
+        {props.preview !== undefined ? (
+          <div style={rowStyle}>
+            <span style={labelStyle}>Preview Text</span>
+            <p style={valueStyle}>{props.preview}</p>
+          </div>
+        ) : null}
       </div>
       {props.children}
     </div>

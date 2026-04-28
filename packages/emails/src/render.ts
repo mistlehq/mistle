@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 export type EmailTemplateMetadata = {
   templateName: string;
   subject: string;
-  preview: string;
+  preview?: string;
 };
 
 export type EmailTemplate = {

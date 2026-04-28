@@ -21,12 +21,10 @@ export type BuildOrganizationInvitationTemplateOptions = {
 function buildTemplateProps(
   options: BuildOrganizationInvitationTemplateOptions,
 ): OrganizationInvitationTemplateProps {
-  const metadata = buildMetadata(options);
-
   return {
     organizationName: options.organizationName,
     inviterDisplayName: options.inviterDisplayName,
-    preview: metadata.preview,
+    preview: getInvitationPreview(options),
     role: options.role,
     invitationUrl: options.invitationUrl,
   };
@@ -36,13 +34,17 @@ function getInvitationSubject(organizationName: string): string {
   return `Join ${organizationName} on Mistle`;
 }
 
+function getInvitationPreview(options: BuildOrganizationInvitationTemplateOptions): string {
+  return `${options.inviterDisplayName} invited you to join ${options.organizationName} as ${options.role}.`;
+}
+
 function buildMetadata(options: BuildOrganizationInvitationTemplateOptions): EmailTemplateMetadata {
   const subject = getInvitationSubject(options.organizationName);
 
   return {
     templateName: "Organization Invitation",
     subject,
-    preview: `${options.inviterDisplayName} invited you to join ${options.organizationName} as ${options.role}.`,
+    preview: getInvitationPreview(options),
   };
 }
 
