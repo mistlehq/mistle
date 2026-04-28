@@ -26,12 +26,14 @@ export const it = vitestIt.extend<{ fixture: TokenizerProxyIntegrationFixture }>
             baseUrl: "http://127.0.0.1:5100",
             publicBaseUrl: "https://public-control-plane.example.test",
           },
-        },
-        internalAuthServiceToken: "integration-service-token",
-        egressGrantConfig: {
-          tokenSecret: "integration-egress-grant-secret",
-          tokenIssuer: "mistle-tokenizer-proxy-integration",
-          tokenAudience: "tokenizer-proxy",
+          internalAuth: {
+            serviceToken: "integration-service-token",
+          },
+          egressGrant: {
+            tokenSecret: "integration-egress-grant-secret",
+            tokenIssuer: "mistle-tokenizer-proxy-integration",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       };
 

@@ -447,6 +447,14 @@ const tokenizerProxyEnvConfig = {
     baseUrl: "http://127.0.0.1:5000",
     publicBaseUrl: "https://public-control-plane.example.test",
   },
+  internalAuth: {
+    serviceToken,
+  },
+  egressGrant: {
+    tokenSecret: sandboxEgressTokenSecret,
+    tokenIssuer: sandboxEgressTokenIssuer,
+    tokenAudience: sandboxEgressTokenAudience,
+  },
 } as const;
 
 const tokenizerProxyBaseFixtureConfig = {

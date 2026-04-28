@@ -14,6 +14,7 @@ import {
   getDataPlaneWorkerSandboxProviderValidationIssue,
 } from "./apps/data-plane-worker/schema.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
+import { PartialTokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
 import { asObjectRecord, getValueAtPath } from "./core/record.js";
@@ -172,6 +173,39 @@ function parseAppConfig(
   throw new Error("Unsupported app id.");
 }
 
+function composeTokenizerProxyConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY> {
+  const partialAppConfig = PartialTokenizerProxyConfigSchema.parse(appConfig);
+
+  return tokenizerProxyConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: {
+      serviceToken: globalConfig.internalAuth.serviceToken,
+    },
+    egressGrant: globalConfig.sandbox.egress,
+  });
+}
+
+function loadTokenizerProxyConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, tokenizerProxyConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeTokenizerProxyConfig(
+    getValueAtPath(envLoadedRoot, tokenizerProxyConfigModule.namespace),
+    globalConfig,
+  );
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
+}
+
 function loadSelectedAppConfig(
   appId: typeof AppIds.CONTROL_PLANE_API,
   rootConfig: RootConfig,
@@ -303,7 +337,8 @@ function validateSelectedAppConfig(
 
 export function loadConfig<TApp extends AppConfigModuleKey>(
   options: LoadConfigOptions<TApp>,
-): LoadConfigResult<TApp> {
+): LoadConfigResult<TApp>;
+export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): LoadConfigResult {
   const appModule = appConfigModules[options.app];
   const { configPath, env } = resolveLoadInputs(options);
 
@@ -332,11 +367,23 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
   }
 
   if (options.includeGlobal === false) {
+    if (options.app === AppIds.TOKENIZER_PROXY) {
+      const { app: appConfig } = loadTokenizerProxyConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     const validatedRoot = loadValidatedEnvRoot([appModule], env);
     const appConfig = parseAppConfig(options.app, validatedRoot);
     return {
       app: appConfig,
     };
+  }
+
+  if (options.app === AppIds.TOKENIZER_PROXY) {
+    return loadTokenizerProxyConfigFromEnv(env);
   }
 
   const validatedRoot = loadValidatedEnvRoot([globalConfigModule, appModule], env);

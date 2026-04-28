@@ -30,7 +30,7 @@ import { CredentialCache } from "../src/egress/credential-cache.js";
 import { createEgressProxyHandler } from "../src/egress/proxy-handler.js";
 import { createTokenizerProxyRuntime } from "../src/runtime/index.js";
 import { startServer } from "../src/server.js";
-import type { AppContextBindings } from "../src/types.js";
+import type { AppContextBindings, TokenizerProxyRuntimeConfig } from "../src/types.js";
 import { it } from "./test-context.js";
 
 const ControlPlaneInternalAuthHeader = "x-mistle-service-token";
@@ -203,7 +203,7 @@ function createRuntimeConfig(input: {
   port: number;
   controlPlaneBaseUrl: string;
   controlPlanePublicBaseUrl?: string;
-}) {
+}): TokenizerProxyRuntimeConfig {
   return {
     app: {
       server: {
@@ -214,10 +214,12 @@ function createRuntimeConfig(input: {
         baseUrl: input.controlPlaneBaseUrl,
         publicBaseUrl: input.controlPlanePublicBaseUrl ?? PublicControlPlaneBaseUrl,
       },
+      internalAuth: {
+        serviceToken: "integration-service-token",
+      },
+      egressGrant: IntegrationEgressGrantConfig,
     },
-    internalAuthServiceToken: "integration-service-token",
-    egressGrantConfig: IntegrationEgressGrantConfig,
-  } as const;
+  };
 }
 
 async function startTokenizerProxyWithRequestMiddleware(input: {
@@ -724,20 +726,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/v1"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -780,20 +775,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/v1"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -837,20 +825,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/v1"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -897,20 +878,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/backend-api/codex"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -960,20 +934,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/mistlehq/mistle.git"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1043,20 +1010,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/mistlehq/mistle.git"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1604,20 +1564,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/mcp"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1674,20 +1627,13 @@ describe("tokenizer proxy integration", () => {
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1743,20 +1689,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/repos"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1828,20 +1767,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/repos"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1911,20 +1843,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/repos"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -1984,20 +1909,13 @@ describe("tokenizer proxy integration", () => {
       authInjectionType: "bearer",
       authInjectionTarget: "authorization",
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2050,20 +1968,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/backend-api/codex"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2128,20 +2039,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/graphql"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2203,20 +2107,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/backend-api/codex"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2274,20 +2171,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["POST"],
       allowedPathPrefixes: ["/"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2368,20 +2258,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/v1"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {
@@ -2459,20 +2342,13 @@ describe("tokenizer proxy integration", () => {
       allowedMethods: ["GET"],
       allowedPathPrefixes: ["/mcp"],
     });
-    const runtime = createTokenizerProxyRuntime({
-      app: {
-        server: {
-          host,
-          port,
-        },
-        controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
-          publicBaseUrl: PublicControlPlaneBaseUrl,
-        },
-      },
-      internalAuthServiceToken: "integration-service-token",
-      egressGrantConfig: IntegrationEgressGrantConfig,
-    });
+    const runtime = createTokenizerProxyRuntime(
+      createRuntimeConfig({
+        host,
+        port,
+        controlPlaneBaseUrl: controlPlaneServer.baseUrl,
+      }),
+    );
     await runtime.start();
 
     try {

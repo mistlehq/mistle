@@ -209,6 +209,14 @@ describe("parseConfigRecord", () => {
             baseUrl: "http://127.0.0.1:5100",
             publicBaseUrl: "https://mistle.example.test",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          egressGrant: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
     };
@@ -419,6 +427,14 @@ describe("parseConfigRecord", () => {
             baseUrl: "http://127.0.0.1:5100",
             publicBaseUrl: "https://mistle.example.test",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          egressGrant: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
     };
@@ -623,6 +639,14 @@ describe("parseConfigRecord", () => {
             baseUrl: "http://127.0.0.1:5100",
             publicBaseUrl: "https://mistle.example.test",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
+          egressGrant: {
+            tokenSecret: "test-egress-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "tokenizer-proxy",
+          },
         },
       },
     };
@@ -821,6 +845,14 @@ describe("parseConfigRecord", () => {
             controlPlaneApi: {
               baseUrl: "http://127.0.0.1:5100",
               publicBaseUrl: "https://mistle.example.test",
+            },
+            internalAuth: {
+              serviceToken: "test-service-token",
+            },
+            egressGrant: {
+              tokenSecret: "test-egress-token-secret",
+              tokenIssuer: "data-plane-worker",
+              tokenAudience: "tokenizer-proxy",
             },
           },
         },

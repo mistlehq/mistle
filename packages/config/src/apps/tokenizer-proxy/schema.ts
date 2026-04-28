@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GlobalSandboxTokenConfigSchema } from "../../global/schema.js";
+
 export const TokenizerProxyServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -23,10 +25,18 @@ export const TokenizerProxyControlPlaneApiConfigSchema = z
   })
   .strict();
 
+export const TokenizerProxyInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
+  })
+  .strict();
+
 export const TokenizerProxyConfigSchema = z
   .object({
     server: TokenizerProxyServerConfigSchema,
     controlPlaneApi: TokenizerProxyControlPlaneApiConfigSchema,
+    internalAuth: TokenizerProxyInternalAuthConfigSchema,
+    egressGrant: GlobalSandboxTokenConfigSchema,
   })
   .strict();
 
@@ -34,6 +44,8 @@ export const PartialTokenizerProxyConfigSchema = z
   .object({
     server: TokenizerProxyServerConfigSchema.partial().optional(),
     controlPlaneApi: TokenizerProxyControlPlaneApiConfigSchema.partial().optional(),
+    internalAuth: TokenizerProxyInternalAuthConfigSchema.partial().optional(),
+    egressGrant: GlobalSandboxTokenConfigSchema.partial().optional(),
   })
   .strict();
 

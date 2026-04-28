@@ -1,13 +1,11 @@
 import { shutdownTelemetry } from "@mistle/telemetry";
 
-import { appConfig, globalConfig } from "./instrument.js";
+import { appConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createTokenizerProxyRuntime } from "./runtime/index.js";
 
 const runtime = createTokenizerProxyRuntime({
   app: appConfig,
-  internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
-  egressGrantConfig: globalConfig.sandbox.egress,
 });
 
 await runtime.start();

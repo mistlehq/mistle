@@ -8,12 +8,9 @@ import type { Context, Hono } from "hono";
 type LoadTokenizerProxyConfigResult = ReturnType<typeof loadConfig<typeof AppIds.TOKENIZER_PROXY>>;
 
 export type TokenizerProxyConfig = LoadTokenizerProxyConfigResult["app"];
-export type TokenizerProxyGlobalConfig = NonNullable<LoadTokenizerProxyConfigResult["global"]>;
 
 export type TokenizerProxyRuntimeConfig = {
   app: TokenizerProxyConfig;
-  internalAuthServiceToken: TokenizerProxyGlobalConfig["internalAuth"]["serviceToken"];
-  egressGrantConfig: TokenizerProxyGlobalConfig["sandbox"]["egress"];
 };
 
 export type AppContextBindings = {

@@ -344,6 +344,14 @@ export function selectTokenizerProxyConfig(config: Config): AppConfig["apps"]["t
       baseUrl: config.services.control_plane_api.internal_url,
       publicBaseUrl: config.services.control_plane_api.public_url,
     },
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
+    egressGrant: {
+      tokenSecret: config.sandbox.tokens.egress.secret,
+      tokenIssuer: config.sandbox.tokens.egress.issuer,
+      tokenAudience: config.sandbox.tokens.egress.audience,
+    },
   };
 }
 

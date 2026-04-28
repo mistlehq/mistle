@@ -229,6 +229,14 @@ describe("projectServiceConfigToEnv", () => {
           baseUrl: "http://control-plane-api:8080",
           publicBaseUrl: "https://api.mistle.example",
         },
+        internalAuth: {
+          serviceToken: "secret://MISTLE_INTERNAL_AUTH_SHARED_TOKEN",
+        },
+        egressGrant: {
+          tokenSecret: "secret://MISTLE_SANDBOX_EGRESS_TOKEN_SECRET",
+          tokenIssuer: "data-plane-worker",
+          tokenAudience: "tokenizer-proxy",
+        },
       },
     } satisfies LoadConfigResult<typeof AppIds.TOKENIZER_PROXY>;
 

@@ -17,7 +17,6 @@ import type {
   AppContextBindings,
   TokenizerProxyApp,
   TokenizerProxyConfig,
-  TokenizerProxyRuntimeConfig,
   TokenizerProxyUpgradeHandler,
 } from "./types.js";
 
@@ -26,15 +25,11 @@ type TokenizerProxyAppComponents = {
   onUpgrade: TokenizerProxyUpgradeHandler;
 };
 
-export function createAppComponents(
-  config: TokenizerProxyConfig,
-  internalAuthServiceToken: string,
-  egressGrantConfig: TokenizerProxyRuntimeConfig["egressGrantConfig"],
-): TokenizerProxyAppComponents {
+export function createAppComponents(config: TokenizerProxyConfig): TokenizerProxyAppComponents {
   const app = new Hono<AppContextBindings>();
   const controlPlaneInternalClient = new ControlPlaneInternalClient({
     baseUrl: config.controlPlaneApi.baseUrl,
-    internalAuthServiceToken,
+    internalAuthServiceToken: config.internalAuth.serviceToken,
     requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
   });
   const credentialCache = new CredentialCache({
@@ -46,18 +41,18 @@ export function createAppComponents(
   const egressProxyHandler = createEgressProxyHandler({
     controlPlaneInternalClient,
     credentialCache,
-    egressGrantConfig,
+    egressGrantConfig: config.egressGrant,
     resolveEgressCredentialResolver: resolveIntegrationEgressCredentialResolver,
   });
   const egressProxyUpgradeHandler = createEgressProxyUpgradeHandler({
     controlPlaneInternalClient,
     credentialCache,
-    egressGrantConfig,
+    egressGrantConfig: config.egressGrant,
   });
 
   app.use("*", async (ctx, next) => {
     ctx.set("config", config);
-    ctx.set("internalAuthServiceToken", internalAuthServiceToken);
+    ctx.set("internalAuthServiceToken", config.internalAuth.serviceToken);
     await next();
   });
 
@@ -74,10 +69,6 @@ export function createAppComponents(
   };
 }
 
-export function createApp(
-  config: TokenizerProxyConfig,
-  internalAuthServiceToken: string,
-  egressGrantConfig: TokenizerProxyRuntimeConfig["egressGrantConfig"],
-): TokenizerProxyApp {
-  return createAppComponents(config, internalAuthServiceToken, egressGrantConfig).app;
+export function createApp(config: TokenizerProxyConfig): TokenizerProxyApp {
+  return createAppComponents(config).app;
 }
