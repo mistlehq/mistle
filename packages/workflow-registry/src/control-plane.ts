@@ -208,3 +208,22 @@ export const ScheduleDispatchWorkflowSpec = defineWorkflowSpec<
   name: ScheduleDispatchWorkflowName,
   version: ScheduleDispatchWorkflowVersion,
 });
+
+export const ScheduleDispatchBatchWorkflowName = "control-plane.schedules.dispatch-batch";
+export const ScheduleDispatchBatchWorkflowVersion = "1";
+
+export type ScheduleDispatchBatchWorkflowInput = {
+  scheduledActionIds: string[];
+};
+
+export type ScheduleDispatchBatchWorkflowOutput = {
+  scheduledActionIds: string[];
+};
+
+export const ScheduleDispatchBatchWorkflowSpec = defineWorkflowSpec<
+  ScheduleDispatchBatchWorkflowInput,
+  ScheduleDispatchBatchWorkflowOutput
+>({
+  name: ScheduleDispatchBatchWorkflowName,
+  version: ScheduleDispatchBatchWorkflowVersion,
+});

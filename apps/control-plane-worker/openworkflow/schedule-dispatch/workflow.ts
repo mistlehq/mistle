@@ -3,6 +3,7 @@ import { ScheduleDispatchWorkflowSpec } from "@mistle/workflow-registry/control-
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedControlPlaneWorkflow } from "../core/tracing.js";
 import { dispatchDueSchedules } from "./dispatch-due-schedules.js";
+import { startScheduleDispatchChildBatches } from "./start-child-batches.js";
 
 export const ScheduleDispatchWorkflow = defineTracedControlPlaneWorkflow(
   ScheduleDispatchWorkflowSpec,
@@ -12,9 +13,22 @@ export const ScheduleDispatchWorkflow = defineTracedControlPlaneWorkflow(
       throw new Error(`Invalid schedule dispatch cutoff minute: ${input.cutoffMinute}`);
     }
 
-    const { db } = await getWorkflowContext();
+    const { db, openWorkflow } = await getWorkflowContext();
 
-    return step.run({ name: "dispatch-due-schedules" }, async () =>
+    await step.run({ name: "recover-scheduled-actions-before-dispatch" }, async () =>
+      startScheduleDispatchChildBatches(
+        {
+          db,
+          openWorkflow,
+        },
+        {
+          cutoffMinute,
+          scheduledActionIds: [],
+        },
+      ),
+    );
+
+    const dispatchResult = await step.run({ name: "dispatch-due-schedules" }, async () =>
       dispatchDueSchedules(
         {
           db,
@@ -24,5 +38,20 @@ export const ScheduleDispatchWorkflow = defineTracedControlPlaneWorkflow(
         },
       ),
     );
+
+    await step.run({ name: "start-schedule-dispatch-child-batches" }, async () =>
+      startScheduleDispatchChildBatches(
+        {
+          db,
+          openWorkflow,
+        },
+        {
+          cutoffMinute,
+          scheduledActionIds: dispatchResult.pendingScheduledActionIds,
+        },
+      ),
+    );
+
+    return dispatchResult;
   },
 );
