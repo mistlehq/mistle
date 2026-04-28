@@ -12,7 +12,9 @@ import {
 } from "@mistle/integrations-core";
 import {
   buildConvertedGitHubAppConnectionConfig,
+  buildConvertedGitHubAppConnectionSecrets as buildConvertedGitHubAppConnectionSecretsFromDefinitions,
   buildGitHubAppManifestConversionUrl,
+  GitHubAppManifestConversionMissingClientSecretError,
   parseGitHubAppManifestConversionResponse as parseGitHubAppManifestConversionResponseFromDefinitions,
   type GitHubAppManifestConversion,
 } from "@mistle/integrations-definitions/server";
@@ -138,26 +140,18 @@ export function buildConvertedConnectionSecrets(input: {
   conversion: GitHubAppManifestConversion;
   supportsClientSecret: boolean;
 }): Record<string, string> {
-  if (!input.supportsClientSecret) {
-    return {
-      appPrivateKeyPem: input.conversion.pem,
-      webhookSecret: input.conversion.webhook_secret,
-    };
-  }
+  try {
+    return buildConvertedGitHubAppConnectionSecretsFromDefinitions(input);
+  } catch (error) {
+    if (error instanceof GitHubAppManifestConversionMissingClientSecretError) {
+      throw new BadRequestError(
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+        error.message,
+      );
+    }
 
-  const clientSecret = input.conversion.client_secret;
-  if (clientSecret === undefined) {
-    throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
-      "GitHub App manifest conversion response is missing `client_secret`.",
-    );
+    throw error;
   }
-
-  return {
-    appPrivateKeyPem: input.conversion.pem,
-    webhookSecret: input.conversion.webhook_secret,
-    clientSecret,
-  };
 }
 
 export async function completeGitHubAppManifestConnection(

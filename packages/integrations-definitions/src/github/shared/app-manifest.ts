@@ -26,6 +26,13 @@ export type GitHubAppManifestConversion = z.output<
   typeof GitHubAppManifestConversionResponseSchema
 >;
 
+export class GitHubAppManifestConversionMissingClientSecretError extends Error {
+  constructor() {
+    super("GitHub App manifest conversion response is missing `client_secret`.");
+    this.name = "GitHubAppManifestConversionMissingClientSecretError";
+  }
+}
+
 export const GitHubAppManifestTemplate = {
   name: "Mistle GitHub App",
   url: "https://github.com/mistlehq/mistle",
@@ -71,6 +78,29 @@ export function buildConvertedGitHubAppConnectionConfig(input: {
     app_id: input.conversion.id.toString(),
     app_slug: input.conversion.slug,
     client_id: input.conversion.client_id,
+  };
+}
+
+export function buildConvertedGitHubAppConnectionSecrets(input: {
+  conversion: GitHubAppManifestConversion;
+  supportsClientSecret: boolean;
+}): Record<string, string> {
+  if (!input.supportsClientSecret) {
+    return {
+      appPrivateKeyPem: input.conversion.pem,
+      webhookSecret: input.conversion.webhook_secret,
+    };
+  }
+
+  const clientSecret = input.conversion.client_secret;
+  if (clientSecret === undefined) {
+    throw new GitHubAppManifestConversionMissingClientSecretError();
+  }
+
+  return {
+    appPrivateKeyPem: input.conversion.pem,
+    webhookSecret: input.conversion.webhook_secret,
+    clientSecret,
   };
 }
 

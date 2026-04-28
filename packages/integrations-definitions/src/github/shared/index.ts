@@ -23,10 +23,12 @@ export { GitHubAppInstallationCredentialResolver } from "./credential-resolver.s
 export { GitHubCredentialSlotKeys } from "./slot-keys.js";
 export {
   buildConvertedGitHubAppConnectionConfig,
+  buildConvertedGitHubAppConnectionSecrets,
   buildGitHubAppInstallationUrl,
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
+  GitHubAppManifestConversionMissingClientSecretError,
   parseGitHubAppManifestConversionResponse,
   type GitHubAppManifestConversion,
   type GitHubAppManifestOwner,
