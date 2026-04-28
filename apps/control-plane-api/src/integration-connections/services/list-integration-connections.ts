@@ -3,6 +3,7 @@ import {
   integrationWebhookSources,
   organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
+  sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   webhookAutomations,
   type ControlPlaneDatabase,
@@ -303,7 +304,19 @@ async function listBindingCountsByConnectionId(input: {
       bindingCount: sql<number>`count(*)::int`,
     })
     .from(sandboxProfileVersionIntegrationBindings)
-    .where(inArray(sandboxProfileVersionIntegrationBindings.connectionId, [...input.connectionIds]))
+    .innerJoin(
+      sandboxProfiles,
+      eq(sandboxProfiles.id, sandboxProfileVersionIntegrationBindings.sandboxProfileId),
+    )
+    .where(
+      and(
+        inArray(sandboxProfileVersionIntegrationBindings.connectionId, [...input.connectionIds]),
+        eq(
+          sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+          sandboxProfiles.activeVersion,
+        ),
+      ),
+    )
     .groupBy(sandboxProfileVersionIntegrationBindings.connectionId);
 
   return new Map(bindingCounts.map((entry) => [entry.connectionId, entry.bindingCount] as const));

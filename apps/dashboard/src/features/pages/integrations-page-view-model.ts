@@ -178,7 +178,7 @@ export function buildIntegrationConnectionDetailItems(input: {
       ...(isIdentityLinked ? { isIdentityLinked: true } : {}),
       automationCount,
       bindingCount,
-      canDelete: automationCount === 0 && !isIdentityLinked,
+      canDelete: bindingCount === 0 && automationCount === 0 && !isIdentityLinked,
       ...(connection.connectionMethodId === undefined
         ? { authMethodId: null }
         : { authMethodId: connection.connectionMethodId }),

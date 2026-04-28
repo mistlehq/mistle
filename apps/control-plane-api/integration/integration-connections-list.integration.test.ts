@@ -120,6 +120,7 @@ describe("integration connections list integration", () => {
       profileDisplayName: "Profile 1",
       bindingId: "ibd_001",
       connectionId: "icn_001",
+      activeVersion: 1,
     });
     await insertWebhookAutomationUsage(fixture, {
       organizationId: firstOrgSession.organizationId,
@@ -623,6 +624,29 @@ describe("integration connections list integration", () => {
         },
       },
     });
+
+    const listUsageResponse = await fixture.request("/v1/integration/connections", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+    expect(listUsageResponse.status).toBe(200);
+    const listUsagePage = ListIntegrationConnectionsResponseSchema.parse(
+      await listUsageResponse.json(),
+    );
+    expect(
+      listUsagePage.items.find((connection) => connection.id === "icn_delete_bound")?.bindingCount,
+    ).toBe(0);
+    expect(
+      listUsagePage.items.find(
+        (connection) => connection.id === "icn_delete_inactive_published_binding",
+      )?.bindingCount,
+    ).toBe(0);
+    expect(
+      listUsagePage.items.find(
+        (connection) => connection.id === "icn_delete_active_version_binding",
+      )?.bindingCount,
+    ).toBe(1);
 
     const deleteFreeResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_free",

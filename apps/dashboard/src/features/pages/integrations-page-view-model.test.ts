@@ -634,7 +634,7 @@ describe("integrations page view model", () => {
     expect(item?.canDelete).toBe(false);
   });
 
-  it("allows deletion when a connection only has sandbox profile bindings", () => {
+  it("blocks deletion when a connection has active sandbox profile bindings", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {
@@ -652,7 +652,7 @@ describe("integrations page view model", () => {
     });
 
     expect(item?.bindingCount).toBe(2);
-    expect(item?.canDelete).toBe(true);
+    expect(item?.canDelete).toBe(false);
   });
 
   it("returns an empty resource summary list when a connection has no resources payload", () => {
