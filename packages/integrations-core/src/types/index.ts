@@ -490,8 +490,33 @@ export const IntegrationFormConnectionMethodCreateBehaviors: {
 };
 
 export type IntegrationFormConnectionMethodSetupFlow = {
+  completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement;
   routeSegment: string;
 };
+
+export type IntegrationFormConnectionMethodSetupCompletionRequirementLeaf =
+  | {
+      kind: "connection-external-subject";
+    }
+  | {
+      field: string;
+      kind: "config-field";
+    }
+  | {
+      field: string;
+      kind: "secret-field";
+    };
+
+export type IntegrationFormConnectionMethodSetupCompletionRequirement =
+  | IntegrationFormConnectionMethodSetupCompletionRequirementLeaf
+  | {
+      anyOf: readonly IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "any-of";
+    }
+  | {
+      allOf: readonly IntegrationFormConnectionMethodSetupCompletionRequirementLeaf[];
+      kind: "all-of";
+    };
 
 type IntegrationConnectionMethodDefinitionBase<
   TTargetConfig = Record<string, unknown>,

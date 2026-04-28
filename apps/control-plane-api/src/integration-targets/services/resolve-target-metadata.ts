@@ -1,6 +1,8 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
   IntegrationConnectionMethodDefinition,
+  IntegrationFormConnectionMethodSetupCompletionRequirement,
+  IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -85,6 +87,7 @@ export type ResolvedIntegrationTargetMetadata = {
         kind: "form";
         createBehavior?: "single-step" | "draft-then-setup";
         setupFlow?: {
+          completionRequirements?: ResolvedSetupCompletionRequirement;
           routeSegment: string;
         };
         secretFields: {
@@ -129,6 +132,30 @@ export type ResolvedIntegrationTargetMetadata = {
   supportedWebhookEvents?: ResolvedWebhookEvent[];
 };
 
+type ResolvedSetupCompletionRequirementLeaf =
+  | {
+      kind: "connection-external-subject";
+    }
+  | {
+      field: string;
+      kind: "config-field";
+    }
+  | {
+      field: string;
+      kind: "secret-field";
+    };
+
+type ResolvedSetupCompletionRequirement =
+  | ResolvedSetupCompletionRequirementLeaf
+  | {
+      anyOf: ResolvedSetupCompletionRequirementLeaf[];
+      kind: "any-of";
+    }
+  | {
+      allOf: ResolvedSetupCompletionRequirementLeaf[];
+      kind: "all-of";
+    };
+
 function resolveConnectionMethod(
   method: IntegrationConnectionMethodDefinition,
 ): NonNullable<ResolvedIntegrationTargetMetadata["connectionMethods"]>[number] {
@@ -142,6 +169,13 @@ function resolveConnectionMethod(
         ? {}
         : {
             setupFlow: {
+              ...(method.setupFlow.completionRequirements === undefined
+                ? {}
+                : {
+                    completionRequirements: cloneSetupCompletionRequirement(
+                      method.setupFlow.completionRequirements,
+                    ),
+                  }),
               routeSegment: method.setupFlow.routeSegment,
             },
           }),
@@ -171,6 +205,41 @@ function resolveConnectionMethod(
     label: method.label,
     kind: "redirect",
     ui: method.ui,
+  };
+}
+
+function cloneSetupCompletionRequirement(
+  requirement: IntegrationFormConnectionMethodSetupCompletionRequirement,
+): ResolvedSetupCompletionRequirement {
+  if (requirement.kind === "any-of") {
+    return {
+      kind: requirement.kind,
+      anyOf: requirement.anyOf.map(cloneSetupCompletionRequirementLeaf),
+    };
+  }
+
+  if (requirement.kind === "all-of") {
+    return {
+      kind: requirement.kind,
+      allOf: requirement.allOf.map(cloneSetupCompletionRequirementLeaf),
+    };
+  }
+
+  return cloneSetupCompletionRequirementLeaf(requirement);
+}
+
+function cloneSetupCompletionRequirementLeaf(
+  requirement: IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
+): ResolvedSetupCompletionRequirementLeaf {
+  if (requirement.kind === "connection-external-subject") {
+    return {
+      kind: requirement.kind,
+    };
+  }
+
+  return {
+    kind: requirement.kind,
+    field: requirement.field,
   };
 }
 

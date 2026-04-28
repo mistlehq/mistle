@@ -66,6 +66,18 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
         kind: "form",
         createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
         setupFlow: {
+          completionRequirements: {
+            kind: "any-of",
+            anyOf: [
+              {
+                kind: "config-field",
+                field: "installation_id",
+              },
+              {
+                kind: "connection-external-subject",
+              },
+            ],
+          },
           routeSegment: "github-app",
         },
         secretFields: [

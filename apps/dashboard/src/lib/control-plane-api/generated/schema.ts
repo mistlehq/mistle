@@ -3828,6 +3828,61 @@ export interface paths {
                         slotKey: string;
                       }[];
                       setupFlow?: {
+                        completionRequirements?:
+                          | {
+                              /** @enum {string} */
+                              kind: "connection-external-subject";
+                            }
+                          | {
+                              field: string;
+                              /** @enum {string} */
+                              kind: "config-field";
+                            }
+                          | {
+                              field: string;
+                              /** @enum {string} */
+                              kind: "secret-field";
+                            }
+                          | {
+                              anyOf: (
+                                | {
+                                    /** @enum {string} */
+                                    kind: "connection-external-subject";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "config-field";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "secret-field";
+                                  }
+                              )[];
+                              /** @enum {string} */
+                              kind: "any-of";
+                            }
+                          | {
+                              allOf: (
+                                | {
+                                    /** @enum {string} */
+                                    kind: "connection-external-subject";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "config-field";
+                                  }
+                                | {
+                                    field: string;
+                                    /** @enum {string} */
+                                    kind: "secret-field";
+                                  }
+                              )[];
+                              /** @enum {string} */
+                              kind: "all-of";
+                            };
                         routeSegment: string;
                       };
                     }
