@@ -2,15 +2,6 @@ import { buildUrlWithPath } from "@mistle/http";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { z } from "zod";
 
-export type GitHubAppManifestOwner =
-  | {
-      kind: "personal";
-    }
-  | {
-      kind: "organization";
-      organizationSlug: string;
-    };
-
 const GitHubAppManifestConversionResponseSchema = z
   .object({
     id: z.union([z.string().min(1), z.number().int().nonnegative()]),
@@ -21,6 +12,26 @@ const GitHubAppManifestConversionResponseSchema = z
     webhook_secret: z.string().min(1),
   })
   .loose();
+
+export const GitHubAppManifestOwnerSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("personal"),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("organization"),
+      organizationSlug: z
+        .string()
+        .trim()
+        .min(1)
+        .regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/),
+    })
+    .strict(),
+]);
+
+export type GitHubAppManifestOwner = z.output<typeof GitHubAppManifestOwnerSchema>;
 
 export type GitHubAppManifestConversion = z.output<
   typeof GitHubAppManifestConversionResponseSchema

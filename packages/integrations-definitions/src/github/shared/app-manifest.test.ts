@@ -6,6 +6,7 @@ import {
   buildConvertedGitHubAppConnectionSecrets,
   buildGitHubAppInstallationUrl,
   GitHubAppManifestConversionMissingClientSecretError,
+  GitHubAppManifestOwnerSchema,
   GitHubAppManifestTemplate,
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
@@ -93,6 +94,39 @@ describe("parseGitHubAppManifestConversionResponse", () => {
     }
 
     expect(thrownError).toBeInstanceOf(z.ZodError);
+  });
+});
+
+describe("GitHubAppManifestOwnerSchema", () => {
+  it("accepts personal GitHub App owners", () => {
+    expect(
+      GitHubAppManifestOwnerSchema.parse({
+        kind: "personal",
+      }),
+    ).toEqual({
+      kind: "personal",
+    });
+  });
+
+  it("accepts and trims organization GitHub App owners", () => {
+    expect(
+      GitHubAppManifestOwnerSchema.parse({
+        kind: "organization",
+        organizationSlug: " Mistle-Org ",
+      }),
+    ).toEqual({
+      kind: "organization",
+      organizationSlug: "Mistle-Org",
+    });
+  });
+
+  it("rejects invalid organization slugs", () => {
+    expect(() =>
+      GitHubAppManifestOwnerSchema.parse({
+        kind: "organization",
+        organizationSlug: "-mistle-org",
+      }),
+    ).toThrow("Invalid string");
   });
 });
 
