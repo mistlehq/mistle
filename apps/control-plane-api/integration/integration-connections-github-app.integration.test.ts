@@ -16,6 +16,10 @@ import {
   CompleteGitHubAppInstallationConnectionQuerySchema,
 } from "../src/integration-callbacks/github-app/complete-installation/schema.js";
 import {
+  CompleteGitHubAppManifestConnectionBadRequestResponseSchema,
+  CompleteGitHubAppManifestConnectionQuerySchema,
+} from "../src/integration-callbacks/github-app/complete-manifest/schema.js";
+import {
   StartGitHubAppInstallationConnectionBadRequestResponseSchema,
   StartGitHubAppInstallationConnectionNotFoundResponseSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
@@ -87,6 +91,12 @@ describe("integration connections GitHub App integration", () => {
     const query = CompleteGitHubAppInstallationConnectionQuerySchema.parse(input.query);
     const searchParams = new URLSearchParams(query);
     return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
+  }
+
+  function createGitHubAppManifestCompletePath(input: { query: Record<string, string> }): string {
+    const query = CompleteGitHubAppManifestConnectionQuerySchema.parse(input.query);
+    const searchParams = new URLSearchParams(query);
+    return `/p/integration/callbacks/github-app-manifest?${searchParams.toString()}`;
   }
 
   it("creates a GitHub App installation authorization URL for an existing connection and persists redirect session state", async ({
@@ -305,6 +315,61 @@ describe("integration connections GitHub App integration", () => {
     expect(state).toContain(".");
   });
 
+  it("returns the documented GitHub App manifest completion code when the callback code is missing", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-github-app-manifest-complete-missing-code@example.com",
+    });
+    const connectionId = await createGitHubAppDraftConnection(fixture, {
+      authenticatedSession,
+      displayName: "Draft GitHub",
+    });
+    const startResponse = await fixture.request(
+      `/v1/integration/connections/${connectionId}/github-app-manifest/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startResponseBody = StartGitHubAppManifestConnectionResponseSchema.parse(
+      await startResponse.json(),
+    );
+    const state = resolveGitHubAppManifestSubmissionState(new URL(startResponseBody.submissionUrl));
+
+    const response = await fixture.request(
+      createGitHubAppManifestCompletePath({
+        query: {
+          state,
+        },
+      }),
+      {
+        method: "GET",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = CompleteGitHubAppManifestConnectionBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT");
+    expect(responseBody.message).toContain("must include `code`");
+  });
+
   it("fails to start installation when a draft connection is still missing required GitHub App credentials", async ({
     fixture,
   }) => {
@@ -507,6 +572,40 @@ describe("integration connections GitHub App integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
+  });
+
+  it("returns the documented GitHub App installation completion code when installation_id is missing", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
+      email:
+        "integration-connections-github-app-installation-complete-missing-installation-id@example.com",
+      displayName: "GitHub Prod",
+    });
+    const { state } = await startGitHubAppInstallationConnection(fixture, {
+      authenticatedSession,
+      connectionId,
+    });
+
+    const response = await fixture.request(
+      createGitHubAppInstallationCompletePath({
+        query: {
+          state,
+        },
+      }),
+      {
+        method: "GET",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
+    expect(responseBody.message).toContain("must include `installation_id`");
   });
 
   it("returns 400 when GitHub App installation completion state is invalid", async ({

@@ -47,6 +47,18 @@ type CompletedExternalAppSetup = {
   routeSegment: string;
 };
 
+type ExternalAppSetupStartInvalidInputCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_MANIFEST_START_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+
+type ExternalAppSetupCompleteInvalidInputCode =
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+
 function resolveSetupFlowOrThrow(input: {
   routeSegment: string;
   flows: ReadonlyArray<IntegrationExternalAppSetupFlowCapability>;
@@ -171,8 +183,11 @@ export async function startExternalAppSetup(
     connectionId: string;
     routeSegment: string;
     body: Record<string, unknown>;
+    invalidInputCode?: ExternalAppSetupStartInvalidInputCode;
   },
 ): Promise<StartedExternalAppSetup> {
+  const invalidInputCode =
+    input.invalidInputCode ?? IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
   const connection = await resolveConnectionWithTargetOrThrow({
     db: ctx.db,
     organizationId: input.organizationId,
@@ -266,7 +281,7 @@ export async function startExternalAppSetup(
     }
 
     throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      invalidInputCode,
       error instanceof Error ? error.message : "External app setup start failed.",
     );
   }
@@ -275,12 +290,12 @@ export async function startExternalAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+    invalidInputCode,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: startedSetup.secrets ?? {},
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+    invalidInputCode,
   });
 
   await persistRedirectSessionOrThrow({
@@ -323,13 +338,18 @@ export async function completeExternalAppSetup(
       | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
       | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
       | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT;
+    invalidInputCode?: ExternalAppSetupCompleteInvalidInputCode;
   },
 ): Promise<CompletedExternalAppSetup> {
+  const invalidInputCode =
+    input.invalidInputCode ?? IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
   const queryParams = createRedirectQueryParams(input.query);
   const state = queryParams.get("state");
   if (state === null || state.length === 0) {
     throw new BadRequestError(
-      input.missingStateCode ?? IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      input.missingStateCode ??
+        input.invalidInputCode ??
+        IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       "External app setup callback query must include `state`.",
     );
   }
@@ -434,13 +454,13 @@ export async function completeExternalAppSetup(
       error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
     ) {
       throw new BadRequestError(
-        IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+        invalidInputCode,
         `Integration connection '${connection.id}' is missing required setup credentials.`,
       );
     }
 
     throw new BadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      invalidInputCode,
       error instanceof Error ? error.message : "External app setup completion failed.",
     );
   }
@@ -449,12 +469,12 @@ export async function completeExternalAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+    invalidInputCode,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: setupResult.secrets ?? {},
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+    invalidInputCode,
   });
   const completedConnection = await persistExternalAppSetupResult({
     db: ctx.db,

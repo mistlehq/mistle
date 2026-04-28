@@ -3,6 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../../types.js";
+import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import { startExternalAppSetup } from "../../services/external-app-setup.js";
 import { route } from "./route.js";
 
@@ -28,6 +29,8 @@ const routeHandler = async (
       connectionId,
       routeSegment: "github-app",
       body,
+      invalidInputCode:
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT,
     },
   );
 
