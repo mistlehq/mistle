@@ -118,14 +118,12 @@ export function createWebhookAutomationEventOption(input: {
             }),
           ),
         }),
-    ...(input.eventDefinition.requiredTriggerCapabilities === undefined
+    ...(input.eventDefinition.requirements === undefined
       ? {}
       : {
-          requiredTriggerCapabilities: input.eventDefinition.requiredTriggerCapabilities.map(
-            (requirement) => ({
-              ...requirement,
-            }),
-          ),
+          requirements: input.eventDefinition.requirements.map((requirement) => ({
+            ...requirement,
+          })),
         }),
     ...(category === undefined ? {} : { category }),
     ...(input.eventDefinition.parameters === undefined

@@ -126,9 +126,7 @@ export const IntegrationTargetSchema = z
             providerEventType: z.string().min(1),
             displayName: z.string().min(1),
             category: z.string().min(1).optional(),
-            requiredTriggerCapabilities: z
-              .array(IntegrationWebhookTriggerRequirementSchema)
-              .optional(),
+            requirements: z.array(IntegrationWebhookTriggerRequirementSchema).optional(),
             payloadReferences: z
               .array(
                 z

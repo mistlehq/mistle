@@ -89,7 +89,7 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
-                requiredTriggerCapabilities: [
+                requirements: [
                   {
                     kind: "provider-permission",
                     permission: "issues",
@@ -173,7 +173,7 @@ describe("buildWebhookAutomationEventOptions", () => {
         connectionId: GitHubConnectionId,
         connectionLabel: "GitHub - GitHub Engineering",
         label: "Issue comment created",
-        requiredTriggerCapabilities: [
+        requirements: [
           {
             kind: "provider-permission",
             permission: "issues",

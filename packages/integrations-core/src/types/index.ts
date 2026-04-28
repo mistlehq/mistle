@@ -1673,7 +1673,7 @@ export type IntegrationWebhookEventDefinition = {
       }>
     | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
-  requiredTriggerCapabilities?: ReadonlyArray<IntegrationWebhookTriggerRequirement> | undefined;
+  requirements?: ReadonlyArray<IntegrationWebhookTriggerRequirement> | undefined;
 };
 
 /**

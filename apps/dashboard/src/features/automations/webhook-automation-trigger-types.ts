@@ -69,7 +69,7 @@ export type WebhookAutomationEventOption = {
   payloadReferences?: readonly WebhookAutomationPayloadReference[];
   conversationKeyOptions?: readonly WebhookAutomationConversationKeyOption[];
   parameters?: readonly WebhookAutomationEventParameterOption[];
-  requiredTriggerCapabilities?: readonly IntegrationWebhookTriggerRequirement[];
+  requirements?: readonly IntegrationWebhookTriggerRequirement[];
 };
 
 export type WebhookAutomationTriggerParameterValueMap = Record<string, Record<string, string>>;

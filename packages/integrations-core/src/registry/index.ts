@@ -101,18 +101,18 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       );
     }
 
-    for (const requirement of supportedWebhookEvent.requiredTriggerCapabilities ?? []) {
+    for (const requirement of supportedWebhookEvent.requirements ?? []) {
       if (requirement.label.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].label must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements[*].label must be non-empty.",
         );
       }
 
       if (requirement.kind === "provider-event" && requirement.eventType.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].eventType must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements[*].eventType must be non-empty.",
         );
       }
 
@@ -122,7 +122,7 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       ) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].permission must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements[*].permission must be non-empty.",
         );
       }
 
@@ -133,7 +133,7 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       ) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          "Integration definition supportedWebhookEvents[*].requiredTriggerCapabilities[*].access must be non-empty.",
+          "Integration definition supportedWebhookEvents[*].requirements[*].access must be non-empty.",
         );
       }
     }

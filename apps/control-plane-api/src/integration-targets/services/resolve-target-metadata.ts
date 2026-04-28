@@ -62,7 +62,7 @@ type ResolvedWebhookEvent = {
   providerEventType: string;
   displayName: string;
   category?: string;
-  requiredTriggerCapabilities?: IntegrationWebhookTriggerRequirement[];
+  requirements?: IntegrationWebhookTriggerRequirement[];
   payloadReferences?: {
     path: string[];
     description: string;
@@ -217,14 +217,12 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
-    ...(eventDefinition.requiredTriggerCapabilities === undefined
+    ...(eventDefinition.requirements === undefined
       ? {}
       : {
-          requiredTriggerCapabilities: eventDefinition.requiredTriggerCapabilities.map(
-            (requirement) => ({
-              ...requirement,
-            }),
-          ),
+          requirements: eventDefinition.requirements.map((requirement) => ({
+            ...requirement,
+          })),
         }),
     ...(eventDefinition.payloadReferences === undefined
       ? {}
