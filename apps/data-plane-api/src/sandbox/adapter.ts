@@ -9,26 +9,26 @@ export function createSandboxRuntimeAdapter(config: DataPlaneApiRuntimeConfig): 
 function createSandboxProviderConfig(
   config: DataPlaneApiRuntimeConfig,
 ): Parameters<typeof createSandboxAdapter>[0] {
-  if (config.sandboxProvider === "docker") {
+  if (config.app.sandbox.provider === "docker") {
     if (config.app.sandbox.docker === undefined) {
       throw new Error("Expected data-plane API docker sandbox config for global provider docker.");
     }
 
     return {
-      provider: config.sandboxProvider,
+      provider: config.app.sandbox.provider,
       docker: {
         socketPath: config.app.sandbox.docker.socketPath,
       },
     };
   }
 
-  if (config.sandboxProvider === "e2b") {
+  if (config.app.sandbox.provider === "e2b") {
     if (config.app.sandbox.e2b === undefined) {
       throw new Error("Expected data-plane API E2B sandbox config for global provider e2b.");
     }
 
     return {
-      provider: config.sandboxProvider,
+      provider: config.app.sandbox.provider,
       e2b: {
         apiKey: config.app.sandbox.e2b.apiKey,
         ...(config.app.sandbox.e2b.domain === undefined
@@ -38,7 +38,7 @@ function createSandboxProviderConfig(
     };
   }
 
-  return assertUnreachable(config.sandboxProvider);
+  return assertUnreachable(config.app.sandbox.provider);
 }
 
 function assertUnreachable(_value: never): never {

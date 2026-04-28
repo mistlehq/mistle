@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GlobalSandboxStorageConfigSchema } from "../../global/schema.js";
+
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
 
@@ -72,6 +74,8 @@ export const DataPlaneApiSandboxE2BConfigSchema = z
 
 export const DataPlaneApiSandboxConfigSchema = z
   .object({
+    provider: z.enum(SandboxProviders),
+    storage: GlobalSandboxStorageConfigSchema.optional(),
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
   })
@@ -79,8 +83,16 @@ export const DataPlaneApiSandboxConfigSchema = z
 
 export const PartialDataPlaneApiSandboxConfigSchema = z
   .object({
+    provider: z.enum(SandboxProviders).optional(),
+    storage: GlobalSandboxStorageConfigSchema.partial().optional(),
     docker: DataPlaneApiSandboxDockerConfigSchema.partial().optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.partial().optional(),
+  })
+  .strict();
+
+export const DataPlaneApiInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
   })
   .strict();
 
@@ -92,6 +104,7 @@ export const DataPlaneApiConfigSchema = z
     runtimeState: DataPlaneApiRuntimeStateConfigSchema,
     sandbox: DataPlaneApiSandboxConfigSchema,
     controlPlaneApi: DataPlaneApiControlPlaneApiConfigSchema,
+    internalAuth: DataPlaneApiInternalAuthConfigSchema,
   })
   .strict();
 
@@ -103,6 +116,7 @@ export const PartialDataPlaneApiConfigSchema = z
     runtimeState: DataPlaneApiRuntimeStateConfigSchema.partial().optional(),
     sandbox: PartialDataPlaneApiSandboxConfigSchema.optional(),
     controlPlaneApi: PartialDataPlaneApiControlPlaneApiConfigSchema.optional(),
+    internalAuth: DataPlaneApiInternalAuthConfigSchema.partial().optional(),
   })
   .strict();
 
@@ -113,20 +127,19 @@ const DataPlaneApiProviderRequirementMessages = {
 } as const;
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
-  globalSandboxProvider: (typeof SandboxProviders)[number];
   appSandbox: DataPlaneApiConfig["sandbox"];
 }): {
   path: readonly ["sandbox", "docker"] | readonly ["sandbox", "e2b"];
   message: string;
 } | null {
-  if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
+  if (input.appSandbox.provider === "docker" && input.appSandbox.docker === undefined) {
     return {
       path: ["sandbox", "docker"],
       message: DataPlaneApiProviderRequirementMessages.DOCKER,
     };
   }
 
-  if (input.globalSandboxProvider === "e2b" && input.appSandbox.e2b === undefined) {
+  if (input.appSandbox.provider === "e2b" && input.appSandbox.e2b === undefined) {
     return {
       path: ["sandbox", "e2b"],
       message: DataPlaneApiProviderRequirementMessages.E2B,

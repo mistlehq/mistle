@@ -6,7 +6,10 @@ import type { z } from "zod";
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
-import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
+import {
+  getDataPlaneApiSandboxProviderValidationIssue,
+  PartialDataPlaneApiConfigSchema,
+} from "./apps/data-plane-api/schema.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { PartialDataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
@@ -203,6 +206,50 @@ function composeDataPlaneGatewayConfig(
   });
 }
 
+function composeDataPlaneApiConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API> {
+  const partialAppConfig = PartialDataPlaneApiConfigSchema.parse(appConfig);
+
+  return dataPlaneApiConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: {
+      serviceToken: globalConfig.internalAuth.serviceToken,
+    },
+    sandbox: {
+      ...partialAppConfig.sandbox,
+      provider: globalConfig.sandbox.provider,
+      storage: globalConfig.sandbox.storage,
+    },
+  });
+}
+
+function loadDataPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneApiConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeDataPlaneApiConfig(
+    getValueAtPath(envLoadedRoot, dataPlaneApiConfigModule.namespace),
+    globalConfig,
+  );
+  const issue = getDataPlaneApiSandboxProviderValidationIssue({
+    appSandbox: appConfig.sandbox,
+  });
+
+  if (issue !== null) {
+    throw new Error(issue.message);
+  }
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
+}
+
 function loadDataPlaneGatewayConfigFromEnv(env: NodeJS.ProcessEnv): {
   app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
   global: AppConfig["global"];
@@ -296,11 +343,17 @@ function loadSelectedAppConfig(
   }
 
   if (appId === AppIds.DATA_PLANE_API) {
-    return applyModuleEnvOverrides(
-      dataPlaneApiConfigModule,
-      selectDataPlaneApiConfig(rootConfig),
+    const globalConfig = applyModuleEnvOverrides(
+      globalConfigModule,
+      selectGlobalConfig(rootConfig),
       env,
     );
+    const selectedConfig = composeDataPlaneApiConfig(
+      selectDataPlaneApiConfig(rootConfig),
+      globalConfig,
+    );
+
+    return applyModuleEnvOverrides(dataPlaneApiConfigModule, selectedConfig, env);
   }
 
   if (appId === AppIds.DATA_PLANE_GATEWAY) {
@@ -339,7 +392,6 @@ function validateSelectedAppConfig(
   if (appId === AppIds.DATA_PLANE_API) {
     const dataPlaneApiConfig = loadSelectedAppConfig(AppIds.DATA_PLANE_API, rootConfig, env);
     const issue = getDataPlaneApiSandboxProviderValidationIssue({
-      globalSandboxProvider: globalConfig.sandbox.provider,
       appSandbox: dataPlaneApiConfig.sandbox,
     });
 
@@ -400,6 +452,14 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   }
 
   if (options.includeGlobal === false) {
+    if (options.app === AppIds.DATA_PLANE_API) {
+      const { app: appConfig } = loadDataPlaneApiConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     if (options.app === AppIds.DATA_PLANE_GATEWAY) {
       const { app: appConfig } = loadDataPlaneGatewayConfigFromEnv(env);
 
@@ -423,6 +483,10 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     };
   }
 
+  if (options.app === AppIds.DATA_PLANE_API) {
+    return loadDataPlaneApiConfigFromEnv(env);
+  }
+
   if (options.app === AppIds.DATA_PLANE_GATEWAY) {
     return loadDataPlaneGatewayConfigFromEnv(env);
   }
@@ -435,16 +499,7 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   const globalConfig = parseModuleValue(globalConfigModule, validatedRoot);
   const appConfig = parseAppConfig(options.app, validatedRoot);
 
-  if (options.app === AppIds.DATA_PLANE_API) {
-    const issue = getDataPlaneApiSandboxProviderValidationIssue({
-      globalSandboxProvider: globalConfig.sandbox.provider,
-      appSandbox: parseModuleValue(dataPlaneApiConfigModule, validatedRoot).sandbox,
-    });
-
-    if (issue !== null) {
-      throw new Error(issue.message);
-    }
-  } else if (options.app === AppIds.DATA_PLANE_WORKER) {
+  if (options.app === AppIds.DATA_PLANE_WORKER) {
     const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
       globalSandboxProvider: globalConfig.sandbox.provider,
       appSandbox: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot).sandbox,

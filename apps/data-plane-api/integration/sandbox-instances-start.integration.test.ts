@@ -488,15 +488,16 @@ describe("sandboxInstances.start integration", () => {
         },
         sandbox: {
           ...fixture.config.sandbox,
+          provider: "e2b",
+          storage: {
+            backend: "archil",
+          },
           e2b: {
             apiKey: "integration-e2b-api-key",
             domain: "e2b.app",
           },
         },
       },
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      sandboxProvider: "e2b",
-      sandboxStorageBackend: "archil",
     });
     await runtime.start();
 
@@ -607,10 +608,12 @@ describe("sandboxInstances.start integration", () => {
           ...fixture.config.server,
           port,
         },
+        sandbox: {
+          ...fixture.config.sandbox,
+          provider: "docker",
+          storage: undefined,
+        },
       },
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      sandboxProvider: "docker",
-      sandboxStorageBackend: undefined,
     });
     await runtime.start();
 

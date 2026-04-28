@@ -6,7 +6,6 @@ import type { AppRuntimeResources } from "./resources.js";
 import type {
   AppContextBindings,
   DataPlaneApiConfig,
-  DataPlaneApiGlobalConfig,
   DataPlaneApiSandboxStorageBackend,
   DataPlaneApp,
 } from "./types.js";
@@ -23,7 +22,7 @@ export type CreateAppInput = {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
   resources: AppRuntimeResources;
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 

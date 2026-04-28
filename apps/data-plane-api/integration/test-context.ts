@@ -477,9 +477,16 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
             baseUrl: `http://127.0.0.1:${String(controlPlanePort)}`,
           },
           sandbox: {
+            provider: "docker",
+            storage: {
+              backend: SandboxStorageBackend.DOCKER_VOLUME,
+            },
             docker: {
               socketPath: "/var/run/docker.sock",
             },
+          },
+          internalAuth: {
+            serviceToken: sharedInfraConfig.internalAuthServiceToken,
           },
         };
         const controlPlaneRuntime = await startControlPlaneApiProcess({
@@ -498,9 +505,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
 
         const runtime = await createDataPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
-          sandboxProvider: "docker",
-          sandboxStorageBackend: "docker_volume",
         });
         await runtime.start();
         await waitForDataPlaneApiHealth({

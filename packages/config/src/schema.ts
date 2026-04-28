@@ -31,7 +31,6 @@ export const ConfigSchema = z
   })
   .superRefine((value, ctx) => {
     const dataPlaneApiIssue = getDataPlaneApiSandboxProviderValidationIssue({
-      globalSandboxProvider: value.global.sandbox.provider,
       appSandbox: value.apps.data_plane_api.sandbox,
     });
 

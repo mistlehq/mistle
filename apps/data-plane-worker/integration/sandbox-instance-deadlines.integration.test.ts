@@ -434,15 +434,19 @@ describe("sandbox instance deadlines integration", () => {
         controlPlaneApi: {
           baseUrl: "http://127.0.0.1:1",
         },
+        internalAuth: {
+          serviceToken: InternalAuthServiceToken,
+        },
         sandbox: {
+          provider: "docker",
+          storage: {
+            backend: "docker_volume",
+          },
           docker: {
             socketPath: "/var/run/docker.sock",
           },
         },
       },
-      internalAuthServiceToken: InternalAuthServiceToken,
-      sandboxProvider: "docker",
-      sandboxStorageBackend: "docker_volume",
     });
     await dataPlaneApiRuntime.start();
     dataPlaneApiBaseUrl = `http://${GatewayPortHost}:${String(dataPlaneApiPort)}`;

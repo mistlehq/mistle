@@ -15,11 +15,7 @@ import { z } from "zod";
 
 import { DataPlaneOpenWorkflowSchema } from "../../../openworkflow/index.js";
 import type { AppRuntimeResources } from "../../../resources.js";
-import type {
-  DataPlaneApiConfig,
-  DataPlaneApiGlobalConfig,
-  DataPlaneApiSandboxStorageBackend,
-} from "../../../types.js";
+import type { DataPlaneApiConfig, DataPlaneApiSandboxStorageBackend } from "../../../types.js";
 import type {
   StartSandboxInstanceAcceptedResponse,
   StartSandboxInstanceInput,
@@ -37,7 +33,7 @@ type StartSandboxInstanceContext = {
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   workflowNamespaceId: DataPlaneApiConfig["workflow"]["namespaceId"];
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
@@ -61,7 +57,7 @@ function createSandboxInstanceId(): string {
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
   persistentSandboxesEnabled: boolean;
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
   if (!input.persistentSandboxesEnabled) {

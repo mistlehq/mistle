@@ -32,11 +32,11 @@ export async function createAppResources(
   const db = createDataPlaneDatabase(dbPool);
   const runtimeStateReader = new GatewayHttpSandboxRuntimeStateReader({
     baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
-    serviceToken: runtimeConfig.internalAuthServiceToken,
+    serviceToken: runtimeConfig.app.internalAuth.serviceToken,
   });
   const controlPlaneInternalClient = new ControlPlaneInternalClient({
     baseUrl: runtimeConfig.app.controlPlaneApi.baseUrl,
-    internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+    internalAuthServiceToken: runtimeConfig.app.internalAuth.serviceToken,
   });
   const sandboxAdapter = createSandboxRuntimeAdapter(runtimeConfig);
 

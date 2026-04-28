@@ -234,7 +234,11 @@ export async function createDisposableDataPlaneRuntime(input: {
       controlPlaneApi: {
         baseUrl: input.controlPlaneBaseUrl,
       },
+      internalAuth: {
+        serviceToken: input.internalAuthServiceToken,
+      },
       sandbox: {
+        provider: "docker",
         docker: {
           socketPath: "/var/run/docker.sock",
         },
@@ -243,9 +247,6 @@ export async function createDisposableDataPlaneRuntime(input: {
 
     runtime = await createDataPlaneApiRuntime({
       app: config,
-      internalAuthServiceToken: input.internalAuthServiceToken,
-      sandboxProvider: "docker",
-      sandboxStorageBackend: undefined,
     });
     await runtime.start();
     gateway = await startGatewayProcess({

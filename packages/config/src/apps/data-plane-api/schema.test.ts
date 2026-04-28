@@ -9,12 +9,14 @@ import {
 describe("DataPlaneApiSandboxConfigSchema", () => {
   it("defaults the E2B domain to the hosted cloud domain", () => {
     const parsed = DataPlaneApiSandboxConfigSchema.parse({
+      provider: "e2b",
       e2b: {
         apiKey: "test-api-key",
       },
     });
 
     expect(parsed).toEqual({
+      provider: "e2b",
       e2b: {
         apiKey: "test-api-key",
         domain: "e2b.app",
@@ -43,9 +45,13 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
         baseUrl: "http://127.0.0.1:5100",
       },
       sandbox: {
+        provider: "docker",
         docker: {
           socketPath: "/var/run/docker.sock",
         },
+      },
+      internalAuth: {
+        serviceToken: "test-service-token",
       },
     });
 
@@ -72,7 +78,15 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
         runtimeState: {
           gatewayBaseUrl: "http://127.0.0.1:5202",
         },
-        sandbox: {},
+        sandbox: {
+          provider: "docker",
+          docker: {
+            socketPath: "/var/run/docker.sock",
+          },
+        },
+        internalAuth: {
+          serviceToken: "test-service-token",
+        },
       }),
     ).toThrow(/controlPlaneApi/);
   });
@@ -81,8 +95,9 @@ describe("DataPlaneApiSandboxConfigSchema", () => {
 describe("getDataPlaneApiSandboxProviderValidationIssue", () => {
   it("requires docker settings when the global provider is docker", () => {
     const issue = getDataPlaneApiSandboxProviderValidationIssue({
-      globalSandboxProvider: "docker",
-      appSandbox: {},
+      appSandbox: {
+        provider: "docker",
+      },
     });
 
     expect(issue).toEqual({

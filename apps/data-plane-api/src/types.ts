@@ -8,16 +8,10 @@ import type { AppRuntimeResources } from "./resources.js";
 type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_API>>;
 
 export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
-export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult["global"]>;
-type DataPlaneApiGlobalSandboxStorageConfig = NonNullable<
-  DataPlaneApiGlobalConfig["sandbox"]["storage"]
->;
-export type DataPlaneApiSandboxStorageBackend = DataPlaneApiGlobalSandboxStorageConfig["backend"];
+type DataPlaneApiSandboxStorageConfig = NonNullable<DataPlaneApiConfig["sandbox"]["storage"]>;
+export type DataPlaneApiSandboxStorageBackend = DataPlaneApiSandboxStorageConfig["backend"];
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
-  internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
-  sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
 export type AppContextBindings = {
@@ -34,7 +28,7 @@ export type AppContextVariables = {
   internalAuthServiceToken: string;
   resources: AppRuntimeResources;
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
-  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
+  sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
@@ -58,9 +52,3 @@ export type DataPlaneApiRuntime = {
   start: () => Promise<void>;
   stop: () => Promise<void>;
 };
-
-export function resolveConfiguredSandboxStorageBackend(input: {
-  globalConfig: DataPlaneApiGlobalConfig;
-}): DataPlaneApiSandboxStorageBackend {
-  return input.globalConfig.sandbox.storage?.backend;
-}

@@ -17,10 +17,10 @@ export async function createDataPlaneApiRuntime(
   try {
     app = createApp({
       config: runtimeConfig.app,
-      internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+      internalAuthServiceToken: runtimeConfig.app.internalAuth.serviceToken,
       resources,
-      sandboxProvider: runtimeConfig.sandboxProvider,
-      sandboxStorageBackend: runtimeConfig.sandboxStorageBackend,
+      sandboxProvider: runtimeConfig.app.sandbox.provider,
+      sandboxStorageBackend: runtimeConfig.app.sandbox.storage?.backend,
     });
   } catch (error) {
     await stopAppResources(resources);

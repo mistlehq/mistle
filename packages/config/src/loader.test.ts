@@ -199,7 +199,11 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
           sandbox: {
+            provider: "docker",
             docker: {
               socketPath: "/var/run/docker.sock",
             },
@@ -418,7 +422,11 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
           sandbox: {
+            provider: "docker",
             docker: {
               socketPath: "/var/run/docker.sock",
             },
@@ -635,7 +643,11 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
           sandbox: {
+            provider: "docker",
             docker: {
               socketPath: "/var/run/docker.sock",
             },
@@ -834,7 +846,14 @@ describe("parseConfigRecord", () => {
             runtimeState: {
               gatewayBaseUrl: "http://127.0.0.1:5202",
             },
+            controlPlaneApi: {
+              baseUrl: "http://127.0.0.1:5100",
+            },
+            internalAuth: {
+              serviceToken: "test-service-token",
+            },
             sandbox: {
+              provider: "docker",
               docker: {
                 socketPath: "/var/run/docker.sock",
               },

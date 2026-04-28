@@ -247,7 +247,17 @@ export function selectDataPlaneApiConfig(config: Config): AppConfig["apps"]["dat
     controlPlaneApi: {
       baseUrl: config.services.control_plane_api.internal_url,
     },
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
     sandbox: {
+      provider: config.sandbox.provider,
+      storage:
+        config.sandbox.storage === undefined
+          ? undefined
+          : {
+              backend: config.sandbox.storage.backend,
+            },
       docker: config.sandbox.docker
         ? {
             socketPath: config.sandbox.docker.socket_path,
