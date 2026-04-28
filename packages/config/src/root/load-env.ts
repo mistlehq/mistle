@@ -315,6 +315,10 @@ const RootEnvDescriptors: readonly RootEnvDescriptor[] = [
     path: ["postgres", "control_plane", "pooled_url"],
   },
   {
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_MIGRATION_URL",
+    path: ["postgres", "control_plane", "direct_url"],
+  },
+  {
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
     path: ["workflow", "control_plane", "namespace_id"],
   },
@@ -403,6 +407,10 @@ const RootEnvDescriptors: readonly RootEnvDescriptor[] = [
   {
     envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
     path: ["postgres", "data_plane", "pooled_url"],
+  },
+  {
+    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_MIGRATION_URL",
+    path: ["postgres", "data_plane", "direct_url"],
   },
   {
     envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",

@@ -699,6 +699,49 @@ describe("loadConfig integrations", () => {
     });
   });
 
+  it("maps workflow migration URL env overrides into direct Postgres resources", () => {
+    const controlPlaneWorkflowMigrationUrl =
+      "postgresql://mistle:mistle@127.0.0.1:15432/control-plane";
+    const dataPlaneWorkflowMigrationUrl = "postgresql://mistle:mistle@127.0.0.1:25432/data-plane";
+
+    expect(
+      loadConfig({
+        app: AppIds.CONTROL_PLANE_API,
+        configPath: tomlConfigFixturePath,
+        env: {
+          MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_MIGRATION_URL: controlPlaneWorkflowMigrationUrl,
+        },
+      }).app.workflow.migrationUrl,
+    ).toBe(controlPlaneWorkflowMigrationUrl);
+    expect(
+      loadConfig({
+        app: AppIds.DATA_PLANE_API,
+        configPath: tomlConfigFixturePath,
+        env: {
+          MISTLE_APPS_DATA_PLANE_API_WORKFLOW_MIGRATION_URL: dataPlaneWorkflowMigrationUrl,
+        },
+      }).app.workflow.migrationUrl,
+    ).toBe(dataPlaneWorkflowMigrationUrl);
+  });
+
+  it("accepts shared E2B API key env while the selected sandbox provider is docker", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_API,
+      configPath: tomlConfigFixturePath,
+      env: {
+        MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "fixture-e2b-api-key",
+      },
+    });
+
+    expect(config.app.sandbox).toEqual({
+      ...dataPlaneApiFixtureConfig.sandbox,
+      e2b: {
+        apiKey: "fixture-e2b-api-key",
+        domain: "e2b.app",
+      },
+    });
+  });
+
   it("rejects conflicting existing env aliases for the same central resource", () => {
     expect(() =>
       loadConfig({

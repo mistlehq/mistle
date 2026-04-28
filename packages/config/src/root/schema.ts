@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 const UrlSchema = z.string().trim().min(1);
+const DefaultE2BCloudDomain = "e2b.app";
+const DefaultE2BCpuCount = 2;
+const DefaultE2BMemoryMb = 4 * 1024;
 
 const ServiceEndpointSchema = z
   .object({
@@ -299,9 +302,9 @@ export const ConfigSchema = z
         e2b: z
           .object({
             api_key: z.string().trim().min(1),
-            domain: z.string().trim().min(1),
-            cpu_count: z.number().int().min(1),
-            memory_mb: z.number().int().min(1),
+            domain: z.string().trim().min(1).default(DefaultE2BCloudDomain),
+            cpu_count: z.number().int().min(1).default(DefaultE2BCpuCount),
+            memory_mb: z.number().int().min(1).default(DefaultE2BMemoryMb),
           })
           .strict()
           .optional(),
