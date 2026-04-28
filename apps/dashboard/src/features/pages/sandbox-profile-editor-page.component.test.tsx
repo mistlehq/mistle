@@ -23,9 +23,11 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
+import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
+  resolveSandboxProfileSetupScriptIntegrationRows,
   resolveSandboxProfileEditorVersionMode,
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
@@ -1292,6 +1294,38 @@ describe("SandboxProfileEditorPage", () => {
     expect(configurationsPanel.textContent).toContain(
       "For example, mistlehq/mistle is available at",
     );
+  });
+
+  it("uses draft integration rows for setup script repository context", () => {
+    const initialRows: SandboxProfileBindingEditorRow[] = [
+      {
+        clientId: "initial-git-row",
+        connectionId: "connection-github",
+        kind: "git",
+        config: {
+          repositories: ["mistlehq/mistle"],
+        },
+      },
+    ];
+    const draftRows: SandboxProfileBindingEditorRow[] = [
+      {
+        clientId: "draft-git-row",
+        connectionId: "connection-github",
+        kind: "git",
+        config: {
+          repositories: ["mistlehq/dashboard"],
+        },
+      },
+    ];
+
+    expect(
+      resolveSandboxProfileSetupScriptIntegrationRows({
+        initialRows,
+        integrationDraftState: {
+          integrationRows: draftRows,
+        },
+      }),
+    ).toBe(draftRows);
   });
 
   it("renders an empty setup script editor when no script is configured", () => {

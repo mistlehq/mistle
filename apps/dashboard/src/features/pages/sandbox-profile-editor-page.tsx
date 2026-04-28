@@ -177,6 +177,7 @@ type SandboxProfileEditorNavigationState = {
 type SandboxProfileDraftSectionState = {
   flushDraftChanges: () => Promise<boolean>;
   hasUnpersistedChanges: boolean;
+  integrationRows?: readonly SandboxProfileBindingEditorRow[] | null;
   isSaving: boolean;
 };
 type SandboxProfileIntegrationSetupSectionId = Extract<
@@ -1382,6 +1383,7 @@ function ReadySandboxProfileEditorPage(input: {
           <SandboxProfileEditorSectionPanels
             activeSectionId={sectionId}
             draftFieldsAreDisabled={draftFieldsAreDisabled}
+            integrationDraftState={integrationDraftState}
             integrationsLoader={integrationsLoader}
             invalidateVersionBindings={input.invalidateVersionBindings}
             invalidateVersionSetupScript={input.invalidateVersionSetupScript}
@@ -1409,6 +1411,7 @@ function ReadySandboxProfileEditorPage(input: {
 function SandboxProfileEditorSectionPanels(input: {
   activeSectionId: SandboxProfileEditorSectionId;
   draftFieldsAreDisabled: boolean;
+  integrationDraftState: SandboxProfileDraftSectionState;
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
@@ -1450,7 +1453,10 @@ function SandboxProfileEditorSectionPanels(input: {
         <LoadedSandboxProfileSetupScriptSection
           disabled={input.draftFieldsAreDisabled}
           key={`${input.profileId}:${String(input.mode.version)}:setup-script`}
-          integrationRows={input.integrationsLoader.initialRows}
+          integrationRows={resolveSandboxProfileSetupScriptIntegrationRows({
+            initialRows: input.integrationsLoader.initialRows,
+            integrationDraftState: input.integrationDraftState,
+          })}
           loader={input.setupScriptLoader}
           profileId={input.profileId}
           invalidateVersionSetupScript={input.invalidateVersionSetupScript}
@@ -1472,6 +1478,13 @@ function SandboxProfileEditorSectionPanels(input: {
       ) : null}
     </>
   );
+}
+
+export function resolveSandboxProfileSetupScriptIntegrationRows(input: {
+  initialRows: readonly SandboxProfileBindingEditorRow[] | null;
+  integrationDraftState: Pick<SandboxProfileDraftSectionState, "integrationRows">;
+}): readonly SandboxProfileBindingEditorRow[] | null {
+  return input.integrationDraftState.integrationRows ?? input.initialRows;
 }
 
 const SandboxProfileEditorTabs = [
@@ -2135,12 +2148,14 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     onDraftStateChange?.({
       flushDraftChanges: integrationsState.flushDraftChanges,
       hasUnpersistedChanges: integrationsState.hasUnsavedChanges,
+      integrationRows: integrationsState.integrationRows,
       isSaving: integrationsState.isSubmittingIntegrationBindings,
     });
   }, [
     onDraftStateChange,
     integrationsState.flushDraftChanges,
     integrationsState.hasUnsavedChanges,
+    integrationsState.integrationRows,
     integrationsState.isSubmittingIntegrationBindings,
   ]);
 
