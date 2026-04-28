@@ -38,6 +38,7 @@ use hyper_util::rt::{TokioExecutor, TokioIo};
 use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Map, Value};
+use tokio::io::copy_bidirectional;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::oneshot;
@@ -1227,12 +1228,24 @@ fn run_proxy_server(
 }
 
 async fn handle_proxy_request(
-    request: Request<Incoming>,
+    mut request: Request<Incoming>,
     state: EgressProxyState,
     tunneled_authority: Option<String>,
 ) -> Result<Response<HyperBody>, Infallible> {
     if request.method() == Method::CONNECT {
         return Ok(handle_connect_request(request, state));
+    }
+
+    if is_websocket_upgrade_request(&request) {
+        let downstream_upgrade = hyper::upgrade::on(&mut request);
+        return Ok(
+            match forward_upgrade_request(request, state, tunneled_authority, downstream_upgrade)
+                .await
+            {
+                Ok(response) => response,
+                Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
+            },
+        );
     }
 
     Ok(
@@ -1241,6 +1254,25 @@ async fn handle_proxy_request(
             Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
         },
     )
+}
+
+fn is_websocket_upgrade_request(request: &Request<Incoming>) -> bool {
+    let has_upgrade_token = request
+        .headers()
+        .get(hyper::header::CONNECTION)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value
+                .split(',')
+                .any(|token| token.trim().eq_ignore_ascii_case("upgrade"))
+        });
+    let upgrades_to_websocket = request
+        .headers()
+        .get(hyper::header::UPGRADE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.eq_ignore_ascii_case("websocket"));
+
+    has_upgrade_token && upgrades_to_websocket
 }
 
 fn handle_connect_request(
@@ -1278,6 +1310,7 @@ fn handle_connect_request(
         });
         let _ = http1::Builder::new()
             .serve_connection(TokioIo::new(tls_stream), service)
+            .with_upgrades()
             .await;
     });
 
@@ -1285,6 +1318,172 @@ fn handle_connect_request(
         .status(StatusCode::OK)
         .body(empty_body())
         .expect("CONNECT acknowledgement response should build")
+}
+
+async fn forward_upgrade_request(
+    request: Request<Incoming>,
+    state: EgressProxyState,
+    tunneled_authority: Option<String>,
+    downstream_upgrade: hyper::upgrade::OnUpgrade,
+) -> Result<Response<HyperBody>, EgressProxyError> {
+    let (parts, body) = request.into_parts();
+    let request_method = parts.method.clone();
+    let request_target = resolve_request_target(&parts, tunneled_authority.as_deref())?;
+    let request_path_and_query = request_target
+        .uri
+        .path_and_query()
+        .map_or("/", |path_and_query| path_and_query.as_str());
+    let route = match_route(
+        &state.routes,
+        &request_target.host,
+        request_path_and_query,
+        request_method.as_str(),
+    )?;
+    let upstream_uri = match route {
+        Some(_) => build_tokenizer_proxy_forward_uri(
+            &state.tokenizer_proxy_egress_base_url,
+            request_path_and_query,
+        )?,
+        None => request_target.uri.clone(),
+    };
+    let request_context = Arc::new(EgressProxyRequestContext {
+        sandbox_instance_id: state.sandbox_instance_id.clone(),
+        request_id: format!(
+            "egp_{}",
+            state.next_request_id.fetch_add(1, Ordering::Relaxed)
+        ),
+        method: request_method.to_string(),
+        authority: request_target.authority.clone(),
+        host: request_target.host.clone(),
+        path_and_query: request_path_and_query.to_string(),
+        route_mode: if route.is_some() { "managed" } else { "direct" },
+        egress_rule_id: route.map(|matched_route| matched_route.egress_rule_id.clone()),
+        upstream_url: upstream_uri.to_string(),
+        started_at_ms: state.clock.now_ms(),
+        clock: state.clock.clone(),
+    });
+    let mut request_started_fields = request_context.common_fields();
+    request_started_fields.push(("upgrade", Value::String("websocket".to_string())));
+    emit_egress_proxy_log(
+        request_context.clock.as_ref(),
+        &request_context.sandbox_instance_id,
+        "egress_proxy_upgrade_started",
+        &request_started_fields,
+    );
+
+    let mut outbound_request = Request::builder().method(request_method).uri(upstream_uri);
+    for (header_name, header_value) in filter_upgrade_request_headers(&parts.headers) {
+        outbound_request = outbound_request.header(header_name, header_value);
+    }
+    let outbound_request = match route {
+        Some(route) => outbound_request
+            .header(
+                TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME,
+                route.grant.as_str(),
+            )
+            .body(body)
+            .map_err(|error| {
+                EgressProxyError::new(format!("failed to build proxied upgrade request: {error}"))
+            })?,
+        None => outbound_request.body(body).map_err(|error| {
+            EgressProxyError::new(format!("failed to build direct upgrade request: {error}"))
+        })?,
+    };
+
+    let mut upstream_response =
+        state
+            .client
+            .request(outbound_request)
+            .await
+            .map_err(|error| match route {
+                Some(route) => EgressProxyError::new(format!(
+                    "failed to forward upgrade request for '{}' through tokenizer-proxy route '{}': {error}",
+                    route.host, route.upstream_base_url
+                )),
+                None => EgressProxyError::new(format!(
+                    "failed to forward upgrade request directly to '{}': {error}",
+                    request_target.authority
+                )),
+            })?;
+
+    let upstream_status = upstream_response.status();
+    let upstream_headers = upstream_response.headers().clone();
+    if upstream_status != StatusCode::SWITCHING_PROTOCOLS {
+        let (parts, body) = upstream_response.into_parts();
+        let mut response_builder = Response::builder().status(parts.status);
+        for (header_name, header_value) in filter_outbound_response_headers(&parts.headers) {
+            response_builder = response_builder.header(header_name, header_value);
+        }
+        response_builder = response_builder.header(
+            SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+            request_context.request_id.as_str(),
+        );
+        return response_builder
+            .body(box_body(InstrumentedResponseBody {
+                inner: body,
+                context: request_context,
+                upstream_status,
+                upstream_trace_id: header_value_to_string(
+                    upstream_headers.get("x-mistle-trace-id"),
+                ),
+                chunk_count: 0,
+                forwarded_bytes: 0,
+                first_chunk_at_ms: None,
+                ended: false,
+            }))
+            .map_err(|error| {
+                EgressProxyError::new(format!("failed to build upgrade error response: {error}"))
+            });
+    }
+
+    let upstream_upgrade = hyper::upgrade::on(&mut upstream_response);
+    let mut response_builder = Response::builder().status(upstream_status);
+    for (header_name, header_value) in filter_upgrade_response_headers(&upstream_headers) {
+        response_builder = response_builder.header(header_name, header_value);
+    }
+    response_builder = response_builder.header(
+        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+        request_context.request_id.as_str(),
+    );
+
+    let tunnel_context = request_context.clone();
+    tokio::spawn(async move {
+        let tunnel_result = async {
+            let downstream = downstream_upgrade.await.map_err(|error| {
+                EgressProxyError::new(format!("failed to upgrade downstream websocket: {error}"))
+            })?;
+            let upstream = upstream_upgrade.await.map_err(|error| {
+                EgressProxyError::new(format!("failed to upgrade upstream websocket: {error}"))
+            })?;
+            let mut downstream = TokioIo::new(downstream);
+            let mut upstream = TokioIo::new(upstream);
+            copy_bidirectional(&mut downstream, &mut upstream)
+                .await
+                .map_err(|error| {
+                    EgressProxyError::new(format!("websocket tunnel copy failed: {error}"))
+                })?;
+            Ok::<(), EgressProxyError>(())
+        }
+        .await;
+
+        if let Err(error) = tunnel_result {
+            let mut fields = tunnel_context.common_fields();
+            fields.push(("outcome", Value::String("tunnel_failed".to_string())));
+            fields.push(("error", Value::String(error.to_string())));
+            emit_egress_proxy_log(
+                tunnel_context.clock.as_ref(),
+                &tunnel_context.sandbox_instance_id,
+                "egress_proxy_upgrade_failed",
+                &fields,
+            );
+        }
+    });
+
+    response_builder.body(empty_body()).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build websocket upgrade response: {error}"
+        ))
+    })
 }
 
 async fn forward_request(
@@ -1619,6 +1818,30 @@ fn filter_outbound_request_headers(
         .collect()
 }
 
+fn filter_upgrade_request_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            let blocked = matches!(
+                name.as_str().to_ascii_lowercase().as_str(),
+                "host"
+                    | "proxy-authenticate"
+                    | "proxy-authorization"
+                    | "proxy-connection"
+                    | "te"
+                    | "trailer"
+                    | "transfer-encoding"
+            );
+            if blocked {
+                return None;
+            }
+            Some((name.clone(), value.clone()))
+        })
+        .collect()
+}
+
 fn filter_outbound_response_headers(
     headers: &hyper::HeaderMap<HeaderValue>,
 ) -> Vec<(HeaderName, HeaderValue)> {
@@ -1636,6 +1859,29 @@ fn filter_outbound_response_headers(
                     | "trailer"
                     | "transfer-encoding"
                     | "upgrade"
+            );
+            if blocked {
+                return None;
+            }
+            Some((name.clone(), value.clone()))
+        })
+        .collect()
+}
+
+fn filter_upgrade_response_headers(
+    headers: &hyper::HeaderMap<HeaderValue>,
+) -> Vec<(HeaderName, HeaderValue)> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            let blocked = matches!(
+                name.as_str().to_ascii_lowercase().as_str(),
+                "proxy-authenticate"
+                    | "proxy-authorization"
+                    | "proxy-connection"
+                    | "te"
+                    | "trailer"
+                    | "transfer-encoding"
             );
             if blocked {
                 return None;
@@ -1864,7 +2110,10 @@ mod tests {
     use crate::time::SystemClock;
     use crate::time::testing::MutableClock;
     use reqwest::Proxy;
+    use rustls_pki_types::pem::PemObject;
+    use rustls_pki_types::{CertificateDer, ServerName};
     use serde_json::Value;
+    use tokio_rustls::rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
     struct TestProxyCaPaths {
         root_directory: PathBuf,
@@ -2158,6 +2407,374 @@ mod tests {
             .read_to_string(&mut rest)
             .expect("remaining streamed response should read");
         assert_eq!(rest, "world");
+
+        proxy.close().expect("egress proxy close should succeed");
+        tokenizer_thread
+            .join()
+            .expect("tokenizer thread should exit cleanly");
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn tunnels_managed_websocket_upgrade_requests() {
+        let tokenizer_listener =
+            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
+        let tokenizer_address = tokenizer_listener
+            .local_addr()
+            .expect("tokenizer listener should expose its address");
+        let (request_sender, request_receiver) = mpsc::channel();
+        let tokenizer_thread = thread::spawn(move || {
+            let (mut stream, _) = tokenizer_listener
+                .accept()
+                .expect("tokenizer listener should accept one connection");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .expect("tokenizer stream read timeout should set");
+            let request_head = read_http_head(&mut stream);
+            request_sender
+                .send(request_head.clone())
+                .expect("request head should send");
+
+            stream
+                .write_all(
+                    concat!(
+                        "HTTP/1.1 101 Switching Protocols\r\n",
+                        "connection: Upgrade\r\n",
+                        "upgrade: websocket\r\n",
+                        "sec-websocket-accept: test-accept\r\n",
+                        "\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .expect("upgrade response should write");
+            stream.flush().expect("upgrade response should flush");
+
+            let mut tunneled_payload = [0_u8; 12];
+            stream
+                .read_exact(&mut tunneled_payload)
+                .expect("tunneled client payload should be readable");
+            assert_eq!(&tunneled_payload, b"ping-through");
+            stream
+                .write_all(b"pong-through")
+                .expect("tunneled server payload should write");
+            stream
+                .flush()
+                .expect("tunneled server payload should flush");
+        });
+
+        let listener_address = reserve_test_listener_address();
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let mut runtime_plan = sample_runtime_plan();
+        runtime_plan.egress_routes[0].r#match.methods = Some(vec!["GET".to_string()]);
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            &format!("http://{tokenizer_address}/tokenizer-proxy/egress"),
+            listener_address,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+
+        let proxy_url = proxy
+            .runtime_env()
+            .get("HTTP_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTP_PROXY");
+        let proxy_address = proxy_url
+            .strip_prefix("http://")
+            .expect("proxy url should use http scheme");
+        let mut client_stream =
+            std::net::TcpStream::connect(proxy_address).expect("client should connect to proxy");
+        client_stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("client stream read timeout should set");
+        client_stream
+            .write_all(
+                concat!(
+                    "GET http://api.openai.com/v1/responses HTTP/1.1\r\n",
+                    "host: api.openai.com\r\n",
+                    "connection: Upgrade\r\n",
+                    "upgrade: websocket\r\n",
+                    "sec-websocket-key: test-key\r\n",
+                    "sec-websocket-version: 13\r\n",
+                    "\r\n"
+                )
+                .as_bytes(),
+            )
+            .expect("upgrade request should write");
+
+        let response_head = read_http_head(&mut client_stream);
+        assert!(
+            response_head.starts_with("HTTP/1.1 101 Switching Protocols\r\n"),
+            "expected switching protocols response, got: {response_head}"
+        );
+        assert!(
+            response_head
+                .to_ascii_lowercase()
+                .contains("upgrade: websocket"),
+            "expected websocket upgrade header, got: {response_head}"
+        );
+        assert!(
+            response_head
+                .to_ascii_lowercase()
+                .contains(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
+            "expected sandbox egress correlation header, got: {response_head}"
+        );
+
+        let forwarded_request = request_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("tokenizer server should receive the proxied websocket request");
+        assert!(
+            forwarded_request.starts_with("GET /tokenizer-proxy/egress/v1/responses HTTP/1.1"),
+            "expected managed route rewrite, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("connection: upgrade"),
+            "expected connection upgrade header in forwarded request, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("upgrade: websocket"),
+            "expected websocket upgrade header in forwarded request, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("x-mistle-egress-grant: grant-1"),
+            "expected egress grant header in forwarded request, got: {forwarded_request}"
+        );
+
+        client_stream
+            .write_all(b"ping-through")
+            .expect("tunneled client payload should write");
+        client_stream
+            .flush()
+            .expect("tunneled client payload should flush");
+        let mut tunneled_response = [0_u8; 12];
+        client_stream
+            .read_exact(&mut tunneled_response)
+            .expect("tunneled server payload should be readable");
+        assert_eq!(&tunneled_response, b"pong-through");
+
+        proxy.close().expect("egress proxy close should succeed");
+        tokenizer_thread
+            .join()
+            .expect("tokenizer thread should exit cleanly");
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn tunnels_managed_websocket_upgrade_requests_through_connect_tls() {
+        let tokenizer_listener =
+            StdTcpListener::bind(("127.0.0.1", 0)).expect("tokenizer listener should bind");
+        let tokenizer_address = tokenizer_listener
+            .local_addr()
+            .expect("tokenizer listener should expose its address");
+        let (request_sender, request_receiver) = mpsc::channel();
+        let tokenizer_thread = thread::spawn(move || {
+            let (mut stream, _) = tokenizer_listener
+                .accept()
+                .expect("tokenizer listener should accept one connection");
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .expect("tokenizer stream read timeout should set");
+            let request_head = read_http_head(&mut stream);
+            request_sender
+                .send(request_head.clone())
+                .expect("request head should send");
+
+            stream
+                .write_all(
+                    concat!(
+                        "HTTP/1.1 101 Switching Protocols\r\n",
+                        "connection: Upgrade\r\n",
+                        "upgrade: websocket\r\n",
+                        "sec-websocket-accept: test-accept\r\n",
+                        "\r\n"
+                    )
+                    .as_bytes(),
+                )
+                .expect("upgrade response should write");
+            stream.flush().expect("upgrade response should flush");
+
+            let mut tunneled_payload = [0_u8; 12];
+            stream
+                .read_exact(&mut tunneled_payload)
+                .expect("tunneled client payload should be readable");
+            assert_eq!(&tunneled_payload, b"ping-through");
+            stream
+                .write_all(b"pong-through")
+                .expect("tunneled server payload should write");
+            stream
+                .flush()
+                .expect("tunneled server payload should flush");
+        });
+
+        let listener_address = reserve_test_listener_address();
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let mut runtime_plan = sample_runtime_plan();
+        runtime_plan.egress_routes[0].r#match.methods = Some(vec!["GET".to_string()]);
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            &format!("http://{tokenizer_address}/tokenizer-proxy/egress"),
+            listener_address,
+            ProxyCaConfig {
+                runtime_certificate_path: &proxy_ca_paths.runtime_certificate_path,
+                trust_store_certificate_path: &proxy_ca_paths.trust_store_certificate_path,
+                refresh_command: &proxy_ca_paths.refresh_command_path,
+            },
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+
+        let proxy_url = proxy
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+        let proxy_address = proxy_url
+            .strip_prefix("http://")
+            .expect("proxy url should use http scheme");
+        let mut client_stream =
+            std::net::TcpStream::connect(proxy_address).expect("client should connect to proxy");
+        client_stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .expect("client stream read timeout should set");
+        client_stream
+            .set_write_timeout(Some(Duration::from_secs(5)))
+            .expect("client stream write timeout should set");
+        client_stream
+            .write_all(
+                concat!(
+                    "CONNECT api.openai.com:443 HTTP/1.1\r\n",
+                    "host: api.openai.com:443\r\n",
+                    "\r\n"
+                )
+                .as_bytes(),
+            )
+            .expect("CONNECT request should write");
+
+        let connect_response = read_http_head(&mut client_stream);
+        assert!(
+            connect_response.starts_with("HTTP/1.1 200 "),
+            "expected CONNECT acknowledgement, got: {connect_response}"
+        );
+
+        let ca_certificate_pem = fs::read(&proxy_ca_paths.runtime_certificate_path)
+            .expect("proxy CA certificate should be readable");
+        let ca_certificate = CertificateDer::from_pem_slice(&ca_certificate_pem)
+            .expect("proxy CA certificate should parse");
+        let mut root_store = RootCertStore::empty();
+        root_store
+            .add(ca_certificate)
+            .expect("proxy CA certificate should install in test root store");
+        let client_config = ClientConfig::builder()
+            .with_root_certificates(root_store)
+            .with_no_client_auth();
+        let server_name = ServerName::try_from("api.openai.com")
+            .expect("server name should parse")
+            .to_owned();
+        let client_connection = ClientConnection::new(Arc::new(client_config), server_name)
+            .expect("TLS client connection should build");
+        let mut tls_stream = StreamOwned::new(client_connection, client_stream);
+
+        tls_stream
+            .write_all(
+                concat!(
+                    "GET /v1/responses HTTP/1.1\r\n",
+                    "host: api.openai.com\r\n",
+                    "connection: Upgrade\r\n",
+                    "upgrade: websocket\r\n",
+                    "sec-websocket-key: test-key\r\n",
+                    "sec-websocket-version: 13\r\n",
+                    "\r\n"
+                )
+                .as_bytes(),
+            )
+            .expect("upgrade request should write");
+
+        let response_head = read_http_head(&mut tls_stream);
+        assert!(
+            response_head.starts_with("HTTP/1.1 101 Switching Protocols\r\n"),
+            "expected switching protocols response, got: {response_head}"
+        );
+        assert!(
+            response_head
+                .to_ascii_lowercase()
+                .contains("upgrade: websocket"),
+            "expected websocket upgrade header, got: {response_head}"
+        );
+        assert!(
+            response_head
+                .to_ascii_lowercase()
+                .contains(SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME),
+            "expected sandbox egress correlation header, got: {response_head}"
+        );
+
+        let forwarded_request = request_receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("tokenizer server should receive the proxied websocket request");
+        assert!(
+            forwarded_request.starts_with("GET /tokenizer-proxy/egress/v1/responses HTTP/1.1"),
+            "expected managed route rewrite, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("connection: upgrade"),
+            "expected connection upgrade header in forwarded request, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("upgrade: websocket"),
+            "expected websocket upgrade header in forwarded request, got: {forwarded_request}"
+        );
+        assert!(
+            forwarded_request
+                .to_ascii_lowercase()
+                .contains("x-mistle-egress-grant: grant-1"),
+            "expected egress grant header in forwarded request, got: {forwarded_request}"
+        );
+
+        tls_stream
+            .write_all(b"ping-through")
+            .expect("tunneled client payload should write");
+        tls_stream
+            .flush()
+            .expect("tunneled client payload should flush");
+        let mut tunneled_response = [0_u8; 12];
+        tls_stream
+            .read_exact(&mut tunneled_response)
+            .expect("tunneled server payload should be readable");
+        assert_eq!(&tunneled_response, b"pong-through");
 
         proxy.close().expect("egress proxy close should succeed");
         tokenizer_thread
@@ -2493,7 +3110,7 @@ mod tests {
         }
     }
 
-    fn read_http_head(stream: &mut std::net::TcpStream) -> String {
+    fn read_http_head(stream: &mut impl Read) -> String {
         let mut buffer = Vec::new();
         let mut byte = [0_u8; 1];
         while !buffer.ends_with(b"\r\n\r\n") {
