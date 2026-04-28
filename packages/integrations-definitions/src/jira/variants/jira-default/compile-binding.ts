@@ -24,7 +24,7 @@ const JiraCliArtifactName = "Jira CLI";
 const ArtifactCommandTimeoutMs = 120_000;
 // Pin exact release tags for sandbox startup to avoid live upstream version
 // resolution and the associated rate-limit / availability failures.
-const JiraCliReleaseTag = "jira/v0.4.0";
+const JiraCliReleaseTag = "jira/v0.5.0";
 
 function createJiraCliArtifact(upstreamBaseUrl: string): CompileBindingResult["artifacts"][number] {
   return {

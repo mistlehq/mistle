@@ -152,7 +152,7 @@ describe("compileJiraBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "jira/v0.4.0",
+            tag: "jira/v0.5.0",
           },
           asset: {
             kind: "exact",
