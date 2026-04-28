@@ -9,6 +9,7 @@ import {
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
   type StartedGitHubAppManifestConnection,
+  type StartedExternalAppSetup,
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
   DeviceAuthorizationAttemptResponseSchema,
@@ -16,6 +17,7 @@ import {
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
   StartedGitHubAppManifestConnectionSchema,
+  StartedExternalAppSetupSchema,
   StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
   readJsonWithSchema,
@@ -332,24 +334,46 @@ export async function cancelDeviceAuthorizationAttempt(input: {
 export async function startGitHubAppInstallation(input: {
   connectionId: string;
 }): Promise<StartedRedirectConnection> {
+  const startedSetup = await startExternalAppSetup({
+    connectionId: input.connectionId,
+    routeSegment: "github-app-installation",
+    body: {},
+    fallbackMessage: "Could not start GitHub App installation.",
+  });
+  if (startedSetup.kind !== "redirect") {
+    throw new Error("GitHub App installation setup did not return a redirect URL.");
+  }
+
+  return {
+    authorizationUrl: startedSetup.authorizationUrl,
+  };
+}
+
+export async function startExternalAppSetup(input: {
+  connectionId: string;
+  routeSegment: string;
+  body: Record<string, unknown>;
+  fallbackMessage: string;
+}): Promise<StartedExternalAppSetup> {
   try {
     const response = await requestControlPlane({
-      operation: "startGitHubAppInstallation",
+      operation: "startExternalAppSetup",
       method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/github-app-installation/start`,
-      fallbackMessage: "Could not start GitHub App installation.",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/setup/${encodeURIComponent(input.routeSegment)}/start`,
+      body: input.body,
+      fallbackMessage: input.fallbackMessage,
     });
 
     return readJsonWithSchema({
       response,
-      schema: StartedRedirectConnectionSchema,
-      operation: "startGitHubAppInstallation",
+      schema: StartedExternalAppSetupSchema,
+      operation: "startExternalAppSetup",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "startGitHubAppInstallation",
+      operation: "startExternalAppSetup",
       error,
-      fallbackMessage: "Could not start GitHub App installation.",
+      fallbackMessage: input.fallbackMessage,
     });
   }
 }
@@ -359,30 +383,30 @@ export async function startGitHubAppManifestCreation(input: {
   manifest: Record<string, unknown>;
   owner: GitHubAppManifestOwner;
 }): Promise<StartedGitHubAppManifestConnection> {
-  try {
-    const response = await requestControlPlane({
-      operation: "startGitHubAppManifestCreation",
-      method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/github-app-manifest/start`,
-      body: {
-        manifest: input.manifest,
-        owner: input.owner,
-      },
-      fallbackMessage: "Could not create GitHub App manifest.",
-    });
-
-    return readJsonWithSchema({
-      response,
-      schema: StartedGitHubAppManifestConnectionSchema,
-      operation: "startGitHubAppManifestCreation",
-    });
-  } catch (error) {
-    throw wrapIntegrationsApiError({
-      operation: "startGitHubAppManifestCreation",
-      error,
-      fallbackMessage: "Could not create GitHub App manifest.",
-    });
+  const startedSetup = await startExternalAppSetup({
+    connectionId: input.connectionId,
+    routeSegment: "github-app",
+    body: {
+      manifest: input.manifest,
+      owner: input.owner,
+    },
+    fallbackMessage: "Could not create GitHub App manifest.",
+  });
+  if (startedSetup.kind !== "form-post") {
+    throw new Error("GitHub App manifest setup did not return a form submission.");
   }
+
+  const manifest = startedSetup.fields["manifest"];
+  if (manifest === undefined) {
+    throw new Error("GitHub App manifest setup did not return a manifest field.");
+  }
+
+  return StartedGitHubAppManifestConnectionSchema.parse({
+    submissionUrl: startedSetup.submissionUrl,
+    fields: {
+      manifest,
+    },
+  });
 }
 
 export async function startSlackAppManifestCreation(input: {
@@ -390,28 +414,20 @@ export async function startSlackAppManifestCreation(input: {
   manifest: Record<string, unknown>;
   appConfigToken: string;
 }): Promise<StartedRedirectConnection> {
-  try {
-    const response = await requestControlPlane({
-      operation: "startSlackAppManifestCreation",
-      method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/slack-app-manifest/start`,
-      body: {
-        manifest: input.manifest,
-        appConfigToken: input.appConfigToken,
-      },
-      fallbackMessage: "Could not create Slack app manifest.",
-    });
-
-    return readJsonWithSchema({
-      response,
-      schema: StartedRedirectConnectionSchema,
-      operation: "startSlackAppManifestCreation",
-    });
-  } catch (error) {
-    throw wrapIntegrationsApiError({
-      operation: "startSlackAppManifestCreation",
-      error,
-      fallbackMessage: "Could not create Slack app manifest.",
-    });
+  const startedSetup = await startExternalAppSetup({
+    connectionId: input.connectionId,
+    routeSegment: "slack-app",
+    body: {
+      manifest: input.manifest,
+      appConfigToken: input.appConfigToken,
+    },
+    fallbackMessage: "Could not create Slack app manifest.",
+  });
+  if (startedSetup.kind !== "redirect") {
+    throw new Error("Slack app manifest setup did not return a redirect URL.");
   }
+
+  return {
+    authorizationUrl: startedSetup.authorizationUrl,
+  };
 }

@@ -2234,6 +2234,129 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/setup/:routeSegment/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+          routeSegment: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      responses: {
+        /** @description Start an external app setup flow. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  fields: {
+                    [key: string]: string;
+                  };
+                  /** @enum {string} */
+                  kind: "form-post";
+                  /** Format: uri */
+                  submissionUrl: string;
+                }
+              | {
+                  /** Format: uri */
+                  authorizationUrl: string;
+                  /** @enum {string} */
+                  kind: "redirect";
+                };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_MANIFEST_START_INPUT"
+                    | "INVALID_SLACK_APP_MANIFEST_START_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "WEBHOOK_SOURCE_NOT_SUPPORTED";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:connectionId/slack-app-manifest/start": {
     parameters: {
       query?: never;

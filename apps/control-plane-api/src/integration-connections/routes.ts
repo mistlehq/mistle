@@ -21,6 +21,7 @@ import * as refreshAllIntegrationConnectionResources from "./refresh-all-integra
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as startSlackAppManifestConnection from "./slack-app/start-manifest/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
+import * as startExternalAppSetup from "./start-external-app-setup/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
 import * as updateFormConnection from "./update-form-connection/index.js";
 import * as updateIntegrationConnection from "./update-integration-connection/index.js";
@@ -107,6 +108,9 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(startSlackAppManifestConnection.route.path, requireAuthSession);
   routes.openapi(startSlackAppManifestConnection.route, startSlackAppManifestConnection.handler);
+
+  routes.use(startExternalAppSetup.route.path, requireAuthSession);
+  routes.openapi(startExternalAppSetup.route, startExternalAppSetup.handler);
 
   routes.use(startOAuth2AuthorizationCodeConnection.route.path, requireAuthSession);
   routes.openapi(

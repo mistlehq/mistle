@@ -26,6 +26,7 @@ import {
   CreatedFormIntegrationConnectionSchema,
   IntegrationConnectionSchema,
 } from "../src/integration-connections/schemas.js";
+import { StartedExternalAppSetupResponseSchema } from "../src/integration-connections/start-external-app-setup/schema.js";
 import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -248,6 +249,60 @@ describe("integration connections GitHub App integration", () => {
         ),
     });
     expect(redirectSession).toBeDefined();
+  });
+
+  it("starts GitHub App manifest creation through the generic external app setup route", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-generic-github-app-manifest-start@example.com",
+    });
+    const connectionId = await createGitHubAppDraftConnection(fixture, {
+      authenticatedSession,
+      displayName: "Draft GitHub",
+    });
+
+    const response = await fixture.request(
+      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const responseBody = StartedExternalAppSetupResponseSchema.parse(await response.json());
+    expect(responseBody.kind).toBe("form-post");
+    if (responseBody.kind !== "form-post") {
+      throw new Error("Expected form-post start response.");
+    }
+
+    const submissionUrl = new URL(responseBody.submissionUrl);
+    const state = resolveGitHubAppManifestSubmissionState(submissionUrl);
+    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.state, state),
+        ),
+    });
+
+    expect(redirectSession).toBeDefined();
+    expect(state).toContain(".");
   });
 
   it("fails to start installation when a draft connection is still missing required GitHub App credentials", async ({

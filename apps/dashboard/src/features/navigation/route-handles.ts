@@ -208,6 +208,14 @@ export const ROUTE_HANDLES = {
       icon: resolveIntegrationDetailHeaderIcon,
     },
   },
+  integrationSetup: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Setup",
+    title: resolveIntegrationAppSetupTitle,
+    header: {
+      icon: resolveIntegrationDetailHeaderIcon,
+    },
+  },
   sessions: {
     breadcrumb: "Sessions",
     title: "Sessions",

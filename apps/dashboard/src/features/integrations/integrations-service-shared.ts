@@ -431,6 +431,22 @@ export const StartedGitHubAppManifestConnectionSchema = z
   })
   .strict();
 
+export const StartedExternalAppSetupSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("form-post"),
+      submissionUrl: z.url(),
+      fields: z.record(z.string(), z.string()),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("redirect"),
+      authorizationUrl: z.url(),
+    })
+    .strict(),
+]);
+
 export const StartedDeviceAuthorizationConnectionSchema = z
   .object({
     attemptId: z.string().min(1),
@@ -503,6 +519,7 @@ export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnection
 export type StartedGitHubAppManifestConnection = z.infer<
   typeof StartedGitHubAppManifestConnectionSchema
 >;
+export type StartedExternalAppSetup = z.infer<typeof StartedExternalAppSetupSchema>;
 export type StartedDeviceAuthorizationConnection = z.infer<
   typeof StartedDeviceAuthorizationConnectionSchema
 >;

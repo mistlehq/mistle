@@ -1,12 +1,6 @@
-import {
-  integrationConnectionCredentials,
-  integrationConnectionRedirectSessions,
-  integrationConnections,
-  integrationCredentials,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { IntegrationCredentialSecretKinds } from "@mistle/db/control-plane";
-import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
+import { BadRequestError } from "@mistle/http/errors.js";
 import { type IntegrationRegistry } from "@mistle/integrations-core";
 import { SlackConnectionMethodId, SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
 import {
@@ -17,20 +11,11 @@ import {
   parseSlackOAuthAccessSuccessResponse,
   type SlackOAuthAccessSuccessResponse,
 } from "@mistle/integrations-definitions/server";
-import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { resolveConnectionSecretOrThrow } from "../../../identity-linking/services/resolve-connection-secret.js";
-import {
-  encryptCredentialUtf8,
-  resolveMasterEncryptionKeyMaterial,
-  unwrapOrganizationCredentialKey,
-} from "../../../lib/crypto.js";
 import type { AppContext } from "../../../types.js";
-import {
-  IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsNotFoundCodes,
-} from "../../constants.js";
+import { IntegrationConnectionsBadRequestCodes } from "../../constants.js";
 import {
   parseUpdateFormSecretsOrThrow,
   resolveFormConnectionMethodOrThrow,
@@ -41,8 +26,8 @@ import {
   resolveRequiredRedirectQueryParamOrThrow,
   resolveConnectionRedirectStateConnectionId,
 } from "../../services/redirect-flow.js";
+import { persistExternalAppSetupResult } from "../../services/setup-result-persistence.js";
 import {
-  ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
   resolveConnectionWithTargetOrThrow,
 } from "../../services/webhook-sources.js";
@@ -247,126 +232,16 @@ export async function completeSlackAppInstallation(
       IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT,
   });
 
-  const organizationCredentialKey = await ctx.db.query.organizationCredentialKeys.findFirst({
-    where: (table, { eq }) => eq(table.organizationId, redirectSession.organizationId),
-    orderBy: (table, { desc }) => [desc(table.version)],
+  return persistExternalAppSetupResult({
+    db: ctx.db,
+    integrationsConfig: ctx.integrationsConfig,
+    organizationId: redirectSession.organizationId,
+    connection,
+    definition,
+    parsedSecrets,
+    connectionUpdate: {
+      externalSubjectId: slackOAuthAccess.team?.id ?? slackOAuthAccess.app_id ?? null,
+    },
+    redirectSession,
   });
-
-  if (organizationCredentialKey === undefined) {
-    throw new Error(
-      `Organization credential key is missing for '${redirectSession.organizationId}'.`,
-    );
-  }
-
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-    masterEncryptionKeys: ctx.integrationsConfig.masterEncryptionKeys,
-  });
-  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: organizationCredentialKey.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
-
-  try {
-    return await ctx.db.transaction(async (tx) => {
-      const consumedSessionRows = await tx
-        .update(integrationConnectionRedirectSessions)
-        .set({
-          usedAt: sql`now()`,
-        })
-        .where(
-          and(
-            eq(integrationConnectionRedirectSessions.id, redirectSession.id),
-            isNull(integrationConnectionRedirectSessions.usedAt),
-          ),
-        )
-        .returning({
-          id: integrationConnectionRedirectSessions.id,
-        });
-
-      if (consumedSessionRows.length !== 1) {
-        throw new BadRequestError(
-          IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
-          "Redirect state has already been used.",
-        );
-      }
-
-      for (const parsedSecret of parsedSecrets) {
-        const encryptedSecret = encryptCredentialUtf8({
-          plaintext: parsedSecret.normalizedValue,
-          organizationCredentialKey: unwrappedOrganizationCredentialKey,
-        });
-
-        const [createdCredential] = await tx
-          .insert(integrationCredentials)
-          .values({
-            organizationId: redirectSession.organizationId,
-            secretKind: parsedSecret.persistedSecretRef.secretKind,
-            ciphertext: encryptedSecret.ciphertext,
-            nonce: encryptedSecret.nonce,
-            organizationCredentialKeyVersion: organizationCredentialKey.version,
-            intendedFamilyId: connection.target.familyId,
-          })
-          .returning({
-            id: integrationCredentials.id,
-          });
-
-        if (createdCredential === undefined) {
-          throw new Error("Failed to create Slack bot token credential.");
-        }
-
-        await tx
-          .insert(integrationConnectionCredentials)
-          .values({
-            connectionId: connection.id,
-            credentialId: createdCredential.id,
-            slotKey: parsedSecret.persistedSecretRef.slotKey,
-          })
-          .onConflictDoUpdate({
-            target: [
-              integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.slotKey,
-            ],
-            set: {
-              credentialId: createdCredential.id,
-            },
-          });
-      }
-
-      const [updatedConnection] = await tx
-        .update(integrationConnections)
-        .set({
-          externalSubjectId: slackOAuthAccess.team?.id ?? slackOAuthAccess.app_id ?? null,
-          updatedAt: sql`now()`,
-        })
-        .where(
-          and(
-            eq(integrationConnections.id, connection.id),
-            eq(integrationConnections.organizationId, redirectSession.organizationId),
-          ),
-        )
-        .returning();
-
-      if (updatedConnection === undefined) {
-        throw new NotFoundError(
-          IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
-          `Integration connection '${connection.id}' was not found.`,
-        );
-      }
-
-      await ensureImplicitConnectionWebhookSource({
-        db: tx,
-        organizationId: redirectSession.organizationId,
-        connectionId: updatedConnection.id,
-        targetKey: updatedConnection.targetKey,
-      });
-
-      return {
-        id: updatedConnection.id,
-        targetKey: updatedConnection.targetKey,
-      };
-    });
-  } finally {
-    unwrappedOrganizationCredentialKey.fill(0);
-  }
 }

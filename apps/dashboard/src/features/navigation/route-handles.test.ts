@@ -18,6 +18,9 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.title).toBe("function");
     expect(ROUTE_HANDLES.integrationGitHubAppSetup.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationGitHubAppSetup.appShellInsetOwner).toBe("child");
+    expect(typeof ROUTE_HANDLES.integrationSetup.title).toBe("function");
+    expect(ROUTE_HANDLES.integrationSetup.header?.icon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
@@ -144,10 +147,16 @@ describe("route handles", () => {
   it("resolves integration app setup titles from the target key", () => {
     const setupTitle = ROUTE_HANDLES.integrationGitHubAppSetup.title;
     const slackSetupTitle = ROUTE_HANDLES.integrationSlackAppSetup.title;
+    const genericSetupTitle = ROUTE_HANDLES.integrationSetup.title;
     expect(typeof setupTitle).toBe("function");
     expect(typeof slackSetupTitle).toBe("function");
+    expect(typeof genericSetupTitle).toBe("function");
 
-    if (typeof setupTitle !== "function" || typeof slackSetupTitle !== "function") {
+    if (
+      typeof setupTitle !== "function" ||
+      typeof slackSetupTitle !== "function" ||
+      typeof genericSetupTitle !== "function"
+    ) {
       throw new Error("integration app setup titles must be functions");
     }
 
@@ -156,6 +165,7 @@ describe("route handles", () => {
     expect(setupTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Setup Custom Integration V2 App",
     );
+    expect(genericSetupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");
   });
 
   it("omits supporting text from integration route handles", () => {
@@ -164,6 +174,7 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.integrationEdit).not.toHaveProperty("description");
     expect(ROUTE_HANDLES.integrationGitHubAppSetup).not.toHaveProperty("description");
     expect(ROUTE_HANDLES.integrationSlackAppSetup).not.toHaveProperty("description");
+    expect(ROUTE_HANDLES.integrationSetup).not.toHaveProperty("description");
   });
 
   it("defines sandbox profile published and draft breadcrumbs", () => {

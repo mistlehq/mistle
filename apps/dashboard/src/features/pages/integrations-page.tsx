@@ -359,5 +359,6 @@ function renderSelectedConnectionSetupBody(input: {
   return renderIntegrationConnectionSetupPane({
     connection: input.connection,
     routeSegment: input.setupFlow.routeSegment,
+    searchParams: new URLSearchParams(),
   });
 }

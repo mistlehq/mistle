@@ -20,6 +20,7 @@ describe("renderIntegrationConnectionSetupPane", () => {
         renderIntegrationConnectionSetupPane({
           connection: Connection,
           routeSegment: "github-app",
+          searchParams: new URLSearchParams(),
         }),
       ),
     ).toBe(true);
@@ -30,6 +31,7 @@ describe("renderIntegrationConnectionSetupPane", () => {
       renderIntegrationConnectionSetupPane({
         connection: Connection,
         routeSegment: "unsupported",
+        searchParams: new URLSearchParams(),
       }),
     ).toThrow("Unsupported integration setup route segment 'unsupported'.");
   });

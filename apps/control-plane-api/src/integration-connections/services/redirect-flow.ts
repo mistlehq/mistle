@@ -6,6 +6,7 @@ import {
   integrationConnectionRedirectSessions,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
+import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 
@@ -98,6 +99,60 @@ export function encodeConnectionRedirectStateMetadata(input: {
   connectionId: string;
 }): string {
   return `${input.state}.${Buffer.from(input.connectionId, "utf8").toString("base64url")}`;
+}
+
+export function encodeConnectionSetupRedirectStateMetadata(input: {
+  state: string;
+  connectionId: string;
+  routeSegment: string;
+}): string {
+  return `${input.state}.${Buffer.from(
+    JSON.stringify({
+      connectionId: input.connectionId,
+      routeSegment: input.routeSegment,
+    }),
+    "utf8",
+  ).toString("base64url")}`;
+}
+
+export function resolveConnectionRedirectStateMetadata(input: {
+  state: string;
+  compatibilityRouteSegment?: string;
+}): {
+  connectionId: string;
+  routeSegment: string;
+} {
+  const separatorIndex = input.state.indexOf(".");
+  if (separatorIndex < 0 || separatorIndex === input.state.length - 1) {
+    throw new Error("Connection redirect state is missing connection metadata.");
+  }
+
+  const encodedMetadata = input.state.slice(separatorIndex + 1);
+  const decodedMetadata = Buffer.from(encodedMetadata, "base64url").toString("utf8").trim();
+  try {
+    const parsedJson = z
+      .object({
+        connectionId: z.string().min(1),
+        routeSegment: z.string().min(1),
+      })
+      .strict()
+      .safeParse(JSON.parse(decodedMetadata));
+
+    if (parsedJson.success) {
+      return parsedJson.data;
+    }
+  } catch {
+    // Compatibility with redirect states created before setup flow metadata was encoded.
+  }
+
+  if (input.compatibilityRouteSegment === undefined) {
+    throw new Error("Connection redirect state is missing setup flow metadata.");
+  }
+
+  return {
+    connectionId: decodedMetadata,
+    routeSegment: input.compatibilityRouteSegment,
+  };
 }
 
 export function resolveConnectionRedirectStateConnectionId(state: string): string {
