@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx scripts/run-dev.ts",
+    "dev:schedules": "tsx scripts/run-schedule-dispatcher-dev.ts",
     "db:migrate": "tsx scripts/run-control-plane-migrations.ts",
     "workflow:migrate": "tsx scripts/run-control-plane-workflow-migrations.ts",
     "integration-targets:sync": "tsx scripts/run-integration-targets-sync.ts",

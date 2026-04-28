@@ -29,6 +29,13 @@
       "persistent": true,
       "interruptible": true
     },
+    "dev:schedules": {
+      "dependsOn": ["^build"],
+      "passThroughEnv": ["MISTLE_*"],
+      "cache": false,
+      "persistent": true,
+      "interruptible": true
+    },
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]

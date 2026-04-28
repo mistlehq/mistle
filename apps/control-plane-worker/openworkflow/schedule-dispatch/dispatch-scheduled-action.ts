@@ -10,6 +10,10 @@ import { eq, sql } from "drizzle-orm";
 
 import { claimScheduledActionForDispatch } from "./claim-scheduled-action.js";
 import { dispatchSnapshotRefreshScheduledAction } from "./dispatch-snapshot-refresh.js";
+import {
+  recordMissingScheduleTargetHandler,
+  recordScheduleTargetHandoffFailure,
+} from "./telemetry.js";
 
 export type ScheduleDispatchTargetHandlerInput = Readonly<{
   scheduledActionId: string;
@@ -72,12 +76,32 @@ export async function dispatchScheduledAction(
     };
   }
 
-  const targetResult = await dispatchScheduleTarget(ctx, targetType, {
+  const targetHandlerInput = {
     scheduledActionId: claim.scheduledActionId,
     organizationId: claim.organizationId,
     scheduleId: claim.scheduleId,
     targetPayload: claim.targetPayload,
-  });
+  };
+  if (!hasScheduleTargetHandler(targetType)) {
+    recordMissingScheduleTargetHandler({
+      scheduledActionId: claim.scheduledActionId,
+      targetType,
+    });
+    throw new Error(`No schedule dispatch target handler is registered for ${targetType}.`);
+  }
+
+  let targetResult: ScheduleDispatchTargetHandlerResult;
+  try {
+    targetResult = await dispatchScheduleTarget(ctx, targetType, targetHandlerInput);
+  } catch (error) {
+    recordScheduleTargetHandoffFailure({
+      error,
+      scheduledActionId: claim.scheduledActionId,
+      scheduleId: claim.scheduleId,
+      targetType,
+    });
+    throw error;
+  }
   await markScheduledActionDispatched(ctx, {
     scheduledActionId: claim.scheduledActionId,
     targetWorkflowId: targetResult.targetWorkflowId,
@@ -103,6 +127,10 @@ async function dispatchScheduleTarget(
   }
 
   throw new Error(`No schedule dispatch target handler is registered for ${targetType}.`);
+}
+
+function hasScheduleTargetHandler(targetType: ScheduleTargetType): boolean {
+  return targetType === ScheduleTargetTypes.SNAPSHOT_REFRESH;
 }
 
 function parseScheduleTargetType(targetType: string): ScheduleTargetType | null {

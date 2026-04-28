@@ -189,6 +189,9 @@ describe("schedule dispatch claim", () => {
 
       expect(result.pendingScheduledActionIds).toHaveLength(1);
       expect(result.claimedScheduleCount).toBe(1);
+      expect(result.createdScheduledActionCount).toBe(1);
+      expect(result.failedScheduledActionCount).toBe(0);
+      expect(result.skippedLateCount).toBe(0);
       expect(result.reachedMaxBatches).toBe(false);
 
       const persistedActions = await listScheduledActions({ db: database.db });
@@ -375,6 +378,7 @@ describe("schedule dispatch claim", () => {
       );
 
       expect(result.pendingScheduledActionIds).toHaveLength(1);
+      expect(result.createdScheduledActionCount).toBe(1);
       const persistedActions = await listScheduledActions({ db: database.db });
       expect(persistedActions).toEqual([
         expect.objectContaining({
@@ -421,6 +425,9 @@ describe("schedule dispatch claim", () => {
       );
 
       expect(result.pendingScheduledActionIds).toHaveLength(2);
+      expect(result.backlogFastForwardedCount).toBe(1);
+      expect(result.createdScheduledActionCount).toBe(3);
+      expect(result.skippedLateCount).toBe(1);
       const persistedActions = await listScheduledActions({ db: database.db });
       expect(persistedActions).toEqual([
         expect.objectContaining({
@@ -500,6 +507,8 @@ describe("schedule dispatch claim", () => {
       );
 
       expect(result.pendingScheduledActionIds).toHaveLength(0);
+      expect(result.duplicateScheduledActionCount).toBe(1);
+      expect(result.skippedLateCount).toBe(0);
       const persistedActions = await listScheduledActions({ db: database.db });
       expect(persistedActions).toHaveLength(1);
       expect(persistedActions[0]).toEqual(
@@ -556,6 +565,8 @@ describe("schedule dispatch claim", () => {
       );
 
       expect(result.pendingScheduledActionIds).toHaveLength(0);
+      expect(result.createdScheduledActionCount).toBe(1);
+      expect(result.failedScheduledActionCount).toBe(1);
       const persistedActions = await listScheduledActions({ db: database.db });
       expect(persistedActions).toEqual([
         expect.objectContaining({

@@ -445,6 +445,8 @@ describe("schedule dispatch child batches", () => {
       expect(result).toEqual({
         scheduledActionIds: expectedScheduledActionIds,
         childBatchCount: 1,
+        pendingRecoveredCount: 1,
+        staleDispatchingRecoveredCount: 1,
       });
 
       const workflowRuns = await backend.listWorkflowRuns({

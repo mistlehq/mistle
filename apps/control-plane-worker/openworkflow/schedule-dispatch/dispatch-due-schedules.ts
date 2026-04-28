@@ -10,6 +10,8 @@ import {
 import { findNextScheduleOccurrence, getScheduledLocalSlot } from "@mistle/time";
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
+import { recordMissingScheduleTarget } from "./telemetry.js";
+
 const CatchUpWindowMs = 24 * 60 * 60 * 1000;
 const ClaimBatchSize = 500;
 const MaxBatchesPerDispatch = 100;
@@ -38,11 +40,13 @@ type TargetPayloadResult =
 
 type DispatchableAction = Readonly<{
   id: string;
+  kind: "pending";
   status: typeof ScheduledActionStatuses.PENDING;
 }>;
 
 type NonDispatchableAction = Readonly<{
   id: string | null;
+  kind: "duplicate" | "failed" | "skipped_late";
   status: typeof ScheduledActionStatuses.FAILED | typeof ScheduledActionStatuses.SKIPPED_LATE;
 }>;
 
@@ -51,12 +55,22 @@ type CreatedScheduledAction = DispatchableAction | NonDispatchableAction;
 type ClaimedScheduleResult = Readonly<{
   pendingScheduledActionIds: string[];
   claimedScheduleCount: number;
+  backlogFastForwardedCount: number;
+  createdScheduledActionCount: number;
+  duplicateScheduledActionCount: number;
+  failedScheduledActionCount: number;
+  skippedLateCount: number;
 }>;
 
 export type DispatchDueSchedulesResult = Readonly<{
   pendingScheduledActionIds: string[];
   claimedScheduleCount: number;
+  backlogFastForwardedCount: number;
+  createdScheduledActionCount: number;
+  duplicateScheduledActionCount: number;
+  failedScheduledActionCount: number;
   reachedMaxBatches: boolean;
+  skippedLateCount: number;
 }>;
 
 export async function dispatchDueSchedules(
@@ -69,6 +83,11 @@ export async function dispatchDueSchedules(
 ): Promise<DispatchDueSchedulesResult> {
   const pendingScheduledActionIds: string[] = [];
   let claimedScheduleCount = 0;
+  let backlogFastForwardedCount = 0;
+  let createdScheduledActionCount = 0;
+  let duplicateScheduledActionCount = 0;
+  let failedScheduledActionCount = 0;
+  let skippedLateCount = 0;
   let batchCount = 0;
 
   while (batchCount < MaxBatchesPerDispatch) {
@@ -79,19 +98,34 @@ export async function dispatchDueSchedules(
       return {
         pendingScheduledActionIds,
         claimedScheduleCount,
+        backlogFastForwardedCount,
+        createdScheduledActionCount,
+        duplicateScheduledActionCount,
+        failedScheduledActionCount,
         reachedMaxBatches: false,
+        skippedLateCount,
       };
     }
 
     pendingScheduledActionIds.push(...batch.pendingScheduledActionIds);
     claimedScheduleCount += batch.claimedScheduleCount;
+    backlogFastForwardedCount += batch.backlogFastForwardedCount;
+    createdScheduledActionCount += batch.createdScheduledActionCount;
+    duplicateScheduledActionCount += batch.duplicateScheduledActionCount;
+    failedScheduledActionCount += batch.failedScheduledActionCount;
+    skippedLateCount += batch.skippedLateCount;
     batchCount += 1;
   }
 
   return {
     pendingScheduledActionIds,
     claimedScheduleCount,
+    backlogFastForwardedCount,
+    createdScheduledActionCount,
+    duplicateScheduledActionCount,
+    failedScheduledActionCount,
     reachedMaxBatches: true,
+    skippedLateCount,
   };
 }
 
@@ -108,6 +142,11 @@ async function claimDueScheduleBatch(
       cutoffMinute: input.cutoffMinute,
     });
     const pendingScheduledActionIds: string[] = [];
+    let backlogFastForwardedCount = 0;
+    let createdScheduledActionCount = 0;
+    let duplicateScheduledActionCount = 0;
+    let failedScheduledActionCount = 0;
+    let skippedLateCount = 0;
 
     for (const claimedSchedule of claimedSchedules) {
       const scheduledAction = await consumeClaimedSchedule(tx, {
@@ -117,11 +156,28 @@ async function claimDueScheduleBatch(
       if (scheduledAction.status === ScheduledActionStatuses.PENDING) {
         pendingScheduledActionIds.push(scheduledAction.id);
       }
+      if (scheduledAction.id === null) {
+        duplicateScheduledActionCount += 1;
+      } else {
+        createdScheduledActionCount += 1;
+      }
+      if (scheduledAction.kind === "failed") {
+        failedScheduledActionCount += 1;
+      }
+      if (scheduledAction.kind === "skipped_late") {
+        backlogFastForwardedCount += 1;
+        skippedLateCount += 1;
+      }
     }
 
     return {
       pendingScheduledActionIds,
       claimedScheduleCount: claimedSchedules.length,
+      backlogFastForwardedCount,
+      createdScheduledActionCount,
+      duplicateScheduledActionCount,
+      failedScheduledActionCount,
+      skippedLateCount,
     };
   });
 }
@@ -186,6 +242,12 @@ async function consumeClaimedSchedule(
   });
 
   if (!targetPayload.resolved) {
+    if (targetPayload.failureCode === "target_missing") {
+      recordMissingScheduleTarget({
+        scheduleId: input.schedule.id,
+        targetType: input.schedule.targetType,
+      });
+    }
     const failedAction = await insertFailedScheduledAction(tx, {
       failureCode: targetPayload.failureCode,
       failureMessage: targetPayload.failureMessage,
@@ -202,6 +264,7 @@ async function consumeClaimedSchedule(
     });
     return {
       id: failedAction,
+      kind: "failed",
       status: ScheduledActionStatuses.FAILED,
     };
   }
@@ -234,12 +297,14 @@ async function consumeClaimedSchedule(
   if (pendingActionId === null) {
     return {
       id: null,
+      kind: "duplicate",
       status: ScheduledActionStatuses.SKIPPED_LATE,
     };
   }
 
   return {
     id: pendingActionId,
+    kind: "pending",
     status: ScheduledActionStatuses.PENDING,
   };
 }
@@ -343,6 +408,7 @@ async function skipLateScheduleBacklog(
 
   return {
     id: skippedActionId,
+    kind: "skipped_late",
     status: ScheduledActionStatuses.SKIPPED_LATE,
   };
 }
