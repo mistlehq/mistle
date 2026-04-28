@@ -12,7 +12,9 @@ describe("connection redirect state metadata", () => {
       connectionId: "icn_connection_123",
     });
 
-    expect(state).toBe("redirect_state.aWNuX2Nvbm5lY3Rpb25fMTIz");
+    expect(state).toBe(
+      `redirect_state.${Buffer.from("icn_connection_123", "utf8").toString("base64url")}`,
+    );
     expect(resolveConnectionRedirectStateConnectionId(state)).toBe("icn_connection_123");
   });
 
