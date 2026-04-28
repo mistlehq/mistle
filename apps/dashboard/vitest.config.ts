@@ -96,7 +96,7 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.ts"],
     exclude: ["src/**/*.component.test.ts", "src/**/*.component.test.tsx"],
-    setupFiles: ["./src/test/setup-vitest.ts"],
+    setupFiles: ["./src/test/setup-unit-vitest.ts"],
     server: {
       deps: {
         inline: ["@pierre/diffs", "@pierre/theme"],
