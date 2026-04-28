@@ -5,6 +5,3 @@ type LoadControlPlaneWorkerConfigResult = ReturnType<
 >;
 
 export type ControlPlaneWorkerConfig = LoadControlPlaneWorkerConfigResult["app"];
-export type ControlPlaneWorkerGlobalConfig = NonNullable<
-  LoadControlPlaneWorkerConfigResult["global"]
->;

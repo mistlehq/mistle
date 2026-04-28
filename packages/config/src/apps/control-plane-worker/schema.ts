@@ -33,12 +33,19 @@ export const ControlPlaneWorkerControlPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneWorkerInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
+  })
+  .strict();
+
 export const ControlPlaneWorkerConfigSchema = z
   .object({
     workflow: ControlPlaneWorkerWorkflowConfigSchema,
     email: ControlPlaneWorkerEmailConfigSchema,
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema,
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema,
+    internalAuth: ControlPlaneWorkerInternalAuthConfigSchema,
   })
   .strict();
 
@@ -48,6 +55,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     email: ControlPlaneWorkerEmailConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
+    internalAuth: ControlPlaneWorkerInternalAuthConfigSchema.partial().optional(),
   })
   .strict();
 

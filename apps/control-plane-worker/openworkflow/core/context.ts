@@ -27,7 +27,7 @@ let closeWorkflowContextPromise: Promise<void> | undefined;
 let shutdownHandlersRegistered = false;
 
 async function createWorkflowContext(): Promise<WorkflowContext> {
-  const { backend, globalConfig, workerConfig } = await getOpenWorkflowRuntime();
+  const { backend, workerConfig } = await getOpenWorkflowRuntime();
   const dbPool = new Pool({
     connectionString: workerConfig.workflow.databaseUrl,
   });
@@ -39,11 +39,11 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
     });
     const dataPlaneClient = createDataPlaneSandboxInstancesClient({
       baseUrl: workerConfig.dataPlaneApi.baseUrl,
-      serviceToken: globalConfig.internalAuth.serviceToken,
+      serviceToken: workerConfig.internalAuth.serviceToken,
     });
     const controlPlaneInternalClient = new ControlPlaneInternalClient({
       baseUrl: workerConfig.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+      internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
       requestTimeoutMs: ControlPlaneInternalRequestTimeoutMs,
     });
     const emailDelivery = {

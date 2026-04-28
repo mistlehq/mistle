@@ -178,6 +178,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
         },
         data_plane_api: {
           server: {
@@ -401,6 +404,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
         },
         data_plane_api: {
           server: {
@@ -623,6 +629,9 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          internalAuth: {
+            serviceToken: "test-service-token",
+          },
         },
         data_plane_api: {
           server: {
@@ -831,6 +840,9 @@ describe("parseConfigRecord", () => {
             },
             controlPlaneApi: {
               baseUrl: "http://127.0.0.1:5000",
+            },
+            internalAuth: {
+              serviceToken: "test-service-token",
             },
           },
           data_plane_api: {

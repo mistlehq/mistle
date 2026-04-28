@@ -1,11 +1,10 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
 import { createControlPlaneBackend } from "./client.js";
-import type { ControlPlaneWorkerConfig, ControlPlaneWorkerGlobalConfig } from "./config.js";
+import type { ControlPlaneWorkerConfig } from "./config.js";
 
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
-  globalConfig: ControlPlaneWorkerGlobalConfig;
   workerConfig: ControlPlaneWorkerConfig;
 };
 
@@ -24,13 +23,8 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
         env: process.env,
       });
 
-      if (loadedConfig.global === undefined) {
-        throw new Error("Expected global config to be loaded for control-plane-worker workflows.");
-      }
-
       return {
         workerConfig: loadedConfig.app,
-        globalConfig: loadedConfig.global,
         backend: await createControlPlaneBackend({
           url: loadedConfig.app.workflow.databaseUrl,
           namespaceId: loadedConfig.app.workflow.namespaceId,

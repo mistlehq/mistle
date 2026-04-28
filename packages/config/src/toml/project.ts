@@ -223,6 +223,9 @@ export function selectControlPlaneWorkerConfig(
     controlPlaneApi: {
       baseUrl: config.services.control_plane_api.internal_url,
     },
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
   };
 }
 

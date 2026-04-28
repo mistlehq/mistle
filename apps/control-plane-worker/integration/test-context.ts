@@ -195,6 +195,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
         controlPlaneApi: {
           baseUrl: "http://127.0.0.1:5000",
         },
+        internalAuth: {
+          serviceToken: sharedInfraConfig.internalAuthServiceToken,
+        },
       };
 
       try {

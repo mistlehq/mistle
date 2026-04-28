@@ -5,6 +5,7 @@ import type { z } from "zod";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
+import { PartialControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import {
   getDataPlaneApiSandboxProviderValidationIssue,
@@ -206,6 +207,20 @@ function composeDataPlaneGatewayConfig(
   });
 }
 
+function composeControlPlaneWorkerConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER> {
+  const partialAppConfig = PartialControlPlaneWorkerConfigSchema.parse(appConfig);
+
+  return controlPlaneWorkerConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: {
+      serviceToken: globalConfig.internalAuth.serviceToken,
+    },
+  });
+}
+
 function composeDataPlaneApiConfig(
   appConfig: unknown,
   globalConfig: AppConfig["global"],
@@ -223,6 +238,24 @@ function composeDataPlaneApiConfig(
       storage: globalConfig.sandbox.storage,
     },
   });
+}
+
+function loadControlPlaneWorkerConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, controlPlaneWorkerConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeControlPlaneWorkerConfig(
+    getValueAtPath(envLoadedRoot, controlPlaneWorkerConfigModule.namespace),
+    globalConfig,
+  );
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
 }
 
 function loadDataPlaneApiConfigFromEnv(env: NodeJS.ProcessEnv): {
@@ -335,11 +368,17 @@ function loadSelectedAppConfig(
   }
 
   if (appId === AppIds.CONTROL_PLANE_WORKER) {
-    return applyModuleEnvOverrides(
-      controlPlaneWorkerConfigModule,
-      selectControlPlaneWorkerConfig(rootConfig),
+    const globalConfig = applyModuleEnvOverrides(
+      globalConfigModule,
+      selectGlobalConfig(rootConfig),
       env,
     );
+    const selectedConfig = composeControlPlaneWorkerConfig(
+      selectControlPlaneWorkerConfig(rootConfig),
+      globalConfig,
+    );
+
+    return applyModuleEnvOverrides(controlPlaneWorkerConfigModule, selectedConfig, env);
   }
 
   if (appId === AppIds.DATA_PLANE_API) {
@@ -452,6 +491,14 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   }
 
   if (options.includeGlobal === false) {
+    if (options.app === AppIds.CONTROL_PLANE_WORKER) {
+      const { app: appConfig } = loadControlPlaneWorkerConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     if (options.app === AppIds.DATA_PLANE_API) {
       const { app: appConfig } = loadDataPlaneApiConfigFromEnv(env);
 
@@ -481,6 +528,10 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     return {
       app: appConfig,
     };
+  }
+
+  if (options.app === AppIds.CONTROL_PLANE_WORKER) {
+    return loadControlPlaneWorkerConfigFromEnv(env);
   }
 
   if (options.app === AppIds.DATA_PLANE_API) {
