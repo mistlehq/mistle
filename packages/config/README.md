@@ -80,14 +80,16 @@ Use module ownership to keep config changes localized:
 
 - `src/global/*` owns `global.*`
 - `src/apps/<app-id>/*` owns the selected service config schema.
-- `src/toml/schema.ts` owns the central resource-oriented TOML schema.
-- `src/toml/project.ts` owns service selectors from central resources.
+- `src/root/schema.ts` owns the central resource-oriented config schema.
+- `src/root/selectors.ts` owns service selectors from central resources.
+- `src/root/load-env.ts` owns legacy env override compatibility into the central root.
+- `src/toml.ts` owns TOML parsing helpers only.
 
 ### Add A New Key To An Existing Module
 
 1. Update the module schema in `schema.ts` (source of truth for runtime validation and types).
 2. Update `load-env.ts` with the env mapping and parsing logic for the new key.
-3. If the key is operator-facing TOML, update `src/toml/schema.ts` and any service selectors in `src/toml/project.ts` that consume it.
+3. If the key is operator-facing config, update `src/root/schema.ts` and any service selectors in `src/root/selectors.ts` that consume it.
 4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
 5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
 6. Add or update tests:
@@ -105,7 +107,7 @@ Use module ownership to keep config changes localized:
    - add `AppIds.<NEW_APP>`
    - add to `appConfigModules`
 3. Update `src/loader.ts` app parsing branch/map so `loadConfig` can parse and return the app config for the new app id.
-4. Add the service selector for the app in `src/toml/project.ts` if TOML should configure it.
+4. Add the service selector for the app in `src/root/selectors.ts` if central config should configure it.
 5. Add the service/resource sections in [`../../config/config.sample.toml`](../../config/config.sample.toml).
 6. Add module docs link in this README.
 7. Add integration test coverage for TOML-only, env-only, and merged precedence cases.

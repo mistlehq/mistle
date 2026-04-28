@@ -16,8 +16,8 @@ import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { asObjectRecord } from "./core/record.js";
 import { AppIds, type AppConfigModuleKey, type AppConfigModuleValue } from "./modules.js";
-import { type AppConfig } from "./schema.js";
-import { loadRootConfigFromEnv } from "./toml/load-env.js";
+import { loadRootConfigFromEnv } from "./root/load-env.js";
+import { ConfigSchema as RootConfigSchema, type Config as RootConfig } from "./root/schema.js";
 import {
   selectControlPlaneApiConfig,
   selectControlPlaneWorkerConfig,
@@ -26,8 +26,8 @@ import {
   selectDataPlaneWorkerConfig,
   selectGlobalConfig,
   selectTokenizerProxyConfig,
-} from "./toml/project.js";
-import { ConfigSchema as RootConfigSchema, type Config as RootConfig } from "./toml/schema.js";
+} from "./root/selectors.js";
+import { type AppConfig } from "./schema.js";
 
 export type LoadConfigSourceOptions = {
   configPath?: string;
