@@ -137,13 +137,6 @@ async function resolveWebhookCallbackUrl(input: {
   controlPlaneBaseUrl: string;
   connection: Awaited<ReturnType<typeof resolveConnectionWithTargetOrThrow>>;
 }): Promise<string | undefined> {
-  if (
-    input.connection.target.familyId !== "github" &&
-    input.connection.target.familyId !== "slack"
-  ) {
-    return undefined;
-  }
-
   const {
     webhookSourceCapability,
     parsedTargetConfig: parsedWebhookTargetConfig,
@@ -273,13 +266,16 @@ export async function startExternalAppSetup(
     connectionId: connection.id,
     routeSegment: input.routeSegment,
   });
-  const webhookCallbackUrl = await resolveWebhookCallbackUrl({
-    db: ctx.db,
-    integrationRegistry: ctx.integrationRegistry,
-    integrationsConfig: ctx.integrationsConfig,
-    controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
-    connection,
-  });
+  const webhookCallbackUrl =
+    flow.requiresWebhookCallbackUrl === true
+      ? await resolveWebhookCallbackUrl({
+          db: ctx.db,
+          integrationRegistry: ctx.integrationRegistry,
+          integrationsConfig: ctx.integrationsConfig,
+          controlPlaneBaseUrl: ctx.controlPlaneBaseUrl,
+          connection,
+        })
+      : undefined;
 
   let startedSetup;
   try {

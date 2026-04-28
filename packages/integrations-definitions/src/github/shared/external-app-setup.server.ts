@@ -80,6 +80,7 @@ export function createGitHubExternalAppSetupCapability(
     flows: [
       {
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        requiresWebhookCallbackUrl: true,
         routeSegment: "github-app",
         async start(input) {
           const body = GitHubAppManifestStartBodySchema.parse(input.body);

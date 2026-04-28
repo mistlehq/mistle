@@ -116,6 +116,7 @@ export const SlackExternalAppSetupCapability: IntegrationExternalAppSetupCapabil
   flows: [
     {
       methodId: SlackConnectionMethodId,
+      requiresWebhookCallbackUrl: true,
       routeSegment: "slack-app",
       async start(input) {
         const body = SlackAppManifestStartBodySchema.parse(input.body);

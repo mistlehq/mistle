@@ -350,7 +350,7 @@ export function IntegrationsPage() {
 
 function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
-  setupFlow: { routeSegment: string } | null;
+  setupFlow: { methodId: string; routeSegment: string } | null;
 }): React.JSX.Element | undefined {
   if (input.connection === undefined || input.setupFlow === null) {
     return undefined;
@@ -358,7 +358,7 @@ function renderSelectedConnectionSetupBody(input: {
 
   return renderIntegrationConnectionSetupPane({
     connection: input.connection,
-    routeSegment: input.setupFlow.routeSegment,
+    setupRoute: input.setupFlow,
     searchParams: new URLSearchParams(),
   });
 }

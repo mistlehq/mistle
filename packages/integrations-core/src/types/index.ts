@@ -556,6 +556,7 @@ export type IntegrationExternalAppSetupFlowCapability<
   TConnectionConfig = Record<string, unknown>,
 > = {
   methodId: IntegrationConnectionMethodId;
+  requiresWebhookCallbackUrl?: boolean;
   routeSegment: string;
   complete?(
     input: IntegrationExternalAppSetupCompleteInput<

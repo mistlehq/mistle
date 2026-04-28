@@ -9,6 +9,7 @@ import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
+import { resolveIntegrationConnectionSetupRouteOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 export function IntegrationConnectionSetupPage(): React.JSX.Element {
@@ -96,6 +97,11 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
       `Integration connection '${connectionId}' was not found for target '${targetKey}'.`,
     );
   }
+  const setupRoute = resolveIntegrationConnectionSetupRouteOrThrow({
+    connection,
+    connectionMethods: card.target.connectionMethods,
+    routeSegment: setupRouteSegment,
+  });
 
   return (
     <FormPageFrame
@@ -105,7 +111,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
     >
       {renderIntegrationConnectionSetupPane({
         connection,
-        routeSegment: setupRouteSegment,
+        setupRoute,
         searchParams,
       })}
     </FormPageFrame>

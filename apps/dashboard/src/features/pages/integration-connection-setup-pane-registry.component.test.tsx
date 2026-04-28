@@ -10,6 +10,7 @@ const Connection: IntegrationConnection = {
   id: "icn_setup",
   status: "active",
   targetKey: "github-cloud",
+  connectionMethodId: "github-app-installation",
   updatedAt: "2026-04-28T00:00:00.000Z",
 };
 
@@ -19,7 +20,10 @@ describe("renderIntegrationConnectionSetupPane", () => {
       isValidElement(
         renderIntegrationConnectionSetupPane({
           connection: Connection,
-          routeSegment: "github-app",
+          setupRoute: {
+            methodId: "github-app-installation",
+            routeSegment: "github-app",
+          },
           searchParams: new URLSearchParams(),
         }),
       ),
@@ -30,9 +34,12 @@ describe("renderIntegrationConnectionSetupPane", () => {
     expect(() =>
       renderIntegrationConnectionSetupPane({
         connection: Connection,
-        routeSegment: "unsupported",
+        setupRoute: {
+          methodId: "unsupported-method",
+          routeSegment: "unsupported",
+        },
         searchParams: new URLSearchParams(),
       }),
-    ).toThrow("Unsupported integration setup route segment 'unsupported'.");
+    ).toThrow("Unsupported integration setup flow 'unsupported-method/unsupported'.");
   });
 });

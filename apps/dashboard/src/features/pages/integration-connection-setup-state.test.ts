@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { IntegrationConnectionMethod } from "../integrations/integration-connection-editor.js";
-import { resolveIncompleteIntegrationConnectionSetupFlow } from "./integration-connection-setup-state.js";
+import {
+  resolveIncompleteIntegrationConnectionSetupFlow,
+  resolveIntegrationConnectionSetupRouteOrThrow,
+} from "./integration-connection-setup-state.js";
 
 const CreatedAt = "2026-04-28T00:00:00.000Z";
 const UpdatedAt = "2026-04-28T00:00:00.000Z";
@@ -82,6 +85,7 @@ describe("resolveIncompleteIntegrationConnectionSetupFlow", () => {
     });
 
     expect(setupFlow).toEqual({
+      methodId: "slack-bot-token",
       routeSegment: "slack-app",
     });
   });
@@ -205,6 +209,49 @@ describe("resolveIncompleteIntegrationConnectionSetupFlow", () => {
       }),
     ).toThrow(
       "Draft-then-setup connection method 'slack-bot-token' is missing setup completion metadata.",
+    );
+  });
+});
+
+describe("resolveIntegrationConnectionSetupRouteOrThrow", () => {
+  it("returns method-owned setup route metadata when the URL segment matches", () => {
+    expect(
+      resolveIntegrationConnectionSetupRouteOrThrow({
+        connectionMethods: [SlackAppMethod],
+        routeSegment: "slack-app",
+        connection: {
+          createdAt: CreatedAt,
+          id: "icn_slack",
+          targetKey: "slack-default",
+          displayName: "Slack",
+          status: "active",
+          connectionMethodId: "slack-bot-token",
+          updatedAt: UpdatedAt,
+        },
+      }),
+    ).toEqual({
+      methodId: "slack-bot-token",
+      routeSegment: "slack-app",
+    });
+  });
+
+  it("fails fast when the URL setup segment does not match the connection method", () => {
+    expect(() =>
+      resolveIntegrationConnectionSetupRouteOrThrow({
+        connectionMethods: [SlackAppMethod],
+        routeSegment: "github-app",
+        connection: {
+          createdAt: CreatedAt,
+          id: "icn_slack",
+          targetKey: "slack-default",
+          displayName: "Slack",
+          status: "active",
+          connectionMethodId: "slack-bot-token",
+          updatedAt: UpdatedAt,
+        },
+      }),
+    ).toThrow(
+      "Integration setup route segment 'github-app' does not match connection method 'slack-bot-token'.",
     );
   });
 });
