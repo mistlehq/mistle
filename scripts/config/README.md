@@ -8,7 +8,7 @@ Maintainer docs for local config initialization scripts.
 - Script: `scripts/config/init-development.ts`
 - Output: `config/config.development.toml`
 - Behavior:
-  - Generates the current TOML shape.
+  - Generates the resource-oriented TOML shape.
   - Generates local-only secrets at init time.
   - Preserves generated section comments for operator-facing guidance.
   - Writes `config/config.development.toml` (overwrites on each run).
@@ -22,7 +22,7 @@ Maintainer docs for local config initialization scripts.
   - `config/config.integration.docker.toml`
   - `config/config.integration.e2b.toml`
 - Behavior:
-  - Generates the current TOML shape.
+  - Generates the resource-oriented TOML shape.
   - Uses the development config as the integration baseline.
   - Shapes the config per requested sandbox provider from `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`.
   - Applies the existing env override names that are still needed while the env surface remains stable.
@@ -32,7 +32,7 @@ Maintainer docs for local config initialization scripts.
 
 ## Notes
 
-- Generated development and integration TOML files use the current shape.
+- Generated development and integration TOML files use the resource-oriented shape.
 - `config:init:integration` expects `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` to be set.
 - Docker integration configs use `sandbox.storage.backend = "docker_volume"`.
 - E2B integration configs use Archil-backed storage and require a fully
@@ -51,7 +51,7 @@ Integration provider metadata lives under `scripts/config/presets/integration/`.
 
 ## Conventions
 
-- Keep generated TOML in the current shape.
+- Keep generated TOML in the resource-oriented shape.
 - Keep generated comments useful for operators.
 - Keep env support limited to the existing `MISTLE_GLOBAL_*` and
   `MISTLE_APPS_*` override names until the env surface gets its own migration.

@@ -200,7 +200,7 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Build TS workspace in Nix shell
-        run: nix develop --command bash -c "MISTLE_CONFIG_FORMAT=next MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build:ts"
+        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm build:ts"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.build-ts-turbo-cache.outputs.cache-hit != 'true' }}
@@ -274,7 +274,7 @@ jobs:
 
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: nix develop --command bash -c "MISTLE_CONFIG_FORMAT=next MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
+        run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
         run: nix develop --command bash -c "pnpm lint:rust && pnpm typecheck:rust"

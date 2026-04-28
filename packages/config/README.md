@@ -2,15 +2,15 @@
 
 Central config package for Mistle apps.
 
-`@mistle/config` loads configuration through a projection pipeline:
+`@mistle/config` loads configuration from one resource-oriented TOML root:
 
 1. Load TOML as the base config.
-2. Project TOML into the existing runtime config shape.
-3. Apply env overrides.
-4. Validate the final runtime config.
+2. Apply env overrides into the same central root.
+3. Select the requested service config from shared resources and service-owned sections.
+4. Validate the selected service config.
 
 The public operator sample at [`../../config/config.sample.toml`](../../config/config.sample.toml)
-uses the current TOML shape.
+uses the resource-oriented TOML shape.
 
 ## Public API
 
@@ -44,7 +44,7 @@ Currently supported `app` values are exposed in `AppIds`.
 `configPath` can come from either `options.configPath` or `options.env.MISTLE_CONFIG_PATH`.
 There is no implicit fallback to process env.
 
-Env overrides are still applied after TOML projection, so the existing
+Env overrides are still applied after TOML is loaded, so the existing
 `MISTLE_GLOBAL_*` and `MISTLE_APPS_*` env variables keep their current override
 behavior.
 
@@ -60,9 +60,9 @@ Return shape:
 ## Merge Rules
 
 - TOML is loaded first.
-- TOML is projected into the existing runtime config shape.
-- Env values are loaded second.
-- Env values override TOML when both provide the same runtime key.
+- Env values are loaded second into the central config root.
+- Env values override TOML when both provide the same config key.
+- The requested service config is selected from the merged root.
 
 ## Module Docs
 
@@ -79,14 +79,15 @@ Return shape:
 Use module ownership to keep config changes localized:
 
 - `src/global/*` owns `global.*`
-- `src/apps/<app-id>/*` owns `apps.<app_id>.*`
-- `src/toml/*` owns the TOML schema and projection into runtime config.
+- `src/apps/<app-id>/*` owns the selected service config schema.
+- `src/toml/schema.ts` owns the central resource-oriented TOML schema.
+- `src/toml/project.ts` owns service selectors from central resources.
 
 ### Add A New Key To An Existing Module
 
 1. Update the module schema in `schema.ts` (source of truth for runtime validation and types).
 2. Update `load-env.ts` with the env mapping and parsing logic for the new key.
-3. If the key is operator-facing TOML, update `src/toml/schema.ts` and `src/toml/project.ts`.
+3. If the key is operator-facing TOML, update `src/toml/schema.ts` and any service selectors in `src/toml/project.ts` that consume it.
 4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
 5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
 6. Add or update tests:
@@ -104,8 +105,8 @@ Use module ownership to keep config changes localized:
    - add `AppIds.<NEW_APP>`
    - add to `appConfigModules`
 3. Update `src/loader.ts` app parsing branch/map so `loadConfig` can parse and return the app config for the new app id.
-4. Add the runtime projection for the app in `src/toml/project.ts` if TOML should configure it.
-5. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
+4. Add the service selector for the app in `src/toml/project.ts` if TOML should configure it.
+5. Add the service/resource sections in [`../../config/config.sample.toml`](../../config/config.sample.toml).
 6. Add module docs link in this README.
 7. Add integration test coverage for TOML-only, env-only, and merged precedence cases.
 
