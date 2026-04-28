@@ -320,9 +320,9 @@ describe("sandbox instance deadlines integration", () => {
 
       const connectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -404,9 +404,9 @@ describe("sandbox instance deadlines integration", () => {
 
     const connectionToken = await mintConnectionToken({
       config: {
-        connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-        tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-        tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+        tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+        tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
       },
       jti: randomUUID(),
       sandboxInstanceId,

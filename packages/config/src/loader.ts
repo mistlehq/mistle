@@ -8,6 +8,7 @@ import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/inde
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { getDataPlaneApiSandboxProviderValidationIssue } from "./apps/data-plane-api/schema.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
+import { PartialDataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import {
   getDataPlaneWorkerPersistentSandboxValidationIssue,
@@ -186,6 +187,38 @@ function composeTokenizerProxyConfig(
     },
     egressGrant: globalConfig.sandbox.egress,
   });
+}
+
+function composeDataPlaneGatewayConfig(
+  appConfig: unknown,
+  globalConfig: AppConfig["global"],
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY> {
+  const partialAppConfig = PartialDataPlaneGatewayConfigSchema.parse(appConfig);
+
+  return dataPlaneGatewayConfigModule.schema.parse({
+    ...partialAppConfig,
+    internalAuth: globalConfig.internalAuth,
+    sandbox: globalConfig.sandbox,
+    telemetry: globalConfig.telemetry,
+  });
+}
+
+function loadDataPlaneGatewayConfigFromEnv(env: NodeJS.ProcessEnv): {
+  app: AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
+  global: AppConfig["global"];
+} {
+  const envLoadedRoot = loadFromEnv([globalConfigModule, dataPlaneGatewayConfigModule], env);
+  const globalRoot = validateModules([globalConfigModule], envLoadedRoot);
+  const globalConfig = parseModuleValue(globalConfigModule, globalRoot);
+  const appConfig = composeDataPlaneGatewayConfig(
+    getValueAtPath(envLoadedRoot, dataPlaneGatewayConfigModule.namespace),
+    globalConfig,
+  );
+
+  return {
+    global: globalConfig,
+    app: appConfig,
+  };
 }
 
 function loadTokenizerProxyConfigFromEnv(env: NodeJS.ProcessEnv): {
@@ -367,6 +400,14 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
   }
 
   if (options.includeGlobal === false) {
+    if (options.app === AppIds.DATA_PLANE_GATEWAY) {
+      const { app: appConfig } = loadDataPlaneGatewayConfigFromEnv(env);
+
+      return {
+        app: appConfig,
+      };
+    }
+
     if (options.app === AppIds.TOKENIZER_PROXY) {
       const { app: appConfig } = loadTokenizerProxyConfigFromEnv(env);
 
@@ -380,6 +421,10 @@ export function loadConfig(options: LoadConfigOptions<AppConfigModuleKey>): Load
     return {
       app: appConfig,
     };
+  }
+
+  if (options.app === AppIds.DATA_PLANE_GATEWAY) {
+    return loadDataPlaneGatewayConfigFromEnv(env);
   }
 
   if (options.app === AppIds.TOKENIZER_PROXY) {

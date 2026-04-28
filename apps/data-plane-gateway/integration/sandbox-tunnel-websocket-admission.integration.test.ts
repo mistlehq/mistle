@@ -75,14 +75,14 @@ describe("sandbox tunnel websocket admission integration", () => {
     try {
       const admission = new SandboxTunnelWebSocketAdmission({
         bootstrapTokenConfig: {
-          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         connectionTokenConfig: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         sandboxOwnerResolver: new AttachmentBackedSandboxOwnerResolver(
           "dpg_test_admission",

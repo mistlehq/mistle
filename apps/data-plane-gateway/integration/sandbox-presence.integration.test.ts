@@ -33,7 +33,7 @@ async function insertSandboxInstanceRow(input: {
     organizationId: "org_sandbox_presence_it",
     sandboxProfileId: "sbp_sandbox_presence_it",
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.sandbox.provider,
+    runtimeProvider: input.fixture.config.app.sandbox.provider,
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
     startedByKind: "system",
@@ -48,9 +48,9 @@ async function mintValidBootstrapToken(input: {
 }): Promise<string> {
   return mintBootstrapToken({
     config: {
-      bootstrapTokenSecret: input.fixture.config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.fixture.config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.fixture.config.sandbox.bootstrap.tokenAudience,
+      bootstrapTokenSecret: input.fixture.config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.fixture.config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.fixture.config.app.sandbox.bootstrap.tokenAudience,
     },
     jti: randomUUID(),
     sandboxInstanceId: input.sandboxInstanceId,
@@ -64,9 +64,9 @@ async function mintValidConnectionToken(input: {
 }): Promise<string> {
   return mintConnectionToken({
     config: {
-      connectionTokenSecret: input.fixture.config.sandbox.connect.tokenSecret,
-      tokenIssuer: input.fixture.config.sandbox.connect.tokenIssuer,
-      tokenAudience: input.fixture.config.sandbox.connect.tokenAudience,
+      connectionTokenSecret: input.fixture.config.app.sandbox.connect.tokenSecret,
+      tokenIssuer: input.fixture.config.app.sandbox.connect.tokenIssuer,
+      tokenAudience: input.fixture.config.app.sandbox.connect.tokenAudience,
     },
     jti: randomUUID(),
     sandboxInstanceId: input.sandboxInstanceId,

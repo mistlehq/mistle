@@ -68,7 +68,7 @@ function deriveAccessHost(input: {
 }): string {
   return derivePortAccessHost({
     config: {
-      baseDomain: input.fixture.config.sandbox.publish.baseDomain,
+      baseDomain: input.fixture.config.app.sandbox.publish.baseDomain,
     },
     sandboxInstanceId: input.sandboxInstanceId,
     port: input.port,
@@ -85,7 +85,7 @@ async function mintSessionToken(input: {
 }): Promise<string> {
   return mintPortAccessSession({
     config: {
-      cookieSigningSecret: input.fixture.config.sandbox.publish.session.cookieSigningSecret,
+      cookieSigningSecret: input.fixture.config.app.sandbox.publish.session.cookieSigningSecret,
     },
     clock: input.clock ?? systemClock,
     sandboxInstanceId: input.sandboxInstanceId,

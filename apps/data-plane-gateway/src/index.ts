@@ -1,14 +1,11 @@
 import { shutdownTelemetry } from "@mistle/telemetry";
 
-import { appConfig, globalConfig } from "./instrument.js";
+import { appConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createDataPlaneGatewayRuntime } from "./runtime/index.js";
 
 const runtime = createDataPlaneGatewayRuntime({
   app: appConfig,
-  internalAuth: globalConfig.internalAuth,
-  sandbox: globalConfig.sandbox,
-  telemetry: globalConfig.telemetry,
 });
 
 await runtime.start();

@@ -318,6 +318,11 @@ const dataPlaneGatewayEnvConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
   },
+  internalAuth: {
+    serviceToken,
+  },
+  sandbox: globalDevelopmentConfig.sandbox,
+  telemetry: globalDevelopmentConfig.telemetry,
 } as const;
 
 const dataPlaneGatewayBaseFixtureConfig = {
@@ -920,6 +925,9 @@ describe("loadConfig integrations", () => {
         runtimeState: dataPlaneGatewayEnvConfig.runtimeState,
         dataPlaneApi: dataPlaneGatewayEnvConfig.dataPlaneApi,
         controlPlaneApi: dataPlaneGatewayEnvConfig.controlPlaneApi,
+        internalAuth: dataPlaneGatewayEnvConfig.internalAuth,
+        sandbox: dataPlaneGatewayEnvConfig.sandbox,
+        telemetry: dataPlaneGatewayEnvConfig.telemetry,
       },
     });
   });

@@ -42,7 +42,7 @@ async function insertSandboxInstanceRow(input: {
     organizationId: "org_data_plane_gateway_integration",
     sandboxProfileId: "sbp_data_plane_gateway_integration",
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.sandbox.provider,
+    runtimeProvider: input.fixture.config.app.sandbox.provider,
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: input.status ?? SandboxInstanceStatuses.RUNNING,
     startedByKind: "system",
@@ -84,9 +84,9 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
       const exchangeTokenJti = randomUUID();
       const exchangeToken = await mintTunnelExchangeToken({
         config: {
-          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: exchangeTokenJti,
         sandboxInstanceId,
@@ -109,17 +109,17 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
 
       const verifiedBootstrapToken = await verifyBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         token: body.bootstrapToken,
       });
       const verifiedExchangeToken = await verifyTunnelExchangeToken({
         config: {
-          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         token: body.tunnelExchangeToken,
       });
@@ -151,9 +151,9 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
       const exchangeTokenJti = randomUUID();
       const exchangeToken = await mintTunnelExchangeToken({
         config: {
-          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: exchangeTokenJti,
         sandboxInstanceId,
@@ -220,9 +220,9 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
       });
       const exchangeToken = await mintTunnelExchangeToken({
         config: {
-          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -256,9 +256,9 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
       });
       const exchangeToken = await mintTunnelExchangeToken({
         config: {
-          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,

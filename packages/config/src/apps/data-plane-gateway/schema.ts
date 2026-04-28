@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import {
+  GlobalSandboxConfigSchema,
+  GlobalTelemetryConfigSchema,
+  PartialGlobalSandboxConfigSchema,
+  PartialGlobalTelemetryConfigSchema,
+} from "../../global/schema.js";
+
 const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
@@ -76,6 +83,12 @@ export const DataPlaneGatewayControlPlaneApiConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayInternalAuthConfigSchema = z
+  .object({
+    serviceToken: z.string().trim().min(1),
+  })
+  .strict();
+
 export const DataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema,
@@ -83,6 +96,9 @@ export const DataPlaneGatewayConfigSchema = z
     runtimeState: DataPlaneGatewayRuntimeStateConfigSchema,
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema,
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema,
+    internalAuth: DataPlaneGatewayInternalAuthConfigSchema,
+    sandbox: GlobalSandboxConfigSchema,
+    telemetry: GlobalTelemetryConfigSchema,
   })
   .strict();
 
@@ -93,6 +109,9 @@ export const PartialDataPlaneGatewayConfigSchema = z
     runtimeState: PartialDataPlaneGatewayRuntimeStateConfigSchema.optional(),
     dataPlaneApi: DataPlaneGatewayDataPlaneApiConfigSchema.partial().optional(),
     controlPlaneApi: DataPlaneGatewayControlPlaneApiConfigSchema.partial().optional(),
+    internalAuth: DataPlaneGatewayInternalAuthConfigSchema.partial().optional(),
+    sandbox: PartialGlobalSandboxConfigSchema.optional(),
+    telemetry: PartialGlobalTelemetryConfigSchema.optional(),
   })
   .strict();
 

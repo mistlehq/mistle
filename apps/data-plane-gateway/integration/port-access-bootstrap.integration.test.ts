@@ -27,7 +27,7 @@ async function mintPortAccessBootstrap(input: {
 }): Promise<{ host: string; token: string }> {
   const host = derivePortAccessHost({
     config: {
-      baseDomain: input.fixture.config.sandbox.publish.baseDomain,
+      baseDomain: input.fixture.config.app.sandbox.publish.baseDomain,
     },
     sandboxInstanceId: input.sandboxInstanceId,
     port: input.port,
@@ -36,7 +36,7 @@ async function mintPortAccessBootstrap(input: {
   return {
     host,
     token: await mintPortAccessBootstrapToken({
-      config: input.fixture.config.sandbox.publish.access,
+      config: input.fixture.config.app.sandbox.publish.access,
       sandboxInstanceId: input.sandboxInstanceId,
       port: input.port,
       host,

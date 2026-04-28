@@ -268,6 +268,8 @@ export function selectDataPlaneApiConfig(config: Config): AppConfig["apps"]["dat
 export function selectDataPlaneGatewayConfig(
   config: Config,
 ): AppConfig["apps"]["data_plane_gateway"] {
+  const globalConfig = selectGlobalConfig(config);
+
   return {
     server: {
       host: config.services.data_plane_gateway.host,
@@ -289,6 +291,11 @@ export function selectDataPlaneGatewayConfig(
     controlPlaneApi: {
       baseUrl: config.services.control_plane_api.internal_url,
     },
+    internalAuth: {
+      serviceToken: config.internal_auth.shared_token.token,
+    },
+    sandbox: globalConfig.sandbox,
+    telemetry: globalConfig.telemetry,
   };
 }
 

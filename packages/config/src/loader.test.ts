@@ -5,6 +5,57 @@ import { AppIds } from "./modules.js";
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "./sandbox-base-images.js";
 
 const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
+const DataPlaneGatewaySharedAppConfig = {
+  internalAuth: {
+    serviceToken: "test-service-token",
+  },
+  sandbox: {
+    provider: "docker",
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
+    gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+    internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+    connect: {
+      tokenSecret: "test-connection-token-secret",
+      tokenIssuer: "control-plane-api",
+      tokenAudience: "data-plane-gateway",
+    },
+    bootstrap: {
+      tokenSecret: "test-bootstrap-token-secret",
+      tokenIssuer: "data-plane-worker",
+      tokenAudience: "data-plane-gateway",
+    },
+    egress: {
+      tokenSecret: "test-egress-token-secret",
+      tokenIssuer: "data-plane-worker",
+      tokenAudience: "tokenizer-proxy",
+    },
+    publish: {
+      baseDomain: "mistle.example.test",
+      access: {
+        tokenSecret: "test-publish-token-secret",
+        tokenIssuer: "control-plane-api",
+        tokenAudience: "data-plane-gateway",
+      },
+      session: {
+        cookieSigningSecret: "test-publish-cookie-secret",
+      },
+    },
+  },
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
+} as const;
 
 describe("parseConfigRecord", () => {
   it("parses a minimal config record", () => {
@@ -199,6 +250,7 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          ...DataPlaneGatewaySharedAppConfig,
         },
         tokenizer_proxy: {
           server: {
@@ -417,6 +469,7 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          ...DataPlaneGatewaySharedAppConfig,
         },
         tokenizer_proxy: {
           server: {
@@ -629,6 +682,7 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5000",
           },
+          ...DataPlaneGatewaySharedAppConfig,
         },
         tokenizer_proxy: {
           server: {

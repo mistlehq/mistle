@@ -171,23 +171,23 @@ export function createDataPlaneGatewayRuntime(
   );
   const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
   const sandboxSigningRequestService = new SandboxSigningRequestService({
-    bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
-    tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
-    tokenAudience: config.sandbox.bootstrap.tokenAudience,
+    bootstrapTokenSecret: config.app.sandbox.bootstrap.tokenSecret,
+    tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
+    tokenAudience: config.app.sandbox.bootstrap.tokenAudience,
     controlPlaneClient: new ControlPlaneInternalClient({
       baseUrl: config.app.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: config.internalAuth.serviceToken,
+      internalAuthServiceToken: config.app.internalAuth.serviceToken,
     }),
   });
   const telemetryIngressSink = createSandboxTelemetryIngressSink({
     clock: systemClock,
     gatewayNodeId: nodeId,
-    telemetry: config.telemetry,
+    telemetry: config.app.telemetry,
   });
   const telemetryIngressService = new SandboxTelemetryIngressService(telemetryIngressSink);
   const dataPlaneClient = createDataPlaneSandboxInstancesClient({
     baseUrl: config.app.dataPlaneApi.baseUrl,
-    serviceToken: config.internalAuth.serviceToken,
+    serviceToken: config.app.internalAuth.serviceToken,
   });
   const sandboxInstanceDeadlineService = new SandboxInstanceDeadlineService(
     dataPlaneClient,
@@ -199,7 +199,7 @@ export function createDataPlaneGatewayRuntime(
   registerSandboxRuntimeStateRoute({
     app,
     clock: systemClock,
-    internalAuthServiceToken: config.internalAuth.serviceToken,
+    internalAuthServiceToken: config.app.internalAuth.serviceToken,
     activeBootstrapSessionStore,
     sandboxKeepaliveStore,
     sandboxPresenceStore,
@@ -211,14 +211,14 @@ export function createDataPlaneGatewayRuntime(
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
     gatewayNodeId: nodeId,
     bootstrapTokenConfig: {
-      bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: config.sandbox.bootstrap.tokenAudience,
+      bootstrapTokenSecret: config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.app.sandbox.bootstrap.tokenAudience,
     } satisfies BootstrapTokenConfig,
     connectionTokenConfig: {
-      connectionTokenSecret: config.sandbox.connect.tokenSecret,
-      tokenIssuer: config.sandbox.connect.tokenIssuer,
-      tokenAudience: config.sandbox.connect.tokenAudience,
+      connectionTokenSecret: config.app.sandbox.connect.tokenSecret,
+      tokenIssuer: config.app.sandbox.connect.tokenIssuer,
+      tokenAudience: config.app.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
     sandboxSigningRequestService,
     portAccessTransportService,
@@ -242,30 +242,30 @@ export function createDataPlaneGatewayRuntime(
   registerSandboxTunnelTokenExchangeRoute({
     app,
     bootstrapTokenConfig: {
-      bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: config.sandbox.bootstrap.tokenAudience,
+      bootstrapTokenSecret: config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.app.sandbox.bootstrap.tokenAudience,
     },
     tunnelExchangeTokenConfig: {
-      tokenSecret: config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: config.sandbox.bootstrap.tokenAudience,
+      tokenSecret: config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.app.sandbox.bootstrap.tokenAudience,
     },
   });
   registerPortAccessRoutes({
     app,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
     bootstrapTokenConfig: {
-      tokenSecret: config.sandbox.publish.access.tokenSecret,
-      tokenIssuer: config.sandbox.publish.access.tokenIssuer,
-      tokenAudience: config.sandbox.publish.access.tokenAudience,
+      tokenSecret: config.app.sandbox.publish.access.tokenSecret,
+      tokenIssuer: config.app.sandbox.publish.access.tokenIssuer,
+      tokenAudience: config.app.sandbox.publish.access.tokenAudience,
     },
     hostConfig: {
-      baseDomain: config.sandbox.publish.baseDomain,
+      baseDomain: config.app.sandbox.publish.baseDomain,
     },
     portAccessTransportService,
     sessionConfig: {
-      cookieSigningSecret: config.sandbox.publish.session.cookieSigningSecret,
+      cookieSigningSecret: config.app.sandbox.publish.session.cookieSigningSecret,
     },
     portsTargetAuthorizeService,
     clock: systemClock,

@@ -35,7 +35,7 @@ async function insertSandboxInstanceRow(input: {
     organizationId: "org_data_plane_gateway_integration",
     sandboxProfileId: "sbp_data_plane_gateway_integration",
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.sandbox.provider,
+    runtimeProvider: input.fixture.config.app.sandbox.provider,
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
     startedByKind: "system",
@@ -50,9 +50,9 @@ async function connectBootstrapSocket(input: {
 }) {
   const token = await mintBootstrapToken({
     config: {
-      bootstrapTokenSecret: input.fixture.config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.fixture.config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.fixture.config.sandbox.bootstrap.tokenAudience,
+      bootstrapTokenSecret: input.fixture.config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.fixture.config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.fixture.config.app.sandbox.bootstrap.tokenAudience,
     },
     jti: randomUUID(),
     sandboxInstanceId: input.sandboxInstanceId,
@@ -102,9 +102,9 @@ describe("sandbox tunnel telemetry ingress integration", () => {
       });
       const connectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: connectionTokenJti,
         sandboxInstanceId,

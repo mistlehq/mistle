@@ -2,7 +2,7 @@ import { createOtlpLogForwarder, type OtlpLogForwarder } from "@mistle/telemetry
 import type { Clock } from "@mistle/time";
 import { metrics, type Attributes } from "@opentelemetry/api";
 
-import type { DataPlaneGatewayGlobalConfig } from "../../types.js";
+import type { DataPlaneGatewayConfig } from "../../types.js";
 import { NoopSandboxTelemetryIngressSink } from "./noop-sandbox-telemetry-ingress-sink.js";
 import type {
   SandboxTelemetryIngressSink,
@@ -33,7 +33,7 @@ type OtlpTraceForwarder = {
 };
 
 type EnabledTelemetryTracesConfig = Extract<
-  DataPlaneGatewayGlobalConfig["telemetry"],
+  DataPlaneGatewayConfig["telemetry"],
   { enabled: true }
 >["traces"];
 
@@ -402,7 +402,7 @@ export class OtlpSandboxTelemetryIngressSink implements SandboxTelemetryIngressS
 export function createSandboxTelemetryIngressSink(input: {
   clock: Clock;
   gatewayNodeId: string;
-  telemetry: DataPlaneGatewayGlobalConfig["telemetry"];
+  telemetry: DataPlaneGatewayConfig["telemetry"];
 }): SandboxTelemetryIngressSink {
   if (!input.telemetry.enabled) {
     return new NoopSandboxTelemetryIngressSink();

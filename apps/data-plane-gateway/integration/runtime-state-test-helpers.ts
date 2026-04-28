@@ -32,7 +32,7 @@ export async function insertSandboxInstanceRow(input: {
     organizationId: `org_${input.testId}`,
     sandboxProfileId: `sbp_${input.testId}`,
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.sandbox.provider,
+    runtimeProvider: input.fixture.config.app.sandbox.provider,
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
     startedByKind: "system",
@@ -47,9 +47,9 @@ export async function mintValidBootstrapToken(input: {
 }): Promise<string> {
   return mintBootstrapToken({
     config: {
-      bootstrapTokenSecret: input.fixture.config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.fixture.config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.fixture.config.sandbox.bootstrap.tokenAudience,
+      bootstrapTokenSecret: input.fixture.config.app.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.fixture.config.app.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.fixture.config.app.sandbox.bootstrap.tokenAudience,
     },
     jti: randomUUID(),
     sandboxInstanceId: input.sandboxInstanceId,
@@ -65,7 +65,7 @@ export async function readRuntimeState(input: {
     `${input.fixture.baseUrl}/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/runtime-state`,
     {
       headers: {
-        [InternalServiceTokenHeader]: input.fixture.config.internalAuth.serviceToken,
+        [InternalServiceTokenHeader]: input.fixture.config.app.internalAuth.serviceToken,
       },
     },
   );

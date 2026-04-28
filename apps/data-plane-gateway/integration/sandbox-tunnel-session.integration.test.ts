@@ -49,7 +49,7 @@ async function insertSandboxInstanceRow(input: {
     organizationId: "org_data_plane_gateway_integration",
     sandboxProfileId: "sbp_data_plane_gateway_integration",
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.sandbox.provider,
+    runtimeProvider: input.fixture.config.app.sandbox.provider,
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
     status: SandboxInstanceStatuses.STARTING,
     startedByKind: "system",
@@ -80,9 +80,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const bootstrapToken = await mintBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -90,9 +90,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const connectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -170,9 +170,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const bootstrapToken = await mintBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -180,9 +180,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const firstConnectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -190,9 +190,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const secondConnectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -267,9 +267,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const bootstrapToken = await mintBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,
@@ -277,9 +277,9 @@ describe("sandbox tunnel session lifecycle integration", () => {
       });
       const connectionToken = await mintConnectionToken({
         config: {
-          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
         sandboxInstanceId,

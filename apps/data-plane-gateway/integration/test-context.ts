@@ -422,55 +422,55 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
               controlPlaneApi: {
                 baseUrl: controlPlaneApi.baseUrl,
               },
-            },
-            internalAuth: {
-              serviceToken: INTERNAL_AUTH_SERVICE_TOKEN,
-            },
-            sandbox: {
-              provider: "docker",
-              defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
-              gatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
-              internalGatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
-              connect: {
-                tokenSecret: IntegrationConnectTokenSecret,
-                tokenIssuer: "integration-control-plane-api",
-                tokenAudience: IntegrationTokenAudience,
+              internalAuth: {
+                serviceToken: INTERNAL_AUTH_SERVICE_TOKEN,
               },
-              bootstrap: {
-                tokenSecret: IntegrationBootstrapTokenSecret,
-                tokenIssuer: IntegrationTokenIssuer,
-                tokenAudience: IntegrationTokenAudience,
-              },
-              egress: {
-                tokenSecret: "integration-egress-token-secret",
-                tokenIssuer: "integration-data-plane-worker",
-                tokenAudience: "integration-tokenizer-proxy",
-              },
-              publish: {
-                baseDomain: "mistle.example.test",
-                access: {
-                  tokenSecret: "integration-publish-token-secret",
+              sandbox: {
+                provider: "docker",
+                defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
+                gatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
+                internalGatewayWsUrl: `ws://127.0.0.1:${String(gatewayPort)}/tunnel/sandbox`,
+                connect: {
+                  tokenSecret: IntegrationConnectTokenSecret,
                   tokenIssuer: "integration-control-plane-api",
                   tokenAudience: IntegrationTokenAudience,
                 },
-                session: {
-                  cookieSigningSecret: "integration-publish-cookie-secret",
+                bootstrap: {
+                  tokenSecret: IntegrationBootstrapTokenSecret,
+                  tokenIssuer: IntegrationTokenIssuer,
+                  tokenAudience: IntegrationTokenAudience,
+                },
+                egress: {
+                  tokenSecret: "integration-egress-token-secret",
+                  tokenIssuer: "integration-data-plane-worker",
+                  tokenAudience: "integration-tokenizer-proxy",
+                },
+                publish: {
+                  baseDomain: "mistle.example.test",
+                  access: {
+                    tokenSecret: "integration-publish-token-secret",
+                    tokenIssuer: "integration-control-plane-api",
+                    tokenAudience: IntegrationTokenAudience,
+                  },
+                  session: {
+                    cookieSigningSecret: "integration-publish-cookie-secret",
+                  },
                 },
               },
-            },
-            telemetry: {
-              enabled: true,
-              debug: false,
-              traces: {
-                endpoint: `${otlpReceiver.url}/v1/traces`,
+              telemetry: {
+                enabled: true,
+                debug: false,
+                traces: {
+                  endpoint: `${otlpReceiver.url}/v1/traces`,
+                },
+                logs: {
+                  endpoint: `${otlpReceiver.url}/v1/logs`,
+                },
+                metrics: {
+                  endpoint: `${otlpReceiver.url}/v1/metrics`,
+                },
+                resourceAttributes: "deployment.environment=integration",
               },
-              logs: {
-                endpoint: `${otlpReceiver.url}/v1/logs`,
-              },
-              metrics: {
-                endpoint: `${otlpReceiver.url}/v1/metrics`,
-              },
-              resourceAttributes: "deployment.environment=integration",
             },
           };
 
