@@ -67,12 +67,6 @@ describe("OpenAiApiKeyDefinition", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.4",
-            options: {
-              reasoningEffort: "high",
-            },
-          },
         },
       },
       refs: {
@@ -88,13 +82,13 @@ describe("OpenAiApiKeyDefinition", () => {
     });
 
     expect(resolvedCapabilities.agentProviderAccess?.allowedModels).toEqual(["gpt-5.4"]);
+    expect(resolvedCapabilities.agentProviderAccess?.defaultModel).toBe("gpt-5.4");
     expect(resolvedCapabilities.agentProviderAccess?.additionalHeaders).toEqual({
       "ChatGPT-Account-ID": "acct_123",
     });
     expect(resolvedCapabilities.agentProviderAccess?.apiBaseUrl).toBe(OpenAiChatGptOriginBaseUrl);
     expect(resolvedCapabilities.agentProviderAccess?.allowedPathPrefixes).toEqual(["/"]);
     expect(resolvedCapabilities.agentProviderAccess?.providerMetadata).toMatchObject({
-      reasoningEffort: "high",
       responsesApiBaseUrl: OpenAiChatGptResponsesApiBaseUrl,
       chatgptBaseUrl: OpenAiChatGptBaseUrl,
     });

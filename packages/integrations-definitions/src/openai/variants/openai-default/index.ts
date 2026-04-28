@@ -12,7 +12,6 @@ export {
 export {
   OpenAiApiKeyBindingConfigSchema,
   OpenAiAllowedRuntimeIds,
-  OpenAiReasoningEfforts,
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
 export {
@@ -27,6 +26,7 @@ export {
   OpenAiConnectionMethodIds,
   OpenAiDefaultModelId,
   OpenAiModelIds,
+  OpenAiReasoningEfforts,
   OpenAiReasoningEffortLabelByValue,
   isOpenAiModelSupported,
   isOpenAiConnectionMethodId,

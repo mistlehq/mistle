@@ -98,12 +98,6 @@ describe("sandbox profile versions create integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       }),
       createSandboxProfileVersionIntegrationBindingFixture({
@@ -116,12 +110,6 @@ describe("sandbox profile versions create integration", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.4",
-            options: {
-              reasoningEffort: "high",
-            },
           },
         },
       }),
@@ -193,12 +181,6 @@ describe("sandbox profile versions create integration", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.4",
-            options: {
-              reasoningEffort: "high",
-            },
           },
         },
       },

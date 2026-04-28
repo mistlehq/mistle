@@ -96,9 +96,7 @@ describe("compileCodexRuntime", () => {
         defaultModel: "gpt-5.3-codex",
         allowedModels: ["gpt-5.3-codex"],
         providerMetadata: {
-          reasoningEffort: "medium",
           responsesApiBaseUrl: "https://api.openai.com",
-          additionalInstructions: "Prefer concise answers.",
         },
       },
       mcpServers: [],
@@ -175,14 +173,17 @@ describe("compileCodexRuntime", () => {
     expect(compiled.runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",
       setup: {
-        env: {
-          OPENAI_MODEL: "gpt-5.3-codex",
-          OPENAI_REASONING_EFFORT: "medium",
-        },
+        env: {},
         files: [
           {
             fileId: "codex_config",
             path: "/etc/codex/config.toml",
+            mode: 384,
+            writeMode: "if-absent",
+          },
+          {
+            fileId: "codex_global_agents",
+            path: "/root/.codex/AGENTS.md",
             mode: 384,
             writeMode: "if-absent",
           },
@@ -218,22 +219,40 @@ describe("compileCodexRuntime", () => {
         connectionMode: "dedicated",
       },
     ]);
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'developer_instructions = "Mistle-managed sandbox context:',
-    );
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+    const setupFiles = compiled.runtimeClients[0]?.setup.files;
+    if (setupFiles === undefined) {
+      throw new Error("Expected compiled Codex runtime setup files.");
+    }
+    const configFile = setupFiles.find((file) => file.fileId === "codex_config");
+    if (configFile === undefined) {
+      throw new Error("Expected compiled Codex config file.");
+    }
+    const agentsFile = setupFiles.find((file) => file.fileId === "codex_global_agents");
+    if (agentsFile === undefined) {
+      throw new Error("Expected compiled Codex global AGENTS.md file.");
+    }
+
+    expect(configFile.content).not.toContain("developer_instructions");
+    expect(configFile.content).not.toContain("model =");
+    expect(configFile.content).not.toContain("model_reasoning_effort");
+    expect(configFile.content).toContain('model_provider = "proxy"');
+    expect(configFile.content).toContain("[model_providers.proxy]");
+    expect(configFile.content).toContain('base_url = "https://api.openai.com"');
+    expect(configFile.content).toContain('wire_api = "responses"');
+    expect(configFile.content).toContain("requires_openai_auth = false");
+    expect(configFile.content).toContain("supports_websockets = true");
+    expect(configFile.content).toContain("[features]");
+    expect(configFile.content).toContain("apps = false");
+    expect(configFile.content).toContain("plugins = false");
+    expect(configFile.content).toContain("tool_search = true");
+    expect(agentsFile.content).toContain("Mistle-managed sandbox context:");
+    expect(agentsFile.content).toContain(
       "prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`",
     );
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+    expect(agentsFile.content).toContain(
       "Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
     );
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      "Prefer concise answers.",
-    );
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("[features]");
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("apps = false");
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("plugins = false");
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain("tool_search = true");
+    expect(agentsFile.content).not.toContain("User-provided additional instructions:");
     expect(compiled.agentRuntimes).toEqual([
       {
         runtimeId: "codex",
@@ -313,7 +332,6 @@ describe("compileCodexRuntime", () => {
         defaultModel: "gpt-5.4",
         allowedModels: ["gpt-5.4"],
         providerMetadata: {
-          reasoningEffort: "medium",
           responsesApiBaseUrl: "https://chatgpt.com/backend-api/codex",
           chatgptBaseUrl: "https://chatgpt.com/backend-api",
         },
@@ -356,10 +374,18 @@ describe("compileCodexRuntime", () => {
       },
     ]);
 
-    const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
-    expect(configContent).toContain('name = "OpenAI"');
+    const configContent = compiled.runtimeClients[0]?.setup.files.find(
+      (file) => file.fileId === "codex_config",
+    )?.content;
+    expect(configContent).toContain('model_provider = "proxy"');
+    expect(configContent).toContain("[model_providers.proxy]");
     expect(configContent).toContain('base_url = "https://chatgpt.com/backend-api/codex"');
     expect(configContent).toContain('chatgpt_base_url = "https://chatgpt.com/backend-api"');
+    expect(configContent).toContain("requires_openai_auth = false");
+    expect(configContent).toContain("supports_websockets = true");
+    expect(configContent).not.toContain("developer_instructions");
+    expect(configContent).not.toContain("model =");
+    expect(configContent).not.toContain("model_reasoning_effort");
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");

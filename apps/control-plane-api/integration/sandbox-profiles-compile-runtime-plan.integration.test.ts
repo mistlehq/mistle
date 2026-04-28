@@ -125,13 +125,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            additionalInstructions: "Prefer concise answers.\nAlways explain tradeoffs.",
-          },
-        },
       },
     });
 
@@ -190,14 +183,17 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",
       setup: {
-        env: {
-          OPENAI_MODEL: "gpt-5.3-codex",
-          OPENAI_REASONING_EFFORT: "medium",
-        },
+        env: {},
         files: [
           {
             fileId: "codex_config",
             path: "/etc/codex/config.toml",
+            mode: 384,
+            writeMode: "if-absent",
+          },
+          {
+            fileId: "codex_global_agents",
+            path: "/root/.codex/AGENTS.md",
             mode: 384,
             writeMode: "if-absent",
           },
@@ -233,30 +229,29 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
       ],
     });
-    const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
-    expect(configContent).toContain('model = "gpt-5.3-codex"');
+    const setupFiles = runtimePlan.runtimeClients[0]?.setup.files;
+    if (setupFiles === undefined) {
+      throw new Error("Expected runtime client setup files.");
+    }
+    const configContent = setupFiles.find((file) => file.fileId === "codex_config")?.content;
+    const agentsContent = setupFiles.find((file) => file.fileId === "codex_global_agents")?.content;
+    expect(configContent).not.toContain("model =");
     expect(configContent).toContain('model_provider = "proxy"');
-    expect(configContent).toContain('model_reasoning_effort = "medium"');
+    expect(configContent).not.toContain("model_reasoning_effort");
     expect(configContent).toContain('approval_policy = "never"');
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
-    expect(configContent).toContain("developer_instructions");
-    expect(configContent).toContain("Mistle-managed sandbox context:");
-    expect(configContent).toContain("managed outbound proxy");
-    expect(configContent).toContain("User-provided additional instructions:");
-    expect(configContent).toContain("Prefer concise answers.");
-    expect(configContent).toContain("Always explain tradeoffs.");
-    expect(configContent?.indexOf("Mistle-managed sandbox context:")).toBeLessThan(
-      configContent?.indexOf("User-provided additional instructions:") ?? 0,
-    );
-    expect(configContent?.indexOf("User-provided additional instructions:")).toBeLessThan(
-      configContent?.indexOf("Prefer concise answers.") ?? 0,
-    );
+    expect(configContent).not.toContain("developer_instructions");
+    expect(agentsContent).toContain("Mistle-managed sandbox context:");
+    expect(agentsContent).toContain("managed outbound proxy");
+    expect(agentsContent).not.toContain("User-provided additional instructions:");
+    expect(agentsContent).not.toContain("Prefer concise answers.");
+    expect(agentsContent).not.toContain("Always explain tradeoffs.");
     expect(configContent).toContain("[model_providers.proxy]");
     expect(configContent).toContain('name = "OpenAI"');
     expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");
-    expect(configContent).toContain("supports_websockets = false");
+    expect(configContent).toContain("supports_websockets = true");
     expect(configContent).toContain('[projects."/"]');
     expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).toContain("[features]");
@@ -357,12 +352,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
 
@@ -391,6 +380,10 @@ describe("sandbox profile compile runtime plan integration", () => {
     const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain(`base_url = "${OpenAiChatGptResponsesApiBaseUrl}"`);
     expect(configContent).toContain(`chatgpt_base_url = "${OpenAiChatGptBaseUrl}"`);
+    expect(configContent).toContain('model_provider = "proxy"');
+    expect(configContent).toContain("[model_providers.proxy]");
+    expect(configContent).toContain("requires_openai_auth = false");
+    expect(configContent).toContain("supports_websockets = true");
     expect(configContent).toContain("[features]");
     expect(configContent).toContain("apps = false");
     expect(configContent).toContain("plugins = false");
@@ -794,12 +787,6 @@ describe("sandbox profile compile runtime plan integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       },
       {
@@ -919,12 +906,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
           },
         },
       },
@@ -1048,12 +1029,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
           },
         },
       },
@@ -1239,12 +1214,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
 
@@ -1324,12 +1293,6 @@ describe("sandbox profile compile runtime plan integration", () => {
         runtime: {
           runtimeId: "codex",
           config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
         },
       },
     });

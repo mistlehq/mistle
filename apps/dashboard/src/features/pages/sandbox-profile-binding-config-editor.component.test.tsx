@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -66,105 +66,16 @@ describe("SandboxProfileBindingConfigEditor", () => {
       targets: [target],
     });
 
-    expect(screen.getByLabelText("Default model")).toBeDefined();
-    expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
+    expect(screen.queryByLabelText("Default model")).toBeNull();
+    expect(screen.queryByLabelText("Reasoning effort")).toBeNull();
+    expect(screen.queryByLabelText("Agent Instructions")).toBeNull();
     expect(screen.queryByText("runtime")).toBeNull();
     expect(screen.queryByText("config")).toBeNull();
     expect(screen.queryByText("model")).toBeNull();
     expect(screen.queryByText("options")).toBeNull();
-    const additionalInstructionsField = screen
-      .getAllByRole("textbox", {
-        name: "Agent Instructions",
-      })
-      .find((field) => field instanceof HTMLTextAreaElement);
-    if (additionalInstructionsField === undefined) {
-      throw new Error("Expected Agent Instructions textarea.");
-    }
 
-    expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
-    expect(container.querySelector("textarea")).toBe(additionalInstructionsField);
-  });
-
-  it("removes additional instructions from config when the textarea is cleared", () => {
-    const target: IntegrationTargetSummary = {
-      targetKey: "target-openai",
-      displayName: "OpenAI",
-      familyId: "openai",
-      variantId: "openai-default",
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities_by_connection_method:
-          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
-      },
-      targetHealth: {
-        configStatus: "valid",
-      },
-    };
-    const connection: IntegrationConnectionSummary = {
-      id: "connection-openai",
-      displayName: "Primary OpenAI Workspace",
-      targetKey: target.targetKey,
-      status: "active",
-      config: {
-        connection_method: "api-key",
-      },
-    };
-    const row: SandboxProfileBindingEditorRow = {
-      clientId: "row-openai",
-      connectionId: connection.id,
-      kind: "agent",
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            additionalInstructions: "Prefer concise answers.",
-          },
-        },
-      },
-    };
-    const updates: Array<Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>> = [];
-
-    render(
-      <SandboxProfileBindingConfigEditor
-        availableConnections={[connection]}
-        availableTargets={[target]}
-        onIntegrationBindingRowChange={(_clientId, changes) => {
-          updates.push(changes);
-        }}
-        row={row}
-      />,
-    );
-
-    const additionalInstructionsField = screen
-      .getAllByRole("textbox", {
-        name: "Agent Instructions",
-      })
-      .find((field) => field instanceof HTMLTextAreaElement && field.value.length > 0);
-    if (additionalInstructionsField === undefined) {
-      throw new Error("Expected Agent Instructions textarea.");
-    }
-
-    fireEvent.change(additionalInstructionsField, {
-      target: { value: "   " },
-    });
-
-    expect(updates.at(-1)?.config).toEqual({
-      runtime: {
-        runtimeId: "codex",
-        config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.3-codex",
-        options: {
-          reasoningEffort: "medium",
-        },
-      },
-    });
+    expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(0);
+    expect(container.querySelector("textarea")).toBeNull();
   });
 
   it("resolves GitHub binding config to a resource-backed repository widget", () => {
@@ -288,13 +199,6 @@ describe("SandboxProfileBindingConfigEditor", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            additionalInstructions: "Prefer concise answers.",
-          },
-        },
       },
     };
 
@@ -305,20 +209,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
         targets: [target],
         maxItems: Number.POSITIVE_INFINITY,
       }),
-    ).toEqual([
-      {
-        label: "Default model",
-        value: "gpt-5.3-codex",
-      },
-      {
-        label: "Reasoning effort",
-        value: "Medium",
-      },
-      {
-        label: "Agent Instructions",
-        value: "Prefer concise answers.",
-      },
-    ]);
+    ).toEqual([]);
   });
 
   it("renders array-backed tool selections with human-readable labels", () => {

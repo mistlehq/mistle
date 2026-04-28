@@ -109,6 +109,12 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
           input.target.config.bindingCapabilitiesByConnectionMethod,
         connectionMethod: connectionConfig.connection_method,
       });
+      const defaultModel = capabilitySet.models[0];
+      if (defaultModel === undefined) {
+        throw new Error(
+          `OpenAI connection method '${connectionConfig.connection_method}' has no supported models.`,
+        );
+      }
 
       return {
         agentProviderAccess: {
@@ -143,10 +149,9 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
             connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
               ? ["/"]
               : ["/"],
-          defaultModel: input.binding.config.model.defaultModel,
+          defaultModel,
           allowedModels: [...capabilitySet.models],
           providerMetadata: {
-            reasoningEffort: input.binding.config.model.options.reasoningEffort,
             responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
               targetConfig: input.target.config,
               connectionMethod: connectionConfig.connection_method,
@@ -159,11 +164,6 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
                   chatgptBaseUrl: resolveOpenAiChatGptBaseUrlForConnectionMethod({
                     connectionMethod: connectionConfig.connection_method,
                   }),
-                }),
-            ...(input.binding.config.model.options.additionalInstructions === undefined
-              ? {}
-              : {
-                  additionalInstructions: input.binding.config.model.options.additionalInstructions,
                 }),
           },
         },

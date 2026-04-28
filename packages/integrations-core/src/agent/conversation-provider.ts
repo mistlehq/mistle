@@ -62,8 +62,6 @@ export type AgentConversationGenerateTitleResult = {
 };
 
 export type AgentConversationCollaborationModeSettings = {
-  model: string;
-  reasoningEffort: string | null;
   developerInstructions: string | null;
 };
 

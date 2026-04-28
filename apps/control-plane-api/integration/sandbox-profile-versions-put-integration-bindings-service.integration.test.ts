@@ -93,12 +93,6 @@ describe("sandbox profile version put integration bindings service integration",
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       },
       {
@@ -131,13 +125,6 @@ describe("sandbox profile version put integration bindings service integration",
                 runtimeId: "codex",
                 config: {},
               },
-              model: {
-                defaultModel: "gpt-5.3-codex",
-                options: {
-                  reasoningEffort: "medium",
-                  additionalInstructions: "Prefer concise answers.",
-                },
-              },
             },
           },
           {
@@ -147,12 +134,6 @@ describe("sandbox profile version put integration bindings service integration",
               runtime: {
                 runtimeId: "codex",
                 config: {},
-              },
-              model: {
-                defaultModel: "gpt-5.3-codex-spark",
-                options: {
-                  reasoningEffort: "high",
-                },
               },
             },
           },
@@ -173,13 +154,6 @@ describe("sandbox profile version put integration bindings service integration",
         runtimeId: "codex",
         config: {},
       },
-      model: {
-        defaultModel: "gpt-5.3-codex",
-        options: {
-          reasoningEffort: "medium",
-          additionalInstructions: "Prefer concise answers.",
-        },
-      },
     });
 
     const persistedUpdatedBinding =
@@ -190,13 +164,6 @@ describe("sandbox profile version put integration bindings service integration",
       runtime: {
         runtimeId: "codex",
         config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.3-codex",
-        options: {
-          reasoningEffort: "medium",
-          additionalInstructions: "Prefer concise answers.",
-        },
       },
     });
 
@@ -212,12 +179,6 @@ describe("sandbox profile version put integration bindings service integration",
       runtime: {
         runtimeId: "codex",
         config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.3-codex-spark",
-        options: {
-          reasoningEffort: "high",
-        },
       },
     });
 
@@ -349,12 +310,6 @@ describe("sandbox profile version put integration bindings service integration",
                   runtimeId: "codex",
                   config: {},
                 },
-                model: {
-                  defaultModel: "gpt-5.3-codex",
-                  options: {
-                    reasoningEffort: "medium",
-                  },
-                },
               },
             },
           ],
@@ -431,12 +386,6 @@ describe("sandbox profile version put integration bindings service integration",
                 runtime: {
                   runtimeId: "codex",
                   config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.3-codex",
-                  options: {
-                    reasoningEffort: "medium",
-                  },
                 },
               },
             },

@@ -77,12 +77,6 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
 

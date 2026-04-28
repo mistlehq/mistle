@@ -460,12 +460,6 @@ describe("internal sandbox runtime", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
     await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
@@ -655,12 +649,6 @@ describe("internal sandbox runtime", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
           },
         },
       },

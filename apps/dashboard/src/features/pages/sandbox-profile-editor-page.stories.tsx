@@ -142,13 +142,6 @@ const StoryBindings = [
     connectionId: StoryOpenAiConnection.id,
     kind: "agent" as const,
     config: {
-      model: {
-        defaultModel: "gpt-5.3-codex",
-        options: {
-          reasoningEffort: "medium",
-          additionalInstructions: "Stay concise and ask before destructive changes.",
-        },
-      },
       runtime: {
         runtimeId: "codex",
         config: {},

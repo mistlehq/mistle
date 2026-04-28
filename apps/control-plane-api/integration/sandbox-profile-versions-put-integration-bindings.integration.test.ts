@@ -90,12 +90,6 @@ describe("sandbox profile version put integration bindings integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       },
       {
@@ -129,13 +123,6 @@ describe("sandbox profile version put integration bindings integration", () => {
                   runtimeId: "codex",
                   config: {},
                 },
-                model: {
-                  defaultModel: "gpt-5.2",
-                  options: {
-                    reasoningEffort: "medium",
-                    additionalInstructions: "Prefer concise answers.",
-                  },
-                },
               },
             },
             {
@@ -145,12 +132,6 @@ describe("sandbox profile version put integration bindings integration", () => {
                 runtime: {
                   runtimeId: "codex",
                   config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.3-codex-spark",
-                  options: {
-                    reasoningEffort: "high",
-                  },
                 },
               },
             },
@@ -176,13 +157,6 @@ describe("sandbox profile version put integration bindings integration", () => {
         runtimeId: "codex",
         config: {},
       },
-      model: {
-        defaultModel: "gpt-5.2",
-        options: {
-          reasoningEffort: "medium",
-          additionalInstructions: "Prefer concise answers.",
-        },
-      },
     });
 
     const persistedUpdatedBinding =
@@ -193,13 +167,6 @@ describe("sandbox profile version put integration bindings integration", () => {
       runtime: {
         runtimeId: "codex",
         config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.2",
-        options: {
-          reasoningEffort: "medium",
-          additionalInstructions: "Prefer concise answers.",
-        },
       },
     });
 
@@ -247,12 +214,6 @@ describe("sandbox profile version put integration bindings integration", () => {
                 runtime: {
                   runtimeId: "codex",
                   config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.3-codex",
-                  options: {
-                    reasoningEffort: "medium",
-                  },
                 },
               },
             },
@@ -329,12 +290,6 @@ describe("sandbox profile version put integration bindings integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
 
@@ -356,12 +311,6 @@ describe("sandbox profile version put integration bindings integration", () => {
                 runtime: {
                   runtimeId: "codex",
                   config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.4",
-                  options: {
-                    reasoningEffort: "high",
-                  },
                 },
               },
             },
@@ -393,12 +342,6 @@ describe("sandbox profile version put integration bindings integration", () => {
         runtime: {
           runtimeId: "codex",
           config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
         },
       },
     });
@@ -616,12 +559,6 @@ describe("sandbox profile version put integration bindings integration", () => {
                   runtimeId: "codex",
                   config: {},
                 },
-                model: {
-                  defaultModel: "gpt-5.3-codex",
-                  options: {
-                    reasoningEffort: "medium",
-                  },
-                },
               },
             },
           ],
@@ -680,97 +617,6 @@ describe("sandbox profile version put integration bindings integration", () => {
     expect(responseBody.code).toBe("VALIDATION_ERROR");
     expect(responseBody.message).toBe("Invalid request.");
   });
-
-  it("returns INVALID_BINDING_CONFIG_REFERENCE for unsupported reasoning per model", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-put-bindings-invalid-reasoning@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-put-bindings-invalid-reasoning",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities_by_connection_method:
-          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
-      },
-    });
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_put_bindings_invalid_reasoning_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Invalid Reasoning Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_put_bindings_invalid_reasoning_001",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-
-    const [connection] = await fixture.db
-      .insert(integrationConnections)
-      .values({
-        id: "icn_put_bindings_invalid_reasoning_001",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-default-put-bindings-invalid-reasoning",
-        displayName: "Invalid Reasoning Connection",
-        config: {
-          connection_method: "api-key",
-        },
-      })
-      .returning();
-    if (connection === undefined) {
-      throw new Error("Expected integration connection to be inserted.");
-    }
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_put_bindings_invalid_reasoning_001/versions/1/integration-bindings",
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          bindings: [
-            {
-              clientRef: "row-2",
-              connectionId: connection.id,
-              kind: IntegrationBindingKinds.AGENT,
-              config: {
-                runtime: {
-                  runtimeId: "codex",
-                  config: {},
-                },
-                model: {
-                  defaultModel: "gpt-5.1-codex-mini",
-                  options: {
-                    reasoningEffort: "low",
-                  },
-                },
-              },
-            },
-          ],
-        }),
-      },
-    );
-
-    expect(response.status).toBe(400);
-    const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
-    if (responseBody.code !== "INVALID_BINDING_CONFIG_REFERENCE" || !("details" in responseBody)) {
-      throw new Error("Expected invalid binding config reference response.");
-    }
-    expect(responseBody.details.issues[0]?.validatorCode).toBe(
-      "openai.unsupported_reasoning_for_model",
-    );
-  }, 60_000);
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {
     const response = await fixture.request(

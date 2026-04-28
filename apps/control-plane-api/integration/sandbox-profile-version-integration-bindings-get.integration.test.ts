@@ -74,13 +74,6 @@ describe("sandbox profile version integration bindings get integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            additionalInstructions: "Prefer concise answers.",
-          },
-        },
       },
     });
 
@@ -104,13 +97,6 @@ describe("sandbox profile version integration bindings get integration", () => {
         runtime: {
           runtimeId: "codex",
           config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-            additionalInstructions: "Prefer concise answers.",
-          },
         },
       },
     });

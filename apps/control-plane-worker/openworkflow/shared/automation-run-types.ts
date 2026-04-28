@@ -25,8 +25,7 @@ export type PreparedAutomationRun = {
   renderedIdempotencyKey: string | null;
   instructions: string | null;
   collaborationModeSettings: {
-    model: string;
-    reasoningEffort: string | null;
+    developerInstructions: string | null;
   } | null;
 };
 

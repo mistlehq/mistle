@@ -286,12 +286,6 @@ describe("sandbox profile version start instance integration", () => {
           runtimeId: "codex",
           config: {},
         },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
-        },
       },
     });
 
@@ -412,12 +406,6 @@ describe("sandbox profile version start instance integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       });
 
@@ -535,12 +523,6 @@ describe("sandbox profile version start instance integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
-          },
         },
       },
       {
@@ -648,12 +630,6 @@ describe("sandbox profile version start instance integration", () => {
         runtime: {
           runtimeId: "codex",
           config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
         },
       },
     });
@@ -775,12 +751,6 @@ describe("sandbox profile version start instance integration", () => {
         runtime: {
           runtimeId: "codex",
           config: {},
-        },
-        model: {
-          defaultModel: "gpt-5.3-codex",
-          options: {
-            reasoningEffort: "medium",
-          },
         },
       },
     });
@@ -942,12 +912,6 @@ describe("sandbox profile version start instance integration", () => {
           runtime: {
             runtimeId: "codex",
             config: {},
-          },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {
-              reasoningEffort: "medium",
-            },
           },
         },
       },

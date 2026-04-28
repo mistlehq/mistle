@@ -11,7 +11,6 @@ import {
   CodexAppServerProcessKey,
   CodexProxyListenUrl,
 } from "./app-server.js";
-import { composeCodexDeveloperInstructions } from "./developer-instructions.js";
 import { CodexPtyLaunchSpec } from "./pty-launch.js";
 
 const CodexCliArtifactKey = "codex-cli";
@@ -19,6 +18,23 @@ const CodexCliVersion = "0.125.0";
 const CodexCliReleaseTag = `rust-v${CodexCliVersion}`;
 const ProxyModelProviderKey = "proxy";
 const ProxyModelProviderName = "OpenAI";
+const CodexConfigPath = "/etc/codex/config.toml";
+const CodexGlobalAgentsPath = "/root/.codex/AGENTS.md";
+const CodexGlobalAgentsMd = [
+  "Mistle-managed sandbox context:",
+  "",
+  "- This runtime operates behind a managed outbound proxy.",
+  "- Network tools and scripts should use the sandbox's existing proxy configuration rather than expecting direct outbound access.",
+  "- Provider credentials may be injected by the platform outside the sandboxed process environment.",
+  "- Do not assume missing API keys or auth-related environment variables inside the sandbox mean authentication is misconfigured.",
+  "- Prefer debugging request behavior and proxy-mediated access before treating missing in-process credentials as the root cause.",
+  "- Do not modify proxy-related environment variables unless explicitly instructed.",
+  "- When interacting with external systems, prefer the provider CLI available in the environment over ad hoc HTTP requests or raw `curl`.",
+  "- Use `cmddir search <pattern>` to discover relevant commands progressively before reaching for lower-level approaches.",
+  "- Examples:",
+  "  - `cmddir search '^gh$'`",
+  "  - `cmddir search '^(jira|slack)$'`",
+].join("\n");
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {
@@ -35,10 +51,8 @@ const RuntimeClientProcessReadinessTimeoutMs = 60_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 type CodexProviderMetadata = {
-  reasoningEffort: string;
   responsesApiBaseUrl: string;
   chatgptBaseUrl?: string;
-  additionalInstructions?: string;
 };
 
 function resolveCodexProviderMetadata(
@@ -49,12 +63,6 @@ function resolveCodexProviderMetadata(
     return null;
   }
 
-  const reasoningEffort = providerMetadata["reasoningEffort"];
-  if (typeof reasoningEffort !== "string" || reasoningEffort.trim().length === 0) {
-    return null;
-  }
-
-  const additionalInstructions = providerMetadata["additionalInstructions"];
   const responsesApiBaseUrl = providerMetadata["responsesApiBaseUrl"];
   const chatgptBaseUrl = providerMetadata["chatgptBaseUrl"];
 
@@ -66,50 +74,27 @@ function resolveCodexProviderMetadata(
     return null;
   }
 
-  if (additionalInstructions === undefined) {
-    return {
-      reasoningEffort,
-      responsesApiBaseUrl,
-      ...(chatgptBaseUrl === undefined ? {} : { chatgptBaseUrl }),
-    };
-  }
-
-  if (typeof additionalInstructions !== "string") {
-    return null;
-  }
-
   return {
-    reasoningEffort,
     responsesApiBaseUrl,
     ...(chatgptBaseUrl === undefined ? {} : { chatgptBaseUrl }),
-    additionalInstructions,
   };
 }
 
 function renderCodexConfig(input: {
-  model: string;
-  reasoningEffort: string;
   responsesApiBaseUrl: string;
   chatgptBaseUrl?: string;
-  additionalInstructions?: string;
 }): string {
   return stringifyToml({
-    model: input.model,
     model_provider: ProxyModelProviderKey,
-    model_reasoning_effort: input.reasoningEffort,
     approval_policy: "never",
     sandbox_mode: "danger-full-access",
-    developer_instructions: composeCodexDeveloperInstructions({
-      bindingAdditionalInstructions: input.additionalInstructions ?? null,
-      automationInstructions: null,
-    }),
     model_providers: {
       [ProxyModelProviderKey]: {
         name: ProxyModelProviderName,
         base_url: input.responsesApiBaseUrl,
         wire_api: "responses",
         requires_openai_auth: false,
-        supports_websockets: false,
+        supports_websockets: true,
       },
     },
     features: {
@@ -126,6 +111,10 @@ function renderCodexConfig(input: {
   });
 }
 
+function renderCodexGlobalAgentsMd(): string {
+  return `${CodexGlobalAgentsMd}\n`;
+}
+
 export function compileCodexRuntime(
   input: CompileAgentRuntimeInput<Record<string, never>>,
 ): CompileAgentRuntimeResult {
@@ -134,7 +123,7 @@ export function compileCodexRuntime(
   const providerMetadata = resolveCodexProviderMetadata(input.providerAccess);
 
   if (providerMetadata === null) {
-    throw new Error("Codex runtime requires provider reasoning metadata.");
+    throw new Error("Codex runtime requires provider URL metadata.");
   }
 
   return {
@@ -202,31 +191,28 @@ export function compileCodexRuntime(
       {
         clientId: "codex-cli",
         setup: {
-          env: {
-            OPENAI_MODEL: input.providerAccess.defaultModel,
-            OPENAI_REASONING_EFFORT: providerMetadata.reasoningEffort,
-          },
+          env: {},
           files: [
             {
               fileId: "codex_config",
-              path: "/etc/codex/config.toml",
+              path: CodexConfigPath,
               mode: 384,
               writeMode: "if-absent",
               content: renderCodexConfig({
-                model: input.providerAccess.defaultModel,
-                reasoningEffort: providerMetadata.reasoningEffort,
                 responsesApiBaseUrl: providerMetadata.responsesApiBaseUrl,
                 ...(providerMetadata.chatgptBaseUrl === undefined
                   ? {}
                   : {
                       chatgptBaseUrl: providerMetadata.chatgptBaseUrl,
                     }),
-                ...(providerMetadata.additionalInstructions === undefined
-                  ? {}
-                  : {
-                      additionalInstructions: providerMetadata.additionalInstructions,
-                    }),
               }),
+            },
+            {
+              fileId: "codex_global_agents",
+              path: CodexGlobalAgentsPath,
+              mode: 384,
+              writeMode: "if-absent",
+              content: renderCodexGlobalAgentsMd(),
             },
           ],
         },

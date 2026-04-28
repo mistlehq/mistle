@@ -26,7 +26,6 @@ import {
   createIntegrationRegistry,
   createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiApiKeyDefinition,
-  OpenAiReasoningEfforts,
 } from "@mistle/integrations-definitions/server";
 import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
 import { systemSleeper } from "@mistle/time";
@@ -139,12 +138,6 @@ async function seedOpenAiAgentBinding(input: {
       runtime: {
         runtimeId: "codex",
         config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.2",
-        options: {
-          reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
-        },
       },
     },
   });

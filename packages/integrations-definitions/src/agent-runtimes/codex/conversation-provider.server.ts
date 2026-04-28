@@ -418,8 +418,6 @@ export function resolveCodexTurnStartParams(input: {
     | {
         mode: "default";
         settings: {
-          model: string;
-          reasoning_effort: string | null;
           developer_instructions: string | null;
         };
       }
@@ -434,8 +432,6 @@ export function resolveCodexTurnStartParams(input: {
           collaborationMode: {
             mode: "default" as const,
             settings: {
-              model: input.collaborationModeSettings.model,
-              reasoning_effort: input.collaborationModeSettings.reasoningEffort,
               developer_instructions: input.collaborationModeSettings.developerInstructions,
             },
           },

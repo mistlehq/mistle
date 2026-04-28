@@ -94,10 +94,6 @@ describe("sandbox profile version automation config get integration", () => {
             runtimeId: "codex",
             config: {},
           },
-          model: {
-            defaultModel: "gpt-5.3-codex",
-            options: {},
-          },
         },
       },
       {

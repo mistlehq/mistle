@@ -187,10 +187,8 @@ export async function deliverConversationAutomationPayload(
           ? {}
           : {
               collaborationModeSettings: {
-                model: input.preparedAutomationRun.collaborationModeSettings.model,
-                reasoningEffort:
-                  input.preparedAutomationRun.collaborationModeSettings.reasoningEffort,
-                developerInstructions: input.preparedAutomationRun.instructions,
+                developerInstructions:
+                  input.preparedAutomationRun.collaborationModeSettings.developerInstructions,
               },
             }),
         providerConversationId: activeRoute.providerConversationId,

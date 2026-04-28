@@ -33,7 +33,6 @@ import {
 import {
   createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiApiKeyDefinition,
-  OpenAiReasoningEfforts,
 } from "@mistle/integrations-definitions";
 import {
   HandleAutomationConversationDeliveryWorkflowSpec,
@@ -134,12 +133,6 @@ async function seedOpenAiAgentBinding(input: {
       runtime: {
         runtimeId: "codex",
         config: {},
-      },
-      model: {
-        defaultModel: "gpt-5.2",
-        options: {
-          reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
-        },
       },
     },
   });
@@ -568,8 +561,7 @@ describe("handleAutomationRun integration", () => {
           renderedIdempotencyKey: "delivery_prepare",
           instructions: "Always include a reproducible next step.",
           collaborationModeSettings: {
-            model: "gpt-5.2",
-            reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+            developerInstructions: "Always include a reproducible next step.",
           },
         });
         expect(preparedRun.webhookPayload).toEqual({
@@ -1051,8 +1043,7 @@ describe("handleAutomationRun integration", () => {
           renderedIdempotencyKey: "delivery_replay_snapshot",
           instructions: "Mention the automation marker `AUTOMATION_ONLY` exactly once.",
           collaborationModeSettings: {
-            model: "gpt-5.2",
-            reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+            developerInstructions: "Mention the automation marker `AUTOMATION_ONLY` exactly once.",
           },
         });
         expect(replayPreparedRun).toEqual(firstPreparedRun);

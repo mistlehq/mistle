@@ -9,7 +9,6 @@ import {
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
-import { OpenAiApiKeyBindingConfigSchema } from "@mistle/integrations-definitions/openai";
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
@@ -50,7 +49,6 @@ export const AutomationRunFailureCodes = {
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
   AGENT_BINDING_RUNTIME_INVALID: "agent_binding_runtime_invalid",
-  AGENT_BINDING_CONFIG_INVALID: "agent_binding_config_invalid",
   WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
@@ -272,29 +270,6 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
   };
 }
 
-function readCodexCollaborationModeSettings(input: {
-  automationRunId: string;
-  bindingId: string;
-  bindingConfig: Record<string, unknown>;
-}): {
-  model: string;
-  reasoningEffort: string | null;
-} {
-  const parsedBindingConfig = OpenAiApiKeyBindingConfigSchema.safeParse(input.bindingConfig);
-  if (!parsedBindingConfig.success) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AGENT_BINDING_CONFIG_INVALID,
-      message: `Automation run '${input.automationRunId}' references AGENT binding '${input.bindingId}' with invalid Codex binding config.`,
-      cause: parsedBindingConfig.error,
-    });
-  }
-
-  return {
-    model: parsedBindingConfig.data.model.defaultModel,
-    reasoningEffort: parsedBindingConfig.data.model.options.reasoningEffort,
-  };
-}
-
 function readAgentBindingRuntimeId(input: {
   automationRunId: string;
   bindingId: string;
@@ -322,10 +297,6 @@ async function resolveAutomationConversationBindingContext(
 ): Promise<{
   integrationFamilyId: string;
   runtimeId: string;
-  collaborationModeSettings: {
-    model: string;
-    reasoningEffort: string | null;
-  } | null;
 }> {
   const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     where: (table, { and: whereAnd, eq: whereEq }) =>
@@ -384,14 +355,6 @@ async function resolveAutomationConversationBindingContext(
   return {
     integrationFamilyId: agentTarget.familyId,
     runtimeId,
-    collaborationModeSettings:
-      runtimeId === "codex"
-        ? readCodexCollaborationModeSettings({
-            automationRunId: input.automationRunId,
-            bindingId: agentBinding.id,
-            bindingConfig: agentBinding.config,
-          })
-        : null,
   };
 }
 
@@ -509,15 +472,6 @@ export async function prepareAutomationRun(
     },
   });
   if (persistedSnapshot !== null) {
-    const bindingContext =
-      persistedSnapshot.instructions === null
-        ? null
-        : await resolveAutomationConversationBindingContext(ctx.db, {
-            automationRunId: automationRun.id,
-            organizationId: automation.organizationId,
-            sandboxProfileId: automationTarget.sandboxProfileId,
-            sandboxProfileVersion,
-          });
     if (persistedSnapshot.webhookSourceOrderKey.length === 0) {
       throw new AutomationRunExecutionError({
         code: AutomationRunFailureCodes.WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING,
@@ -527,7 +481,12 @@ export async function prepareAutomationRun(
 
     return {
       ...persistedSnapshot,
-      collaborationModeSettings: bindingContext?.collaborationModeSettings ?? null,
+      collaborationModeSettings:
+        persistedSnapshot.instructions === null
+          ? null
+          : {
+              developerInstructions: persistedSnapshot.instructions,
+            },
     };
   }
 
@@ -635,7 +594,11 @@ export async function prepareAutomationRun(
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
     instructions: webhookAutomation.instructions,
     collaborationModeSettings:
-      webhookAutomation.instructions === null ? null : bindingContext.collaborationModeSettings,
+      webhookAutomation.instructions === null
+        ? null
+        : {
+            developerInstructions: webhookAutomation.instructions,
+          },
   };
 }
 

@@ -36,8 +36,6 @@ describe("resolveCodexTurnStartParams", () => {
         providerConversationId: "thread_123",
         inputText: "Handle the webhook payload.",
         collaborationModeSettings: {
-          model: "gpt-5.2",
-          reasoningEffort: "medium",
           developerInstructions: "Always include the automation marker.",
         },
       }),
@@ -52,8 +50,6 @@ describe("resolveCodexTurnStartParams", () => {
       collaborationMode: {
         mode: "default",
         settings: {
-          model: "gpt-5.2",
-          reasoning_effort: "medium",
           developer_instructions: "Always include the automation marker.",
         },
       },

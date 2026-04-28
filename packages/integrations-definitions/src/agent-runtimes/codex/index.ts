@@ -1,7 +1,6 @@
 export { CodexRuntimeDefinition } from "./definition.js";
 export { CodexRuntimeConfigSchema, type CodexRuntimeConfig } from "./runtime-config-schema.js";
 export { compileCodexRuntime } from "./compile-runtime.js";
-export { composeCodexDeveloperInstructions } from "./developer-instructions.js";
 export {
   CodexAppServerEndpointKey,
   CodexAppServerListenUrl,
