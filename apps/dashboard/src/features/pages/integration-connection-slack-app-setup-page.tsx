@@ -55,6 +55,10 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
+import {
+  hasConfiguredSetupSecretField,
+  resolveConfiguredSetupSecretFieldKeys,
+} from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type SlackSetupMode = IntegrationConnectionSetupMode;
@@ -158,33 +162,26 @@ function createFieldTimeoutRefs(): SlackExistingAppTimeoutRefs {
   };
 }
 
-function resolveConfiguredSecretFieldKeys(
+function resolveConfiguredSlackSecretFieldKeys(
   connection: IntegrationConnection,
 ): ReadonlySet<SlackExistingAppSecretFieldKey> {
-  const configuredSecretFieldKeys = new Set<SlackExistingAppSecretFieldKey>();
-
-  for (const configuredSecretName of connection.configuredSecretNames ?? []) {
-    if (
-      configuredSecretName === "botToken" ||
-      configuredSecretName === "signingSecret" ||
-      configuredSecretName === "clientSecret"
-    ) {
-      configuredSecretFieldKeys.add(configuredSecretName);
-    }
-  }
-
-  return configuredSecretFieldKeys;
-}
-
-function hasConfiguredSecret(connection: IntegrationConnection, fieldName: string): boolean {
-  return connection.configuredSecretNames?.includes(fieldName) ?? false;
+  return resolveConfiguredSetupSecretFieldKeys({
+    configuredSecretNames: connection.configuredSecretNames,
+    fieldKeys: ["botToken", "signingSecret", "clientSecret"],
+  });
 }
 
 function isSlackAppInstalled(connection: IntegrationConnection): boolean {
   return (
     typeof connection.config?.["client_id"] === "string" &&
-    hasConfiguredSecret(connection, "botToken") &&
-    hasConfiguredSecret(connection, "signingSecret")
+    hasConfiguredSetupSecretField({
+      configuredSecretNames: connection.configuredSecretNames,
+      fieldName: "botToken",
+    }) &&
+    hasConfiguredSetupSecretField({
+      configuredSecretNames: connection.configuredSecretNames,
+      fieldName: "signingSecret",
+    })
   );
 }
 
@@ -522,7 +519,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
     createInitialExistingAppDraft(input.connection),
   );
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
-    resolveConfiguredSecretFieldKeys(input.connection),
+    resolveConfiguredSlackSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
@@ -676,7 +673,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
       setSavedExistingAppDraft(nextSavedDraft);
       setExistingAppDraft(nextDraft);
       if (isSlackExistingAppSecretFieldKey(fieldKey)) {
-        setConfiguredSecretFieldKeys(resolveConfiguredSecretFieldKeys(updatedConnection));
+        setConfiguredSecretFieldKeys(resolveConfiguredSlackSecretFieldKeys(updatedConnection));
       }
       setActionErrorMessage(null);
       setFieldStates((currentFieldStates) => ({

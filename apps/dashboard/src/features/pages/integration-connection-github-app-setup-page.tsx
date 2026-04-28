@@ -59,6 +59,7 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
+import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type GitHubExistingAppSetupDraft = {
@@ -162,18 +163,13 @@ function createInitialDraft(connection: IntegrationConnection): GitHubExistingAp
   };
 }
 
-function resolveConfiguredSecretFieldKeys(
+function resolveConfiguredGitHubSecretFieldKeys(
   connection: IntegrationConnection,
 ): ReadonlySet<GitHubExistingAppSetupSecretFieldKey> {
-  const configuredSecretFieldKeys = new Set<GitHubExistingAppSetupSecretFieldKey>();
-
-  for (const configuredSecretName of connection.configuredSecretNames ?? []) {
-    if (isGitHubExistingAppSetupSecretFieldKey(configuredSecretName)) {
-      configuredSecretFieldKeys.add(configuredSecretName);
-    }
-  }
-
-  return configuredSecretFieldKeys;
+  return resolveConfiguredSetupSecretFieldKeys({
+    configuredSecretNames: connection.configuredSecretNames,
+    fieldKeys: GitHubExistingAppSetupSecretFieldKeys,
+  });
 }
 
 function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): GitHubAppSetupMode {
@@ -776,7 +772,7 @@ export function GitHubAppSetupPane(input: {
     useState<GitHubManifestAppOwnerKind | null>(null);
   const [manifestOrganizationSlug, setManifestOrganizationSlug] = useState("");
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
-    resolveConfiguredSecretFieldKeys(input.connection),
+    resolveConfiguredGitHubSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
@@ -1002,7 +998,7 @@ export function GitHubAppSetupPane(input: {
       setSavedDraft(nextSavedDraft);
       setDraft(nextDraft);
       if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {
-        setConfiguredSecretFieldKeys(resolveConfiguredSecretFieldKeys(updatedConnection));
+        setConfiguredSecretFieldKeys(resolveConfiguredGitHubSecretFieldKeys(updatedConnection));
       }
       setActionErrorMessage(null);
       setFieldStates((currentFieldStates) => ({
