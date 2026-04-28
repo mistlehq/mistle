@@ -11,7 +11,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
+import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 function createSlackConnection(input?: {
   configuredSecretNames?: readonly string[];

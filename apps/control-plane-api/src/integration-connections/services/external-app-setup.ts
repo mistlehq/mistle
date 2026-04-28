@@ -204,12 +204,9 @@ export async function startExternalAppSetup(
     connectionId: string;
     routeSegment: string;
     body: Record<string, unknown>;
-    invalidInputCode?: ExternalAppSetupStartInvalidInputCode;
-    missingCredentialsMessage?: string;
+    invalidInputCode: ExternalAppSetupStartInvalidInputCode;
   },
 ): Promise<IntegrationExternalAppSetupStartResult> {
-  const invalidInputCode =
-    input.invalidInputCode ?? IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
   const connection = await resolveConnectionWithTargetOrThrow({
     db: ctx.db,
     organizationId: input.organizationId,
@@ -316,14 +313,13 @@ export async function startExternalAppSetup(
       error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
     ) {
       throw new BadRequestError(
-        invalidInputCode,
-        input.missingCredentialsMessage ??
-          `Integration connection '${connection.id}' is missing required setup credentials.`,
+        input.invalidInputCode,
+        `Integration connection '${connection.id}' is missing required setup credentials.`,
       );
     }
 
     throw new BadRequestError(
-      invalidInputCode,
+      input.invalidInputCode,
       error instanceof Error ? error.message : "External app setup start failed.",
     );
   }
@@ -332,12 +328,12 @@ export async function startExternalAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode,
+    invalidInputCode: input.invalidInputCode,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: startedSetup.secrets ?? {},
-    invalidInputCode,
+    invalidInputCode: input.invalidInputCode,
   });
 
   await persistRedirectSessionOrThrow({
@@ -375,16 +371,14 @@ export async function completeExternalAppSetup(
   },
   input: {
     query: Record<string, string>;
-    invalidInputCode?: ExternalAppSetupCompleteInvalidInputCode;
+    invalidInputCode: ExternalAppSetupCompleteInvalidInputCode;
   },
 ): Promise<CompletedExternalAppSetup> {
-  const invalidInputCode =
-    input.invalidInputCode ?? IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
   const queryParams = createRedirectQueryParams(input.query);
   const state = queryParams.get("state");
   if (state === null || state.length === 0) {
     throw new BadRequestError(
-      invalidInputCode,
+      input.invalidInputCode,
       "External app setup callback query must include `state`.",
     );
   }
@@ -492,13 +486,13 @@ export async function completeExternalAppSetup(
       error.code === InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND
     ) {
       throw new BadRequestError(
-        invalidInputCode,
+        input.invalidInputCode,
         `Integration connection '${connection.id}' is missing required setup credentials.`,
       );
     }
 
     throw new BadRequestError(
-      invalidInputCode,
+      input.invalidInputCode,
       error instanceof Error ? error.message : "External app setup completion failed.",
     );
   }
@@ -507,12 +501,12 @@ export async function completeExternalAppSetup(
     targetKey: connection.targetKey,
     methodId: flow.methodId,
     connectionMethods: definition.connectionMethods,
-    invalidInputCode,
+    invalidInputCode: input.invalidInputCode,
   });
   const parsedSecrets = parseUpdateFormSecretsOrThrow({
     method: formMethod,
     secrets: setupResult.secrets ?? {},
-    invalidInputCode,
+    invalidInputCode: input.invalidInputCode,
   });
   const completedConnection = await persistExternalAppSetupResult({
     db: ctx.db,

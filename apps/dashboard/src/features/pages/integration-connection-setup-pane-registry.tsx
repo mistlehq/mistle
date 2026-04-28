@@ -2,9 +2,9 @@ import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
+import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-page.js";
+import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 type IntegrationConnectionSetupPaneComponent = (input: {
   connection: IntegrationConnection;

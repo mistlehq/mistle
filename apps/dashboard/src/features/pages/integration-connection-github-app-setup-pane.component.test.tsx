@@ -10,7 +10,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-page.js";
+import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
 
 function createGitHubAppSetupConnection(input?: {
   configuredSecretNames?: readonly string[];
