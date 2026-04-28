@@ -16,7 +16,10 @@ import {
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
-import { resolveIncompleteIntegrationConnectionSetupFlow } from "./integration-connection-setup-state.js";
+import {
+  type IntegrationConnectionSetupRoute,
+  resolveIncompleteIntegrationConnectionSetupFlow,
+} from "./integration-connection-setup-state.js";
 import {
   buildIntegrationConnectionDetailItems,
   resolveIntegrationConnectionDetailWebhookPolicy,
@@ -350,7 +353,7 @@ export function IntegrationsPage() {
 
 function renderSelectedConnectionSetupBody(input: {
   connection: IntegrationConnection | undefined;
-  setupFlow: { methodId: string; routeSegment: string } | null;
+  setupFlow: IntegrationConnectionSetupRoute | null;
 }): React.JSX.Element | undefined {
   if (input.connection === undefined || input.setupFlow === null) {
     return undefined;

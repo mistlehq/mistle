@@ -375,10 +375,6 @@ export async function completeExternalAppSetup(
   },
   input: {
     query: Record<string, string>;
-    missingStateCode?:
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT;
     invalidInputCode?: ExternalAppSetupCompleteInvalidInputCode;
   },
 ): Promise<CompletedExternalAppSetup> {
@@ -388,9 +384,7 @@ export async function completeExternalAppSetup(
   const state = queryParams.get("state");
   if (state === null || state.length === 0) {
     throw new BadRequestError(
-      input.missingStateCode ??
-        input.invalidInputCode ??
-        IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      invalidInputCode,
       "External app setup callback query must include `state`.",
     );
   }

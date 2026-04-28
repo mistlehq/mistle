@@ -11,7 +11,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ROUTE_HANDLES } from "../src/features/navigation/route-handles.js";
-import { IntegrationConnectionGitHubAppSetupPage } from "../src/features/pages/integration-connection-github-app-setup-page.js";
+import { IntegrationConnectionSetupPage } from "../src/features/pages/integration-connection-setup-page.js";
 import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
 import { renderDashboardPageIntegration } from "./helpers/dashboard-page.js";
 
@@ -41,6 +41,13 @@ function createGitHubTarget() {
         id: "github-app-installation",
         label: "GitHub App installation",
         kind: "form" as const,
+        createBehavior: "draft-then-setup" as const,
+        setupFlow: {
+          routeSegment: "github-app",
+          completionRequirements: {
+            kind: "connection-external-subject" as const,
+          },
+        },
         secretFields: [
           {
             name: "appPrivateKeyPem",
@@ -71,9 +78,9 @@ function createIntegrationsRouter(
           <Route handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
             <Route element={<IntegrationsPage />} index />
             <Route
-              element={<IntegrationConnectionGitHubAppSetupPage />}
-              handle={ROUTE_HANDLES.integrationGitHubAppSetup}
-              path=":connectionId/github-app/setup"
+              element={<IntegrationConnectionSetupPage />}
+              handle={ROUTE_HANDLES.integrationSetup}
+              path=":connectionId/:setupRouteSegment/setup"
             />
           </Route>
         </Route>

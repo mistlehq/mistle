@@ -14,9 +14,8 @@ import {
   RadioGroupItem,
 } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -25,9 +24,7 @@ import {
   SavingTextField,
   type SavingFieldState,
 } from "../forms/configured-secret-field.js";
-import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
-  listIntegrationDirectory,
   startGitHubAppInstallation,
   startGitHubAppManifestCreation,
   updateFormIntegrationConnection,
@@ -44,7 +41,6 @@ import {
   type ManifestWebhookCallbackState,
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
-import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
@@ -54,7 +50,6 @@ import {
 } from "../shared/auto-save-behavior.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
   IntegrationConnectionSetupModeTabs,
@@ -594,106 +589,6 @@ function GitHubAppSetupActions(input: {
         </Button>
       ) : null}
     </FormPageActionBar>
-  );
-}
-
-export function IntegrationConnectionGitHubAppSetupPage(): React.JSX.Element {
-  const pageMeta = useAppPageMeta();
-  const navigate = useNavigate();
-  const params = useParams();
-  const [searchParams] = useSearchParams();
-  const { title, description } = resolvePageFrameText(pageMeta, "Setup GitHub App");
-  const targetKey = params["targetKey"];
-  const connectionId = params["connectionId"];
-
-  if (targetKey === undefined) {
-    throw new Error("Integration target key is required.");
-  }
-
-  if (connectionId === undefined) {
-    throw new Error("Integration connection id is required.");
-  }
-
-  const directoryQuery = useQuery({
-    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    retry: false,
-  });
-
-  if (directoryQuery.isError) {
-    return (
-      <FormPageFrame
-        description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
-        title={title}
-      >
-        <FormPageSection>
-          <div className="flex flex-col gap-4 p-4">
-            <Notice title="Could not load setup" variant="alert">
-              {resolveApiErrorMessage({
-                error: directoryQuery.error,
-                fallbackMessage: "Could not load integrations.",
-              })}
-            </Notice>
-            <div>
-              <Button
-                onClick={() => {
-                  void navigate(`/integrations/${targetKey}`);
-                }}
-                type="button"
-                variant="outline"
-              >
-                Back to integration
-              </Button>
-            </div>
-          </div>
-        </FormPageSection>
-      </FormPageFrame>
-    );
-  }
-
-  if (directoryQuery.isPending || directoryQuery.data === undefined) {
-    return (
-      <FormPageFrame
-        description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
-        title={title}
-      >
-        {null}
-      </FormPageFrame>
-    );
-  }
-
-  const card = buildIntegrationCards(directoryQuery.data).find(
-    (candidate) => candidate.target.targetKey === targetKey,
-  );
-  if (card === undefined) {
-    throw new Error(`Integration target '${targetKey}' was not found.`);
-  }
-
-  const connection = card.connections.find((candidate) => candidate.id === connectionId);
-  if (connection === undefined) {
-    throw new Error(
-      `Integration connection '${connectionId}' was not found for target '${targetKey}'.`,
-    );
-  }
-
-  if (connection.connectionMethodId !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
-    throw new Error(`Integration connection '${connectionId}' is not a GitHub App connection.`);
-  }
-
-  return (
-    <FormPageFrame
-      description={description}
-      headerIcon={pageMeta.headerIcon ?? undefined}
-      title={title}
-    >
-      <GitHubAppSetupPane
-        key={connection.id}
-        connection={connection}
-        manifestCreationSucceeded={searchParams.get("githubAppManifest") === "created"}
-      />
-    </FormPageFrame>
   );
 }
 

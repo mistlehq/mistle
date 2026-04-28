@@ -13,9 +13,9 @@ import {
   Input,
   TextLink,
 } from "@mistle/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -23,9 +23,7 @@ import {
   SavingTextField,
   type SavingFieldState,
 } from "../forms/configured-secret-field.js";
-import { buildIntegrationCards } from "../integrations/directory-model.js";
 import {
-  listIntegrationDirectory,
   startSlackAppManifestCreation,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
@@ -41,7 +39,6 @@ import {
   type ManifestWebhookCallbackState,
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
-import { useAppPageMeta } from "../navigation/route-meta.js";
 import {
   buildSavedFieldValuePatch,
   clearPendingStatusTimeouts,
@@ -50,7 +47,6 @@ import {
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
   IntegrationConnectionSetupModeTabs,
@@ -403,60 +399,6 @@ function SlackSetupUrls(input: {
         />
       </div>
     </div>
-  );
-}
-
-export function IntegrationConnectionSlackAppSetupPage(): React.JSX.Element {
-  const pageMeta = useAppPageMeta();
-  const params = useParams();
-  const { title, description } = resolvePageFrameText(pageMeta, "Set Up Slack App");
-  const targetKey = params["targetKey"];
-  const connectionId = params["connectionId"];
-
-  if (targetKey === undefined || connectionId === undefined) {
-    throw new Error("Integration target key and connection id are required.");
-  }
-
-  const directoryQuery = useQuery({
-    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    retry: false,
-  });
-
-  if (directoryQuery.isPending || directoryQuery.data === undefined) {
-    return (
-      <FormPageFrame
-        description={description}
-        headerIcon={pageMeta.headerIcon ?? undefined}
-        title={title}
-      >
-        {null}
-      </FormPageFrame>
-    );
-  }
-
-  const card = buildIntegrationCards(directoryQuery.data).find(
-    (candidate) => candidate.target.targetKey === targetKey,
-  );
-  if (card === undefined) {
-    throw new Error(`Integration target '${targetKey}' was not found.`);
-  }
-
-  const connection = card.connections.find((candidate) => candidate.id === connectionId);
-  if (connection === undefined) {
-    throw new Error(
-      `Integration connection '${connectionId}' was not found for target '${targetKey}'.`,
-    );
-  }
-
-  return (
-    <FormPageFrame
-      description={description}
-      headerIcon={pageMeta.headerIcon ?? undefined}
-      title={title}
-    >
-      <SlackAppSetupPane connection={connection} key={connection.id} />
-    </FormPageFrame>
   );
 }
 

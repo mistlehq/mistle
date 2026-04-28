@@ -24,7 +24,7 @@ import type {
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
-import { IntegrationConnectionGitHubAppSetupPage } from "./integration-connection-github-app-setup-page.js";
+import { IntegrationConnectionSetupPage } from "./integration-connection-setup-page.js";
 import { IntegrationsPage } from "./integrations-page.js";
 import { createStoryConnectionMethods } from "./organization-integrations-settings-page-story-support.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -386,9 +386,9 @@ function GitHubAppSetupPageStory(input: {
           <Route element={<Outlet />} handle={ROUTE_HANDLES.integrations} path="/integrations">
             <Route element={<Outlet />} handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
               <Route
-                element={<IntegrationConnectionGitHubAppSetupPage />}
-                handle={ROUTE_HANDLES.integrationGitHubAppSetup}
-                path=":connectionId/github-app/setup"
+                element={<IntegrationConnectionSetupPage />}
+                handle={ROUTE_HANDLES.integrationSetup}
+                path=":connectionId/:setupRouteSegment/setup"
               />
             </Route>
           </Route>

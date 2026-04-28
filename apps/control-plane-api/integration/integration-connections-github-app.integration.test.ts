@@ -319,60 +319,6 @@ describe("integration connections GitHub App integration", () => {
     expect(redirectSession).toBeDefined();
   });
 
-  it("starts GitHub App manifest creation through the generic external app setup route", async ({
-    fixture,
-  }) => {
-    await ensureGithubCloudTarget(fixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-generic-github-app-manifest-start@example.com",
-    });
-    const connectionId = await createGitHubAppDraftConnection(fixture, {
-      authenticatedSession,
-      displayName: "Draft GitHub",
-    });
-
-    const response = await fixture.request(
-      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          manifest: {
-            name: "Mistle GitHub App",
-          },
-          owner: {
-            kind: "personal",
-          },
-        }),
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const responseBody = await parseStartedExternalAppSetupFormPost(response);
-    expect(responseBody.kind).toBe("form-post");
-    if (responseBody.kind !== "form-post") {
-      throw new Error("Expected form-post start response.");
-    }
-
-    const submissionUrl = new URL(responseBody.submissionUrl);
-    const state = resolveGitHubAppManifestSubmissionState(submissionUrl);
-    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.organizationId, authenticatedSession.organizationId),
-          eq(table.targetKey, "github-cloud"),
-          eq(table.state, state),
-        ),
-    });
-
-    expect(redirectSession).toBeDefined();
-    expect(state).toContain(".");
-  });
-
   it("starts and completes GitHub Enterprise Server App installation through the generic external app setup route", async ({
     fixture,
   }) => {
@@ -501,31 +447,6 @@ describe("integration connections GitHub App integration", () => {
     expect(response.status).toBe(400);
     const responseBody = StartExternalAppSetupBadRequestResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
-
-    const genericResponse = await fixture.request(
-      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          manifest: {
-            name: "Mistle GitHub App",
-          },
-          owner: {
-            kind: "personal",
-          },
-        }),
-      },
-    );
-
-    expect(genericResponse.status).toBe(400);
-    const genericResponseBody = StartExternalAppSetupBadRequestResponseSchema.parse(
-      await genericResponse.json(),
-    );
-    expect(genericResponseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 
   it("returns the documented GitHub App manifest completion code when the callback code is missing", async ({

@@ -22,8 +22,6 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
     },
     {
       query,
-      missingStateCode:
-        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
       invalidInputCode:
         IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
     },

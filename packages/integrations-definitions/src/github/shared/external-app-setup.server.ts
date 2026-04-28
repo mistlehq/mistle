@@ -11,7 +11,6 @@ import {
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
-  GitHubAppManifestConversionMissingClientSecretError,
   GitHubAppManifestOwnerSchema,
   parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
@@ -140,23 +139,15 @@ export function createGitHubExternalAppSetupCapability(
             code,
           });
 
-          try {
-            return {
-              connection: {
-                config: buildConvertedGitHubAppConnectionConfig({ conversion }),
-              },
-              secrets: buildConvertedGitHubAppConnectionSecrets({
-                conversion,
-                supportsClientSecret: options.supportsClientSecret,
-              }),
-            };
-          } catch (error) {
-            if (error instanceof GitHubAppManifestConversionMissingClientSecretError) {
-              throw error;
-            }
-
-            throw error;
-          }
+          return {
+            connection: {
+              config: buildConvertedGitHubAppConnectionConfig({ conversion }),
+            },
+            secrets: buildConvertedGitHubAppConnectionSecrets({
+              conversion,
+              supportsClientSecret: options.supportsClientSecret,
+            }),
+          };
         },
       },
       {

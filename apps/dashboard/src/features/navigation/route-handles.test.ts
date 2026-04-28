@@ -15,9 +15,6 @@ describe("route handles", () => {
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
     expect(ROUTE_HANDLES.integrationCreate.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationCreate.appShellInsetOwner).toBe("child");
-    expect(typeof ROUTE_HANDLES.integrationGitHubAppSetup.title).toBe("function");
-    expect(ROUTE_HANDLES.integrationGitHubAppSetup.header?.icon).toBeDefined();
-    expect(ROUTE_HANDLES.integrationGitHubAppSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationSetup.title).toBe("function");
     expect(ROUTE_HANDLES.integrationSetup.header?.icon).toBeDefined();
     expect(ROUTE_HANDLES.integrationSetup.appShellInsetOwner).toBe("child");
@@ -145,35 +142,24 @@ describe("route handles", () => {
   });
 
   it("resolves integration app setup titles from the target key", () => {
-    const setupTitle = ROUTE_HANDLES.integrationGitHubAppSetup.title;
-    const slackSetupTitle = ROUTE_HANDLES.integrationSlackAppSetup.title;
-    const genericSetupTitle = ROUTE_HANDLES.integrationSetup.title;
+    const setupTitle = ROUTE_HANDLES.integrationSetup.title;
     expect(typeof setupTitle).toBe("function");
-    expect(typeof slackSetupTitle).toBe("function");
-    expect(typeof genericSetupTitle).toBe("function");
 
-    if (
-      typeof setupTitle !== "function" ||
-      typeof slackSetupTitle !== "function" ||
-      typeof genericSetupTitle !== "function"
-    ) {
+    if (typeof setupTitle !== "function") {
       throw new Error("integration app setup titles must be functions");
     }
 
     expect(setupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");
-    expect(slackSetupTitle({ params: { targetKey: "slack-default" } })).toBe("Setup Slack App");
+    expect(setupTitle({ params: { targetKey: "slack-default" } })).toBe("Setup Slack App");
     expect(setupTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Setup Custom Integration V2 App",
     );
-    expect(genericSetupTitle({ params: { targetKey: "github-cloud" } })).toBe("Setup GitHub App");
   });
 
   it("omits supporting text from integration route handles", () => {
     expect(ROUTE_HANDLES.integrationDetail).not.toHaveProperty("description");
     expect(ROUTE_HANDLES.integrationCreate).not.toHaveProperty("description");
     expect(ROUTE_HANDLES.integrationEdit).not.toHaveProperty("description");
-    expect(ROUTE_HANDLES.integrationGitHubAppSetup).not.toHaveProperty("description");
-    expect(ROUTE_HANDLES.integrationSlackAppSetup).not.toHaveProperty("description");
     expect(ROUTE_HANDLES.integrationSetup).not.toHaveProperty("description");
   });
 

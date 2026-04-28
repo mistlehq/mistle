@@ -12,11 +12,6 @@ type IntegrationSetupCompletionRequirementLeaf = Extract<
   { kind: "connection-external-subject" | "config-field" | "secret-field" }
 >;
 
-export type IncompleteIntegrationConnectionSetupFlow = {
-  methodId: string;
-  routeSegment: string;
-};
-
 export type IntegrationConnectionSetupRoute = {
   methodId: string;
   routeSegment: string;
@@ -25,7 +20,7 @@ export type IntegrationConnectionSetupRoute = {
 export function resolveIncompleteIntegrationConnectionSetupFlow(input: {
   connection: IntegrationConnection;
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
-}): IncompleteIntegrationConnectionSetupFlow | null {
+}): IntegrationConnectionSetupRoute | null {
   if (input.connection.connectionMethodId === undefined) {
     return null;
   }
