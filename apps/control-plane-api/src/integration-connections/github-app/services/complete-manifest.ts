@@ -31,7 +31,7 @@ import {
 import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
-  resolveGitHubAppManifestConnectionId,
+  resolveConnectionRedirectStateConnectionId,
   resolveRequiredRedirectQueryParamOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -87,7 +87,7 @@ function resolveManifestCodeOrThrow(params: URLSearchParams): string {
 
 function resolveGitHubAppManifestConnectionIdOrThrow(state: string): string {
   try {
-    return resolveGitHubAppManifestConnectionId(state);
+    return resolveConnectionRedirectStateConnectionId(state);
   } catch {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,

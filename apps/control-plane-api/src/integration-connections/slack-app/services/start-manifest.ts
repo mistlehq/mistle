@@ -29,7 +29,7 @@ import {
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
-  encodeSlackAppInstallationStateMetadata,
+  encodeConnectionRedirectStateMetadata,
   persistRedirectSessionOrThrow,
 } from "../../services/redirect-flow.js";
 import {
@@ -252,7 +252,7 @@ export async function startSlackAppManifestConnection(
     );
   }
 
-  const state = encodeSlackAppInstallationStateMetadata({
+  const state = encodeConnectionRedirectStateMetadata({
     state: createRedirectState(),
     connectionId: connection.id,
   });

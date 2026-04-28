@@ -33,7 +33,7 @@ import {
   createRedirectQueryParams,
   resolveActiveRedirectSessionOrThrow,
   resolveRequiredRedirectQueryParamOrThrow,
-  resolveSlackAppInstallationConnectionId,
+  resolveConnectionRedirectStateConnectionId,
 } from "../../services/redirect-flow.js";
 import {
   ensureImplicitConnectionWebhookSource,
@@ -103,7 +103,7 @@ function resolveAuthorizationCodeOrThrow(params: URLSearchParams): string {
 
 function resolveSlackAppInstallationConnectionIdOrThrow(state: string): string {
   try {
-    return resolveSlackAppInstallationConnectionId(state);
+    return resolveConnectionRedirectStateConnectionId(state);
   } catch {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,

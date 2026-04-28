@@ -93,33 +93,27 @@ export function resolveRedirectDisplayName(state: string): string | undefined {
   return displayName;
 }
 
-export function encodeGitHubAppInstallationStateMetadata(input: {
+export function encodeConnectionRedirectStateMetadata(input: {
   state: string;
   connectionId: string;
 }): string {
   return `${input.state}.${Buffer.from(input.connectionId, "utf8").toString("base64url")}`;
 }
 
-export const encodeGitHubAppManifestStateMetadata = encodeGitHubAppInstallationStateMetadata;
-export const encodeSlackAppInstallationStateMetadata = encodeGitHubAppInstallationStateMetadata;
-
-export function resolveGitHubAppInstallationConnectionId(state: string): string {
+export function resolveConnectionRedirectStateConnectionId(state: string): string {
   const separatorIndex = state.indexOf(".");
   if (separatorIndex < 0 || separatorIndex === state.length - 1) {
-    throw new Error("GitHub App installation state is missing connection metadata.");
+    throw new Error("Connection redirect state is missing connection metadata.");
   }
 
   const encodedConnectionId = state.slice(separatorIndex + 1);
   const connectionId = Buffer.from(encodedConnectionId, "base64url").toString("utf8").trim();
   if (connectionId.length === 0) {
-    throw new Error("GitHub App installation state contains an empty connection id.");
+    throw new Error("Connection redirect state contains an empty connection id.");
   }
 
   return connectionId;
 }
-
-export const resolveGitHubAppManifestConnectionId = resolveGitHubAppInstallationConnectionId;
-export const resolveSlackAppInstallationConnectionId = resolveGitHubAppInstallationConnectionId;
 
 export function createRedirectQueryParams(query: Record<string, string>): URLSearchParams {
   const params = new URLSearchParams();
