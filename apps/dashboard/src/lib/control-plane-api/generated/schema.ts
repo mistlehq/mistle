@@ -1486,7 +1486,7 @@ export interface paths {
             };
           };
         };
-        /** @description Integration connection still has one or more dependent bindings or automations. */
+        /** @description Integration connection still has one or more active dependent bindings, automations, or identity-linking usages. */
         409: {
           headers: {
             [name: string]: unknown;

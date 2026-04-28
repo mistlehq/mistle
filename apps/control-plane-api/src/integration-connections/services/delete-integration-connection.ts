@@ -4,6 +4,7 @@ import {
   integrationCredentials,
   integrationWebhookSources,
   OrganizationIdentityLinkProviderConfigStatus,
+  sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   type ControlPlaneDatabase,
   webhookAutomations,
@@ -55,17 +56,29 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
     );
   }
 
-  const [bindingUsage] = await input.db
+  const [activeVersionBindingUsage] = await input.db
     .select({
-      bindingCount: sql<number>`count(*)::int`,
+      activeVersionBindingCount: sql<number>`count(*)::int`,
     })
     .from(sandboxProfileVersionIntegrationBindings)
-    .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, lockedConnection.id));
+    .innerJoin(
+      sandboxProfiles,
+      eq(sandboxProfiles.id, sandboxProfileVersionIntegrationBindings.sandboxProfileId),
+    )
+    .where(
+      and(
+        eq(sandboxProfileVersionIntegrationBindings.connectionId, lockedConnection.id),
+        eq(
+          sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+          sandboxProfiles.activeVersion,
+        ),
+      ),
+    );
 
-  if ((bindingUsage?.bindingCount ?? 0) > 0) {
+  if ((activeVersionBindingUsage?.activeVersionBindingCount ?? 0) > 0) {
     throw new ConflictError(
       IntegrationConnectionsConflictCodes.CONNECTION_HAS_BINDINGS,
-      "This integration connection cannot be deleted while it is still used by one or more bindings.",
+      "This integration connection cannot be deleted while it is still used by one or more active sandbox profile versions.",
     );
   }
 
@@ -106,6 +119,15 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
       "This integration connection cannot be deleted while it is configured for Identity Linking.",
     );
   }
+}
+
+async function deleteInactiveVersionBindings(input: {
+  db: ControlPlaneDatabase;
+  connectionId: string;
+}): Promise<void> {
+  await input.db
+    .delete(sandboxProfileVersionIntegrationBindings)
+    .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId));
 }
 
 export async function deleteIntegrationConnection(
@@ -204,6 +226,11 @@ export async function deleteIntegrationConnection(
     await assertConnectionDeletionGuardsOrThrow({
       db: tx,
       organizationId: input.organizationId,
+      connectionId: input.connectionId,
+    });
+
+    await deleteInactiveVersionBindings({
+      db: tx,
       connectionId: input.connectionId,
     });
 

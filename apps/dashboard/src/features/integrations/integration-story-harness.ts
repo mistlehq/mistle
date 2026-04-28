@@ -365,7 +365,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           connectionId,
         }),
         bindingCount: 3,
-        canDelete: false,
+        canDelete: true,
         displayName: "GitHub App (Ready)",
         installation: {
           actionLabel: "Manage installation",
@@ -644,6 +644,7 @@ export function createGitHubNotSyncedDetailViewStoryProps(): IntegrationConnecti
 }
 
 type ScenarioDetailStorySpec = {
+  automationCount?: number;
   authMethod?: StoryAuthMethodSpec;
   bindingCount?: number;
   connectionConfig?: Record<string, unknown>;
@@ -764,8 +765,9 @@ function createScenarioDetailViewStoryProps(
   return {
     connections: [
       {
+        automationCount: input.automationCount ?? 0,
         bindingCount: input.bindingCount ?? 0,
-        canDelete: input.bindingCount === undefined || input.bindingCount === 0,
+        canDelete: (input.automationCount ?? 0) === 0,
         ...(authMethod === undefined ? {} : authMethod),
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,

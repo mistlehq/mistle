@@ -145,7 +145,7 @@ describe("IntegrationConnectionDetailView", () => {
           {
             id: "icn_github_primary",
             bindingCount: 1,
-            canDelete: false,
+            canDelete: true,
             displayName: "Engineering GitHub",
             status: "active",
             installation: {
@@ -941,7 +941,7 @@ describe("IntegrationConnectionDetailView", () => {
     expect(within(authSection).getAllByText("**********")).toHaveLength(2);
   });
 
-  it("shows delete for all connections and disables it when bindings prevent deletion", () => {
+  it("allows delete for connections with binding usage", () => {
     let deletedConnectionId: string | null = null;
 
     render(
@@ -950,7 +950,7 @@ describe("IntegrationConnectionDetailView", () => {
           {
             id: "icn_bound",
             bindingCount: 2,
-            canDelete: false,
+            canDelete: true,
             displayName: "Bound connection",
             authMethodId: "github-app-installation",
             authMethodLabel: "GitHub App installation",
@@ -977,10 +977,11 @@ describe("IntegrationConnectionDetailView", () => {
     const boundDeleteButton = screen.getByRole("button", {
       name: "Delete connection Bound connection",
     });
-    expect(boundDeleteButton).toHaveProperty("disabled", true);
-    expect(boundDeleteButton.getAttribute("title")).toBe(
-      "This connection can't be deleted while it has 2 bindings.",
-    );
+    expect(boundDeleteButton).not.toHaveProperty("disabled", true);
+    fireEvent.click(boundDeleteButton);
+    expect(deletedConnectionId).toBe("icn_bound");
+    deletedConnectionId = null;
+
     fireEvent.click(screen.getByRole("button", { name: "Select connection Free connection" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete connection Free connection" }));
     expect(deletedConnectionId).toBe("icn_free");

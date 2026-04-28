@@ -278,7 +278,8 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     }
   });
 
-  it("offers delete for unbound connections and calls the delete endpoint", async () => {
+  it("offers delete for binding-only connections and calls the delete endpoint", async () => {
+    const deleteRequests: string[] = [];
     const renderedPage = await renderDashboardPageIntegration({
       handler: (request, response) => {
         const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -340,12 +341,14 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
         if (
           request.method === "DELETE" &&
-          requestUrl.pathname === "/v1/integration/connections/icn_free"
+          (requestUrl.pathname === "/v1/integration/connections/icn_free" ||
+            requestUrl.pathname === "/v1/integration/connections/icn_bound")
         ) {
+          deleteRequests.push(`${requestUrl.pathname}${requestUrl.search}`);
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              connectionId: "icn_free",
+              connectionId: requestUrl.pathname.endsWith("icn_bound") ? "icn_bound" : "icn_free",
             }),
           );
           return;
@@ -358,9 +361,18 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     });
 
     try {
-      expect(
+      fireEvent.click(
         await screen.findByRole("button", { name: "Delete connection Bound GitHub" }),
-      ).toHaveProperty("disabled", true);
+      );
+      expect(await screen.findByText("Delete integration connection")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Delete connection" }));
+
+      await waitFor(() => {
+        expect(deleteRequests).toContain("/v1/integration/connections/icn_bound");
+      });
+      await waitFor(() => {
+        expect(screen.queryByText("Delete integration connection")).toBeNull();
+      });
 
       fireEvent.click(screen.getByRole("button", { name: "Select connection Free GitHub" }));
       fireEvent.click(screen.getByRole("button", { name: "Delete connection Free GitHub" }));
@@ -369,6 +381,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
       await waitFor(() => {
         expect(screen.queryByText("Delete integration connection")).toBeNull();
+        expect(deleteRequests).toContain("/v1/integration/connections/icn_free");
       });
     } finally {
       await renderedPage.close();
