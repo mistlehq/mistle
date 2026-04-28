@@ -112,7 +112,6 @@ export async function startControlPlaneSystemEnvironment(
       prebuiltImageName: preparedRuntime.appImages.controlPlaneApi,
       environment: {
         ...input.controlPlaneApiEnvironment,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
@@ -138,7 +137,6 @@ export async function startControlPlaneSystemEnvironment(
       prebuiltImageName: preparedRuntime.appImages.controlPlaneWorker,
       environment: {
         ...input.controlPlaneWorkerEnvironment,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
         MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",

@@ -10,8 +10,7 @@ Central config package for Mistle apps.
 4. Validate the final runtime config.
 
 The public operator sample at [`../../config/config.sample.toml`](../../config/config.sample.toml)
-uses the next TOML shape. Legacy TOML loading remains available during the
-migration period.
+uses the current TOML shape.
 
 ## Public API
 
@@ -19,12 +18,6 @@ The package exports these public APIs from [`src/index.ts`](./src/index.ts):
 
 - `loadConfig(options)`
 - `AppIds`
-- `convertEnvToTomlRecord(env)`
-- `convertTomlToEnvRecord(tomlRoot)`
-- `convertDotenvContentToTomlContent(content)`
-- `convertTomlContentToDotenvContent(content)`
-- `parseDotenvContent(content)`
-- `stringifyDotenvContent(env)`
 
 ## Usage
 
@@ -51,15 +44,9 @@ Currently supported `app` values are exposed in `AppIds`.
 `configPath` can come from either `options.configPath` or `options.env.MISTLE_CONFIG_PATH`.
 There is no implicit fallback to process env.
 
-The current operator-facing TOML shape is explicitly opt-in during the migration
-period:
-
-- pass `format: "next"` to `loadConfig(...)`, or
-- set `MISTLE_CONFIG_FORMAT=next` alongside `MISTLE_CONFIG_PATH`.
-
-Any other non-empty `MISTLE_CONFIG_FORMAT` value is rejected. Env overrides are
-still applied after TOML projection, so the existing `MISTLE_GLOBAL_*` and
-`MISTLE_APPS_*` env variables keep their current override behavior.
+Env overrides are still applied after TOML projection, so the existing
+`MISTLE_GLOBAL_*` and `MISTLE_APPS_*` env variables keep their current override
+behavior.
 
 `includeGlobal` defaults to `true`.
 
@@ -70,55 +57,10 @@ Return shape:
 
 `app` is type-safe and inferred from `options.app` (for example, `AppIds.CONTROL_PLANE_API` returns the control-plane-api app config shape).
 
-## Conversion Helpers
-
-`@mistle/config` includes helpers for converting between existing runtime env
-and legacy TOML shapes:
-
-- Env record to TOML record:
-
-```ts
-import { convertEnvToTomlRecord } from "@mistle/config";
-
-const tomlRoot = convertEnvToTomlRecord(process.env);
-```
-
-- TOML record to env record:
-
-```ts
-import { convertTomlToEnvRecord } from "@mistle/config";
-
-const env = convertTomlToEnvRecord({
-  global: { env: "development" },
-});
-```
-
-- Dotenv content to TOML content:
-
-```ts
-import { convertDotenvContentToTomlContent } from "@mistle/config";
-
-const tomlContent = convertDotenvContentToTomlContent("NODE_ENV=production\n");
-```
-
-- TOML content to dotenv content:
-
-```ts
-import { convertTomlContentToDotenvContent } from "@mistle/config";
-
-const dotenvContent = convertTomlContentToDotenvContent('[global]\nenv = "production"\n');
-```
-
-Scope:
-
-- Conversion covers keys managed by `@mistle/config` modules (`global`, `apps.control_plane_api`, `apps.control_plane_worker`, `apps.data_plane_api`, `apps.data_plane_gateway`, `apps.data_plane_worker`, `apps.tokenizer_proxy`).
-- Conversion helpers do not emit the next TOML shape.
-- Unknown keys are ignored.
-
 ## Merge Rules
 
 - TOML is loaded first.
-- Next TOML is projected into the existing runtime config shape when `format: "next"` is set.
+- TOML is projected into the existing runtime config shape.
 - Env values are loaded second.
 - Env values override TOML when both provide the same runtime key.
 
@@ -138,19 +80,16 @@ Use module ownership to keep config changes localized:
 
 - `src/global/*` owns `global.*`
 - `src/apps/<app-id>/*` owns `apps.<app_id>.*`
-- `src/next/*` owns the next TOML schema and projection into runtime config.
+- `src/toml/*` owns the TOML schema and projection into runtime config.
 
 ### Add A New Key To An Existing Module
 
 1. Update the module schema in `schema.ts` (source of truth for runtime validation and types).
-2. Update `load-toml.ts` with the TOML path and parsing logic for the new key.
-3. Update `load-env.ts` with the env mapping and parsing logic for the new key.
-4. Update [`src/conversion-mappings.ts`](./src/conversion-mappings.ts) so env <-> TOML conversion helpers include the new key mapping.
-5. Update the module `README.md` table (Type, TOML key, Env key, defaults).
-6. If the key is operator-facing in next TOML, update `src/next/schema.ts` and `src/next/project.ts`.
-7. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
-8. If generated next config should populate the key, update `scripts/config/next-config.ts`.
-9. Add or update tests:
+2. Update `load-env.ts` with the env mapping and parsing logic for the new key.
+3. If the key is operator-facing TOML, update `src/toml/schema.ts` and `src/toml/project.ts`.
+4. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
+5. If generated config should populate the key, update `scripts/config/toml-config.ts`.
+6. Add or update tests:
    - unit tests in `src/**/*test.ts` for parsing/merge/validation behavior
    - integration coverage in `integration/load-config.integration.test.ts` (and fixture updates if needed)
 
@@ -158,7 +97,6 @@ Use module ownership to keep config changes localized:
 
 1. Create `src/apps/<app-id>/` with:
    - `schema.ts`
-   - `load-toml.ts`
    - `load-env.ts`
    - `index.ts` (exports the `ConfigModule`)
    - `README.md` (single config table)
@@ -166,11 +104,10 @@ Use module ownership to keep config changes localized:
    - add `AppIds.<NEW_APP>`
    - add to `appConfigModules`
 3. Update `src/loader.ts` app parsing branch/map so `loadConfig` can parse and return the app config for the new app id.
-4. Update [`src/conversion-mappings.ts`](./src/conversion-mappings.ts) with env <-> TOML mappings for the app module keys.
-5. Add the runtime projection for the app in `src/next/project.ts` if next TOML should configure it.
-6. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
-7. Add module docs link in this README.
-8. Add integration test coverage for TOML-only, env-only, and merged precedence cases.
+4. Add the runtime projection for the app in `src/toml/project.ts` if TOML should configure it.
+5. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
+6. Add module docs link in this README.
+7. Add integration test coverage for TOML-only, env-only, and merged precedence cases.
 
 ### Quick Validation
 

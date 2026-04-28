@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 import { parse as parseToml } from "smol-toml";
 
-import { resolveConfigFormat } from "../../packages/config/src/loader.ts";
 import {
   getLocalDevDockerRegistrySandboxBaseImageRef,
   getLocalPreparedRuntimeSandboxBaseImageRef,
@@ -58,7 +57,6 @@ type RunInput = {
 };
 
 type SandboxProvider = "docker" | "e2b";
-type TomlConfigFormat = "legacy" | "next";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -88,10 +86,6 @@ function readTomlConfigRoot(configPath: string): Record<string, unknown> {
   return parsed;
 }
 
-function resolveDevTomlConfigFormat(): TomlConfigFormat {
-  return resolveConfigFormat({ env: process.env }) ?? "next";
-}
-
 function readRequiredIntegerTomlValue(
   configPath: string,
   path: readonly string[],
@@ -108,53 +102,26 @@ function readRequiredIntegerTomlValue(
 }
 
 function readControlPlaneApiLocalPort(configPath: string): number {
-  const configFormat = resolveDevTomlConfigFormat();
-  if (configFormat === "next") {
-    return readRequiredIntegerTomlValue(
-      configPath,
-      ["services", "control_plane_api", "port"],
-      "services.control_plane_api.port",
-    );
-  }
-
   return readRequiredIntegerTomlValue(
     configPath,
-    ["apps", "control_plane_api", "server", "port"],
-    "apps.control_plane_api.server.port",
+    ["services", "control_plane_api", "port"],
+    "services.control_plane_api.port",
   );
 }
 
 function readDataPlaneGatewayLocalPort(configPath: string): number {
-  const configFormat = resolveDevTomlConfigFormat();
-  if (configFormat === "next") {
-    return readRequiredIntegerTomlValue(
-      configPath,
-      ["services", "data_plane_gateway", "port"],
-      "services.data_plane_gateway.port",
-    );
-  }
-
   return readRequiredIntegerTomlValue(
     configPath,
-    ["apps", "data_plane_gateway", "server", "port"],
-    "apps.data_plane_gateway.server.port",
+    ["services", "data_plane_gateway", "port"],
+    "services.data_plane_gateway.port",
   );
 }
 
 function readTokenizerProxyLocalPort(configPath: string): number {
-  const configFormat = resolveDevTomlConfigFormat();
-  if (configFormat === "next") {
-    return readRequiredIntegerTomlValue(
-      configPath,
-      ["services", "tokenizer_proxy", "port"],
-      "services.tokenizer_proxy.port",
-    );
-  }
-
   return readRequiredIntegerTomlValue(
     configPath,
-    ["apps", "tokenizer_proxy", "server", "port"],
-    "apps.tokenizer_proxy.server.port",
+    ["services", "tokenizer_proxy", "port"],
+    "services.tokenizer_proxy.port",
   );
 }
 
@@ -172,17 +139,13 @@ function readSandboxProvider(configPath: string): SandboxProvider {
   }
 
   const parsed = readTomlConfigRoot(configPath);
-  const configFormat = resolveDevTomlConfigFormat();
-  const sandboxProviderPath =
-    configFormat === "next" ? ["sandbox", "provider"] : ["global", "sandbox", "provider"];
-  const resolvedValue = getValueAtPath(parsed, sandboxProviderPath);
+  const resolvedValue = getValueAtPath(parsed, ["sandbox", "provider"]);
 
   if (resolvedValue === "docker" || resolvedValue === "e2b") {
     return resolvedValue;
   }
 
-  const pathLabel = configFormat === "next" ? "sandbox.provider" : "global.sandbox.provider";
-  throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
+  throw new Error("Missing or invalid sandbox.provider in config/config.development.toml.");
 }
 
 function readRequiredEnv(envVarName: string): string {
@@ -425,7 +388,6 @@ function dockerImageExists(imageTag: string): boolean {
 }
 
 async function start(): Promise<void> {
-  const configFormat = resolveDevTomlConfigFormat();
   const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
   const infraSummary =
     sandboxProvider === "docker"
@@ -451,7 +413,6 @@ async function start(): Promise<void> {
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
-    ...(configFormat === "next" ? { MISTLE_CONFIG_FORMAT: configFormat } : {}),
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
@@ -562,10 +523,24 @@ async function start(): Promise<void> {
     env: sharedDevEnv,
   });
 
+  console.log("Running control-plane workflow migrations...");
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/control-plane-api", "workflow:migrate"],
+    env: sharedDevEnv,
+  });
+
   console.log("Running data-plane DB migrations...");
   runOrThrow({
     command: "pnpm",
     args: ["--filter", "@mistle/data-plane-api", "db:migrate"],
+    env: sharedDevEnv,
+  });
+
+  console.log("Running data-plane workflow migrations...");
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/data-plane-api", "workflow:migrate"],
     env: sharedDevEnv,
   });
 

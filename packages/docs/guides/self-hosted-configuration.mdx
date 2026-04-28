@@ -9,12 +9,7 @@ Self-hosted Mistle deployments are configured with a TOML file plus optional
 environment overrides.
 
 Use [`config/config.sample.toml`](https://github.com/mistlehq/mistle/blob/main/config/config.sample.toml)
-as the complete reference for the current TOML shape. During the migration
-period, services that read this TOML file must also set:
-
-```bash
-MISTLE_CONFIG_FORMAT=next
-```
+as the complete reference for the current TOML shape.
 
 Set `MISTLE_CONFIG_PATH` to the TOML file path used by each service. Existing
 `MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment variables still work as
@@ -153,11 +148,8 @@ mount_object_store = "sandbox_storage"
 TOML should be the primary authored config. Environment variables are override
 inputs for deployment systems and secret managers.
 
-During the migration period:
-
 - keep using existing `MISTLE_GLOBAL_*` and `MISTLE_APPS_*` environment names
 - set `MISTLE_CONFIG_PATH` to the config file path
-- set `MISTLE_CONFIG_FORMAT=next` when using the sample TOML shape
 - do not use new `MISTLE_POSTGRES_*`, `MISTLE_KV_*`, or `MISTLE_SERVICES_*`
   environment namespaces
 
@@ -166,8 +158,7 @@ setting.
 
 ## Full TOML Key Reference
 
-This table covers the operator-facing next TOML keys accepted by
-`@mistle/config`.
+This table covers the operator-facing TOML keys accepted by `@mistle/config`.
 
 | Key                                                                            | Required                                   | Notes                                                                                     |
 | ------------------------------------------------------------------------------ | ------------------------------------------ | ----------------------------------------------------------------------------------------- |

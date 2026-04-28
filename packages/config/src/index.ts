@@ -1,4 +1,4 @@
-export { loadConfig, resolveConfigFormat } from "./loader.js";
+export { loadConfig } from "./loader.js";
 export { AppIds } from "./modules.js";
 export { readRepositoryVersion } from "./repository-version.js";
 export {
@@ -22,11 +22,3 @@ export {
   type DashboardBuildConfig,
   type DashboardBuildEnvironment,
 } from "./apps/dashboard/index.js";
-export {
-  convertDotenvContentToTomlContent,
-  convertEnvToTomlRecord,
-  convertTomlContentToDotenvContent,
-  convertTomlToEnvRecord,
-  parseDotenvContent,
-  stringifyDotenvContent,
-} from "./conversion.js";

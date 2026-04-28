@@ -7,13 +7,13 @@ import { describe, expect, it } from "vitest";
 import { loadConfig } from "../../packages/config/src/loader.ts";
 import { AppIds } from "../../packages/config/src/modules.ts";
 import {
-  buildNextDevelopmentConfig,
-  buildNextIntegrationConfig,
-  stringifyNextConfig,
-} from "./next-config.ts";
+  buildDevelopmentTomlConfig,
+  buildIntegrationTomlConfig,
+  stringifyTomlConfig,
+} from "./toml-config.ts";
 
 function writeTemporaryConfig(content: string): string {
-  const directory = mkdtempSync(join(tmpdir(), "mistle-next-config-"));
+  const directory = mkdtempSync(join(tmpdir(), "mistle-toml-config-"));
   const configPath = join(directory, "config.toml");
   writeFileSync(configPath, content, "utf8");
   return configPath;
@@ -27,22 +27,22 @@ function loadEveryAppFromContent(content: string): void {
   const configPath = writeTemporaryConfig(content);
 
   try {
-    loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath, format: "next" });
-    loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath, format: "next" });
-    loadConfig({ app: AppIds.DATA_PLANE_API, configPath, format: "next" });
-    loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath, format: "next" });
-    loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath, format: "next" });
-    loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath, format: "next" });
+    loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath });
+    loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath });
+    loadConfig({ app: AppIds.DATA_PLANE_API, configPath });
+    loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath });
+    loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath });
+    loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath });
   } finally {
     removeTemporaryConfig(configPath);
   }
 }
 
-describe("next config generation", () => {
+describe("toml config generation", () => {
   it("generates loadable development TOML with operator comments", () => {
-    const content = stringifyNextConfig({
+    const content = stringifyTomlConfig({
       header: "",
-      configRoot: buildNextDevelopmentConfig(),
+      configRoot: buildDevelopmentTomlConfig(),
     });
 
     expect(content).toContain("[services.control_plane_api]");
@@ -53,9 +53,9 @@ describe("next config generation", () => {
   });
 
   it("generates loadable docker integration TOML", () => {
-    const content = stringifyNextConfig({
+    const content = stringifyTomlConfig({
       header: "",
-      configRoot: buildNextIntegrationConfig({
+      configRoot: buildIntegrationTomlConfig({
         provider: "docker",
         environment: {},
       }),
@@ -66,9 +66,9 @@ describe("next config generation", () => {
   });
 
   it("generates loadable e2b integration TOML from required env values", () => {
-    const content = stringifyNextConfig({
+    const content = stringifyTomlConfig({
       header: "",
-      configRoot: buildNextIntegrationConfig({
+      configRoot: buildIntegrationTomlConfig({
         provider: "e2b",
         e2bSandboxBaseImage: "ghcr.io/mistlehq/sandbox-base:test",
         environment: {

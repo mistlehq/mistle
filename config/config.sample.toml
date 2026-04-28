@@ -1,6 +1,5 @@
 # Full reference of config keys.
-# This sample uses the next TOML shape and is production-centric.
-# Runtime consumers must set MISTLE_CONFIG_FORMAT=next while legacy TOML support remains available.
+# This sample is production-centric.
 
 [global]
 env = "production"

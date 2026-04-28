@@ -16,7 +16,7 @@ type CommentedSection = {
   comments: readonly string[];
 };
 
-const NextConfigComments: readonly CommentedSection[] = [
+const TomlConfigComments: readonly CommentedSection[] = [
   {
     heading: "[postgres.control_plane]",
     comments: [
@@ -124,26 +124,26 @@ function deleteValueAtPath(root: ConfigRecord, path: readonly string[]): ConfigR
     throw new Error("Deletion path contained an undefined segment.");
   }
 
-  const nextRoot: ConfigRecord = { ...root };
+  const updatedRoot: ConfigRecord = { ...root };
 
   if (tail.length === 0) {
-    delete nextRoot[head];
-    return nextRoot;
+    delete updatedRoot[head];
+    return updatedRoot;
   }
 
-  const childValue = nextRoot[head];
+  const childValue = updatedRoot[head];
   if (!isObjectRecord(childValue)) {
-    return nextRoot;
+    return updatedRoot;
   }
 
-  const nextChild = deleteValueAtPath(childValue, tail);
-  if (Object.keys(nextChild).length === 0) {
-    delete nextRoot[head];
-    return nextRoot;
+  const updatedChild = deleteValueAtPath(childValue, tail);
+  if (Object.keys(updatedChild).length === 0) {
+    delete updatedRoot[head];
+    return updatedRoot;
   }
 
-  nextRoot[head] = nextChild;
-  return nextRoot;
+  updatedRoot[head] = updatedChild;
+  return updatedRoot;
 }
 
 function readRequiredStringField(input: {
@@ -176,7 +176,7 @@ function parseSandboxObjectStoreFromArchilMounts(environment: NodeJS.ProcessEnv)
 
   if (parsedMounts.length !== 1) {
     throw new Error(
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON must contain exactly one mount for next TOML generation.",
+      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON must contain exactly one mount for current TOML generation.",
     );
   }
 
@@ -194,7 +194,7 @@ function parseSandboxObjectStoreFromArchilMounts(environment: NodeJS.ProcessEnv)
   });
   if (type !== "s3-compatible") {
     throw new Error(
-      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON only supports s3-compatible mounts for next TOML generation.",
+      "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_STORAGE_ARCHIL_MOUNTS_JSON only supports s3-compatible mounts for current TOML generation.",
     );
   }
 
@@ -236,7 +236,7 @@ function upsertOptionalValueAtPath(
   return setValueAtPath(root, path, value);
 }
 
-export function buildNextDevelopmentConfig(): ConfigRecord {
+export function buildDevelopmentTomlConfig(): ConfigRecord {
   const postgresDirectUrl = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev";
   const postgresPooledUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_dev";
   const controlPlaneApiUrl = "http://localhost:5100";
@@ -433,12 +433,12 @@ export function buildNextDevelopmentConfig(): ConfigRecord {
   };
 }
 
-export function buildNextIntegrationConfig(input: {
+export function buildIntegrationTomlConfig(input: {
   provider: "docker" | "e2b";
   environment: NodeJS.ProcessEnv;
   e2bSandboxBaseImage?: string;
 }): ConfigRecord {
-  let configRoot = buildNextDevelopmentConfig();
+  let configRoot = buildDevelopmentTomlConfig();
 
   configRoot = setValueAtPath(
     configRoot,
@@ -561,7 +561,7 @@ export function buildNextIntegrationConfig(input: {
   return configRoot;
 }
 
-export function applyNextConfigEnvOverrides(input: {
+export function applyTomlConfigEnvOverrides(input: {
   configRoot: ConfigRecord;
   environment: NodeJS.ProcessEnv;
 }): ConfigRecord {
@@ -633,12 +633,12 @@ export function applyNextConfigEnvOverrides(input: {
   return configRoot;
 }
 
-export function stringifyNextConfig(input: { header: string; configRoot: ConfigRecord }): string {
+export function stringifyTomlConfig(input: { header: string; configRoot: ConfigRecord }): string {
   const tomlLines = stringifyToml(input.configRoot).split("\n");
   const outputLines: string[] = [];
 
   for (const line of tomlLines) {
-    const comments = NextConfigComments.find((comment) => comment.heading === line)?.comments;
+    const comments = TomlConfigComments.find((comment) => comment.heading === line)?.comments;
 
     if (comments !== undefined) {
       if (outputLines.length > 0 && outputLines[outputLines.length - 1] !== "") {
@@ -671,6 +671,6 @@ export function isMissingRequiredConfigValue(value: unknown): boolean {
   return true;
 }
 
-export function getValueAtNextConfigPath(root: ConfigRecord, path: readonly string[]): unknown {
+export function getValueAtTomlConfigPath(root: ConfigRecord, path: readonly string[]): unknown {
   return getValueAtPath(root, path);
 }

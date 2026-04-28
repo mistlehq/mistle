@@ -7,15 +7,9 @@ import { AppIds } from "../src/modules.js";
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../src/sandbox-base-images.js";
 import { createIntegrationEnv } from "./fixtures/env.js";
 
-const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
-const nextConfigFixturePath = fileURLToPath(
-  new URL("./fixtures/config.next.toml", import.meta.url),
-);
+const tomlConfigFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
 const configSamplePath = fileURLToPath(
   new URL("../../../config/config.sample.toml", import.meta.url),
-);
-const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
-  new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
 );
 const serviceToken = "fixture-service-token";
 const sandboxConnectTokenSecret = "fixture-connection-token-secret";
@@ -154,15 +148,6 @@ const globalProductionDockerConfig = {
   },
 } as const;
 
-const globalDevelopmentDockerConfig = {
-  ...globalDevelopmentConfig,
-  sandbox: {
-    ...globalDevelopmentConfig.sandbox,
-    provider: "docker",
-    internalGatewayWsUrl: "ws://host.docker.internal:5003/tunnel/sandbox",
-  },
-} as const;
-
 const controlPlaneApiEnvConfig = {
   server: {
     host: "127.0.0.1",
@@ -207,7 +192,7 @@ const controlPlaneApiEnvConfig = {
   },
 } as const;
 
-const controlPlaneApiFixtureConfig = {
+const controlPlaneApiBaseFixtureConfig = {
   ...controlPlaneApiEnvConfig,
   server: {
     host: "0.0.0.0",
@@ -252,7 +237,7 @@ const controlPlaneWorkerEnvConfig = {
   },
 } as const;
 
-const controlPlaneWorkerFixtureConfig = {
+const controlPlaneWorkerBaseFixtureConfig = {
   ...controlPlaneWorkerEnvConfig,
   workflow: {
     ...controlPlaneWorkerEnvConfig.workflow,
@@ -294,7 +279,7 @@ const dataPlaneApiEnvConfig = {
   },
 } as const;
 
-const dataPlaneApiFixtureConfig = {
+const dataPlaneApiBaseFixtureConfig = {
   ...dataPlaneApiEnvConfig,
   server: {
     host: "0.0.0.0",
@@ -335,7 +320,7 @@ const dataPlaneGatewayEnvConfig = {
   },
 } as const;
 
-const dataPlaneGatewayFixtureConfig = {
+const dataPlaneGatewayBaseFixtureConfig = {
   ...dataPlaneGatewayEnvConfig,
   server: {
     host: "0.0.0.0",
@@ -397,7 +382,7 @@ const dataPlaneWorkerEnvConfig = {
   },
 } as const;
 
-const dataPlaneWorkerFixtureConfig = {
+const dataPlaneWorkerBaseFixtureConfig = {
   ...dataPlaneWorkerEnvConfig,
   workflow: {
     ...dataPlaneWorkerEnvConfig.workflow,
@@ -464,7 +449,7 @@ const tokenizerProxyEnvConfig = {
   },
 } as const;
 
-const tokenizerProxyFixtureConfig = {
+const tokenizerProxyBaseFixtureConfig = {
   ...tokenizerProxyEnvConfig,
   server: {
     host: "0.0.0.0",
@@ -479,65 +464,65 @@ const tokenizerProxyFixtureConfig = {
 const pooledPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:6432/mistle";
 const directPostgresUrl = "postgresql://mistle:mistle@127.0.0.1:5432/mistle";
 
-const controlPlaneApiNextFixtureConfig = {
-  ...controlPlaneApiFixtureConfig,
+const controlPlaneApiFixtureConfig = {
+  ...controlPlaneApiBaseFixtureConfig,
   database: {
     url: pooledPostgresUrl,
-    migrationUrl: controlPlaneApiFixtureConfig.database.migrationUrl,
+    migrationUrl: controlPlaneApiBaseFixtureConfig.database.migrationUrl,
   },
   auth: {
-    ...controlPlaneApiFixtureConfig.auth,
+    ...controlPlaneApiBaseFixtureConfig.auth,
     baseUrl: "https://mistle.example.test",
   },
   workflow: {
-    ...controlPlaneApiFixtureConfig.workflow,
+    ...controlPlaneApiBaseFixtureConfig.workflow,
     migrationUrl: directPostgresUrl,
   },
 };
 
-const controlPlaneWorkerNextFixtureConfig = {
-  ...controlPlaneWorkerFixtureConfig,
+const controlPlaneWorkerFixtureConfig = {
+  ...controlPlaneWorkerBaseFixtureConfig,
   workflow: {
-    ...controlPlaneWorkerFixtureConfig.workflow,
+    ...controlPlaneWorkerBaseFixtureConfig.workflow,
     databaseUrl: pooledPostgresUrl,
     runMigrations: false,
   },
 };
 
-const dataPlaneApiNextFixtureConfig = {
-  ...dataPlaneApiFixtureConfig,
+const dataPlaneApiFixtureConfig = {
+  ...dataPlaneApiBaseFixtureConfig,
   database: {
     url: pooledPostgresUrl,
-    migrationUrl: dataPlaneApiFixtureConfig.database.migrationUrl,
+    migrationUrl: dataPlaneApiBaseFixtureConfig.database.migrationUrl,
   },
   workflow: {
-    ...dataPlaneApiFixtureConfig.workflow,
+    ...dataPlaneApiBaseFixtureConfig.workflow,
     migrationUrl: directPostgresUrl,
   },
 };
 
-const dataPlaneGatewayNextFixtureConfig = {
-  ...dataPlaneGatewayFixtureConfig,
+const dataPlaneGatewayFixtureConfig = {
+  ...dataPlaneGatewayBaseFixtureConfig,
   database: {
     url: pooledPostgresUrl,
   },
 };
 
-const dataPlaneWorkerNextFixtureConfig = {
-  ...dataPlaneWorkerFixtureConfig,
+const dataPlaneWorkerFixtureConfig = {
+  ...dataPlaneWorkerBaseFixtureConfig,
   database: {
     url: pooledPostgresUrl,
   },
   workflow: {
-    ...dataPlaneWorkerFixtureConfig.workflow,
+    ...dataPlaneWorkerBaseFixtureConfig.workflow,
     runMigrations: false,
   },
 };
 
-const tokenizerProxyNextFixtureConfig = {
-  ...tokenizerProxyFixtureConfig,
+const tokenizerProxyFixtureConfig = {
+  ...tokenizerProxyBaseFixtureConfig,
   controlPlaneApi: {
-    baseUrl: tokenizerProxyFixtureConfig.controlPlaneApi.baseUrl,
+    baseUrl: tokenizerProxyBaseFixtureConfig.controlPlaneApi.baseUrl,
     publicBaseUrl: "https://mistle.example.test",
   },
 };
@@ -545,143 +530,76 @@ const tokenizerProxyNextFixtureConfig = {
 describe("loadConfig integrations", () => {
   it("loads every app from config.sample.toml", () => {
     expect(() => {
-      loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath: configSamplePath, format: "next" });
-      loadConfig({
-        app: AppIds.CONTROL_PLANE_WORKER,
-        configPath: configSamplePath,
-        format: "next",
-      });
-      loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath, format: "next" });
-      loadConfig({
-        app: AppIds.DATA_PLANE_GATEWAY,
-        configPath: configSamplePath,
-        format: "next",
-      });
-      loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath, format: "next" });
-      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath, format: "next" });
+      loadConfig({ app: AppIds.CONTROL_PLANE_API, configPath: configSamplePath });
+      loadConfig({ app: AppIds.CONTROL_PLANE_WORKER, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_API, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_GATEWAY, configPath: configSamplePath });
+      loadConfig({ app: AppIds.DATA_PLANE_WORKER, configPath: configSamplePath });
+      loadConfig({ app: AppIds.TOKENIZER_PROXY, configPath: configSamplePath });
     }).not.toThrow();
   });
 
-  it("loads every app from the next config file fixture when format is opted in", () => {
+  it("loads every app from the toml config file fixture", () => {
     expect(
       loadConfig({
         app: AppIds.CONTROL_PLANE_API,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: controlPlaneApiNextFixtureConfig,
+      app: controlPlaneApiFixtureConfig,
     });
     expect(
       loadConfig({
         app: AppIds.CONTROL_PLANE_WORKER,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: controlPlaneWorkerNextFixtureConfig,
+      app: controlPlaneWorkerFixtureConfig,
     });
     expect(
       loadConfig({
         app: AppIds.DATA_PLANE_API,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: dataPlaneApiNextFixtureConfig,
+      app: dataPlaneApiFixtureConfig,
     });
     expect(
       loadConfig({
         app: AppIds.DATA_PLANE_GATEWAY,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: dataPlaneGatewayNextFixtureConfig,
+      app: dataPlaneGatewayFixtureConfig,
     });
     expect(
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: dataPlaneWorkerNextFixtureConfig,
+      app: dataPlaneWorkerFixtureConfig,
     });
     expect(
       loadConfig({
         app: AppIds.TOKENIZER_PROXY,
-        configPath: nextConfigFixturePath,
-        format: "next",
+        configPath: tomlConfigFixturePath,
       }),
     ).toEqual({
       global: globalDevelopmentConfig,
-      app: tokenizerProxyNextFixtureConfig,
+      app: tokenizerProxyFixtureConfig,
     });
   });
 
-  it("keeps the next config file fixture behind an explicit format opt-in", () => {
-    expect(() =>
-      loadConfig({
-        app: AppIds.CONTROL_PLANE_API,
-        configPath: nextConfigFixturePath,
-      }),
-    ).toThrow(/Invalid input/);
-  });
-
-  it("loads the next config file fixture when MISTLE_CONFIG_FORMAT opts in", () => {
+  it("applies env overrides after loading the toml config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
-      configPath: nextConfigFixturePath,
-      env: {
-        MISTLE_CONFIG_FORMAT: "next",
-      },
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentConfig,
-      app: controlPlaneApiNextFixtureConfig,
-    });
-  });
-
-  it("lets an explicit format option override MISTLE_CONFIG_FORMAT", () => {
-    const config = loadConfig({
-      app: AppIds.CONTROL_PLANE_API,
-      configPath: nextConfigFixturePath,
-      format: "next",
-      env: {
-        MISTLE_CONFIG_FORMAT: "legacy",
-      },
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentConfig,
-      app: controlPlaneApiNextFixtureConfig,
-    });
-  });
-
-  it("rejects an unsupported MISTLE_CONFIG_FORMAT value", () => {
-    expect(() =>
-      loadConfig({
-        app: AppIds.CONTROL_PLANE_API,
-        configPath: configFixturePath,
-        env: {
-          MISTLE_CONFIG_FORMAT: "legacy",
-        },
-      }),
-    ).toThrow('MISTLE_CONFIG_FORMAT must be "next" when set.');
-  });
-
-  it("applies env overrides after loading the next config file fixture", () => {
-    const config = loadConfig({
-      app: AppIds.CONTROL_PLANE_API,
-      configPath: nextConfigFixturePath,
-      format: "next",
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
       },
@@ -690,7 +608,7 @@ describe("loadConfig integrations", () => {
     expect(config).toEqual({
       global: globalDevelopmentConfig,
       app: {
-        ...controlPlaneApiNextFixtureConfig,
+        ...controlPlaneApiFixtureConfig,
         server: {
           host: "localhost",
           port: 5100,
@@ -699,45 +617,22 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("applies env overrides after MISTLE_CONFIG_FORMAT opts into next TOML", () => {
-    const config = loadConfig({
-      app: AppIds.CONTROL_PLANE_API,
-      configPath: nextConfigFixturePath,
-      env: {
-        MISTLE_CONFIG_FORMAT: "next",
-        MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
-      },
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentConfig,
-      app: {
-        ...controlPlaneApiNextFixtureConfig,
-        server: {
-          host: "localhost",
-          port: 5100,
-        },
-      },
-    });
-  });
-
-  it("returns only app config for the next config file fixture when includeGlobal is false", () => {
+  it("returns only app config for the toml config file fixture when includeGlobal is false", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       includeGlobal: false,
-      configPath: nextConfigFixturePath,
-      format: "next",
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
-      app: dataPlaneWorkerNextFixtureConfig,
+      app: dataPlaneWorkerFixtureConfig,
     });
   });
 
   it("loads control-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -771,7 +666,7 @@ describe("loadConfig integrations", () => {
   it("loads control-plane-api from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_CONTROL_PLANE_API_HOST: "localhost",
       },
@@ -793,7 +688,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -804,7 +699,7 @@ describe("loadConfig integrations", () => {
   it("loads control-plane-worker purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_WORKER,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -830,7 +725,7 @@ describe("loadConfig integrations", () => {
   it("loads control-plane-worker from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_WORKER,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "override",
       },
@@ -852,7 +747,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_WORKER,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -863,7 +758,7 @@ describe("loadConfig integrations", () => {
   it("loads data-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -908,7 +803,7 @@ describe("loadConfig integrations", () => {
   it("loads data-plane-api from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: "override",
       },
@@ -930,7 +825,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -941,7 +836,7 @@ describe("loadConfig integrations", () => {
   it("loads data-plane-gateway purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_GATEWAY,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -997,7 +892,7 @@ describe("loadConfig integrations", () => {
   it("loads data-plane-gateway from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_GATEWAY,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: "localhost",
       },
@@ -1019,7 +914,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_GATEWAY,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -1030,7 +925,7 @@ describe("loadConfig integrations", () => {
   it("loads data-plane-worker purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -1075,22 +970,10 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("loads data-plane-worker with docker sandbox config from a config file fixture", () => {
-    const config = loadConfig({
-      app: AppIds.DATA_PLANE_WORKER,
-      configPath: dataPlaneWorkerDockerConfigFixturePath,
-    });
-
-    expect(config).toEqual({
-      global: globalDevelopmentDockerConfig,
-      app: dataPlaneWorkerDockerFixtureConfig,
-    });
-  });
-
   it("loads data-plane-worker from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "override",
       },
@@ -1108,10 +991,10 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("merges partial docker sandbox overrides across config file and env", () => {
+  it("merges partial docker sandbox overrides across toml config file and env", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
-      configPath: dataPlaneWorkerDockerConfigFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
@@ -1119,13 +1002,13 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: globalDevelopmentDockerConfig,
+      global: globalDevelopmentConfig,
       app: {
-        ...dataPlaneWorkerDockerFixtureConfig,
+        ...dataPlaneWorkerFixtureConfig,
         sandbox: {
-          ...dataPlaneWorkerDockerFixtureConfig.sandbox,
+          ...dataPlaneWorkerFixtureConfig.sandbox,
           docker: {
-            ...dataPlaneWorkerDockerFixtureConfig.sandbox.docker,
+            ...dataPlaneWorkerFixtureConfig.sandbox.docker,
             socketPath: "/tmp/docker.sock",
           },
         },
@@ -1206,7 +1089,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -1217,7 +1100,7 @@ describe("loadConfig integrations", () => {
   it("loads tokenizer-proxy purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.TOKENIZER_PROXY,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({
@@ -1251,7 +1134,7 @@ describe("loadConfig integrations", () => {
   it("loads tokenizer-proxy from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.TOKENIZER_PROXY,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
       env: {
         MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "https://control-plane.local",
         MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_PUBLIC_BASE_URL:
@@ -1275,7 +1158,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.TOKENIZER_PROXY,
       includeGlobal: false,
-      configPath: configFixturePath,
+      configPath: tomlConfigFixturePath,
     });
 
     expect(config).toEqual({

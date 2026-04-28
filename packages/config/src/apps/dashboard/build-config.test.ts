@@ -54,31 +54,11 @@ afterEach(() => {
 
 function createDashboardConfigFile(input?: {
   dashboardOrigin?: string;
-  googleTomlBlock?: string;
-}): string {
-  const directory = createTempDirectory();
-  const configPath = join(directory, "config.toml");
-  const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
-  const googleTomlBlock = input?.googleTomlBlock ?? "";
-
-  writeFileSync(
-    configPath,
-    [`[apps.dashboard]`, `control_plane_api_origin = "${dashboardOrigin}"`, "", googleTomlBlock]
-      .filter((line) => line.length > 0)
-      .join("\n"),
-    "utf8",
-  );
-
-  return configPath;
-}
-
-function createNextDashboardConfigFile(input?: {
-  dashboardOrigin?: string;
   enabledMethods?: readonly string[];
   googleTomlBlock?: string;
 }): string {
   const directory = createTempDirectory();
-  const configPath = join(directory, "config.next.toml");
+  const configPath = join(directory, "config.toml");
   const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
   const enabledMethods = input?.enabledMethods ?? ["otp"];
   const googleTomlBlock = input?.googleTomlBlock ?? "";
@@ -120,11 +100,23 @@ describe("loadDashboardBuildConfig", () => {
   it("falls back to config/config.development.toml when MISTLE_CONFIG_PATH is unset", () => {
     writeWorkspaceConfigFile({
       relativePath: "config/config.development.toml",
-      content: '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
+      content: [
+        "[services.dashboard]",
+        'control_plane_api_origin = "http://127.0.0.1:5100"',
+        "",
+        "[services.control_plane_api.auth]",
+        'enabled_methods = ["otp"]',
+      ].join("\n"),
     });
     writeWorkspaceConfigFile({
       relativePath: "config/config.production.toml",
-      content: '[apps.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5200"\n',
+      content: [
+        "[services.dashboard]",
+        'control_plane_api_origin = "http://127.0.0.1:5200"',
+        "",
+        "[services.control_plane_api.auth]",
+        'enabled_methods = ["otp"]',
+      ].join("\n"),
     });
 
     const config = loadDashboardBuildConfig({}, "production");
@@ -146,32 +138,9 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("does not infer next format from config/config.development.toml", () => {
-    writeWorkspaceConfigFile({
-      relativePath: "config/config.development.toml",
-      content: '[services.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
-    });
-
-    expect(() => loadDashboardBuildConfig({}, "development")).toThrow(/Invalid input/u);
-  });
-
-  it("loads dashboard origin from next config shape", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createNextDashboardConfigFile(),
-      env: {
-        MISTLE_CONFIG_FORMAT: "next",
-      },
-    });
-
-    expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
-    expect(config.authMethods).toEqual({
-      google: false,
-    });
-  });
-
-  it("loads dashboard origin from dashboard-only next config shape", () => {
+  it("loads dashboard origin from dashboard-only config shape", () => {
     const directory = createTempDirectory();
-    const configPath = join(directory, "config.next.toml");
+    const configPath = join(directory, "config.toml");
     writeFileSync(
       configPath,
       '[services.dashboard]\ncontrol_plane_api_origin = "http://127.0.0.1:5100"\n',
@@ -180,9 +149,6 @@ describe("loadDashboardBuildConfig", () => {
 
     const config = loadDashboardBuildConfigForTest({
       configPath,
-      env: {
-        MISTLE_CONFIG_FORMAT: "next",
-      },
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
@@ -194,22 +160,6 @@ describe("loadDashboardBuildConfig", () => {
   it("derives google auth availability from control-plane auth config", () => {
     const config = loadDashboardBuildConfigForTest({
       configPath: createDashboardConfigFile({
-        googleTomlBlock: [
-          "[apps.control_plane_api.auth.google]",
-          'client_id = "google-client-id"',
-          'client_secret = "google-client-secret"',
-        ].join("\n"),
-      }),
-    });
-
-    expect(config.authMethods).toEqual({
-      google: true,
-    });
-  });
-
-  it("derives google auth availability from next control-plane auth config", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createNextDashboardConfigFile({
         enabledMethods: ["otp", "google"],
         googleTomlBlock: [
           "[services.control_plane_api.auth.google]",
@@ -217,9 +167,6 @@ describe("loadDashboardBuildConfig", () => {
           'client_secret = "google-client-secret"',
         ].join("\n"),
       }),
-      env: {
-        MISTLE_CONFIG_FORMAT: "next",
-      },
     });
 
     expect(config.authMethods).toEqual({
@@ -227,15 +174,12 @@ describe("loadDashboardBuildConfig", () => {
     });
   });
 
-  it("fails when next google auth is enabled without provider config", () => {
+  it("fails when google auth is enabled without provider config", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
-        configPath: createNextDashboardConfigFile({
+        configPath: createDashboardConfigFile({
           enabledMethods: ["otp", "google"],
         }),
-        env: {
-          MISTLE_CONFIG_FORMAT: "next",
-        },
       }),
     ).toThrow("services.control_plane_api.auth.google is required when google auth is enabled.");
   });
@@ -268,7 +212,7 @@ describe("loadDashboardBuildConfig", () => {
     );
   });
 
-  it("fails when apps.dashboard.control_plane_api_origin is missing", () => {
+  it("fails when services.dashboard.control_plane_api_origin is missing", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
         configPath: createDashboardConfigFile({
@@ -278,26 +222,12 @@ describe("loadDashboardBuildConfig", () => {
     ).toThrow("Too small: expected string to have >=1 characters");
   });
 
-  it("fails when apps.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
+  it("fails when services.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
         configPath: createDashboardConfigFile({
           dashboardOrigin: "localhost:5100",
         }),
-        environment: "production",
-      }),
-    ).toThrow("apps.dashboard.control_plane_api_origin must use http:// or https://.");
-  });
-
-  it("fails when services.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
-    expect(() =>
-      loadDashboardBuildConfigForTest({
-        configPath: createNextDashboardConfigFile({
-          dashboardOrigin: "localhost:5100",
-        }),
-        env: {
-          MISTLE_CONFIG_FORMAT: "next",
-        },
         environment: "production",
       }),
     ).toThrow("services.dashboard.control_plane_api_origin must use http:// or https://.");

@@ -594,7 +594,6 @@ export async function startFullSystemEnvironment(
           : {}),
         environment: {
           ...input.dataPlaneApiEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
           MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
@@ -627,7 +626,6 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.dataPlaneGatewayEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
           MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://valkey:6379",
@@ -656,7 +654,6 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.controlPlaneApiEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: containerDatabaseUrl,
           MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
@@ -702,7 +699,6 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.controlPlaneWorkerEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID:
             input.controlPlaneWorkflowNamespaceId,
@@ -737,7 +733,6 @@ export async function startFullSystemEnvironment(
         network: activeNetwork,
         environment: {
           ...input.tokenizerProxyEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL:
             CONTROL_PLANE_API_CONTAINER_BASE_URL,
         },
@@ -764,7 +759,6 @@ export async function startFullSystemEnvironment(
         network,
         environment: {
           ...input.dataPlaneWorkerEnvironment,
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
           MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,

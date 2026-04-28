@@ -15,6 +15,5 @@ export type OptionalInput<TSchema extends z.ZodType> = DeepOptional<z.input<TSch
 export type ConfigModule<TSchema extends z.ZodType = z.ZodType> = {
   namespace: readonly string[];
   schema: TSchema;
-  loadToml: (tomlRoot: Record<string, unknown>) => OptionalInput<TSchema>;
   loadEnv: (env: NodeJS.ProcessEnv) => OptionalInput<TSchema>;
 };

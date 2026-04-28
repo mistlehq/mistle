@@ -6,7 +6,6 @@ import { parse as parseToml } from "smol-toml";
 import { z } from "zod";
 
 type UnknownRecord = Record<string, unknown>;
-type TomlConfigFormat = "legacy" | "next";
 type PartialIntegrationTargetsSyncConfig = {
   databaseUrl?: string;
   integrations?: {
@@ -60,54 +59,8 @@ function asObjectRecord(value: unknown): UnknownRecord {
   return value;
 }
 
-function resolveConfigFormat(environment: NodeJS.ProcessEnv): TomlConfigFormat {
-  const envFormat = environment.MISTLE_CONFIG_FORMAT?.trim();
-  if (envFormat === undefined || envFormat.length === 0) {
-    return "legacy";
-  }
-
-  if (envFormat === "next") {
-    return "next";
-  }
-
-  throw new Error('MISTLE_CONFIG_FORMAT must be "next" when set.');
-}
-
-function loadLegacyTomlConfig(parsedRoot: UnknownRecord): PartialIntegrationTargetsSyncConfig {
-  const apps = asObjectRecord(parsedRoot.apps);
-  const controlPlaneApi = asObjectRecord(apps.control_plane_api);
-  const database = asObjectRecord(controlPlaneApi.database);
-  const integrations = asObjectRecord(controlPlaneApi.integrations);
-  const masterEncryptionKeys = asObjectRecord(integrations.master_encryption_keys);
-  const activeMasterEncryptionKeyVersion =
-    typeof integrations.active_master_encryption_key_version === "number"
-      ? integrations.active_master_encryption_key_version
-      : undefined;
-
-  const normalizedMasterEncryptionKeys: Record<string, string> = {};
-  for (const [version, keyMaterial] of Object.entries(masterEncryptionKeys)) {
-    if (typeof keyMaterial === "string") {
-      normalizedMasterEncryptionKeys[version] = keyMaterial;
-    }
-  }
-
-  return {
-    ...(typeof database.url === "string" ? { databaseUrl: database.url } : {}),
-    ...(Object.keys(normalizedMasterEncryptionKeys).length === 0 &&
-    activeMasterEncryptionKeyVersion === undefined
-      ? {}
-      : {
-          integrations: {
-            ...(activeMasterEncryptionKeyVersion === undefined
-              ? {}
-              : { activeMasterEncryptionKeyVersion }),
-            masterEncryptionKeys: normalizedMasterEncryptionKeys,
-          },
-        }),
-  };
-}
-
-function loadNextTomlConfig(parsedRoot: UnknownRecord): PartialIntegrationTargetsSyncConfig {
+function loadTomlConfig(configPath: string): PartialIntegrationTargetsSyncConfig {
+  const parsedRoot = asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
   const postgres = asObjectRecord(parsedRoot.postgres);
   const controlPlanePostgres = asObjectRecord(postgres.control_plane);
   const services = asObjectRecord(parsedRoot.services);
@@ -142,18 +95,6 @@ function loadNextTomlConfig(parsedRoot: UnknownRecord): PartialIntegrationTarget
           },
         }),
   };
-}
-
-function loadTomlConfig(
-  configPath: string,
-  configFormat: TomlConfigFormat,
-): PartialIntegrationTargetsSyncConfig {
-  const parsedRoot = asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
-  if (configFormat === "next") {
-    return loadNextTomlConfig(parsedRoot);
-  }
-
-  return loadLegacyTomlConfig(parsedRoot);
 }
 
 function loadEnvConfig(environment: NodeJS.ProcessEnv): PartialIntegrationTargetsSyncConfig {
@@ -239,8 +180,7 @@ export function loadIntegrationTargetsSyncConfig(input: {
     input.environment,
     input.scriptDirectory,
   );
-  const configFormat = resolveConfigFormat(input.environment);
-  const tomlConfig = configPath === undefined ? {} : loadTomlConfig(configPath, configFormat);
+  const tomlConfig = configPath === undefined ? {} : loadTomlConfig(configPath);
   const envConfig = loadEnvConfig(input.environment);
 
   return IntegrationTargetsSyncConfigSchema.parse({

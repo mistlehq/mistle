@@ -1,20 +1,6 @@
 import type { ConfigModule } from "./core/module.js";
 import { getValueAtPath, setValueAtPath } from "./core/record.js";
 
-export function loadFromToml(
-  modules: readonly ConfigModule[],
-  tomlRoot: Record<string, unknown>,
-): Record<string, unknown> {
-  let loaded: Record<string, unknown> = {};
-
-  for (const module of modules) {
-    const moduleValue = module.loadToml(tomlRoot);
-    loaded = setValueAtPath(loaded, module.namespace, moduleValue);
-  }
-
-  return loaded;
-}
-
 export function loadFromEnv(
   modules: readonly ConfigModule[],
   env: NodeJS.ProcessEnv,

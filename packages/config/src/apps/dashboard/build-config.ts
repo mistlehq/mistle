@@ -5,36 +5,13 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
-import { resolveConfigFormat } from "../../loader.js";
 import { deriveDashboardAuthMethods } from "../control-plane-api/dashboard-auth-methods.js";
 
 export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
 
-const LegacyDashboardBuildConfigSchema = z.object({
-  apps: z.object({
-    dashboard: z.object({
-      control_plane_api_origin: z.string().min(1),
-    }),
-    control_plane_api: z
-      .object({
-        auth: z
-          .object({
-            google: z
-              .object({
-                client_id: z.string().min(1),
-                client_secret: z.string().min(1),
-              })
-              .optional(),
-          })
-          .optional(),
-      })
-      .optional(),
-  }),
-});
-
-const NextDashboardBuildConfigSchema = z.object({
+const DashboardBuildConfigSchema = z.object({
   services: z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
@@ -66,37 +43,7 @@ export type DashboardBuildConfig = {
 
 function resolveGoogleAuthConfig(
   environment: NodeJS.ProcessEnv,
-  parsedConfig: z.infer<typeof LegacyDashboardBuildConfigSchema>,
-): { clientId: string; clientSecret: string } | undefined {
-  const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
-  const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
-
-  if (googleClientId !== undefined || googleClientSecret !== undefined) {
-    if (googleClientId === undefined || googleClientSecret === undefined) {
-      throw new Error(
-        "Dashboard build config requires both MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-      );
-    }
-
-    return {
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-    };
-  }
-
-  if (parsedConfig.apps.control_plane_api?.auth?.google === undefined) {
-    return undefined;
-  }
-
-  return {
-    clientId: parsedConfig.apps.control_plane_api.auth.google.client_id,
-    clientSecret: parsedConfig.apps.control_plane_api.auth.google.client_secret,
-  };
-}
-
-function resolveNextGoogleAuthConfig(
-  environment: NodeJS.ProcessEnv,
-  parsedConfig: z.infer<typeof NextDashboardBuildConfigSchema>,
+  parsedConfig: z.infer<typeof DashboardBuildConfigSchema>,
 ): { clientId: string; clientSecret: string } | undefined {
   const googleClientId = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
   const googleClientSecret = environment.MISTLE_APPS_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
@@ -201,28 +148,11 @@ export function loadDashboardBuildConfig(
 ): DashboardBuildConfig {
   const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
   const parsedRoot = parseTomlFile(configPath);
-  const configFormat = resolveConfigFormat({ env: environment });
 
-  if (configFormat === "next") {
-    const parsedConfig = NextDashboardBuildConfigSchema.parse(parsedRoot);
-    const controlPlaneApiOrigin = normalizeOrigin(
-      parsedConfig.services.dashboard.control_plane_api_origin,
-      "services.dashboard.control_plane_api_origin",
-    );
-    const authMethods = deriveDashboardAuthMethods({
-      google: resolveNextGoogleAuthConfig(environment, parsedConfig),
-    });
-
-    return {
-      controlPlaneApiOrigin,
-      authMethods,
-    };
-  }
-
-  const parsedConfig = LegacyDashboardBuildConfigSchema.parse(parsedRoot);
+  const parsedConfig = DashboardBuildConfigSchema.parse(parsedRoot);
   const controlPlaneApiOrigin = normalizeOrigin(
-    parsedConfig.apps.dashboard.control_plane_api_origin,
-    "apps.dashboard.control_plane_api_origin",
+    parsedConfig.services.dashboard.control_plane_api_origin,
+    "services.dashboard.control_plane_api_origin",
   );
   const authMethods = deriveDashboardAuthMethods({
     google: resolveGoogleAuthConfig(environment, parsedConfig),

@@ -1,48 +1,87 @@
 [global]
 env = "development"
 
-[global.telemetry]
+[telemetry]
 enabled = false
 debug = false
 resource_attributes = "deployment.environment=development"
 
-[global.sandbox]
-provider = "docker"
-default_base_image = "ghcr.io/mistlehq/sandbox-base:latest"
-gateway_ws_url = "ws://localhost:8084/tunnel/sandbox"
-internal_gateway_ws_url = "ws://data-plane-gateway:5202/tunnel/sandbox"
+[services.dashboard]
+public_url = "http://localhost:3000"
+control_plane_api_origin = "http://localhost:8080"
 
-[global.sandbox.storage]
-backend = "docker_volume"
-
-[global.sandbox.connect]
-token_issuer = "control-plane-api"
-token_audience = "data-plane-gateway"
-
-[global.sandbox.bootstrap]
-token_issuer = "data-plane-worker"
-token_audience = "data-plane-gateway"
-
-[global.sandbox.egress]
-token_issuer = "data-plane-worker"
-token_audience = "tokenizer-proxy"
-
-[global.sandbox.publish]
-base_domain = "mistle.localhost"
-
-[global.sandbox.publish.access]
-token_issuer = "control-plane-api"
-token_audience = "data-plane-gateway"
-
-[apps.control_plane_api.server]
+[services.control_plane_api]
 host = "0.0.0.0"
 port = 5100
+public_url = "http://localhost:8080"
+internal_url = "http://control-plane-api:5100"
 
-[apps.control_plane_api.database]
-url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-migration_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+[services.control_plane_api.auth]
+secret = "replace-with-auth-secret"
+trusted_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+enabled_methods = ["otp"]
 
-[apps.control_plane_api.object_store]
+[services.control_plane_api.auth.otp]
+length = 6
+expires_in_seconds = 300
+allowed_attempts = 3
+
+[services.control_plane_api.integrations]
+active_master_encryption_key_version = 1
+
+[services.control_plane_api.integrations.master_encryption_keys]
+1 = "replace-with-integration-master-key"
+
+[services.data_plane_api]
+host = "0.0.0.0"
+port = 5200
+internal_url = "http://data-plane-api:5200"
+
+[services.data_plane_gateway]
+host = "0.0.0.0"
+port = 5202
+internal_url = "http://data-plane-gateway:5202"
+sandbox_ws_public_url = "ws://localhost:8084/tunnel/sandbox"
+sandbox_ws_internal_url = "ws://data-plane-gateway:5202/tunnel/sandbox"
+
+[services.tokenizer_proxy]
+host = "0.0.0.0"
+port = 5205
+public_url = "http://localhost:8080"
+internal_url = "http://tokenizer-proxy:5205"
+egress_url = "http://tokenizer-proxy:5205/tokenizer-proxy/egress"
+
+[services.control_plane_worker]
+workflow_concurrency = 1
+
+[services.data_plane_worker]
+workflow_concurrency = 1
+
+[workflow.control_plane]
+namespace_id = "local"
+
+[workflow.data_plane]
+namespace_id = "local"
+
+[postgres.control_plane]
+direct_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+pooled_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+
+[postgres.data_plane]
+direct_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+pooled_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+
+[kv.control_plane]
+backend = "valkey"
+url = "redis://valkey:6379"
+key_prefix = "mistle:control:local"
+
+[kv.data_plane]
+backend = "valkey"
+url = "redis://valkey:6379"
+key_prefix = "mistle:runtime-state:local"
+
+[object_store.assets]
 bucket_name = "mistle-assets"
 region = "us-east-1"
 endpoint = "http://seaweedfs:8333"
@@ -50,117 +89,63 @@ force_path_style = true
 access_key_id = "mistle-access-key"
 secret_access_key = "mistle-secret-key"
 
-[apps.control_plane_api.auth]
-base_url = "http://localhost:8080"
-trusted_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
-otp_length = 6
-otp_expires_in_seconds = 300
-otp_allowed_attempts = 3
+[object_store.sandbox_storage]
+bucket_name = "mistle-sandbox-storage"
+region = "us-east-1"
+endpoint = "http://seaweedfs:8333"
+force_path_style = true
+access_key_id = "mistle-access-key"
+secret_access_key = "mistle-secret-key"
 
-[apps.control_plane_api.dashboard]
-base_url = "http://localhost:3000"
-
-[apps.control_plane_api.workflow]
-database_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-namespace_id = "local"
-
-[apps.control_plane_api.data_plane_api]
-base_url = "http://data-plane-api:5200"
-
-[apps.control_plane_worker.workflow]
-database_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-namespace_id = "local"
-run_migrations = true
-concurrency = 1
-
-[apps.control_plane_worker.email]
+[email.smtp]
 from_address = "no-reply@mistle.local"
 from_name = "Mistle (Local)"
-smtp_host = "mailpit"
-smtp_port = 1025
-smtp_secure = false
-smtp_username = "mailpit"
-smtp_password = "mailpit"
+host = "mailpit"
+port = 1025
+secure = false
+username = "mailpit"
+password = "mailpit"
 
-[apps.control_plane_worker.data_plane_api]
-base_url = "http://data-plane-api:5200"
+[internal_auth]
+method = "shared_token"
 
-[apps.control_plane_worker.control_plane_api]
-base_url = "http://control-plane-api:5100"
+[internal_auth.shared_token]
+token = "replace-with-service-token"
 
-[apps.data_plane_api.server]
-host = "0.0.0.0"
-port = 5200
+[sandbox]
+provider = "docker"
+default_base_image = "ghcr.io/mistlehq/sandbox-base:latest"
+publish_base_domain = "mistle.localhost"
 
-[apps.data_plane_api.database]
-url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-migration_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
+[sandbox.storage]
+backend = "docker_volume"
 
-[apps.data_plane_api.sandbox.docker]
-socket_path = "/var/run/docker.sock"
+[sandbox.tokens.connect]
+secret = "replace-with-connect-token-secret"
+issuer = "control-plane-api"
+audience = "data-plane-gateway"
 
-[apps.data_plane_api.workflow]
-database_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-namespace_id = "local"
+[sandbox.tokens.bootstrap]
+secret = "replace-with-bootstrap-token-secret"
+issuer = "data-plane-worker"
+audience = "data-plane-gateway"
 
-[apps.data_plane_api.runtime_state]
-gateway_base_url = "http://data-plane-gateway:5202"
+[sandbox.tokens.egress]
+secret = "replace-with-egress-token-secret"
+issuer = "data-plane-worker"
+audience = "tokenizer-proxy"
 
-[apps.data_plane_api.control_plane_api]
-base_url = "http://control-plane-api:5100"
+[sandbox.publish.access_token]
+secret = "replace-with-publish-access-token-secret"
+issuer = "control-plane-api"
+audience = "data-plane-gateway"
 
-[apps.data_plane_gateway.server]
-host = "0.0.0.0"
-port = 5202
+[sandbox.publish.session]
+cookie_signing_secret = "replace-with-publish-cookie-signing-secret"
 
-[apps.data_plane_gateway.database]
-url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-
-[apps.data_plane_gateway.runtime_state]
-backend = "valkey"
-
-[apps.data_plane_gateway.runtime_state.valkey]
-url = "redis://valkey:6379"
-key_prefix = "mistle:runtime-state:local"
-
-[apps.data_plane_gateway.data_plane_api]
-base_url = "http://data-plane-api:5200"
-
-[apps.data_plane_gateway.control_plane_api]
-base_url = "http://control-plane-api:5100"
-
-[apps.data_plane_worker.database]
-url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-
-[apps.data_plane_worker.workflow]
-database_url = "postgresql://mistle:mistle@postgres:5432/mistle_local"
-namespace_id = "local"
-run_migrations = true
-concurrency = 1
-
-[apps.data_plane_worker.runtime_state]
-gateway_base_url = "http://data-plane-gateway:5202"
-
-[apps.data_plane_worker.control_plane_api]
-base_url = "http://control-plane-api:5100"
-
-[apps.data_plane_worker.sandbox]
-tokenizer_proxy_egress_base_url = "http://tokenizer-proxy:5205/tokenizer-proxy/egress"
-
-[apps.data_plane_worker.sandbox.docker]
+[sandbox.docker]
 socket_path = "/var/run/docker.sock"
 network_name = "mistle-sandbox-local"
 
-[apps.data_plane_worker.sandbox_storage.docker_volume]
+[sandbox.storage.docker_volume]
 name_prefix = "mistle-local-"
-
-[apps.tokenizer_proxy.server]
-host = "0.0.0.0"
-port = 5205
-
-[apps.tokenizer_proxy.control_plane_api]
-base_url = "http://control-plane-api:5100"
-public_base_url = "http://localhost:8080"
-
-[apps.dashboard]
-control_plane_api_origin = "http://localhost:8080"

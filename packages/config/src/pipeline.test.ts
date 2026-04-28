@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { ConfigModule } from "./core/module.js";
-import { asObjectRecord } from "./core/record.js";
-import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
+import { loadFromEnv, validateModules } from "./pipeline.js";
 
 const GlobalSchema = z
   .object({
@@ -22,12 +21,6 @@ const modules: readonly ConfigModule[] = [
   {
     namespace: ["global"],
     schema: GlobalSchema,
-    loadToml: (tomlRoot) => {
-      const globalRecord = asObjectRecord(tomlRoot.global);
-      return GlobalSchema.partial().parse({
-        env: globalRecord.env,
-      });
-    },
     loadEnv: (env) =>
       GlobalSchema.partial().parse({
         env: env.NODE_ENV,
@@ -36,14 +29,6 @@ const modules: readonly ConfigModule[] = [
   {
     namespace: ["apps", "control_plane_api"],
     schema: AppSchema,
-    loadToml: (tomlRoot) => {
-      const apps = asObjectRecord(tomlRoot.apps);
-      const controlPlaneApi = asObjectRecord(apps.control_plane_api);
-      return AppSchema.partial().parse({
-        host: controlPlaneApi.host,
-        port: controlPlaneApi.port,
-      });
-    },
     loadEnv: (env) =>
       AppSchema.partial().parse({
         host: env.TEST_APP_HOST,
@@ -53,32 +38,6 @@ const modules: readonly ConfigModule[] = [
 ];
 
 describe("pipeline", () => {
-  it("loads namespaced values from TOML", () => {
-    const loaded = loadFromToml(modules, {
-      global: {
-        env: "development",
-      },
-      apps: {
-        control_plane_api: {
-          host: "127.0.0.1",
-          port: 5000,
-        },
-      },
-    });
-
-    expect(loaded).toEqual({
-      global: {
-        env: "development",
-      },
-      apps: {
-        control_plane_api: {
-          host: "127.0.0.1",
-          port: 5000,
-        },
-      },
-    });
-  });
-
   it("loads namespaced values from env", () => {
     const loaded = loadFromEnv(modules, {
       NODE_ENV: "production",

@@ -29,13 +29,13 @@ export function setValueAtPath(
     return root;
   }
 
-  const nextRoot: Record<string, unknown> = { ...root };
-  let cursor = nextRoot;
+  const updatedRoot: Record<string, unknown> = { ...root };
+  let cursor = updatedRoot;
 
   for (let index = 0; index < path.length - 1; index += 1) {
     const segment = path[index]!;
-    const nextSegment = asObjectRecord(cursor[segment]);
-    const clonedSegment = { ...nextSegment };
+    const existingSegment = asObjectRecord(cursor[segment]);
+    const clonedSegment = { ...existingSegment };
     cursor[segment] = clonedSegment;
     cursor = clonedSegment;
   }
@@ -43,5 +43,5 @@ export function setValueAtPath(
   const finalSegment = path[path.length - 1]!;
   cursor[finalSegment] = value;
 
-  return nextRoot;
+  return updatedRoot;
 }

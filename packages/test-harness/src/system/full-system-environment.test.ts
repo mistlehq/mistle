@@ -48,7 +48,6 @@ describe("createControlPlaneIntegrationTargetsSyncCommandInput", () => {
       cwd: BuildContextHostPath,
       env: {
         MISTLE_CONFIG_PATH: HostConfigPath,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: HostDatabaseUrl,
       },
     });
@@ -69,7 +68,6 @@ describe("system migration command inputs", () => {
       cwd: BuildContextHostPath,
       env: {
         MISTLE_CONFIG_PATH: HostConfigPath,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_API_DATABASE_MIGRATION_URL: HostDatabaseUrl,
       },
     });
@@ -94,7 +92,6 @@ describe("system migration command inputs", () => {
       cwd: BuildContextHostPath,
       env: {
         MISTLE_CONFIG_PATH: HostConfigPath,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: HostDatabaseUrl,
       },
     });
@@ -113,7 +110,6 @@ describe("system migration command inputs", () => {
       cwd: BuildContextHostPath,
       env: {
         MISTLE_CONFIG_PATH: HostConfigPath,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_DATA_PLANE_API_DATABASE_MIGRATION_URL: HostDatabaseUrl,
       },
     });
@@ -138,7 +134,6 @@ describe("system migration command inputs", () => {
       cwd: BuildContextHostPath,
       env: {
         MISTLE_CONFIG_PATH: HostConfigPath,
-        MISTLE_CONFIG_FORMAT: "next",
         MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: HostDatabaseUrl,
       },
     });

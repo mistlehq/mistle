@@ -45,7 +45,7 @@ describe("integration-targets-sync-config-path", () => {
 
     await mkdir(scriptDirectory, { recursive: true });
     await mkdir(join(temporaryWorkspaceRoot, "config"), { recursive: true });
-    await writeFile(productionConfigPath, "[apps.control_plane_api]\n", "utf8");
+    await writeFile(productionConfigPath, "[services.control_plane_api]\n", "utf8");
 
     try {
       const configPath = resolveIntegrationTargetsSyncConfigPath({}, scriptDirectory);
@@ -68,7 +68,7 @@ describe("integration-targets-sync-config-path", () => {
     }
   });
 
-  it("loads the minimal sync config from next development TOML", async () => {
+  it("loads the minimal sync config from development TOML", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
     const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
     const developmentConfigPath = join(temporaryWorkspaceRoot, "config", "config.development.toml");
@@ -93,9 +93,7 @@ describe("integration-targets-sync-config-path", () => {
 
     try {
       const config = loadIntegrationTargetsSyncConfig({
-        environment: {
-          MISTLE_CONFIG_FORMAT: "next",
-        },
+        environment: {},
         scriptDirectory,
       });
 
@@ -108,60 +106,6 @@ describe("integration-targets-sync-config-path", () => {
           },
         },
       });
-    } finally {
-      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
-    }
-  });
-
-  it("does not infer next format from development TOML", async () => {
-    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
-    const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
-    const developmentConfigPath = join(temporaryWorkspaceRoot, "config", "config.development.toml");
-
-    await mkdir(scriptDirectory, { recursive: true });
-    await mkdir(join(temporaryWorkspaceRoot, "config"), { recursive: true });
-    await writeFile(
-      developmentConfigPath,
-      [
-        "[postgres.control_plane]",
-        'pooled_url = "postgresql://user:pass@localhost:6432/mistle"',
-        "",
-        "[services.control_plane_api.integrations]",
-        "active_master_encryption_key_version = 1",
-        "",
-        "[services.control_plane_api.integrations.master_encryption_keys]",
-        '1 = "dev-master-key"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-
-    try {
-      expect(() =>
-        loadIntegrationTargetsSyncConfig({
-          environment: {},
-          scriptDirectory,
-        }),
-      ).toThrow(/databaseUrl/u);
-    } finally {
-      await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
-    }
-  });
-
-  it("rejects unsupported config formats", async () => {
-    const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-sync-config-"));
-    const scriptDirectory = join(temporaryWorkspaceRoot, "apps", "control-plane-api", "scripts");
-    await mkdir(scriptDirectory, { recursive: true });
-
-    try {
-      expect(() =>
-        loadIntegrationTargetsSyncConfig({
-          environment: {
-            MISTLE_CONFIG_FORMAT: "legacy",
-          },
-          scriptDirectory,
-        }),
-      ).toThrow('MISTLE_CONFIG_FORMAT must be "next" when set.');
     } finally {
       await rm(temporaryWorkspaceRoot, { recursive: true, force: true });
     }
@@ -193,7 +137,6 @@ describe("integration-targets-sync-config-path", () => {
     try {
       const config = loadIntegrationTargetsSyncConfig({
         environment: {
-          MISTLE_CONFIG_FORMAT: "next",
           MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL:
             "postgresql://override:pass@localhost:6432/mistle",
           MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "2",

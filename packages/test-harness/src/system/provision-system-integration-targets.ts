@@ -120,12 +120,11 @@ export function createDataPlaneWorkflowMigrationCommandInput(input: {
 function createConfigPathEnv(input: {
   buildContextHostPath: string;
   configPathInContainer: string;
-}): { MISTLE_CONFIG_PATH: string; MISTLE_CONFIG_FORMAT: string } {
+}): { MISTLE_CONFIG_PATH: string } {
   return {
     MISTLE_CONFIG_PATH: resolveHostPathFromContainerPath({
       buildContextHostPath: input.buildContextHostPath,
       containerPath: input.configPathInContainer,
     }),
-    MISTLE_CONFIG_FORMAT: "next",
   };
 }

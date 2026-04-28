@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { buildNextIntegrationConfig } from "../../../scripts/config/next-config.js";
 import {
   getIntegrationProviderPreset,
   getRequiredIntegrationConfigValues,
   IntegrationSandboxProvider,
 } from "../../../scripts/config/presets/integration/index.js";
+import { buildIntegrationTomlConfig } from "../../../scripts/config/toml-config.js";
 import { getValueAtPath } from "../src/core/record.js";
 
 describe("integration provider presets", () => {
   it("defaults docker integration config generation to managed Docker volume storage", async () => {
-    const configRoot = buildNextIntegrationConfig({
+    const configRoot = buildIntegrationTomlConfig({
       provider: IntegrationSandboxProvider.DOCKER,
       environment: {},
     });
@@ -51,7 +51,7 @@ describe("integration provider presets", () => {
       throw new Error("E2B integration preset must include an E2B sandbox base image.");
     }
 
-    const configRoot = buildNextIntegrationConfig({
+    const configRoot = buildIntegrationTomlConfig({
       provider: IntegrationSandboxProvider.E2B,
       environment: {
         MISTLE_APPS_DATA_PLANE_API_SANDBOX_E2B_API_KEY: "e2b-test-key",

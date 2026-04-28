@@ -34,8 +34,6 @@
     "lint-staged": "lint-staged",
     "config:init:dev": "tsx ./scripts/config/init-development.ts",
     "config:init:integration": "tsx ./scripts/config/init-integration.ts",
-    "config:convert:env-to-toml": "tsx ./scripts/config/convert.ts env-to-toml",
-    "config:convert:toml-to-env": "tsx ./scripts/config/convert.ts toml-to-env",
     "typecheck": "pnpm typecheck:workspace && pnpm typecheck:scripts",
     "typecheck:workspace": "turbo run typecheck --output-logs=errors-only",
     "typecheck:ts": "turbo run typecheck --output-logs=errors-only --filter=!@mistle/sandboxd --filter=!@mistle/commit-sign && pnpm typecheck:scripts",
