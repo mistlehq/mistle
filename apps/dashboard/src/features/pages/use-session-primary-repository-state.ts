@@ -30,11 +30,47 @@ type SessionPrimaryRepositoryState = {
 };
 
 type SelectedRepositoryState = {
-  lastAutoAppliedInitialSelection: string | null | undefined;
+  hasUserSelected: boolean;
   sandboxInstanceId: string | null;
   selectedRepositoryPath: string | null;
-  userSelectionTouched: boolean;
 };
+
+function createInitialSelectedRepositoryState(input: {
+  initialSelectedRepositoryPath: string | null | undefined;
+  sandboxInstanceId: string | null;
+}): SelectedRepositoryState {
+  return {
+    hasUserSelected: false,
+    sandboxInstanceId: input.sandboxInstanceId,
+    selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
+  };
+}
+
+function resolveSelectedRepositoryState(input: {
+  currentState: SelectedRepositoryState;
+  initialSelectedRepositoryPath: string | null | undefined;
+  sandboxInstanceId: string | null;
+}): SelectedRepositoryState {
+  if (input.currentState.sandboxInstanceId !== input.sandboxInstanceId) {
+    return createInitialSelectedRepositoryState({
+      initialSelectedRepositoryPath: input.initialSelectedRepositoryPath,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+  }
+
+  if (
+    !input.currentState.hasUserSelected &&
+    input.initialSelectedRepositoryPath !== undefined &&
+    input.currentState.selectedRepositoryPath !== input.initialSelectedRepositoryPath
+  ) {
+    return {
+      ...input.currentState,
+      selectedRepositoryPath: input.initialSelectedRepositoryPath,
+    };
+  }
+
+  return input.currentState;
+}
 
 async function runExecCommand(input: {
   command: string;
@@ -93,31 +129,18 @@ export function useSessionPrimaryRepositoryState(input: {
   sandboxInstanceId: string | null;
 }): SessionPrimaryRepositoryState {
   const [selectedRepositoryState, setSelectedRepositoryState] = useState<SelectedRepositoryState>(
-    () => ({
-      lastAutoAppliedInitialSelection: input.initialSelectedRepositoryPath,
-      sandboxInstanceId: input.sandboxInstanceId,
-      selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
-      userSelectionTouched: false,
-    }),
+    () =>
+      createInitialSelectedRepositoryState({
+        initialSelectedRepositoryPath: input.initialSelectedRepositoryPath,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
   );
-  const currentSandboxSelectionState =
-    selectedRepositoryState.sandboxInstanceId === input.sandboxInstanceId
-      ? selectedRepositoryState
-      : {
-          lastAutoAppliedInitialSelection: undefined,
-          sandboxInstanceId: input.sandboxInstanceId,
-          selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
-          userSelectionTouched: false,
-        };
-  const shouldApplyInitialSelection =
-    input.sandboxInstanceId !== null &&
-    input.initialSelectedRepositoryPath !== undefined &&
-    !currentSandboxSelectionState.userSelectionTouched &&
-    currentSandboxSelectionState.lastAutoAppliedInitialSelection !==
-      input.initialSelectedRepositoryPath;
-  const selectedRepositoryPath = shouldApplyInitialSelection
-    ? (input.initialSelectedRepositoryPath ?? null)
-    : currentSandboxSelectionState.selectedRepositoryPath;
+  const currentSandboxSelectionState = resolveSelectedRepositoryState({
+    currentState: selectedRepositoryState,
+    initialSelectedRepositoryPath: input.initialSelectedRepositoryPath,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const selectedRepositoryPath = currentSandboxSelectionState.selectedRepositoryPath;
   const query = useQuery({
     enabled: input.enabled && input.sandboxInstanceId !== null,
     queryFn: async () => {
@@ -137,11 +160,7 @@ export function useSessionPrimaryRepositoryState(input: {
   });
   const repositoryOptions = query.data?.repositoryOptions ?? [];
   const queryErrorMessage =
-    query.isError && query.error instanceof Error
-      ? query.error.message
-      : query.isError
-        ? null
-        : null;
+    query.isError && query.error instanceof Error ? query.error.message : null;
   const presentation = resolvePrimaryRepositoryPresentation({
     repositoryOptions,
     selectedRepositoryPath,
@@ -151,51 +170,24 @@ export function useSessionPrimaryRepositoryState(input: {
   });
 
   useEffect(() => {
-    setSelectedRepositoryState((currentState) => {
-      const currentSandboxState =
-        currentState.sandboxInstanceId === input.sandboxInstanceId
-          ? currentState
-          : {
-              lastAutoAppliedInitialSelection: undefined,
-              sandboxInstanceId: input.sandboxInstanceId,
-              selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
-              userSelectionTouched: false,
-            };
-      const shouldSyncInitialSelection =
-        input.sandboxInstanceId !== null &&
-        input.initialSelectedRepositoryPath !== undefined &&
-        !currentSandboxState.userSelectionTouched &&
-        currentSandboxState.lastAutoAppliedInitialSelection !== input.initialSelectedRepositoryPath;
-
-      if (shouldSyncInitialSelection) {
-        return {
-          ...currentSandboxState,
-          lastAutoAppliedInitialSelection: input.initialSelectedRepositoryPath,
-          selectedRepositoryPath: input.initialSelectedRepositoryPath ?? null,
-        };
-      }
-
-      if (currentSandboxState === currentState) {
-        return currentState;
-      }
-
-      return currentSandboxState;
-    });
+    setSelectedRepositoryState((currentState) =>
+      resolveSelectedRepositoryState({
+        currentState,
+        initialSelectedRepositoryPath: input.initialSelectedRepositoryPath,
+        sandboxInstanceId: input.sandboxInstanceId,
+      }),
+    );
   }, [input.initialSelectedRepositoryPath, input.sandboxInstanceId]);
 
   const handleSetSelectedRepositoryPath = useCallback(
     (nextValue: string | null) => {
-      setSelectedRepositoryState((currentState) => ({
-        lastAutoAppliedInitialSelection:
-          currentState.sandboxInstanceId === input.sandboxInstanceId
-            ? currentState.lastAutoAppliedInitialSelection
-            : input.initialSelectedRepositoryPath,
+      setSelectedRepositoryState({
+        hasUserSelected: true,
         sandboxInstanceId: input.sandboxInstanceId,
         selectedRepositoryPath: nextValue,
-        userSelectionTouched: true,
-      }));
+      });
     },
-    [input.initialSelectedRepositoryPath, input.sandboxInstanceId],
+    [input.sandboxInstanceId],
   );
 
   return {
