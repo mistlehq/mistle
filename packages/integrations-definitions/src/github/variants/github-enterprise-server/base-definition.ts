@@ -1,4 +1,5 @@
 import {
+  IntegrationFormConnectionMethodCreateBehaviors,
   IntegrationConnectionMethodIds,
   IntegrationKinds,
   type IntegrationDefinition,
@@ -63,6 +64,7 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
         id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         label: "GitHub App installation",
         kind: "form",
+        createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
         secretFields: [
           {
             name: "appPrivateKeyPem",

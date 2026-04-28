@@ -56,60 +56,32 @@ export async function createFormIntegrationConnection(input: {
   }
 }
 
-export async function createGitHubAppDraftIntegrationConnection(input: {
+export async function createDraftFormIntegrationConnection(input: {
   targetKey: string;
+  methodId: IntegrationConnectionMethod["id"];
   displayName: string;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
-      operation: "createGitHubAppDraftIntegrationConnection",
+      operation: "createDraftFormIntegrationConnection",
       method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/draft`,
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.methodId)}/draft`,
       body: {
         displayName: input.displayName,
       },
-      fallbackMessage: "Could not create GitHub App connection.",
+      fallbackMessage: "Could not create integration connection.",
     });
 
     return readJsonWithSchema({
       response,
       schema: IntegrationConnectionSchema,
-      operation: "createGitHubAppDraftIntegrationConnection",
+      operation: "createDraftFormIntegrationConnection",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "createGitHubAppDraftIntegrationConnection",
+      operation: "createDraftFormIntegrationConnection",
       error,
-      fallbackMessage: "Could not create GitHub App connection.",
-    });
-  }
-}
-
-export async function createSlackAppDraftIntegrationConnection(input: {
-  targetKey: string;
-  displayName: string;
-}): Promise<CreatedIntegrationConnection> {
-  try {
-    const response = await requestControlPlane({
-      operation: "createSlackAppDraftIntegrationConnection",
-      method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/slack-app/draft`,
-      body: {
-        displayName: input.displayName,
-      },
-      fallbackMessage: "Could not create Slack app connection.",
-    });
-
-    return readJsonWithSchema({
-      response,
-      schema: IntegrationConnectionSchema,
-      operation: "createSlackAppDraftIntegrationConnection",
-    });
-  } catch (error) {
-    throw wrapIntegrationsApiError({
-      operation: "createSlackAppDraftIntegrationConnection",
-      error,
-      fallbackMessage: "Could not create Slack app connection.",
+      fallbackMessage: "Could not create integration connection.",
     });
   }
 }

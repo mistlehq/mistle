@@ -1,5 +1,4 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import {
   Button,
   CopyableValue,
@@ -147,18 +146,10 @@ function shouldSkipCreateTimeSetupFields(input: {
   editor: IntegrationConnectionEditorState;
   method: IntegrationConnectionMethod | null;
 }): boolean {
-  if (
-    input.editor.mode === "create" &&
-    input.editor.targetFamilyId === "github" &&
-    input.method?.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
-    return true;
-  }
-
   return (
     input.editor.mode === "create" &&
-    input.editor.targetFamilyId === "slack" &&
-    input.method?.id === SlackConnectionMethodId
+    input.method?.kind === "form" &&
+    input.method.createBehavior === "draft-then-setup"
   );
 }
 

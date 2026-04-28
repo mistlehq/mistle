@@ -275,7 +275,7 @@ function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
       }
 
       const createDraftMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/slack-app\/draft$/,
+        /^\/v1\/integration\/connections\/([^/]+)\/slack-bot-token\/draft$/,
       );
       if (method === "POST" && createDraftMatch !== null) {
         const targetKey = decodeURIComponent(createDraftMatch[1] ?? "");
