@@ -2,6 +2,8 @@ import type {
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookPayloadReference,
+  IntegrationWebhookTriggerProviderPermissionRequirement,
+  IntegrationWebhookTriggerRequirements,
 } from "@mistle/integrations-core";
 
 import { createInvocationTokenParameter } from "../../../shared/invocation-token-parameter.js";
@@ -93,6 +95,48 @@ const SlackChannelParameter: IntegrationWebhookEventParameterDefinition = {
   prefix: "in",
 };
 
+const SlackWebhookPermissionRequirements = {
+  APP_MENTIONS_READ: {
+    permission: "app_mentions:read",
+  },
+  CHANNELS_HISTORY: {
+    permission: "channels:history",
+  },
+  GROUPS_HISTORY: {
+    permission: "groups:history",
+  },
+  REACTIONS_READ: {
+    permission: "reactions:read",
+  },
+} as const satisfies Record<string, IntegrationWebhookTriggerProviderPermissionRequirement>;
+
+function createSlackWebhookRequirements(
+  eventType: string,
+  permission: IntegrationWebhookTriggerProviderPermissionRequirement,
+): IntegrationWebhookTriggerRequirements {
+  return {
+    anyOf: [
+      {
+        event: eventType,
+        permissions: [permission],
+      },
+    ],
+  };
+}
+
+const SlackMessageRequirements: IntegrationWebhookTriggerRequirements = {
+  anyOf: [
+    {
+      event: "message.channels",
+      permissions: [SlackWebhookPermissionRequirements.CHANNELS_HISTORY],
+    },
+    {
+      event: "message.groups",
+      permissions: [SlackWebhookPermissionRequirements.GROUPS_HISTORY],
+    },
+  ],
+};
+
 function createSlackInvocationTokenParameter(): IntegrationWebhookEventParameterDefinition {
   return createInvocationTokenParameter(["event", "text"]);
 }
@@ -102,6 +146,7 @@ function createSlackWebhookEventDefinition(input: {
   providerEventType: string;
   displayName: string;
   category: string;
+  requirements: IntegrationWebhookTriggerRequirements;
   payloadReferences: readonly IntegrationWebhookPayloadReference[];
   conversationKeyOptions: readonly {
     id: string;
@@ -116,6 +161,7 @@ function createSlackWebhookEventDefinition(input: {
     providerEventType: input.providerEventType,
     displayName: input.displayName,
     category: input.category,
+    requirements: input.requirements,
     payloadReferences: input.payloadReferences,
     conversationKeyOptions: input.conversationKeyOptions,
     ...(input.parameters === undefined ? {} : { parameters: input.parameters }),
@@ -128,6 +174,7 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     providerEventType: "message",
     displayName: "Message",
     category: "Messages",
+    requirements: SlackMessageRequirements,
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
     parameters: [createSlackInvocationTokenParameter()],
@@ -137,6 +184,10 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     providerEventType: "app_mention",
     displayName: "App mention",
     category: "Messages",
+    requirements: createSlackWebhookRequirements(
+      "app_mention",
+      SlackWebhookPermissionRequirements.APP_MENTIONS_READ,
+    ),
     payloadReferences: SlackMessagePayloadReferences,
     conversationKeyOptions: [SlackChannelConversationKeyOption, SlackThreadConversationKeyOption],
     parameters: [createSlackInvocationTokenParameter(), SlackChannelParameter],
@@ -146,6 +197,10 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     providerEventType: "reaction_added",
     displayName: "Reaction added",
     category: "Reactions",
+    requirements: createSlackWebhookRequirements(
+      "reaction_added",
+      SlackWebhookPermissionRequirements.REACTIONS_READ,
+    ),
     payloadReferences: SlackReactionPayloadReferences,
     conversationKeyOptions: [
       SlackChannelConversationKeyOption,
@@ -158,6 +213,10 @@ export const SlackSupportedWebhookEvents: readonly IntegrationWebhookEventDefini
     providerEventType: "reaction_removed",
     displayName: "Reaction removed",
     category: "Reactions",
+    requirements: createSlackWebhookRequirements(
+      "reaction_removed",
+      SlackWebhookPermissionRequirements.REACTIONS_READ,
+    ),
     payloadReferences: SlackReactionPayloadReferences,
     conversationKeyOptions: [
       SlackChannelConversationKeyOption,

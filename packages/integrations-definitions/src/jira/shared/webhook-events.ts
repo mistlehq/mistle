@@ -1,4 +1,8 @@
-import type { IntegrationWebhookEventDefinition } from "@mistle/integrations-core";
+import type {
+  IntegrationWebhookEventDefinition,
+  IntegrationWebhookTriggerProviderPermissionRequirement,
+  IntegrationWebhookTriggerRequirements,
+} from "@mistle/integrations-core";
 
 import { createInvocationTokenParameter } from "../../shared/invocation-token-parameter.js";
 
@@ -41,6 +45,31 @@ type JiraWebhookEventMetadata = {
   eventType: JiraWebhookEventType;
 };
 
+const JiraWebhookPermissionRequirements = {
+  READ_WORK: {
+    permission: "read:jira-work",
+  },
+  MANAGE_WEBHOOK: {
+    permission: "manage:jira-webhook",
+  },
+} as const satisfies Record<string, IntegrationWebhookTriggerProviderPermissionRequirement>;
+
+function createJiraWebhookRequirements(
+  eventType: JiraWebhookEventType,
+): IntegrationWebhookTriggerRequirements {
+  return {
+    anyOf: [
+      {
+        event: eventType,
+        permissions: [
+          JiraWebhookPermissionRequirements.READ_WORK,
+          JiraWebhookPermissionRequirements.MANAGE_WEBHOOK,
+        ],
+      },
+    ],
+  };
+}
+
 function createJiraWebhookEventDefinition(
   input: JiraWebhookEventMetadata,
 ): IntegrationWebhookEventDefinition {
@@ -49,6 +78,7 @@ function createJiraWebhookEventDefinition(
     providerEventType: input.eventType,
     displayName: input.displayName,
     category: input.category,
+    requirements: createJiraWebhookRequirements(input.eventType),
     conversationKeyOptions: [JiraIssueConversationKeyOption],
     parameters: [
       ...(input.eventType === "comment_created" || input.eventType === "comment_updated"
