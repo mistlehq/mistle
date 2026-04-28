@@ -1,6 +1,5 @@
 import {
-  SlackAppManifestBotEvents,
-  SlackAppManifestBotScopes,
+  SlackAppManifestTemplate,
   SlackConnectionMethodId,
 } from "@mistle/integrations-definitions/browser";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
@@ -87,40 +86,7 @@ const SlackRequiredExistingAppSecretFieldKeys = [
   "signingSecret",
 ] as const satisfies readonly SlackExistingAppSecretFieldKey[];
 
-export const SlackDraftManifest = JSON.stringify(
-  {
-    display_information: {
-      name: "Mistle",
-      description: "Connect Slack events and messages to Mistle automations.",
-      background_color: "#2f855a",
-    },
-    features: {
-      bot_user: {
-        display_name: "mistle",
-        always_online: false,
-      },
-    },
-    settings: {
-      event_subscriptions: {
-        request_url: "https://mistle.example.com/api/integrations/slack/webhook",
-        bot_events: SlackAppManifestBotEvents,
-      },
-      socket_mode_enabled: false,
-      token_rotation_enabled: false,
-    },
-    oauth_config: {
-      redirect_urls: [
-        "https://mistle.example.com/api/integrations/slack/install/callback",
-        "https://mistle.example.com/api/identity-linking/slack/callback",
-      ],
-      scopes: {
-        bot: SlackAppManifestBotScopes,
-      },
-    },
-  },
-  null,
-  2,
-);
+const SlackDraftManifest = JSON.stringify(SlackAppManifestTemplate, null, 2);
 
 function normalizeInputValue(value: unknown): string {
   return typeof value === "string" ? value : "";

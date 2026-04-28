@@ -11,6 +11,7 @@ export {
   resolveGitHubCredentialSecretType,
 } from "./shared/auth.js";
 export { GitHubSupportedWebhookEvents } from "./shared/supported-webhook-events.js";
+export { GitHubAppManifestTemplate } from "./shared/app-manifest.js";
 export {
   GitHubBindingConfigSchema,
   type GitHubBindingConfig,

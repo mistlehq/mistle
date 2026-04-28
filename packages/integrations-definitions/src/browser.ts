@@ -56,5 +56,6 @@ export function createBrowserDefinitionsBundle(): IntegrationDefinitionsBundle {
 }
 
 export * from "./datadog/index.js";
+export * from "./github/browser.js";
 export * from "./jira/browser.js";
 export * from "./slack/browser.js";
