@@ -73,6 +73,31 @@ const IntegrationSetupCompletionRequirementSchema = z.discriminatedUnion("kind",
     .strict(),
 ]);
 
+const IntegrationWebhookEventCapabilityRequirementSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("webhook-event"),
+      providerEventType: z.string().min(1),
+      label: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("oauth-scope"),
+      scope: z.string().min(1),
+      label: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("github-app-permission"),
+      permission: z.string().min(1),
+      access: z.enum(["read", "write", "admin"]),
+      label: z.string().min(1),
+    })
+    .strict(),
+]);
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -161,32 +186,7 @@ export const IntegrationTargetSchema = z
             displayName: z.string().min(1),
             category: z.string().min(1).optional(),
             requiredCapabilities: z
-              .array(
-                z.discriminatedUnion("kind", [
-                  z
-                    .object({
-                      kind: z.literal("webhook-event"),
-                      providerEventType: z.string().min(1),
-                      label: z.string().min(1),
-                    })
-                    .strict(),
-                  z
-                    .object({
-                      kind: z.literal("oauth-scope"),
-                      scope: z.string().min(1),
-                      label: z.string().min(1),
-                    })
-                    .strict(),
-                  z
-                    .object({
-                      kind: z.literal("github-app-permission"),
-                      permission: z.string().min(1),
-                      access: z.enum(["read", "write", "admin"]),
-                      label: z.string().min(1),
-                    })
-                    .strict(),
-                ]),
-              )
+              .array(IntegrationWebhookEventCapabilityRequirementSchema)
               .optional(),
             payloadReferences: z
               .array(
