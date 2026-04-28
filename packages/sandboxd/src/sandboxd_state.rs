@@ -8,6 +8,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
+use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -103,6 +105,7 @@ impl std::error::Error for SandboxdStateError {}
 
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
+const SETUP_SCRIPT_FILE_MODE: u32 = 0o700;
 const SNAPSHOT_RUNTIME_ARTIFACTS_DIRECTORY: &str = "/run/mistle";
 const SNAPSHOT_TRUST_STORE_CERT_PATH: &str =
     "/usr/local/share/ca-certificates/mistle-egress-proxy-ca.crt";
@@ -1205,14 +1208,43 @@ where
         return Ok(());
     }
 
-    let shell_args = vec![
-        DEFAULT_PTY_SHELL.to_string(),
-        "-lc".to_string(),
-        setup_script.clone(),
-    ];
+    let mut setup_script_file = tempfile::Builder::new()
+        .prefix("mistle-setup-script-")
+        .suffix(".sh")
+        .tempfile()
+        .map_err(|error| {
+            setup_script_file_failure(format!("failed to create temporary file: {error}"))
+        })?;
+    setup_script_file
+        .write_all(setup_script.as_bytes())
+        .map_err(|error| {
+            setup_script_file_failure(format!("failed to write temporary script file: {error}"))
+        })?;
+    setup_script_file.as_file_mut().flush().map_err(|error| {
+        setup_script_file_failure(format!("failed to flush temporary script file: {error}"))
+    })?;
+    fs::set_permissions(
+        setup_script_file.path(),
+        fs::Permissions::from_mode(SETUP_SCRIPT_FILE_MODE),
+    )
+    .map_err(|error| {
+        setup_script_file_failure(format!(
+            "failed to make temporary script executable: {error}"
+        ))
+    })?;
+
+    let setup_script_path = setup_script_file.into_temp_path();
+    let setup_script_path_ref: &Path = setup_script_path.as_ref();
+    let setup_script_command_path = setup_script_path_ref
+        .to_str()
+        .ok_or_else(|| {
+            setup_script_file_failure("temporary script path is not valid unicode".to_string())
+        })?
+        .to_string();
+    let shell_args = build_setup_script_command_args(setup_script, setup_script_command_path);
     let environment = build_setup_script_environment(runtime_env);
 
-    run_command_with_details(
+    let run_result = run_command_with_details(
         CommandSpec {
             args: &shell_args,
             env: Some(&environment),
@@ -1222,7 +1254,37 @@ where
         clock,
         sleeper,
         DEFAULT_COMMAND_POLL_INTERVAL,
-    )
+    );
+    let cleanup_result = setup_script_path.close().map_err(|error| {
+        setup_script_file_failure(format!("failed to remove temporary script file: {error}"))
+    });
+
+    match (run_result, cleanup_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) => Err(error),
+        (Ok(()), Err(error)) | (Err(_), Err(error)) => Err(error),
+    }
+}
+
+fn build_setup_script_command_args(setup_script: &str, setup_script_path: String) -> Vec<String> {
+    if setup_script.as_bytes().starts_with(b"#!") {
+        return vec![setup_script_path];
+    }
+
+    vec![
+        DEFAULT_PTY_SHELL.to_string(),
+        "-l".to_string(),
+        setup_script_path,
+    ]
+}
+
+fn setup_script_file_failure(message: String) -> CommandFailure {
+    CommandFailure {
+        message,
+        exit_code: None,
+        timed_out: false,
+        output_tails: Default::default(),
+    }
 }
 
 fn build_setup_script_environment(
@@ -1876,6 +1938,45 @@ supports_websockets = false
     }
 
     #[test]
+    fn run_setup_script_honors_user_shebang() {
+        let output_path = std::env::temp_dir().join(format!(
+            "mistle-setup-script-shebang-output-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let runtime_plan = CompiledRuntimePlan {
+            image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
+            setup_script: Some(format!(
+                "#!/bin/false\nprintf 'script body ran' > {path}",
+                path = output_path.display()
+            )),
+            egress_routes: Vec::new(),
+            artifacts: Vec::new(),
+            workspace_sources: Vec::new(),
+            runtime_clients: Vec::new(),
+            agent_runtimes: Vec::new(),
+        };
+
+        run_setup_script_in_directory(
+            &runtime_plan,
+            &BTreeMap::new(),
+            std::env::temp_dir()
+                .to_str()
+                .expect("temporary directory should be valid unicode"),
+            &SystemClock,
+            &ThreadSleeper,
+        )
+        .expect_err("setup script should execute through the user shebang");
+
+        assert!(
+            !output_path.exists(),
+            "setup script body should not run when the shebang interpreter exits first"
+        );
+    }
+
+    #[test]
     fn run_setup_script_uses_root_cwd_and_runtime_environment() {
         let working_directory = std::env::temp_dir().join(format!(
             "mistle-setup-script-working-directory-{}",
@@ -1896,7 +1997,7 @@ supports_websockets = false
         let runtime_plan = CompiledRuntimePlan {
             image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: Some(format!(
-                "printf '%s\\n' \"$TERM\" > {path}; printf '%s\\n' \"$MISTLE_TEST_ENV\" >> {path}; pwd >> {path}",
+                "printf '%s\\n' \"$TERM\" > {path}; printf '%s\\n' \"$MISTLE_TEST_ENV\" >> {path}; pwd >> {path}; printf '%s\\n' \"$0\" >> {path}; test -x \"$0\" && printf 'executable\\n' >> {path}",
                 path = output_path.display()
             )),
             egress_routes: Vec::new(),
@@ -1921,14 +2022,26 @@ supports_websockets = false
 
         let output = std::fs::read_to_string(&output_path)
             .expect("setup script should write its output file");
+        let output_lines = output.lines().collect::<Vec<_>>();
         let canonical_working_directory = std::fs::canonicalize(&working_directory)
             .expect("working directory should canonicalize");
         assert_eq!(
-            output,
-            format!(
-                "xterm-256color\nruntime-value\n{}\n",
-                canonical_working_directory.display()
-            )
+            output_lines[0..3],
+            [
+                "xterm-256color",
+                "runtime-value",
+                canonical_working_directory
+                    .to_str()
+                    .expect("working directory should be valid unicode")
+            ]
+        );
+        let setup_script_path = output_lines
+            .get(3)
+            .expect("setup script should record its file path");
+        assert_eq!(output_lines.get(4), Some(&"executable"));
+        assert!(
+            !std::path::Path::new(setup_script_path).exists(),
+            "temporary setup script should be removed after execution"
         );
 
         let _ = std::fs::remove_file(output_path);
@@ -1940,7 +2053,7 @@ supports_websockets = false
         let runtime_plan = CompiledRuntimePlan {
             image: test_runtime_plan_image(crate::runtime::CompiledRuntimePlanImageSource::Base),
             setup_script: Some(
-                "printf 'stdout-line'; printf 'stderr-line' >&2; exit 17".to_string(),
+                "printf '%s\\nstdout-line' \"$0\"; printf 'stderr-line' >&2; exit 17".to_string(),
             ),
             egress_routes: Vec::new(),
             artifacts: Vec::new(),
@@ -1964,9 +2077,25 @@ supports_websockets = false
         assert!(!error.timed_out);
         assert!(error.output_tails.stdout_captured);
         assert!(error.output_tails.stderr_captured);
+        let stdout_tail = error
+            .output_tails
+            .stdout_tail
+            .as_deref()
+            .expect("failing setup script should capture stdout");
+        let setup_script_path = stdout_tail
+            .lines()
+            .next()
+            .expect("setup script should print its temporary path");
+        assert!(
+            !std::path::Path::new(setup_script_path).exists(),
+            "temporary setup script should be removed after failure"
+        );
         assert_eq!(
-            error.output_tails.stdout_tail.as_deref(),
-            Some("stdout-line")
+            stdout_tail
+                .lines()
+                .nth(1)
+                .expect("setup script should print stdout marker"),
+            "stdout-line"
         );
         assert_eq!(
             error.output_tails.stderr_tail.as_deref(),
