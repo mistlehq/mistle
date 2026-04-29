@@ -665,12 +665,6 @@ async function configureBaselineIntegrationAndProfile(cookie: string): Promise<s
                 runtimeId: "codex",
                 config: {},
               },
-              model: {
-                defaultModel: "gpt-5.3-codex",
-                options: {
-                  reasoningEffort: "medium",
-                },
-              },
             },
           },
         ],

@@ -1245,12 +1245,6 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
                       runtimeId: "codex",
                       config: {},
                     },
-                    model: {
-                      defaultModel: "gpt-5.3-codex",
-                      options: {
-                        reasoningEffort: "medium",
-                      },
-                    },
                   },
                 },
               ],

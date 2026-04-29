@@ -1131,12 +1131,6 @@ describe("system port access", () => {
                 runtimeId: "codex",
                 config: {},
               },
-              model: {
-                defaultModel: "gpt-5.3-codex",
-                options: {
-                  reasoningEffort: "medium",
-                },
-              },
             },
           },
         ],
@@ -1268,12 +1262,6 @@ describe("system port access", () => {
               runtime: {
                 runtimeId: "codex",
                 config: {},
-              },
-              model: {
-                defaultModel: "gpt-5.3-codex",
-                options: {
-                  reasoningEffort: "medium",
-                },
               },
             },
           },

@@ -2252,12 +2252,6 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                     runtimeId: "codex",
                     config: {},
                   },
-                  model: {
-                    defaultModel: "gpt-5.3-codex",
-                    options: {
-                      reasoningEffort: "medium",
-                    },
-                  },
                 },
               },
             ],
@@ -2371,12 +2365,6 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                   runtime: {
                     runtimeId: "codex",
                     config: {},
-                  },
-                  model: {
-                    defaultModel: "gpt-5.3-codex",
-                    options: {
-                      reasoningEffort: "medium",
-                    },
                   },
                 },
               },
@@ -2532,12 +2520,6 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                   runtime: {
                     runtimeId: "codex",
                     config: {},
-                  },
-                  model: {
-                    defaultModel: "gpt-5.3-codex",
-                    options: {
-                      reasoningEffort: "medium",
-                    },
                   },
                 },
               },
@@ -2885,12 +2867,6 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                   runtime: {
                     runtimeId: "codex",
                     config: {},
-                  },
-                  model: {
-                    defaultModel: "gpt-5.3-codex",
-                    options: {
-                      reasoningEffort: "medium",
-                    },
                   },
                 },
               },

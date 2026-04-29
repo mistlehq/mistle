@@ -252,12 +252,6 @@ async function updateSandboxBindings(input: {
                 runtimeId: "codex",
                 config: {},
               },
-              model: {
-                defaultModel: "gpt-5.3-codex",
-                options: {
-                  reasoningEffort: "medium",
-                },
-              },
             },
           },
         ],

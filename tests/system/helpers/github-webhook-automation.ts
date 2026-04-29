@@ -1769,12 +1769,6 @@ export async function startGitHubWebhookAutomationConversation(input: {
               runtimeId: "codex",
               config: {},
             },
-            model: {
-              defaultModel: "gpt-5.1-codex-mini",
-              options: {
-                reasoningEffort: "medium",
-              },
-            },
           },
         },
       ],
@@ -1793,12 +1787,6 @@ export async function startGitHubWebhookAutomationConversation(input: {
             runtime: {
               runtimeId: "codex",
               config: {},
-            },
-            model: {
-              defaultModel: "gpt-5.1-codex-mini",
-              options: {
-                reasoningEffort: "medium",
-              },
             },
           },
         },
