@@ -204,8 +204,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -289,8 +294,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -367,8 +377,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -512,8 +527,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -592,8 +612,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -667,8 +692,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -767,8 +797,13 @@ jobs:
       - name: Mount Nix sticky disk
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
           path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
