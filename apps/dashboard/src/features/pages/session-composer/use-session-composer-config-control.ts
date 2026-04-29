@@ -1,3 +1,4 @@
+import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useCallback, useMemo, useState } from "react";
 
 import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
@@ -18,6 +19,17 @@ export type SessionComposerConfigControl = {
   setReasoningEffort: (value: string) => void;
 };
 
+function findSelectedModel(input: {
+  availableModels: readonly CodexModelSummary[];
+  selectedModel: string | null;
+}): CodexModelSummary | null {
+  if (input.selectedModel !== null) {
+    return input.availableModels.find((model) => model.model === input.selectedModel) ?? null;
+  }
+
+  return input.availableModels.find((model) => model.isDefault) ?? null;
+}
+
 export function useSessionComposerConfigControl(input: {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
@@ -31,19 +43,41 @@ export function useSessionComposerConfigControl(input: {
   });
 
   const selectedModel = useMemo(
-    () => composerConfigOverrides.model ?? input.bootstrap.establishedSnapshot.configSnapshot.model,
-    [composerConfigOverrides.model, input.bootstrap.establishedSnapshot.configSnapshot.model],
-  );
-
-  const selectedReasoningEffort = useMemo(
     () =>
-      composerConfigOverrides.modelReasoningEffort ??
-      input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort,
+      composerConfigOverrides.model ??
+      input.bootstrap.establishedSnapshot.configSnapshot.model ??
+      findSelectedModel({
+        availableModels: input.bootstrap.establishedSnapshot.availableModels,
+        selectedModel: null,
+      })?.model ??
+      null,
     [
-      composerConfigOverrides.modelReasoningEffort,
-      input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort,
+      composerConfigOverrides.model,
+      input.bootstrap.establishedSnapshot.availableModels,
+      input.bootstrap.establishedSnapshot.configSnapshot.model,
     ],
   );
+
+  const selectedReasoningEffort = useMemo(() => {
+    const explicitReasoningEffort =
+      composerConfigOverrides.modelReasoningEffort ??
+      input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort;
+    if (explicitReasoningEffort !== null) {
+      return explicitReasoningEffort;
+    }
+
+    return (
+      findSelectedModel({
+        availableModels: input.bootstrap.establishedSnapshot.availableModels,
+        selectedModel,
+      })?.defaultReasoningEffort ?? null
+    );
+  }, [
+    composerConfigOverrides.modelReasoningEffort,
+    input.bootstrap.establishedSnapshot.availableModels,
+    input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort,
+    selectedModel,
+  ]);
 
   const modelOptions = useMemo(
     () =>
