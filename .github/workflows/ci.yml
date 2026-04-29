@@ -209,6 +209,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: static-ts-pnpm-store-cache
@@ -262,12 +264,6 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   build-ts:
     name: TS Build
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -298,6 +294,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: build-ts-pnpm-store-cache
@@ -344,12 +342,6 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   static-rust:
     name: Rust Static
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -380,6 +372,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
@@ -444,12 +438,6 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   knip:
     name: Knip
     # runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -467,6 +455,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Set up Magic Nix Cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
@@ -527,6 +517,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: test-ts-pnpm-store-cache
@@ -575,12 +567,6 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   test-ts-component:
     name: TS Component Test
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -611,6 +597,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore pnpm store cache
         id: test-ts-component-pnpm-store-cache
@@ -657,12 +645,6 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   test-commit-sign:
     name: Commit Sign Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -690,6 +672,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore commit-sign container cargo cache
         id: test-commit-sign-container-cargo-cache
@@ -760,12 +744,6 @@ jobs:
           path: .local/commit-sign-test/target-alpine-container
           key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
 
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
-
   test-sandboxd:
     name: Sandboxd Test
     # runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -794,6 +772,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
 
       - name: Restore sandboxd container cargo cache
         id: test-sandboxd-container-cargo-cache
@@ -872,12 +852,6 @@ jobs:
         with:
           path: .local/sandboxd-test/target-debian-container
           key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
-
-      - name: Stop Nix daemon
-        if: always()
-        run: |
-          sudo systemctl stop nix-daemon.socket
-          sudo systemctl stop nix-daemon.service
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
