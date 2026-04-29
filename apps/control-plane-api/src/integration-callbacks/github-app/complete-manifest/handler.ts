@@ -30,7 +30,7 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
   return ctx.redirect(
     buildDashboardUrl(
       config.dashboard.baseUrl,
-      `/integrations/${encodeURIComponent(completedConnection.targetKey)}/${encodeURIComponent(completedConnection.id)}/github-app/setup?githubAppManifest=created`,
+      `/integrations/${encodeURIComponent(completedConnection.targetKey)}/${encodeURIComponent(completedConnection.id)}/${encodeURIComponent(completedConnection.routeSegment)}/setup?githubAppManifest=created`,
     ),
     302,
   );
