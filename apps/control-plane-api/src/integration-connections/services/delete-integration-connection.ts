@@ -30,6 +30,33 @@ export type DeleteIntegrationConnectionInput = {
   connectionId: string;
 };
 
+async function lockAffectedSandboxProfilesForUpdate(input: {
+  db: ControlPlaneDatabase;
+  organizationId: string;
+  connectionId: string;
+}): Promise<void> {
+  await input.db
+    .select({
+      id: sandboxProfiles.id,
+    })
+    .from(sandboxProfiles)
+    .where(
+      and(
+        eq(sandboxProfiles.organizationId, input.organizationId),
+        inArray(
+          sandboxProfiles.id,
+          input.db
+            .select({
+              sandboxProfileId: sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+            })
+            .from(sandboxProfileVersionIntegrationBindings)
+            .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId)),
+        ),
+      ),
+    )
+    .for("update");
+}
+
 async function assertConnectionDeletionGuardsOrThrow(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
@@ -55,6 +82,12 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
       `Integration connection '${input.connectionId}' was not found.`,
     );
   }
+
+  await lockAffectedSandboxProfilesForUpdate({
+    db: input.db,
+    organizationId: input.organizationId,
+    connectionId: lockedConnection.id,
+  });
 
   const [activeVersionBindingUsage] = await input.db
     .select({

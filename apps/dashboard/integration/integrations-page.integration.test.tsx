@@ -307,7 +307,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                   targetKey: "github",
                   displayName: "Bound GitHub",
                   status: "active",
-                  bindingCount: 1,
+                  bindingCount: 0,
                   config: {
                     connection_method: "github-app-installation",
                     app_id: "123",

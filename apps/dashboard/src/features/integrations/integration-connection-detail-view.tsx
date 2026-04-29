@@ -611,7 +611,7 @@ function ConnectionDetailPane(input: {
 function resolveDeleteConnectionMessage(
   connection: Pick<
     IntegrationConnectionDetailItem,
-    "automationCount" | "canDelete" | "isIdentityLinked"
+    "automationCount" | "bindingCount" | "canDelete" | "isIdentityLinked"
   >,
 ): string | null {
   if (connection.canDelete) {
@@ -620,6 +620,10 @@ function resolveDeleteConnectionMessage(
 
   if (connection.isIdentityLinked === true) {
     return "This connection can't be deleted while it is configured for Identity Linking.";
+  }
+
+  if (connection.bindingCount > 0) {
+    return `This connection can't be deleted while it has ${connection.bindingCount} active sandbox profile ${connection.bindingCount === 1 ? "binding" : "bindings"}.`;
   }
 
   if ((connection.automationCount ?? 0) > 0) {

@@ -113,6 +113,37 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
   });
 
+  it("explains disabled delete when a connection has active sandbox profile bindings", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            bindingCount: 2,
+            canDelete: false,
+            displayName: "Engineering GitHub",
+            status: "active",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+        ]}
+        onDeleteConnection={() => {}}
+      />,
+    );
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete connection Engineering GitHub",
+    });
+
+    expect(deleteButton.getAttribute("disabled")).toBe("");
+    fireEvent.mouseEnter(deleteButton.parentElement ?? deleteButton);
+    expect(
+      screen.getByText(
+        "This connection can't be deleted while it has 2 active sandbox profile bindings.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("hides authentication editing when a connection is configured for identity linking", () => {
     render(
       <IntegrationConnectionDetailView
