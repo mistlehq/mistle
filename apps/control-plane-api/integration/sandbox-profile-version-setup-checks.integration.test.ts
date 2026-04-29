@@ -42,7 +42,6 @@ import { it } from "./test-context.js";
 const WorkflowRunPersistTimeoutMs = 30_000;
 const WorkflowRunPersistPollIntervalMs = 100;
 const StartWorkflowName = "data-plane.sandbox-instances.start";
-const StopWorkflowName = "data-plane.sandbox-instances.stop";
 
 const SetupCheckStartWorkflowInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
@@ -52,13 +51,6 @@ const SetupCheckStartWorkflowInputSchema = z.looseObject({
     setupScript: z.string().min(1).optional(),
   }),
 });
-
-const SetupCheckStopWorkflowInputSchema = z
-  .object({
-    sandboxInstanceId: z.string().min(1),
-    stopReason: z.literal("system"),
-  })
-  .strict();
 
 async function insertProfileVersionFixture(input: {
   fixture: ControlPlaneApiIntegrationFixture;
@@ -139,40 +131,6 @@ async function waitForQueuedSetupCheckStartWorkflowInput(input: {
 
   throw new Error(
     `Timed out waiting for queued setup-check start workflow input for sandbox '${input.sandboxInstanceId}'.`,
-  );
-}
-
-async function waitForQueuedSetupCheckStopWorkflowInput(input: {
-  dataPlaneDbPool: Awaited<ReturnType<typeof createDisposableDataPlaneRuntime>>["dbPool"];
-  workflowNamespaceId: string;
-  sandboxInstanceId: string;
-}) {
-  const deadline = Date.now() + WorkflowRunPersistTimeoutMs;
-
-  while (Date.now() < deadline) {
-    const result = await input.dataPlaneDbPool.query<{ input: unknown }>(
-      `
-        select input
-        from data_plane_openworkflow.workflow_runs
-        where
-          namespace_id = $1
-          and workflow_name = $2
-          and input->>'sandboxInstanceId' = $3
-        order by created_at desc
-        limit 1
-      `,
-      [input.workflowNamespaceId, StopWorkflowName, input.sandboxInstanceId],
-    );
-    const row = result.rows[0];
-    if (row !== undefined) {
-      return SetupCheckStopWorkflowInputSchema.parse(row.input);
-    }
-
-    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for queued setup-check stop workflow input for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -517,9 +475,7 @@ describe("sandbox profile version setup checks integration", () => {
     }
   }, 60_000);
 
-  it("starts cleanup instead of marking a running setup-check sandbox as succeeded", async ({
-    fixture,
-  }) => {
+  it("reports cleaning up for running setup-check sandboxes", async ({ fixture }) => {
     const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
       fixture,
       databaseNamePrefix: "mistle_cp_setup_check_cleanup",
@@ -601,16 +557,6 @@ describe("sandbox profile version setup checks integration", () => {
         failureCode: null,
         failureMessage: null,
         finishedAt: null,
-      });
-
-      const queuedWorkflowInput = await waitForQueuedSetupCheckStopWorkflowInput({
-        dataPlaneDbPool: dataPlaneFixture.dbPool,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: createdBody.sandboxInstanceId,
-      });
-      expect(queuedWorkflowInput).toEqual({
-        sandboxInstanceId: createdBody.sandboxInstanceId,
-        stopReason: "system",
       });
     } finally {
       await adapter.destroy({ id: sandbox.id });

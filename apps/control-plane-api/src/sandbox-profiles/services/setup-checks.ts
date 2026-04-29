@@ -335,32 +335,6 @@ export async function getProfileVersionSetupCheck(
     });
   }
 
-  try {
-    await dataPlaneClient.stopSandboxInstance({
-      sandboxInstanceId: sandboxInstance.id,
-      stopReason: "system",
-      expectedPurpose: SandboxInstancePurposes.SETUP_CHECK,
-      idempotencyKey: `setup-check-cleanup:${sandboxInstance.id}`,
-    });
-  } catch (error) {
-    return {
-      id: sandboxInstance.id,
-      sandboxProfileId: sandboxInstance.sandboxProfileId,
-      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
-      status: SetupCheckStatuses.CLEANUP_FAILED,
-      failurePhase: SetupCheckFailurePhases.CLEANUP,
-      failureCode: "SETUP_CHECK_CLEANUP_START_FAILED",
-      failureMessage:
-        error instanceof Error
-          ? error.message
-          : "Failed to stop setup check sandbox after successful startup.",
-      sandboxInstanceId: sandboxInstance.id,
-      workflowRunId: null,
-      startedAt: sandboxInstance.startedAt,
-      finishedAt: null,
-    };
-  }
-
   return {
     id: sandboxInstance.id,
     sandboxProfileId: sandboxInstance.sandboxProfileId,

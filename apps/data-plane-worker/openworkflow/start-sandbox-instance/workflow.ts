@@ -1,3 +1,4 @@
+import { SandboxInstancePurposes } from "@mistle/db/data-plane";
 import type { SandboxProvider } from "@mistle/sandbox";
 import {
   StartSandboxInstanceWorkflowSpec,
@@ -12,6 +13,7 @@ import { formatPersistedFailureMessage } from "../shared/format-persisted-failur
 import { prepareSandboxStorageForStart } from "../shared/prepare-sandbox-storage-for-start.js";
 import { emitSandboxStartupDiagnostics } from "../shared/sandbox-startup-diagnostics.js";
 import { createSandboxStorageBackendAdapter } from "../shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
+import { stopSandboxInstance } from "../stop-sandbox-instance/stop-sandbox-instance.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { initializeSandboxRuntime } from "./initialize-sandbox-runtime.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -751,6 +753,37 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           cause: error,
         },
+      );
+    }
+
+    if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+      await step.run({ name: "stop-setup-check-sandbox" }, async () => {
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Stopping setup-check sandbox after successful startup.",
+        );
+        await stopSandboxInstance(
+          {
+            config: ctx.config,
+            db: ctx.db,
+            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+            sandboxAdapter: ctx.sandboxAdapter,
+            runtimeStateReader: ctx.runtimeStateReader,
+            clock: ctx.clock,
+          },
+          {
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+            stopReason: "system",
+          },
+        );
+      });
+      logger.info(
+        {
+          providerSandboxId: startedSandbox.providerSandboxId,
+        },
+        "Stopped setup-check sandbox after successful startup.",
       );
     }
 
