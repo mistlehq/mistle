@@ -10,6 +10,12 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 export type IntegrationSetupAppManifestDraftBuilder =
   IntegrationFormConnectionMethodSetupManifestDraft["build"];
 
+export function resolveManifestDraftControlPlaneBaseUrl(input: {
+  webhookCallbackUrl: string;
+}): string {
+  return new URL(input.webhookCallbackUrl).origin;
+}
+
 export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;

@@ -55,7 +55,10 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
-import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
+import {
+  type IntegrationSetupAppManifestDraftBuilder,
+  resolveManifestDraftControlPlaneBaseUrl,
+} from "./integration-connection-setup-manifest-draft.js";
 import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -631,7 +634,9 @@ export function GitHubAppSetupPane(input: {
       ? manifestValue
       : createManifestJsonDraft(
           input.manifestDraftBuilder({
-            controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
+            controlPlaneBaseUrl: resolveManifestDraftControlPlaneBaseUrl({
+              webhookCallbackUrl,
+            }),
             webhookCallbackUrl,
           }),
         );

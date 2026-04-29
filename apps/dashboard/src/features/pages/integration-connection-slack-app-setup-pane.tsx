@@ -14,7 +14,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
-import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   ConfiguredSecretField,
@@ -51,7 +50,10 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
-import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
+import {
+  type IntegrationSetupAppManifestDraftBuilder,
+  resolveManifestDraftControlPlaneBaseUrl,
+} from "./integration-connection-setup-manifest-draft.js";
 import {
   hasConfiguredSetupSecretField,
   resolveConfiguredSetupSecretFieldKeys,
@@ -441,7 +443,9 @@ export function SlackAppSetupPane(input: {
       ? manifestValue
       : createManifestJsonDraft(
           input.manifestDraftBuilder({
-            controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
+            controlPlaneBaseUrl: resolveManifestDraftControlPlaneBaseUrl({
+              webhookCallbackUrl,
+            }),
             webhookCallbackUrl,
           }),
         );

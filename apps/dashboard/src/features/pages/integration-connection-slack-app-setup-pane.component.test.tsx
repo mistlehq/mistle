@@ -44,10 +44,13 @@ function CurrentPath(): React.JSX.Element {
 
 function renderSlackAppSetupPane(input?: {
   connection?: IntegrationConnection;
+  controlPlaneApiOrigin?: string;
+  webhookCallbackUrl?: string;
   webhookSource?: IntegrationWebhookSource | null;
 }) {
   Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN: "https://control-plane.example.com",
+    VITE_CONTROL_PLANE_API_ORIGIN:
+      input?.controlPlaneApiOrigin ?? "https://control-plane.example.com",
   });
   resetDashboardConfigForTest();
 
@@ -63,6 +66,7 @@ function renderSlackAppSetupPane(input?: {
     displayName: "Slack Events API webhook",
     endpointKey: "eps_slack_app_setup",
     callbackUrl:
+      input?.webhookCallbackUrl ??
       "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
     status: "active",
     providerMetadata: {},
@@ -131,6 +135,29 @@ describe("SlackAppSetupPane", () => {
     expect(
       screen.getByRole("button", { name: "Create and connect Slack app" }).hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("uses the provider-facing webhook callback origin for generated redirect URLs", async () => {
+    const rendered = renderSlackAppSetupPane({
+      controlPlaneApiOrigin: "http://localhost:3000",
+      webhookCallbackUrl:
+        "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_public",
+    });
+
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain(
+        "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_public",
+      );
+    });
+    expect(rendered.container.textContent).toContain(
+      "https://public-control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
+    );
+    expect(rendered.container.textContent).toContain(
+      "https://public-control-plane.example.com/p/identity-linking/callbacks/slack",
+    );
+    expect(rendered.container.textContent).not.toContain(
+      "http://localhost:3000/p/integration/callbacks/setup/slack-app-installation",
+    );
   });
 
   it("defaults a configured Slack connection to the existing app setup", () => {

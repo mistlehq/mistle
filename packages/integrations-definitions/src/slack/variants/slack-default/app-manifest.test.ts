@@ -111,6 +111,33 @@ describe("buildSlackAppManifest", () => {
       },
     });
   });
+
+  it("replaces generated Mistle redirect URLs while preserving custom redirect URLs", () => {
+    const manifest = buildSlackAppManifest({
+      controlPlaneBaseUrl: "https://public-control-plane.example.com",
+      webhookCallbackUrl:
+        "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
+      manifest: {
+        oauth_config: {
+          redirect_urls: [
+            "http://localhost:3000/p/integration/callbacks/setup/slack-app-installation",
+            "https://private-dashboard.example.com/p/identity-linking/callbacks/slack",
+            "https://customer.example.com/slack/oauth/callback",
+          ],
+        },
+      },
+    });
+
+    expect(manifest).toMatchObject({
+      oauth_config: {
+        redirect_urls: [
+          "https://customer.example.com/slack/oauth/callback",
+          "https://public-control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
+          "https://public-control-plane.example.com/p/identity-linking/callbacks/slack",
+        ],
+      },
+    });
+  });
 });
 
 describe("buildSlackAppManifestDraft", () => {

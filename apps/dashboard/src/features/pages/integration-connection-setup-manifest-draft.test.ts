@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
+import {
+  resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveManifestDraftControlPlaneBaseUrl,
+} from "./integration-connection-setup-manifest-draft.js";
 
 const GitHubConnection = {
   createdAt: "2026-04-28T00:00:00.000Z",
@@ -22,6 +25,17 @@ const SlackConnection = {
   connectionMethodId: "slack-bot-token",
   updatedAt: "2026-04-28T00:00:00.000Z",
 } satisfies IntegrationConnection;
+
+describe("resolveManifestDraftControlPlaneBaseUrl", () => {
+  it("uses the provider-facing webhook callback URL origin", () => {
+    expect(
+      resolveManifestDraftControlPlaneBaseUrl({
+        webhookCallbackUrl:
+          "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
+      }),
+    ).toBe("https://public-control-plane.example.com");
+  });
+});
 
 describe("resolveIntegrationSetupAppManifestDraftBuilderOrThrow", () => {
   it("resolves the GitHub manifest draft builder from the browser definition", () => {
