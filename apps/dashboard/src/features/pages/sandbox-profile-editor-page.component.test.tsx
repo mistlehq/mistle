@@ -70,7 +70,7 @@ type SandboxProfileEditorTestVersionState =
   | "draft-with-published"
   | "published"
   | "published-with-draft"
-  | "published-pending-with-active"
+  | "published-pending-with-older-active"
   | "published-manual-refresh-no-snapshot"
   | "published-no-snapshot"
   | "published-pending"
@@ -169,7 +169,7 @@ function createSandboxProfileVersionsForTest(input: {
           state: "draft",
         }),
       ];
-    case "published-pending-with-active":
+    case "published-pending-with-older-active":
       return [
         createVersion({
           version: input.version - 1,
@@ -249,7 +249,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
   switch (input.versionState) {
     case "published":
     case "published-with-draft":
-    case "published-pending-with-active":
+    case "published-pending-with-older-active":
     case "published-manual-refresh-no-snapshot":
     case "published-no-snapshot":
     case "published-pending":
@@ -305,7 +305,7 @@ function renderSandboxProfileEditor(input?: {
   const activeVersion =
     input?.versionState === "published" || input?.versionState === "published-with-draft"
       ? version
-      : input?.versionState === "published-pending-with-active"
+      : input?.versionState === "published-pending-with-older-active"
         ? version - 1
         : input?.versionState === "draft-with-published"
           ? version - 1
@@ -1523,7 +1523,7 @@ describe("SandboxProfileEditorPage", () => {
   it("shows the latest published setup script when an older active version still exists", () => {
     renderSandboxProfileEditor({
       routeSection: "configurations",
-      versionState: "published-pending-with-active",
+      versionState: "published-pending-with-older-active",
       setupScriptsByVersion: {
         2: null,
         3: "pnpm install\npnpm test:setup",

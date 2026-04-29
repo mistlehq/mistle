@@ -950,24 +950,19 @@ function LoadedSandboxProfileEditorPage(
         },
       );
 
-      const invalidationPromises = [
+      void Promise.all([
         input.invalidateProfileVersions(input.profileId),
         input.invalidateSandboxProfiles(),
         input.invalidateProfileDetail(input.profileId),
-      ];
-      if (result.activeVersion !== null) {
-        invalidationPromises.push(
-          input.invalidateVersionBindings({
-            profileId: input.profileId,
-            version: result.activeVersion,
-          }),
-          input.invalidateVersionSetupScript({
-            profileId: input.profileId,
-            version: result.activeVersion,
-          }),
-        );
-      }
-      void Promise.all(invalidationPromises);
+        input.invalidateVersionBindings({
+          profileId: input.profileId,
+          version: result.version.version,
+        }),
+        input.invalidateVersionSetupScript({
+          profileId: input.profileId,
+          version: result.version.version,
+        }),
+      ]);
     },
     onError: (error: unknown) => {
       setVersionActionError(
