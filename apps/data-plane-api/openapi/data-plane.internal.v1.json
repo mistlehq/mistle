@@ -172,6 +172,10 @@
                     "type": "integer",
                     "minimum": 1
                   },
+                  "purpose": {
+                    "type": "string",
+                    "enum": ["session", "snapshot", "setup_check"]
+                  },
                   "idempotencyKey": {
                     "type": "string",
                     "minLength": 1,

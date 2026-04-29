@@ -98,6 +98,22 @@ describe("internal sandbox instances list integration", () => {
         createdAt: "2026-03-14T00:00:00.000Z",
         updatedAt: "2026-03-14T00:00:00.000Z",
       },
+      {
+        id: "sbi_list_org_a_setup_check_001",
+        organizationId: "org_dp_list_a",
+        sandboxProfileId: "sbp_setup_check",
+        title: "Hidden setup check",
+        sandboxProfileVersion: 10,
+        runtimeProvider: "docker",
+        providerSandboxId: "provider-list-a-setup-check-001",
+        status: SandboxInstanceStatuses.STOPPED,
+        startedByKind: "user",
+        startedById: "usr_setup_check",
+        source: "dashboard",
+        purpose: SandboxInstancePurposes.SETUP_CHECK,
+        createdAt: "2026-03-15T00:00:00.000Z",
+        updatedAt: "2026-03-15T00:00:00.000Z",
+      },
     ]);
 
     const firstPage = await client.listSandboxInstances({

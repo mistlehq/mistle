@@ -210,6 +210,38 @@ describe("internal sandbox instances get integration", () => {
     await expect(response.json()).resolves.toBeNull();
   });
 
+  it("returns null for setup-check-purpose sandbox instances", async ({ fixture }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_setup_check",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_setup_check_hidden",
+      title: "Setup check",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-setup-check-hidden-001",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "user",
+      startedById: "usr_setup_check_hidden",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_setup_check?organizationId=org_dp_api_conventional_get`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toBeNull();
+  });
+
   it("returns pending before provider provisioning begins", async ({ fixture }) => {
     await fixture.db.insert(sandboxInstances).values({
       id: "sbi_conventional_get_pending",

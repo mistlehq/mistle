@@ -1,4 +1,8 @@
-import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type {
+  SandboxInstancePurpose,
+  SandboxInstanceSource,
+  SandboxInstanceStarterKind,
+} from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import type { SandboxImageHandle, SandboxProvider } from "@mistle/sandbox";
 import type { Client } from "openapi-fetch";
@@ -28,6 +32,7 @@ export type StartSandboxInstanceInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  purpose?: SandboxInstancePurpose;
   runtimePlan: CompiledRuntimePlan;
   startedBy: {
     kind: SandboxInstanceStarterKind;

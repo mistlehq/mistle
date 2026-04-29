@@ -42,6 +42,7 @@ export type SandboxInstanceSource =
 export const SandboxInstancePurposes = {
   SESSION: "session",
   SNAPSHOT: "snapshot",
+  SETUP_CHECK: "setup_check",
 } as const;
 
 export type SandboxInstancePurpose =

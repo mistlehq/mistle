@@ -142,6 +142,8 @@ export interface paths {
               provider?: "docker" | "e2b";
             };
             organizationId: string;
+            /** @enum {string} */
+            purpose?: "session" | "snapshot" | "setup_check";
             runtimePlan: {
               agentRuntimes: {
                 bindingId: string;

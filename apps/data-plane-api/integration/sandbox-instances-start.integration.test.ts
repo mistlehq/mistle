@@ -7,7 +7,11 @@ import {
   organizations,
   SandboxStorageConfigSources,
 } from "@mistle/db/control-plane";
-import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { reserveAvailablePort } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import type { Pool } from "pg";
@@ -31,6 +35,13 @@ const WorkflowRunInputSchema = z
     sandboxInstanceId: z.string().min(1),
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
+    purpose: z
+      .enum([
+        SandboxInstancePurposes.SESSION,
+        SandboxInstancePurposes.SNAPSHOT,
+        SandboxInstancePurposes.SETUP_CHECK,
+      ])
+      .optional(),
     persistenceMode: z.enum([
       SandboxInstancePersistenceModes.EPHEMERAL,
       SandboxInstancePersistenceModes.PERSISTENT,
@@ -195,6 +206,79 @@ describe("sandboxInstances.start integration", () => {
     expect(parsedWorkflowInput.sandboxProfileId).toBe(workflowInput.sandboxProfileId);
     expect(parsedWorkflowInput.sandboxInstanceId).toBe(startedSandbox.sandboxInstanceId);
     expect(parsedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
+    expect(parsedWorkflowInput.purpose).toBeUndefined();
+  }, 60_000);
+
+  it("queues setup-check launches with a setup-check purpose", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxProfileId = "sbp_dp_api_setup_check_launch";
+    const workflowInput: StartSandboxInstanceInput = {
+      organizationId: "org_dp_api_setup_check_launch",
+      sandboxProfileId,
+      sandboxProfileVersion: 3,
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 3,
+      }),
+      startedBy: {
+        kind: "user",
+        id: "usr_dp_api_setup_check_launch",
+      },
+      source: "dashboard",
+      image: {
+        imageId: "im_dp_api_setup_check_launch",
+        createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
+      },
+    };
+
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
+
+    const workflowRuns = await waitForWorkflowRuns({
+      runQuery: async (organizationId, profileId) => {
+        const result = await fixture.dbPool.query<WorkflowRunRow>(
+          `
+            select id, namespace_id, workflow_name, status, input, output
+            from data_plane_openworkflow.workflow_runs
+            where
+              namespace_id = $1
+              and workflow_name = $2
+              and input->>'organizationId' = $3
+              and input->>'sandboxProfileId' = $4
+            order by created_at asc
+          `,
+          [fixture.config.workflow.namespaceId, WorkflowName, organizationId, profileId],
+        );
+        return result.rows;
+      },
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: workflowInput.sandboxProfileId,
+    });
+
+    const queuedRun = workflowRuns[0];
+    if (queuedRun === undefined) {
+      throw new Error("Expected queued workflow run row to exist.");
+    }
+
+    const parsedWorkflowInput = WorkflowRunInputSchema.parse(queuedRun.input);
+    expect(parsedWorkflowInput.sandboxInstanceId).toBe(startedSandbox.sandboxInstanceId);
+    expect(parsedWorkflowInput.purpose).toBe(SandboxInstancePurposes.SETUP_CHECK);
+
+    const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        id: true,
+        purpose: true,
+        status: true,
+      },
+      where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
+    });
+
+    expect(persistedSandboxInstance).toEqual({
+      id: startedSandbox.sandboxInstanceId,
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      status: SandboxInstanceStatuses.PENDING,
+    });
   }, 60_000);
 
   it("queues snapshot launches with the stored snapshot provider", async ({ fixture }) => {
@@ -354,6 +438,7 @@ describe("sandboxInstances.start integration", () => {
         sandboxProfileVersion: true,
         providerSandboxId: true,
         persistenceMode: true,
+        purpose: true,
         status: true,
       },
       where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
@@ -366,6 +451,7 @@ describe("sandboxInstances.start integration", () => {
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
       providerSandboxId: null,
       persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+      purpose: SandboxInstancePurposes.SESSION,
       status: SandboxInstanceStatuses.PENDING,
     });
 

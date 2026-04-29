@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
@@ -45,6 +46,7 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
+    purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
     source: input.source,
     idempotencyKey,
   });
@@ -136,6 +138,7 @@ export async function startSandboxInstance(
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
     persistenceMode,
+    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     runtimePlan: input.runtimePlan,
     startedBy: input.startedBy,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
@@ -172,6 +175,7 @@ export async function startSandboxInstance(
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,
+      purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
       persistenceMode,
     })
     .onConflictDoNothing({

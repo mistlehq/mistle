@@ -1,5 +1,6 @@
 import type {
   SandboxInstancePersistenceMode,
+  SandboxInstancePurpose,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
@@ -58,6 +59,7 @@ export type StartSandboxInstanceWorkflowInput = {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   persistenceMode: SandboxInstancePersistenceMode;
+  purpose?: SandboxInstancePurpose;
   runtimePlan: CompiledRuntimePlan;
   startedBy: {
     kind: SandboxInstanceStarterKind;
