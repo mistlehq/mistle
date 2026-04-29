@@ -127,7 +127,7 @@
 - Prefer Drizzle's relational query API (`database.query.<table>.findFirst/findMany`) over raw `database.select(...)` unless you need SQL-level control.
 - In relational queries, prefer clause operator helpers from callback context (for example `where: (table, { eq, and }) => ...`) instead of importing operators directly from `drizzle-orm`.
 - Prefer `typeid` identifiers over UUIDs for application-generated IDs.
-- Prefer database-native timestamps for persisted rows: use schema defaults like `.defaultNow()` or SQL primitives like `sql\`now()\``instead of`new Date()` values in insert/update payloads.
+- Prefer database-native timestamps for persisted rows: use schema defaults like `.defaultNow()` or SQL primitives like `` sql`now()` `` instead of `new Date()` values in insert/update payloads.
 
 ### Pull Requests
 
@@ -150,3 +150,11 @@
 - Avoid IIFEs; use module scope or named functions for one-off initialization.
 - Avoid unnecessary inline closures, especially in hot paths or render loops; prefer named functions when it improves clarity or stable references. Closures are fine when they make intent clearer.
 - When a module has a clear primary flow or entrypoint, prefer placing that main flow first and supporting helper functions below it.
+
+### Rust
+
+- Do not use `unwrap`, `expect`, `panic!`, `todo!`, `unimplemented!`, or other code paths that can panic in production Rust code. Return and handle explicit errors instead. Tests may use unwraps and panics when they make failures clearer.
+- Prefer `crate::` paths over `super::`. Do not add new `super::` imports, and clean up existing `super::` usage when touching nearby code.
+- Avoid `pub use` for ordinary import convenience. Use it only when intentionally shaping a public API, such as re-exporting a dependency so downstream consumers do not have to depend on it directly.
+- Avoid global state through `lazy_static!`, `Once`, `OnceLock`, or similar mechanisms. Prefer passing explicit context structs for shared state.
+- Prefer strong domain types over strings. Use enums and newtypes when a value has a closed set of states, requires validation, or would otherwise be easy to mix up.
