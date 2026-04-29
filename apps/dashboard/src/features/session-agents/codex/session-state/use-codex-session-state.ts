@@ -25,7 +25,12 @@ import {
   reduceCodexApprovalRequestsState,
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
-import { type ConnectedCodexSession, type StartSessionStep } from "./codex-session-types.js";
+import { parseThreadTokenUsageSnapshot } from "./codex-session-events.js";
+import {
+  type CodexThreadTokenUsageSnapshot,
+  type ConnectedCodexSession,
+  type StartSessionStep,
+} from "./codex-session-types.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
 import { resolvePrimaryRepositoryThreadSwitchAction } from "./primary-repository-thread-switch.js";
 import {
@@ -120,6 +125,10 @@ type CodexSessionMessageState = {
   sessionErrorMessage: string | null;
 };
 
+type CodexSessionContextUsageState = {
+  threadTokenUsageSnapshot: CodexThreadTokenUsageSnapshot | null;
+};
+
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   repositoryStatusRefreshEpoch: number;
@@ -135,6 +144,7 @@ export type UseCodexSessionStateResult = {
   codexConfig: CodexSessionConfigState;
   serverRequests: CodexSessionServerRequestState;
   sessionMessage: CodexSessionMessageState;
+  contextUsage: CodexSessionContextUsageState;
 };
 
 export function useCodexSessionState(input: {
@@ -153,6 +163,8 @@ export function useCodexSessionState(input: {
   const [repositoryStatusRefreshEpoch, setRepositoryStatusRefreshEpoch] = useState(0);
   const [lifecycleErrorMessage, setLifecycleErrorMessage] = useState<string | null>(null);
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
+  const [threadTokenUsageSnapshot, setThreadTokenUsageSnapshot] =
+    useState<CodexThreadTokenUsageSnapshot | null>(null);
 
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
     reduceCodexApprovalRequestsState,
@@ -234,10 +246,22 @@ export function useCodexSessionState(input: {
     });
   }, []);
 
+  const handleSessionNotificationReceived = useCallback(
+    (notification: CodexJsonRpcNotification): void => {
+      const tokenUsageSnapshot = parseThreadTokenUsageSnapshot(notification);
+      if (tokenUsageSnapshot !== null) {
+        setThreadTokenUsageSnapshot(tokenUsageSnapshot);
+      }
+
+      handleNotificationReceived(notification);
+    },
+    [handleNotificationReceived],
+  );
+
   const { lifecycle, updateActiveThread } = useCodexSessionConnection({
     connectionGenerationRef,
     ensureCurrentGeneration,
-    handleChatNotificationReceived: handleNotificationReceived,
+    handleChatNotificationReceived: handleSessionNotificationReceived,
     onTurnCompleted: () => {
       setRepositoryStatusRefreshEpoch((currentEpoch) => currentEpoch + 1);
     },
@@ -911,6 +935,12 @@ export function useCodexSessionState(input: {
     };
   }, [sessionErrorMessage]);
 
+  const contextUsage = useMemo<CodexSessionContextUsageState>(() => {
+    return {
+      threadTokenUsageSnapshot,
+    };
+  }, [threadTokenUsageSnapshot]);
+
   return {
     lifecycle,
     repositoryStatusRefreshEpoch,
@@ -922,5 +952,6 @@ export function useCodexSessionState(input: {
     codexConfig,
     serverRequests,
     sessionMessage,
+    contextUsage,
   };
 }

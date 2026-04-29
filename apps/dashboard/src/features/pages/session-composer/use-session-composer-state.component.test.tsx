@@ -109,6 +109,7 @@ function SessionComposerStateHarness(input: {
         branchLabel: null,
         pullRequest: null,
       },
+      contextUsage: null,
       sessionErrorMessage: null,
       turnControl: {
         activeTurnState: "idle",

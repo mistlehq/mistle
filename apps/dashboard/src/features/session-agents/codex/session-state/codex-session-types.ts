@@ -15,7 +15,21 @@ export type CodexThreadLifecycleEvent = {
 
 export type CodexThreadTokenUsageSnapshot = {
   threadId: string;
+  turnId: string;
+  tokenUsage: {
+    total: CodexTokenUsageBreakdown;
+    last: CodexTokenUsageBreakdown;
+    modelContextWindow: number | null;
+  };
   usageJson: string;
+};
+
+export type CodexTokenUsageBreakdown = {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
 };
 
 export type CodexThreadNameUpdate = {

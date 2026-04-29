@@ -6,6 +6,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef } from "react";
 
+import { formatCodexContextUsage } from "../session-agents/codex/session-state/codex-context-usage.js";
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import { applyPatchedSessionTitleToCache } from "../sessions/session-header-title-model.js";
 import { generateSessionTitleWithSandboxCodexExec } from "../sessions/session-title-generation.js";
@@ -163,6 +164,11 @@ export function useSessionWorkbenchController(input: {
     rpcClientRef,
     sessionEventUnsubscribersRef,
   });
+  const contextUsage =
+    sessionState.contextUsage.threadTokenUsageSnapshot?.threadId ===
+    sessionState.lifecycle.sessionSnapshot?.activeThreadId
+      ? formatCodexContextUsage(sessionState.contextUsage.threadTokenUsageSnapshot)
+      : null;
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
@@ -373,6 +379,7 @@ export function useSessionWorkbenchController(input: {
         sessionErrorMessage: sessionMessage.sessionErrorMessage,
         clearSessionErrorMessage: sessionMessage.clearSessionErrorMessage,
         repositoryStatus,
+        contextUsage,
       },
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,

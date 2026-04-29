@@ -60,6 +60,7 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
   composerText: "Focus on dashboard asset ownership next.",
   gitBranchLabel: null,
   pullRequest: null,
+  contextUsage: null,
   pendingDiffCommentSummary: null,
   pendingAttachments: [],
   modelOptions: CodexFixtureSessionModelOptions,

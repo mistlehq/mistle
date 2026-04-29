@@ -17,6 +17,7 @@ import {
   ArrowCircleUpIcon,
   ChatCircleTextIcon,
   CircleNotchIcon,
+  GaugeIcon,
   GitBranchIcon,
   GitPullRequestIcon,
   PlusIcon,
@@ -71,6 +72,10 @@ export type ChatComposerViewModel = {
     title: string;
     url: string;
   } | null;
+  contextUsage: {
+    label: string;
+    title: string;
+  } | null;
   pendingDiffCommentSummary: {
     count: number;
     label: string;
@@ -113,6 +118,7 @@ export function ChatComposer({
   composerText,
   gitBranchLabel,
   pullRequest,
+  contextUsage,
   pendingDiffCommentSummary,
   pendingAttachments,
   modelOptions,
@@ -403,28 +409,39 @@ export function ChatComposer({
           )}
         </div>
       </div>
-      {gitBranchLabel === null && pullRequest === null ? null : (
-        <div className="text-muted-foreground flex items-center gap-4 px-1.5 pt-2 text-sm">
-          {gitBranchLabel === null ? null : (
-            <div className="flex items-center gap-1.5" data-repository-branch-state="present">
-              <GitBranchIcon aria-hidden="true" className="size-4" />
-              <span>{gitBranchLabel}</span>
+      {gitBranchLabel === null && pullRequest === null && contextUsage === null ? null : (
+        <div className="text-muted-foreground flex items-center justify-between gap-4 px-1.5 pt-2 text-sm">
+          <div className="flex min-w-0 items-center gap-4">
+            {gitBranchLabel === null ? null : (
+              <div
+                className="flex min-w-0 items-center gap-1.5"
+                data-repository-branch-state="present"
+              >
+                <GitBranchIcon aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">{gitBranchLabel}</span>
+              </div>
+            )}
+            {pullRequest === null ? null : (
+              <TextLink
+                className="min-w-0 items-center gap-1.5"
+                href={pullRequest.url}
+                opensInNewWindow
+                title={pullRequest.title}
+                variant="subtle"
+              >
+                <GitPullRequestIcon aria-hidden="true" className="size-4 shrink-0" />
+                <span className="truncate">
+                  PR #{String(pullRequest.number)}
+                  {pullRequest.isDraft ? " Draft" : ""}
+                </span>
+              </TextLink>
+            )}
+          </div>
+          {contextUsage === null ? null : (
+            <div className="ml-auto flex shrink-0 items-center gap-1.5" title={contextUsage.title}>
+              <GaugeIcon aria-hidden="true" className="size-4" />
+              <span>{contextUsage.label}</span>
             </div>
-          )}
-          {pullRequest === null ? null : (
-            <TextLink
-              className="items-center gap-1.5"
-              href={pullRequest.url}
-              opensInNewWindow
-              title={pullRequest.title}
-              variant="subtle"
-            >
-              <GitPullRequestIcon aria-hidden="true" className="size-4 shrink-0" />
-              <span className="truncate">
-                PR #{String(pullRequest.number)}
-                {pullRequest.isDraft ? " Draft" : ""}
-              </span>
-            </TextLink>
           )}
         </div>
       )}

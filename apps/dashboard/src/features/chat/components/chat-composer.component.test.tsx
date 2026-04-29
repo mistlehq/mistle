@@ -11,6 +11,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     composerText: "Ship it",
     gitBranchLabel: null,
     pullRequest: null,
+    contextUsage: null,
     pendingDiffCommentSummary: null,
     pendingAttachments: [],
     modelOptions: [{ value: "gpt-5.4-codex", label: "GPT-5.4" }],
@@ -187,6 +188,20 @@ describe("ChatComposer", () => {
     );
 
     expect(screen.getByRole("link", { name: "PR #142" })).toBeTruthy();
+  });
+
+  it("renders context usage beside repository status when provided", () => {
+    render(
+      <ChatComposer
+        {...createBaseComposerProps()}
+        contextUsage={{
+          label: "Context 82% left",
+          title: "42,000 used of 200,000 window",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Context 82% left")).toBeTruthy();
   });
 
   it("accepts dropped image files on the git branch footer row", () => {

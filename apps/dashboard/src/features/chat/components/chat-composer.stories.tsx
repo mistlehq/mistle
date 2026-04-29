@@ -168,6 +168,24 @@ export const WithGitBranchAndPullRequest: Story = {
   },
 };
 
+export const WithContextUsage: Story = {
+  args: {
+    composerText: "Summarize the remaining implementation risk.",
+    contextUsage: {
+      label: "Context 82% left",
+      title: "42,000 used of 200,000 window",
+    },
+    gitBranchLabel: "feature/show-session-branch",
+    pullRequest: {
+      isDraft: false,
+      number: 142,
+      state: "OPEN",
+      title: "Show pull request status in the composer",
+      url: "https://github.com/mistlehq/mistle/pull/142",
+    },
+  },
+};
+
 export const SteeringTurnShortcutHover: Story = {
   args: {
     composerText: "Focus only on Storybook asset ownership.",

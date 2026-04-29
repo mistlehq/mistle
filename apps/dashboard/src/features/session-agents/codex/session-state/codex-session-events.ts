@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type {
   CodexThreadLifecycleEvent,
   CodexThreadNameUpdate,
@@ -5,6 +7,24 @@ import type {
   CodexTurnDiffSnapshot,
   CodexTurnPlanSnapshot,
 } from "./codex-session-types.js";
+
+const TokenUsageBreakdownSchema = z.object({
+  totalTokens: z.number(),
+  inputTokens: z.number(),
+  cachedInputTokens: z.number(),
+  outputTokens: z.number(),
+  reasoningOutputTokens: z.number(),
+});
+
+const ThreadTokenUsageNotificationParamsSchema = z.object({
+  threadId: z.string().min(1),
+  turnId: z.string().min(1),
+  tokenUsage: z.object({
+    total: TokenUsageBreakdownSchema,
+    last: TokenUsageBreakdownSchema,
+    modelContextWindow: z.number().nullable(),
+  }),
+});
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -126,19 +146,16 @@ export function parseThreadTokenUsageSnapshot(notification: {
     return null;
   }
 
-  const params = resolveNotificationParams(notification);
-  if (params === null) {
-    return null;
-  }
-
-  const threadId = resolveStringProperty(params, "threadId");
-  if (threadId === null) {
+  const params = ThreadTokenUsageNotificationParamsSchema.safeParse(notification.params);
+  if (!params.success) {
     return null;
   }
 
   return {
-    threadId,
-    usageJson: JSON.stringify(params),
+    threadId: params.data.threadId,
+    turnId: params.data.turnId,
+    tokenUsage: params.data.tokenUsage,
+    usageJson: JSON.stringify(params.data),
   };
 }
 

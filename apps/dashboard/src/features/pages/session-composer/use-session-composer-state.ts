@@ -2,6 +2,7 @@ import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definiti
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
+import type { CodexContextUsageViewModel } from "../../session-agents/codex/session-state/codex-context-usage.js";
 import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import {
   buildSessionComposerPrompt,
@@ -81,6 +82,7 @@ export type SessionComposerStateInput = {
     branchLabel: string | null;
     pullRequest: SessionPullRequestSummary | null;
   };
+  contextUsage: CodexContextUsageViewModel | null;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -618,6 +620,7 @@ export function useSessionComposerState(input: {
       canUploadAttachments: composerStateInput.attachmentControl.canUploadAttachments,
       gitBranchLabel: composerStateInput.repositoryStatus.branchLabel,
       pullRequest: composerStateInput.repositoryStatus.pullRequest,
+      contextUsage: composerStateInput.contextUsage,
       isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
       keyboardShortcuts:
         composerStateInput.turnControl.activeTurnState === "running" &&

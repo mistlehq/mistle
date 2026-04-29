@@ -114,6 +114,7 @@ function RenderedComposerPaneHarness(input: {
           branchLabel: null,
           pullRequest: null,
         },
+        contextUsage: null,
         sessionErrorMessage,
         turnControl: {
           activeTurnState: "idle",
@@ -215,6 +216,7 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
             branchLabel: null,
             pullRequest: null,
           },
+          contextUsage: null,
           sessionErrorMessage: null,
           turnControl: {
             activeTurnState,
