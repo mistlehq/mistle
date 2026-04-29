@@ -21,6 +21,7 @@ pub mod pty_stream;
 pub mod runtime_processes;
 pub mod session;
 pub mod telemetry;
+pub(crate) mod upload_classification;
 
 /// Describes why bootstrap tunnel setup or shutdown failed.
 #[derive(Debug, Clone, PartialEq, Eq)]
