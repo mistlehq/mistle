@@ -10,10 +10,22 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 export type IntegrationSetupAppManifestDraftBuilder =
   IntegrationFormConnectionMethodSetupManifestDraft["build"];
 
+const ManifestWebhookCallbackPathPrefix = "/p/integration/webhooks/";
+
 export function resolveManifestDraftControlPlaneBaseUrl(input: {
   webhookCallbackUrl: string;
 }): string {
-  return new URL(input.webhookCallbackUrl).origin;
+  const callbackUrl = new URL(input.webhookCallbackUrl);
+  const callbackPathIndex = callbackUrl.pathname.indexOf(ManifestWebhookCallbackPathPrefix);
+
+  if (callbackPathIndex < 0) {
+    throw new Error(
+      `Webhook callback URL '${input.webhookCallbackUrl}' is not a manifest webhook callback URL.`,
+    );
+  }
+
+  const basePath = callbackUrl.pathname.slice(0, callbackPathIndex);
+  return `${callbackUrl.origin}${basePath}`;
 }
 
 export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {

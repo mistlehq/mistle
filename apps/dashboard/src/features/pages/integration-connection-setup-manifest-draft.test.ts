@@ -27,13 +27,32 @@ const SlackConnection = {
 } satisfies IntegrationConnection;
 
 describe("resolveManifestDraftControlPlaneBaseUrl", () => {
-  it("uses the provider-facing webhook callback URL origin", () => {
+  it("uses the provider-facing webhook callback URL base", () => {
     expect(
       resolveManifestDraftControlPlaneBaseUrl({
         webhookCallbackUrl:
           "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_123",
       }),
     ).toBe("https://public-control-plane.example.com");
+  });
+
+  it("preserves provider-facing path prefixes", () => {
+    expect(
+      resolveManifestDraftControlPlaneBaseUrl({
+        webhookCallbackUrl:
+          "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_123",
+      }),
+    ).toBe("https://public-control-plane.example.com/base");
+  });
+
+  it("fails fast when the callback URL does not use the webhook callback route", () => {
+    expect(() =>
+      resolveManifestDraftControlPlaneBaseUrl({
+        webhookCallbackUrl: "https://public-control-plane.example.com/webhooks/slack",
+      }),
+    ).toThrow(
+      "Webhook callback URL 'https://public-control-plane.example.com/webhooks/slack' is not a manifest webhook callback URL.",
+    );
   });
 });
 

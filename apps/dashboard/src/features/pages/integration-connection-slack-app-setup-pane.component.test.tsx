@@ -137,23 +137,23 @@ describe("SlackAppSetupPane", () => {
     ).toBe(true);
   });
 
-  it("uses the provider-facing webhook callback origin for generated redirect URLs", async () => {
+  it("uses the provider-facing webhook callback base for generated redirect URLs", async () => {
     const rendered = renderSlackAppSetupPane({
       controlPlaneApiOrigin: "http://localhost:3000",
       webhookCallbackUrl:
-        "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_public",
+        "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
     });
 
     await waitFor(() => {
       expect(rendered.container.textContent).toContain(
-        "https://public-control-plane.example.com/p/integration/webhooks/slack-default/eps_public",
+        "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
       );
     });
     expect(rendered.container.textContent).toContain(
-      "https://public-control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
+      "https://public-control-plane.example.com/base/p/integration/callbacks/setup/slack-app-installation",
     );
     expect(rendered.container.textContent).toContain(
-      "https://public-control-plane.example.com/p/identity-linking/callbacks/slack",
+      "https://public-control-plane.example.com/base/p/identity-linking/callbacks/slack",
     );
     expect(rendered.container.textContent).not.toContain(
       "http://localhost:3000/p/integration/callbacks/setup/slack-app-installation",
