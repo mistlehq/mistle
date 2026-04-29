@@ -7,7 +7,17 @@ export type DashboardConfig = {
   authBasePath: "/v1/auth";
 };
 
+const SameOriginControlPlaneApiOrigin = "same-origin";
+
 function parseRequiredUrlOrigin(value: string, key: string): string {
+  if (value === SameOriginControlPlaneApiOrigin) {
+    if (globalThis.location?.origin === undefined) {
+      throw new Error(`${key} cannot use same-origin outside a browser environment.`);
+    }
+
+    return globalThis.location.origin;
+  }
+
   if (value.trim().length === 0) {
     throw new Error(`${key} must be a valid absolute URL origin.`);
   }

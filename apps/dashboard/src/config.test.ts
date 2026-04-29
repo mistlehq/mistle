@@ -11,6 +11,7 @@ function setDashboardControlPlaneApiOrigin(value: string): void {
 afterEach(() => {
   resetDashboardConfigForTest();
   setDashboardControlPlaneApiOrigin("http://localhost:3000");
+  Reflect.deleteProperty(globalThis, "location");
 });
 
 describe("dashboard config", () => {
@@ -20,6 +21,21 @@ describe("dashboard config", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://localhost:3000");
+  });
+
+  it("resolves same-origin control-plane API origin from the browser location", () => {
+    Object.defineProperty(globalThis, "location", {
+      configurable: true,
+      value: {
+        origin: "https://dashboard.example.test",
+      },
+    });
+
+    const config = buildDashboardConfig({
+      VITE_CONTROL_PLANE_API_ORIGIN: "same-origin",
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("https://dashboard.example.test");
   });
 
   it("rejects an invalid control-plane API origin", () => {

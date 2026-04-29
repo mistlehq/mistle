@@ -114,8 +114,9 @@ export function loadDashboardBuildConfig(
 
   const parsedConfig = DashboardBuildConfigSchema.parse(parsedRoot);
   const controlPlaneApiOrigin = normalizeOrigin(
-    parsedConfig.services.dashboard.control_plane_api_origin,
-    "services.dashboard.control_plane_api_origin",
+    environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN ??
+      parsedConfig.services.dashboard.control_plane_api_origin,
+    "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin",
   );
 
   return {

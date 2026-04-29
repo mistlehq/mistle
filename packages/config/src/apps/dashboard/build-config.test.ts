@@ -167,6 +167,17 @@ describe("loadDashboardBuildConfig", () => {
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
   });
 
+  it("allows single-image builds to use same-origin control-plane API routing", () => {
+    const config = loadDashboardBuildConfigForTest({
+      configPath: createDashboardConfigFile(),
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "same-origin",
+      },
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("same-origin");
+  });
+
   it("fails when services.dashboard.control_plane_api_origin is missing", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
@@ -177,7 +188,7 @@ describe("loadDashboardBuildConfig", () => {
     ).toThrow("Too small: expected string to have >=1 characters");
   });
 
-  it("fails when services.dashboard.control_plane_api_origin is not an absolute URL origin", () => {
+  it("fails when services.dashboard.control_plane_api_origin is not an absolute URL origin or same-origin", () => {
     expect(() =>
       loadDashboardBuildConfigForTest({
         configPath: createDashboardConfigFile({
@@ -185,6 +196,8 @@ describe("loadDashboardBuildConfig", () => {
         }),
         environment: "production",
       }),
-    ).toThrow("services.dashboard.control_plane_api_origin must use http:// or https://.");
+    ).toThrow(
+      "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN or services.dashboard.control_plane_api_origin must use http:// or https://.",
+    );
   });
 });
