@@ -634,19 +634,27 @@ describe("integration connections list integration", () => {
     const listUsagePage = ListIntegrationConnectionsResponseSchema.parse(
       await listUsageResponse.json(),
     );
-    expect(
-      listUsagePage.items.find((connection) => connection.id === "icn_delete_bound")?.bindingCount,
-    ).toBe(0);
-    expect(
-      listUsagePage.items.find(
-        (connection) => connection.id === "icn_delete_inactive_published_binding",
-      )?.bindingCount,
-    ).toBe(0);
-    expect(
-      listUsagePage.items.find(
-        (connection) => connection.id === "icn_delete_active_version_binding",
-      )?.bindingCount,
-    ).toBe(1);
+    function expectListedBindingCount(input: { bindingCount: number; connectionId: string }): void {
+      const listedConnection = listUsagePage.items.find(
+        (connection) => connection.id === input.connectionId,
+      );
+
+      expect(listedConnection).toBeDefined();
+      expect(listedConnection?.bindingCount).toBe(input.bindingCount);
+    }
+
+    expectListedBindingCount({
+      bindingCount: 0,
+      connectionId: "icn_delete_bound",
+    });
+    expectListedBindingCount({
+      bindingCount: 0,
+      connectionId: "icn_delete_inactive_published_binding",
+    });
+    expectListedBindingCount({
+      bindingCount: 1,
+      connectionId: "icn_delete_active_version_binding",
+    });
 
     const deleteFreeResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_free",
@@ -690,7 +698,7 @@ describe("integration connections list integration", () => {
     });
     expect(deletedWebhookSecretCredential).toBeUndefined();
 
-    const deleteBoundResponse = await fixture.request(
+    const deleteDraftBindingResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_bound",
       {
         method: "DELETE",
@@ -699,8 +707,8 @@ describe("integration connections list integration", () => {
         },
       },
     );
-    expect(deleteBoundResponse.status).toBe(200);
-    expect(await deleteBoundResponse.json()).toEqual({
+    expect(deleteDraftBindingResponse.status).toBe(200);
+    expect(await deleteDraftBindingResponse.json()).toEqual({
       connectionId: "icn_delete_bound",
     });
 
@@ -710,10 +718,10 @@ describe("integration connections list integration", () => {
       });
     expect(deletedDraftBinding).toBeUndefined();
 
-    const boundConnection = await fixture.db.query.integrationConnections.findFirst({
+    const deletedDraftBindingConnection = await fixture.db.query.integrationConnections.findFirst({
       where: (table, { eq }) => eq(table.id, "icn_delete_bound"),
     });
-    expect(boundConnection).toBeUndefined();
+    expect(deletedDraftBindingConnection).toBeUndefined();
 
     const deleteAutomationResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_automation",

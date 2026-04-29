@@ -761,13 +761,15 @@ function createScenarioDetailViewStoryProps(
   const resourceItemsByKey = createResourceItems(input);
   const webhookPolicy = createWebhookPolicy(input);
   const webhookSourceStateByConnectionId = createWebhookSourceSectionState(input);
+  const automationCount = input.automationCount ?? 0;
+  const bindingCount = input.bindingCount ?? 0;
 
   return {
     connections: [
       {
-        automationCount: input.automationCount ?? 0,
-        bindingCount: input.bindingCount ?? 0,
-        canDelete: (input.bindingCount ?? 0) === 0 && (input.automationCount ?? 0) === 0,
+        automationCount,
+        bindingCount,
+        canDelete: bindingCount === 0 && automationCount === 0,
         ...(authMethod === undefined ? {} : authMethod),
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,

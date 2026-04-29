@@ -55,6 +55,10 @@ function renderNeverSyncedResourceDetail(input: { isLoading: boolean }): void {
   );
 }
 
+function rejectUnexpectedDeleteConnection(): void {
+  throw new Error("Delete connection handler should not be called.");
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -96,7 +100,7 @@ describe("IntegrationConnectionDetailView", () => {
             resources: [],
           },
         ]}
-        onDeleteConnection={() => {}}
+        onDeleteConnection={rejectUnexpectedDeleteConnection}
       />,
     );
 
@@ -127,7 +131,7 @@ describe("IntegrationConnectionDetailView", () => {
             resources: [],
           },
         ]}
-        onDeleteConnection={() => {}}
+        onDeleteConnection={rejectUnexpectedDeleteConnection}
       />,
     );
 

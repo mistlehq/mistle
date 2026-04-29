@@ -626,8 +626,9 @@ function resolveDeleteConnectionMessage(
     return `This connection can't be deleted while it has ${connection.bindingCount} active sandbox profile ${connection.bindingCount === 1 ? "binding" : "bindings"}.`;
   }
 
-  if ((connection.automationCount ?? 0) > 0) {
-    return `This connection can't be deleted while it has ${connection.automationCount ?? 0} webhook ${(connection.automationCount ?? 0) === 1 ? "automation" : "automations"}.`;
+  const automationCount = connection.automationCount ?? 0;
+  if (automationCount > 0) {
+    return `This connection can't be deleted while it has ${automationCount} webhook ${automationCount === 1 ? "automation" : "automations"}.`;
   }
 
   return "This connection can't be deleted while it is still in use.";
