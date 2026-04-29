@@ -35,12 +35,14 @@ describe("resolveCodexTurnStartParams", () => {
       resolveCodexTurnStartParams({
         providerConversationId: "thread_123",
         inputText: "Handle the webhook payload.",
+        model: "gpt-5.3-codex",
         collaborationModeSettings: {
           developerInstructions: "Always include the automation marker.",
         },
       }),
     ).toEqual({
       threadId: "thread_123",
+      model: "gpt-5.3-codex",
       input: [
         {
           type: "text",
@@ -61,9 +63,11 @@ describe("resolveCodexTurnStartParams", () => {
       resolveCodexTurnStartParams({
         providerConversationId: "thread_123",
         inputText: "Handle the webhook payload.",
+        model: "gpt-5.3-codex",
       }),
     ).toEqual({
       threadId: "thread_123",
+      model: "gpt-5.3-codex",
       input: [
         {
           type: "text",

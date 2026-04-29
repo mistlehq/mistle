@@ -36,13 +36,18 @@ type DeliveryServer = {
 type DeliveryServerScenario =
   | "existing_conversation"
   | "create_conversation"
-  | "resume_not_loaded_conversation";
+  | "resume_not_loaded_conversation"
+  | "no_default_model";
 
 const ParentSpanContext = {
   traceId: "0123456789abcdef0123456789abcdef",
   spanId: "0123456789abcdef",
   traceFlags: TraceFlags.SAMPLED,
 };
+
+const DefaultCodexModel = "gpt-5.3-codex";
+const FallbackCodexModel = "gpt-5.5";
+const FallbackCodexModelReasoningEffort = "medium";
 
 const contextManager = new AsyncLocalStorageContextManager();
 
@@ -166,6 +171,28 @@ function expectJsonRpcId(value: number | string | undefined): number | string {
   throw new Error("Expected JSON-RPC id.");
 }
 
+function expectRequestModel(input: {
+  method: string;
+  params: Record<string, unknown> | undefined;
+  expectedModel: string;
+  expectedModelReasoningEffort?: string | undefined;
+}): void {
+  if (input.params === undefined || input.params.model !== input.expectedModel) {
+    throw new Error(`Expected ${input.method} to use Codex model '${input.expectedModel}'.`);
+  }
+  if (input.expectedModelReasoningEffort === undefined) {
+    if ("modelReasoningEffort" in input.params) {
+      throw new Error(`Expected ${input.method} to omit Codex model reasoning effort.`);
+    }
+    return;
+  }
+  if (input.params.modelReasoningEffort !== input.expectedModelReasoningEffort) {
+    throw new Error(
+      `Expected ${input.method} to use Codex model reasoning effort '${input.expectedModelReasoningEffort}'.`,
+    );
+  }
+}
+
 function readDeliveryContextMessage(value: unknown): DeliveryContextMessage {
   const payload = expectMethodPayload(value);
   if (payload.method !== "mistle/setDeliveryContext") {
@@ -260,6 +287,47 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
         return;
       }
 
+      if (methodPayload.method === "model/list") {
+        const modelListData =
+          scenario === "no_default_model"
+            ? [
+                {
+                  id: "model_other",
+                  model: "gpt-5.4",
+                  displayName: "GPT-5.4",
+                  isDefault: false,
+                },
+              ]
+            : [
+                {
+                  id: "model_default",
+                  model: DefaultCodexModel,
+                  displayName: "GPT-5.3 Codex",
+                  isDefault: true,
+                },
+                {
+                  id: "model_other",
+                  model: "gpt-5.4",
+                  displayName: "GPT-5.4",
+                  isDefault: false,
+                },
+              ];
+
+        socket.send(
+          encodeAgentTextPayload({
+            streamId: activeStreamId,
+            payload: {
+              id: expectJsonRpcId(methodPayload.id),
+              result: {
+                data: modelListData,
+                nextCursor: null,
+              },
+            },
+          }),
+        );
+        return;
+      }
+
       if (methodPayload.method === "thread/read") {
         threadReadCount += 1;
         const threadStatusType =
@@ -290,6 +358,11 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
         if (scenario !== "create_conversation") {
           throw new Error("Unexpected thread/start request for this scenario.");
         }
+        expectRequestModel({
+          method: methodPayload.method,
+          params: methodPayload.params,
+          expectedModel: DefaultCodexModel,
+        });
 
         socket.send(
           encodeAgentTextPayload({
@@ -325,6 +398,20 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
       }
 
       if (methodPayload.method === "turn/start") {
+        expectRequestModel(
+          scenario === "no_default_model"
+            ? {
+                method: methodPayload.method,
+                params: methodPayload.params,
+                expectedModel: FallbackCodexModel,
+                expectedModelReasoningEffort: FallbackCodexModelReasoningEffort,
+              }
+            : {
+                method: methodPayload.method,
+                params: methodPayload.params,
+                expectedModel: DefaultCodexModel,
+              },
+        );
         socket.send(
           encodeAgentTextPayload({
             streamId: activeStreamId,
@@ -446,6 +533,7 @@ describe("executeConversationProviderDelivery", () => {
         "initialized",
         "mistle/setDeliveryContext",
         "thread/read",
+        "model/list",
         "turn/start",
       ]);
     } finally {
@@ -499,6 +587,7 @@ describe("executeConversationProviderDelivery", () => {
         "initialize",
         "initialized",
         "mistle/setDeliveryContext",
+        "model/list",
         "thread/start",
         "thread/read",
         "turn/start",
@@ -539,6 +628,48 @@ describe("executeConversationProviderDelivery", () => {
         "thread/read",
         "thread/resume",
         "thread/read",
+        "model/list",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("uses the temporary fallback model when Codex default model resolution fails", async () => {
+    const server = await startDeliveryServer("no_default_model");
+
+    try {
+      const result = await context.with(
+        trace.setSpan(context.active(), trace.wrapSpanContext(ParentSpanContext)),
+        async () =>
+          await executeConversationProviderDelivery({
+            conversationId: "acv_123",
+            runtimeId: "codex",
+            connectionUrl: server.url,
+            inputText: "Handle the webhook payload.",
+            deliveryContext: {
+              webhookEventId: "iwe_123",
+              deliveryTaskId: "cdt_123",
+              automationRunId: "aru_123",
+              conversationId: "acv_123",
+              sandboxInstanceId: "sbi_123",
+            },
+            providerConversationId: "thread_123",
+            providerExecutionId: null,
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_123",
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "thread/read",
+        "model/list",
         "turn/start",
       ]);
     } finally {

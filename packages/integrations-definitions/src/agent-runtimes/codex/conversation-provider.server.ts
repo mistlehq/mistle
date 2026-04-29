@@ -17,6 +17,7 @@ import {
 import { generateConversationTitleWithSandboxCodexExec } from "./title-generation.js";
 
 const CodexMethodNames = {
+  MODEL_LIST: "model/list",
   THREAD_READ: "thread/read",
   THREAD_RESUME: "thread/resume",
   THREAD_START: "thread/start",
@@ -68,6 +69,18 @@ type CodexRequestFailureCause = {
   errorMessage: string;
   errorData?: unknown;
 };
+
+type CodexModelSelection = {
+  model: string;
+  modelReasoningEffort?: string | undefined;
+};
+
+const FallbackCodexDefaultModelSelection: CodexModelSelection = {
+  model: "gpt-5.5",
+  modelReasoningEffort: "medium",
+};
+
+const defaultModelByConnection = new WeakMap<AgentConversationConnection, CodexModelSelection>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -410,9 +423,13 @@ function toCodexTextInputItems(inputText: string): CodexStartExecutionInputItem[
 export function resolveCodexTurnStartParams(input: {
   providerConversationId: string;
   inputText: string;
+  model: string;
+  modelReasoningEffort?: string | undefined;
   collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
 }): {
   threadId: string;
+  model: string;
+  modelReasoningEffort?: string | undefined;
   input: CodexStartExecutionInputItem[];
   collaborationMode?:
     | {
@@ -425,6 +442,10 @@ export function resolveCodexTurnStartParams(input: {
 } {
   return {
     threadId: input.providerConversationId,
+    model: input.model,
+    ...(input.modelReasoningEffort === undefined
+      ? {}
+      : { modelReasoningEffort: input.modelReasoningEffort }),
     input: toCodexTextInputItems(input.inputText),
     ...(input.collaborationModeSettings === undefined
       ? {}
@@ -439,13 +460,10 @@ export function resolveCodexTurnStartParams(input: {
   };
 }
 
-function resolveCodexStartThreadParams(options: Readonly<Record<string, unknown>> | undefined): {
-  model?: string;
+function resolveCodexExplicitModelStartThreadParams(options: Readonly<Record<string, unknown>>): {
+  model: string;
+  modelReasoningEffort?: string | undefined;
 } {
-  if (options === undefined || !("model" in options) || options.model === undefined) {
-    return {};
-  }
-
   const modelValue = options.model;
   if (typeof modelValue !== "string" || modelValue.trim().length === 0) {
     throw new ConversationProviderError({
@@ -454,8 +472,167 @@ function resolveCodexStartThreadParams(options: Readonly<Record<string, unknown>
     });
   }
 
-  return {
+  const params: {
+    model: string;
+    modelReasoningEffort?: string | undefined;
+  } = {
     model: modelValue.trim(),
+  };
+
+  if ("modelReasoningEffort" in options && options.modelReasoningEffort !== undefined) {
+    const modelReasoningEffortValue = options.modelReasoningEffort;
+    if (
+      typeof modelReasoningEffortValue !== "string" ||
+      modelReasoningEffortValue.trim().length === 0
+    ) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
+        message:
+          "Codex createAutomationConversation options.modelReasoningEffort must be a non-empty string.",
+      });
+    }
+    params.modelReasoningEffort = modelReasoningEffortValue.trim();
+  }
+
+  return params;
+}
+
+async function resolveCodexCreateConversationModel(input: {
+  connection: AgentConversationConnection;
+  options: Readonly<Record<string, unknown>> | undefined;
+}): Promise<CodexModelSelection> {
+  if (
+    input.options !== undefined &&
+    "model" in input.options &&
+    input.options.model !== undefined
+  ) {
+    const selection = resolveCodexExplicitModelStartThreadParams(input.options);
+    defaultModelByConnection.set(input.connection, selection);
+    return selection;
+  }
+
+  return await resolveDefaultCodexModel({
+    connection: input.connection,
+    errorCode: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
+  });
+}
+
+async function resolveDefaultCodexModel(input: {
+  connection: AgentConversationConnection;
+  errorCode: ConversationProviderErrorCode;
+}): Promise<CodexModelSelection> {
+  const cachedSelection = defaultModelByConnection.get(input.connection);
+  if (cachedSelection !== undefined) {
+    return cachedSelection;
+  }
+
+  const defaultSelection = await fetchDefaultCodexModel({
+    connection: input.connection,
+    errorCode: input.errorCode,
+  }).catch(() => FallbackCodexDefaultModelSelection);
+  defaultModelByConnection.set(input.connection, defaultSelection);
+  return defaultSelection;
+}
+
+async function fetchDefaultCodexModel(input: {
+  connection: AgentConversationConnection;
+  errorCode: ConversationProviderErrorCode;
+}): Promise<CodexModelSelection> {
+  const defaultModels: CodexModelSelection[] = [];
+  let cursor: string | null = null;
+
+  do {
+    let modelListResult: unknown;
+    try {
+      modelListResult = await input.connection.request({
+        method: CodexMethodNames.MODEL_LIST,
+        params: {
+          cursor,
+        },
+      });
+    } catch (error) {
+      throw new ConversationProviderError({
+        code: input.errorCode,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Codex default model resolution failed with non-error exception.",
+        cause: error,
+      });
+    }
+
+    const page = readCodexModelListPage(modelListResult, input.errorCode);
+    defaultModels.push(...page.defaultModels);
+    cursor = page.nextCursor;
+  } while (cursor !== null);
+
+  if (defaultModels.length !== 1) {
+    throw new ConversationProviderError({
+      code: input.errorCode,
+      message: `Codex model/list returned ${String(defaultModels.length)} default models; expected exactly one.`,
+    });
+  }
+
+  const defaultModel = defaultModels[0];
+  if (defaultModel === undefined) {
+    throw new ConversationProviderError({
+      code: input.errorCode,
+      message: "Codex model/list did not return a default model.",
+    });
+  }
+
+  return defaultModel;
+}
+
+function readCodexModelListPage(
+  value: unknown,
+  errorCode: ConversationProviderErrorCode,
+): { defaultModels: CodexModelSelection[]; nextCursor: string | null } {
+  if (!isRecord(value) || !Array.isArray(value.data)) {
+    throw new ConversationProviderError({
+      code: errorCode,
+      message: "Codex model/list response did not include a data array.",
+    });
+  }
+
+  const defaultModels: CodexModelSelection[] = [];
+  for (const model of value.data) {
+    if (!isRecord(model) || model.isDefault !== true) {
+      continue;
+    }
+
+    if (typeof model.model !== "string" || model.model.trim().length === 0) {
+      throw new ConversationProviderError({
+        code: errorCode,
+        message: "Codex model/list response included a default model without a non-empty model id.",
+      });
+    }
+
+    const defaultModel: CodexModelSelection = {
+      model: model.model.trim(),
+    };
+    if (
+      "defaultReasoningEffort" in model &&
+      typeof model.defaultReasoningEffort === "string" &&
+      model.defaultReasoningEffort.trim().length > 0
+    ) {
+      defaultModel.modelReasoningEffort = model.defaultReasoningEffort.trim();
+    }
+
+    defaultModels.push(defaultModel);
+  }
+
+  const nextCursor = value.nextCursor;
+  if (nextCursor !== undefined && nextCursor !== null && typeof nextCursor !== "string") {
+    throw new ConversationProviderError({
+      code: errorCode,
+      message: "Codex model/list response included an invalid nextCursor.",
+    });
+  }
+
+  return {
+    defaultModels,
+    nextCursor: nextCursor ?? null,
   };
 }
 
@@ -631,11 +808,20 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       return { title };
     },
     createConversation: async (input) => {
+      const modelSelection = await resolveCodexCreateConversationModel({
+        connection: input.connection,
+        options: input.options,
+      });
       let createResult: unknown;
       try {
         createResult = await input.connection.request({
           method: CodexMethodNames.THREAD_START,
-          params: resolveCodexStartThreadParams(input.options),
+          params: {
+            model: modelSelection.model,
+            ...(modelSelection.modelReasoningEffort === undefined
+              ? {}
+              : { modelReasoningEffort: modelSelection.modelReasoningEffort }),
+          },
         });
       } catch (error) {
         throw new ConversationProviderError({
@@ -682,11 +868,21 @@ export function createOpenAiConversationProvider(): AgentConversationProvider {
       }
     },
     startExecution: async (input) => {
+      const modelSelection = await resolveDefaultCodexModel({
+        connection: input.connection,
+        errorCode: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+      });
       let startResult: unknown;
       try {
         startResult = await input.connection.request({
           method: CodexMethodNames.TURN_START,
-          params: resolveCodexTurnStartParams(input),
+          params: resolveCodexTurnStartParams({
+            ...input,
+            model: modelSelection.model,
+            ...(modelSelection.modelReasoningEffort === undefined
+              ? {}
+              : { modelReasoningEffort: modelSelection.modelReasoningEffort }),
+          }),
         });
       } catch (error) {
         if (isProviderConversationMissingError(error)) {
