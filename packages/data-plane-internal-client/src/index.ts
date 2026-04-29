@@ -81,12 +81,18 @@ export type ResumeSandboxInstanceInput = {
 };
 export type ResumeSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/resume"]["post"]["responses"]["200"]["content"]["application/json"];
-export type StopSandboxInstanceInput = {
-  sandboxInstanceId: string;
-  stopReason: "idle";
-  expectedOwnerLeaseId: string;
-  idempotencyKey: string;
-};
+export type StopSandboxInstanceInput =
+  | {
+      sandboxInstanceId: string;
+      stopReason: "idle";
+      expectedOwnerLeaseId: string;
+      idempotencyKey: string;
+    }
+  | {
+      sandboxInstanceId: string;
+      stopReason: "system";
+      idempotencyKey: string;
+    };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ReconcileSandboxInstanceInput = {
@@ -153,6 +159,7 @@ export type MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse =
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
+  includeSetupChecks?: boolean;
 };
 const GetSandboxInstanceResponseSchema = z
   .object({
@@ -419,8 +426,10 @@ export function createDataPlaneSandboxInstancesClient(
           headers: createAuthedJsonHeaders(internalClient.serviceToken),
           body: JSON.stringify({
             stopReason: stopInput.stopReason,
-            expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
             idempotencyKey: stopInput.idempotencyKey,
+            ...(stopInput.stopReason === "idle"
+              ? { expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId }
+              : {}),
           }),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },
@@ -617,6 +626,9 @@ export function createDataPlaneSandboxInstancesClient(
           instanceId: getInput.instanceId,
           query: {
             organizationId: getInput.organizationId,
+            ...(getInput.includeSetupChecks === undefined
+              ? {}
+              : { includeSetupChecks: getInput.includeSetupChecks ? "true" : "false" }),
           },
         }),
         {

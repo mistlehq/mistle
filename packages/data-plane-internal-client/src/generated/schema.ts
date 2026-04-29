@@ -555,6 +555,7 @@ export interface paths {
     get: {
       parameters: {
         query: {
+          includeSetupChecks?: "true" | "false";
           organizationId: string;
         };
         header?: never;
@@ -1401,12 +1402,18 @@ export interface paths {
       };
       requestBody: {
         content: {
-          "application/json": {
-            expectedOwnerLeaseId: string;
-            idempotencyKey: string;
-            /** @enum {string} */
-            stopReason: "idle";
-          };
+          "application/json":
+            | {
+                expectedOwnerLeaseId: string;
+                idempotencyKey: string;
+                /** @enum {string} */
+                stopReason: "idle";
+              }
+            | {
+                idempotencyKey: string;
+                /** @enum {string} */
+                stopReason: "system";
+              };
         };
       };
       responses: {

@@ -3,6 +3,7 @@ import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_PROFILES_ROUTE_BASE_PATH } from "./constants.js";
+import * as createSandboxProfileVersionSetupCheck from "./create-sandbox-profile-version-setup-check/index.js";
 import * as createSandboxProfileVersion from "./create-sandbox-profile-version/index.js";
 import * as createSandboxProfile from "./create-sandbox-profile/index.js";
 import * as deleteSandboxProfileVersionRefreshSchedule from "./delete-sandbox-profile-version-refresh-schedule/index.js";
@@ -11,6 +12,7 @@ import * as discardSandboxProfileVersionDraft from "./discard-sandbox-profile-ve
 import * as getSandboxProfileVersionAutomationConfig from "./get-sandbox-profile-version-automation-config/index.js";
 import * as getSandboxProfileVersionIntegrationBindings from "./get-sandbox-profile-version-integration-bindings/index.js";
 import * as getSandboxProfileVersionPublishability from "./get-sandbox-profile-version-publishability/index.js";
+import * as getSandboxProfileVersionSetupCheck from "./get-sandbox-profile-version-setup-check/index.js";
 import * as getSandboxProfileVersionSetupScript from "./get-sandbox-profile-version-setup-script/index.js";
 import * as getSandboxProfile from "./get-sandbox-profile/index.js";
 import * as listLaunchableSandboxProfiles from "./list-launchable-sandbox-profiles/index.js";
@@ -48,6 +50,14 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
   routes.openapi(
     getSandboxProfileVersionSetupScript.route,
     getSandboxProfileVersionSetupScript.handler,
+  );
+  routes.openapi(
+    createSandboxProfileVersionSetupCheck.route,
+    createSandboxProfileVersionSetupCheck.handler,
+  );
+  routes.openapi(
+    getSandboxProfileVersionSetupCheck.route,
+    getSandboxProfileVersionSetupCheck.handler,
   );
   routes.openapi(
     getSandboxProfileVersionIntegrationBindings.route,

@@ -9,16 +9,25 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
   const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
+  const stopInput =
+    body.stopReason === "idle"
+      ? {
+          sandboxInstanceId: params.id,
+          stopReason: body.stopReason,
+          expectedOwnerLeaseId: body.expectedOwnerLeaseId,
+          idempotencyKey: body.idempotencyKey,
+        }
+      : {
+          sandboxInstanceId: params.id,
+          stopReason: body.stopReason,
+          idempotencyKey: body.idempotencyKey,
+        };
+
   const response = await stopSandboxInstance(
     {
       openWorkflow,
     },
-    {
-      sandboxInstanceId: params.id,
-      stopReason: body.stopReason,
-      expectedOwnerLeaseId: body.expectedOwnerLeaseId,
-      idempotencyKey: body.idempotencyKey,
-    },
+    stopInput,
   );
 
   return ctx.json(response, 200);

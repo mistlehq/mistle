@@ -2,6 +2,9 @@ import { z } from "@hono/zod-openapi";
 import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
+  sandboxProfileSetupChecks,
+  SandboxProfileSetupCheckFailurePhases,
+  SandboxProfileSetupCheckStatuses,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -40,6 +43,24 @@ const sandboxProfileVersionSnapshotJobStateSchema = z.enum([
   SandboxProfileVersionSnapshotJobStates.RUNNING,
   SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
   SandboxProfileVersionSnapshotJobStates.FAILED,
+]);
+const sandboxProfileSetupCheckStatusSchema = z.enum([
+  SandboxProfileSetupCheckStatuses.QUEUED,
+  SandboxProfileSetupCheckStatuses.COMPILING_PROFILE,
+  SandboxProfileSetupCheckStatuses.STARTING_SANDBOX,
+  SandboxProfileSetupCheckStatuses.WAITING_FOR_RUNTIME,
+  SandboxProfileSetupCheckStatuses.RUNNING_SCRIPT,
+  SandboxProfileSetupCheckStatuses.CLEANING_UP,
+  SandboxProfileSetupCheckStatuses.SUCCEEDED,
+  SandboxProfileSetupCheckStatuses.FAILED,
+  SandboxProfileSetupCheckStatuses.CLEANUP_FAILED,
+]);
+const sandboxProfileSetupCheckFailurePhaseSchema = z.enum([
+  SandboxProfileSetupCheckFailurePhases.COMPILE,
+  SandboxProfileSetupCheckFailurePhases.START,
+  SandboxProfileSetupCheckFailurePhases.RUNTIME_READY,
+  SandboxProfileSetupCheckFailurePhases.SCRIPT,
+  SandboxProfileSetupCheckFailurePhases.CLEANUP,
 ]);
 const sandboxProfileVersionSnapshotJobSummarySchema = z
   .object({
@@ -116,6 +137,43 @@ export const sandboxProfileVersionSetupScriptSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const sandboxProfileSetupCheckSchema = createSelectSchema(sandboxProfileSetupChecks, {
+  sandboxProfileVersion: z.number().int().min(1),
+  status: sandboxProfileSetupCheckStatusSchema,
+  failurePhase: sandboxProfileSetupCheckFailurePhaseSchema.nullable(),
+  requestedByUserId: z.string().min(1).nullable(),
+  setupScript: z.string().nullable(),
+  primaryRepositoryId: z.string().min(1).nullable(),
+  idempotencyKey: z.string().min(1).nullable(),
+  failureCode: z.string().min(1).nullable(),
+  failureMessage: z.string().min(1).nullable(),
+  sandboxInstanceId: z.string().min(1).nullable(),
+  workflowRunId: z.string().min(1).nullable(),
+  startedAt: z.string().min(1).nullable(),
+  finishedAt: z.string().min(1).nullable(),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+})
+  .pick({
+    id: true,
+    sandboxProfileId: true,
+    sandboxProfileVersion: true,
+    requestedByUserId: true,
+    setupScript: true,
+    primaryRepositoryId: true,
+    status: true,
+    failurePhase: true,
+    failureCode: true,
+    failureMessage: true,
+    sandboxInstanceId: true,
+    workflowRunId: true,
+    startedAt: true,
+    finishedAt: true,
+    createdAt: true,
+    updatedAt: true,
   })
   .strict();
 
@@ -220,6 +278,18 @@ export const getSandboxProfileVersionSetupScriptResponseSchema =
 export const putSandboxProfileVersionSetupScriptResponseSchema =
   sandboxProfileVersionSetupScriptSchema;
 
+export const createSandboxProfileVersionSetupCheckBodySchema = z
+  .object({
+    setupScript: z.string().nullable(),
+    primaryRepositoryId: z.string().min(1).nullable().optional(),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
+export const createSandboxProfileVersionSetupCheckResponseSchema = sandboxProfileSetupCheckSchema;
+
+export const getSandboxProfileVersionSetupCheckResponseSchema = sandboxProfileSetupCheckSchema;
+
 export const putSandboxProfileVersionRefreshScheduleBodySchema = z
   .object({
     name: z.string().min(1).optional(),
@@ -286,6 +356,17 @@ export const sandboxProfileVersionParamsSchema = z
     version: z.coerce.number().int().min(1),
   })
   .strict();
+
+export const sandboxProfileVersionSetupCheckParamsSchema = sandboxProfileVersionParamsSchema.extend(
+  {
+    setupCheckId: z
+      .string()
+      .min(1)
+      .regex(/^spc_[a-zA-Z0-9_-]+$/, {
+        message: "`setupCheckId` must be a setup check id.",
+      }),
+  },
+);
 
 export const startSandboxProfileInstanceBodySchema = z
   .object({

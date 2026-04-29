@@ -24,7 +24,10 @@ export type CreateSandboxProfilesServiceInput = {
   };
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
-    "materializeSandboxProfileVersionSnapshotJob" | "startSandboxInstance"
+    | "getSandboxInstance"
+    | "materializeSandboxProfileVersionSnapshotJob"
+    | "startSandboxInstance"
+    | "stopSandboxInstance"
   >;
 };
 

@@ -16,8 +16,8 @@ function createStopSandboxIdempotencyKey(input: StopSandboxInstanceInput): strin
     sandboxInstanceId: input.sandboxInstanceId,
     action: "stop",
     stopReason: input.stopReason,
-    expectedOwnerLeaseId: input.expectedOwnerLeaseId,
     idempotencyKey: input.idempotencyKey,
+    ...(input.stopReason === "idle" ? { expectedOwnerLeaseId: input.expectedOwnerLeaseId } : {}),
   });
 }
 
@@ -30,7 +30,7 @@ export async function stopSandboxInstance(
     {
       sandboxInstanceId: input.sandboxInstanceId,
       stopReason: input.stopReason,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      ...(input.stopReason === "idle" ? { expectedOwnerLeaseId: input.expectedOwnerLeaseId } : {}),
     },
     {
       idempotencyKey: createStopSandboxIdempotencyKey(input),

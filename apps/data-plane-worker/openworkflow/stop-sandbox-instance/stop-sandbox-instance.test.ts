@@ -52,4 +52,25 @@ describe("shouldExecuteSandboxStop", () => {
       }),
     ).toBe(false);
   });
+
+  it("allows system stops without runtime-state ownership", () => {
+    expect(
+      shouldExecuteSandboxStop({
+        stopReason: "system",
+        snapshot: {
+          ownerLeaseId: null,
+          attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
+          runtime: {
+            ready: true,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
 });

@@ -1,7 +1,9 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type SandboxInstancePurpose,
   type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
@@ -20,6 +22,7 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
   persistenceMode: SandboxInstancePersistenceMode;
+  purpose: SandboxInstancePurpose;
   runtimeProvider: SandboxInstanceProvider;
   providerSandboxId: string;
 };
@@ -42,9 +45,17 @@ export type StopSandboxInstanceResult = {
  */
 export function shouldExecuteSandboxStop(input: {
   stopReason: SandboxStopReason;
-  expectedOwnerLeaseId: string;
+  expectedOwnerLeaseId?: string;
   snapshot: SandboxRuntimeStateSnapshot;
 }): boolean {
+  if (input.stopReason === "system") {
+    return true;
+  }
+
+  if (input.expectedOwnerLeaseId === undefined) {
+    return false;
+  }
+
   return (
     input.stopReason === "idle" &&
     input.snapshot.ownerLeaseId === input.expectedOwnerLeaseId &&
@@ -59,6 +70,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       persistenceMode: true,
+      purpose: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,
@@ -88,6 +100,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
 
   return {
     persistenceMode: sandboxInstance.persistenceMode,
+    purpose: sandboxInstance.purpose,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,
   };
@@ -98,8 +111,16 @@ async function isSandboxStopStillPermitted(ctx: {
   clock: Clock;
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
-  expectedOwnerLeaseId: string;
+  expectedOwnerLeaseId?: string;
 }): Promise<boolean> {
+  if (ctx.stopReason === "system") {
+    return true;
+  }
+
+  if (ctx.expectedOwnerLeaseId === undefined) {
+    throw new Error("Expected owner lease id is required for idle sandbox stops.");
+  }
+
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: ctx.sandboxInstanceId,
     nowMs: ctx.clock.nowMs(),
@@ -121,21 +142,34 @@ export async function stopSandboxInstance(
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
-  input: {
-    sandboxInstanceId: string;
-    stopReason: SandboxStopReason;
-    expectedOwnerLeaseId: string;
-  },
+  input:
+    | {
+        sandboxInstanceId: string;
+        stopReason: "idle";
+        expectedOwnerLeaseId: string;
+      }
+    | {
+        sandboxInstanceId: string;
+        stopReason: "system";
+      },
 ): Promise<StopSandboxInstanceResult> {
-  if (
-    !(await isSandboxStopStillPermitted({
-      runtimeStateReader: ctx.runtimeStateReader,
-      clock: ctx.clock,
-      sandboxInstanceId: input.sandboxInstanceId,
-      stopReason: input.stopReason,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-    }))
-  ) {
+  const permissionInput =
+    input.stopReason === "idle"
+      ? {
+          runtimeStateReader: ctx.runtimeStateReader,
+          clock: ctx.clock,
+          sandboxInstanceId: input.sandboxInstanceId,
+          stopReason: input.stopReason,
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        }
+      : {
+          runtimeStateReader: ctx.runtimeStateReader,
+          clock: ctx.clock,
+          sandboxInstanceId: input.sandboxInstanceId,
+          stopReason: input.stopReason,
+        };
+
+  if (!(await isSandboxStopStillPermitted(permissionInput))) {
     return {
       executed: false,
       outcome: "runtime_state_fence_before_load",
@@ -154,14 +188,15 @@ export async function stopSandboxInstance(
   }
 
   if (
-    !(await isSandboxStopStillPermitted({
-      runtimeStateReader: ctx.runtimeStateReader,
-      clock: ctx.clock,
-      sandboxInstanceId: input.sandboxInstanceId,
-      stopReason: input.stopReason,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-    }))
+    input.stopReason === "system" &&
+    sandboxInstanceState.purpose !== SandboxInstancePurposes.SETUP_CHECK
   ) {
+    throw new Error(
+      `System stop is only supported for setup-check sandbox instances. Sandbox instance '${input.sandboxInstanceId}' has purpose '${sandboxInstanceState.purpose}'.`,
+    );
+  }
+
+  if (!(await isSandboxStopStillPermitted(permissionInput))) {
     return {
       executed: false,
       outcome: "runtime_state_fence_before_stop",
@@ -193,14 +228,7 @@ export async function stopSandboxInstance(
     db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
-    stillPermitted: async () =>
-      isSandboxStopStillPermitted({
-        runtimeStateReader: ctx.runtimeStateReader,
-        clock: ctx.clock,
-        sandboxInstanceId: input.sandboxInstanceId,
-        stopReason: input.stopReason,
-        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
-      }),
+    stillPermitted: async () => isSandboxStopStillPermitted(permissionInput),
   });
 
   if (markOutcome === "fence_mismatch") {

@@ -1,0 +1,45 @@
+import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
+
+import { withRequiredSession } from "../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../types.js";
+import { createProfileVersionSetupCheck } from "../services/setup-checks.js";
+import { route } from "./route.js";
+
+const routeHandler = async (
+  ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
+  { user, session }: AppSession,
+) => {
+  const db = ctx.get("db");
+  const dataPlaneClient = ctx.get("dataPlaneClient");
+  const integrationsConfig = ctx.get("config").integrations;
+  const sandboxConfig = ctx.get("sandboxConfig");
+  const { profileId, version } = ctx.req.valid("param");
+  const body = ctx.req.valid("json");
+
+  const setupCheck = await createProfileVersionSetupCheck(
+    {
+      db,
+      integrationsConfig,
+      dataPlaneClient,
+      defaultBaseImage: sandboxConfig.defaultBaseImage,
+    },
+    {
+      organizationId: session.activeOrganizationId,
+      profileId,
+      profileVersion: version,
+      requestedByUserId: user.id,
+      setupScript: body.setupScript,
+      ...(body.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: body.primaryRepositoryId }),
+      ...(body.idempotencyKey === undefined ? {} : { idempotencyKey: body.idempotencyKey }),
+    },
+  );
+
+  return ctx.json(setupCheck, 201);
+};
+
+export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
+  withRequiredSession(routeHandler),
+);

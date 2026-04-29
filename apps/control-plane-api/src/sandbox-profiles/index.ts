@@ -9,6 +9,7 @@ export {
   sandboxProfileRepositoryOptionSchema as SandboxProfileRepositoryOptionSchema,
   sandboxProfileVersionSchema as SandboxProfileVersionSchema,
   sandboxProfileVersionSetupScriptSchema as SandboxProfileVersionSetupScriptSchema,
+  sandboxProfileSetupCheckSchema as SandboxProfileSetupCheckSchema,
   listSandboxProfileVersionsResponseSchema as ListSandboxProfileVersionsResponseSchema,
   createSandboxProfileVersionResponseSchema as CreateSandboxProfileVersionResponseSchema,
   getSandboxProfileVersionPublishabilityResponseSchema as GetSandboxProfileVersionPublishabilityResponseSchema,
@@ -21,10 +22,14 @@ export {
   putSandboxProfileVersionSetupScriptBodySchema as PutSandboxProfileVersionSetupScriptBodySchema,
   getSandboxProfileVersionSetupScriptResponseSchema as GetSandboxProfileVersionSetupScriptResponseSchema,
   putSandboxProfileVersionSetupScriptResponseSchema as PutSandboxProfileVersionSetupScriptResponseSchema,
+  createSandboxProfileVersionSetupCheckBodySchema as CreateSandboxProfileVersionSetupCheckBodySchema,
+  createSandboxProfileVersionSetupCheckResponseSchema as CreateSandboxProfileVersionSetupCheckResponseSchema,
+  getSandboxProfileVersionSetupCheckResponseSchema as GetSandboxProfileVersionSetupCheckResponseSchema,
   createSandboxProfileBodySchema as CreateSandboxProfileBodySchema,
   updateSandboxProfileBodySchema as UpdateSandboxProfileBodySchema,
   sandboxProfileIdParamsSchema as SandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema as SandboxProfileVersionParamsSchema,
+  sandboxProfileVersionSetupCheckParamsSchema as SandboxProfileVersionSetupCheckParamsSchema,
   startSandboxProfileInstanceBodySchema as StartSandboxProfileInstanceBodySchema,
   sandboxProfileDeletionAcceptedResponseSchema as SandboxProfileDeletionAcceptedResponseSchema,
   startSandboxProfileInstanceResponseSchema as StartSandboxProfileInstanceResponseSchema,
@@ -43,6 +48,8 @@ export { route as listSandboxProfileVersionsRoute } from "./list-sandbox-profile
 export { route as getSandboxProfileVersionPublishabilityRoute } from "./get-sandbox-profile-version-publishability/route.js";
 export { route as getSandboxProfileVersionAutomationConfigRoute } from "./get-sandbox-profile-version-automation-config/route.js";
 export { route as getSandboxProfileVersionSetupScriptRoute } from "./get-sandbox-profile-version-setup-script/route.js";
+export { route as createSandboxProfileVersionSetupCheckRoute } from "./create-sandbox-profile-version-setup-check/route.js";
+export { route as getSandboxProfileVersionSetupCheckRoute } from "./get-sandbox-profile-version-setup-check/route.js";
 export { route as getSandboxProfileVersionIntegrationBindingsRoute } from "./get-sandbox-profile-version-integration-bindings/route.js";
 export { route as publishSandboxProfileVersionRoute } from "./publish-sandbox-profile-version/route.js";
 export { route as refreshSandboxProfileVersionRoute } from "./refresh-sandbox-profile-version/route.js";
@@ -60,6 +67,15 @@ export {
   conflictResponseSchema as PutSandboxProfileVersionIntegrationBindingsConflictResponseSchema,
 } from "./put-sandbox-profile-version-integration-bindings/schema.js";
 export { conflictResponseSchema as PutSandboxProfileVersionSetupScriptConflictResponseSchema } from "./put-sandbox-profile-version-setup-script/schema.js";
+export {
+  notFoundResponseSchema as CreateSandboxProfileVersionSetupCheckNotFoundResponseSchema,
+  createSetupCheckBadRequestResponseSchema as CreateSandboxProfileVersionSetupCheckBadRequestResponseSchema,
+  conflictResponseSchema as CreateSandboxProfileVersionSetupCheckConflictResponseSchema,
+} from "./create-sandbox-profile-version-setup-check/schema.js";
+export {
+  notFoundResponseSchema as GetSandboxProfileVersionSetupCheckNotFoundResponseSchema,
+  badRequestResponseSchema as GetSandboxProfileVersionSetupCheckBadRequestResponseSchema,
+} from "./get-sandbox-profile-version-setup-check/schema.js";
 export {
   conflictResponseSchema as CreateSandboxProfileVersionConflictResponseSchema,
   notFoundResponseSchema as CreateSandboxProfileVersionNotFoundResponseSchema,

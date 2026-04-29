@@ -141,6 +141,13 @@
       "when": 1777363914143,
       "tag": "0019_add-schedules",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777434512151,
+      "tag": "0020_add-setup-checks",
+      "breakpoints": true
     }
   ]
 }

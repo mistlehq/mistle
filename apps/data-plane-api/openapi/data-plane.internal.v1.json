@@ -1803,6 +1803,15 @@
             "required": true,
             "name": "organizationId",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "includeSetupChecks",
+            "in": "query"
           }
         ],
         "responses": {
@@ -3541,24 +3550,44 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "stopReason": {
-                    "type": "string",
-                    "enum": ["idle"]
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "stopReason": {
+                        "type": "string",
+                        "enum": ["idle"]
+                      },
+                      "expectedOwnerLeaseId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "idempotencyKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
+                    "additionalProperties": false
                   },
-                  "expectedOwnerLeaseId": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "idempotencyKey": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255
+                  {
+                    "type": "object",
+                    "properties": {
+                      "stopReason": {
+                        "type": "string",
+                        "enum": ["system"]
+                      },
+                      "idempotencyKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": ["stopReason", "idempotencyKey"],
+                    "additionalProperties": false
                   }
-                },
-                "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
-                "additionalProperties": false
+                ]
               }
             }
           }

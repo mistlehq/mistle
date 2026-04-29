@@ -23,7 +23,7 @@ export const MaterializeSandboxProfileVersionSnapshotWorkflowName =
   "data-plane.sandbox-profile-version-snapshots.materialize";
 export const MaterializeSandboxProfileVersionSnapshotWorkflowVersion = "1";
 
-export type SandboxStopReason = "idle";
+export type SandboxStopReason = "idle" | "system";
 export type SandboxReconcileReason = "disconnect_grace_elapsed";
 export type SandboxInstanceDeadlineKind = "idle" | "disconnect";
 
@@ -129,7 +129,7 @@ export const ResumeSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 export type StopSandboxInstanceWorkflowInput = {
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
-  expectedOwnerLeaseId: string;
+  expectedOwnerLeaseId?: string;
 };
 
 export type StopSandboxInstanceWorkflowOutput = {

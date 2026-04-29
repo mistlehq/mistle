@@ -8,12 +8,20 @@ export const StopSandboxInstanceParamsSchema = z
   })
   .strict();
 
-export const StopSandboxInstanceBodySchema = z
-  .object({
-    stopReason: z.literal("idle"),
-    expectedOwnerLeaseId: z.string().min(1),
-    idempotencyKey: z.string().min(1).max(255),
-  })
-  .strict();
+export const StopSandboxInstanceBodySchema = z.discriminatedUnion("stopReason", [
+  z
+    .object({
+      stopReason: z.literal("idle"),
+      expectedOwnerLeaseId: z.string().min(1),
+      idempotencyKey: z.string().min(1).max(255),
+    })
+    .strict(),
+  z
+    .object({
+      stopReason: z.literal("system"),
+      idempotencyKey: z.string().min(1).max(255),
+    })
+    .strict(),
+]);
 
 export { StopSandboxInstanceAcceptedResponseSchema };

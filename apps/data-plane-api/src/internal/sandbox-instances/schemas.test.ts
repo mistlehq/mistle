@@ -291,6 +291,16 @@ describe("StopSandboxInstanceInputSchema", () => {
     expect(StopSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
+  it("accepts a system stop request without an owner lease", () => {
+    const input = {
+      sandboxInstanceId: "sbi_123",
+      stopReason: "system",
+      idempotencyKey: "stop-idempotency-123",
+    };
+
+    expect(StopSandboxInstanceInputSchema.parse(input)).toEqual(input);
+  });
+
   it("requires an explicit idempotency key", () => {
     const result = StopSandboxInstanceInputSchema.safeParse({
       sandboxInstanceId: "sbi_123",

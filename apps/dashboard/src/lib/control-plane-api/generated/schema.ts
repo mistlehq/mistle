@@ -8577,6 +8577,307 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-checks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey?: string;
+            primaryRepositoryId?: string | null;
+            setupScript: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Create a setup check for the specified sandbox profile version. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** @enum {string|null} */
+              failurePhase: "compile" | "start" | "runtime_ready" | "script" | "cleanup" | null;
+              finishedAt: string | null;
+              id: string;
+              primaryRepositoryId: string | null;
+              requestedByUserId: string | null;
+              sandboxInstanceId: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
+              setupScript: string | null;
+              startedAt: string | null;
+              /** @enum {string} */
+              status:
+                | "queued"
+                | "compiling_profile"
+                | "starting_sandbox"
+                | "waiting_for_runtime"
+                | "running_script"
+                | "cleaning_up"
+                | "succeeded"
+                | "failed"
+                | "cleanup_failed";
+              updatedAt: string;
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "AGENT_RUNTIME_REQUIRED"
+                    | "INVALID_BINDING_CONNECTION_REFERENCE"
+                    | "INVALID_CONNECTION_TARGET_REFERENCE"
+                    | "CONNECTION_MISMATCH"
+                    | "TARGET_DISABLED"
+                    | "CONNECTION_NOT_ACTIVE"
+                    | "KIND_MISMATCH"
+                    | "INVALID_TARGET_CONFIG"
+                    | "INVALID_TARGET_SECRETS"
+                    | "INVALID_BINDING_CONFIG"
+                    | "ROUTE_CONFLICT"
+                    | "ARTIFACT_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_INVALID_REF";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile version is not usable. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_USABLE";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-checks/{setupCheckId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          setupCheckId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a setup check for the specified sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              failureCode: string | null;
+              failureMessage: string | null;
+              /** @enum {string|null} */
+              failurePhase: "compile" | "start" | "runtime_ready" | "script" | "cleanup" | null;
+              finishedAt: string | null;
+              id: string;
+              primaryRepositoryId: string | null;
+              requestedByUserId: string | null;
+              sandboxInstanceId: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
+              setupScript: string | null;
+              startedAt: string | null;
+              /** @enum {string} */
+              status:
+                | "queued"
+                | "compiling_profile"
+                | "starting_sandbox"
+                | "waiting_for_runtime"
+                | "running_script"
+                | "cleaning_up"
+                | "succeeded"
+                | "failed"
+                | "cleanup_failed";
+              updatedAt: string;
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile, profile version, or setup check was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND" | "SETUP_CHECK_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script": {
     parameters: {
       query?: never;

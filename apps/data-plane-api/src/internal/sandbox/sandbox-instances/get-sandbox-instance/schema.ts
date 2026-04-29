@@ -9,5 +9,9 @@ export const GetSandboxInstanceParamsSchema = z
 export const GetSandboxInstanceQuerySchema = z
   .object({
     organizationId: z.string().min(1),
+    includeSetupChecks: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
   })
   .strict();

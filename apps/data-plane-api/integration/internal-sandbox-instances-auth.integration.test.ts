@@ -228,8 +228,10 @@ describe("internal sandbox instances auth integration", () => {
         },
         body: JSON.stringify({
           stopReason: stopInput.stopReason,
-          expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
           idempotencyKey: stopInput.idempotencyKey,
+          ...(stopInput.stopReason === "idle"
+            ? { expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId }
+            : {}),
         }),
       },
     );

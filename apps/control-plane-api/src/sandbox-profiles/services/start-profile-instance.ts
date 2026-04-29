@@ -8,6 +8,7 @@ import {
 } from "@mistle/db/control-plane";
 import {
   SandboxInstancePurposes,
+  type SandboxInstancePurpose,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
 } from "@mistle/db/data-plane";
@@ -44,6 +45,8 @@ type StartProfileInstanceInput = {
   };
   actingUser?: SandboxActingUser;
   source: SandboxInstanceSource;
+  purpose?: SandboxInstancePurpose;
+  setupScript?: string | null;
 };
 
 type StartProfileInstanceOutput = {
@@ -58,10 +61,40 @@ type ResolvedLaunchImage = {
   workflowImage: StartSandboxInstanceWorkflowImageInput;
 };
 
+type ResolveEffectiveRuntimePlanInput = {
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  primaryRepositoryId?: string | null;
+  compiledRuntimePlan: CompiledRuntimePlan;
+  setupScript?: string | null;
+};
+
 const LaunchImageKinds = {
   BASE: "base",
   SNAPSHOT: "snapshot",
 } as const;
+
+function normalizeSetupScript(setupScript: string | null): string | undefined {
+  if (setupScript === null || setupScript.trim().length === 0) {
+    return undefined;
+  }
+
+  return setupScript;
+}
+
+function applySetupScriptOverride(
+  runtimePlan: CompiledRuntimePlan,
+  setupScript: string | null,
+): CompiledRuntimePlan {
+  const normalizedSetupScript = normalizeSetupScript(setupScript);
+  const { setupScript: _existingSetupScript, ...runtimePlanWithoutSetupScript } = runtimePlan;
+
+  return {
+    ...runtimePlanWithoutSetupScript,
+    ...(normalizedSetupScript === undefined ? {} : { setupScript: normalizedSetupScript }),
+  };
+}
 
 function assertSnapshotImageProvider(
   provider: string,
@@ -75,16 +108,15 @@ function assertSnapshotImageProvider(
 
 async function resolveEffectiveRuntimePlan(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    primaryRepositoryId?: string | null;
-    compiledRuntimePlan: CompiledRuntimePlan;
-  },
+  input: ResolveEffectiveRuntimePlanInput,
 ): Promise<CompiledRuntimePlan> {
+  const runtimePlan =
+    input.setupScript === undefined
+      ? input.compiledRuntimePlan
+      : applySetupScriptOverride(input.compiledRuntimePlan, input.setupScript);
+
   if (input.primaryRepositoryId === undefined || input.primaryRepositoryId === null) {
-    return input.compiledRuntimePlan;
+    return runtimePlan;
   }
 
   const repositoryOptions = await listProfileVersionRepositoryOptions(
@@ -107,8 +139,8 @@ async function resolveEffectiveRuntimePlan(
   }
 
   return {
-    ...input.compiledRuntimePlan,
-    agentRuntimes: input.compiledRuntimePlan.agentRuntimes.map((agentRuntime) => ({
+    ...runtimePlan,
+    agentRuntimes: runtimePlan.agentRuntimes.map((agentRuntime) => ({
       ...agentRuntime,
       ptyLaunch: {
         ...agentRuntime.ptyLaunch,
@@ -223,6 +255,7 @@ export async function startProfileInstance(
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const idempotencyKey = serviceInput.idempotencyKey ?? randomUUID();
+  const purpose = serviceInput.purpose ?? SandboxInstancePurposes.SESSION;
   const launchImage = await resolveLaunchImage(
     {
       db,
@@ -246,7 +279,10 @@ export async function startProfileInstance(
       image: launchImage.compileImage,
     },
   );
-  if (compiledRuntimePlan.agentRuntimes.length === 0) {
+  if (
+    purpose === SandboxInstancePurposes.SESSION &&
+    compiledRuntimePlan.agentRuntimes.length === 0
+  ) {
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
       `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
@@ -264,6 +300,7 @@ export async function startProfileInstance(
       ...(serviceInput.primaryRepositoryId === undefined
         ? {}
         : { primaryRepositoryId: serviceInput.primaryRepositoryId }),
+      ...(serviceInput.setupScript === undefined ? {} : { setupScript: serviceInput.setupScript }),
     },
   );
   const gitIdentity = await resolveActingUserGitIdentity(db, {
@@ -275,7 +312,7 @@ export async function startProfileInstance(
     organizationId: serviceInput.organizationId,
     sandboxProfileId: serviceInput.profileId,
     sandboxProfileVersion: serviceInput.profileVersion,
-    purpose: SandboxInstancePurposes.SESSION,
+    purpose,
     idempotencyKey,
     runtimePlan,
     startedBy: serviceInput.startedBy,
