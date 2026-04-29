@@ -1,5 +1,4 @@
-# Prefilled for remote-sandbox deployments that use an external sandbox provider
-# such as E2B. Replace each value that begins with "replace-with-".
+# Prefilled for E2B sandbox deployments. Replace each value that begins with "replace-with-".
 
 [global]
 env = "production"

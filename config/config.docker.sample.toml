@@ -1,4 +1,4 @@
-# Prefilled for docker-sandbox deployments.
+# Prefilled for Docker sandbox deployments.
 # Replace each value that begins with "replace-with-".
 # This profile expects:
 # - a mounted Docker socket at /var/run/docker.sock
