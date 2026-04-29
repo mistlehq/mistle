@@ -1,4 +1,8 @@
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
@@ -219,6 +223,58 @@ describe("internal sandbox instance title patch integration", () => {
 
     expect(untouchedSandboxInstance).toEqual({
       title: "Existing title",
+    });
+  });
+
+  it("returns not found for setup-check-purpose sandbox instances", async ({ fixture }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_patch_title_setup_check",
+      organizationId: "org_dp_api_patch_title_setup_check",
+      sandboxProfileId: "sbp_patch_title_setup_check",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-patch-title-setup-check",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_patch_title_setup_check",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      title: "Setup check title",
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_patch_title_setup_check`,
+        fixture.baseUrl,
+      ),
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          [InternalAuthHeader]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          organizationId: "org_dp_api_patch_title_setup_check",
+          title: "Should not be written",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      code: "NOT_FOUND",
+      message: "Sandbox instance 'sbi_patch_title_setup_check' was not found.",
+    });
+
+    const untouchedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        title: true,
+      },
+      where: (table, { eq: whereEq }) => whereEq(table.id, "sbi_patch_title_setup_check"),
+    });
+
+    expect(untouchedSandboxInstance).toEqual({
+      title: "Setup check title",
     });
   });
 

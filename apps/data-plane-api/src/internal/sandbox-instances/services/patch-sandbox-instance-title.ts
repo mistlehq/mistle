@@ -1,4 +1,8 @@
-import { sandboxInstances, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstancePurposes,
+  type DataPlaneDatabase,
+} from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { and, eq, isNull } from "drizzle-orm";
 import { sql } from "drizzle-orm";
@@ -29,6 +33,7 @@ export async function patchSandboxInstanceTitle(
       and(
         eq(sandboxInstances.id, input.instanceId),
         eq(sandboxInstances.organizationId, input.organizationId),
+        eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
         ...(titlePredicate === undefined ? [] : [titlePredicate]),
       ),
     )
@@ -63,6 +68,7 @@ export async function patchSandboxInstanceTitle(
       whereAnd(
         whereEq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
+        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
       ),
   });
 
