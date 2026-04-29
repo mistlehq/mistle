@@ -501,11 +501,15 @@ export type IntegrationFormConnectionMethodSetupManifestDraft = {
   ): Record<string, unknown>;
 };
 
-export type IntegrationFormConnectionMethodSetupFlow = {
-  appManifestDraft?: IntegrationFormConnectionMethodSetupManifestDraft;
-  completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement;
+export type IntegrationFormConnectionMethodSetupFlowMetadata = {
+  completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
   routeSegment: string;
 };
+
+export type IntegrationFormConnectionMethodSetupFlow =
+  IntegrationFormConnectionMethodSetupFlowMetadata & {
+    appManifestDraft?: IntegrationFormConnectionMethodSetupManifestDraft | undefined;
+  };
 
 export type IntegrationConnectionMethodDetailFieldSourceLeaf =
   | {
