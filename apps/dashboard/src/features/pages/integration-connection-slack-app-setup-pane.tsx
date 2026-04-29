@@ -93,15 +93,6 @@ const SlackRequiredExistingAppSecretFieldKeys = [
   "signingSecret",
 ] satisfies readonly SlackExistingAppSecretFieldKey[];
 
-function createSlackDraftManifest(webhookCallbackUrl: string): string {
-  return createManifestJsonDraft(
-    buildSlackAppManifestDraft({
-      controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
-      webhookCallbackUrl,
-    }),
-  );
-}
-
 function normalizeInputValue(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
@@ -447,7 +438,12 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const resolvedManifestValue =
     webhookCallbackUrl === null || hasEditedManifest
       ? manifestValue
-      : createSlackDraftManifest(webhookCallbackUrl);
+      : createManifestJsonDraft(
+          buildSlackAppManifestDraft({
+            controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
+            webhookCallbackUrl,
+          }),
+        );
 
   const startManifestMutation = useMutation({
     mutationFn: async () =>

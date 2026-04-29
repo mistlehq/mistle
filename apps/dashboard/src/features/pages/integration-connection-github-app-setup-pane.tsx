@@ -106,15 +106,6 @@ const GitHubExistingAppSetupSecretFieldKeys = [
 
 type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
 
-function createGitHubDraftManifest(webhookCallbackUrl: string): string {
-  return createManifestJsonDraft(
-    buildGitHubAppManifestDraft({
-      controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
-      webhookCallbackUrl,
-    }),
-  );
-}
-
 function isGitHubExistingAppSetupSecretFieldKey(
   fieldKey: string,
 ): fieldKey is GitHubExistingAppSetupSecretFieldKey {
@@ -637,7 +628,12 @@ export function GitHubAppSetupPane(input: {
   const resolvedManifestValue =
     webhookCallbackUrl === null || hasEditedManifest
       ? manifestValue
-      : createGitHubDraftManifest(webhookCallbackUrl);
+      : createManifestJsonDraft(
+          buildGitHubAppManifestDraft({
+            controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
+            webhookCallbackUrl,
+          }),
+        );
 
   const startInstallationMutation = useMutation({
     mutationFn: async () =>
