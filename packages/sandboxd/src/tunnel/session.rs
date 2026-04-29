@@ -60,8 +60,8 @@ use crate::supervision::{
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
-    PortAccessHttpCommand, PortAccessTransportEvent, PortAccessWsCommand, spawn_http_transport,
-    spawn_websocket_transport,
+    PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent, PortAccessWsCommand,
+    spawn_http_transport, spawn_tcp_transport, spawn_websocket_transport,
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -755,6 +755,13 @@ struct TunnelSessionLoopContext<'a> {
     supervisor_handle: &'a SandboxdSupervisorHandle,
 }
 
+struct PortAccessTcpStreamState {
+    sender: mpsc::UnboundedSender<PortAccessTcpCommand>,
+    request_window: StreamSendWindow,
+    request_closed: bool,
+    response_closed: bool,
+}
+
 struct TunnelSessionMutableState {
     telemetry_relay: TelemetryRelay,
     pending_signing_requests: BTreeMap<
@@ -766,6 +773,7 @@ struct TunnelSessionMutableState {
     agent_streams: BTreeMap<u32, AgentStreamState>,
     port_access_http_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessHttpCommand>>,
     port_access_ws_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessWsCommand>>,
+    port_access_tcp_streams: BTreeMap<u32, PortAccessTcpStreamState>,
     processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
     last_processes_snapshot_at_ms: Option<u64>,
     pty_sessions: BTreeMap<String, PtySessionState>,
@@ -1478,6 +1486,7 @@ async fn run_connected_tunnel_session(
         agent_streams: BTreeMap::new(),
         port_access_http_streams: BTreeMap::new(),
         port_access_ws_streams: BTreeMap::new(),
+        port_access_tcp_streams: BTreeMap::new(),
         processes_stream_send_windows: BTreeMap::new(),
         last_processes_snapshot_at_ms: None,
         pty_sessions: BTreeMap::new(),
@@ -3161,6 +3170,7 @@ async fn handle_tunnel_session_event(
     match event {
         TunnelSessionEvent::BootstrapClosed { reason } => {
             let reason_text = reason.unwrap_or_else(|| "bootstrap tunnel closed".to_string());
+            close_port_access_tcp_streams(session_state);
             publish_bootstrap_closed_agent_stream_summaries(
                 tunnel_writer_sender,
                 session_state,
@@ -3684,6 +3694,18 @@ async fn handle_tunnel_session_event(
                         .port_access_ws_streams
                         .remove(&message.stream_id);
                 }
+                PortAccessTransportEvent::TcpClose(message) => {
+                    mark_port_access_tcp_direction_closed(
+                        session_state,
+                        message.stream_id,
+                        &message.direction,
+                    );
+                }
+                PortAccessTransportEvent::TcpError(message) => {
+                    session_state
+                        .port_access_tcp_streams
+                        .remove(&message.stream_id);
+                }
                 PortAccessTransportEvent::StreamError(message) => {
                     session_state
                         .port_access_http_streams
@@ -3691,11 +3713,17 @@ async fn handle_tunnel_session_event(
                     session_state
                         .port_access_ws_streams
                         .remove(&message.stream_id);
+                    session_state
+                        .port_access_tcp_streams
+                        .remove(&message.stream_id);
                 }
                 PortAccessTransportEvent::HttpResponseStart(_)
                 | PortAccessTransportEvent::HttpBodyChunk(_)
                 | PortAccessTransportEvent::WsAccept(_)
-                | PortAccessTransportEvent::WsFrame(_) => {}
+                | PortAccessTransportEvent::WsFrame(_)
+                | PortAccessTransportEvent::TcpConnected(_)
+                | PortAccessTransportEvent::TcpData { .. }
+                | PortAccessTransportEvent::TcpInputWindow { .. } => {}
             }
 
             let payload = match event {
@@ -3707,6 +3735,30 @@ async fn handle_tunnel_session_event(
                 PortAccessTransportEvent::WsAccept(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::WsFrame(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::WsClose(message) => serde_json::to_string(&message),
+                PortAccessTransportEvent::TcpConnected(message) => serde_json::to_string(&message),
+                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                    let encoded =
+                        encode_stream_data_frame(stream_id, PAYLOAD_KIND_RAW_BYTES, &bytes)
+                            .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+                    return continue_with(write_tunnel_binary(tunnel_writer_sender, encoded));
+                }
+                PortAccessTransportEvent::TcpInputWindow { stream_id, bytes } => {
+                    let Some(stream_state) =
+                        session_state.port_access_tcp_streams.get_mut(&stream_id)
+                    else {
+                        return Ok(TunnelSessionControlFlow::Continue);
+                    };
+                    stream_state
+                        .request_window
+                        .add(bytes)
+                        .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+                    return continue_with(write_tunnel_text(
+                        tunnel_writer_sender,
+                        stream_window(stream_id, bytes),
+                    ));
+                }
+                PortAccessTransportEvent::TcpClose(message) => serde_json::to_string(&message),
+                PortAccessTransportEvent::TcpError(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::StreamError(message) => serde_json::to_string(&message),
             }
             .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
@@ -4160,6 +4212,18 @@ async fn handle_tunnel_control_message(
                     .map_err(|error| TunnelSessionError::ParseControl(error.to_string()))?;
                 return Ok(());
             }
+            if let Some(stream_state) = session_state
+                .port_access_tcp_streams
+                .get(&message.stream_id)
+            {
+                stream_state
+                    .sender
+                    .send(PortAccessTcpCommand::Window {
+                        bytes: message.bytes,
+                    })
+                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+                return Ok(());
+            }
             if session_state
                 .pending_agent_opens
                 .contains_key(&message.stream_id)
@@ -4256,10 +4320,23 @@ fn handle_ports_transport_message(
 ) -> Result<(), TunnelSessionError> {
     match message {
         crate::tunnel::protocol::PortsTransportMessage::TcpOpen(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.tcp.open streamId {} is not implemented yet",
-                message.stream_id
-            )));
+            if port_access_stream_is_active(session_state, message.stream_id) {
+                return Err(TunnelSessionError::PortAccess(format!(
+                    "ports.tcp.open streamId {} already exists",
+                    message.stream_id
+                )));
+            }
+            let transport_event_sender = spawn_port_access_transport_event_sender(event_sender);
+            let stream_sender = spawn_tcp_transport(message.clone(), transport_event_sender);
+            session_state.port_access_tcp_streams.insert(
+                message.stream_id,
+                PortAccessTcpStreamState {
+                    sender: stream_sender,
+                    request_window: StreamSendWindow::default(),
+                    request_closed: false,
+                    response_closed: false,
+                },
+            );
         }
         crate::tunnel::protocol::PortsTransportMessage::TcpConnected(message) => {
             return Err(TunnelSessionError::PortAccess(format!(
@@ -4268,10 +4345,27 @@ fn handle_ports_transport_message(
             )));
         }
         crate::tunnel::protocol::PortsTransportMessage::TcpClose(message) => {
-            return Err(TunnelSessionError::PortAccess(format!(
-                "ports.tcp.close streamId {} is not implemented yet",
-                message.stream_id
-            )));
+            if message.direction != "request" {
+                return Err(TunnelSessionError::PortAccess(format!(
+                    "ports.tcp.close streamId {} must use request direction when sent to sandboxd",
+                    message.stream_id
+                )));
+            }
+            let Some(stream_state) = session_state
+                .port_access_tcp_streams
+                .get(&message.stream_id)
+            else {
+                return Err(TunnelSessionError::PortAccess(format!(
+                    "ports.tcp.close streamId {} is not bound to an active port access tcp stream",
+                    message.stream_id
+                )));
+            };
+            stream_state
+                .sender
+                .send(PortAccessTcpCommand::Close {
+                    direction: message.direction.clone(),
+                })
+                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
         }
         crate::tunnel::protocol::PortsTransportMessage::TcpError(message) => {
             return Err(TunnelSessionError::PortAccess(format!(
@@ -4408,6 +4502,14 @@ fn handle_ports_transport_message(
                 stream_sender
                     .send(PortAccessWsCommand::Terminate)
                     .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
+            } else if let Some(stream_state) = session_state
+                .port_access_tcp_streams
+                .remove(&message.stream_id)
+            {
+                stream_state
+                    .sender
+                    .send(PortAccessTcpCommand::Terminate)
+                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
             } else {
                 return Err(TunnelSessionError::PortAccess(format!(
                     "ports.stream.close streamId {} is not bound to an active port access transport stream",
@@ -4445,6 +4547,48 @@ fn port_access_stream_is_active(session_state: &TunnelSessionMutableState, strea
         || session_state
             .port_access_ws_streams
             .contains_key(&stream_id)
+        || session_state
+            .port_access_tcp_streams
+            .contains_key(&stream_id)
+        || tunnel_stream_is_active(session_state, stream_id)
+}
+
+fn tunnel_stream_is_active(session_state: &TunnelSessionMutableState, stream_id: u32) -> bool {
+    session_state.agent_streams.contains_key(&stream_id)
+        || session_state.pending_agent_opens.contains_key(&stream_id)
+        || session_state.pending_exec_opens.contains_key(&stream_id)
+        || session_state
+            .processes_stream_send_windows
+            .contains_key(&stream_id)
+        || session_state.file_uploads.contains_key(&stream_id)
+        || session_state
+            .pty_sessions
+            .values()
+            .any(|pty_state| pty_state.attached_stream_ids.contains(&stream_id))
+}
+
+fn mark_port_access_tcp_direction_closed(
+    session_state: &mut TunnelSessionMutableState,
+    stream_id: u32,
+    direction: &str,
+) {
+    let Some(stream_state) = session_state.port_access_tcp_streams.get_mut(&stream_id) else {
+        return;
+    };
+    match direction {
+        "request" => stream_state.request_closed = true,
+        "response" => stream_state.response_closed = true,
+        _ => return,
+    }
+    if stream_state.request_closed && stream_state.response_closed {
+        session_state.port_access_tcp_streams.remove(&stream_id);
+    }
+}
+
+fn close_port_access_tcp_streams(session_state: &mut TunnelSessionMutableState) {
+    for (_, stream_state) in std::mem::take(&mut session_state.port_access_tcp_streams) {
+        let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+    }
 }
 
 fn handle_tunnel_binary_frame(
@@ -4554,6 +4698,59 @@ fn handle_tunnel_binary_frame(
                     .remove(&frame.stream_id);
             }
         }
+        return Ok(());
+    }
+
+    if session_state
+        .port_access_tcp_streams
+        .contains_key(&frame.stream_id)
+    {
+        if frame.payload_kind != PAYLOAD_KIND_RAW_BYTES {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    frame.stream_id,
+                    STREAM_RESET_CODE_INVALID_STREAM_DATA,
+                    "port access tcp stream only accepts raw byte data frames",
+                ),
+            )?;
+            if let Some(stream_state) = session_state
+                .port_access_tcp_streams
+                .remove(&frame.stream_id)
+            {
+                let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+            }
+            return Ok(());
+        }
+
+        let Some(stream_state) = session_state
+            .port_access_tcp_streams
+            .get_mut(&frame.stream_id)
+        else {
+            return Ok(());
+        };
+        if !stream_state.request_window.try_consume(frame.payload.len()) {
+            write_tunnel_text(
+                tunnel_writer_sender,
+                stream_reset(
+                    frame.stream_id,
+                    STREAM_RESET_CODE_STREAM_WINDOW_EXHAUSTED,
+                    "port access tcp request stream window is exhausted",
+                ),
+            )?;
+            let stream_state = session_state
+                .port_access_tcp_streams
+                .remove(&frame.stream_id)
+                .expect("tcp stream state should exist after failed window consume");
+            let _ = stream_state.sender.send(PortAccessTcpCommand::Terminate);
+            return Ok(());
+        }
+        stream_state
+            .sender
+            .send(PortAccessTcpCommand::Data {
+                bytes: frame.payload,
+            })
+            .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
         return Ok(());
     }
 
@@ -5126,13 +5323,14 @@ fn derive_upload_thread_directory_path(
 mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
-        PTY_OUTCOME_CLOSED, PtySessionStats, PtySessionTermination, TunnelSessionError,
-        TunnelSessionEvent, TunnelSessionLoopContext, TunnelSessionMutableState,
-        TunnelSessionRuntime, TunnelWriterMessage, connect_bootstrap_websocket,
-        handle_tunnel_control_message, handle_tunnel_session_event,
-        prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
-        publish_pty_session_summary, resolve_bootstrap_tunnel_url,
-        run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
+        PTY_OUTCOME_CLOSED, PortAccessTcpStreamState, PtySessionStats, PtySessionTermination,
+        TunnelSessionError, TunnelSessionEvent, TunnelSessionLoopContext,
+        TunnelSessionMutableState, TunnelSessionRuntime, TunnelWriterMessage,
+        connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_control_message,
+        handle_tunnel_session_event, prioritize_ipv4_socket_addresses,
+        publish_pty_input_latency_warning, publish_pty_session_summary,
+        resolve_bootstrap_tunnel_url, run_connected_tunnel_session_catching_panics,
+        sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -5161,9 +5359,11 @@ mod tests {
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
     use crate::time::{Clock, SystemClock, ThreadSleeper};
+    use crate::tunnel::port_access_transport::{PortAccessTcpCommand, PortAccessTransportEvent};
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
+        PortAccessTarget, PortsTcpClose, PortsTcpConnected, PortsTcpOpen, PortsTransportMessage,
+        StreamDataFrame, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
         parse_stream_control_message,
     };
     use crate::tunnel::session::{
@@ -5182,6 +5382,12 @@ mod tests {
 
     struct FixedClock {
         now_ms: u64,
+    }
+
+    #[cfg(target_os = "linux")]
+    enum TunnelGatewayTestMessage {
+        Text(Value),
+        Binary(StreamDataFrame),
     }
 
     impl PanicClock {
@@ -5243,6 +5449,19 @@ mod tests {
         serde_json::from_slice(&decoded).expect("telemetry line should be valid json")
     }
 
+    async fn read_writer_text_json(
+        receiver: &mut tokio::sync::mpsc::UnboundedReceiver<TunnelWriterMessage>,
+    ) -> Value {
+        let writer_message = receiver
+            .recv()
+            .await
+            .expect("writer text frame should be queued");
+        let TunnelWriterMessage::Text(payload) = writer_message else {
+            panic!("expected a tunnel writer text frame");
+        };
+        serde_json::from_str::<Value>(&payload).expect("writer text payload should be json")
+    }
+
     #[tokio::test]
     async fn restores_agent_stream_window_credit_after_runtime_writes_complete() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
@@ -5267,6 +5486,7 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             pty_sessions: BTreeMap::new(),
@@ -5316,6 +5536,448 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn serializes_port_access_tcp_events_to_tunnel_frames() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (tcp_sender, _tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let runtime_env = BTreeMap::new();
+        let clock = SystemClock;
+        let sleeper = ThreadSleeper;
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::from([(
+                55,
+                PortAccessTcpStreamState {
+                    sender: tcp_sender,
+                    request_window: StreamSendWindow::new(0),
+                    request_closed: true,
+                    response_closed: false,
+                },
+            )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            agent_endpoint_url: None,
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            runtime_env: &runtime_env,
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            sleeper: &sleeper,
+            supervisor_handle: &supervisor_handle,
+        };
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::PortAccessTransport(PortAccessTransportEvent::TcpConnected(
+                PortsTcpConnected {
+                    message_type: "ports.tcp.connected".to_string(),
+                    stream_id: 55,
+                },
+            )),
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("tcp connected event should serialize");
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "ports.tcp.connected",
+                "streamId": 55
+            })
+        );
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::PortAccessTransport(PortAccessTransportEvent::TcpData {
+                stream_id: 55,
+                bytes: b"pong".to_vec(),
+            }),
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("tcp data event should serialize");
+        let writer_message = tunnel_writer_receiver
+            .recv()
+            .await
+            .expect("tcp data frame should be queued");
+        let TunnelWriterMessage::Binary(payload) = writer_message else {
+            panic!("expected tcp data as tunnel binary frame");
+        };
+        let frame = decode_stream_data_frame(payload.as_ref())
+            .expect("tcp data frame should decode successfully");
+        assert_eq!(frame.stream_id, 55);
+        assert_eq!(frame.payload_kind, PAYLOAD_KIND_RAW_BYTES);
+        assert_eq!(frame.payload, b"pong");
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::PortAccessTransport(PortAccessTransportEvent::TcpInputWindow {
+                stream_id: 55,
+                bytes: 4,
+            }),
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("tcp input window event should serialize");
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "stream.window",
+                "streamId": 55,
+                "bytes": 4
+            })
+        );
+
+        handle_tunnel_session_event(
+            TunnelSessionEvent::PortAccessTransport(PortAccessTransportEvent::TcpClose(
+                PortsTcpClose {
+                    message_type: "ports.tcp.close".to_string(),
+                    stream_id: 55,
+                    direction: "response".to_string(),
+                },
+            )),
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("tcp close event should serialize");
+        assert_eq!(
+            read_writer_text_json(&mut tunnel_writer_receiver).await,
+            json!({
+                "type": "ports.tcp.close",
+                "streamId": 55,
+                "direction": "response"
+            })
+        );
+        assert!(
+            !session_state.port_access_tcp_streams.contains_key(&55),
+            "response close should release tcp stream state",
+        );
+    }
+
+    #[test]
+    fn routes_raw_tunnel_binary_frames_to_active_port_access_tcp_streams() {
+        let (tunnel_writer_sender, _tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (tcp_sender, mut tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::from([(
+                56,
+                PortAccessTcpStreamState {
+                    sender: tcp_sender,
+                    request_window: StreamSendWindow::default(),
+                    request_closed: false,
+                    response_closed: false,
+                },
+            )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        super::handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 56,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"ping".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("tcp binary frame should route to tcp command channel");
+
+        match tcp_receiver
+            .try_recv()
+            .expect("tcp command receiver should receive request bytes")
+        {
+            PortAccessTcpCommand::Data { bytes } => assert_eq!(bytes, b"ping"),
+            command => panic!("unexpected tcp command: {command:?}"),
+        }
+    }
+
+    #[test]
+    fn keeps_port_access_tcp_stream_active_until_both_directions_close() {
+        let (tcp_sender, _tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::from([(
+                57,
+                PortAccessTcpStreamState {
+                    sender: tcp_sender,
+                    request_window: StreamSendWindow::default(),
+                    request_closed: false,
+                    response_closed: false,
+                },
+            )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        super::mark_port_access_tcp_direction_closed(&mut session_state, 57, "response");
+        assert!(
+            session_state.port_access_tcp_streams.contains_key(&57),
+            "response half-close must not discard request direction state",
+        );
+
+        super::mark_port_access_tcp_direction_closed(&mut session_state, 57, "request");
+        assert!(
+            !session_state.port_access_tcp_streams.contains_key(&57),
+            "tcp stream state should release only after both directions close",
+        );
+    }
+
+    #[test]
+    fn rejects_port_access_tcp_open_when_stream_id_belongs_to_agent_stream() {
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (agent_sender, _agent_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::from([(
+                58,
+                AgentStreamState {
+                    sender: agent_sender,
+                    send_window: StreamSendWindow::new(AGENT_STREAM_WINDOW_BYTES),
+                    stats: AgentStreamStats::new(0),
+                },
+            )]),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        let error = handle_ports_transport_message(
+            PortsTransportMessage::TcpOpen(PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 58,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port: 5173,
+                },
+                upstream_protocol: "http".to_string(),
+            }),
+            &event_sender,
+            &mut session_state,
+        )
+        .expect_err("tcp open must reject stream id owned by an agent stream");
+
+        assert!(
+            error
+                .to_string()
+                .contains("ports.tcp.open streamId 58 already exists"),
+            "collision errors should identify the rejected stream id",
+        );
+        assert!(
+            session_state.port_access_tcp_streams.is_empty(),
+            "rejected tcp opens must not create tcp stream state",
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_port_access_tcp_request_bytes_beyond_stream_window() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (tcp_sender, mut tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::from([(
+                59,
+                PortAccessTcpStreamState {
+                    sender: tcp_sender,
+                    request_window: StreamSendWindow::new(4),
+                    request_closed: false,
+                    response_closed: false,
+                },
+            )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        super::handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 59,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"ping".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("first tcp frame should fit within request window");
+        match tcp_receiver
+            .try_recv()
+            .expect("tcp command receiver should receive in-window bytes")
+        {
+            PortAccessTcpCommand::Data { bytes } => assert_eq!(bytes, b"ping"),
+            command => panic!("unexpected tcp command: {command:?}"),
+        }
+
+        super::handle_tunnel_binary_frame(
+            &tunnel_writer_sender,
+            StreamDataFrame {
+                stream_id: 59,
+                payload_kind: PAYLOAD_KIND_RAW_BYTES,
+                payload: b"!".to_vec(),
+            },
+            &mut session_state,
+            &SystemClock,
+        )
+        .expect("exhausted tcp request window should reset the stream");
+
+        let reset = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        assert_eq!(
+            reset,
+            json!({
+                "type": "stream.reset",
+                "streamId": 59,
+                "code": "stream_window_exhausted",
+                "message": "port access tcp request stream window is exhausted"
+            })
+        );
+        assert!(
+            !session_state.port_access_tcp_streams.contains_key(&59),
+            "stream state should be released after request-window exhaustion",
+        );
+        match tcp_receiver
+            .try_recv()
+            .expect("tcp transport should be terminated after window exhaustion")
+        {
+            PortAccessTcpCommand::Terminate => {}
+            command => panic!("unexpected tcp command: {command:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn bootstrap_disconnect_terminates_active_port_access_tcp_streams() {
+        let (tunnel_writer_sender, _tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (event_sender, _event_receiver) = tokio::sync::mpsc::unbounded_channel();
+        let (tcp_sender, mut tcp_receiver) =
+            tokio::sync::mpsc::unbounded_channel::<PortAccessTcpCommand>();
+        let runtime_env = BTreeMap::new();
+        let clock = SystemClock;
+        let sleeper = ThreadSleeper;
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::from([(
+                60,
+                PortAccessTcpStreamState {
+                    sender: tcp_sender,
+                    request_window: StreamSendWindow::default(),
+                    request_closed: false,
+                    response_closed: false,
+                },
+            )]),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+        let supervisor_handle = test_tunnel_supervisor_handle("sbi_test", Arc::new(SystemClock));
+        let context = TunnelSessionLoopContext {
+            agent_endpoint_url: None,
+            attachment_root: std::path::Path::new("/tmp"),
+            cgroup_root: std::path::Path::new("/tmp"),
+            runtime_env: &runtime_env,
+            sandbox_instance_id: "sbi_test",
+            gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            clock: &clock,
+            sleeper: &sleeper,
+            supervisor_handle: &supervisor_handle,
+        };
+
+        let control_flow = handle_tunnel_session_event(
+            TunnelSessionEvent::BootstrapClosed {
+                reason: Some("test bootstrap disconnect".to_string()),
+            },
+            &tunnel_writer_sender,
+            &event_sender,
+            &context,
+            &mut session_state,
+        )
+        .await
+        .expect("bootstrap disconnect should be handled");
+
+        assert!(matches!(
+            control_flow,
+            super::TunnelSessionControlFlow::RestartRequired
+        ));
+        assert!(
+            session_state.port_access_tcp_streams.is_empty(),
+            "bootstrap disconnect should release tcp stream state",
+        );
+        match tcp_receiver
+            .try_recv()
+            .expect("tcp transport should receive terminate on bootstrap disconnect")
+        {
+            PortAccessTcpCommand::Terminate => {}
+            command => panic!("unexpected tcp command: {command:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn emits_agent_stream_summary_when_gateway_closes_stream() {
         let (tunnel_writer_sender, mut tunnel_writer_receiver) =
             tokio::sync::mpsc::unbounded_channel();
@@ -5344,6 +6006,7 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             pty_sessions: BTreeMap::new(),
@@ -5432,6 +6095,7 @@ mod tests {
             )]),
             port_access_http_streams: BTreeMap::new(),
             port_access_ws_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
             pty_sessions: BTreeMap::new(),
@@ -9781,6 +10445,199 @@ mod tests {
         terminate_child(&mut server);
     }
 
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn relays_port_access_tcp_bytes_and_directional_closes() {
+        let upstream_listener =
+            TcpListener::bind("127.0.0.1:0").expect("upstream tcp listener should bind");
+        let listener_port = upstream_listener
+            .local_addr()
+            .expect("upstream tcp listener should expose an address")
+            .port();
+        let upstream_thread = thread::spawn(move || {
+            let (mut stream, _) = upstream_listener
+                .accept()
+                .expect("upstream tcp listener should accept one connection");
+            let mut request = [0u8; 4];
+            stream
+                .read_exact(&mut request)
+                .expect("upstream should receive tcp request bytes");
+            assert_eq!(&request, b"ping");
+            stream
+                .write_all(b"pong")
+                .expect("upstream should write tcp response bytes");
+            stream
+                .shutdown(std::net::Shutdown::Write)
+                .expect("upstream should close tcp response direction");
+            let mut trailing = Vec::new();
+            stream
+                .read_to_end(&mut trailing)
+                .expect("upstream should observe request direction close");
+            assert!(
+                trailing.is_empty(),
+                "gateway should not send trailing bytes"
+            );
+        });
+
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
+
+            let telemetry_open = read_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "telemetry.open.ok",
+                        "streamId": telemetry_open["streamId"],
+                        "initialWindowBytes": 1024
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should acknowledge telemetry.open");
+
+            while read_json_text_message(&mut websocket)["type"]
+                != Value::String("keepalive.state".to_string())
+            {}
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "ports.tcp.open",
+                        "streamId": 51,
+                        "target": {
+                            "kind": "port",
+                            "port": listener_port
+                        },
+                        "upstreamProtocol": "http"
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open the port access tcp stream");
+
+            let connected = read_port_access_message_for_stream(&mut websocket, 51);
+            assert_eq!(connected["type"], "ports.tcp.connected");
+
+            websocket
+                .send(Message::Binary(
+                    encode_stream_data_frame(51, PAYLOAD_KIND_RAW_BYTES, b"ping")
+                        .expect("tcp request data frame should encode")
+                        .into(),
+                ))
+                .expect("gateway should send tcp request bytes");
+
+            let mut saw_input_window = false;
+            let mut saw_response_data = false;
+            while !(saw_input_window && saw_response_data) {
+                match read_tunnel_message_for_stream(&mut websocket, 51) {
+                    TunnelGatewayTestMessage::Text(message) => {
+                        assert_eq!(message["type"], "stream.window");
+                        assert_eq!(message["bytes"], 4);
+                        saw_input_window = true;
+                    }
+                    TunnelGatewayTestMessage::Binary(frame) => {
+                        assert_eq!(frame.payload_kind, PAYLOAD_KIND_RAW_BYTES);
+                        assert_eq!(frame.payload, b"pong");
+                        saw_response_data = true;
+                    }
+                }
+            }
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "ports.tcp.close",
+                        "streamId": 51,
+                        "direction": "request"
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should close the tcp request direction");
+
+            let mut saw_request_close = false;
+            let mut saw_response_close = false;
+            while !(saw_request_close && saw_response_close) {
+                let message = read_port_access_message_for_stream(&mut websocket, 51);
+                assert_eq!(message["type"], "ports.tcp.close");
+                match message["direction"].as_str() {
+                    Some("request") => saw_request_close = true,
+                    Some("response") => saw_response_close = true,
+                    other => panic!("unexpected tcp close direction: {other:?}"),
+                }
+            }
+
+            websocket
+                .close(None)
+                .expect("gateway websocket should close cleanly");
+            gateway_done_sender
+                .send(())
+                .expect("gateway should signal the tcp transport interaction finished");
+        });
+
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token-value".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
+            tunnel_gateway_ws_url: bootstrap_url,
+            runtime_plan: serde_json::json!({
+                "sandboxProfileId": "sbp_123",
+                "version": 1,
+                "image": {
+                    "source": "base",
+                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
+                },
+                "egressRoutes": [],
+                "artifacts": [],
+                "workspaceSources": [],
+                "runtimeClients": [],
+                "agentRuntimes": []
+            }),
+            egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
+        };
+
+        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+        let tunnel_session = TunnelSession::start(
+            &startup_input,
+            keepalive_manager,
+            runtime_readiness_manager,
+            None,
+            BTreeMap::new(),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+        )
+        .expect("tunnel session should start");
+
+        gateway_done_receiver
+            .recv()
+            .expect("gateway should complete the tcp transport interaction");
+
+        tunnel_session.close();
+        gateway_thread
+            .join()
+            .expect("gateway thread should exit cleanly");
+        upstream_thread
+            .join()
+            .expect("upstream thread should exit cleanly");
+    }
+
     fn read_json_text_message<S>(socket: &mut WebSocket<S>) -> Value
     where
         S: std::io::Read + std::io::Write,
@@ -9829,6 +10686,42 @@ mod tests {
             let message = read_stream_text_message(socket);
             if message["streamId"] == Value::Number(expected_stream_id.into()) {
                 return message;
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn read_tunnel_message_for_stream<S>(
+        socket: &mut WebSocket<S>,
+        expected_stream_id: u32,
+    ) -> TunnelGatewayTestMessage
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            match socket.read().expect("websocket should receive one message") {
+                Message::Text(payload) => {
+                    let message: Value = serde_json::from_str(payload.as_str())
+                        .expect("text payload should be json");
+                    match message["type"].as_str() {
+                        Some("keepalive.state") | Some("runtime.ready") => continue,
+                        _ if message["streamId"] == Value::Number(expected_stream_id.into()) => {
+                            return TunnelGatewayTestMessage::Text(message);
+                        }
+                        _ => continue,
+                    }
+                }
+                Message::Binary(payload) => {
+                    if decode_telemetry_data_frame(payload.as_ref()).is_ok() {
+                        continue;
+                    }
+                    let frame = decode_stream_data_frame(payload.as_ref())
+                        .expect("binary payload should be stream data");
+                    if frame.stream_id == expected_stream_id {
+                        return TunnelGatewayTestMessage::Binary(frame);
+                    }
+                }
+                _ => panic!("expected websocket text or binary message"),
             }
         }
     }

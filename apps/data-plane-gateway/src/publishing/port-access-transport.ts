@@ -811,6 +811,10 @@ export class PortAccessTransportService {
         return false;
       }
       case "ports.http.open":
+      case "ports.tcp.open":
+      case "ports.tcp.connected":
+      case "ports.tcp.close":
+      case "ports.tcp.error":
       case "ports.ws.open":
       case "ports.stream.close": {
         return false;

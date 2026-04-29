@@ -44,11 +44,13 @@ use tokio_tungstenite::tungstenite::http::Request as WebSocketRequest;
 
 use crate::tunnel::protocol::{
     PortAccessTarget, PortsHttpBodyChunk, PortsHttpBodyEnd, PortsHttpOpen, PortsHttpResponseStart,
-    PortsStreamError, PortsWsAccept, PortsWsClose, PortsWsFrame, PortsWsOpen,
+    PortsStreamError, PortsTcpClose, PortsTcpConnected, PortsTcpError, PortsTcpOpen, PortsWsAccept,
+    PortsWsClose, PortsWsFrame, PortsWsOpen, StreamSendWindow,
 };
 
 const UPSTREAM_LOCALHOST: &str = "localhost";
 const PORT_ACCESS_HTTP_BODY_CHANNEL_CAPACITY: usize = 16;
+const TCP_READ_BUFFER_BYTES: usize = 16 * 1024;
 const MAX_WEBSOCKET_HANDSHAKE_RESPONSE_BYTES: usize = 64 * 1024;
 
 type PortAccessHttpClient = Client<HttpsConnector<HttpConnector>, Channel<Bytes, Infallible>>;
@@ -96,6 +98,14 @@ pub enum PortAccessWsCommand {
     Terminate,
 }
 
+#[derive(Debug)]
+pub enum PortAccessTcpCommand {
+    Data { bytes: Vec<u8> },
+    Close { direction: String },
+    Window { bytes: usize },
+    Terminate,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortAccessTransportEvent {
     HttpResponseStart(PortsHttpResponseStart),
@@ -104,6 +114,11 @@ pub enum PortAccessTransportEvent {
     WsAccept(PortsWsAccept),
     WsFrame(PortsWsFrame),
     WsClose(PortsWsClose),
+    TcpConnected(PortsTcpConnected),
+    TcpData { stream_id: u32, bytes: Vec<u8> },
+    TcpInputWindow { stream_id: u32, bytes: usize },
+    TcpClose(PortsTcpClose),
+    TcpError(PortsTcpError),
     StreamError(PortsStreamError),
 }
 
@@ -140,6 +155,26 @@ pub fn spawn_websocket_transport(
         {
             let _ = event_sender.send(PortAccessTransportEvent::StreamError(PortsStreamError {
                 message_type: "ports.stream.error".to_string(),
+                stream_id,
+                code: error.code.to_string(),
+                message: error.to_string(),
+            }));
+        }
+    });
+    command_sender
+}
+
+/// Starts one localhost raw TCP relay for a previously authorized target port.
+pub fn spawn_tcp_transport(
+    open: PortsTcpOpen,
+    event_sender: mpsc::UnboundedSender<PortAccessTransportEvent>,
+) -> mpsc::UnboundedSender<PortAccessTcpCommand> {
+    let (command_sender, command_receiver) = mpsc::unbounded_channel();
+    let stream_id = open.stream_id;
+    tokio::spawn(async move {
+        if let Err(error) = run_tcp_transport(open, command_receiver, event_sender.clone()).await {
+            let _ = event_sender.send(PortAccessTransportEvent::TcpError(PortsTcpError {
+                message_type: "ports.tcp.error".to_string(),
                 stream_id,
                 code: error.code.to_string(),
                 message: error.to_string(),
@@ -277,6 +312,225 @@ async fn run_http_transport(
             }
         }
     }
+}
+
+async fn run_tcp_transport(
+    open: PortsTcpOpen,
+    mut command_receiver: mpsc::UnboundedReceiver<PortAccessTcpCommand>,
+    event_sender: mpsc::UnboundedSender<PortAccessTransportEvent>,
+) -> Result<(), PortAccessTransportError> {
+    let upstream_stream =
+        connect_upstream_tcp_stream(&open.target, &open.upstream_protocol).await?;
+    let (mut upstream_reader, mut upstream_writer) = tokio::io::split(upstream_stream);
+    let mut response_send_window = StreamSendWindow::default();
+    let mut read_buffer = vec![0u8; TCP_READ_BUFFER_BYTES];
+    let mut request_closed = false;
+    let mut response_closed = false;
+
+    event_sender
+        .send(PortAccessTransportEvent::TcpConnected(PortsTcpConnected {
+            message_type: "ports.tcp.connected".to_string(),
+            stream_id: open.stream_id,
+        }))
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_io_error",
+                format!("failed to publish ports.tcp.connected: {error}"),
+            )
+        })?;
+
+    loop {
+        if request_closed && response_closed {
+            return Ok(());
+        }
+
+        if response_closed || response_send_window.available_bytes() == 0 {
+            let command = command_receiver.recv().await;
+            if handle_tcp_command(
+                command,
+                &mut upstream_writer,
+                &event_sender,
+                open.stream_id,
+                &mut response_send_window,
+                &mut request_closed,
+            )
+            .await?
+            {
+                return Ok(());
+            }
+            continue;
+        }
+
+        let max_read = response_send_window
+            .available_bytes()
+            .min(TCP_READ_BUFFER_BYTES);
+        tokio::select! {
+            command = command_receiver.recv() => {
+                if handle_tcp_command(
+                    command,
+                    &mut upstream_writer,
+                    &event_sender,
+                    open.stream_id,
+                    &mut response_send_window,
+                    &mut request_closed,
+                )
+                .await? {
+                    return Ok(());
+                }
+            }
+            read_result = upstream_reader.read(&mut read_buffer[..max_read]) => {
+                let bytes_read = read_result.map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_io_error",
+                        format!("failed to read upstream tcp bytes: {error}"),
+                    )
+                })?;
+                if bytes_read == 0 {
+                    publish_tcp_close(&event_sender, open.stream_id, "response")?;
+                    response_closed = true;
+                    continue;
+                }
+                if !response_send_window.try_consume(bytes_read) {
+                    return Err(PortAccessTransportError::new(
+                        "upstream_io_error",
+                        "tcp response stream send window is exhausted",
+                    ));
+                }
+                event_sender
+                    .send(PortAccessTransportEvent::TcpData {
+                        stream_id: open.stream_id,
+                        bytes: read_buffer[..bytes_read].to_vec(),
+                    })
+                    .map_err(|error| {
+                        PortAccessTransportError::new(
+                            "upstream_io_error",
+                            format!("failed to publish tcp response bytes: {error}"),
+                        )
+                    })?;
+            }
+        }
+    }
+}
+
+async fn handle_tcp_command(
+    command: Option<PortAccessTcpCommand>,
+    upstream_writer: &mut (impl AsyncWrite + Unpin),
+    event_sender: &mpsc::UnboundedSender<PortAccessTransportEvent>,
+    stream_id: u32,
+    response_send_window: &mut StreamSendWindow,
+    request_closed: &mut bool,
+) -> Result<bool, PortAccessTransportError> {
+    match command {
+        Some(PortAccessTcpCommand::Data { bytes }) => {
+            if *request_closed {
+                return Err(PortAccessTransportError::new(
+                    "upstream_io_error",
+                    "received tcp request bytes after request direction closed",
+                ));
+            }
+            upstream_writer.write_all(&bytes).await.map_err(|error| {
+                PortAccessTransportError::new(
+                    "upstream_io_error",
+                    format!("failed to write upstream tcp bytes: {error}"),
+                )
+            })?;
+            upstream_writer.flush().await.map_err(|error| {
+                PortAccessTransportError::new(
+                    "upstream_io_error",
+                    format!("failed to flush upstream tcp bytes: {error}"),
+                )
+            })?;
+            event_sender
+                .send(PortAccessTransportEvent::TcpInputWindow {
+                    stream_id,
+                    bytes: bytes.len(),
+                })
+                .map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_io_error",
+                        format!("failed to publish tcp input stream.window: {error}"),
+                    )
+                })?;
+            Ok(false)
+        }
+        Some(PortAccessTcpCommand::Close { direction }) => {
+            if direction != "request" {
+                return Err(PortAccessTransportError::new(
+                    "upstream_io_error",
+                    format!("tcp command close direction '{direction}' is not supported"),
+                ));
+            }
+            if !*request_closed {
+                upstream_writer.shutdown().await.map_err(|error| {
+                    PortAccessTransportError::new(
+                        "upstream_io_error",
+                        format!("failed to close upstream tcp request direction: {error}"),
+                    )
+                })?;
+                *request_closed = true;
+                publish_tcp_close(event_sender, stream_id, "request")?;
+            }
+            Ok(false)
+        }
+        Some(PortAccessTcpCommand::Window { bytes }) => {
+            response_send_window.add(bytes).map_err(|error| {
+                PortAccessTransportError::new("upstream_io_error", error.to_string())
+            })?;
+            Ok(false)
+        }
+        Some(PortAccessTcpCommand::Terminate) => Ok(true),
+        None => Ok(true),
+    }
+}
+
+async fn connect_upstream_tcp_stream(
+    target: &PortAccessTarget,
+    upstream_protocol: &str,
+) -> Result<MaybeTlsStream<TcpStream>, PortAccessTransportError> {
+    let tcp_stream = TcpStream::connect((UPSTREAM_LOCALHOST, target.port))
+        .await
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_connect_failed",
+                format!(
+                    "failed to connect to upstream tcp target on port {}: {error}",
+                    target.port
+                ),
+            )
+        })?;
+    match upstream_protocol {
+        "http" => Ok(MaybeTlsStream::Plain(tcp_stream)),
+        "https" => connect_tls_stream(tcp_stream, "tcp").await,
+        other => Err(PortAccessTransportError::new(
+            "upstream_handshake_failed",
+            format!("unsupported tcp upstream protocol '{other}'"),
+        )),
+    }
+}
+
+async fn connect_tls_stream(
+    tcp_stream: TcpStream,
+    transport_name: &str,
+) -> Result<MaybeTlsStream<TcpStream>, PortAccessTransportError> {
+    let tls_connector = TlsConnector::from(Arc::new(build_insecure_tls_client_config()));
+    let server_name = ServerName::try_from(UPSTREAM_LOCALHOST)
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!("failed to build upstream {transport_name} tls server name: {error}"),
+            )
+        })?
+        .to_owned();
+    let tls_stream = tls_connector
+        .connect(server_name, tcp_stream)
+        .await
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_handshake_failed",
+                format!("failed to complete upstream {transport_name} tls handshake: {error}"),
+            )
+        })?;
+    Ok(MaybeTlsStream::Rustls(tls_stream))
 }
 
 async fn handle_http_command(
@@ -735,6 +989,25 @@ fn publish_websocket_close(
         })
 }
 
+fn publish_tcp_close(
+    event_sender: &mpsc::UnboundedSender<PortAccessTransportEvent>,
+    stream_id: u32,
+    direction: &str,
+) -> Result<(), PortAccessTransportError> {
+    event_sender
+        .send(PortAccessTransportEvent::TcpClose(PortsTcpClose {
+            message_type: "ports.tcp.close".to_string(),
+            stream_id,
+            direction: direction.to_string(),
+        }))
+        .map_err(|error| {
+            PortAccessTransportError::new(
+                "upstream_io_error",
+                format!("failed to publish ports.tcp.close: {error}"),
+            )
+        })
+}
+
 fn build_http_client() -> Result<PortAccessHttpClient, PortAccessTransportError> {
     let mut http_connector = HttpConnector::new();
     http_connector.enforce_http(false);
@@ -924,27 +1197,7 @@ async fn connect_upstream_websocket_stream(
         })?;
     match upstream_protocol {
         "http" => Ok(MaybeTlsStream::Plain(tcp_stream)),
-        "https" => {
-            let tls_connector = TlsConnector::from(Arc::new(build_insecure_tls_client_config()));
-            let server_name = ServerName::try_from(UPSTREAM_LOCALHOST)
-                .map_err(|error| {
-                    PortAccessTransportError::new(
-                        "upstream_handshake_failed",
-                        format!("failed to build upstream websocket tls server name: {error}"),
-                    )
-                })?
-                .to_owned();
-            let tls_stream = tls_connector
-                .connect(server_name, tcp_stream)
-                .await
-                .map_err(|error| {
-                    PortAccessTransportError::new(
-                        "upstream_handshake_failed",
-                        format!("failed to complete upstream websocket tls handshake: {error}"),
-                    )
-                })?;
-            Ok(MaybeTlsStream::Rustls(tls_stream))
-        }
+        "https" => connect_tls_stream(tcp_stream, "websocket").await,
         other => Err(PortAccessTransportError::new(
             "upstream_handshake_failed",
             format!("unsupported websocket upstream protocol '{other}'"),
@@ -1280,8 +1533,20 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for ReplayableStream<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_request_uri, build_websocket_request_uri};
-    use crate::tunnel::protocol::PortAccessTarget;
+    use super::{
+        PortAccessTcpCommand, PortAccessTransportEvent, build_request_uri,
+        build_websocket_request_uri, spawn_tcp_transport,
+    };
+    use std::sync::Arc;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tokio::sync::mpsc;
+    use tokio::time::{Duration, timeout};
+    use tokio_rustls::TlsAcceptor;
+    use tokio_rustls::rustls::ServerConfig;
+    use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+
+    use crate::tunnel::protocol::{DEFAULT_STREAM_WINDOW_BYTES, PortAccessTarget, PortsTcpOpen};
 
     #[test]
     fn builds_http_request_uri_against_localhost() {
@@ -1313,5 +1578,404 @@ mod tests {
         .expect("websocket request uri should build");
 
         assert_eq!(request_uri, "wss://localhost:3000/@vite/client");
+    }
+
+    #[tokio::test]
+    async fn tcp_transport_relays_bytes_and_directional_closes() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("tcp listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("tcp listener should expose an address")
+            .port();
+        let server_task = tokio::spawn(async move {
+            let (mut stream, _) = listener
+                .accept()
+                .await
+                .expect("tcp listener should accept one connection");
+            let mut request = [0u8; 4];
+            stream
+                .read_exact(&mut request)
+                .await
+                .expect("upstream should receive request bytes");
+            assert_eq!(&request, b"ping");
+            stream
+                .write_all(b"pong")
+                .await
+                .expect("upstream should write response bytes");
+            stream
+                .shutdown()
+                .await
+                .expect("upstream should close response direction");
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+        let command_sender = spawn_tcp_transport(
+            PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 91,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+                upstream_protocol: "http".to_string(),
+            },
+            event_sender,
+        );
+
+        assert_eq!(
+            receive_port_access_event(&mut event_receiver).await,
+            PortAccessTransportEvent::TcpConnected(crate::tunnel::protocol::PortsTcpConnected {
+                message_type: "ports.tcp.connected".to_string(),
+                stream_id: 91,
+            })
+        );
+        command_sender
+            .send(PortAccessTcpCommand::Data {
+                bytes: b"ping".to_vec(),
+            })
+            .expect("tcp command channel should accept request bytes");
+        command_sender
+            .send(PortAccessTcpCommand::Close {
+                direction: "request".to_string(),
+            })
+            .expect("tcp command channel should accept request close");
+
+        let mut saw_input_window = false;
+        let mut saw_request_close = false;
+        let mut saw_response_data = false;
+        let mut saw_response_close = false;
+        while !(saw_input_window && saw_request_close && saw_response_data && saw_response_close) {
+            match receive_port_access_event(&mut event_receiver).await {
+                PortAccessTransportEvent::TcpInputWindow { stream_id, bytes } => {
+                    assert_eq!(stream_id, 91);
+                    assert_eq!(bytes, 4);
+                    saw_input_window = true;
+                }
+                PortAccessTransportEvent::TcpClose(message) if message.direction == "request" => {
+                    assert_eq!(message.stream_id, 91);
+                    saw_request_close = true;
+                }
+                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                    assert_eq!(stream_id, 91);
+                    assert_eq!(bytes, b"pong");
+                    saw_response_data = true;
+                }
+                PortAccessTransportEvent::TcpClose(message) if message.direction == "response" => {
+                    assert_eq!(message.stream_id, 91);
+                    saw_response_close = true;
+                }
+                event => panic!("unexpected port access tcp event: {event:?}"),
+            }
+        }
+
+        server_task.await.expect("upstream task should finish");
+    }
+
+    #[tokio::test]
+    async fn tcp_transport_preserves_target_write_half_close_while_request_continues() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("tcp listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("tcp listener should expose an address")
+            .port();
+        let server_task = tokio::spawn(async move {
+            let (mut stream, _) = listener
+                .accept()
+                .await
+                .expect("tcp listener should accept one connection");
+            stream
+                .write_all(b"ready")
+                .await
+                .expect("upstream should write response bytes");
+            stream
+                .shutdown()
+                .await
+                .expect("upstream should close response direction");
+            let mut request = [0u8; 4];
+            stream
+                .read_exact(&mut request)
+                .await
+                .expect("upstream should still receive request bytes after response close");
+            assert_eq!(&request, b"ping");
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+        let command_sender = spawn_tcp_transport(
+            PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 93,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+                upstream_protocol: "http".to_string(),
+            },
+            event_sender,
+        );
+
+        assert_eq!(
+            receive_port_access_event(&mut event_receiver).await,
+            PortAccessTransportEvent::TcpConnected(crate::tunnel::protocol::PortsTcpConnected {
+                message_type: "ports.tcp.connected".to_string(),
+                stream_id: 93,
+            })
+        );
+        let mut saw_response_data = false;
+        let mut saw_response_close = false;
+        while !(saw_response_data && saw_response_close) {
+            match receive_port_access_event(&mut event_receiver).await {
+                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                    assert_eq!(stream_id, 93);
+                    assert_eq!(bytes, b"ready");
+                    saw_response_data = true;
+                }
+                PortAccessTransportEvent::TcpClose(message) if message.direction == "response" => {
+                    assert_eq!(message.stream_id, 93);
+                    saw_response_close = true;
+                }
+                event => panic!("unexpected port access tcp event: {event:?}"),
+            }
+        }
+
+        command_sender
+            .send(PortAccessTcpCommand::Data {
+                bytes: b"ping".to_vec(),
+            })
+            .expect("tcp command channel should accept request bytes after response close");
+        command_sender
+            .send(PortAccessTcpCommand::Close {
+                direction: "request".to_string(),
+            })
+            .expect("tcp command channel should accept request close");
+
+        server_task.await.expect("upstream task should finish");
+    }
+
+    #[tokio::test]
+    async fn tcp_transport_wraps_https_upstream_with_accept_any_tls() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("tls listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("tls listener should expose an address")
+            .port();
+        let tls_acceptor = build_test_tls_acceptor();
+        let server_task = tokio::spawn(async move {
+            let (stream, _) = listener
+                .accept()
+                .await
+                .expect("tls listener should accept one connection");
+            let mut stream = tls_acceptor
+                .accept(stream)
+                .await
+                .expect("sandboxd tcp transport should complete tls handshake");
+            let mut request = [0u8; 4];
+            stream
+                .read_exact(&mut request)
+                .await
+                .expect("tls upstream should receive request bytes");
+            assert_eq!(&request, b"ping");
+            stream
+                .write_all(b"pong")
+                .await
+                .expect("tls upstream should write response bytes");
+            stream
+                .shutdown()
+                .await
+                .expect("tls upstream should close response direction");
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+        let command_sender = spawn_tcp_transport(
+            PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 94,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+                upstream_protocol: "https".to_string(),
+            },
+            event_sender,
+        );
+
+        assert_eq!(
+            receive_port_access_event(&mut event_receiver).await,
+            PortAccessTransportEvent::TcpConnected(crate::tunnel::protocol::PortsTcpConnected {
+                message_type: "ports.tcp.connected".to_string(),
+                stream_id: 94,
+            })
+        );
+        command_sender
+            .send(PortAccessTcpCommand::Data {
+                bytes: b"ping".to_vec(),
+            })
+            .expect("tcp command channel should accept tls request bytes");
+
+        loop {
+            match receive_port_access_event(&mut event_receiver).await {
+                PortAccessTransportEvent::TcpInputWindow { .. } => {}
+                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                    assert_eq!(stream_id, 94);
+                    assert_eq!(bytes, b"pong");
+                    break;
+                }
+                event => panic!("unexpected port access tcp event: {event:?}"),
+            }
+        }
+
+        server_task.await.expect("tls upstream task should finish");
+    }
+
+    #[tokio::test]
+    async fn tcp_transport_pauses_and_resumes_response_reads_with_stream_window() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("tcp listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("tcp listener should expose an address")
+            .port();
+        let response = vec![b'x'; DEFAULT_STREAM_WINDOW_BYTES + 1];
+        let server_task = tokio::spawn(async move {
+            let (mut stream, _) = listener
+                .accept()
+                .await
+                .expect("tcp listener should accept one connection");
+            stream
+                .write_all(&response)
+                .await
+                .expect("upstream should write response bytes");
+            stream
+                .shutdown()
+                .await
+                .expect("upstream should close response direction");
+        });
+
+        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+        let command_sender = spawn_tcp_transport(
+            PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 95,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+                upstream_protocol: "http".to_string(),
+            },
+            event_sender,
+        );
+
+        assert_eq!(
+            receive_port_access_event(&mut event_receiver).await,
+            PortAccessTransportEvent::TcpConnected(crate::tunnel::protocol::PortsTcpConnected {
+                message_type: "ports.tcp.connected".to_string(),
+                stream_id: 95,
+            })
+        );
+
+        let mut received_bytes = 0usize;
+        while received_bytes < DEFAULT_STREAM_WINDOW_BYTES {
+            match receive_port_access_event(&mut event_receiver).await {
+                PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                    assert_eq!(stream_id, 95);
+                    received_bytes = received_bytes.saturating_add(bytes.len());
+                    assert!(
+                        received_bytes <= DEFAULT_STREAM_WINDOW_BYTES,
+                        "tcp transport must not read past available response window",
+                    );
+                }
+                event => panic!("unexpected port access tcp event: {event:?}"),
+            }
+        }
+
+        assert!(
+            timeout(Duration::from_millis(100), event_receiver.recv())
+                .await
+                .is_err(),
+            "tcp transport should pause response reads while window credit is exhausted",
+        );
+
+        command_sender
+            .send(PortAccessTcpCommand::Window { bytes: 1 })
+            .expect("tcp command channel should accept one byte of response credit");
+        match receive_port_access_event(&mut event_receiver).await {
+            PortAccessTransportEvent::TcpData { stream_id, bytes } => {
+                assert_eq!(stream_id, 95);
+                assert_eq!(bytes.len(), 1);
+            }
+            event => panic!("unexpected event after response window resumed: {event:?}"),
+        }
+
+        server_task.await.expect("upstream task should finish");
+    }
+
+    #[tokio::test]
+    async fn tcp_transport_emits_tcp_error_when_upstream_connect_fails() {
+        let port = reserve_unbound_port().await;
+        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
+        let _command_sender = spawn_tcp_transport(
+            PortsTcpOpen {
+                message_type: "ports.tcp.open".to_string(),
+                stream_id: 92,
+                target: PortAccessTarget {
+                    kind: "port".to_string(),
+                    port,
+                },
+                upstream_protocol: "http".to_string(),
+            },
+            event_sender,
+        );
+
+        match receive_port_access_event(&mut event_receiver).await {
+            PortAccessTransportEvent::TcpError(message) => {
+                assert_eq!(message.stream_id, 92);
+                assert_eq!(message.code, "upstream_connect_failed");
+                assert!(
+                    !message.message.is_empty(),
+                    "tcp connect failures should preserve an error message",
+                );
+            }
+            event => panic!("expected tcp error event, got {event:?}"),
+        }
+    }
+
+    async fn receive_port_access_event(
+        event_receiver: &mut mpsc::UnboundedReceiver<PortAccessTransportEvent>,
+    ) -> PortAccessTransportEvent {
+        timeout(Duration::from_secs(5), event_receiver.recv())
+            .await
+            .expect("port access event should arrive before timeout")
+            .expect("port access event channel should stay open")
+    }
+
+    async fn reserve_unbound_port() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("port reservation listener should bind");
+        let port = listener
+            .local_addr()
+            .expect("port reservation listener should expose an address")
+            .port();
+        drop(listener);
+        port
+    }
+
+    fn build_test_tls_acceptor() -> TlsAcceptor {
+        let rcgen::CertifiedKey { cert, key_pair } =
+            rcgen::generate_simple_self_signed(vec!["localhost".to_string()])
+                .expect("self-signed tls certificate should generate");
+        let cert_chain = vec![CertificateDer::from(cert.der().to_vec())];
+        let private_key = PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(key_pair.serialize_der()));
+        let server_config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(cert_chain, private_key)
+            .expect("test tls server config should build");
+        TlsAcceptor::from(Arc::new(server_config))
     }
 }

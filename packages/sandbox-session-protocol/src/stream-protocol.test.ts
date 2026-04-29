@@ -918,6 +918,34 @@ describe("ports transport message parser", () => {
     expect(
       parsePortsTransportMessage(
         JSON.stringify({
+          type: "ports.tcp.open",
+          streamId: 61,
+          target: {
+            kind: "host",
+            port: 5173,
+          },
+          upstreamProtocol: "http",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.open",
+          streamId: 61,
+          target: {
+            kind: "port",
+            port: 0,
+          },
+          upstreamProtocol: "http",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
           type: "ports.tcp.close",
           streamId: 61,
           direction: "both",

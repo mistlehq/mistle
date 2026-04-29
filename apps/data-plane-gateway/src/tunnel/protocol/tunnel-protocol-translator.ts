@@ -690,6 +690,9 @@ export class TunnelProtocolTranslator {
         portsTransportMessage.type === "ports.http.response.start" ||
         portsTransportMessage.type === "ports.http.body.chunk" ||
         portsTransportMessage.type === "ports.http.body.end" ||
+        portsTransportMessage.type === "ports.tcp.connected" ||
+        portsTransportMessage.type === "ports.tcp.close" ||
+        portsTransportMessage.type === "ports.tcp.error" ||
         portsTransportMessage.type === "ports.ws.accept" ||
         portsTransportMessage.type === "ports.ws.frame" ||
         portsTransportMessage.type === "ports.ws.close" ||

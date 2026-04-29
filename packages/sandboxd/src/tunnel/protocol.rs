@@ -2262,6 +2262,26 @@ mod tests {
                 .contains("ports.tcp.open upstreamProtocol must be 'http' or 'https'")
         );
 
+        let invalid_target_kind = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.open","streamId":61,"target":{"kind":"host","port":5173},"upstreamProtocol":"http"}"#,
+        );
+        assert!(
+            invalid_target_kind
+                .expect_err("invalid target kind should fail validation")
+                .to_string()
+                .contains("ports target kind must be 'port'")
+        );
+
+        let invalid_target_port = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.open","streamId":61,"target":{"kind":"port","port":0},"upstreamProtocol":"http"}"#,
+        );
+        assert!(
+            invalid_target_port
+                .expect_err("invalid target port should fail validation")
+                .to_string()
+                .contains("ports target port must be greater than zero")
+        );
+
         let invalid_direction = parse_ports_transport_message(
             r#"{"type":"ports.tcp.close","streamId":61,"direction":"both"}"#,
         );
