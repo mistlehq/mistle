@@ -2,10 +2,11 @@
 
 import { SlackAppManifestTemplate } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { resetDashboardConfigForTest } from "../../config.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import type {
   IntegrationConnection,
@@ -45,6 +46,11 @@ function renderSlackAppSetupPane(input?: {
   connection?: IntegrationConnection;
   webhookSource?: IntegrationWebhookSource | null;
 }) {
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: "https://control-plane.example.com",
+  });
+  resetDashboardConfigForTest();
+
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -83,8 +89,15 @@ function renderSlackAppSetupPane(input?: {
 }
 
 describe("SlackAppSetupPane", () => {
-  it("defaults an incomplete Slack connection to manifest setup", () => {
-    renderSlackAppSetupPane();
+  afterEach(() => {
+    Object.assign(import.meta.env, {
+      VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
+    });
+    resetDashboardConfigForTest();
+  });
+
+  it("defaults an incomplete Slack connection to manifest setup", async () => {
+    const rendered = renderSlackAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(screen.getByText("App configuration token")).toBeTruthy();
@@ -94,6 +107,18 @@ describe("SlackAppSetupPane", () => {
         "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",
       ),
     ).toBeTruthy();
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain(
+        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+      );
+    });
+    expect(rendered.container.textContent).toContain(
+      "https://control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
+    );
+    expect(rendered.container.textContent).toContain(
+      "https://control-plane.example.com/p/identity-linking/callbacks/slack",
+    );
+    expect(rendered.container.textContent).not.toContain("mistle.example.com");
     expect(
       screen.getByRole("button", { name: "Create and connect Slack app" }).hasAttribute("disabled"),
     ).toBe(true);

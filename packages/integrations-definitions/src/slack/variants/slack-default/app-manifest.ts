@@ -2,7 +2,11 @@ import { buildUrlWithPath } from "@mistle/http";
 import { z } from "zod";
 
 import { SlackConnectionMethodId } from "./auth.js";
-import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
+import {
+  SlackAppManifestBotEvents,
+  SlackAppManifestBotScopes,
+  SlackAppManifestTemplate,
+} from "./manifest.js";
 
 const SlackOAuthAccessSuccessResponseSchema = z
   .object({
@@ -75,6 +79,7 @@ export type SlackManifestCreateErrorResponse = z.output<
 >;
 
 function mergeUniqueStrings(input: {
+  excludedValues?: ReadonlySet<string>;
   existing: unknown;
   requiredValues: ReadonlyArray<string>;
 }): string[] {
@@ -82,7 +87,11 @@ function mergeUniqueStrings(input: {
     Array.isArray(input.existing) && input.existing.every((entry) => typeof entry === "string")
       ? input.existing
       : [];
-  return [...new Set([...values, ...input.requiredValues])];
+  const retainedValues =
+    input.excludedValues === undefined
+      ? values
+      : values.filter((value) => !input.excludedValues?.has(value));
+  return [...new Set([...retainedValues, ...input.requiredValues])];
 }
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -193,6 +202,7 @@ export function buildSlackAppManifest(input: {
     oauth_config: {
       ...oauthConfig,
       redirect_urls: mergeUniqueStrings({
+        excludedValues: new Set(SlackAppManifestTemplate.oauth_config.redirect_urls),
         existing: oauthConfig["redirect_urls"],
         requiredValues: [
           redirectUrl,

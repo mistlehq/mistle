@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { resetDashboardConfigForTest } from "../../config.js";
@@ -96,8 +96,8 @@ describe("GitHubAppSetupPane", () => {
     resetDashboardConfigForTest();
   });
 
-  it("defaults a blank draft connection to the manifest setup mode", () => {
-    renderGitHubAppSetupPane({
+  it("defaults a blank draft connection to the manifest setup mode", async () => {
+    const rendered = renderGitHubAppSetupPane({
       connection: {
         ...createGitHubAppSetupConnection(),
         config: {
@@ -120,6 +120,21 @@ describe("GitHubAppSetupPane", () => {
     expect(screen.getByRole("radio", { name: "Organization" })).toBeTruthy();
     expect(screen.queryByLabelText("GitHub organization")).toBeNull();
     expect(screen.queryByRole("button", { name: "Format JSON" })).toBeNull();
+    await waitFor(() => {
+      expect(rendered.container.textContent).toContain(
+        "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_app_setup",
+      );
+    });
+    expect(rendered.container.textContent).toContain(
+      "https://control-plane.example.com/p/integration/callbacks/setup/github-app-manifest",
+    );
+    expect(rendered.container.textContent).toContain(
+      "https://control-plane.example.com/p/identity-linking/callbacks/github",
+    );
+    expect(rendered.container.textContent).toContain(
+      "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
+    );
+    expect(rendered.container.textContent).not.toContain("mistle.example.com");
     expect(screen.queryByText("Needs setup")).toBeNull();
     expect(screen.queryByText("Status")).toBeNull();
     expect(screen.queryByText("Draft")).toBeNull();

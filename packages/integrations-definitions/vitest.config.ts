@@ -10,6 +10,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL("../integrations-core/src/index.ts", import.meta.url)),
       },
       {
+        find: /^@mistle\/http$/,
+        replacement: fileURLToPath(new URL("../http/src/index.ts", import.meta.url)),
+      },
+      {
         find: /^@mistle\/sandbox-session-client\/browser$/,
         replacement: fileURLToPath(
           new URL("../sandbox-session-client/src/browser.ts", import.meta.url),
