@@ -96,7 +96,7 @@ describe("session-composer-status", () => {
     });
   });
 
-  it("does not show an image warning for generic file attachments on text-only models", () => {
+  it("does not show an image warning when no image attachments are pending on text-only models", () => {
     expect(
       resolveComposerStatusMessage({
         activeComposerModel: TextOnlyModel,

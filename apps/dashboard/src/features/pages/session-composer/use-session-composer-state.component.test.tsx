@@ -273,11 +273,12 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
   });
 
-  it("adds non-image files to pending attachments", () => {
+  it("keeps non-image files pending without showing the image warning", () => {
     render(<SessionComposerStateHarness composerText="" pendingDiffComments={[]} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Add PDF" }));
 
     expect(screen.getByTestId("pending-attachments").textContent).toBe("requirements.pdf");
+    expect(screen.getByTestId("status-message").textContent).toBe("");
   });
 });
