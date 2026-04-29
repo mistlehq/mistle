@@ -171,7 +171,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   build-ts:
     name: TS Build
@@ -259,7 +261,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   static-rust:
     name: Rust Static
@@ -362,7 +366,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   knip:
     name: Knip
@@ -499,7 +505,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   test-ts-component:
     name: TS Component Test
@@ -587,7 +595,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   test-commit-sign:
     name: Commit Sign Test
@@ -682,7 +692,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   test-sandboxd:
     name: Sandboxd Test
@@ -793,7 +805,9 @@ jobs:
 
       - name: Stop Nix daemon
         if: always()
-        run: sudo systemctl stop nix-daemon.service
+        run: |
+          sudo systemctl stop nix-daemon.socket
+          sudo systemctl stop nix-daemon.service
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
