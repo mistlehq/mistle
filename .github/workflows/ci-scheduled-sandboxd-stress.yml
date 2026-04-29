@@ -19,7 +19,6 @@ on:
 permissions:
   contents: read
   id-token: write
-  packages: read
 
 concurrency:
   group: scheduled-sandboxd-stress-${{ github.ref }}
@@ -92,19 +91,19 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
-      - name: Log in to GitHub Container Registry
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Pull sandboxd test runner image
-        run: docker pull "ghcr.io/mistlehq/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}"
+      - name: Build sandboxd test runner image
+        run: >-
+          docker build
+          --pull=false
+          --tag "mistle/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}"
+          --file packages/sandboxd/Dockerfile.test
+          packages/sandboxd
 
       - name: Run sandboxd stress tests in Nix shell
         env:
           MISTLE_SANDBOXD_STRESS_CASES: ${{ inputs.stress_cases || '' }}
           MISTLE_SANDBOXD_STRESS_MULTIPLIER: ${{ inputs.stress_multiplier || '4' }}
-          MISTLE_SANDBOXD_TEST_IMAGE: ghcr.io/mistlehq/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/sandboxd test:stress
 
