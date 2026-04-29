@@ -29,13 +29,12 @@ import {
   type ManifestWebhookCallbackState,
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
-import { buildSavedFieldValuePatch } from "../shared/auto-save-behavior.js";
 import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
   ExistingAppSetupFieldsPanel,
   getSetupFieldState,
-  useSetupFieldFeedback,
+  useExistingAppSetupAutoSave,
   useSetupManifestDraft,
 } from "./integration-connection-app-setup-shared.js";
 import {
@@ -186,6 +185,33 @@ function isSlackExistingAppFieldStable(input: {
   );
 }
 
+function getSlackExistingAppSetupFieldValidationMessage(input: {
+  fieldKey: SlackExistingAppFieldKey;
+  draft: SlackExistingAppDraft;
+}): string | null {
+  const normalizedValue = normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]);
+
+  if (isSlackExistingAppSecretFieldKey(input.fieldKey) && normalizedValue.length === 0) {
+    if (input.fieldKey === "clientSecret") {
+      return null;
+    }
+
+    return `${SlackExistingAppSetupFieldLabels[input.fieldKey]} is required.`;
+  }
+
+  return null;
+}
+
+function shouldPersistSlackExistingAppSetupField(input: {
+  fieldKey: SlackExistingAppFieldKey;
+  draft: SlackExistingAppDraft;
+}): boolean {
+  return (
+    !isSlackExistingAppSecretFieldKey(input.fieldKey) ||
+    normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]).length > 0
+  );
+}
+
 function isSlackExistingAppRequiredSecretReady(input: {
   fieldKey: SlackExistingAppSecretFieldKey;
   draft: SlackExistingAppDraft;
@@ -299,18 +325,53 @@ export function SlackAppSetupPane(input: {
     isSlackAppInstalled(input.connection) ? "existing-app" : "manifest",
   );
   const [appConfigToken, setAppConfigToken] = useState("");
-  const [existingAppDraft, setExistingAppDraft] = useState(() =>
-    createInitialExistingAppDraft(input.connection),
-  );
-  const [savedExistingAppDraft, setSavedExistingAppDraft] = useState(() =>
-    createInitialExistingAppDraft(input.connection),
-  );
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSlackSecretFieldKeys(input.connection),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const fieldFeedback = useSetupFieldFeedback(SlackExistingAppFieldKeys);
+  const existingAppAutoSave = useExistingAppSetupAutoSave<
+    SlackExistingAppFieldKey,
+    IntegrationConnection
+  >({
+    clearActionError: () => {
+      setActionErrorMessage(null);
+    },
+    fieldKeys: SlackExistingAppFieldKeys,
+    initialDraft: createInitialExistingAppDraft(input.connection),
+    normalizeValue: normalizeSlackExistingAppSetupValue,
+    onFieldSaved: (updatedConnection, fieldKey) => {
+      if (isSlackExistingAppSecretFieldKey(fieldKey)) {
+        setConfiguredSecretFieldKeys(resolveConfiguredSlackSecretFieldKeys(updatedConnection));
+      }
+    },
+    resolveSavedFieldKeys: resolveSlackExistingAppSetupSavedFieldKeys,
+    resolveSaveErrorMessage: (error) =>
+      resolveApiErrorMessage({
+        error,
+        fallbackMessage: "Could not save Slack app setup.",
+      }),
+    saveField: async ({ draft, fieldKey }) => {
+      const secrets = buildSlackExistingAppSetupSecrets({
+        draft,
+        fieldKey,
+      });
+      const updatedConnection = await updateFormIntegrationConnection({
+        connectionId: input.connection.id,
+        displayName: input.connection.displayName,
+        config: buildSlackExistingAppSetupConfig(draft),
+        ...(secrets === undefined ? {} : { secrets }),
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+
+      return updatedConnection;
+    },
+    shouldPersistField: shouldPersistSlackExistingAppSetupField,
+    validateField: getSlackExistingAppSetupFieldValidationMessage,
+  });
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: true,
     connectionId: input.connection.id,
@@ -344,113 +405,6 @@ export function SlackAppSetupPane(input: {
     }
   }
 
-  function updateExistingAppFieldDraft(
-    fieldKey: SlackExistingAppFieldKey,
-    nextValue: string,
-  ): void {
-    setExistingAppDraft((currentDraft) => ({
-      ...currentDraft,
-      [fieldKey]: nextValue,
-    }));
-    setActionErrorMessage(null);
-    const fieldState = getSetupFieldState(fieldFeedback.fieldStates, fieldKey);
-    if (fieldState.status !== "idle" || fieldState.errorMessage !== null) {
-      fieldFeedback.resetFieldFeedback(fieldKey);
-    }
-  }
-
-  async function persistExistingAppField(fieldKey: SlackExistingAppFieldKey): Promise<void> {
-    if (getSetupFieldState(fieldFeedback.fieldStates, fieldKey).status === "saving") {
-      return;
-    }
-
-    if (
-      !isSlackExistingAppSetupFieldDirty({
-        fieldKey,
-        draft: existingAppDraft,
-        savedDraft: savedExistingAppDraft,
-      })
-    ) {
-      setExistingAppDraft((currentDraft) => ({
-        ...currentDraft,
-        [fieldKey]: savedExistingAppDraft[fieldKey],
-      }));
-      fieldFeedback.resetFieldFeedback(fieldKey);
-      return;
-    }
-
-    const normalizedValue = normalizeSlackExistingAppSetupValue(existingAppDraft[fieldKey]);
-    if (isSlackExistingAppSecretFieldKey(fieldKey) && normalizedValue.length === 0) {
-      if (fieldKey === "clientSecret") {
-        fieldFeedback.resetFieldFeedback(fieldKey);
-        return;
-      }
-
-      fieldFeedback.setFieldError(
-        fieldKey,
-        `${SlackExistingAppSetupFieldLabels[fieldKey]} is required.`,
-      );
-      return;
-    }
-
-    fieldFeedback.setFieldSaving(fieldKey);
-
-    try {
-      const secrets = buildSlackExistingAppSetupSecrets({
-        draft: existingAppDraft,
-        fieldKey,
-      });
-      const updatedConnection = await updateFormIntegrationConnection({
-        connectionId: input.connection.id,
-        displayName: input.connection.displayName,
-        config: buildSlackExistingAppSetupConfig(existingAppDraft),
-        ...(secrets === undefined ? {} : { secrets }),
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-      });
-
-      const savedFieldValuePatch = buildSavedFieldValuePatch({
-        draft: existingAppDraft,
-        fieldKeys: resolveSlackExistingAppSetupSavedFieldKeys(fieldKey),
-        normalizeValue: normalizeSlackExistingAppSetupValue,
-      });
-      const nextSavedDraft = {
-        ...savedExistingAppDraft,
-        ...savedFieldValuePatch,
-      };
-      const nextDraft = {
-        ...existingAppDraft,
-        ...savedFieldValuePatch,
-      };
-
-      setSavedExistingAppDraft(nextSavedDraft);
-      setExistingAppDraft(nextDraft);
-      if (isSlackExistingAppSecretFieldKey(fieldKey)) {
-        setConfiguredSecretFieldKeys(resolveConfiguredSlackSecretFieldKeys(updatedConnection));
-      }
-      setActionErrorMessage(null);
-      fieldFeedback.markFieldSavedWithReset(fieldKey);
-    } catch (error) {
-      fieldFeedback.setFieldError(
-        fieldKey,
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not save Slack app setup.",
-        }),
-      );
-    }
-  }
-
-  function revertSecretReplacement(fieldKey: SlackExistingAppSecretFieldKey): void {
-    setExistingAppDraft((currentDraft) => ({
-      ...currentDraft,
-      [fieldKey]: "",
-    }));
-    fieldFeedback.resetFieldFeedback(fieldKey);
-  }
-
   const manifestValidation = validateManifestJsonObject(manifestDraft.manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
@@ -459,18 +413,18 @@ export function SlackAppSetupPane(input: {
   const requiredSecretsReady = SlackRequiredExistingAppSecretFieldKeys.every((fieldKey) =>
     isSlackExistingAppRequiredSecretReady({
       fieldKey,
-      draft: existingAppDraft,
-      savedDraft: savedExistingAppDraft,
-      fieldState: getSetupFieldState(fieldFeedback.fieldStates, fieldKey),
+      draft: existingAppAutoSave.draft,
+      savedDraft: existingAppAutoSave.savedDraft,
+      fieldState: getSetupFieldState(existingAppAutoSave.fieldStates, fieldKey),
       isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey),
     }),
   );
   const allFieldsStable = SlackExistingAppFieldKeys.every((fieldKey) =>
     isSlackExistingAppFieldStable({
       fieldKey,
-      draft: existingAppDraft,
-      savedDraft: savedExistingAppDraft,
-      fieldState: getSetupFieldState(fieldFeedback.fieldStates, fieldKey),
+      draft: existingAppAutoSave.draft,
+      savedDraft: existingAppAutoSave.savedDraft,
+      fieldState: getSetupFieldState(existingAppAutoSave.fieldStates, fieldKey),
     }),
   );
   const canConnectExistingApp =
@@ -491,17 +445,17 @@ export function SlackAppSetupPane(input: {
                 fieldKey: "clientId",
                 id: "slack-client-id",
                 label: SlackExistingAppSetupFieldLabels.clientId,
-                value: existingAppDraft.clientId,
+                value: existingAppAutoSave.draft.clientId,
               },
             ]}
             description="Paste values from a Slack app you already created or configured in Slack."
-            fieldStates={fieldFeedback.fieldStates}
+            fieldStates={existingAppAutoSave.fieldStates}
             onCommitField={(fieldKey) => {
-              void persistExistingAppField(fieldKey);
+              void existingAppAutoSave.persistField(fieldKey);
             }}
             onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
-            onRevertSecretReplacement={revertSecretReplacement}
-            onUpdateFieldDraft={updateExistingAppFieldDraft}
+            onRevertSecretReplacement={existingAppAutoSave.revertField}
+            onUpdateFieldDraft={existingAppAutoSave.updateFieldDraft}
             secretFields={[
               {
                 configured: configuredSecretFieldKeys.has("botToken"),
@@ -512,7 +466,7 @@ export function SlackAppSetupPane(input: {
                 required: !configuredSecretFieldKeys.has("botToken"),
                 secretLabel: "bot token",
                 type: "password",
-                value: existingAppDraft.botToken,
+                value: existingAppAutoSave.draft.botToken,
               },
               {
                 configured: configuredSecretFieldKeys.has("signingSecret"),
@@ -522,7 +476,7 @@ export function SlackAppSetupPane(input: {
                 required: !configuredSecretFieldKeys.has("signingSecret"),
                 secretLabel: "signing secret",
                 type: "password",
-                value: existingAppDraft.signingSecret,
+                value: existingAppAutoSave.draft.signingSecret,
               },
               {
                 configured: configuredSecretFieldKeys.has("clientSecret"),
@@ -531,7 +485,7 @@ export function SlackAppSetupPane(input: {
                 label: SlackExistingAppSetupFieldLabels.clientSecret,
                 secretLabel: "client secret",
                 type: "password",
-                value: existingAppDraft.clientSecret,
+                value: existingAppAutoSave.draft.clientSecret,
               },
             ]}
             title="Existing Slack App"

@@ -43,12 +43,26 @@ type ExistingAppSetupSecretField<SecretFieldKey extends string> = {
   multiline?: boolean;
 };
 
+type ExistingAppSetupAutoSaveValidationInput<FieldKey extends string> = {
+  fieldKey: FieldKey;
+  draft: Record<FieldKey, string>;
+};
+
 export type SetupFieldFeedback<FieldKey extends string> = {
   fieldStates: ReadonlyMap<FieldKey, SavingFieldState>;
   markFieldSavedWithReset: (fieldKey: FieldKey) => void;
   resetFieldFeedback: (fieldKey: FieldKey) => void;
   setFieldError: (fieldKey: FieldKey, errorMessage: string) => void;
   setFieldSaving: (fieldKey: FieldKey) => void;
+};
+
+export type ExistingAppSetupAutoSave<FieldKey extends string> = {
+  draft: Record<FieldKey, string>;
+  fieldStates: ReadonlyMap<FieldKey, SavingFieldState>;
+  persistField: (fieldKey: FieldKey) => Promise<void>;
+  revertField: (fieldKey: FieldKey) => void;
+  savedDraft: Record<FieldKey, string>;
+  updateFieldDraft: (fieldKey: FieldKey, nextValue: string) => void;
 };
 
 export function useSetupFieldFeedback<FieldKey extends string>(
@@ -154,6 +168,131 @@ export function useSetupFieldFeedback<FieldKey extends string>(
     resetFieldFeedback,
     setFieldError,
     setFieldSaving,
+  };
+}
+
+export function useExistingAppSetupAutoSave<FieldKey extends string, SaveResult>(input: {
+  clearActionError: () => void;
+  fieldKeys: readonly FieldKey[];
+  initialDraft: Record<FieldKey, string>;
+  normalizeValue: (value: string) => string;
+  onFieldSaved?: (saveResult: SaveResult, fieldKey: FieldKey) => void;
+  resolveSavedFieldKeys: (fieldKey: FieldKey) => readonly FieldKey[];
+  resolveSaveErrorMessage: (error: unknown) => string;
+  saveField: (saveInput: {
+    draft: Record<FieldKey, string>;
+    fieldKey: FieldKey;
+  }) => Promise<SaveResult>;
+  shouldPersistField?: (
+    validationInput: ExistingAppSetupAutoSaveValidationInput<FieldKey>,
+  ) => boolean;
+  validateField?: (
+    validationInput: ExistingAppSetupAutoSaveValidationInput<FieldKey>,
+  ) => string | null;
+}): ExistingAppSetupAutoSave<FieldKey> {
+  const [draft, setDraft] = useState(input.initialDraft);
+  const [savedDraft, setSavedDraft] = useState(input.initialDraft);
+  const fieldFeedback = useSetupFieldFeedback(input.fieldKeys);
+
+  function updateFieldDraft(fieldKey: FieldKey, nextValue: string): void {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [fieldKey]: nextValue,
+    }));
+    input.clearActionError();
+    const fieldState = getSetupFieldState(fieldFeedback.fieldStates, fieldKey);
+    if (fieldState.status !== "idle" || fieldState.errorMessage !== null) {
+      fieldFeedback.resetFieldFeedback(fieldKey);
+    }
+  }
+
+  async function persistField(fieldKey: FieldKey): Promise<void> {
+    if (getSetupFieldState(fieldFeedback.fieldStates, fieldKey).status === "saving") {
+      return;
+    }
+
+    if (
+      !isExistingAppSetupFieldDirty({
+        fieldKey,
+        draft,
+        savedDraft,
+        normalizeValue: input.normalizeValue,
+      })
+    ) {
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        [fieldKey]: savedDraft[fieldKey],
+      }));
+      fieldFeedback.resetFieldFeedback(fieldKey);
+      return;
+    }
+
+    const validationMessage =
+      input.validateField?.({
+        fieldKey,
+        draft,
+      }) ?? null;
+    if (validationMessage !== null) {
+      fieldFeedback.setFieldError(fieldKey, validationMessage);
+      return;
+    }
+
+    const shouldPersist =
+      input.shouldPersistField?.({
+        fieldKey,
+        draft,
+      }) ?? true;
+    if (!shouldPersist) {
+      fieldFeedback.resetFieldFeedback(fieldKey);
+      return;
+    }
+
+    fieldFeedback.setFieldSaving(fieldKey);
+
+    try {
+      const saveResult = await input.saveField({
+        draft,
+        fieldKey,
+      });
+      const savedFieldValuePatch = buildSavedFieldValuePatch({
+        draft,
+        fieldKeys: input.resolveSavedFieldKeys(fieldKey),
+        normalizeValue: input.normalizeValue,
+      });
+      const nextSavedDraft = {
+        ...savedDraft,
+        ...savedFieldValuePatch,
+      };
+      const nextDraft = {
+        ...draft,
+        ...savedFieldValuePatch,
+      };
+
+      setSavedDraft(nextSavedDraft);
+      setDraft(nextDraft);
+      input.onFieldSaved?.(saveResult, fieldKey);
+      input.clearActionError();
+      fieldFeedback.markFieldSavedWithReset(fieldKey);
+    } catch (error) {
+      fieldFeedback.setFieldError(fieldKey, input.resolveSaveErrorMessage(error));
+    }
+  }
+
+  function revertField(fieldKey: FieldKey): void {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      [fieldKey]: "",
+    }));
+    fieldFeedback.resetFieldFeedback(fieldKey);
+  }
+
+  return {
+    draft,
+    fieldStates: fieldFeedback.fieldStates,
+    persistField,
+    revertField,
+    savedDraft,
+    updateFieldDraft,
   };
 }
 
@@ -306,4 +445,30 @@ function clearFieldStatusTimeouts(
     fadeStartTimeoutRef: fieldTimeoutRefs.fadeStartTimeoutRef,
     scheduler: systemScheduler,
   });
+}
+
+function buildSavedFieldValuePatch<FieldKey extends string>(input: {
+  draft: Record<FieldKey, string>;
+  fieldKeys: readonly FieldKey[];
+  normalizeValue: (value: string) => string;
+}): Partial<Record<FieldKey, string>> {
+  const patch: Partial<Record<FieldKey, string>> = {};
+
+  for (const fieldKey of input.fieldKeys) {
+    patch[fieldKey] = input.normalizeValue(input.draft[fieldKey]);
+  }
+
+  return patch;
+}
+
+function isExistingAppSetupFieldDirty<FieldKey extends string>(input: {
+  draft: Record<FieldKey, string>;
+  fieldKey: FieldKey;
+  normalizeValue: (value: string) => string;
+  savedDraft: Record<FieldKey, string>;
+}): boolean {
+  return (
+    input.normalizeValue(input.draft[input.fieldKey]) !==
+    input.normalizeValue(input.savedDraft[input.fieldKey])
+  );
 }
