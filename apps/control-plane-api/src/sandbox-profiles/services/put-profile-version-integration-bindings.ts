@@ -85,14 +85,14 @@ function jsonValuesEqual(left: unknown, right: unknown): boolean {
   });
 }
 
-function integrationBindingValuesChanged(input: {
-  existingBinding: SandboxProfileVersionIntegrationBinding;
-  binding: ValidatedIntegrationBinding;
-}): boolean {
+function integrationBindingValuesChanged(
+  existingBinding: SandboxProfileVersionIntegrationBinding,
+  binding: ValidatedIntegrationBinding,
+): boolean {
   return (
-    input.existingBinding.connectionId !== input.binding.connectionId ||
-    input.existingBinding.kind !== input.binding.kind ||
-    !jsonValuesEqual(input.existingBinding.config, input.binding.bindingConfig)
+    existingBinding.connectionId !== binding.connectionId ||
+    existingBinding.kind !== binding.kind ||
+    !jsonValuesEqual(existingBinding.config, binding.bindingConfig)
   );
 }
 
@@ -500,7 +500,7 @@ export async function putProfileVersionIntegrationBindings(
         );
       }
 
-      if (!integrationBindingValuesChanged({ existingBinding, binding })) {
+      if (!integrationBindingValuesChanged(existingBinding, binding)) {
         continue;
       }
 
