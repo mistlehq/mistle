@@ -102,6 +102,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
@@ -174,6 +185,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -248,6 +270,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -383,6 +416,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
@@ -458,6 +502,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
@@ -530,6 +585,17 @@ jobs:
 
       - name: Setup Blacksmith Builder
         uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
@@ -611,6 +677,17 @@ jobs:
 
       - name: Setup Blacksmith Builder
         uses: useblacksmith/setup-docker-builder@v1
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-${{ runner.os }}-${{ github.job }}
+          path: /nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
