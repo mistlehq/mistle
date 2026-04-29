@@ -1366,6 +1366,7 @@ function ReadySandboxProfileEditorPage(input: {
           draftFieldsAreDisabled={draftFieldsAreDisabled}
           integrationDraftState={integrationDraftState}
           integrationsLoader={integrationsLoader}
+          invalidateProfileVersions={input.invalidateProfileVersions}
           invalidateVersionBindings={input.invalidateVersionBindings}
           invalidateVersionSetupScript={input.invalidateVersionSetupScript}
           mode={input.mode}
@@ -1394,6 +1395,7 @@ function SandboxProfileEditorSectionPanels(input: {
   draftFieldsAreDisabled: boolean;
   integrationDraftState: SandboxProfileDraftSectionState;
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
@@ -1449,6 +1451,7 @@ function SandboxProfileEditorSectionPanels(input: {
       {input.activeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT ? (
         <SandboxProfileSnapshotPanel
           isActionPending={input.versionActionIsPending}
+          invalidateProfileVersions={input.invalidateProfileVersions}
           onRefreshSnapshot={() => {
             input.onRefreshSnapshot(input.mode.version);
           }}
@@ -1521,6 +1524,7 @@ function createSandboxProfileEditorSections(input: {
 
 function SandboxProfileSnapshotPanel(input: {
   isActionPending: boolean;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: () => void;
   publishSuccessMessageKey: Key;
@@ -1596,6 +1600,7 @@ function SandboxProfileSnapshotPanel(input: {
 
       <SandboxProfileSnapshotRefreshScheduleSection
         disabled={input.isActionPending}
+        invalidateProfileVersions={input.invalidateProfileVersions}
         profileId={input.profileId}
         refreshSchedule={input.refreshSchedule}
         version={input.version}
@@ -1606,11 +1611,11 @@ function SandboxProfileSnapshotPanel(input: {
 
 function SandboxProfileSnapshotRefreshScheduleSection(input: {
   disabled: boolean;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
   profileId: string;
   refreshSchedule: SandboxProfileVersion["refreshSchedule"];
   version: number;
 }): React.JSX.Element {
-  const queryClient = useQueryClient();
   const existingSchedule = input.refreshSchedule;
   const [cronExpression, setCronExpression] = useState(existingSchedule?.cronExpression ?? "");
   const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? readBrowserTimeZone());
@@ -1633,9 +1638,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     },
     onSuccess: async () => {
       setMutationError(null);
-      await queryClient.invalidateQueries({
-        queryKey: sandboxProfileVersionsQueryKey(input.profileId),
-      });
+      await input.invalidateProfileVersions(input.profileId);
     },
     onError: (error: unknown) => {
       setMutationError(
@@ -1654,11 +1657,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
       }),
     onSuccess: async () => {
       setMutationError(null);
-      setCronExpression("");
-      setTimezone(readBrowserTimeZone());
-      await queryClient.invalidateQueries({
-        queryKey: sandboxProfileVersionsQueryKey(input.profileId),
-      });
+      await input.invalidateProfileVersions(input.profileId);
     },
     onError: (error: unknown) => {
       setMutationError(

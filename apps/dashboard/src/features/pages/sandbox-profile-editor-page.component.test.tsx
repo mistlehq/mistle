@@ -135,7 +135,9 @@ function createSandboxProfileVersionsForTest(input: {
       ...(versionInput.latestSnapshotJob === undefined
         ? {}
         : { latestSnapshotJob: versionInput.latestSnapshotJob }),
-      ...(input.refreshSchedule === undefined ? {} : { refreshSchedule: input.refreshSchedule }),
+      ...(versionInput.state !== "published" || input.refreshSchedule === undefined
+        ? {}
+        : { refreshSchedule: input.refreshSchedule }),
       ...(versionInput.usable === undefined ? {} : { usable: versionInput.usable }),
     };
   }
