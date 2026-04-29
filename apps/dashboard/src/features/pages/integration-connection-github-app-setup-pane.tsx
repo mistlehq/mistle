@@ -29,7 +29,6 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
 import {
   type ManifestJsonValidation,
   createManifestJsonDraft,
@@ -51,6 +50,7 @@ import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
+  IntegrationConnectionSetupManifestEditorSection,
   IntegrationConnectionSetupModeTabs,
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
@@ -334,16 +334,14 @@ function GitHubManifestSetupPanel(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      <SectionHeader
+      <IntegrationConnectionSetupManifestEditorSection
         description="Create a GitHub App from a basic manifest. You can still change the settings later in GitHub."
+        editorId="github-app-manifest-editor"
+        manifestCallbackState={input.manifestCallbackState}
+        manifestValidation={input.manifestValidation}
+        manifestValue={input.manifestValue}
+        onManifestChange={input.onManifestChange}
         title="GitHub App Manifest"
-      />
-      <ManifestCallbackJsonEditor
-        callbackState={input.manifestCallbackState}
-        id="github-app-manifest-editor"
-        onChange={input.onManifestChange}
-        validation={input.manifestValidation}
-        value={input.manifestValue}
       />
       <Field>
         <FieldHeader>

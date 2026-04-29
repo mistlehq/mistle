@@ -1,5 +1,7 @@
 import { CopyableValue, Notice, Tabs, TabsContent, TabsList, TabsTrigger } from "@mistle/ui";
 
+import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
+import type { ManifestJsonValidation } from "../integrations/manifest-json-editor.js";
 import type { ManifestWebhookCallbackState } from "../integrations/manifest-webhook-callback-state.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
@@ -83,4 +85,27 @@ export function IntegrationConnectionSetupWebhookCallbackValue(input: {
   }
 
   return <CopyableValue label={input.label} value={input.webhookCallbackState.value} />;
+}
+
+export function IntegrationConnectionSetupManifestEditorSection(input: {
+  description: string;
+  editorId: string;
+  manifestCallbackState: ManifestWebhookCallbackState;
+  manifestValidation: ManifestJsonValidation;
+  manifestValue: string;
+  onManifestChange: (value: string) => void;
+  title: string;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-2">
+      <SectionHeader description={input.description} title={input.title} />
+      <ManifestCallbackJsonEditor
+        callbackState={input.manifestCallbackState}
+        id={input.editorId}
+        onChange={input.onManifestChange}
+        validation={input.manifestValidation}
+        value={input.manifestValue}
+      />
+    </div>
+  );
 }

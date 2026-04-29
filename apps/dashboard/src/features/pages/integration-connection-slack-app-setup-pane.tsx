@@ -25,7 +25,6 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
 import {
   type ManifestJsonValidation,
   createManifestJsonDraft,
@@ -46,6 +45,7 @@ import {
 import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
+  IntegrationConnectionSetupManifestEditorSection,
   IntegrationConnectionSetupModeTabs,
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
@@ -264,22 +264,15 @@ function SlackManifestSetupPanel(input: {
         </FieldContent>
       </Field>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-base font-medium">Slack app manifest</h3>
-          <p className="text-muted-foreground text-sm">
-            Create a Slack app from a basic manifest. You can still change the settings later in
-            Slack.
-          </p>
-        </div>
-        <ManifestCallbackJsonEditor
-          callbackState={input.manifestCallbackState}
-          id="slack-app-manifest-editor"
-          onChange={input.onManifestChange}
-          validation={input.manifestValidation}
-          value={input.manifestValue}
-        />
-      </div>
+      <IntegrationConnectionSetupManifestEditorSection
+        description="Create a Slack app from a basic manifest. You can still change the settings later in Slack."
+        editorId="slack-app-manifest-editor"
+        manifestCallbackState={input.manifestCallbackState}
+        manifestValidation={input.manifestValidation}
+        manifestValue={input.manifestValue}
+        onManifestChange={input.onManifestChange}
+        title="Slack app manifest"
+      />
     </div>
   );
 }
