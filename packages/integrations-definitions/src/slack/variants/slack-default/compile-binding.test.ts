@@ -159,7 +159,7 @@ describe("compileSlackBinding", () => {
           release: {
             kind: "tag",
             match: "exact",
-            tag: "slack/v0.2.1",
+            tag: "slack/v0.3.0",
           },
           asset: {
             kind: "exact",
