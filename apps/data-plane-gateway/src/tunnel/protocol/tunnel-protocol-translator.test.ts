@@ -288,6 +288,7 @@ async function sendBootstrapUploadCompleted(
       streamId: 1,
       event: {
         type: "fileUpload.completed",
+        kind: "image",
         attachmentId: "att_123",
         threadId: "thread_123",
         originalFilename: "upload.png",
@@ -748,6 +749,7 @@ describe("TunnelProtocolTranslator", () => {
           streamId: 42,
           event: {
             type: "fileUpload.completed",
+            kind: "image",
             attachmentId: "att_123",
             threadId: "thread_123",
             originalFilename: "upload.png",

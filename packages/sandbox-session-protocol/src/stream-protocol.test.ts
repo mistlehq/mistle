@@ -209,6 +209,38 @@ describe("stream control message parser", () => {
     expect(
       parseStreamControlMessage(
         JSON.stringify({
+          type: "stream.event",
+          streamId: 11,
+          event: {
+            type: "fileUpload.completed",
+            kind: "file",
+            attachmentId: "att_124",
+            threadId: "thread_123",
+            originalFilename: "notes.txt",
+            mimeType: "text/plain",
+            sizeBytes: 12,
+            path: "/root/.local/attachments/thread_123/upload.txt",
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "stream.event",
+      streamId: 11,
+      event: {
+        type: "fileUpload.completed",
+        kind: "file",
+        attachmentId: "att_124",
+        threadId: "thread_123",
+        originalFilename: "notes.txt",
+        mimeType: "text/plain",
+        sizeBytes: 12,
+        path: "/root/.local/attachments/thread_123/upload.txt",
+      },
+    });
+
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
           type: "stream.complete",
           streamId: 8,
         }),
@@ -241,6 +273,7 @@ describe("stream control message parser", () => {
           streamId: 9,
           event: {
             type: "fileUpload.completed",
+            kind: "image",
             attachmentId: "att_123",
             threadId: "thread_123",
             originalFilename: "screenshot.png",
@@ -255,6 +288,7 @@ describe("stream control message parser", () => {
       streamId: 9,
       event: {
         type: "fileUpload.completed",
+        kind: "image",
         attachmentId: "att_123",
         threadId: "thread_123",
         originalFilename: "screenshot.png",
@@ -289,6 +323,27 @@ describe("stream control message parser", () => {
         truncated: false,
       },
     });
+  });
+
+  it("rejects malformed file upload completion events", () => {
+    expect(
+      parseStreamControlMessage(
+        JSON.stringify({
+          type: "stream.event",
+          streamId: 9,
+          event: {
+            type: "fileUpload.completed",
+            kind: "document",
+            attachmentId: "att_123",
+            threadId: "thread_123",
+            originalFilename: "notes.txt",
+            mimeType: "text/plain",
+            sizeBytes: 1024,
+            path: "/root/.local/attachments/thread_123/upload.txt",
+          },
+        }),
+      ),
+    ).toBeUndefined();
   });
 
   it("rejects malformed stream.complete messages", () => {

@@ -71,15 +71,9 @@ const PTYExitEventSchema = z.object({
   exitCode: z.int(),
 });
 
-/**
- * Emitted only after the runtime has accepted the upload as a supported image
- * using lightweight validation and persisted it at the final attachment path.
- *
- * This is not a guarantee that every downstream image decoder or model input
- * pipeline will accept the file.
- */
 const FileUploadCompletedEventSchema = z.object({
   type: z.literal("fileUpload.completed"),
+  kind: z.enum(["image", "file"]),
   attachmentId: NonEmptyStringSchema,
   threadId: NonEmptyStringSchema,
   originalFilename: NonEmptyStringSchema,

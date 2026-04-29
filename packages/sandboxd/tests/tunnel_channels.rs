@@ -377,6 +377,7 @@ fn persists_supported_image_uploads_and_emits_completion() {
     assert_eq!(completion_event["type"], "stream.event");
     assert_eq!(completion_event["streamId"], 9);
     assert_eq!(completion_event["event"]["type"], "fileUpload.completed");
+    assert_eq!(completion_event["event"]["kind"], "image");
     assert_eq!(completion_event["event"]["threadId"], "thread_123");
     assert_eq!(completion_event["event"]["mimeType"], "image/png");
     assert_eq!(completion_event["event"]["sizeBytes"], 8);
@@ -400,7 +401,7 @@ fn persists_supported_image_uploads_and_emits_completion() {
 }
 
 #[test]
-fn rejects_unsupported_uploaded_file_content() {
+fn persists_generic_file_uploads_and_emits_completion() {
     let attachment_root = create_temp_test_dir("file_upload_invalid");
     let tunnel_listener = TcpListener::bind("127.0.0.1:0").expect("tunnel listener should bind");
     let tunnel_address = tunnel_listener
@@ -434,7 +435,7 @@ fn rejects_unsupported_uploaded_file_content() {
             .expect("client should connect to file upload relay");
     client_socket
         .send(Message::Text(
-            r#"{"type":"stream.open","streamId":10,"channel":{"kind":"fileUpload","threadId":"thread_456","mimeType":"image/png","originalFilename":"image.png","sizeBytes":8}}"#
+            r#"{"type":"stream.open","streamId":10,"channel":{"kind":"fileUpload","threadId":"thread_456","mimeType":"text/plain","originalFilename":"notes.txt","sizeBytes":8}}"#
                 .to_string()
                 .into(),
         ))
@@ -445,8 +446,8 @@ fn rejects_unsupported_uploaded_file_content() {
         r#"{"type":"stream.open.ok","streamId":10}"#
     );
 
-    let invalid_bytes = vec![0_u8; 8];
-    let encoded_upload = encode_stream_data_frame(10, PAYLOAD_KIND_RAW_BYTES, &invalid_bytes)
+    let file_bytes = b"notimage".to_vec();
+    let encoded_upload = encode_stream_data_frame(10, PAYLOAD_KIND_RAW_BYTES, &file_bytes)
         .expect("upload frame should encode");
     client_socket
         .send(Message::Binary(encoded_upload.into()))
@@ -463,9 +464,101 @@ fn rejects_unsupported_uploaded_file_content() {
         ))
         .expect("client should close the upload stream");
 
+    let completion_event = parse_json_text_message(&mut client_socket);
+    assert_eq!(completion_event["type"], "stream.event");
+    assert_eq!(completion_event["streamId"], 10);
+    assert_eq!(completion_event["event"]["type"], "fileUpload.completed");
+    assert_eq!(completion_event["event"]["kind"], "file");
+    assert_eq!(completion_event["event"]["threadId"], "thread_456");
+    assert_eq!(completion_event["event"]["mimeType"], "text/plain");
+    assert_eq!(completion_event["event"]["sizeBytes"], 8);
+
+    let persisted_path = completion_event["event"]["path"]
+        .as_str()
+        .expect("completion event should include the final path");
+    assert_eq!(
+        fs::read(persisted_path).expect("persisted upload should be readable"),
+        file_bytes
+    );
+    assert!(persisted_path.ends_with(".txt"));
+
+    let completion_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(completion_message["type"], "stream.complete");
+    assert_eq!(completion_message["streamId"], 10);
+
+    tunnel_thread
+        .join()
+        .expect("file upload relay thread should exit cleanly");
+    fs::remove_dir_all(&attachment_root).expect("attachment root should be removable");
+}
+
+#[test]
+fn rejects_declared_image_uploads_without_supported_image_content() {
+    let attachment_root = create_temp_test_dir("file_upload_invalid_image");
+    let tunnel_listener = TcpListener::bind("127.0.0.1:0").expect("tunnel listener should bind");
+    let tunnel_address = tunnel_listener
+        .local_addr()
+        .expect("tunnel listener should expose its address");
+    let attachment_root_for_server = attachment_root.clone();
+
+    let tunnel_thread = thread::spawn(move || {
+        let (stream, _) = tunnel_listener
+            .accept()
+            .expect("file upload relay should accept a client");
+        let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
+        let Message::Text(open_payload) = websocket
+            .read()
+            .expect("file upload relay should receive the initial stream.open")
+        else {
+            panic!("expected initial text stream.open payload");
+        };
+
+        relay_file_upload_stream(
+            &mut websocket,
+            open_payload.as_str(),
+            &attachment_root_for_server,
+            &SystemClock,
+        )
+        .expect("file upload relay should finish cleanly");
+    });
+
+    let (mut client_socket, _) =
+        connect(format!("ws://127.0.0.1:{}/upload", tunnel_address.port()))
+            .expect("client should connect to file upload relay");
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.open","streamId":13,"channel":{"kind":"fileUpload","threadId":"thread_invalid_image","mimeType":"image/png","originalFilename":"image.png","sizeBytes":8}}"#
+                .to_string()
+                .into(),
+        ))
+        .expect("client should send file upload stream.open");
+
+    assert_eq!(
+        read_text_message(&mut client_socket),
+        r#"{"type":"stream.open.ok","streamId":13}"#
+    );
+
+    let invalid_image_bytes = b"notimage".to_vec();
+    let encoded_upload = encode_stream_data_frame(13, PAYLOAD_KIND_RAW_BYTES, &invalid_image_bytes)
+        .expect("upload frame should encode");
+    client_socket
+        .send(Message::Binary(encoded_upload.into()))
+        .expect("client should send upload bytes");
+
+    let window_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(window_message["type"], "stream.window");
+    assert_eq!(window_message["streamId"], 13);
+    assert_eq!(window_message["bytes"], 8);
+
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.close","streamId":13}"#.to_string().into(),
+        ))
+        .expect("client should close the upload stream");
+
     let reset_message = parse_json_text_message(&mut client_socket);
     assert_eq!(reset_message["type"], "stream.reset");
-    assert_eq!(reset_message["streamId"], 10);
+    assert_eq!(reset_message["streamId"], 13);
     assert_eq!(reset_message["code"], "invalid_file_type");
     assert_eq!(
         reset_message["message"],
@@ -475,16 +568,197 @@ fn rejects_unsupported_uploaded_file_content() {
     tunnel_thread
         .join()
         .expect("file upload relay thread should exit cleanly");
-    let persisted_thread_dir = attachment_root.join("thread_456");
+    let persisted_thread_dir = attachment_root.join("thread_invalid_image");
     if persisted_thread_dir.exists() {
         assert!(
             fs::read_dir(&persisted_thread_dir)
                 .expect("thread upload directory should be readable")
                 .next()
                 .is_none(),
-            "invalid uploads should not leave persisted attachment files"
+            "rejected image uploads should not leave persisted attachment files"
         );
     }
+    fs::remove_dir_all(&attachment_root).expect("attachment root should be removable");
+}
+
+#[test]
+fn rejects_supported_image_mime_mismatches() {
+    let attachment_root = create_temp_test_dir("file_upload_mime_mismatch");
+    let tunnel_listener = TcpListener::bind("127.0.0.1:0").expect("tunnel listener should bind");
+    let tunnel_address = tunnel_listener
+        .local_addr()
+        .expect("tunnel listener should expose its address");
+    let attachment_root_for_server = attachment_root.clone();
+
+    let tunnel_thread = thread::spawn(move || {
+        let (stream, _) = tunnel_listener
+            .accept()
+            .expect("file upload relay should accept a client");
+        let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
+        let Message::Text(open_payload) = websocket
+            .read()
+            .expect("file upload relay should receive the initial stream.open")
+        else {
+            panic!("expected initial text stream.open payload");
+        };
+
+        relay_file_upload_stream(
+            &mut websocket,
+            open_payload.as_str(),
+            &attachment_root_for_server,
+            &SystemClock,
+        )
+        .expect("file upload relay should finish cleanly");
+    });
+
+    let (mut client_socket, _) =
+        connect(format!("ws://127.0.0.1:{}/upload", tunnel_address.port()))
+            .expect("client should connect to file upload relay");
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.open","streamId":11,"channel":{"kind":"fileUpload","threadId":"thread_789","mimeType":"image/png","originalFilename":"image.png","sizeBytes":8}}"#
+                .to_string()
+                .into(),
+        ))
+        .expect("client should send file upload stream.open");
+
+    assert_eq!(
+        read_text_message(&mut client_socket),
+        r#"{"type":"stream.open.ok","streamId":11}"#
+    );
+
+    let jpeg_bytes = vec![0xff, 0xd8, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00];
+    let encoded_upload = encode_stream_data_frame(11, PAYLOAD_KIND_RAW_BYTES, &jpeg_bytes)
+        .expect("upload frame should encode");
+    client_socket
+        .send(Message::Binary(encoded_upload.into()))
+        .expect("client should send upload bytes");
+
+    let window_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(window_message["type"], "stream.window");
+    assert_eq!(window_message["streamId"], 11);
+    assert_eq!(window_message["bytes"], 8);
+
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.close","streamId":11}"#.to_string().into(),
+        ))
+        .expect("client should close the upload stream");
+
+    let reset_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(reset_message["type"], "stream.reset");
+    assert_eq!(reset_message["streamId"], 11);
+    assert_eq!(reset_message["code"], "mime_type_mismatch");
+    assert_eq!(
+        reset_message["message"],
+        "uploaded file content is 'image/jpeg', which does not match declared MIME type 'image/png'"
+    );
+
+    tunnel_thread
+        .join()
+        .expect("file upload relay thread should exit cleanly");
+    let persisted_thread_dir = attachment_root.join("thread_789");
+    if persisted_thread_dir.exists() {
+        assert!(
+            fs::read_dir(&persisted_thread_dir)
+                .expect("thread upload directory should be readable")
+                .next()
+                .is_none(),
+            "rejected uploads should not leave persisted attachment files"
+        );
+    }
+    fs::remove_dir_all(&attachment_root).expect("attachment root should be removable");
+}
+
+#[test]
+fn ignores_original_filename_path_segments_for_generic_upload_extension() {
+    let attachment_root = create_temp_test_dir("file_upload_path_segments");
+    let tunnel_listener = TcpListener::bind("127.0.0.1:0").expect("tunnel listener should bind");
+    let tunnel_address = tunnel_listener
+        .local_addr()
+        .expect("tunnel listener should expose its address");
+    let attachment_root_for_server = attachment_root.clone();
+
+    let tunnel_thread = thread::spawn(move || {
+        let (stream, _) = tunnel_listener
+            .accept()
+            .expect("file upload relay should accept a client");
+        let mut websocket = accept(stream).expect("tunnel websocket handshake should succeed");
+        let Message::Text(open_payload) = websocket
+            .read()
+            .expect("file upload relay should receive the initial stream.open")
+        else {
+            panic!("expected initial text stream.open payload");
+        };
+
+        relay_file_upload_stream(
+            &mut websocket,
+            open_payload.as_str(),
+            &attachment_root_for_server,
+            &SystemClock,
+        )
+        .expect("file upload relay should finish cleanly");
+    });
+
+    let (mut client_socket, _) =
+        connect(format!("ws://127.0.0.1:{}/upload", tunnel_address.port()))
+            .expect("client should connect to file upload relay");
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.open","streamId":12,"channel":{"kind":"fileUpload","threadId":"thread_segments","mimeType":"text/plain","originalFilename":"../secret.pdf","sizeBytes":8}}"#
+                .to_string()
+                .into(),
+        ))
+        .expect("client should send file upload stream.open");
+
+    assert_eq!(
+        read_text_message(&mut client_socket),
+        r#"{"type":"stream.open.ok","streamId":12}"#
+    );
+
+    let file_bytes = b"contents".to_vec();
+    let encoded_upload = encode_stream_data_frame(12, PAYLOAD_KIND_RAW_BYTES, &file_bytes)
+        .expect("upload frame should encode");
+    client_socket
+        .send(Message::Binary(encoded_upload.into()))
+        .expect("client should send upload bytes");
+
+    let window_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(window_message["type"], "stream.window");
+    assert_eq!(window_message["streamId"], 12);
+    assert_eq!(window_message["bytes"], 8);
+
+    client_socket
+        .send(Message::Text(
+            r#"{"type":"stream.close","streamId":12}"#.to_string().into(),
+        ))
+        .expect("client should close the upload stream");
+
+    let completion_event = parse_json_text_message(&mut client_socket);
+    assert_eq!(completion_event["type"], "stream.event");
+    assert_eq!(completion_event["event"]["kind"], "file");
+    let persisted_path = completion_event["event"]["path"]
+        .as_str()
+        .expect("completion event should include the final path");
+    let persisted_path = PathBuf::from(persisted_path);
+    let expected_parent = attachment_root.join("thread_segments");
+    assert_eq!(persisted_path.parent(), Some(expected_parent.as_path()));
+    assert_eq!(
+        persisted_path.extension().and_then(|value| value.to_str()),
+        Some("bin")
+    );
+    assert_eq!(
+        fs::read(&persisted_path).expect("persisted upload should be readable"),
+        file_bytes
+    );
+
+    let completion_message = parse_json_text_message(&mut client_socket);
+    assert_eq!(completion_message["type"], "stream.complete");
+    assert_eq!(completion_message["streamId"], 12);
+
+    tunnel_thread
+        .join()
+        .expect("file upload relay thread should exit cleanly");
     fs::remove_dir_all(&attachment_root).expect("attachment root should be removable");
 }
 

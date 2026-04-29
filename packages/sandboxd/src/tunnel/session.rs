@@ -69,8 +69,8 @@ use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
     FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
     FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
-    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
-    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
+    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, STREAM_RESET_CODE_EXEC_COMMAND_FAILED,
     STREAM_RESET_CODE_INVALID_STREAM_CLOSE, STREAM_RESET_CODE_INVALID_STREAM_DATA,
     STREAM_RESET_CODE_INVALID_STREAM_SIGNAL, STREAM_RESET_CODE_INVALID_STREAM_WINDOW,
@@ -108,6 +108,10 @@ const GIF89A_SIGNATURE: &[u8] = &[0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
 const WEBP_RIFF_SIGNATURE: &[u8] = &[0x52, 0x49, 0x46, 0x46];
 const WEBP_BRAND_SIGNATURE: &[u8] = &[0x57, 0x45, 0x42, 0x50];
 static UPLOAD_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+const UPLOADED_FILE_KIND_IMAGE: &str = "image";
+const UPLOADED_FILE_KIND_FILE: &str = "file";
+const DEFAULT_UPLOAD_EXTENSION: &str = "bin";
+const MAX_UPLOAD_EXTENSION_LENGTH: usize = 16;
 const DEFAULT_EXEC_TIMEOUT_MS: u64 = 15_000;
 const DEFAULT_EXEC_MAX_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const DEFAULT_SIGNING_REQUEST_TIMEOUT: StdDuration = StdDuration::from_secs(120);
@@ -723,14 +727,20 @@ struct PtySessionState {
 }
 
 struct FileUploadState {
+    attachment_id: String,
+    thread_directory_path: PathBuf,
     thread_id: String,
     mime_type: String,
     original_filename: String,
     size_bytes: usize,
     temp_path: PathBuf,
-    final_path: PathBuf,
     file: File,
     received_bytes: usize,
+}
+
+struct UploadedFileClassification {
+    kind: &'static str,
+    extension: String,
 }
 
 struct TunnelSessionRuntime {
@@ -4839,9 +4849,7 @@ fn create_file_upload_state(
         clock.now_ms(),
         UPLOAD_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
     );
-    let extension = resolve_image_extension(&message.channel.mime_type)?;
     let temp_path = thread_directory_path.join(format!(".{attachment_id}.part"));
-    let final_path = thread_directory_path.join(format!("{attachment_id}.{extension}"));
     let file = OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -4854,12 +4862,13 @@ fn create_file_upload_state(
         })?;
 
     Ok(FileUploadState {
+        attachment_id,
+        thread_directory_path,
         thread_id: message.channel.thread_id.clone(),
         mime_type: message.channel.mime_type.clone(),
         original_filename: message.channel.original_filename.clone(),
         size_bytes: message.channel.size_bytes,
         temp_path,
-        final_path,
         file,
         received_bytes: 0,
     })
@@ -4887,38 +4896,38 @@ fn finalize_file_upload(
         .file
         .sync_all()
         .map_err(|error| TunnelSessionError::FileUpload(error.to_string()))?;
-    match validate_uploaded_image(
+    let classification = match classify_uploaded_file(
         &upload_state.mime_type,
         &upload_state.temp_path,
-        &upload_state.final_path,
+        &upload_state.original_filename,
     ) {
-        Ok(()) => {}
+        Ok(classification) => classification,
         Err((code, message)) => {
             write_tunnel_text(tunnel_writer_sender, stream_reset(stream_id, code, message))?;
             let _ = fs::remove_file(&upload_state.temp_path);
             return Ok(());
         }
-    }
+    };
 
-    fs::rename(&upload_state.temp_path, &upload_state.final_path)
+    let final_path = upload_state.thread_directory_path.join(format!(
+        "{}.{}",
+        upload_state.attachment_id, classification.extension
+    ));
+    fs::rename(&upload_state.temp_path, &final_path)
         .map_err(|error| TunnelSessionError::FileUpload(error.to_string()))?;
-    let attachment_id = upload_state
-        .final_path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("attachment");
-    let final_path_text = upload_state.final_path.to_string_lossy();
+    let final_path_text = final_path.to_string_lossy();
     write_tunnel_text(
         tunnel_writer_sender,
-        file_upload_completed_event(
+        file_upload_completed_event(FileUploadCompletedEventInput {
             stream_id,
-            attachment_id,
-            &upload_state.thread_id,
-            &upload_state.original_filename,
-            &upload_state.mime_type,
-            upload_state.size_bytes,
-            &final_path_text,
-        ),
+            kind: classification.kind,
+            attachment_id: &upload_state.attachment_id,
+            thread_id: &upload_state.thread_id,
+            original_filename: &upload_state.original_filename,
+            mime_type: &upload_state.mime_type,
+            size_bytes: upload_state.size_bytes,
+            path: &final_path_text,
+        }),
     )?;
     write_tunnel_text(tunnel_writer_sender, stream_complete(stream_id))?;
 
@@ -5064,17 +5073,16 @@ fn assert_upload_metadata(
     if size_bytes > MAX_UPLOAD_SIZE_BYTES {
         return Err("sizeBytes exceeds the configured upload limit.".to_string());
     }
-    resolve_image_extension(mime_type)?;
     Ok(())
 }
 
-fn resolve_image_extension(mime_type: &str) -> Result<&'static str, String> {
+fn resolve_image_extension(mime_type: &str) -> Option<&'static str> {
     match mime_type {
-        "image/png" => Ok("png"),
-        "image/jpeg" => Ok("jpg"),
-        "image/webp" => Ok("webp"),
-        "image/gif" => Ok("gif"),
-        _ => Err(format!("Unsupported image MIME type '{mime_type}'.")),
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/webp" => Some("webp"),
+        "image/gif" => Some("gif"),
+        _ => None,
     }
 }
 
@@ -5106,11 +5114,11 @@ fn derive_upload_thread_directory_path(
     Ok(attachment_root_path.join(thread_id))
 }
 
-fn validate_uploaded_image(
+fn classify_uploaded_file(
     declared_mime_type: &str,
     temp_path: &Path,
-    final_path: &Path,
-) -> Result<(), (&'static str, String)> {
+    original_filename: &str,
+) -> Result<UploadedFileClassification, (&'static str, String)> {
     let mut file = File::open(temp_path).map_err(|error| {
         (
             FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
@@ -5131,27 +5139,59 @@ fn validate_uploaded_image(
         )
     })?;
     let detected_mime_type = detect_supported_image_mime_type(&signature_bytes[..bytes_read]);
-    let Some(detected_mime_type) = detected_mime_type else {
+    let declared_image_extension = resolve_image_extension(declared_mime_type);
+    if let Some(detected_mime_type) = detected_mime_type {
+        if declared_image_extension.is_some() && detected_mime_type != declared_mime_type {
+            return Err((
+                FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
+                format!(
+                    "uploaded file content is '{detected_mime_type}', which does not match declared MIME type '{declared_mime_type}'"
+                ),
+            ));
+        }
+
+        return Ok(UploadedFileClassification {
+            kind: UPLOADED_FILE_KIND_IMAGE,
+            extension: resolve_image_extension(detected_mime_type)
+                .expect("detected supported image MIME type should have an extension")
+                .to_string(),
+        });
+    }
+    if declared_image_extension.is_some() {
         return Err((
             FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
             "uploaded file is not a supported image".to_string(),
         ));
+    }
+
+    Ok(UploadedFileClassification {
+        kind: UPLOADED_FILE_KIND_FILE,
+        extension: resolve_generic_upload_extension(original_filename),
+    })
+}
+
+fn resolve_generic_upload_extension(original_filename: &str) -> String {
+    if original_filename.contains('/') || original_filename.contains('\\') {
+        return DEFAULT_UPLOAD_EXTENSION.to_string();
+    }
+
+    let Some(extension) = Path::new(original_filename)
+        .extension()
+        .and_then(|value| value.to_str())
+    else {
+        return DEFAULT_UPLOAD_EXTENSION.to_string();
     };
-    if detected_mime_type != declared_mime_type {
-        return Err((
-            FILE_UPLOAD_RESET_CODE_MIME_TYPE_MISMATCH,
-            format!(
-                "uploaded file content is '{detected_mime_type}', which does not match declared MIME type '{declared_mime_type}'"
-            ),
-        ));
+    let normalized_extension = extension.to_ascii_lowercase();
+    if normalized_extension.is_empty()
+        || normalized_extension.len() > MAX_UPLOAD_EXTENSION_LENGTH
+        || !normalized_extension
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return DEFAULT_UPLOAD_EXTENSION.to_string();
     }
-    if final_path.parent().is_none() {
-        return Err((
-            FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-            "final upload path must include a parent directory".to_string(),
-        ));
-    }
-    Ok(())
+
+    normalized_extension
 }
 
 fn detect_supported_image_mime_type(bytes: &[u8]) -> Option<&'static str> {
@@ -6026,6 +6066,7 @@ mod tests {
             assert_eq!(completion_event["type"], "stream.event");
             assert_eq!(completion_event["streamId"], Value::Number(9.into()));
             assert_eq!(completion_event["event"]["type"], "fileUpload.completed");
+            assert_eq!(completion_event["event"]["kind"], "image");
             let persisted_path = completion_event["event"]["path"]
                 .as_str()
                 .expect("file upload completed event should expose a persisted path")
@@ -6038,6 +6079,133 @@ mod tests {
             let complete_message = read_stream_text_message(&mut websocket);
             assert_eq!(complete_message["type"], "stream.complete");
             assert_eq!(complete_message["streamId"], Value::Number(9.into()));
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 10,
+                        "channel": {
+                            "kind": "fileUpload",
+                            "threadId": upload_thread_id_for_gateway,
+                            "mimeType": "text/plain",
+                            "originalFilename": "notes.txt",
+                            "sizeBytes": 8
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open a generic file upload stream");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 10
+                })
+            );
+
+            let file_bytes = b"notimage".to_vec();
+            let encoded_upload = encode_stream_data_frame(10, PAYLOAD_KIND_RAW_BYTES, &file_bytes)
+                .expect("file upload frame should encode");
+            websocket
+                .send(Message::Binary(encoded_upload.into()))
+                .expect("gateway should send generic file upload bytes");
+
+            let upload_window = read_stream_text_message(&mut websocket);
+            assert_eq!(upload_window["type"], "stream.window");
+            assert_eq!(upload_window["streamId"], Value::Number(10.into()));
+            assert_eq!(upload_window["bytes"], Value::Number(8.into()));
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.close",
+                        "streamId": 10
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should close the generic file upload stream");
+
+            let completion_event = read_stream_text_message(&mut websocket);
+            assert_eq!(completion_event["type"], "stream.event");
+            assert_eq!(completion_event["streamId"], Value::Number(10.into()));
+            assert_eq!(completion_event["event"]["type"], "fileUpload.completed");
+            assert_eq!(completion_event["event"]["kind"], "file");
+            let generic_persisted_path = completion_event["event"]["path"]
+                .as_str()
+                .expect("generic file upload completed event should expose a persisted path")
+                .to_string();
+            assert!(
+                generic_persisted_path.ends_with(".txt"),
+                "generic uploads should preserve safe filename extensions"
+            );
+            assert_eq!(
+                fs::read(&generic_persisted_path)
+                    .expect("generic persisted upload should be readable"),
+                file_bytes
+            );
+
+            let complete_message = read_stream_text_message(&mut websocket);
+            assert_eq!(complete_message["type"], "stream.complete");
+            assert_eq!(complete_message["streamId"], Value::Number(10.into()));
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.open",
+                        "streamId": 11,
+                        "channel": {
+                            "kind": "fileUpload",
+                            "threadId": upload_thread_id_for_gateway,
+                            "mimeType": "image/png",
+                            "originalFilename": "image.png",
+                            "sizeBytes": 8
+                        }
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should open a declared image upload stream");
+            assert_eq!(
+                read_stream_text_message(&mut websocket),
+                json!({
+                    "type": "stream.open.ok",
+                    "streamId": 11
+                })
+            );
+
+            let encoded_upload = encode_stream_data_frame(11, PAYLOAD_KIND_RAW_BYTES, &file_bytes)
+                .expect("declared image upload frame should encode");
+            websocket
+                .send(Message::Binary(encoded_upload.into()))
+                .expect("gateway should send invalid image upload bytes");
+
+            let upload_window = read_stream_text_message(&mut websocket);
+            assert_eq!(upload_window["type"], "stream.window");
+            assert_eq!(upload_window["streamId"], Value::Number(11.into()));
+            assert_eq!(upload_window["bytes"], Value::Number(8.into()));
+
+            websocket
+                .send(Message::Text(
+                    json!({
+                        "type": "stream.close",
+                        "streamId": 11
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .expect("gateway should close the invalid image upload stream");
+
+            let reset_message = read_stream_text_message(&mut websocket);
+            assert_eq!(reset_message["type"], "stream.reset");
+            assert_eq!(reset_message["streamId"], Value::Number(11.into()));
+            assert_eq!(reset_message["code"], "invalid_file_type");
+            assert_eq!(
+                reset_message["message"],
+                "uploaded file is not a supported image"
+            );
 
             websocket
                 .close(None)

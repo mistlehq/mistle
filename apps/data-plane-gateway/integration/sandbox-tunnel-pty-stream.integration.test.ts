@@ -228,6 +228,7 @@ describe("sandbox tunnel pty stream integration", () => {
             streamId: 1,
             event: {
               type: "fileUpload.completed",
+              kind: "image",
               attachmentId: "att_gateway_it",
               threadId: "thread_gateway_it",
               originalFilename: "gateway.png",
@@ -244,6 +245,7 @@ describe("sandbox tunnel pty stream integration", () => {
           streamId: clientStreamId,
           event: {
             type: "fileUpload.completed",
+            kind: "image",
             attachmentId: "att_gateway_it",
             threadId: "thread_gateway_it",
             originalFilename: "gateway.png",

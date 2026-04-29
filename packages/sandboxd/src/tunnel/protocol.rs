@@ -689,12 +689,24 @@ struct PtyExitEvent<'a> {
 struct FileUploadCompletedEvent<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
+    kind: &'a str,
     attachment_id: &'a str,
     thread_id: &'a str,
     original_filename: &'a str,
     mime_type: &'a str,
     size_bytes: usize,
     path: &'a str,
+}
+
+pub struct FileUploadCompletedEventInput<'a> {
+    pub stream_id: u32,
+    pub kind: &'a str,
+    pub attachment_id: &'a str,
+    pub thread_id: &'a str,
+    pub original_filename: &'a str,
+    pub mime_type: &'a str,
+    pub size_bytes: usize,
+    pub path: &'a str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -1229,26 +1241,19 @@ pub fn pty_exit_event(stream_id: u32, exit_code: i32) -> String {
 }
 
 /// Builds one `stream.event` file-upload completion payload.
-pub fn file_upload_completed_event(
-    stream_id: u32,
-    attachment_id: &str,
-    thread_id: &str,
-    original_filename: &str,
-    mime_type: &str,
-    size_bytes: usize,
-    path: &str,
-) -> String {
+pub fn file_upload_completed_event(input: FileUploadCompletedEventInput<'_>) -> String {
     serialize_json(&StreamEvent {
         message_type: "stream.event",
-        stream_id,
+        stream_id: input.stream_id,
         event: FileUploadCompletedEvent {
             message_type: "fileUpload.completed",
-            attachment_id,
-            thread_id,
-            original_filename,
-            mime_type,
-            size_bytes,
-            path,
+            kind: input.kind,
+            attachment_id: input.attachment_id,
+            thread_id: input.thread_id,
+            original_filename: input.original_filename,
+            mime_type: input.mime_type,
+            size_bytes: input.size_bytes,
+            path: input.path,
         },
     })
 }
@@ -1989,10 +1994,11 @@ fn validate_signing_failure_result(
 #[cfg(test)]
 mod tests {
     use crate::tunnel::protocol::{
-        BootstrapTelemetryControlMessage, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT,
-        ProcessesStreamMessage, PtyControlMessage, SigningControlMessage, SigningRequest,
-        StreamControlMessage, StreamSendWindow, decode_stream_data_frame, encode_stream_data_frame,
-        exec_result_event, file_upload_completed_event, parse_bootstrap_telemetry_control_message,
+        BootstrapTelemetryControlMessage, FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES,
+        PAYLOAD_KIND_WEBSOCKET_TEXT, ProcessesStreamMessage, PtyControlMessage,
+        SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
+        decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
+        file_upload_completed_event, parse_bootstrap_telemetry_control_message,
         parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
         parse_pty_control_message, parse_signing_control_message, parse_stream_control_message,
         ports_target_authorize_failure_result, ports_target_authorize_success_result,
@@ -2258,16 +2264,17 @@ mod tests {
             r#"{"type":"stream.event","streamId":7,"event":{"type":"pty.exit","exitCode":3}}"#
         );
         assert_eq!(
-            file_upload_completed_event(
-                7,
-                "att_123",
-                "thread_123",
-                "image.png",
-                "image/png",
-                8,
-                "/root/.local/attachments/thread_123/file.png",
-            ),
-            r#"{"type":"stream.event","streamId":7,"event":{"type":"fileUpload.completed","attachmentId":"att_123","threadId":"thread_123","originalFilename":"image.png","mimeType":"image/png","sizeBytes":8,"path":"/root/.local/attachments/thread_123/file.png"}}"#
+            file_upload_completed_event(FileUploadCompletedEventInput {
+                stream_id: 7,
+                kind: "image",
+                attachment_id: "att_123",
+                thread_id: "thread_123",
+                original_filename: "image.png",
+                mime_type: "image/png",
+                size_bytes: 8,
+                path: "/root/.local/attachments/thread_123/file.png",
+            }),
+            r#"{"type":"stream.event","streamId":7,"event":{"type":"fileUpload.completed","kind":"image","attachmentId":"att_123","threadId":"thread_123","originalFilename":"image.png","mimeType":"image/png","sizeBytes":8,"path":"/root/.local/attachments/thread_123/file.png"}}"#
         );
         assert_eq!(
             exec_result_event(9, 0, "stdout", "stderr", true),

@@ -94,6 +94,7 @@ function sendFileUploadCompleted(
     streamId: input.streamId,
     event: {
       type: "fileUpload.completed",
+      kind: "image",
       attachmentId: "att_123",
       threadId: "thread_123",
       originalFilename: "screenshot.png",
