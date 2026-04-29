@@ -1,4 +1,4 @@
-import { findNextScheduleOccurrence } from "@mistle/time";
+import { findNextScheduleOccurrence, validateScheduleCronExpression } from "@mistle/time";
 import {
   Accordion,
   AccordionContent,
@@ -27,10 +27,19 @@ import {
   MoreActionsMenu,
   Notice,
   NoticeAutoHideDurationsMs,
+  Switch,
 } from "@mistle/ui";
 import { CheckCircleIcon, SpinnerGapIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState, type Key, type SyntheticEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Key,
+  type SyntheticEvent,
+} from "react";
 import {
   Navigate,
   Outlet,
@@ -44,6 +53,8 @@ import {
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
 import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
+import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import type { StringComboboxOption } from "../forms/string-combobox-options.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
@@ -287,6 +298,34 @@ const SandboxProfileEditorSectionIds = {
 } satisfies Record<string, SandboxProfileEditorSectionId>;
 const SnapshotRefreshSchedulePreviewPrompt =
   "Enter a valid cron expression and timezone to preview the schedule.";
+const BrowserTimezoneOptions = Intl.supportedValuesOf("timeZone").map((timezone) => ({
+  label: timezone,
+  value: timezone,
+}));
+const MonthFieldLabels = new Map([
+  ["1", "January"],
+  ["2", "February"],
+  ["3", "March"],
+  ["4", "April"],
+  ["5", "May"],
+  ["6", "June"],
+  ["7", "July"],
+  ["8", "August"],
+  ["9", "September"],
+  ["10", "October"],
+  ["11", "November"],
+  ["12", "December"],
+]);
+const DayOfWeekFieldLabels = new Map([
+  ["0", "Sunday"],
+  ["1", "Monday"],
+  ["2", "Tuesday"],
+  ["3", "Wednesday"],
+  ["4", "Thursday"],
+  ["5", "Friday"],
+  ["6", "Saturday"],
+  ["7", "Sunday"],
+]);
 
 const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
   notice: "publish-success",
@@ -1620,14 +1659,20 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   version: number;
 }): React.JSX.Element {
   const existingSchedule = input.refreshSchedule;
+  const [scheduleEnabled, setScheduleEnabled] = useState(existingSchedule !== null);
   const [cronExpression, setCronExpression] = useState(existingSchedule?.cronExpression ?? "");
   const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? readBrowserTimeZone());
+  const timezoneOptions = useMemo(
+    () => createTimezoneOptions(existingSchedule?.timezone ?? null),
+    [existingSchedule?.timezone],
+  );
   const [mutationError, setMutationError] = useState<string | null>(null);
   const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
     after: new Date(),
     cronExpression,
     timezone,
   });
+  const cronExpressionBreakdown = resolveCronExpressionBreakdown(cronExpression);
   const saveScheduleMutation = useMutation({
     mutationFn: async () => {
       const nextCronExpression = cronExpression.trim();
@@ -1678,8 +1723,15 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   });
   const isMutating = saveScheduleMutation.isPending || removeScheduleMutation.isPending;
   const fieldsAreDisabled = input.disabled || isMutating;
+  const submitIsDisabled = fieldsAreDisabled || (!scheduleEnabled && existingSchedule === null);
+  const scheduleStatusMessage = scheduleEnabled
+    ? existingSchedule === null
+      ? "Automatic refresh will start after a schedule is saved."
+      : "Automatic refresh is enabled for this published version."
+    : "Snapshots will not refresh automatically.";
 
   useEffect(() => {
+    setScheduleEnabled(existingSchedule !== null);
     setCronExpression(existingSchedule?.cronExpression ?? "");
     setTimezone(existingSchedule?.timezone ?? readBrowserTimeZone());
     setMutationError(null);
@@ -1687,18 +1739,36 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
-    saveScheduleMutation.mutate();
+    if (scheduleEnabled) {
+      saveScheduleMutation.mutate();
+      return;
+    }
+
+    if (existingSchedule !== null) {
+      removeScheduleMutation.mutate();
+    }
   }
 
   return (
     <form className="space-y-4 border-t pt-4" onSubmit={handleSubmit}>
       <div className="space-y-1">
-        <h2 className="text-base font-semibold leading-6">Automatic refresh</h2>
-        <p className="text-sm text-muted-foreground">
-          {existingSchedule === null
-            ? "Automatic snapshot refresh is not configured."
-            : "Automatic snapshot refresh is configured for this published version."}
-        </p>
+        <div className="flex min-h-10 items-center justify-between gap-3">
+          <div className="space-y-1">
+            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-enabled">
+              Automatic refresh
+            </FieldLabel>
+            <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+          </div>
+          <Switch
+            aria-label="Automatic refresh"
+            checked={scheduleEnabled}
+            disabled={fieldsAreDisabled}
+            id="sandbox-profile-snapshot-refresh-enabled"
+            onCheckedChange={(checked) => {
+              setScheduleEnabled(checked);
+            }}
+          />
+        </div>
       </div>
 
       {mutationError === null ? null : (
@@ -1707,7 +1777,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
         </Notice>
       )}
 
-      {existingSchedule === null ? null : (
+      {existingSchedule === null || !scheduleEnabled ? null : (
         <DefinitionList
           items={[
             {
@@ -1729,70 +1799,236 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldHeader>
-            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">Cron expression</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <Input
-              disabled={fieldsAreDisabled}
-              id="sandbox-profile-snapshot-refresh-cron"
-              onChange={(event) => {
-                setCronExpression(event.target.value);
-              }}
-              placeholder="0 9 * * 1"
-              required
-              value={cronExpression}
-            />
-            <FieldDescription>Use raw cron syntax for the refresh cadence.</FieldDescription>
-          </FieldContent>
-        </Field>
-        <Field>
-          <FieldHeader>
-            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">Timezone</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <Input
-              disabled={fieldsAreDisabled}
-              id="sandbox-profile-snapshot-refresh-timezone"
-              onChange={(event) => {
-                setTimezone(event.target.value);
-              }}
-              placeholder="Asia/Singapore"
-              required
-              value={timezone}
-            />
-            <FieldDescription>Use an IANA timezone name.</FieldDescription>
-          </FieldContent>
-        </Field>
-      </div>
+      {scheduleEnabled ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">
+                  Cron expression
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  disabled={fieldsAreDisabled}
+                  id="sandbox-profile-snapshot-refresh-cron"
+                  onChange={(event) => {
+                    setCronExpression(event.target.value);
+                  }}
+                  placeholder="0 9 * * 1"
+                  required
+                  value={cronExpression}
+                />
+              </FieldContent>
+            </Field>
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">
+                  Timezone
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <SingleSelectStringComboboxField
+                  contentClassName="max-h-80"
+                  disabled={fieldsAreDisabled}
+                  emptyMessage="No matching timezones."
+                  inputId="sandbox-profile-snapshot-refresh-timezone"
+                  inputLabel="Timezone"
+                  onChange={(value) => {
+                    setTimezone(value ?? "");
+                  }}
+                  options={timezoneOptions}
+                  placeholder="Asia/Singapore"
+                  value={timezone}
+                />
+              </FieldContent>
+            </Field>
+          </div>
 
-      <p className="text-sm text-muted-foreground">{scheduleBehaviorDescription}</p>
+          <CronExpressionBreakdownList
+            breakdown={cronExpressionBreakdown}
+            message={scheduleBehaviorDescription}
+          />
+        </>
+      ) : null}
 
-      <ButtonGroup>
-        <Button disabled={fieldsAreDisabled} type="submit">
-          Save schedule
-        </Button>
-        {existingSchedule === null ? null : (
-          <Button
-            disabled={fieldsAreDisabled}
-            onClick={() => {
-              removeScheduleMutation.mutate();
-            }}
-            type="button"
-            variant="outline"
-          >
-            Remove schedule
+      {scheduleEnabled || existingSchedule !== null ? (
+        <ButtonGroup>
+          <Button disabled={submitIsDisabled} type="submit">
+            {scheduleEnabled ? "Save schedule" : "Save changes"}
           </Button>
-        )}
-      </ButtonGroup>
+        </ButtonGroup>
+      ) : null}
     </form>
+  );
+}
+
+function CronExpressionBreakdownList(input: {
+  breakdown: CronExpressionBreakdown | null;
+  message: string;
+}): React.JSX.Element {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 text-sm" aria-label="Cron breakdown">
+      {input.breakdown === null ? (
+        <p className="text-muted-foreground">{input.message}</p>
+      ) : (
+        <pre className="overflow-x-auto rounded-sm bg-background p-2 font-mono text-xs leading-5 text-muted-foreground">
+          {formatCronExpressionBreakdownDiagram(input.breakdown)}
+        </pre>
+      )}
+    </div>
   );
 }
 
 function readBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+}
+
+type CronExpressionBreakdown = Readonly<{
+  minute: string;
+  hour: string;
+  dayOfMonthExpression: string;
+  dayOfMonth: string;
+  monthExpression: string;
+  month: string;
+  dayOfWeekExpression: string;
+  dayOfWeek: string;
+}>;
+
+export function createTimezoneOptions(
+  persistedTimezone: string | null,
+): readonly StringComboboxOption[] {
+  if (
+    persistedTimezone === null ||
+    persistedTimezone.trim().length === 0 ||
+    BrowserTimezoneOptions.some((option) => option.value === persistedTimezone)
+  ) {
+    return BrowserTimezoneOptions;
+  }
+
+  return [
+    {
+      label: persistedTimezone,
+      value: persistedTimezone,
+    },
+    ...BrowserTimezoneOptions,
+  ];
+}
+
+export function resolveCronExpressionBreakdown(
+  cronExpression: string,
+): CronExpressionBreakdown | null {
+  const fields = cronExpression.trim().split(/\s+/);
+  if (fields.length !== 5) {
+    return null;
+  }
+
+  try {
+    validateScheduleCronExpression(cronExpression);
+  } catch {
+    return null;
+  }
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = fields;
+  if (
+    minute === undefined ||
+    hour === undefined ||
+    dayOfMonth === undefined ||
+    month === undefined ||
+    dayOfWeek === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    minute,
+    hour,
+    dayOfMonthExpression: dayOfMonth,
+    dayOfMonth: describeCronField({
+      everyLabel: "Every day",
+      field: dayOfMonth,
+      labelMap: null,
+    }),
+    monthExpression: month,
+    month: describeCronField({
+      everyLabel: "Every month",
+      field: month,
+      labelMap: MonthFieldLabels,
+    }),
+    dayOfWeekExpression: dayOfWeek,
+    dayOfWeek: describeCronField({
+      everyLabel: "Every day",
+      field: dayOfWeek,
+      labelMap: DayOfWeekFieldLabels,
+    }),
+  };
+}
+
+function describeCronField(input: {
+  everyLabel: string;
+  field: string;
+  labelMap: ReadonlyMap<string, string> | null;
+}): string {
+  if (input.field === "*") {
+    return input.everyLabel;
+  }
+
+  const parts = input.field.split(",");
+  const labels = parts.map((part) => describeCronFieldPart({ part, labelMap: input.labelMap }));
+  if (labels.length === 1) {
+    const label = labels[0];
+    if (label === undefined) {
+      throw new Error("Cron field part did not produce a label.");
+    }
+    return label;
+  }
+
+  return labels.join(", ");
+}
+
+function describeCronFieldPart(input: {
+  part: string;
+  labelMap: ReadonlyMap<string, string> | null;
+}): string {
+  const mappedLabel = input.labelMap?.get(input.part);
+  if (mappedLabel !== undefined) {
+    return mappedLabel;
+  }
+
+  return input.part;
+}
+
+function formatCronExpressionBreakdownDiagram(input: CronExpressionBreakdown): string {
+  return [
+    `${input.minute} ${input.hour} ${input.dayOfMonthExpression} ${input.monthExpression} ${input.dayOfWeekExpression}`,
+    "| | | | |",
+    `| | | | day of week: ${input.dayOfWeek}`,
+    `| | | month: ${input.month.toLowerCase()}`,
+    `| | day of month: ${input.dayOfMonth.toLowerCase()}`,
+    `| hour: ${formatHourLabel(input.hour)}`,
+    `minute: ${input.minute}`,
+  ].join("\n");
+}
+
+function formatHourLabel(hour: string): string {
+  const hourNumber = Number(hour);
+  if (!Number.isInteger(hourNumber) || hourNumber < 0 || hourNumber > 23) {
+    return hour;
+  }
+
+  if (hourNumber === 0) {
+    return "12 AM";
+  }
+
+  if (hourNumber < 12) {
+    return `${hourNumber} AM`;
+  }
+
+  if (hourNumber === 12) {
+    return "12 PM";
+  }
+
+  return `${hourNumber - 12} PM`;
 }
 
 export function resolveSnapshotRefreshScheduleBehaviorDescription(input: {

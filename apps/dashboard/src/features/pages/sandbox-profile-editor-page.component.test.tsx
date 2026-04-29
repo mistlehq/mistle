@@ -26,6 +26,8 @@ import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-c
 import {
   applyPublishedSandboxProfileVersionToProfile,
   applyPublishedSandboxProfileVersionToVersions,
+  createTimezoneOptions,
+  resolveCronExpressionBreakdown,
   resolveSandboxProfileSetupScriptIntegrationRows,
   resolveSandboxProfileEditorVersionMode,
   resolveSnapshotRefreshScheduleBehaviorDescription,
@@ -812,19 +814,34 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Create snapshot" })).toBeDefined();
   });
 
-  it("shows that automatic snapshot refresh is not configured", () => {
+  it("shows automatic snapshot refresh as disabled when it is not configured", () => {
     renderSandboxProfileEditor({
       routeSection: "snapshot",
       versionState: "published",
     });
 
-    expect(screen.getByText("Automatic refresh")).toBeDefined();
-    expect(screen.getByText("Automatic snapshot refresh is not configured.")).toBeDefined();
+    const refreshSwitch = screen.getByRole("switch", { name: "Automatic refresh" });
+    expect(refreshSwitch.getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
+    expect(screen.queryByLabelText("Cron expression")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+  });
+
+  it("shows schedule fields after automatic snapshot refresh is enabled", () => {
+    renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+
+    expect(
+      screen.getByText("Automatic refresh will start after a schedule is saved."),
+    ).toBeDefined();
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     expect(cronExpressionInput).toBeInstanceOf(HTMLInputElement);
     expect(cronExpressionInput).toHaveProperty("value", "");
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Remove schedule" })).toBeNull();
   });
 
   it("shows an existing automatic snapshot refresh schedule", () => {
@@ -841,35 +858,83 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published",
     });
 
+    const refreshSwitch = screen.getByRole("switch", { name: "Automatic refresh" });
+    expect(refreshSwitch.getAttribute("aria-checked")).toBe("true");
     expect(
-      screen.getByText("Automatic snapshot refresh is configured for this published version."),
+      screen.getByText("Automatic refresh is enabled for this published version."),
     ).toBeDefined();
     expect(screen.getByText("Cron")).toBeDefined();
     expect(screen.getAllByDisplayValue("0 9 * * 1")).toHaveLength(1);
     expect(screen.getByText("Asia/Singapore")).toBeDefined();
     expect(screen.getByText("2026-04-30T01:00:00.000Z")).toBeDefined();
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Remove schedule" })).toBeDefined();
   });
 
-  it("updates the automatic snapshot refresh behavior description while editing", () => {
+  it("marks an existing automatic snapshot refresh schedule for removal when disabled", () => {
+    renderSandboxProfileEditor({
+      refreshSchedule: {
+        scheduleId: "sched_snapshot_refresh",
+        name: "Snapshot refresh",
+        cronExpression: "0 9 * * 1",
+        timezone: "Asia/Singapore",
+        enabled: true,
+        nextScheduledAt: "2026-04-30T01:00:00.000Z",
+      },
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
+
+    expect(screen.getByText("Snapshots will not refresh automatically.")).toBeDefined();
+    expect(screen.queryByLabelText("Cron expression")).toBeNull();
+    expect(screen.queryByText("2026-04-30T01:00:00.000Z")).toBeNull();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeDefined();
+  });
+
+  it("updates the automatic snapshot refresh behavior description while editing", async () => {
     renderSandboxProfileEditor({
       routeSection: "snapshot",
       versionState: "published",
     });
 
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
     const cronExpressionInput = screen.getByLabelText("Cron expression");
     const timezoneInput = screen.getByLabelText("Timezone");
     fireEvent.change(cronExpressionInput, { target: { value: "0 9 * * *" } });
-    fireEvent.change(timezoneInput, { target: { value: "Asia/Singapore" } });
+    fireEvent.focus(timezoneInput);
+    const timezoneListbox = await screen.findByRole("listbox");
+    fireEvent.click(within(timezoneListbox).getByText("Asia/Singapore"));
 
-    expect(screen.getByText(/^Next refresh: .+ Asia\/Singapore\.$/u)).toBeDefined();
+    const cronBreakdown = screen.getByLabelText("Cron breakdown");
+    expect(cronBreakdown.textContent).toContain("0 9 * * *");
+    expect(cronBreakdown.textContent).toContain("| | | | day of week: Every day");
+    expect(cronBreakdown.textContent).toContain("| | | month: every month");
+    expect(screen.queryByText(/^Next refresh: .+ Asia\/Singapore\.$/u)).toBeNull();
 
     fireEvent.change(cronExpressionInput, { target: { value: "not a cron expression" } });
 
     expect(
       screen.getByText("Enter a valid cron expression and timezone to preview the schedule."),
     ).toBeDefined();
+    expect(screen.getByLabelText("Cron breakdown").textContent).toContain(
+      "Enter a valid cron expression and timezone to preview the schedule.",
+    );
+  });
+
+  it("resolves automatic snapshot refresh cron field breakdowns", () => {
+    expect(resolveCronExpressionBreakdown("0 9 * * 1,3,5")).toEqual({
+      minute: "0",
+      hour: "9",
+      dayOfMonthExpression: "*",
+      dayOfMonth: "Every day",
+      monthExpression: "*",
+      month: "Every month",
+      dayOfWeekExpression: "1,3,5",
+      dayOfWeek: "Monday, Wednesday, Friday",
+    });
+
+    expect(resolveCronExpressionBreakdown("not a cron expression")).toBeNull();
   });
 
   it("resolves automatic snapshot refresh behavior descriptions", () => {
@@ -890,14 +955,21 @@ describe("SandboxProfileEditorPage", () => {
     ).toBe("Enter a valid cron expression and timezone to preview the schedule.");
   });
 
+  it("keeps persisted timezone values selectable when the browser list does not include them", () => {
+    expect(createTimezoneOptions("Custom/Zone")[0]).toEqual({
+      label: "Custom/Zone",
+      value: "Custom/Zone",
+    });
+  });
+
   it("shows schedule validation errors in the snapshot schedule section", async () => {
     renderSandboxProfileEditor({
       routeSection: "snapshot",
       versionState: "published",
     });
 
+    fireEvent.click(screen.getByRole("switch", { name: "Automatic refresh" }));
     fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "   " } });
-    fireEvent.change(screen.getByLabelText("Timezone"), { target: { value: "Asia/Singapore" } });
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     await waitFor(() => {

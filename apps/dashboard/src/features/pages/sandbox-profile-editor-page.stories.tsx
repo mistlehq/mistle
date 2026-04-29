@@ -5,12 +5,12 @@ import {
   DefinitionList,
   Field,
   FieldContent,
-  FieldDescription,
   FieldHeader,
   FieldLabel,
   Input,
   Notice,
   NoticeAutoHideDurationsMs,
+  Switch,
 } from "@mistle/ui";
 import { WarningCircleIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
@@ -20,6 +20,7 @@ import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } f
 import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { ActivityStatus } from "../shared/activity-status.js";
 import {
   clearPendingStatusTimeouts,
@@ -46,6 +47,8 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  createTimezoneOptions,
+  resolveCronExpressionBreakdown,
   resolveSnapshotRefreshScheduleBehaviorDescription,
   SandboxProfileIntegrationsSetupUnavailableState,
   SandboxProfileEditorView,
@@ -369,12 +372,20 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
       ? "*/15 9 * * *"
       : (existingSchedule?.cronExpression ?? "0 9 * * *"),
   );
+  const [scheduleEnabled, setScheduleEnabled] = useState(existingSchedule !== null);
   const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? "Asia/Singapore");
+  const timezoneOptions = createTimezoneOptions(existingSchedule?.timezone ?? null);
   const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
     after: new Date("2026-04-29T00:00:00.000Z"),
     cronExpression,
     timezone,
   });
+  const cronExpressionBreakdown = resolveCronExpressionBreakdown(cronExpression);
+  const scheduleStatusMessage = scheduleEnabled
+    ? existingSchedule === null
+      ? "Automatic refresh will start after a schedule is saved."
+      : "Automatic refresh is enabled for this published version."
+    : "Snapshots will not refresh automatically.";
 
   return (
     <form
@@ -384,12 +395,20 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
       }}
     >
       <div className="space-y-1">
-        <h2 className="text-base font-semibold leading-6">Automatic refresh</h2>
-        <p className="text-sm text-muted-foreground">
-          {existingSchedule === null
-            ? "Automatic snapshot refresh is not configured."
-            : "Automatic snapshot refresh is configured for this published version."}
-        </p>
+        <div className="flex min-h-10 items-center justify-between gap-3">
+          <div className="space-y-1">
+            <FieldLabel htmlFor="storybook-snapshot-refresh-enabled">Automatic refresh</FieldLabel>
+            <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+          </div>
+          <Switch
+            aria-label="Automatic refresh"
+            checked={scheduleEnabled}
+            id="storybook-snapshot-refresh-enabled"
+            onCheckedChange={(checked) => {
+              setScheduleEnabled(checked);
+            }}
+          />
+        </div>
       </div>
 
       {input.state === "save-failure" ? (
@@ -398,7 +417,7 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
         </Notice>
       ) : null}
 
-      {existingSchedule === null ? null : (
+      {existingSchedule === null || !scheduleEnabled ? null : (
         <DefinitionList
           items={[
             {
@@ -420,51 +439,104 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldHeader>
-            <FieldLabel htmlFor="storybook-snapshot-refresh-cron">Cron expression</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <Input
-              id="storybook-snapshot-refresh-cron"
-              onChange={(event) => {
-                setCronExpression(event.target.value);
-              }}
-              value={cronExpression}
-            />
-            <FieldDescription>Use raw cron syntax for the refresh cadence.</FieldDescription>
-          </FieldContent>
-        </Field>
-        <Field>
-          <FieldHeader>
-            <FieldLabel htmlFor="storybook-snapshot-refresh-timezone">Timezone</FieldLabel>
-          </FieldHeader>
-          <FieldContent>
-            <Input
-              id="storybook-snapshot-refresh-timezone"
-              onChange={(event) => {
-                setTimezone(event.target.value);
-              }}
-              value={timezone}
-            />
-            <FieldDescription>Use an IANA timezone name.</FieldDescription>
-          </FieldContent>
-        </Field>
-      </div>
+      {scheduleEnabled ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="storybook-snapshot-refresh-cron">Cron expression</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  id="storybook-snapshot-refresh-cron"
+                  onChange={(event) => {
+                    setCronExpression(event.target.value);
+                  }}
+                  value={cronExpression}
+                />
+              </FieldContent>
+            </Field>
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="storybook-snapshot-refresh-timezone">Timezone</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <SingleSelectStringComboboxField
+                  contentClassName="max-h-80"
+                  emptyMessage="No matching timezones."
+                  inputId="storybook-snapshot-refresh-timezone"
+                  inputLabel="Timezone"
+                  onChange={(value) => {
+                    setTimezone(value ?? "");
+                  }}
+                  options={timezoneOptions}
+                  placeholder="Asia/Singapore"
+                  value={timezone}
+                />
+              </FieldContent>
+            </Field>
+          </div>
 
-      <p className="text-sm text-muted-foreground">{scheduleBehaviorDescription}</p>
+          <StoryCronExpressionBreakdownList
+            breakdown={cronExpressionBreakdown}
+            message={scheduleBehaviorDescription}
+          />
+        </>
+      ) : null}
 
-      <ButtonGroup>
-        <Button type="submit">Save schedule</Button>
-        {existingSchedule === null ? null : (
-          <Button type="button" variant="outline">
-            Remove schedule
-          </Button>
-        )}
-      </ButtonGroup>
+      {scheduleEnabled || existingSchedule !== null ? (
+        <ButtonGroup>
+          <Button type="submit">{scheduleEnabled ? "Save schedule" : "Save changes"}</Button>
+        </ButtonGroup>
+      ) : null}
     </form>
   );
+}
+
+function StoryCronExpressionBreakdownList(input: {
+  breakdown: ReturnType<typeof resolveCronExpressionBreakdown>;
+  message: string;
+}): React.JSX.Element {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 text-sm" aria-label="Cron breakdown">
+      {input.breakdown === null ? (
+        <p className="text-muted-foreground">{input.message}</p>
+      ) : (
+        <pre className="overflow-x-auto rounded-sm bg-background p-2 font-mono text-xs leading-5 text-muted-foreground">
+          {[
+            `${input.breakdown.minute} ${input.breakdown.hour} ${input.breakdown.dayOfMonthExpression} ${input.breakdown.monthExpression} ${input.breakdown.dayOfWeekExpression}`,
+            "| | | | |",
+            `| | | | day of week: ${input.breakdown.dayOfWeek}`,
+            `| | | month: ${input.breakdown.month.toLowerCase()}`,
+            `| | day of month: ${input.breakdown.dayOfMonth.toLowerCase()}`,
+            `| hour: ${formatStoryCronHourLabel(input.breakdown.hour)}`,
+            `minute: ${input.breakdown.minute}`,
+          ].join("\n")}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+function formatStoryCronHourLabel(hour: string): string {
+  const hourNumber = Number(hour);
+  if (!Number.isInteger(hourNumber) || hourNumber < 0 || hourNumber > 23) {
+    return hour;
+  }
+
+  if (hourNumber === 0) {
+    return "12 AM";
+  }
+
+  if (hourNumber < 12) {
+    return `${hourNumber} AM`;
+  }
+
+  if (hourNumber === 12) {
+    return "12 PM";
+  }
+
+  return `${hourNumber - 12} PM`;
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
