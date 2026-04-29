@@ -136,6 +136,7 @@ function createSandboxProfileVersion(input: {
     isActive: input.isActive ?? true,
     usable: state === "published",
     latestSnapshotJob: null,
+    refreshSchedule: null,
   };
 }
 

@@ -6,6 +6,10 @@ import type {
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
+import {
+  loadActiveRefreshSchedulesByVersion,
+  type ProfileVersionRefreshScheduleSummary,
+} from "./profile-version-refresh-schedule-summary.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type ListProfileVersionsInput = {
@@ -20,6 +24,7 @@ type ListProfileVersionsOutput = {
     state: SandboxProfileVersionState;
     isActive: boolean;
     usable: boolean;
+    refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
     latestSnapshotJob: {
       id: string;
       trigger: SandboxProfileVersionSnapshotJobTrigger;
@@ -90,6 +95,11 @@ export async function listProfileVersions(
     latestJobsByVersion.set(job.sandboxProfileVersion, job);
   }
 
+  const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
+    db,
+    profileId: input.profileId,
+  });
+
   return {
     versions: versions.map((version) => {
       const latestJob = latestJobsByVersion.get(version.version);
@@ -103,6 +113,7 @@ export async function listProfileVersions(
           version.state === SandboxProfileVersionStates.PUBLISHED &&
           version.snapshotImageProvider !== null &&
           version.snapshotImageId !== null,
+        refreshSchedule: refreshSchedulesByVersion.get(version.version) ?? null,
         latestSnapshotJob:
           latestJob === undefined
             ? null

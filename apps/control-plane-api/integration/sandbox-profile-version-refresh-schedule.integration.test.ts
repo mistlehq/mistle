@@ -92,6 +92,33 @@ describe("sandbox profile version refresh schedule integration", () => {
       /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/u,
     );
 
+    const listVersionsResponse = await fixture.request(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions",
+      {
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(listVersionsResponse.status).toBe(200);
+    await expect(listVersionsResponse.json()).resolves.toMatchObject({
+      versions: [
+        {
+          sandboxProfileId: "sbp_refresh_schedule_001",
+          version: 1,
+          refreshSchedule: {
+            scheduleId: createdTarget.scheduleId,
+            name: "Daily refresh",
+            cronExpression: "0 9 * * *",
+            timezone: "Asia/Singapore",
+            enabled: true,
+            nextScheduledAt: expect.any(String),
+          },
+        },
+      ],
+    });
+
     const updateResponse = await fixture.request(
       "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions/1/refresh-schedule",
       {
@@ -234,5 +261,25 @@ describe("sandbox profile version refresh schedule integration", () => {
       nextScheduledAt: null,
     });
     expect(persistedSchedule?.deletedAt).not.toBeNull();
+
+    const listVersionsResponse = await fixture.request(
+      "/v1/sandbox/profiles/sbp_refresh_schedule_delete/versions",
+      {
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+
+    expect(listVersionsResponse.status).toBe(200);
+    await expect(listVersionsResponse.json()).resolves.toMatchObject({
+      versions: [
+        {
+          sandboxProfileId: "sbp_refresh_schedule_delete",
+          version: 1,
+          refreshSchedule: null,
+        },
+      ],
+    });
   });
 });

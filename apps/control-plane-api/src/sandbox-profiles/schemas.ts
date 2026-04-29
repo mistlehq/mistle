@@ -53,6 +53,16 @@ const sandboxProfileVersionSnapshotJobSummarySchema = z
     finishedAt: z.string().min(1).nullable(),
   })
   .strict();
+const sandboxProfileVersionRefreshScheduleSummarySchema = z
+  .object({
+    scheduleId: z.string().min(1),
+    name: z.string().min(1),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+    enabled: z.boolean(),
+    nextScheduledAt: z.string().min(1).nullable(),
+  })
+  .strict();
 
 export const sandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   activeVersion: z.number().int().min(1).nullable(),
@@ -107,6 +117,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
   .extend({
     isActive: z.boolean(),
     usable: z.boolean(),
+    refreshSchedule: sandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
     latestSnapshotJob: sandboxProfileVersionSnapshotJobSummarySchema.nullable(),
   })
   .strict();

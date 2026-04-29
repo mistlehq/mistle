@@ -12960,6 +12960,43 @@
                     "usable": {
                       "type": "boolean"
                     },
+                    "refreshSchedule": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "scheduleId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cronExpression": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "nextScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "scheduleId",
+                        "name",
+                        "cronExpression",
+                        "timezone",
+                        "enabled",
+                        "nextScheduledAt"
+                      ],
+                      "additionalProperties": false
+                    },
                     "latestSnapshotJob": {
                       "type": ["object", "null"],
                       "properties": {
@@ -13015,6 +13052,7 @@
                     "state",
                     "isActive",
                     "usable",
+                    "refreshSchedule",
                     "latestSnapshotJob"
                   ],
                   "additionalProperties": false
@@ -13189,6 +13227,43 @@
                           "usable": {
                             "type": "boolean"
                           },
+                          "refreshSchedule": {
+                            "type": ["object", "null"],
+                            "properties": {
+                              "scheduleId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "name": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "cronExpression": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "timezone": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "nextScheduledAt": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "scheduleId",
+                              "name",
+                              "cronExpression",
+                              "timezone",
+                              "enabled",
+                              "nextScheduledAt"
+                            ],
+                            "additionalProperties": false
+                          },
                           "latestSnapshotJob": {
                             "type": ["object", "null"],
                             "properties": {
@@ -13244,6 +13319,7 @@
                           "state",
                           "isActive",
                           "usable",
+                          "refreshSchedule",
                           "latestSnapshotJob"
                         ],
                         "additionalProperties": false
@@ -15708,6 +15784,43 @@
                         "usable": {
                           "type": "boolean"
                         },
+                        "refreshSchedule": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "scheduleId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "cronExpression": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "timezone": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "nextScheduledAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "scheduleId",
+                            "name",
+                            "cronExpression",
+                            "timezone",
+                            "enabled",
+                            "nextScheduledAt"
+                          ],
+                          "additionalProperties": false
+                        },
                         "latestSnapshotJob": {
                           "type": ["object", "null"],
                           "properties": {
@@ -15763,6 +15876,7 @@
                         "state",
                         "isActive",
                         "usable",
+                        "refreshSchedule",
                         "latestSnapshotJob"
                       ],
                       "additionalProperties": false
@@ -16002,6 +16116,43 @@
                         "usable": {
                           "type": "boolean"
                         },
+                        "refreshSchedule": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "scheduleId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "cronExpression": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "timezone": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "nextScheduledAt": {
+                              "type": ["string", "null"],
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "scheduleId",
+                            "name",
+                            "cronExpression",
+                            "timezone",
+                            "enabled",
+                            "nextScheduledAt"
+                          ],
+                          "additionalProperties": false
+                        },
                         "latestSnapshotJob": {
                           "type": ["object", "null"],
                           "properties": {
@@ -16057,6 +16208,7 @@
                         "state",
                         "isActive",
                         "usable",
+                        "refreshSchedule",
                         "latestSnapshotJob"
                       ],
                       "additionalProperties": false

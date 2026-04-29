@@ -16,6 +16,7 @@ import {
 } from "../errors.js";
 import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
 import { getProfileVersionPublishability } from "./get-profile-version-publishability.js";
+import type { ProfileVersionRefreshScheduleSummary } from "./profile-version-refresh-schedule-summary.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -31,6 +32,7 @@ type PublishProfileVersionOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     isActive: boolean;
     usable: boolean;
+    refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
     latestSnapshotJob: {
       id: string;
       trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
@@ -178,6 +180,7 @@ export async function publishProfileVersion(
         ...publishedVersion,
         isActive: false,
         usable: false,
+        refreshSchedule: null,
         latestSnapshotJob: snapshotJob,
       },
       activeVersion: sandboxProfile.activeVersion,

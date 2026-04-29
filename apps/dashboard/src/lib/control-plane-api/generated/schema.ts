@@ -7126,6 +7126,14 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                refreshSchedule: {
+                  cronExpression: string;
+                  enabled: boolean;
+                  name: string;
+                  nextScheduledAt: string | null;
+                  scheduleId: string;
+                  timezone: string;
+                } | null;
                 sandboxProfileId: string;
                 /** @enum {string} */
                 state: "draft" | "published";
@@ -7229,6 +7237,14 @@ export interface paths {
                 state: "queued" | "running" | "succeeded" | "failed";
                 /** @enum {string} */
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+              } | null;
+              refreshSchedule: {
+                cronExpression: string;
+                enabled: boolean;
+                name: string;
+                nextScheduledAt: string | null;
+                scheduleId: string;
+                timezone: string;
               } | null;
               sandboxProfileId: string;
               /** @enum {string} */
@@ -8017,6 +8033,14 @@ export interface paths {
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
                 } | null;
+                refreshSchedule: {
+                  cronExpression: string;
+                  enabled: boolean;
+                  name: string;
+                  nextScheduledAt: string | null;
+                  scheduleId: string;
+                  timezone: string;
+                } | null;
                 sandboxProfileId: string;
                 /** @enum {string} */
                 state: "draft" | "published";
@@ -8276,6 +8300,14 @@ export interface paths {
                   state: "queued" | "running" | "succeeded" | "failed";
                   /** @enum {string} */
                   trigger: "publish" | "manual_refresh" | "scheduled_refresh";
+                } | null;
+                refreshSchedule: {
+                  cronExpression: string;
+                  enabled: boolean;
+                  name: string;
+                  nextScheduledAt: string | null;
+                  scheduleId: string;
+                  timezone: string;
                 } | null;
                 sandboxProfileId: string;
                 /** @enum {string} */

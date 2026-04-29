@@ -285,6 +285,17 @@ const SandboxProfileVersionSchema = z
       })
       .strict()
       .nullable(),
+    refreshSchedule: z
+      .object({
+        scheduleId: z.string().min(1),
+        name: z.string().min(1),
+        cronExpression: z.string().min(1),
+        timezone: z.string().min(1),
+        enabled: z.boolean(),
+        nextScheduledAt: z.string().min(1).nullable(),
+      })
+      .strict()
+      .nullable(),
     sandboxProfileId: z.string().min(1),
     state: z.enum(["draft", "published"]),
     usable: z.boolean(),

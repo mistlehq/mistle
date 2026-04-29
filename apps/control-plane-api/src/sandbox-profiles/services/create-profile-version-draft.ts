@@ -12,6 +12,7 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
+import type { ProfileVersionRefreshScheduleSummary } from "./profile-version-refresh-schedule-summary.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type CreateProfileVersionDraftInput = {
@@ -25,6 +26,7 @@ type CreateProfileVersionDraftOutput = {
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
   isActive: boolean;
   usable: boolean;
+  refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
   latestSnapshotJob: null;
 };
 
@@ -134,6 +136,7 @@ export async function createProfileVersionDraft(
         ...createdDraftVersion,
         isActive: false,
         usable: false,
+        refreshSchedule: null,
         latestSnapshotJob: null,
       };
     });

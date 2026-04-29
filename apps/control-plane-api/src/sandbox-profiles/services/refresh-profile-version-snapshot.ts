@@ -18,6 +18,10 @@ import {
   SandboxProfilesNotFoundError,
 } from "../errors.js";
 import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
+import {
+  loadActiveRefreshSchedulesByVersion,
+  type ProfileVersionRefreshScheduleSummary,
+} from "./profile-version-refresh-schedule-summary.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type RefreshProfileVersionSnapshotInput = {
@@ -33,6 +37,7 @@ type RefreshProfileVersionSnapshotOutput = {
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
     isActive: boolean;
     usable: boolean;
+    refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
     latestSnapshotJob: {
       id: string;
       trigger: (typeof SandboxProfileVersionSnapshotJobTriggers)[keyof typeof SandboxProfileVersionSnapshotJobTriggers];
@@ -123,6 +128,10 @@ export async function refreshProfileVersionSnapshot(
         );
       }
 
+      const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
+        db: tx,
+        profileId: input.profileId,
+      });
       const [snapshotJob] = await tx
         .insert(sandboxProfileVersionSnapshotJobs)
         .values({
@@ -157,6 +166,7 @@ export async function refreshProfileVersionSnapshot(
           usable:
             sandboxProfileVersion.snapshotImageProvider !== null &&
             sandboxProfileVersion.snapshotImageId !== null,
+          refreshSchedule: refreshSchedulesByVersion.get(resolvedSandboxProfileVersion) ?? null,
           latestSnapshotJob: snapshotJob,
         },
         activeVersion: sandboxProfileVersion.activeVersion,
