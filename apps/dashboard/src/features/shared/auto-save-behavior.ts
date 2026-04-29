@@ -76,25 +76,6 @@ export function clearPendingStatusTimeouts(input: {
   }
 }
 
-export function buildSavedFieldValuePatch(input: {
-  draft: Record<string, string>;
-  fieldKeys: ReadonlyArray<string>;
-  normalizeValue: (value: string) => string;
-}): Record<string, string> {
-  const patch: Record<string, string> = {};
-
-  for (const fieldKey of input.fieldKeys) {
-    const value = input.draft[fieldKey];
-    if (value === undefined) {
-      throw new Error(`Draft field '${fieldKey}' is missing.`);
-    }
-
-    patch[fieldKey] = input.normalizeValue(value);
-  }
-
-  return patch;
-}
-
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;

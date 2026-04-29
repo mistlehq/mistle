@@ -456,8 +456,8 @@ export function GitHubAppSetupPane(input: {
     clearActionError: () => {
       setActionErrorMessage(null);
     },
+    createInitialDraft: () => createInitialDraft(input.connection),
     fieldKeys: GitHubExistingAppSetupFieldKeys,
-    initialDraft: createInitialDraft(input.connection),
     normalizeValue: normalizeGitHubExistingAppSetupValue,
     onFieldSaved: (updatedConnection, fieldKey) => {
       if (isGitHubExistingAppSetupSecretFieldKey(fieldKey)) {

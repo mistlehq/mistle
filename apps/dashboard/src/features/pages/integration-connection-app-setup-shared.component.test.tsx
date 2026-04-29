@@ -18,13 +18,18 @@ function ExistingAppSetupAutoSaveHarness(input: {
   validateClientSecret?: boolean;
 }): React.JSX.Element {
   const [savedField, setSavedField] = useState("none");
+  const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(
+    "Previous action failed.",
+  );
   const autoSave = useExistingAppSetupAutoSave<TestFieldKey, { savedField: TestFieldKey }>({
-    clearActionError: () => {},
-    fieldKeys: TestFieldKeys,
-    initialDraft: {
+    clearActionError: () => {
+      setActionErrorMessage(null);
+    },
+    createInitialDraft: () => ({
       clientId: "initial-client-id",
       clientSecret: "initial-client-secret",
-    },
+    }),
+    fieldKeys: TestFieldKeys,
     normalizeValue: (value) => value.trim(),
     onFieldSaved: (result) => {
       setSavedField(result.savedField);
@@ -92,6 +97,7 @@ function ExistingAppSetupAutoSaveHarness(input: {
       <div data-testid="saved-client-id">{autoSave.savedDraft.clientId}</div>
       <div data-testid="saved-client-secret">{autoSave.savedDraft.clientSecret}</div>
       <div data-testid="saved-field">{savedField}</div>
+      <div data-testid="action-error">{actionErrorMessage}</div>
     </div>
   );
 }
@@ -105,6 +111,7 @@ describe("useExistingAppSetupAutoSave", () => {
     });
     fireEvent.blur(screen.getByLabelText("Client ID"));
 
+    expect(screen.getByTestId("action-error").textContent).toBe("");
     await waitFor(() => {
       expect(screen.getByTestId("client-id-status").textContent).toBe("saved");
     });

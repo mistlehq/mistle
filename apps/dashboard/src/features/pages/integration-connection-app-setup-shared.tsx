@@ -43,7 +43,7 @@ type ExistingAppSetupSecretField<SecretFieldKey extends string> = {
   multiline?: boolean;
 };
 
-type ExistingAppSetupAutoSaveValidationInput<FieldKey extends string> = {
+type ExistingAppSetupAutoSaveFieldInput<FieldKey extends string> = {
   fieldKey: FieldKey;
   draft: Record<FieldKey, string>;
 };
@@ -63,6 +63,19 @@ export type ExistingAppSetupAutoSave<FieldKey extends string> = {
   revertField: (fieldKey: FieldKey) => void;
   savedDraft: Record<FieldKey, string>;
   updateFieldDraft: (fieldKey: FieldKey, nextValue: string) => void;
+};
+
+type ExistingAppSetupAutoSaveInput<FieldKey extends string, SaveResult> = {
+  clearActionError: () => void;
+  createInitialDraft: () => Record<FieldKey, string>;
+  fieldKeys: readonly FieldKey[];
+  normalizeValue: (value: string) => string;
+  onFieldSaved?: (saveResult: SaveResult, fieldKey: FieldKey) => void;
+  resolveSavedFieldKeys: (fieldKey: FieldKey) => readonly FieldKey[];
+  resolveSaveErrorMessage: (error: unknown) => string;
+  saveField: (saveInput: ExistingAppSetupAutoSaveFieldInput<FieldKey>) => Promise<SaveResult>;
+  shouldPersistField?: (fieldInput: ExistingAppSetupAutoSaveFieldInput<FieldKey>) => boolean;
+  validateField?: (fieldInput: ExistingAppSetupAutoSaveFieldInput<FieldKey>) => string | null;
 };
 
 export function useSetupFieldFeedback<FieldKey extends string>(
@@ -171,27 +184,11 @@ export function useSetupFieldFeedback<FieldKey extends string>(
   };
 }
 
-export function useExistingAppSetupAutoSave<FieldKey extends string, SaveResult>(input: {
-  clearActionError: () => void;
-  fieldKeys: readonly FieldKey[];
-  initialDraft: Record<FieldKey, string>;
-  normalizeValue: (value: string) => string;
-  onFieldSaved?: (saveResult: SaveResult, fieldKey: FieldKey) => void;
-  resolveSavedFieldKeys: (fieldKey: FieldKey) => readonly FieldKey[];
-  resolveSaveErrorMessage: (error: unknown) => string;
-  saveField: (saveInput: {
-    draft: Record<FieldKey, string>;
-    fieldKey: FieldKey;
-  }) => Promise<SaveResult>;
-  shouldPersistField?: (
-    validationInput: ExistingAppSetupAutoSaveValidationInput<FieldKey>,
-  ) => boolean;
-  validateField?: (
-    validationInput: ExistingAppSetupAutoSaveValidationInput<FieldKey>,
-  ) => string | null;
-}): ExistingAppSetupAutoSave<FieldKey> {
-  const [draft, setDraft] = useState(input.initialDraft);
-  const [savedDraft, setSavedDraft] = useState(input.initialDraft);
+export function useExistingAppSetupAutoSave<FieldKey extends string, SaveResult>(
+  input: ExistingAppSetupAutoSaveInput<FieldKey, SaveResult>,
+): ExistingAppSetupAutoSave<FieldKey> {
+  const [draft, setDraft] = useState(input.createInitialDraft);
+  const [savedDraft, setSavedDraft] = useState(input.createInitialDraft);
   const fieldFeedback = useSetupFieldFeedback(input.fieldKeys);
 
   function updateFieldDraft(fieldKey: FieldKey, nextValue: string): void {

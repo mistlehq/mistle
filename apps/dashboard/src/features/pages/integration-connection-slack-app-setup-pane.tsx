@@ -337,8 +337,8 @@ export function SlackAppSetupPane(input: {
     clearActionError: () => {
       setActionErrorMessage(null);
     },
+    createInitialDraft: () => createInitialExistingAppDraft(input.connection),
     fieldKeys: SlackExistingAppFieldKeys,
-    initialDraft: createInitialExistingAppDraft(input.connection),
     normalizeValue: normalizeSlackExistingAppSetupValue,
     onFieldSaved: (updatedConnection, fieldKey) => {
       if (isSlackExistingAppSecretFieldKey(fieldKey)) {
