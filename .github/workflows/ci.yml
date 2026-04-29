@@ -26,6 +26,7 @@ jobs:
       ts_build: ${{ steps.filter.outputs.ts_build }}
       ts_test: ${{ steps.filter.outputs.ts_test }}
       ts_component: ${{ steps.filter.outputs.ts_component }}
+      knip: ${{ steps.filter.outputs.knip }}
       rust_static: ${{ steps.filter.outputs.rust_static }}
       commit_sign: ${{ steps.filter.outputs.commit_sign }}
       sandboxd: ${{ steps.filter.outputs.sandboxd }}
@@ -41,10 +42,6 @@ jobs:
         with:
           filters: |
             ts_static:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'apps/**'
               - 'packages/**'
@@ -57,12 +54,9 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
+              - '!packages/commit-sign/**'
               - '!packages/sandboxd/**'
             ts_build:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'apps/**'
               - 'packages/**'
@@ -78,10 +72,6 @@ jobs:
               - '!packages/docs/**'
               - '!packages/sandboxd/**'
             ts_test:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'apps/**'
               - 'packages/**'
@@ -98,10 +88,6 @@ jobs:
               - '!packages/docs/**'
               - '!packages/sandboxd/**'
             ts_component:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'apps/dashboard/**'
               - 'packages/config/**'
@@ -119,61 +105,41 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
+            knip:
+              - '.envrc'
+              - 'apps/**'
+              - 'packages/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'knip.jsonc'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '!packages/commit-sign/**'
+              - '!packages/sandboxd/**'
             rust_static:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'packages/commit-sign/**'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
-              - 'packages/integrations-core/**'
-              - 'packages/integrations-definitions/**'
-              - 'packages/sandbox-session-protocol/**'
-              - 'packages/time/**'
-              - 'scripts/**'
               - 'flake.nix'
               - 'flake.lock'
-              - 'package.json'
-              - 'pnpm-workspace.yaml'
-              - 'pnpm-lock.yaml'
-              - 'turbo.json'
-              - 'tsconfig.base.json'
             commit_sign:
-              - '.github/workflows/ci.yml'
               - '.envrc'
               - 'packages/commit-sign/**'
               - 'flake.nix'
               - 'flake.lock'
-              - 'package.json'
-              - 'pnpm-workspace.yaml'
-              - 'pnpm-lock.yaml'
             sandboxd:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
-              - 'packages/integrations-core/**'
-              - 'packages/integrations-definitions/**'
-              - 'packages/sandbox-session-protocol/**'
-              - 'packages/time/**'
-              - 'scripts/**'
               - 'flake.nix'
               - 'flake.lock'
-              - 'package.json'
-              - 'pnpm-workspace.yaml'
-              - 'pnpm-lock.yaml'
-              - 'turbo.json'
-              - 'tsconfig.base.json'
             sandbox_base_linux:
-              - '.github/workflows/ci.yml'
-              - '.github/workflows/ci-scheduled-integration.yml'
-              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
-              - '.github/workflows/ci-scheduled-system.yml'
               - '.dockerignore'
               - 'packages/sandboxd/Dockerfile'
               - 'packages/sandboxd/scripts/cmddir'
@@ -457,6 +423,9 @@ jobs:
     # runs-on: blacksmith-2vcpu-ubuntu-2404
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs:
+      - changes
+    if: needs.changes.outputs.knip == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
