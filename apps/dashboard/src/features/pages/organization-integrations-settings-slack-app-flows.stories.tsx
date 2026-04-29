@@ -313,12 +313,13 @@ function useSlackStoryControlPlane(input: { queryClient: QueryClient }): void {
       }
 
       const startManifestMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/slack-app-manifest\/start$/,
+        /^\/v1\/integration\/connections\/([^/]+)\/setup\/slack-app\/start$/,
       );
       if (method === "POST" && startManifestMatch !== null) {
         const requestBody: unknown = await request.json();
         StorySlackManifestStartRequestBodySchema.parse(requestBody);
         return createJsonResponse({
+          kind: "redirect",
           authorizationUrl: `${StoryControlPlaneApiOrigin}/storybook/slack-app-install`,
         });
       }

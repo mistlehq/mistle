@@ -270,10 +270,11 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
       }
 
       const startInstallMatch = path.match(
-        /^\/v1\/integration\/connections\/([^/]+)\/github-app-installation\/start$/,
+        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app-installation\/start$/,
       );
       if (method === "POST" && startInstallMatch !== null) {
         return createJsonResponse({
+          kind: "redirect",
           authorizationUrl: `${StoryControlPlaneApiOrigin}/storybook/github-app-install`,
         });
       }
