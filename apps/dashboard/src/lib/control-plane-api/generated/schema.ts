@@ -2040,7 +2040,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Start an external app setup flow. */
+        /** @description Start a provider app setup flow. */
         200: {
           headers: {
             [name: string]: unknown;

@@ -1,4 +1,4 @@
-import type { IntegrationExternalAppSetupCapability } from "@mistle/integrations-core";
+import type { IntegrationProviderAppSetupCapability } from "@mistle/integrations-core";
 import { z } from "zod";
 
 import {
@@ -108,7 +108,7 @@ async function completeSlackOAuthAccess(input: {
   return parseSlackOAuthAccessSuccessResponse(responseJson);
 }
 
-export const SlackExternalAppSetupCapability: IntegrationExternalAppSetupCapability<
+export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapability<
   SlackTargetConfig,
   SlackTargetSecrets,
   SlackConnectionConfig

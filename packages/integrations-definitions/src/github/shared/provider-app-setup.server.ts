@@ -1,6 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
-  type IntegrationExternalAppSetupCapability,
+  type IntegrationProviderAppSetupCapability,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
@@ -20,7 +20,7 @@ import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
-type GitHubExternalAppSetupCapabilityOptions = {
+type GitHubProviderAppSetupCapabilityOptions = {
   requiredInstallationSecrets: ReadonlyArray<{
     secretKind: "api_key" | "oauth2_client_secret";
     slotKey:
@@ -68,9 +68,9 @@ async function convertGitHubAppManifest(input: {
   return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
-export function createGitHubExternalAppSetupCapability(
-  options: GitHubExternalAppSetupCapabilityOptions,
-): IntegrationExternalAppSetupCapability<
+export function createGitHubProviderAppSetupCapability(
+  options: GitHubProviderAppSetupCapabilityOptions,
+): IntegrationProviderAppSetupCapability<
   GitHubTargetConfig,
   GitHubTargetSecrets,
   GitHubConnectionConfig
@@ -198,7 +198,7 @@ export function createGitHubExternalAppSetupCapability(
   };
 }
 
-export const GitHubCloudExternalAppSetupCapability = createGitHubExternalAppSetupCapability({
+export const GitHubCloudProviderAppSetupCapability = createGitHubProviderAppSetupCapability({
   requiredInstallationSecrets: [
     {
       slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM,
@@ -216,8 +216,8 @@ export const GitHubCloudExternalAppSetupCapability = createGitHubExternalAppSetu
   supportsClientSecret: true,
 });
 
-export const GitHubEnterpriseServerExternalAppSetupCapability =
-  createGitHubExternalAppSetupCapability({
+export const GitHubEnterpriseServerProviderAppSetupCapability =
+  createGitHubProviderAppSetupCapability({
     requiredInstallationSecrets: [
       {
         slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,

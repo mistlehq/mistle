@@ -9,7 +9,7 @@ import {
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
   type StartedGitHubAppManifestConnection,
-  type StartedExternalAppSetup,
+  type StartedProviderAppSetup,
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
   DeviceAuthorizationAttemptResponseSchema,
@@ -17,7 +17,7 @@ import {
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
   StartedGitHubAppManifestConnectionSchema,
-  StartedExternalAppSetupSchema,
+  StartedProviderAppSetupSchema,
   StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
   readJsonWithSchema,
@@ -334,7 +334,7 @@ export async function cancelDeviceAuthorizationAttempt(input: {
 export async function startGitHubAppInstallation(input: {
   connectionId: string;
 }): Promise<StartedRedirectConnection> {
-  const startedSetup = await startExternalAppSetup({
+  const startedSetup = await startProviderAppSetup({
     connectionId: input.connectionId,
     routeSegment: "github-app-installation",
     body: {},
@@ -349,15 +349,15 @@ export async function startGitHubAppInstallation(input: {
   };
 }
 
-export async function startExternalAppSetup(input: {
+export async function startProviderAppSetup(input: {
   connectionId: string;
   routeSegment: string;
   body: Record<string, unknown>;
   fallbackMessage: string;
-}): Promise<StartedExternalAppSetup> {
+}): Promise<StartedProviderAppSetup> {
   try {
     const response = await requestControlPlane({
-      operation: "startExternalAppSetup",
+      operation: "startProviderAppSetup",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/setup/${encodeURIComponent(input.routeSegment)}/start`,
       body: input.body,
@@ -366,12 +366,12 @@ export async function startExternalAppSetup(input: {
 
     return readJsonWithSchema({
       response,
-      schema: StartedExternalAppSetupSchema,
-      operation: "startExternalAppSetup",
+      schema: StartedProviderAppSetupSchema,
+      operation: "startProviderAppSetup",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "startExternalAppSetup",
+      operation: "startProviderAppSetup",
       error,
       fallbackMessage: input.fallbackMessage,
     });
@@ -383,7 +383,7 @@ export async function startGitHubAppManifestCreation(input: {
   manifest: Record<string, unknown>;
   owner: GitHubAppManifestOwner;
 }): Promise<StartedGitHubAppManifestConnection> {
-  const startedSetup = await startExternalAppSetup({
+  const startedSetup = await startProviderAppSetup({
     connectionId: input.connectionId,
     routeSegment: "github-app",
     body: {
@@ -414,7 +414,7 @@ export async function startSlackAppManifestCreation(input: {
   manifest: Record<string, unknown>;
   appConfigToken: string;
 }): Promise<StartedRedirectConnection> {
-  const startedSetup = await startExternalAppSetup({
+  const startedSetup = await startProviderAppSetup({
     connectionId: input.connectionId,
     routeSegment: "slack-app",
     body: {

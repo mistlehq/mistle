@@ -1,8 +1,8 @@
 import { GitHubCredentialResolverKeys } from "../../shared/credential-resolver-keys.js";
 import { GitHubAppInstallationCredentialResolver } from "../../shared/credential-resolver.server.js";
 import { AppendSessionLinkToGitHubMarkdownRequestMiddleware } from "../../shared/egress-request-middleware.server.js";
-import { GitHubEnterpriseServerExternalAppSetupCapability } from "../../shared/external-app-setup.server.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.server.js";
+import { GitHubEnterpriseServerProviderAppSetupCapability } from "../../shared/provider-app-setup.server.js";
 import {
   createGitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
@@ -17,7 +17,7 @@ import { GitHubEnterpriseServerWebhookHandler } from "./webhook.server.js";
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerBaseIntegrationDefinition = {
   ...GitHubEnterpriseServerBaseDefinition,
-  externalAppSetup: GitHubEnterpriseServerExternalAppSetupCapability,
+  providerAppSetup: GitHubEnterpriseServerProviderAppSetupCapability,
   egressRequestMiddleware: [AppendSessionLinkToGitHubMarkdownRequestMiddleware],
   credentialResolvers: {
     custom: {

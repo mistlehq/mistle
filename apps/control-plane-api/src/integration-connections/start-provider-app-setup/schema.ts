@@ -9,16 +9,16 @@ import {
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
 
-export const StartExternalAppSetupParamsSchema = z
+export const StartProviderAppSetupParamsSchema = z
   .object({
     connectionId: z.string().min(1),
     routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
   })
   .strict();
 
-export const StartExternalAppSetupBodySchema = z.record(z.string(), z.unknown());
+export const StartProviderAppSetupBodySchema = z.record(z.string(), z.unknown());
 
-export const StartedExternalAppSetupResponseSchema = z.discriminatedUnion("kind", [
+export const StartedProviderAppSetupResponseSchema = z.discriminatedUnion("kind", [
   z
     .object({
       kind: z.literal("form-post"),
@@ -34,7 +34,7 @@ export const StartedExternalAppSetupResponseSchema = z.discriminatedUnion("kind"
     .strict(),
 ]);
 
-export const StartExternalAppSetupBadRequestResponseSchema = z.union([
+export const StartProviderAppSetupBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
       IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
@@ -49,6 +49,6 @@ export const StartExternalAppSetupBadRequestResponseSchema = z.union([
   ValidationErrorResponseSchema,
 ]);
 
-export const StartExternalAppSetupNotFoundResponseSchema = createCodeMessageErrorSchema(
+export const StartProviderAppSetupNotFoundResponseSchema = createCodeMessageErrorSchema(
   z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND),
 );

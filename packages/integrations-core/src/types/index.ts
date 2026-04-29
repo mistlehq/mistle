@@ -494,7 +494,7 @@ export type IntegrationFormConnectionMethodSetupFlow = {
   routeSegment: string;
 };
 
-export type IntegrationExternalAppSetupStartResult =
+export type IntegrationProviderAppSetupStartResult =
   | {
       kind: "form-post";
       fields: Record<string, string>;
@@ -505,22 +505,22 @@ export type IntegrationExternalAppSetupStartResult =
       kind: "redirect";
     };
 
-export type IntegrationExternalAppSetupConnectionUpdate = {
+export type IntegrationProviderAppSetupConnectionUpdate = {
   config?: Record<string, unknown>;
   externalSubjectId?: string | null;
 };
 
-export type IntegrationExternalAppSetupResult = {
-  connection?: IntegrationExternalAppSetupConnectionUpdate;
+export type IntegrationProviderAppSetupResult = {
+  connection?: IntegrationProviderAppSetupConnectionUpdate;
   secrets?: Record<string, string>;
 };
 
-export type IntegrationExternalAppSetupConnectionSecretResolver = (input: {
+export type IntegrationProviderAppSetupConnectionSecretResolver = (input: {
   secretKind: string;
   slotKey: string;
 }) => MaybePromise<string>;
 
-export type IntegrationExternalAppSetupStartInput<
+export type IntegrationProviderAppSetupStartInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
@@ -531,12 +531,12 @@ export type IntegrationExternalAppSetupStartInput<
   };
   controlPlaneBaseUrl: string;
   redirectState: string;
-  resolveConnectionSecret: IntegrationExternalAppSetupConnectionSecretResolver;
+  resolveConnectionSecret: IntegrationProviderAppSetupConnectionSecretResolver;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   webhookCallbackUrl?: string;
 };
 
-export type IntegrationExternalAppSetupCompleteInput<
+export type IntegrationProviderAppSetupCompleteInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
@@ -546,11 +546,11 @@ export type IntegrationExternalAppSetupCompleteInput<
   };
   controlPlaneBaseUrl: string;
   query: URLSearchParams;
-  resolveConnectionSecret: IntegrationExternalAppSetupConnectionSecretResolver;
+  resolveConnectionSecret: IntegrationProviderAppSetupConnectionSecretResolver;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
 };
 
-export type IntegrationExternalAppSetupFlowCapability<
+export type IntegrationProviderAppSetupFlowCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
@@ -559,26 +559,26 @@ export type IntegrationExternalAppSetupFlowCapability<
   requiresWebhookCallbackUrl?: boolean;
   routeSegment: string;
   complete?(
-    input: IntegrationExternalAppSetupCompleteInput<
+    input: IntegrationProviderAppSetupCompleteInput<
       TTargetConfig,
       TTargetSecrets,
       TConnectionConfig
     >,
-  ): MaybePromise<IntegrationExternalAppSetupResult>;
+  ): MaybePromise<IntegrationProviderAppSetupResult>;
   start?(
-    input: IntegrationExternalAppSetupStartInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
+    input: IntegrationProviderAppSetupStartInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
   ): MaybePromise<
-    IntegrationExternalAppSetupResult & { start: IntegrationExternalAppSetupStartResult }
+    IntegrationProviderAppSetupResult & { start: IntegrationProviderAppSetupStartResult }
   >;
 };
 
-export type IntegrationExternalAppSetupCapability<
+export type IntegrationProviderAppSetupCapability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
 > = {
   flows: ReadonlyArray<
-    IntegrationExternalAppSetupFlowCapability<TTargetConfig, TTargetSecrets, TConnectionConfig>
+    IntegrationProviderAppSetupFlowCapability<TTargetConfig, TTargetSecrets, TConnectionConfig>
   >;
 };
 
@@ -2023,7 +2023,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
-  externalAppSetup?: IntegrationExternalAppSetupCapability<
+  providerAppSetup?: IntegrationProviderAppSetupCapability<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig

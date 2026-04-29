@@ -2,11 +2,11 @@ import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
-  StartExternalAppSetupBadRequestResponseSchema,
-  StartExternalAppSetupBodySchema,
-  StartExternalAppSetupNotFoundResponseSchema,
-  StartExternalAppSetupParamsSchema,
-  StartedExternalAppSetupResponseSchema,
+  StartProviderAppSetupBadRequestResponseSchema,
+  StartProviderAppSetupBodySchema,
+  StartProviderAppSetupNotFoundResponseSchema,
+  StartProviderAppSetupParamsSchema,
+  StartedProviderAppSetupResponseSchema,
 } from "./schema.js";
 
 export const route = createRoute({
@@ -14,22 +14,22 @@ export const route = createRoute({
   path: "/:connectionId/setup/:routeSegment/start",
   tags: ["Integrations"],
   request: {
-    params: StartExternalAppSetupParamsSchema,
+    params: StartProviderAppSetupParamsSchema,
     body: {
       required: true,
       content: {
         "application/json": {
-          schema: StartExternalAppSetupBodySchema,
+          schema: StartProviderAppSetupBodySchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Start an external app setup flow.",
+      description: "Start a provider app setup flow.",
       content: {
         "application/json": {
-          schema: StartedExternalAppSetupResponseSchema,
+          schema: StartedProviderAppSetupResponseSchema,
         },
       },
     },
@@ -37,7 +37,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: StartExternalAppSetupBadRequestResponseSchema,
+          schema: StartProviderAppSetupBadRequestResponseSchema,
         },
       },
     },
@@ -61,7 +61,7 @@ export const route = createRoute({
       description: "Integration connection was not found.",
       content: {
         "application/json": {
-          schema: StartExternalAppSetupNotFoundResponseSchema,
+          schema: StartProviderAppSetupNotFoundResponseSchema,
         },
       },
     },

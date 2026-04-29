@@ -4960,7 +4960,7 @@
         },
         "responses": {
           "200": {
-            "description": "Start an external app setup flow.",
+            "description": "Start a provider app setup flow.",
             "content": {
               "application/json": {
                 "schema": {

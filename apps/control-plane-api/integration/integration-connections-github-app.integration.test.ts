@@ -25,10 +25,10 @@ import {
   IntegrationConnectionSchema,
 } from "../src/integration-connections/schemas.js";
 import {
-  StartExternalAppSetupBadRequestResponseSchema,
-  StartExternalAppSetupNotFoundResponseSchema,
-  StartedExternalAppSetupResponseSchema,
-} from "../src/integration-connections/start-external-app-setup/schema.js";
+  StartProviderAppSetupBadRequestResponseSchema,
+  StartProviderAppSetupNotFoundResponseSchema,
+  StartedProviderAppSetupResponseSchema,
+} from "../src/integration-connections/start-provider-app-setup/schema.js";
 import { buildDashboardUrl } from "../src/lib/dashboard-url.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -43,33 +43,33 @@ const GitHubEnterpriseServerTargetConfig = {
   web_base_url: "https://github.enterprise.example.com",
 } as const;
 
-type StartedExternalAppSetupResponse = z.infer<typeof StartedExternalAppSetupResponseSchema>;
-type StartedExternalAppSetupFormPost = Extract<
-  StartedExternalAppSetupResponse,
+type StartedProviderAppSetupResponse = z.infer<typeof StartedProviderAppSetupResponseSchema>;
+type StartedProviderAppSetupFormPost = Extract<
+  StartedProviderAppSetupResponse,
   { kind: "form-post" }
 >;
-type StartedExternalAppSetupRedirect = Extract<
-  StartedExternalAppSetupResponse,
+type StartedProviderAppSetupRedirect = Extract<
+  StartedProviderAppSetupResponse,
   { kind: "redirect" }
 >;
 
-async function parseStartedExternalAppSetupFormPost(
+async function parseStartedProviderAppSetupFormPost(
   response: Response,
-): Promise<StartedExternalAppSetupFormPost> {
-  const responseBody = StartedExternalAppSetupResponseSchema.parse(await response.json());
+): Promise<StartedProviderAppSetupFormPost> {
+  const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
   if (responseBody.kind !== "form-post") {
-    throw new Error("Expected external app setup start to return a form post.");
+    throw new Error("Expected provider app setup start to return a form post.");
   }
 
   return responseBody;
 }
 
-async function parseStartedExternalAppSetupRedirect(
+async function parseStartedProviderAppSetupRedirect(
   response: Response,
-): Promise<StartedExternalAppSetupRedirect> {
-  const responseBody = StartedExternalAppSetupResponseSchema.parse(await response.json());
+): Promise<StartedProviderAppSetupRedirect> {
+  const responseBody = StartedProviderAppSetupResponseSchema.parse(await response.json());
   if (responseBody.kind !== "redirect") {
-    throw new Error("Expected external app setup start to return a redirect.");
+    throw new Error("Expected provider app setup start to return a redirect.");
   }
 
   return responseBody;
@@ -276,7 +276,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = await parseStartedExternalAppSetupFormPost(response);
+    const responseBody = await parseStartedProviderAppSetupFormPost(response);
     const submissionUrl = new URL(responseBody.submissionUrl);
     expect(submissionUrl.origin).toBe("https://github.com");
     expect(submissionUrl.pathname).toBe("/organizations/mistle-labs/settings/apps/new");
@@ -319,7 +319,7 @@ describe("integration connections GitHub App integration", () => {
     expect(redirectSession).toBeDefined();
   });
 
-  it("starts and completes GitHub Enterprise Server App installation through the generic external app setup route", async ({
+  it("starts and completes GitHub Enterprise Server App installation through the generic provider app setup route", async ({
     fixture,
   }) => {
     await ensureGithubEnterpriseServerTarget(fixture);
@@ -345,7 +345,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(200);
-    const responseBody = await parseStartedExternalAppSetupRedirect(response);
+    const responseBody = await parseStartedProviderAppSetupRedirect(response);
 
     const authorizationUrl = new URL(responseBody.authorizationUrl);
     expect(authorizationUrl.origin).toBe("https://github.enterprise.example.com");
@@ -445,7 +445,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = StartExternalAppSetupBadRequestResponseSchema.parse(await response.json());
+    const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 
@@ -480,7 +480,7 @@ describe("integration connections GitHub App integration", () => {
       },
     );
     expect(startResponse.status).toBe(200);
-    const startResponseBody = await parseStartedExternalAppSetupFormPost(startResponse);
+    const startResponseBody = await parseStartedProviderAppSetupFormPost(startResponse);
     const state = resolveGitHubAppManifestSubmissionState(new URL(startResponseBody.submissionUrl));
 
     const response = await fixture.request(
@@ -533,7 +533,7 @@ describe("integration connections GitHub App integration", () => {
       },
     );
     expect(startResponse.status).toBe(200);
-    const startResponseBody = await parseStartedExternalAppSetupFormPost(startResponse);
+    const startResponseBody = await parseStartedProviderAppSetupFormPost(startResponse);
     const state = resolveGitHubAppManifestSubmissionState(new URL(startResponseBody.submissionUrl));
 
     await fixture.db
@@ -615,7 +615,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(startResponse.status).toBe(400);
-    const responseBody = StartExternalAppSetupBadRequestResponseSchema.parse(
+    const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(
       await startResponse.json(),
     );
     expect(responseBody.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
@@ -989,7 +989,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = StartExternalAppSetupBadRequestResponseSchema.parse(await response.json());
+    const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 
@@ -1055,7 +1055,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(404);
-    const responseBody = StartExternalAppSetupNotFoundResponseSchema.parse(await response.json());
+    const responseBody = StartProviderAppSetupNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("CONNECTION_NOT_FOUND");
   });
 });
@@ -1228,7 +1228,7 @@ async function startGitHubAppInstallationConnection(
   );
 
   expect(response.status).toBe(200);
-  const responseBody = await parseStartedExternalAppSetupRedirect(response);
+  const responseBody = await parseStartedProviderAppSetupRedirect(response);
   const authorizationUrl = new URL(responseBody.authorizationUrl);
   const state = authorizationUrl.searchParams.get("state");
 

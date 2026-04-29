@@ -3,8 +3,8 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import type {
   IntegrationConnectionMethodId,
-  IntegrationExternalAppSetupFlowCapability,
-  IntegrationExternalAppSetupStartResult,
+  IntegrationProviderAppSetupFlowCapability,
+  IntegrationProviderAppSetupStartResult,
   IntegrationRegistry,
 } from "@mistle/integrations-core";
 import { z } from "zod";
@@ -30,7 +30,7 @@ import {
   resolveActiveRedirectSessionOrThrow,
   resolveConnectionRedirectStateMetadata,
 } from "./redirect-flow.js";
-import { persistExternalAppSetupResult } from "./setup-result-persistence.js";
+import { persistProviderAppSetupResult } from "./setup-result-persistence.js";
 import {
   ensureImplicitConnectionWebhookSource,
   resolveConnectionConfigOrThrow,
@@ -41,19 +41,19 @@ import {
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 
-type CompletedExternalAppSetup = {
+type CompletedProviderAppSetup = {
   id: string;
   targetKey: string;
   routeSegment: string;
 };
 
-type ExternalAppSetupStartInvalidInputCode =
+type ProviderAppSetupStartInvalidInputCode =
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_MANIFEST_START_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
 
-type ExternalAppSetupCompleteInvalidInputCode =
+type ProviderAppSetupCompleteInvalidInputCode =
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT
@@ -61,8 +61,8 @@ type ExternalAppSetupCompleteInvalidInputCode =
 
 function resolveSetupFlowOrThrow(input: {
   routeSegment: string;
-  flows: ReadonlyArray<IntegrationExternalAppSetupFlowCapability>;
-}): IntegrationExternalAppSetupFlowCapability {
+  flows: ReadonlyArray<IntegrationProviderAppSetupFlowCapability>;
+}): IntegrationProviderAppSetupFlowCapability {
   const flow = input.flows.find((entry) => entry.routeSegment === input.routeSegment);
   if (flow === undefined) {
     throw new BadRequestError(
@@ -192,7 +192,7 @@ async function resolveWebhookCallbackUrl(input: {
   return webhookSourceDescriptor.callbackUrl;
 }
 
-export async function startExternalAppSetup(
+export async function startProviderAppSetup(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -204,9 +204,9 @@ export async function startExternalAppSetup(
     connectionId: string;
     routeSegment: string;
     body: Record<string, unknown>;
-    invalidInputCode: ExternalAppSetupStartInvalidInputCode;
+    invalidInputCode: ProviderAppSetupStartInvalidInputCode;
   },
-): Promise<IntegrationExternalAppSetupStartResult> {
+): Promise<IntegrationProviderAppSetupStartResult> {
   const connection = await resolveConnectionWithTargetOrThrow({
     db: ctx.db,
     organizationId: input.organizationId,
@@ -217,15 +217,15 @@ export async function startExternalAppSetup(
     variantId: connection.target.variantId,
   });
 
-  if (definition?.externalAppSetup === undefined) {
+  if (definition?.providerAppSetup === undefined) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
-      `Integration target '${connection.targetKey}' does not support external app setup.`,
+      `Integration target '${connection.targetKey}' does not support provider app setup.`,
     );
   }
 
   const flow = resolveSetupFlowOrThrow({
-    flows: definition.externalAppSetup.flows,
+    flows: definition.providerAppSetup.flows,
     routeSegment: input.routeSegment,
   });
 
@@ -320,7 +320,7 @@ export async function startExternalAppSetup(
 
     throw new BadRequestError(
       input.invalidInputCode,
-      error instanceof Error ? error.message : "External app setup start failed.",
+      error instanceof Error ? error.message : "Provider app setup start failed.",
     );
   }
 
@@ -342,11 +342,11 @@ export async function startExternalAppSetup(
     targetKey: connection.targetKey,
     state: redirectState,
     expiresAt: createRedirectSessionExpiryTimestamp(),
-    failureMessage: "Failed to persist external app setup redirect session state.",
+    failureMessage: "Failed to persist provider app setup redirect session state.",
   });
 
   if (parsedSecrets.length > 0 || startedSetup.connection !== undefined) {
-    await persistExternalAppSetupResult({
+    await persistProviderAppSetupResult({
       db: ctx.db,
       integrationsConfig: ctx.integrationsConfig,
       organizationId: input.organizationId,
@@ -362,7 +362,7 @@ export async function startExternalAppSetup(
   return startedSetup.start;
 }
 
-export async function completeExternalAppSetup(
+export async function completeProviderAppSetup(
   ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
@@ -371,15 +371,15 @@ export async function completeExternalAppSetup(
   },
   input: {
     query: Record<string, string>;
-    invalidInputCode: ExternalAppSetupCompleteInvalidInputCode;
+    invalidInputCode: ProviderAppSetupCompleteInvalidInputCode;
   },
-): Promise<CompletedExternalAppSetup> {
+): Promise<CompletedProviderAppSetup> {
   const queryParams = createRedirectQueryParams(input.query);
   const state = queryParams.get("state");
   if (state === null || state.length === 0) {
     throw new BadRequestError(
       input.invalidInputCode,
-      "External app setup callback query must include `state`.",
+      "Provider app setup callback query must include `state`.",
     );
   }
 
@@ -408,15 +408,15 @@ export async function completeExternalAppSetup(
     familyId: connection.target.familyId,
     variantId: connection.target.variantId,
   });
-  if (definition?.externalAppSetup === undefined) {
+  if (definition?.providerAppSetup === undefined) {
     throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
-      `Integration target '${connection.targetKey}' does not support external app setup.`,
+      `Integration target '${connection.targetKey}' does not support provider app setup.`,
     );
   }
 
   const flow = resolveSetupFlowOrThrow({
-    flows: definition.externalAppSetup.flows,
+    flows: definition.providerAppSetup.flows,
     routeSegment: stateMetadata.routeSegment,
   });
   if (flow.complete === undefined) {
@@ -493,7 +493,7 @@ export async function completeExternalAppSetup(
 
     throw new BadRequestError(
       input.invalidInputCode,
-      error instanceof Error ? error.message : "External app setup completion failed.",
+      error instanceof Error ? error.message : "Provider app setup completion failed.",
     );
   }
 
@@ -508,7 +508,7 @@ export async function completeExternalAppSetup(
     secrets: setupResult.secrets ?? {},
     invalidInputCode: input.invalidInputCode,
   });
-  const completedConnection = await persistExternalAppSetupResult({
+  const completedConnection = await persistProviderAppSetupResult({
     db: ctx.db,
     integrationsConfig: ctx.integrationsConfig,
     organizationId: redirectSession.organizationId,

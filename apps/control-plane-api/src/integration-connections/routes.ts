@@ -18,8 +18,8 @@ import * as listIntegrationWebhookSources from "./list-integration-webhook-sourc
 import * as refreshAllIntegrationConnectionResources from "./refresh-all-integration-connection-resources/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
 import * as startDeviceAuthorizationConnection from "./start-device-authorization-connection/index.js";
-import * as startExternalAppSetup from "./start-external-app-setup/index.js";
 import * as startOAuth2AuthorizationCodeConnection from "./start-oauth2-authorization-code-connection/index.js";
+import * as startProviderAppSetup from "./start-provider-app-setup/index.js";
 import * as updateFormConnection from "./update-form-connection/index.js";
 import * as updateIntegrationConnection from "./update-integration-connection/index.js";
 
@@ -94,8 +94,8 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   routes.use(updateFormConnection.route.path, requireAuthSession);
   routes.openapi(updateFormConnection.route, updateFormConnection.handler);
 
-  routes.use(startExternalAppSetup.route.path, requireAuthSession);
-  routes.openapi(startExternalAppSetup.route, startExternalAppSetup.handler);
+  routes.use(startProviderAppSetup.route.path, requireAuthSession);
+  routes.openapi(startProviderAppSetup.route, startProviderAppSetup.handler);
 
   routes.use(startOAuth2AuthorizationCodeConnection.route.path, requireAuthSession);
   routes.openapi(

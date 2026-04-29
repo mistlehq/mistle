@@ -8,7 +8,7 @@ import {
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type {
   AnyIntegrationDefinition,
-  IntegrationExternalAppSetupConnectionUpdate,
+  IntegrationProviderAppSetupConnectionUpdate,
 } from "@mistle/integrations-core";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -42,14 +42,14 @@ type SetupPersistenceResult = {
   targetKey: string;
 };
 
-export async function persistExternalAppSetupResult(input: {
+export async function persistProviderAppSetupResult(input: {
   db: ControlPlaneDatabase;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   organizationId: string;
   connection: SetupPersistenceConnection;
   definition: AnyIntegrationDefinition;
   parsedSecrets: ParsedFormSecret[];
-  connectionUpdate?: IntegrationExternalAppSetupConnectionUpdate;
+  connectionUpdate?: IntegrationProviderAppSetupConnectionUpdate;
   redirectSession?: {
     id: string;
   };
