@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
 
 import {
+  CodexFixtureChatThreadEntriesWithFileAttachment,
+  CodexFixtureChatThreadEntriesWithMixedAttachments,
   CodexFixtureChatThreadEntriesWithSequentialActionGroups,
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
@@ -95,6 +97,18 @@ export const WithThinkingGroup: Story = {
 export const WithStructuredPlan: Story = {
   args: {
     chatEntries: CodexFixtureChatThreadEntriesWithStructuredPlan,
+  },
+};
+
+export const WithFileAttachment: Story = {
+  args: {
+    chatEntries: CodexFixtureChatThreadEntriesWithFileAttachment,
+  },
+};
+
+export const WithMixedAttachments: Story = {
+  args: {
+    chatEntries: CodexFixtureChatThreadEntriesWithMixedAttachments,
   },
 };
 

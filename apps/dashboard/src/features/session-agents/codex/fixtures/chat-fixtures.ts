@@ -61,6 +61,80 @@ export const CodexFixtureChatThreadEntries: readonly ChatEntry[] = [
   },
 ];
 
+export const CodexFixtureChatThreadEntriesWithFileAttachment: readonly ChatEntry[] = [
+  {
+    id: "user-file-attachment",
+    turnId: "turn-file-attachment",
+    kind: "user-message",
+    status: "completed",
+    text: [
+      "Review the attached deployment notes.",
+      "",
+      "Attached files:",
+      "- deployment-notes.md: /root/.local/attachments/thread_123/deployment-notes.md",
+    ].join("\n"),
+    attachments: [
+      {
+        kind: "file",
+        path: "/root/.local/attachments/thread_123/deployment-notes.md",
+        name: "deployment-notes.md",
+      },
+    ],
+  },
+  {
+    id: "assistant-file-attachment",
+    turnId: "turn-file-attachment",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "I can inspect that file from the sandbox path and summarize the deployment notes.",
+  },
+];
+
+export const CodexFixtureChatThreadEntriesWithMixedAttachments: readonly ChatEntry[] = [
+  {
+    id: "user-mixed-attachments",
+    turnId: "turn-mixed-attachments",
+    kind: "user-message",
+    status: "completed",
+    text: [
+      "Compare the screenshot with the attached implementation notes.",
+      "",
+      "Attached images:",
+      "- /root/.local/attachments/thread_123/session-overview.png",
+      "",
+      "Attached files:",
+      "- deployment-notes.md: /root/.local/attachments/thread_123/deployment-notes.md",
+      "- requirements.pdf: /root/.local/attachments/thread_123/requirements.pdf",
+    ].join("\n"),
+    attachments: [
+      {
+        kind: "image",
+        path: "/root/.local/attachments/thread_123/session-overview.png",
+        name: "session-overview.png",
+      },
+      {
+        kind: "file",
+        path: "/root/.local/attachments/thread_123/deployment-notes.md",
+        name: "deployment-notes.md",
+      },
+      {
+        kind: "file",
+        path: "/root/.local/attachments/thread_123/requirements.pdf",
+        name: "requirements.pdf",
+      },
+    ],
+  },
+  {
+    id: "assistant-mixed-attachments",
+    turnId: "turn-mixed-attachments",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "I will use the image attachment for visual inspection and inspect the two files from their sandbox paths.",
+  },
+];
+
 const StorySemanticDisplayKeys = {
   exploring: {
     active: "exploring.active",

@@ -47,7 +47,7 @@ export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element 
                 className="bg-background/70 rounded-full px-2.5 py-1 text-xs"
                 key={attachment.path}
               >
-                {attachment.kind === "image" ? "Image" : "File"} attached: {attachment.name}
+                {attachment.kind === "image" ? "Image" : "File"}: {attachment.name}
               </div>
             ))}
           </div>

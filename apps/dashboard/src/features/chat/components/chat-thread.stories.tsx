@@ -4,6 +4,7 @@ import {
   CodexFixtureChatThreadEntries,
   CodexFixtureChatThreadEntriesWithExploringGroup,
   CodexFixtureChatThreadEntriesWithGenericItem,
+  CodexFixtureChatThreadEntriesWithMixedAttachments,
   CodexFixtureChatThreadEntriesWithSequentialActionGroups,
   CodexFixtureChatThreadEntriesWithStructuredPlan,
   CodexFixtureChatThreadEntriesWithThinkingGroup,
@@ -68,6 +69,13 @@ export const WithStructuredPlan: Story = {
 export const WithGenericItem: Story = {
   args: {
     entries: CodexFixtureChatThreadEntriesWithGenericItem,
+    ...BaseArgs,
+  },
+};
+
+export const WithMixedAttachments: Story = {
+  args: {
+    entries: CodexFixtureChatThreadEntriesWithMixedAttachments,
     ...BaseArgs,
   },
 };

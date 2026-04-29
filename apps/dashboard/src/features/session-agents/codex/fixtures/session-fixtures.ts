@@ -88,10 +88,11 @@ export const SessionComposerFixtureProps: ChatComposerViewModel = {
 
 export const SessionComposerFixturePropsWithPendingAttachments: ChatComposerViewModel = {
   ...SessionComposerFixtureProps,
-  composerText: "Compare the attached screenshots and summarize the UI differences.",
+  composerText: "Compare the screenshot with the attached implementation notes.",
   pendingAttachments: [
     { id: "attachment-1", name: "session-workbench-overview.png" },
-    { id: "attachment-2", name: "terminal-panel-empty-state.webp" },
+    { id: "attachment-2", name: "deployment-notes.md" },
+    { id: "attachment-3", name: "requirements.pdf" },
   ],
 };
 

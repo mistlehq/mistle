@@ -317,7 +317,7 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("Image attached: screenshot.png")).toBeTruthy();
+    expect(screen.getByText("Image: screenshot.png")).toBeTruthy();
   });
 
   it("renders user file attachments as attachment rows", () => {
@@ -345,7 +345,7 @@ describe("ChatThread", () => {
       />,
     );
 
-    expect(screen.getByText("File attached: requirements.pdf")).toBeTruthy();
+    expect(screen.getByText("File: requirements.pdf")).toBeTruthy();
   });
 
   it("renders trailing user actions and routes their action id", () => {
