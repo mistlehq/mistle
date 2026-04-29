@@ -164,19 +164,11 @@ export function useSessionComposerState(input: {
 
   const addPendingComposerFiles = useCallback(
     (files: readonly File[]): void => {
-      const nextAttachments = files.flatMap((file) => {
-        if (!file.type.startsWith("image/")) {
-          return [];
-        }
-
-        return [
-          {
-            id: crypto.randomUUID(),
-            file,
-            name: file.name,
-          },
-        ];
-      });
+      const nextAttachments = files.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        name: file.name,
+      }));
 
       if (nextAttachments.length === 0) {
         return;

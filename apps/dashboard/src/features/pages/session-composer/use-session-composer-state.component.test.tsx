@@ -158,6 +158,18 @@ function SessionComposerStateHarness(input: {
       <button onClick={composerState.composerViewModel.onSubmit} type="button">
         Submit
       </button>
+      <button
+        onClick={() => {
+          composerState.composerViewModel.onPendingFilesAdded([
+            new File(["pdf-bytes"], "requirements.pdf", {
+              type: "application/pdf",
+            }),
+          ]);
+        }}
+        type="button"
+      >
+        Add PDF
+      </button>
       {resolveSubmit === null ? null : (
         <button onClick={resolveSubmit} type="button">
           Resolve submit
@@ -170,6 +182,11 @@ function SessionComposerStateHarness(input: {
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
       <div data-testid="composer-text">{composerText}</div>
+      <div data-testid="pending-attachments">
+        {composerState.composerViewModel.pendingAttachments
+          .map((attachment) => attachment.name)
+          .join(",")}
+      </div>
       <div data-testid="pending-diff-comments">{String(pendingDiffComments.length)}</div>
       <div data-testid="status-message">{composerState.statusMessage?.message ?? ""}</div>
     </div>
@@ -254,5 +271,13 @@ describe("useSessionComposerState", () => {
       "Submit this with review comments",
     );
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
+  });
+
+  it("adds non-image files to pending attachments", () => {
+    render(<SessionComposerStateHarness composerText="" pendingDiffComments={[]} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add PDF" }));
+
+    expect(screen.getByTestId("pending-attachments").textContent).toBe("requirements.pdf");
   });
 });
