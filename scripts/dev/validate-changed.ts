@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { join, parse, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 type Step = "format" | "lint" | "typecheck" | "test";
@@ -60,6 +60,7 @@ const AFFECTED_INTEGRATION_TEST_PACKAGE_NAMES = new Set([
   "@mistle/test-harness",
   "@mistle/tokenizer-proxy",
 ]);
+const AFFECTED_RUST_TEST_PACKAGE_NAMES = new Set(["@mistle/commit-sign", "@mistle/sandboxd"]);
 
 const ALL_PACKAGES_REASON = "root-level or repo-wide config changed";
 
@@ -680,6 +681,96 @@ function buildAffectedIntegrationVitestCommand(
   ];
 }
 
+function isRustIntegrationTargetFilePath(
+  workspacePackage: WorkspacePackage,
+  filePath: string,
+): boolean {
+  const testsDirectoryPrefix = `${workspacePackage.relativePath}/tests/`;
+  const relativeTestFilePath = filePath.slice(testsDirectoryPrefix.length);
+
+  return (
+    filePath.startsWith(testsDirectoryPrefix) &&
+    filePath.endsWith(".rs") &&
+    relativeTestFilePath.includes("/") === false
+  );
+}
+
+function buildAffectedCommitSignTestCommand(
+  workspacePackage: WorkspacePackage,
+  filePaths: readonly string[],
+): Command {
+  return [
+    "pnpm",
+    "--dir",
+    workspacePackage.relativePath,
+    "exec",
+    "node",
+    "./scripts/run-cargo-in-container.mjs",
+    "nextest",
+    "run",
+    "--locked",
+    ...filePaths.flatMap((filePath) => ["--test", parse(filePath).name]),
+  ];
+}
+
+function buildAffectedSandboxdIntegrationTestCommand(
+  workspacePackage: WorkspacePackage,
+  filePaths: readonly string[],
+): Command {
+  return [
+    "pnpm",
+    "--dir",
+    workspacePackage.relativePath,
+    "run",
+    "test:integration",
+    "--",
+    ...filePaths,
+  ];
+}
+
+function buildAffectedRustTestCommand(
+  plan: ValidationPlan,
+  workspacePackage: WorkspacePackage,
+): Command | null {
+  if (AFFECTED_RUST_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false) {
+    return null;
+  }
+
+  const reasons = plan.packageReasons.get(workspacePackage.name) ?? [];
+  if (reasons.includes(ALL_PACKAGES_REASON)) {
+    return null;
+  }
+
+  const packageChangedFiles = plan.changedFiles.filter((filePath) =>
+    filePath.startsWith(`${workspacePackage.relativePath}/`),
+  );
+  if (packageChangedFiles.length === 0) {
+    return null;
+  }
+
+  const changedExistingRustTestFiles = packageChangedFiles.filter(
+    (filePath) =>
+      isRustIntegrationTargetFilePath(workspacePackage, filePath) &&
+      existsSync(resolve(REPO_ROOT, filePath)),
+  );
+  if (changedExistingRustTestFiles.length !== packageChangedFiles.length) {
+    return null;
+  }
+
+  if (workspacePackage.name === "@mistle/commit-sign") {
+    return buildAffectedCommitSignTestCommand(workspacePackage, changedExistingRustTestFiles);
+  }
+
+  if (workspacePackage.name === "@mistle/sandboxd") {
+    return buildAffectedSandboxdIntegrationTestCommand(
+      workspacePackage,
+      changedExistingRustTestFiles,
+    );
+  }
+
+  return null;
+}
+
 function buildAffectedTestCommands(
   plan: ValidationPlan,
   workspacePackages: readonly WorkspacePackage[],
@@ -688,10 +779,18 @@ function buildAffectedTestCommands(
   const turboPackages: WorkspacePackage[] = [];
 
   for (const workspacePackage of plan.selectedPackages) {
-    if (
-      workspacePackage.policySteps.includes("test") === false ||
-      AFFECTED_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false
-    ) {
+    if (workspacePackage.policySteps.includes("test") === false) {
+      turboPackages.push(workspacePackage);
+      continue;
+    }
+
+    const rustTestCommand = buildAffectedRustTestCommand(plan, workspacePackage);
+    if (rustTestCommand !== null) {
+      affectedCommands.push(rustTestCommand);
+      continue;
+    }
+
+    if (AFFECTED_TEST_PACKAGE_NAMES.has(workspacePackage.name) === false) {
       turboPackages.push(workspacePackage);
       continue;
     }
@@ -907,7 +1006,12 @@ function printDryRunDetails(plan: ValidationPlan): void {
   console.log("");
 }
 
-function printPlan(plan: ValidationPlan, steps: readonly Step[], dryRun: boolean): void {
+function printPlan(
+  plan: ValidationPlan,
+  steps: readonly Step[],
+  dryRun: boolean,
+  commands: readonly Command[],
+): void {
   if (dryRun) {
     printDryRunDetails(plan);
   }
@@ -934,6 +1038,18 @@ function printPlan(plan: ValidationPlan, steps: readonly Step[], dryRun: boolean
 
   if (hasWorkspaceChecks === false && hasRepoChecks === false) {
     console.log("  - none");
+  }
+
+  if (dryRun) {
+    console.log("");
+    console.log(`Commands (${String(commands.length)}):`);
+    if (commands.length === 0) {
+      console.log("  - none");
+    } else {
+      for (const command of commands) {
+        console.log(`  - ${formatCommand(command)}`);
+      }
+    }
   }
 }
 
@@ -971,14 +1087,13 @@ function main(): void {
 
   const workspacePackages = loadWorkspacePackages();
   const plan = createValidationPlan(changedFiles, steps, workspacePackages);
+  const commands = buildExecutionCommands(plan, steps);
 
-  printPlan(plan, steps, dryRun);
+  printPlan(plan, steps, dryRun, commands);
 
   if (dryRun) {
     return;
   }
-
-  const commands = buildExecutionCommands(plan, steps);
 
   for (const command of commands) {
     runCommand(command);
