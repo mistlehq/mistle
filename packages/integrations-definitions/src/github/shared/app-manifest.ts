@@ -70,6 +70,7 @@ export const GitHubAppManifestTemplate = {
     "issues",
     "issue_comment",
     "pull_request",
+    "pull_request_review",
     "pull_request_review_comment",
     "check_run",
     "check_suite",
