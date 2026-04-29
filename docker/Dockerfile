@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-alpine AS base
+FROM node:25-alpine3.22 AS base
 
 ENV PNPM_HOME=/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
+RUN npm install --global pnpm@10.30.2
 
 FROM base AS workspace-deps
 
@@ -36,11 +36,11 @@ RUN pnpm --filter @mistle/data-plane-gateway... build
 FROM workspace-deps AS tokenizer-proxy-build
 RUN pnpm --filter @mistle/tokenizer-proxy... build
 
-FROM rust:1.89-alpine AS commit-sign-build
+FROM alpine:3.22 AS commit-sign-build
 
 WORKDIR /build/packages/commit-sign
 
-RUN apk add --no-cache build-base musl-dev
+RUN apk add --no-cache cargo rust build-base musl-dev
 
 COPY packages/commit-sign/Cargo.toml packages/commit-sign/Cargo.lock ./
 COPY packages/commit-sign/src ./src
