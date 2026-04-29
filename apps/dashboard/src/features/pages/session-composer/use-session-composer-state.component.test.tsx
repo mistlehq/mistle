@@ -228,7 +228,6 @@ describe("useSessionComposerState", () => {
     await waitFor(() => {
       expect(screen.getByTestId("composer-text").textContent).toBe("");
     });
-    expect(screen.getByTestId("composer-text").textContent).toBe("");
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("0");
   });
 
