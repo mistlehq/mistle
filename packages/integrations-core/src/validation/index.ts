@@ -27,6 +27,7 @@ const ReservedArtifactEnvKeys = new Set([
   "GIT_SSL_CAINFO",
   "REQUESTS_CA_BUNDLE",
   "NODE_EXTRA_CA_CERTS",
+  "NIX_SSL_CERT_FILE",
   "SSL_CERT_DIR",
   "GIT_SSL_CAPATH",
 ]);

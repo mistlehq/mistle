@@ -936,7 +936,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactEnv: {
-        NODE_EXTRA_CA_CERTS: "/tmp/custom-ca.pem",
+        NIX_SSL_CERT_FILE: "/tmp/custom-ca.pem",
       },
     });
 
