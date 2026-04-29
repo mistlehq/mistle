@@ -404,6 +404,58 @@ describe("sandboxInstances.start integration", () => {
     expect(queuedWorkflowRuns[0]?.id).toBe(firstStartedSandbox.workflowRunId);
   }, 60_000);
 
+  it("does not return stale start idempotency matches outside the workflow window", async ({
+    fixture,
+  }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxProfileId = "sbp_dp_api_integration_stale_idempotency";
+    const idempotencyKey = "dashboard-start-stale-001";
+    const purpose = SandboxInstancePurposes.SESSION;
+    const workflowInput: StartSandboxInstanceInput = {
+      organizationId: "org_dp_api_integration_stale_idempotency",
+      sandboxProfileId,
+      sandboxProfileVersion: 11,
+      purpose,
+      idempotencyKey,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 11,
+      }),
+      startedBy: {
+        kind: "user",
+        id: "usr_dp_api_integration_stale_idempotency",
+      },
+      source: "dashboard",
+      image: {
+        imageId: "im_dp_api_integration_stale_idempotency",
+        createdAt: "2026-02-27T00:00:00.000Z",
+        kind: "base",
+      },
+    };
+
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
+
+    await fixture.dbPool.query(
+      `
+        update data_plane_openworkflow.workflow_runs
+        set created_at = now() - interval '25 hours'
+        where namespace_id = $1 and id = $2
+      `,
+      [fixture.config.workflow.namespaceId, startedSandbox.workflowRunId],
+    );
+
+    await expect(
+      client.getSandboxInstanceByStartIdempotency({
+        organizationId: workflowInput.organizationId,
+        sandboxProfileId: workflowInput.sandboxProfileId,
+        sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+        purpose,
+        source: workflowInput.source,
+        idempotencyKey,
+      }),
+    ).resolves.toBeNull();
+  }, 60_000);
+
   it("creates a pending sandbox instance row immediately after start is accepted", async ({
     fixture,
   }) => {

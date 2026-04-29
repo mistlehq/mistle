@@ -14,6 +14,7 @@ import {
   StartSandboxInstanceWorkflowName,
   StartSandboxInstanceWorkflowSpec,
 } from "@mistle/workflow-registry/data-plane";
+import { DEFAULT_RUN_IDEMPOTENCY_PERIOD_MS } from "openworkflow/internal";
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
@@ -87,12 +88,15 @@ export async function findStartedSandboxInstanceByIdempotencyKey(
       where namespace_id = $1
         and workflow_name = $2
         and idempotency_key = $3
+        and created_at >= $4
+      order by created_at asc, id asc
       limit 1
     `,
     [
       ctx.workflowNamespaceId,
       StartSandboxInstanceWorkflowName,
       createStartSandboxIdempotencyKey(input),
+      new Date(Date.now() - DEFAULT_RUN_IDEMPOTENCY_PERIOD_MS),
     ],
   );
 
