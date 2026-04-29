@@ -1486,7 +1486,7 @@ export interface paths {
             };
           };
         };
-        /** @description Integration connection still has one or more active dependent bindings, automations, or identity-linking usages. */
+        /** @description Integration connection still has active sandbox profile bindings, webhook automations, or identity-linking configuration. */
         409: {
           headers: {
             [name: string]: unknown;

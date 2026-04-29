@@ -638,7 +638,7 @@ describe("integrations page view model", () => {
     const [item] = buildIntegrationConnectionDetailItems({
       connections: [
         {
-          id: "icn_binding_only",
+          id: "icn_active_binding",
           targetKey: "github",
           displayName: "Engineering GitHub",
           status: "active",

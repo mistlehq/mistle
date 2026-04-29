@@ -59,7 +59,7 @@ export const route = createRoute({
     },
     409: {
       description:
-        "Integration connection still has one or more active dependent bindings, automations, or identity-linking usages.",
+        "Integration connection still has active sandbox profile bindings, webhook automations, or identity-linking configuration.",
       content: {
         "application/json": {
           schema: DeleteIntegrationConnectionConflictResponseSchema,
