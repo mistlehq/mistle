@@ -5,6 +5,7 @@
     "paths": {
       "@mistle/config": ["../../packages/config/src/index.ts"],
       "@mistle/db/control-plane": ["../../packages/db/src/control-plane/index.ts"],
+      "@mistle/db/data-plane": ["../../packages/db/src/data-plane/index.ts"],
       "@mistle/http/*.js": ["../../packages/http/src/*.ts"],
       "@mistle/integrations-definitions/server": [
         "../../packages/integrations-definitions/src/server.ts"
@@ -14,6 +15,9 @@
       "@mistle/time": ["../../packages/time/src/index.ts"],
       "@mistle/workflow-registry/control-plane": [
         "../../packages/workflow-registry/src/control-plane.ts"
+      ],
+      "@mistle/workflow-registry/data-plane": [
+        "../../packages/workflow-registry/src/data-plane.ts"
       ],
       "@mistle/*": ["../../packages/*/src/index.ts"]
     }
