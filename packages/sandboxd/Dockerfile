@@ -98,7 +98,7 @@ COPY packages/sandboxd /app/packages/sandboxd
 
 RUN cargo build --locked --bin sandboxd
 
-FROM sandbox-base-common AS sandbox-base
+FROM sandbox-base-common AS sandbox-base-tooling
 
 # The final sandbox image only carries the compiled supervisor binary and the
 # shared Linux tooling the sandbox session expects at runtime.
@@ -174,6 +174,8 @@ RUN mkdir -p /var/empty \
 COPY --from=nix /nix /nix
 COPY --from=nix /root/.nix-profile /root/.nix-profile
 COPY --from=nix /etc/nix /etc/nix
+
+FROM sandbox-base-tooling AS sandbox-base
 
 COPY --from=sandboxd-build /app/packages/sandboxd/target/release/sandboxd /opt/mistle/bin/sandboxd
 
