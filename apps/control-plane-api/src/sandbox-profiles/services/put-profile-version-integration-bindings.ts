@@ -42,8 +42,62 @@ type PutProfileVersionIntegrationBindingsResult = {
 const Definitions = createDefinitionsBundle();
 const IntegrationRegistry = Definitions.integrationRegistry;
 
+type ValidatedIntegrationBinding = {
+  id?: string;
+  clientRef?: string;
+  bindingIdOrDraftIndex: string;
+  kind: IntegrationBindingKind;
+  bindingConfig: Record<string, unknown>;
+  connectionId: string;
+  definition: ReturnType<typeof IntegrationRegistry.getDefinitionOrThrow>;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((leftItem, index) => jsonValuesEqual(leftItem, right[index]));
+  }
+
+  if (!isRecord(left) || !isRecord(right)) {
+    return false;
+  }
+
+  const leftKeys = Object.keys(left).sort();
+  const rightKeys = Object.keys(right).sort();
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((leftKey, index) => {
+    const rightKey = rightKeys[index];
+    return rightKey === leftKey && jsonValuesEqual(left[leftKey], right[rightKey]);
+  });
+}
+
+function integrationBindingValuesChanged(input: {
+  existingBinding: SandboxProfileVersionIntegrationBinding;
+  binding: ValidatedIntegrationBinding;
+}): boolean {
+  return (
+    input.existingBinding.connectionId !== input.binding.connectionId ||
+    input.existingBinding.kind !== input.binding.kind ||
+    !jsonValuesEqual(input.existingBinding.config, input.binding.bindingConfig)
+  );
+}
+
 function toRecord(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error("Expected parsed binding config to be an object.");
   }
 
@@ -250,15 +304,7 @@ export async function putProfileVersionIntegrationBindings(
     }
   }
 
-  const validatedBindings: Array<{
-    id?: string;
-    clientRef?: string;
-    bindingIdOrDraftIndex: string;
-    kind: IntegrationBindingKind;
-    bindingConfig: Record<string, unknown>;
-    connectionId: string;
-    definition: ReturnType<typeof IntegrationRegistry.getDefinitionOrThrow>;
-  }> = [];
+  const validatedBindings: ValidatedIntegrationBinding[] = [];
 
   for (const [bindingIndex, binding] of input.bindings.entries()) {
     const resolvedConnection = availableConnectionsById.get(binding.connectionId);
@@ -443,6 +489,18 @@ export async function putProfileVersionIntegrationBindings(
 
     for (const binding of validatedBindings) {
       if (binding.id === undefined) {
+        continue;
+      }
+
+      const existingBinding = existingBindingsById.get(binding.id);
+      if (existingBinding === undefined) {
+        throw new SandboxProfilesIntegrationBindingsBadRequestError(
+          SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
+          `Binding '${binding.id}' does not exist on sandbox profile version '${input.profileVersion}'.`,
+        );
+      }
+
+      if (!integrationBindingValuesChanged({ existingBinding, binding })) {
         continue;
       }
 

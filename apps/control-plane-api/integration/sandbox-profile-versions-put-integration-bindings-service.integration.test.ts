@@ -189,6 +189,208 @@ describe("sandbox profile version put integration bindings service integration",
     expect(deletedBinding).toBeUndefined();
   });
 
+  it("updates only existing bindings whose persisted values changed", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email:
+        "integration-sandbox-profile-version-put-bindings-service-selective-update@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "openai-default-put-bindings-selective-update",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            binding_capabilities_by_connection_method:
+              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
+          },
+        },
+        {
+          targetKey: "jira-default-put-bindings-selective-update",
+          familyId: "jira",
+          variantId: "jira-default",
+          enabled: true,
+          config: {},
+        },
+      ])
+      .onConflictDoNothing();
+
+    const [firstOpenAiConnection, secondOpenAiConnection, jiraConnection] = await fixture.db
+      .insert(integrationConnections)
+      .values([
+        {
+          id: "icn_put_bindings_selective_openai_001",
+          organizationId: authenticatedSession.organizationId,
+          targetKey: "openai-default-put-bindings-selective-update",
+          displayName: "Selective OpenAI Connection A",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        {
+          id: "icn_put_bindings_selective_openai_002",
+          organizationId: authenticatedSession.organizationId,
+          targetKey: "openai-default-put-bindings-selective-update",
+          displayName: "Selective OpenAI Connection B",
+          config: {
+            connection_method: "api-key",
+          },
+        },
+        {
+          id: "icn_put_bindings_selective_jira_001",
+          organizationId: authenticatedSession.organizationId,
+          targetKey: "jira-default-put-bindings-selective-update",
+          displayName: "Selective Jira Connection",
+          config: {
+            connection_method: "jira-personal-api-token",
+            site_url: "https://mistle.atlassian.net",
+            email: "user@example.com",
+          },
+        },
+      ])
+      .returning();
+
+    if (
+      firstOpenAiConnection === undefined ||
+      secondOpenAiConnection === undefined ||
+      jiraConnection === undefined
+    ) {
+      throw new Error("Expected integration connections to be inserted.");
+    }
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_selective_update_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "PUT Bindings Selective Update Profile",
+      status: IntegrationConnectionStatuses.ACTIVE,
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_selective_update_001",
+      state: SandboxProfileVersionStates.DRAFT,
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_put_bindings_selective_agent_001",
+        sandboxProfileId: "sbp_put_bindings_selective_update_001",
+        sandboxProfileVersion: 1,
+        connectionId: firstOpenAiConnection.id,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+        },
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "ibd_put_bindings_selective_connector_001",
+        sandboxProfileId: "sbp_put_bindings_selective_update_001",
+        sandboxProfileVersion: 1,
+        connectionId: jiraConnection.id,
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          tools: [],
+        },
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    const unchangedResult = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_selective_update_001",
+        profileVersion: 1,
+        bindings: [
+          {
+            id: "ibd_put_bindings_selective_agent_001",
+            connectionId: firstOpenAiConnection.id,
+            kind: IntegrationBindingKinds.AGENT,
+            config: {
+              runtime: {
+                config: {},
+                runtimeId: "codex",
+              },
+            },
+          },
+          {
+            id: "ibd_put_bindings_selective_connector_001",
+            connectionId: jiraConnection.id,
+            kind: IntegrationBindingKinds.CONNECTOR,
+            config: {},
+          },
+        ],
+      },
+    );
+
+    expect(unchangedResult.bindings).toHaveLength(2);
+
+    const unchangedAgentBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_selective_agent_001"),
+      });
+    const unchangedConnectorBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_selective_connector_001"),
+      });
+
+    expect(unchangedAgentBinding?.updatedAt).toBe("2026-01-01 00:00:00+00");
+    expect(unchangedConnectorBinding?.updatedAt).toBe("2026-01-02 00:00:00+00");
+
+    const changedResult = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_selective_update_001",
+        profileVersion: 1,
+        bindings: [
+          {
+            id: "ibd_put_bindings_selective_agent_001",
+            connectionId: secondOpenAiConnection.id,
+            kind: IntegrationBindingKinds.AGENT,
+            config: {
+              runtime: {
+                runtimeId: "codex",
+                config: {},
+              },
+            },
+          },
+          {
+            id: "ibd_put_bindings_selective_connector_001",
+            connectionId: jiraConnection.id,
+            kind: IntegrationBindingKinds.CONNECTOR,
+            config: {},
+          },
+        ],
+      },
+    );
+
+    expect(changedResult.bindings).toHaveLength(2);
+
+    const changedAgentBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_selective_agent_001"),
+      });
+    const stillUnchangedConnectorBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_selective_connector_001"),
+      });
+
+    expect(changedAgentBinding?.connectionId).toBe(secondOpenAiConnection.id);
+    expect(changedAgentBinding?.updatedAt).not.toBe("2026-01-01 00:00:00+00");
+    expect(stillUnchangedConnectorBinding?.updatedAt).toBe("2026-01-02 00:00:00+00");
+  });
+
   it("throws not found when sandbox profile is missing", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-version-put-bindings-missing-profile@example.com",
