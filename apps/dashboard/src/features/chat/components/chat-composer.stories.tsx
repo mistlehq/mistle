@@ -5,7 +5,7 @@ import { expect, userEvent, within } from "storybook/test";
 import {
   SessionComposerFixtureProps,
   SessionComposerFixturePropsWithPendingDiffComments,
-  SessionComposerFixturePropsWithPendingImageAttachments,
+  SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionModelOptions,
 } from "../../session-agents/codex/fixtures/session-fixtures.js";
 import { ChatComposer } from "./chat-composer.js";
@@ -81,7 +81,7 @@ function InteractiveChatComposerStory(
       composerText={composerText}
       onComposerTextChange={setComposerText}
       onModelChange={setSelectedModel}
-      onPendingImageFilesAdded={(files) => {
+      onPendingFilesAdded={(files) => {
         setPendingAttachments((currentAttachments) => [
           ...currentAttachments,
           ...files.map((file, index) => ({
@@ -210,9 +210,9 @@ export const InterruptOnly: Story = {
   },
 };
 
-export const WithPendingImageAttachments: Story = {
+export const WithPendingAttachments: Story = {
   args: {
-    ...SessionComposerFixturePropsWithPendingImageAttachments,
+    ...SessionComposerFixturePropsWithPendingAttachments,
   },
 };
 

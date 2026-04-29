@@ -46,7 +46,7 @@ function createImageFile(): File {
 }
 
 function RenderedComposerPaneHarness(input: {
-  uploadImage: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
+  uploadFile: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
 }): React.JSX.Element {
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const transport = useMemo(
@@ -72,7 +72,7 @@ function RenderedComposerPaneHarness(input: {
       // for the rendered composer pane path yet. Cleanup owner: Codex. Cleanup date: 2026-04-10.
       createUploadStreamClient: () => {
         return {
-          uploadImage: input.uploadImage,
+          uploadFile: input.uploadFile,
         };
       },
     },
@@ -440,7 +440,7 @@ describe("SessionConversationBottomPanel", () => {
   it("shows upload failures in the rendered pane and keeps pending attachments visible", async () => {
     const { container } = render(
       <RenderedComposerPaneHarness
-        uploadImage={async () => {
+        uploadFile={async () => {
           throw new Error("That image file could not be validated.");
         }}
       />,
@@ -469,7 +469,7 @@ describe("SessionConversationBottomPanel", () => {
     let uploadAttemptCount = 0;
     const { container } = render(
       <RenderedComposerPaneHarness
-        uploadImage={async () => {
+        uploadFile={async () => {
           uploadAttemptCount += 1;
           if (uploadAttemptCount === 1) {
             throw new Error("That image file could not be validated.");

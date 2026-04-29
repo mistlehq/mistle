@@ -29,7 +29,7 @@ function createBaseComposerProps(): React.ComponentProps<typeof ChatComposer> {
     onSubmit: () => {},
     onModelChange: () => {},
     onReasoningEffortChange: () => {},
-    onPendingImageFilesAdded: () => {},
+    onPendingFilesAdded: () => {},
     onClearPendingDiffComments: () => {},
     onRemovePendingAttachment: () => {},
   };
@@ -104,10 +104,11 @@ describe("ChatComposer", () => {
     );
   });
 
-  it("renders the image attachment button with icon-only visible copy", () => {
-    render(<ChatComposer {...createBaseComposerProps()} />);
+  it("renders the file attachment button with icon-only visible copy", () => {
+    const { container } = render(<ChatComposer {...createBaseComposerProps()} />);
 
-    expect(screen.getByRole("button", { name: "Add images" }).textContent).toBe("");
+    expect(screen.getByRole("button", { name: "Add files" }).textContent).toBe("");
+    expect(container.querySelector('input[type="file"]')?.getAttribute("accept")).toBeNull();
   });
 
   it("renders safely when model and reasoning selections are unset", () => {
@@ -129,7 +130,7 @@ describe("ChatComposer", () => {
     expect(screen.getByRole("combobox", { name: "Model switcher" })).toBeTruthy();
   });
 
-  it("renders pending image attachments and upload progress", () => {
+  it("renders pending attachments and upload progress", () => {
     const baseProps = createBaseComposerProps();
     render(
       <ChatComposer
@@ -204,13 +205,13 @@ describe("ChatComposer", () => {
     expect(screen.getByText("Context 82% left")).toBeTruthy();
   });
 
-  it("accepts dropped image files on the git branch footer row", () => {
+  it("accepts dropped files on the git branch footer row", () => {
     const droppedFiles: File[][] = [];
     render(
       <ChatComposer
         {...createBaseComposerProps()}
         gitBranchLabel="feature/show-branch"
-        onPendingImageFilesAdded={(files) => {
+        onPendingFilesAdded={(files) => {
           droppedFiles.push([...files]);
         }}
       />,

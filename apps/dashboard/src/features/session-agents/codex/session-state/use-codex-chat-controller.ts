@@ -1,6 +1,7 @@
 import {
   buildCodexTurnInputItems,
   interruptCodexTurn,
+  normalizeCodexLocalImageAttachment,
   startCodexTurn,
   steerCodexTurn,
   type CodexTurnInputLocalImageItem,
@@ -9,6 +10,7 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useReducer, useRef, useState, type RefObject } from "react";
 
+import type { ChatAttachment } from "../../../chat/chat-types.js";
 import {
   createInitialCodexChatState,
   reduceCodexChatState,
@@ -32,18 +34,20 @@ function buildTurnRequest(input: {
   submittedPrompt: string;
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
-  displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments?: readonly ChatAttachment[];
 }): {
   submittedPrompt: string;
   transcriptPrompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly ChatAttachment[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
 } {
   const submittedPrompt = input.submittedPrompt.trim();
   const transcriptPrompt = (input.transcriptPrompt ?? input.submittedPrompt).trim();
   const submittedAttachments = input.submittedAttachments ?? [];
-  const displayAttachments = input.displayAttachments ?? submittedAttachments;
+  const displayAttachments =
+    input.displayAttachments ??
+    submittedAttachments.map((attachment) => normalizeCodexLocalImageAttachment(attachment));
 
   return {
     submittedPrompt,
@@ -157,7 +161,7 @@ export function useCodexChatController(input: {
       submittedPrompt: string;
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
       transcriptPrompt?: string;
-      displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+      displayAttachments?: readonly ChatAttachment[];
     }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
@@ -333,7 +337,7 @@ export function useCodexChatController(input: {
         submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
         transcriptPrompt?: string;
-        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly ChatAttachment[];
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },
@@ -376,7 +380,7 @@ export function useCodexChatController(input: {
         submittedPrompt: string;
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
         transcriptPrompt?: string;
-        displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+        displayAttachments?: readonly ChatAttachment[];
       }): Promise<void> => {
         const rpcClient = input.rpcClientRef.current;
         const threadId = input.threadIdRef.current;

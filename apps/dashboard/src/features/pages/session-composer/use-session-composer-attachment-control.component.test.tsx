@@ -26,6 +26,16 @@ const UploadedImageFixture: UploadedSandboxFile = {
   path: "/root/.local/attachments/thread_123/upload.png",
 };
 
+const UploadedFileFixture: UploadedSandboxFile = {
+  attachmentId: "att_file",
+  kind: "file",
+  threadId: "thread_123",
+  originalFilename: "requirements.pdf",
+  mimeType: "application/pdf",
+  sizeBytes: 8,
+  path: "/root/.local/attachments/thread_123/requirements.pdf",
+};
+
 const PrepareAttachmentInput = {
   prompt: "inspect this",
   supportsImageInspection: true,
@@ -50,12 +60,12 @@ function createDeferredPromise<T>() {
 }
 
 function createDependencies(input: {
-  uploadImage: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
+  uploadFile: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
 }): SessionComposerAttachmentControlDependencies {
   return {
     createUploadStreamClient: () => {
       return {
-        uploadImage: input.uploadImage,
+        uploadFile: input.uploadFile,
       };
     },
   };
@@ -102,7 +112,7 @@ describe("useSessionComposerAttachmentControl", () => {
     const deferredUpload = createDeferredPromise<typeof UploadedImageFixture>();
     const { result } = renderAttachmentControl({
       dependencies: createDependencies({
-        uploadImage: async () => {
+        uploadFile: async () => {
           return await deferredUpload.promise;
         },
       }),
@@ -130,7 +140,7 @@ describe("useSessionComposerAttachmentControl", () => {
     let attemptCount = 0;
     const { result } = renderAttachmentControl({
       dependencies: createDependencies({
-        uploadImage: async () => {
+        uploadFile: async () => {
           attemptCount += 1;
           if (attemptCount === 1) {
             throw new FileUploadRejectedError({
@@ -158,11 +168,39 @@ describe("useSessionComposerAttachmentControl", () => {
       ],
       displayAttachments: [
         {
-          type: "localImage",
+          kind: "image",
+          name: UploadedImageFixture.originalFilename,
           path: UploadedImageFixture.path,
         },
       ],
     });
     expect(result.current.isUploadingAttachments).toBe(false);
+  });
+
+  it("keeps generic files in prompt text and display attachments only", async () => {
+    const { result } = renderAttachmentControl({
+      dependencies: createDependencies({
+        uploadFile: async () => {
+          return UploadedFileFixture;
+        },
+      }),
+    });
+
+    await expect(prepareSingleAttachment(result.current)).resolves.toEqual({
+      prompt: [
+        PrepareAttachmentInput.prompt,
+        "",
+        "Attached files:",
+        "- requirements.pdf: /root/.local/attachments/thread_123/requirements.pdf",
+      ].join("\n"),
+      submittedAttachments: [],
+      displayAttachments: [
+        {
+          kind: "file",
+          name: UploadedFileFixture.originalFilename,
+          path: UploadedFileFixture.path,
+        },
+      ],
+    });
   });
 });

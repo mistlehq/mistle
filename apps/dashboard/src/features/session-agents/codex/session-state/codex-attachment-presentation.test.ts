@@ -112,8 +112,14 @@ describe("codex-attachment-presentation", () => {
       ],
       displayAttachments: [
         {
-          type: "localImage",
+          kind: "image",
+          name: UploadedImageAttachment.originalFilename,
           path: UploadedImageAttachment.path,
+        },
+        {
+          kind: "file",
+          name: UploadedFileAttachment.originalFilename,
+          path: UploadedFileAttachment.path,
         },
       ],
     });
@@ -139,8 +145,14 @@ describe("codex-attachment-presentation", () => {
       submittedAttachments: [],
       displayAttachments: [
         {
-          type: "localImage",
+          kind: "image",
+          name: UploadedImageAttachment.originalFilename,
           path: UploadedImageAttachment.path,
+        },
+        {
+          kind: "file",
+          name: UploadedFileAttachment.originalFilename,
+          path: UploadedFileAttachment.path,
         },
       ],
     });
@@ -195,7 +207,13 @@ describe("codex-attachment-presentation", () => {
         "- /root/.local/attachments/thread_123/image-1.png",
       ].join("\n"),
       submittedAttachments: [],
-      displayAttachments: uploadedAttachments,
+      displayAttachments: [
+        {
+          kind: "image",
+          name: "image-1.png",
+          path: "/root/.local/attachments/thread_123/image-1.png",
+        },
+      ],
     });
   });
 });

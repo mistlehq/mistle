@@ -1,3 +1,15 @@
+export type ChatAttachment =
+  | {
+      kind: "image";
+      path: string;
+      name: string;
+    }
+  | {
+      kind: "file";
+      path: string;
+      name: string;
+    };
+
 export type ChatUserEntry = {
   id: string;
   turnId: string;
@@ -8,11 +20,7 @@ export type ChatUserEntry = {
     actionId: string;
   };
   text: string;
-  attachments?: readonly {
-    kind: "image";
-    path: string;
-    name: string;
-  }[];
+  attachments?: readonly ChatAttachment[];
   status: "completed";
 };
 

@@ -31,8 +31,9 @@ describe("reduceCodexChatState", () => {
       prompt: "Reply with exactly PHASE_2_OK.",
       attachments: [
         {
-          type: "localImage",
+          kind: "image",
           path: "/root/.local/attachments/thread_123/screenshot.png",
+          name: "screenshot.png",
         },
       ],
     });
@@ -51,6 +52,39 @@ describe("reduceCodexChatState", () => {
             kind: "image",
             path: "/root/.local/attachments/thread_123/screenshot.png",
             name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
+  });
+
+  it("keeps file display attachments when a turn is accepted by the runtime", () => {
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "turn_started",
+      turnId: "turn_123",
+      status: "inProgress",
+      prompt: "Review the attached file.",
+      attachments: [
+        {
+          kind: "file",
+          path: "/root/.local/attachments/thread_123/requirements.pdf",
+          name: "requirements.pdf",
+        },
+      ],
+    });
+
+    expect(state.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Review the attached file.",
+        attachments: [
+          {
+            kind: "file",
+            path: "/root/.local/attachments/thread_123/requirements.pdf",
+            name: "requirements.pdf",
           },
         ],
         status: "completed",
@@ -78,8 +112,9 @@ describe("reduceCodexChatState", () => {
       prompt: "Reply with exactly PHASE_2_OK.",
       attachments: [
         {
-          type: "localImage",
+          kind: "image",
           path: "/root/.local/attachments/thread_123/screenshot.png",
+          name: "screenshot.png",
         },
       ],
     });

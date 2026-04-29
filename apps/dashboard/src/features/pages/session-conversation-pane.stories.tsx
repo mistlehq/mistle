@@ -11,8 +11,8 @@ import {
   SessionComposerFixturePropsForNonImageCapableModel,
   SessionComposerFixtureStatusMessageForLoadingModel,
   SessionComposerFixtureStatusMessageForNonImageCapableModel,
-  SessionComposerFixturePropsUploadingImageAttachments,
-  SessionComposerFixturePropsWithPendingImageAttachments,
+  SessionComposerFixturePropsUploadingAttachments,
+  SessionComposerFixturePropsWithPendingAttachments,
   CodexFixtureSessionEntriesWithExploringGroup,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
@@ -98,15 +98,15 @@ export const WithStructuredPlan: Story = {
   },
 };
 
-export const WithPendingImageAttachments: Story = {
+export const WithPendingAttachments: Story = {
   args: {
-    composerViewModel: SessionComposerFixturePropsWithPendingImageAttachments,
+    composerViewModel: SessionComposerFixturePropsWithPendingAttachments,
   },
 };
 
-export const UploadingImageAttachments: Story = {
+export const UploadingAttachments: Story = {
   args: {
-    composerViewModel: SessionComposerFixturePropsUploadingImageAttachments,
+    composerViewModel: SessionComposerFixturePropsUploadingAttachments,
     statusMessage: {
       message: "Uploading attachments...",
       variant: "default",

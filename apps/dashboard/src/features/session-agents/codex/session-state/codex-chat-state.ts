@@ -1,5 +1,4 @@
 import type {
-  CodexTurnInputLocalImageItem,
   CodexJsonRpcNotification,
   CodexThreadReadTurn,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -14,6 +13,7 @@ import { z } from "zod";
 
 import type {
   ChatAssistantEntry,
+  ChatAttachment,
   ChatCommandEntry,
   ChatEntry,
   ChatFileChangeEntry,
@@ -145,14 +145,14 @@ export type CodexChatAction =
       turnId: string;
       status: string;
       prompt: string;
-      attachments?: readonly CodexTurnInputLocalImageItem[];
+      attachments?: readonly ChatAttachment[];
     }
   | {
       type: "steer_turn_requested";
       entryId: string;
       turnId: string;
       prompt: string;
-      attachments?: readonly CodexTurnInputLocalImageItem[];
+      attachments?: readonly ChatAttachment[];
     }
   | {
       type: "steer_turn_processed";
@@ -1072,12 +1072,6 @@ function buildUserEntry(
   };
 }
 
-function buildChatUserAttachments(
-  attachments: readonly CodexTurnInputLocalImageItem[] | undefined,
-): NonNullable<ChatUserEntry["attachments"]> {
-  return (attachments ?? []).map((attachment) => normalizeCodexLocalImageAttachment(attachment));
-}
-
 function clearEntrySteerPresentation(entry: ChatUserEntry): ChatUserEntry {
   const { label: _label, labelAction: _labelAction, ...nextEntry } = entry;
   return nextEntry;
@@ -1361,11 +1355,7 @@ export function reduceCodexChatState(
       completedStatus: null,
       completedErrorMessage: null,
       planSnapshot: existingTurn.planSnapshot,
-      userEntry: buildUserEntry(
-        action.turnId,
-        action.prompt,
-        buildChatUserAttachments(action.attachments),
-      ),
+      userEntry: buildUserEntry(action.turnId, action.prompt, action.attachments ?? []),
       clientSteerEntries: existingTurn.clientSteerEntries,
       itemOrder: existingTurn.itemOrder,
       rawItemsById: existingTurn.rawItemsById,
@@ -1401,7 +1391,7 @@ export function reduceCodexChatState(
               entry: buildUserEntry(
                 action.turnId,
                 action.prompt,
-                buildChatUserAttachments(action.attachments),
+                action.attachments ?? [],
                 action.entryId,
                 {
                   label: "Steer",

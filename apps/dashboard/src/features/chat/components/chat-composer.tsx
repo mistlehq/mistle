@@ -112,7 +112,7 @@ export type ChatComposerViewModel = {
   onSecondarySubmit?: () => void;
   onModelChange: (value: string) => void;
   onReasoningEffortChange: (value: string) => void;
-  onPendingImageFilesAdded: (files: readonly File[]) => void;
+  onPendingFilesAdded: (files: readonly File[]) => void;
   onClearPendingDiffComments: () => void;
   onRemovePendingAttachment: (attachmentId: string) => void;
 };
@@ -141,7 +141,7 @@ export function ChatComposer({
   onSecondarySubmit,
   onModelChange,
   onReasoningEffortChange,
-  onPendingImageFilesAdded,
+  onPendingFilesAdded,
   onClearPendingDiffComments,
   onRemovePendingAttachment,
 }: ChatComposerViewModel): React.JSX.Element {
@@ -173,7 +173,7 @@ export function ChatComposer({
       return;
     }
 
-    onPendingImageFilesAdded(files);
+    onPendingFilesAdded(files);
   }
 
   return (
@@ -189,7 +189,6 @@ export function ChatComposer({
     >
       <div className="bg-card flex flex-col gap-3 rounded-md border p-1.5 shadow-xs">
         <input
-          accept="image/*"
           className="hidden"
           multiple
           onChange={(event) => {
@@ -285,7 +284,7 @@ export function ChatComposer({
         <div className="flex items-center gap-2">
           <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_minmax(0,1fr)] items-center gap-1.5 md:flex md:flex-wrap md:items-center md:gap-2">
             <Button
-              aria-label="Add images"
+              aria-label="Add files"
               className="text-muted-foreground h-8 min-w-0 rounded-md px-1.5 hover:bg-muted/60"
               disabled={!canUploadAttachments || isUploadingAttachments}
               onClick={() => {

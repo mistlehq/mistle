@@ -20,6 +20,7 @@ import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useMemo, useReducer, useRef, useState, type RefObject } from "react";
 
+import type { ChatAttachment } from "../../../chat/chat-types.js";
 import {
   createInitialCodexApprovalRequestsState,
   reduceCodexApprovalRequestsState,
@@ -99,7 +100,7 @@ type CodexSessionChatState = {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
   interruptTurn: () => void;
   dismissUserMessageAction: (actionId: string) => void;
@@ -107,7 +108,7 @@ type CodexSessionChatState = {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
   reloadChat: () => void;
 };

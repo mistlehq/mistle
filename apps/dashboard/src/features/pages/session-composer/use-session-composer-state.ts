@@ -1,6 +1,7 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ChatAttachment } from "../../chat/chat-types.js";
 import type { ChatComposerViewModel } from "../../chat/components/chat-composer.js";
 import type { CodexContextUsageViewModel } from "../../session-agents/codex/session-state/codex-context-usage.js";
 import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
@@ -42,11 +43,7 @@ type QueuedComposerPrompt = {
 export type QueuedComposerPromptViewModel = {
   id: string;
   text: string;
-  attachments: readonly {
-    kind: "image";
-    name: string;
-    path: string;
-  }[];
+  attachments: readonly ChatAttachment[];
   isRemovable: boolean;
 };
 
@@ -62,13 +59,13 @@ export type SessionTurnControl = {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
   steerTurn: (input: {
     submittedPrompt: string;
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
-    displayAttachments?: readonly CodexTurnInputLocalImageItem[];
+    displayAttachments?: readonly ChatAttachment[];
   }) => Promise<void>;
   interruptTurn: () => void;
 };
@@ -551,7 +548,7 @@ export function useSessionComposerState(input: {
             ? queuedPrompt.prompt
             : buildPendingSessionDiffCommentSummaryLabel(queuedPrompt.pendingDiffComments.length),
         attachments: queuedPrompt.attachments.map((attachment) => ({
-          kind: "image" as const,
+          kind: "file" as const,
           name: attachment.name,
           path: attachment.id,
         })),
@@ -640,7 +637,7 @@ export function useSessionComposerState(input: {
       onSecondarySubmit: queuePrompt,
       onModelChange: handleModelChange,
       onReasoningEffortChange: handleReasoningEffortChange,
-      onPendingImageFilesAdded: addPendingComposerFiles,
+      onPendingFilesAdded: addPendingComposerFiles,
       onRemovePendingAttachment: removePendingComposerAttachment,
       onClearPendingDiffComments: draftState.clearPendingDiffComments,
     },

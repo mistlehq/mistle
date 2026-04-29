@@ -1,5 +1,7 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 
+import type { ChatAttachment } from "../../../chat/chat-types.js";
+
 export const AttachedImagesHeader = "Attached images:";
 export const AttachedFilesHeader = "Attached files:";
 
@@ -130,6 +132,22 @@ function toLocalImageAttachments(
   });
 }
 
+function toDisplayAttachment(attachment: UploadedComposerAttachment): ChatAttachment {
+  return {
+    kind: attachment.kind,
+    path: attachment.path,
+    name: attachment.originalFilename,
+  };
+}
+
+function toImageDisplayAttachment(attachment: CodexTurnInputLocalImageItem): ChatAttachment {
+  return {
+    kind: "image",
+    path: attachment.path,
+    name: attachment.path.split("/").at(-1) ?? attachment.path,
+  };
+}
+
 export function buildMixedAttachmentTurnPrompt(input: {
   prompt: string;
   uploadedAttachments: readonly UploadedComposerAttachment[];
@@ -151,7 +169,7 @@ export function resolveMixedAttachmentTurnRepresentation(input: {
 }): {
   prompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly ChatAttachment[];
 } {
   const imageAttachments = toLocalImageAttachments(input.uploadedAttachments);
 
@@ -162,7 +180,9 @@ export function resolveMixedAttachmentTurnRepresentation(input: {
       supportsImageInspection: input.supportsImageInspection,
     }),
     submittedAttachments: input.supportsImageInspection ? imageAttachments : [],
-    displayAttachments: imageAttachments,
+    displayAttachments: input.uploadedAttachments.map((attachment) =>
+      toDisplayAttachment(attachment),
+    ),
   };
 }
 
@@ -189,7 +209,7 @@ export function resolveTurnRepresentation(input: {
 }): {
   prompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly ChatAttachment[];
 } {
   return {
     prompt: buildTurnPrompt({
@@ -198,6 +218,8 @@ export function resolveTurnRepresentation(input: {
       supportsImageInspection: input.supportsImageInspection,
     }),
     submittedAttachments: input.supportsImageInspection ? input.uploadedAttachments : [],
-    displayAttachments: input.uploadedAttachments,
+    displayAttachments: input.uploadedAttachments.map((attachment) =>
+      toImageDisplayAttachment(attachment),
+    ),
   };
 }

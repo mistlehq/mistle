@@ -1,14 +1,11 @@
 import { Button } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
+import type { ChatAttachment } from "../chat-types.js";
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
 type ChatUserMessageProps = {
-  attachments?: readonly {
-    kind: "image";
-    path: string;
-    name: string;
-  }[];
+  attachments?: readonly ChatAttachment[];
   label?: string;
   labelAction?: {
     ariaLabel: string;
@@ -50,7 +47,7 @@ export function ChatUserMessage(props: ChatUserMessageProps): React.JSX.Element 
                 className="bg-background/70 rounded-full px-2.5 py-1 text-xs"
                 key={attachment.path}
               >
-                Image attached: {attachment.name}
+                {attachment.kind === "image" ? "Image" : "File"} attached: {attachment.name}
               </div>
             ))}
           </div>

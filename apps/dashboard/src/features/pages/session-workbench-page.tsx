@@ -542,7 +542,7 @@ function createEmptyComposerViewModel(): ChatComposerViewModel {
     onSecondarySubmit: function onSecondarySubmit() {},
     onModelChange: function onModelChange() {},
     onReasoningEffortChange: function onReasoningEffortChange() {},
-    onPendingImageFilesAdded: function onPendingImageFilesAdded() {},
+    onPendingFilesAdded: function onPendingFilesAdded() {},
     onClearPendingDiffComments: function onClearPendingDiffComments() {},
     onRemovePendingAttachment: function onRemovePendingAttachment() {},
   };

@@ -1,14 +1,19 @@
 import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { UploadStreamClient, type SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import {
+  UploadStreamClient,
+  type SandboxSessionTransport,
+  type UploadedSandboxFile,
+} from "@mistle/sandbox-session-client";
 import { useCallback, useState } from "react";
 
-import { resolveTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
+import type { ChatAttachment } from "../../chat/chat-types.js";
+import { resolveMixedAttachmentTurnRepresentation } from "../../session-agents/codex/session-state/codex-attachment-presentation.js";
 import { resolveUploadErrorMessage } from "./session-composer-upload-errors.js";
 
 export type PreparedComposerAttachments = {
   prompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
-  displayAttachments: readonly CodexTurnInputLocalImageItem[];
+  displayAttachments: readonly ChatAttachment[];
 };
 
 export type SessionComposerAttachmentControl = {
@@ -24,7 +29,7 @@ export type SessionComposerAttachmentControl = {
 export type SessionComposerAttachmentControlDependencies = {
   createUploadStreamClient: (
     transport: SandboxSessionTransport,
-  ) => Pick<UploadStreamClient, "uploadImage">;
+  ) => Pick<UploadStreamClient, "uploadFile">;
 };
 
 const DefaultSessionComposerAttachmentControlDependencies: SessionComposerAttachmentControlDependencies =
@@ -53,16 +58,15 @@ export function useSessionComposerAttachmentControl(input: {
       supportsImageInspection: boolean;
     }): Promise<PreparedComposerAttachments> => {
       if (prepareInput.files.length === 0) {
-        return resolveTurnRepresentation({
+        return resolveMixedAttachmentTurnRepresentation({
           prompt: prepareInput.prompt,
-          attachmentPaths: [],
           uploadedAttachments: [],
           supportsImageInspection: prepareInput.supportsImageInspection,
         });
       }
 
       if (input.attachmentTarget === null) {
-        throw new Error("Connect to a sandbox session before uploading images.");
+        throw new Error("Connect to a sandbox session before uploading files.");
       }
 
       setIsUploadingAttachments(true);
@@ -71,27 +75,21 @@ export function useSessionComposerAttachmentControl(input: {
           sandboxInstanceId: input.attachmentTarget.sandboxInstanceId,
         });
         const uploadClient = dependencies.createUploadStreamClient(transportConnection.transport);
-        const uploadedImages = [];
+        const uploadedAttachments: UploadedSandboxFile[] = [];
         // Uploads are intentionally serialized in the supported composer flow.
         // Parallel attachment uploads are not part of the current product contract.
         for (const attachment of prepareInput.files) {
-          uploadedImages.push(
-            await uploadClient.uploadImage({
+          uploadedAttachments.push(
+            await uploadClient.uploadFile({
               threadId: input.attachmentTarget.threadId,
               file: attachment,
             }),
           );
         }
 
-        return resolveTurnRepresentation({
+        return resolveMixedAttachmentTurnRepresentation({
           prompt: prepareInput.prompt,
-          attachmentPaths: uploadedImages.map((image) => image.path),
-          uploadedAttachments: uploadedImages.map(
-            (image): CodexTurnInputLocalImageItem => ({
-              type: "localImage",
-              path: image.path,
-            }),
-          ),
+          uploadedAttachments,
           supportsImageInspection: prepareInput.supportsImageInspection,
         });
       } catch (error) {
