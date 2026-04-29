@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@opentelemetry/context-async-hooks": "^2.6.1",
+    "@opentelemetry/context-async-hooks": "^2.7.0",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.18.1"
   }

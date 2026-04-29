@@ -37,7 +37,7 @@ importers:
         version: 19.2.3(@types/react@19.2.14)
       '@typescript/native-preview':
         specifier: latest
-        version: 7.0.0-dev.20260425.1
+        version: 7.0.0-dev.20260426.1
       knip:
         specifier: ^5.88.0
         version: 5.88.0(@types/node@25.5.0)(typescript@5.9.3)
@@ -254,8 +254,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.6.1
-        version: 2.6.1(@opentelemetry/api@1.9.1)
+        specifier: ^2.7.0
+        version: 2.7.0(@opentelemetry/api@1.9.1)
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
@@ -1083,8 +1083,8 @@ importers:
         version: 2.7.0(@opentelemetry/api@1.9.1)
     devDependencies:
       '@opentelemetry/context-async-hooks':
-        specifier: ^2.6.1
-        version: 2.6.1(@opentelemetry/api@1.9.1)
+        specifier: ^2.7.0
+        version: 2.7.0(@opentelemetry/api@1.9.1)
 
   packages/test-harness:
     dependencies:
@@ -3566,12 +3566,6 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
-
-  '@opentelemetry/context-async-hooks@2.6.1':
-    resolution: {integrity: sha512-XHzhwRNkBpeP8Fs/qjGrAf9r9PRv67wkJQ/7ZPaBQQ68DYlTBBx5MF9LvPx7mhuXcDessKK2b+DcxqwpgkcivQ==}
-    engines: {node: ^18.19.0 || >=20.6.0}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
   '@opentelemetry/context-async-hooks@2.7.0':
     resolution: {integrity: sha512-MWXggArM+Y11mPS8VOrqxOj+YMGQSRuvhM91eSBX4xFpJa05mpkeVvM8pPux5ElkEjV5RMgrkisrlP/R83SpBQ==}
@@ -6487,50 +6481,50 @@ packages:
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-vM7O+PlxHRUT4Dv0VkxEmU3N2uyWeSFrhu57O7s3SE9TX1ENljwQlCFG0oQdBGLBRo+SZSoedxKL5jOGlD1eiw==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-HzGvERpIFO7p6pMljPN1fIOHqAv2oMeVIqYLSt27TKILkTRpe7fANW3R2OAM+/A+pLtYNNXGDbKl/wR+DHz9KA==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-EiikklZSuEvMhZEeN0VRb0vmedhLgtKwz5p4Oz9e8hlJ4lLrslgvX7Z7JWb2YSKlhm14dUlRMvdoe+6t+56rSA==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-aE17wCPNQ09K4jV7TQYYRYF/Q/6nFS9jLpbyTYHtS+i+0yV1Rrs4VsqboisS1R/iSWsq3m1Yhh3uS4x3/9KUkg==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-5KJ++prl1dscJtxnkE7Cb6rjud4T3nO4mcnKhkCfYcQaFtFrvcZhBtDobwcpSzHbfsW0MeM+QCy1UfWoK4gjUQ==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-6OfhODChD1N6FX+ITzA1lny3WX6uew/Nw9kN7uWhymXlM3/vE0qtaAfsMpgdHdCbTPgcdpGaNFhbcMieju9Vdg==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-9eWInaHqhfTu1Mt/1M85p5M+HlSStahAQkqYaW9rJzUWRe+AcVUKsN6I7U7iwxbkCT8gFZsMCRqABcwBUWw3kg==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-/XJRC8B6JeOOb2/iek/BrzW4r5Nut+fkucG7ntEOQn63IRTsfP+AfJdJodG1VIwXOleNlFgG4RtYTUsvcbDJhg==}
     engines: {node: '>=16.20.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-a/E/8UL2x6nWmIJwrrbEvLz938RMcrFfm5hLRKaPMjCE32bgwesBZEG5jRn8fzQes+4HICRXKEaL544jtb/Syg==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-KPDpjmLo/4xY8ugfMGFm7Ona/1igPzZveLt/C0rb6/jNPYuShumRfKYnItGDRXBlmecJY/04lrqkWqQjhtSSPg==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-BZ7jEnaNZHkHbq9LWuqqIgYMmMb2E2NReMybjOyl3ASFmJHYekDnytXIT3Zbp4dyPLJV55faGzLqMw2MMS81NA==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-I7ThiopxuNKX/iAcwgMwsm6L32GOwmwLOyPwQmXjh5c3VD2acq3FYyZRDJVk0aUUy1w6bTbODlo5ZHoPnlZtvw==}
     engines: {node: '>=16.20.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-/iwK50mO31lKr1KVDRCqW5xGyKArZuq9jQr2b/PJ3e0xEuV6hoJ4Kok11LA1lhx1uctqr3UXKmfwQF3HWqcZTQ==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-4624MJq72vN4H1msiWVBqAIyerJRi5Ni/U6eeE1A1Opqg4c4QoalYQQ+5h5RIuaZ6rY+9kvUn+SjsvbZwyLbjQ==}
     engines: {node: '>=16.20.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20260425.1':
-    resolution: {integrity: sha512-qhSVDT9DsoKPBeEm777eUUkiCDjBFlF7wwjfMvcPctZFVHfD6b1O1icpfCdQHPqzjrSXWu2YaNiY0DXbljTmgw==}
+  '@typescript/native-preview@7.0.0-dev.20260426.1':
+    resolution: {integrity: sha512-zE7B6TIG4XDYr4Your5E2Bxm1vD2YiPyD8OFG4nD5Odt/uN6gO0Y+T4TIbtGUBmOftMRqEV2Jw1ZC4ka0my1yw==}
     engines: {node: '>=16.20.0'}
     hasBin: true
 
@@ -15343,10 +15337,6 @@ snapshots:
       '@opentelemetry/core': 2.7.0(@opentelemetry/api@1.9.1)
       yaml: 2.8.3
 
-  '@opentelemetry/context-async-hooks@2.6.1(@opentelemetry/api@1.9.1)':
-    dependencies:
-      '@opentelemetry/api': 1.9.1
-
   '@opentelemetry/context-async-hooks@2.7.0(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
@@ -18553,36 +18543,36 @@ snapshots:
       '@types/node': 25.6.0
     optional: true
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20260425.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20260426.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20260425.1':
+  '@typescript/native-preview@7.0.0-dev.20260426.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260425.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260425.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20260426.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20260426.1
 
   '@typescript/vfs@1.6.4(typescript@5.9.3)':
     dependencies:
