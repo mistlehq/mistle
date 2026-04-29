@@ -111,6 +111,7 @@ export function createStoryConnectionMethods(
         id: method.id,
         kind: method.kind,
         label: method.label,
+        ...(method.postCreate === undefined ? {} : { postCreate: method.postCreate }),
         secretFields: method.secretFields.map((secretField) => ({
           description: secretField.description,
           inputType: secretField.inputType,

@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import type {
   IntegrationConnectionMethodDetailFieldSource,
   IntegrationConnectionMethodDetailMetadata,
+  IntegrationFormConnectionMethodPostCreateMetadata,
 } from "@mistle/integrations-core";
 
 const IntegrationConnectionMethodSecretFieldSchema = z
@@ -98,18 +99,19 @@ const IntegrationConnectionMethodDetailSchema: z.ZodType<IntegrationConnectionMe
     })
     .strict();
 
-const IntegrationFormConnectionMethodPostCreateSchema = z
-  .object({
-    managedWebhookSource: z
-      .object({
-        autoCreate: z.boolean().optional(),
-        failureNoticeTitle: z.string().min(1),
-        successNoticeTitle: z.string().min(1),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+const IntegrationFormConnectionMethodPostCreateSchema: z.ZodType<IntegrationFormConnectionMethodPostCreateMetadata> =
+  z
+    .object({
+      managedWebhookSource: z
+        .object({
+          autoCreate: z.boolean().optional(),
+          failureNoticeTitle: z.string().min(1),
+          successNoticeTitle: z.string().min(1),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict();
 
 const IntegrationSetupConnectionExternalSubjectRequirementSchema = z
   .object({

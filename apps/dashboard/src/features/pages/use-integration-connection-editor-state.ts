@@ -9,9 +9,11 @@ import type {
   IntegrationConnectionEditorState,
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
+import { resolveFormConnectionMethodManagedWebhookSourcePostCreate } from "../integrations/integration-connection-method-metadata.js";
 import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
 import type {
   IntegrationConnectionMethod,
+  IntegrationManagedWebhookSourcePostCreate,
   ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
 import {
@@ -570,19 +572,11 @@ export function useIntegrationConnectionEditorState(
 export function resolveManagedWebhookSourcePostCreate(input: {
   editor: IntegrationConnectionEditorState;
   methodId: IntegrationConnectionMethodId;
-}): NonNullable<
-  NonNullable<
-    Extract<IntegrationConnectionMethod, { kind: "form" }>["postCreate"]
-  >["managedWebhookSource"]
-> | null {
+}): IntegrationManagedWebhookSourcePostCreate | null {
   if (input.editor.mode !== "create") {
     return null;
   }
 
   const method = input.editor.methods.find((candidate) => candidate.id === input.methodId) ?? null;
-  if (method?.kind !== "form") {
-    return null;
-  }
-
-  return method.postCreate?.managedWebhookSource ?? null;
+  return resolveFormConnectionMethodManagedWebhookSourcePostCreate(method);
 }

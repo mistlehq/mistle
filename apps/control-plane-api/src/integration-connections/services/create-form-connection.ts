@@ -44,10 +44,10 @@ export type CreateFormConnectionInput = {
   secrets: Record<string, string>;
 };
 
-export function shouldAutoCreateManagedWebhookSource(input: {
-  postCreate: IntegrationFormConnectionMethodPostCreateMetadata | undefined;
-}): boolean {
-  return input.postCreate?.managedWebhookSource?.autoCreate === true;
+export function shouldAutoCreateManagedWebhookSource(
+  postCreate: IntegrationFormConnectionMethodPostCreateMetadata | undefined,
+): boolean {
+  return postCreate?.managedWebhookSource?.autoCreate === true;
 }
 
 export function shouldReturnPartialManagedWebhookSetupFailure(
@@ -244,11 +244,7 @@ export async function createFormConnection(
       });
     });
 
-    if (
-      shouldAutoCreateManagedWebhookSource({
-        postCreate: formMethod.postCreate,
-      })
-    ) {
+    if (shouldAutoCreateManagedWebhookSource(formMethod.postCreate)) {
       return {
         ...createdConnection,
         managedWebhookSetup: await tryCreateManagedWebhookSource(ctx, {

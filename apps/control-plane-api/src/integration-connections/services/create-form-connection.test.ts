@@ -11,37 +11,31 @@ describe("shouldAutoCreateManagedWebhookSource", () => {
   it("returns true when the method opts into managed webhook source auto-create", () => {
     expect(
       shouldAutoCreateManagedWebhookSource({
-        postCreate: {
-          managedWebhookSource: {
-            autoCreate: true,
-            failureNoticeTitle: "Connection created, webhook setup failed",
-            successNoticeTitle: "Connection and webhook created",
-          },
+        managedWebhookSource: {
+          autoCreate: true,
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Connection and webhook created",
         },
       }),
     ).toBe(true);
   });
 
   it("returns false without an explicit managed webhook source auto-create opt-in", () => {
-    expect(shouldAutoCreateManagedWebhookSource({ postCreate: undefined })).toBe(false);
+    expect(shouldAutoCreateManagedWebhookSource(undefined)).toBe(false);
     expect(
       shouldAutoCreateManagedWebhookSource({
-        postCreate: {
-          managedWebhookSource: {
-            failureNoticeTitle: "Connection created, webhook setup failed",
-            successNoticeTitle: "Connection and webhook created",
-          },
+        managedWebhookSource: {
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Connection and webhook created",
         },
       }),
     ).toBe(false);
     expect(
       shouldAutoCreateManagedWebhookSource({
-        postCreate: {
-          managedWebhookSource: {
-            autoCreate: false,
-            failureNoticeTitle: "Connection created, webhook setup failed",
-            successNoticeTitle: "Connection and webhook created",
-          },
+        managedWebhookSource: {
+          autoCreate: false,
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Connection and webhook created",
         },
       }),
     ).toBe(false);

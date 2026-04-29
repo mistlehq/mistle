@@ -528,14 +528,14 @@ export type IntegrationConnectionMethodDetailMetadata = {
     | undefined;
 };
 
+export type IntegrationManagedWebhookSourcePostCreateMetadata = {
+  autoCreate?: boolean | undefined;
+  failureNoticeTitle: string;
+  successNoticeTitle: string;
+};
+
 export type IntegrationFormConnectionMethodPostCreateMetadata = {
-  managedWebhookSource?:
-    | {
-        autoCreate?: boolean | undefined;
-        failureNoticeTitle: string;
-        successNoticeTitle: string;
-      }
-    | undefined;
+  managedWebhookSource?: IntegrationManagedWebhookSourcePostCreateMetadata | undefined;
 };
 
 export type IntegrationProviderAppSetupStartResult =

@@ -9,9 +9,11 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { DeleteIntegrationConnectionDialog } from "../integrations/delete-integration-connection-dialog.js";
 import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-connection-api-key-dialog.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import { resolveFormConnectionMethodManagedWebhookSourcePostCreate } from "../integrations/integration-connection-method-metadata.js";
 import {
   ManagedWebhookSetupResultSchema,
   type IntegrationConnectionMethod,
+  type IntegrationManagedWebhookSourcePostCreate,
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
@@ -159,11 +161,7 @@ function resolveRouteStateConnectionNotice(input: {
 function resolveManagedWebhookSourcePostCreate(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   selectedConnection: Pick<IntegrationConnection, "connectionMethodId"> | undefined;
-}): NonNullable<
-  NonNullable<
-    Extract<IntegrationConnectionMethod, { kind: "form" }>["postCreate"]
-  >["managedWebhookSource"]
-> | null {
+}): IntegrationManagedWebhookSourcePostCreate | null {
   const connectionMethodId = input.selectedConnection?.connectionMethodId;
   if (connectionMethodId === undefined) {
     return null;
@@ -171,11 +169,7 @@ function resolveManagedWebhookSourcePostCreate(input: {
 
   const method =
     input.connectionMethods?.find((candidate) => candidate.id === connectionMethodId) ?? null;
-  if (method?.kind !== "form") {
-    return null;
-  }
-
-  return method.postCreate?.managedWebhookSource ?? null;
+  return resolveFormConnectionMethodManagedWebhookSourcePostCreate(method);
 }
 
 function resolveManagedWebhookSetupState(state: unknown): ManagedWebhookSetupResult | null {
