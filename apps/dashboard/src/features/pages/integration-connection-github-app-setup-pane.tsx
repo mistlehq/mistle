@@ -17,7 +17,7 @@ import { useState } from "react";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { type SavingFieldState } from "../forms/configured-secret-field.js";
+import type { SavingFieldState } from "../forms/configured-secret-field.js";
 import {
   startGitHubAppInstallation,
   startGitHubAppManifestCreation,
@@ -25,6 +25,7 @@ import {
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
+  type ManifestJsonValidation,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -305,7 +306,7 @@ function GitHubManifestSetupPanel(input: {
   appOwnerKind: GitHubManifestAppOwnerKind | null;
   manifestCallbackState: ManifestWebhookCallbackState;
   manifestValue: string;
-  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
+  manifestValidation: ManifestJsonValidation;
   onAppOwnerKindChange: (value: GitHubManifestAppOwnerKind) => void;
   onManifestChange: (value: string) => void;
   onOrganizationSlugChange: (value: string) => void;
@@ -747,26 +748,25 @@ export function GitHubAppSetupPane(input: {
               {
                 fieldKey: "appId",
                 id: "github-app-id",
-                label: "App ID",
+                label: GitHubExistingAppSetupRequiredFieldLabels.appId,
                 required: true,
                 value: draft.appId,
               },
               {
                 fieldKey: "appSlug",
                 id: "github-app-slug",
-                label: "App slug",
+                label: GitHubExistingAppSetupRequiredFieldLabels.appSlug,
                 required: true,
                 value: draft.appSlug,
               },
               {
                 fieldKey: "clientId",
                 id: "github-client-id",
-                label: "Client ID",
+                label: GitHubExistingAppSetupRequiredFieldLabels.clientId,
                 required: true,
                 value: draft.clientId,
               },
             ]}
-            configuredSecretFieldKeys={configuredSecretFieldKeys}
             description="Paste values from a GitHub App you already created or configured in GitHub."
             fieldStates={fieldFeedback.fieldStates}
             onCommitField={(fieldKey) => {
@@ -780,7 +780,7 @@ export function GitHubAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("appPrivateKeyPem"),
                 fieldKey: "appPrivateKeyPem",
                 id: "github-app-private-key",
-                label: "App private key",
+                label: GitHubExistingAppSetupRequiredFieldLabels.appPrivateKeyPem,
                 multiline: true,
                 placeholder: "-----BEGIN PRIVATE KEY-----",
                 required: true,
@@ -792,7 +792,7 @@ export function GitHubAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("clientSecret"),
                 fieldKey: "clientSecret",
                 id: "github-client-secret",
-                label: "Client secret",
+                label: GitHubExistingAppSetupRequiredFieldLabels.clientSecret,
                 required: true,
                 secretLabel: "client secret",
                 type: "password",
@@ -802,7 +802,7 @@ export function GitHubAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("webhookSecret"),
                 fieldKey: "webhookSecret",
                 id: "github-webhook-secret",
-                label: "Webhook secret",
+                label: GitHubExistingAppSetupRequiredFieldLabels.webhookSecret,
                 required: true,
                 secretLabel: "webhook secret",
                 type: "password",

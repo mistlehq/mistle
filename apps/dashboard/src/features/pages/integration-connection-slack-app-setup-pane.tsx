@@ -62,6 +62,13 @@ type SlackExistingAppDraft = {
 
 type SlackExistingAppFieldKey = keyof SlackExistingAppDraft;
 
+const SlackExistingAppSetupFieldLabels = {
+  clientId: "Client ID",
+  botToken: "Bot token",
+  signingSecret: "Signing secret",
+  clientSecret: "Client secret",
+} satisfies Record<SlackExistingAppFieldKey, string>;
+
 const SlackExistingAppFieldKeys = [
   "clientId",
   "botToken",
@@ -381,7 +388,7 @@ export function SlackAppSetupPane(input: {
 
       fieldFeedback.setFieldError(
         fieldKey,
-        `${fieldKey === "botToken" ? "Bot token" : "Signing secret"} is required.`,
+        `${SlackExistingAppSetupFieldLabels[fieldKey]} is required.`,
       );
       return;
     }
@@ -483,11 +490,10 @@ export function SlackAppSetupPane(input: {
               {
                 fieldKey: "clientId",
                 id: "slack-client-id",
-                label: "Client ID",
+                label: SlackExistingAppSetupFieldLabels.clientId,
                 value: existingAppDraft.clientId,
               },
             ]}
-            configuredSecretFieldKeys={configuredSecretFieldKeys}
             description="Paste values from a Slack app you already created or configured in Slack."
             fieldStates={fieldFeedback.fieldStates}
             onCommitField={(fieldKey) => {
@@ -501,7 +507,7 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("botToken"),
                 fieldKey: "botToken",
                 id: "slack-bot-token",
-                label: "Bot token",
+                label: SlackExistingAppSetupFieldLabels.botToken,
                 placeholder: "xoxb-...",
                 required: !configuredSecretFieldKeys.has("botToken"),
                 secretLabel: "bot token",
@@ -512,7 +518,7 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("signingSecret"),
                 fieldKey: "signingSecret",
                 id: "slack-signing-secret",
-                label: "Signing secret",
+                label: SlackExistingAppSetupFieldLabels.signingSecret,
                 required: !configuredSecretFieldKeys.has("signingSecret"),
                 secretLabel: "signing secret",
                 type: "password",
@@ -522,7 +528,7 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("clientSecret"),
                 fieldKey: "clientSecret",
                 id: "slack-client-secret",
-                label: "Client secret",
+                label: SlackExistingAppSetupFieldLabels.clientSecret,
                 secretLabel: "client secret",
                 type: "password",
                 value: existingAppDraft.clientSecret,

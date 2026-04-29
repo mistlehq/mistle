@@ -9,6 +9,7 @@ import {
 import { createManifestJsonDraft } from "../integrations/manifest-json-editor.js";
 import type { ManifestWebhookCallbackState } from "../integrations/manifest-webhook-callback-state.js";
 import {
+  type AutoSaveFieldTimeoutRefs,
   clearPendingStatusTimeouts,
   createAutoSaveFieldTimeoutRefs,
   resolveAutoSaveFieldTimeoutRefs,
@@ -207,7 +208,6 @@ export function ExistingAppSetupFieldsPanel<
   SecretFieldKey extends FieldKey,
 >(input: {
   configFields: readonly ExistingAppSetupTextField<FieldKey>[];
-  configuredSecretFieldKeys: ReadonlySet<SecretFieldKey>;
   description: string;
   fieldStates: ReadonlyMap<FieldKey, SavingFieldState>;
   onCommitField: (fieldKey: FieldKey) => void;
@@ -294,7 +294,7 @@ function setSavingFieldState<FieldKey extends string>(
 }
 
 function clearFieldStatusTimeouts(
-  timeoutRefs: Record<string, ReturnType<typeof resolveAutoSaveFieldTimeoutRefs>>,
+  timeoutRefs: Record<string, AutoSaveFieldTimeoutRefs>,
   fieldKey: string,
 ): void {
   const fieldTimeoutRefs = resolveAutoSaveFieldTimeoutRefs({
