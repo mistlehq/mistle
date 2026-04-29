@@ -21,6 +21,8 @@ export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
 };
 
+const SameOriginControlPlaneApiOrigin = "same-origin";
+
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -45,6 +47,10 @@ function resolveWorkspaceRoot(): string {
 }
 
 function normalizeOrigin(value: string, key: string): string {
+  if (value === SameOriginControlPlaneApiOrigin) {
+    return value;
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(value);
@@ -89,6 +95,20 @@ export function loadDashboardBuildConfig(
   environment: NodeJS.ProcessEnv,
   dashboardBuildEnvironment: DashboardBuildEnvironment,
 ): DashboardBuildConfig {
+  const explicitControlPlaneApiOrigin =
+    environment.MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN;
+  if (
+    typeof explicitControlPlaneApiOrigin === "string" &&
+    explicitControlPlaneApiOrigin.trim().length > 0
+  ) {
+    return {
+      controlPlaneApiOrigin: normalizeOrigin(
+        explicitControlPlaneApiOrigin,
+        "MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN",
+      ),
+    };
+  }
+
   const configPath = resolveConfigPath(environment, dashboardBuildEnvironment);
   const parsedRoot = parseTomlFile(configPath);
 

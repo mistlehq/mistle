@@ -83,6 +83,39 @@ function loadDashboardBuildConfigForTest(input?: {
 }
 
 describe("loadDashboardBuildConfig", () => {
+  it("loads explicit dashboard origin from MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN without a config file", () => {
+    const config = loadDashboardBuildConfigForTest({
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "https://api.example.test",
+      },
+      configPath: "",
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("https://api.example.test");
+  });
+
+  it("allows explicit single-image same-origin routing without a config file", () => {
+    const config = loadDashboardBuildConfigForTest({
+      env: {
+        MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "same-origin",
+      },
+      configPath: "",
+    });
+
+    expect(config.controlPlaneApiOrigin).toBe("same-origin");
+  });
+
+  it("fails when explicit dashboard origin is not an absolute URL origin or same-origin", () => {
+    expect(() =>
+      loadDashboardBuildConfigForTest({
+        env: {
+          MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN: "localhost:5100",
+        },
+        configPath: "",
+      }),
+    ).toThrow("MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN must use http:// or https://.");
+  });
+
   it("falls back to config/config.development.toml when MISTLE_CONFIG_PATH is unset", () => {
     writeWorkspaceConfigFile({
       relativePath: "config/config.development.toml",
