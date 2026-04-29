@@ -181,7 +181,7 @@ export function buildGitHubAppInstallationUrl(input: {
     input.variantId === "github-enterprise-server"
       ? `/github-apps/${input.appSlug}/installations/select_target`
       : `/apps/${input.appSlug}/installations/select_target`;
-  const installUrl = new URL(installationPath, input.webBaseUrl);
+  const installUrl = new URL(buildUrlWithPath(input.webBaseUrl, installationPath));
   installUrl.searchParams.set("state", input.state);
   return installUrl.toString();
 }

@@ -1,3 +1,4 @@
+import { buildUrlWithPath } from "@mistle/http";
 import type {
   DiscoveredIntegrationResource,
   ListConnectionResourcesInput,
@@ -47,8 +48,7 @@ type SlackListConnectionResourcesInput = ListConnectionResourcesInput<
 type SlackConversation = z.output<typeof SlackConversationSchema>;
 
 function buildSlackConversationsListUrl(input: { apiBaseUrl: string; cursor?: string }): URL {
-  const apiUrl = new URL(input.apiBaseUrl);
-  apiUrl.pathname = `${apiUrl.pathname === "/" ? "" : apiUrl.pathname}/conversations.list`;
+  const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, "/conversations.list"));
   apiUrl.searchParams.set("types", "public_channel,private_channel");
   apiUrl.searchParams.set("exclude_archived", "true");
   if (input.cursor !== undefined && input.cursor.length > 0) {

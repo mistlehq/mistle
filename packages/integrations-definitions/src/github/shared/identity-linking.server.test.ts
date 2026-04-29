@@ -110,6 +110,22 @@ describe("github identity linking", () => {
     expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
+  it("preserves GitHub web base path prefixes in authorization URLs", () => {
+    const result = startGitHubLinkedAccountAuthorization({
+      webBaseUrl: "https://proxy.example.com/github",
+      clientId: "Iv1.client123",
+      state: "state_123",
+      redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/github",
+      pkceVerifier: "verifier_123",
+    });
+
+    const authorizationUrl = new URL(result.authorizationUrl);
+    expect(authorizationUrl.origin).toBe("https://proxy.example.com");
+    expect(authorizationUrl.pathname).toBe("/github/login/oauth/authorize");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("Iv1.client123");
+    expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
+  });
+
   it("exchanges a code, fetches the user profile, and normalizes linked-account material", async () => {
     const seenRequests: Array<{
       method: string;
@@ -144,7 +160,7 @@ describe("github identity linking", () => {
 
           response.setHeader("content-type", "application/json");
 
-          if (requestUrl.pathname === "/login/oauth/access_token") {
+          if (requestUrl.pathname === "/github/login/oauth/access_token") {
             response.end(
               JSON.stringify({
                 access_token: "ghu_user_token",
@@ -158,7 +174,7 @@ describe("github identity linking", () => {
             return;
           }
 
-          if (requestUrl.pathname === "/user") {
+          if (requestUrl.pathname === "/github/api/v3/user") {
             response.end(
               JSON.stringify({
                 id: 12345,
@@ -173,7 +189,7 @@ describe("github identity linking", () => {
             return;
           }
 
-          if (requestUrl.pathname === "/user/emails") {
+          if (requestUrl.pathname === "/github/api/v3/user/emails") {
             response.end(
               JSON.stringify([
                 {
@@ -195,8 +211,8 @@ describe("github identity linking", () => {
 
     try {
       const result = await completeGitHubLinkedAccountAuthorization({
-        apiBaseUrl: server.baseUrl,
-        webBaseUrl: server.baseUrl,
+        apiBaseUrl: `${server.baseUrl}/github/api/v3`,
+        webBaseUrl: `${server.baseUrl}/github`,
         clientId: "Iv1.client123",
         clientSecret: "github-client-secret",
         query: new URLSearchParams({
@@ -211,7 +227,7 @@ describe("github identity linking", () => {
       expect(seenRequests).toEqual([
         {
           method: "POST",
-          pathname: "/login/oauth/access_token",
+          pathname: "/github/login/oauth/access_token",
           search:
             "?client_id=Iv1.client123&client_secret=github-client-secret&code=code_123&redirect_uri=https%3A%2F%2Fmistle.example.com%2Fp%2Fidentity-linking%2Fcallbacks%2Fgithub&code_verifier=verifier_123",
           body: "",
@@ -219,14 +235,14 @@ describe("github identity linking", () => {
         },
         {
           method: "GET",
-          pathname: "/user",
+          pathname: "/github/api/v3/user",
           search: "",
           body: "",
           authorization: "Bearer ghu_user_token",
         },
         {
           method: "GET",
-          pathname: "/user/emails",
+          pathname: "/github/api/v3/user/emails",
           search: "",
           body: "",
           authorization: "Bearer ghu_user_token",

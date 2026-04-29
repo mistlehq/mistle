@@ -100,6 +100,21 @@ describe("slack identity linking", () => {
     expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
   });
 
+  it("preserves Slack web base path prefixes derived from API base URLs", () => {
+    const result = startSlackLinkedAccountAuthorization({
+      apiBaseUrl: "https://proxy.example.com/slack/api",
+      clientId: "123.456",
+      state: "state_123",
+      redirectUrl: "https://mistle.example.com/p/identity-linking/callbacks/slack",
+    });
+
+    const authorizationUrl = new URL(result.authorizationUrl);
+    expect(authorizationUrl.origin).toBe("https://proxy.example.com");
+    expect(authorizationUrl.pathname).toBe("/slack/oauth/v2/authorize");
+    expect(authorizationUrl.searchParams.get("client_id")).toBe("123.456");
+    expect(authorizationUrl.searchParams.get("state")).toBe("state_123");
+  });
+
   it("extracts Slack webhook actor keys from normalized event payloads", () => {
     expect(
       SlackIdentityLinkingCapability.resolveWebhookActor?.({

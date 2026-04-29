@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
+import { buildUrlWithPath } from "@mistle/http";
 import {
   IntegrationConnectionMethodIds,
   type CompletedIdentityLinkingAuthorization,
@@ -15,6 +16,10 @@ import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 
 const GitHubPkceChallengeMethod = "S256" as const;
+const GitHubOAuthAuthorizePath = "/login/oauth/authorize";
+const GitHubOAuthAccessTokenPath = "/login/oauth/access_token";
+const GitHubUserProfilePath = "/user";
+const GitHubUserEmailsPath = "/user/emails";
 
 const GitHubAuthorizationCallbackErrorSchema = z
   .object({
@@ -285,7 +290,7 @@ function buildGitHubUserAuthorizationUrl(input: {
   redirectUrl: string;
   pkceChallenge: string;
 }): string {
-  const authorizationUrl = new URL("/login/oauth/authorize", input.webBaseUrl);
+  const authorizationUrl = new URL(buildUrlWithPath(input.webBaseUrl, GitHubOAuthAuthorizePath));
   authorizationUrl.searchParams.set("client_id", input.clientId);
   authorizationUrl.searchParams.set("redirect_uri", input.redirectUrl);
   authorizationUrl.searchParams.set("state", input.state);
@@ -316,7 +321,7 @@ async function exchangeAuthorizationCode(input: {
   redirectUrl: string;
   pkceVerifier: string;
 }): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
-  const tokenUrl = new URL("/login/oauth/access_token", input.webBaseUrl);
+  const tokenUrl = new URL(buildUrlWithPath(input.webBaseUrl, GitHubOAuthAccessTokenPath));
   // GitHub's GitHub App user-token docs define these as query parameters on the POST
   // request to /login/oauth/access_token, not as a form-encoded request body.
   // https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app
@@ -352,7 +357,7 @@ async function refreshUserAccessToken(input: {
   clientSecret: string;
   refreshToken: string;
 }): Promise<z.infer<typeof GitHubUserAccessTokenResponseSchema>> {
-  const tokenUrl = new URL("/login/oauth/access_token", input.webBaseUrl);
+  const tokenUrl = new URL(buildUrlWithPath(input.webBaseUrl, GitHubOAuthAccessTokenPath));
   // GitHub documents refresh-token exchange for GitHub App user tokens as a POST
   // to /login/oauth/access_token with query parameters, including grant_type and
   // refresh_token.
@@ -386,7 +391,7 @@ async function fetchUserProfile(input: {
   apiBaseUrl: string;
   accessToken: string;
 }): Promise<z.infer<typeof GitHubUserProfileResponseSchema>> {
-  const profileUrl = new URL("/user", input.apiBaseUrl);
+  const profileUrl = new URL(buildUrlWithPath(input.apiBaseUrl, GitHubUserProfilePath));
   const response = await fetch(profileUrl, {
     headers: {
       accept: "application/vnd.github+json",
@@ -419,7 +424,7 @@ async function fetchAvailableEmails(input: {
   apiBaseUrl: string;
   accessToken: string;
 }): Promise<readonly GitHubLinkedEmail[] | undefined> {
-  const emailsUrl = new URL("/user/emails", input.apiBaseUrl);
+  const emailsUrl = new URL(buildUrlWithPath(input.apiBaseUrl, GitHubUserEmailsPath));
   const response = await fetch(emailsUrl, {
     headers: {
       accept: "application/vnd.github+json",

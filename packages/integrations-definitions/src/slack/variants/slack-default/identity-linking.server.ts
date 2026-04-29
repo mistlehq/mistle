@@ -1,3 +1,4 @@
+import { buildUrlWithPath } from "@mistle/http";
 import {
   type CompletedIdentityLinkingAuthorization,
   type IdentityLinkingPrincipalKey,
@@ -16,6 +17,10 @@ import {
 import type { SlackTargetConfig } from "./target-config-schema.js";
 
 const SlackUserScope = "users.profile:read,users:read,users:read.email";
+const SlackApiPathSuffix = "/api";
+const SlackOAuthAuthorizePath = "/oauth/v2/authorize";
+const SlackOAuthAccessPath = "/oauth.v2.access";
+const SlackUserProfilePath = "/users.profile.get";
 
 const SlackAuthorizationCallbackErrorSchema = z
   .object({
@@ -126,19 +131,13 @@ function resolveFutureTimestamp(input: {
 
 function resolveSlackWebBaseUrl(apiBaseUrl: string): string {
   const apiUrl = new URL(apiBaseUrl);
-  apiUrl.pathname = "";
+  apiUrl.pathname =
+    apiUrl.pathname === SlackApiPathSuffix || apiUrl.pathname.endsWith(SlackApiPathSuffix)
+      ? apiUrl.pathname.slice(0, -SlackApiPathSuffix.length)
+      : "";
   apiUrl.search = "";
   apiUrl.hash = "";
   return apiUrl.toString();
-}
-
-function buildSlackApiUrl(input: { apiBaseUrl: string; path: string }): URL {
-  const apiUrl = new URL(input.apiBaseUrl);
-  const normalizedBasePath = apiUrl.pathname === "/" ? "" : apiUrl.pathname.replace(/\/$/, "");
-  apiUrl.pathname = `${normalizedBasePath}/${input.path.replace(/^\//, "")}`;
-  apiUrl.search = "";
-  apiUrl.hash = "";
-  return apiUrl;
 }
 
 function resolveSlackClientIdOrThrow(input: {
@@ -342,7 +341,7 @@ function buildSlackUserAuthorizationUrl(input: {
   state: string;
   redirectUrl: string;
 }): string {
-  const authorizationUrl = new URL("/oauth/v2/authorize", input.webBaseUrl);
+  const authorizationUrl = new URL(buildUrlWithPath(input.webBaseUrl, SlackOAuthAuthorizePath));
   authorizationUrl.searchParams.set("client_id", input.clientId);
   authorizationUrl.searchParams.set("user_scope", SlackUserScope);
   authorizationUrl.searchParams.set("redirect_uri", input.redirectUrl);
@@ -357,10 +356,7 @@ async function exchangeAuthorizationCode(input: {
   code: string;
   redirectUrl: string;
 }): Promise<z.infer<typeof SlackOAuthAccessSuccessResponseSchema>> {
-  const tokenUrl = buildSlackApiUrl({
-    apiBaseUrl: input.apiBaseUrl,
-    path: "/oauth.v2.access",
-  });
+  const tokenUrl = new URL(buildUrlWithPath(input.apiBaseUrl, SlackOAuthAccessPath));
   // Slack documents oauth.v2.access as a POST with application/x-www-form-urlencoded
   // parameters including client_id, client_secret, code, and redirect_uri.
   // https://docs.slack.dev/authentication/installing-with-oauth/
@@ -392,10 +388,7 @@ async function refreshSlackUserToken(input: {
   clientSecret: string;
   refreshToken: string;
 }): Promise<z.infer<typeof SlackOAuthAccessSuccessResponseSchema>> {
-  const tokenUrl = buildSlackApiUrl({
-    apiBaseUrl: input.apiBaseUrl,
-    path: "/oauth.v2.access",
-  });
+  const tokenUrl = new URL(buildUrlWithPath(input.apiBaseUrl, SlackOAuthAccessPath));
   // Slack documents refresh-token exchange for rotating user tokens on oauth.v2.access
   // using application/x-www-form-urlencoded POST parameters, including grant_type and
   // refresh_token.
@@ -427,10 +420,7 @@ async function fetchSlackUserProfile(input: {
   accessToken: string;
   userId: string;
 }): Promise<z.infer<(typeof SlackUserProfileResponseSchema)["shape"]["profile"]>> {
-  const profileUrl = buildSlackApiUrl({
-    apiBaseUrl: input.apiBaseUrl,
-    path: "/users.profile.get",
-  });
+  const profileUrl = new URL(buildUrlWithPath(input.apiBaseUrl, SlackUserProfilePath));
   profileUrl.searchParams.set("user", input.userId);
 
   const response = await fetch(profileUrl, {

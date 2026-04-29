@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import { buildUrlWithPath } from "@mistle/http";
 import type {
   IntegrationConnection,
   IntegrationWebhookEvent,
@@ -215,8 +216,7 @@ function buildSlackConversationsRepliesUrl(input: {
   channel: string;
   ts: string;
 }): URL {
-  const apiUrl = new URL(input.apiBaseUrl);
-  apiUrl.pathname = `${apiUrl.pathname === "/" ? "" : apiUrl.pathname}/${SlackConversationsRepliesPath}`;
+  const apiUrl = new URL(buildUrlWithPath(input.apiBaseUrl, SlackConversationsRepliesPath));
   apiUrl.searchParams.set("channel", input.channel);
   apiUrl.searchParams.set("ts", input.ts);
   return apiUrl;

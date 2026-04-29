@@ -1,3 +1,5 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+
 import { describe, expect, it } from "vitest";
 
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
@@ -6,6 +8,44 @@ import {
   buildSlackWebhookSignature,
   verifySlackWebhookSignature,
 } from "./webhook.server.js";
+
+async function startTestServer(input: {
+  handler: (request: IncomingMessage, response: ServerResponse) => void;
+}): Promise<{
+  baseUrl: string;
+  stop: () => Promise<void>;
+}> {
+  const server = createServer(input.handler);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Expected HTTP server address.");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(address.port)}`,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error === undefined) {
+            resolve();
+            return;
+          }
+
+          reject(error);
+        });
+      });
+    },
+  };
+}
 
 function createSlackMessageEvent(): Record<string, unknown> {
   return {
@@ -245,6 +285,97 @@ describe("slack webhook handler", () => {
         sourceOrderKey: "2024-03-09T16:00:00.000Z#1710000000.000300",
       },
     });
+  });
+
+  it("preserves Slack API base path prefixes when enriching reactions", async () => {
+    const seenUrls: string[] = [];
+    const server = await startTestServer({
+      handler(request, response) {
+        if (request.url === undefined) {
+          response.writeHead(500);
+          response.end("Missing request URL.");
+          return;
+        }
+
+        const requestUrl = new URL(request.url, "http://127.0.0.1");
+        seenUrls.push(requestUrl.toString());
+        response.setHeader("content-type", "application/json");
+        response.end(
+          JSON.stringify({
+            ok: true,
+            messages: [
+              {
+                type: "message",
+                channel: "C123",
+                ts: "1710000000.000100",
+                thread_ts: "1710000000.000050",
+              },
+            ],
+          }),
+        );
+      },
+    });
+
+    try {
+      if (SlackWebhookHandler.enrichEvent === undefined) {
+        throw new Error("Expected Slack webhook handler to define event enrichment.");
+      }
+
+      const enriched = await SlackWebhookHandler.enrichEvent({
+        targetKey: "slack-default",
+        target: {
+          familyId: "slack",
+          variantId: "slack-default",
+          enabled: true,
+          config: {
+            apiBaseUrl: `${server.baseUrl}/slack/api`,
+          },
+          secrets: {},
+        },
+        connection: {
+          id: "icn_slack",
+          status: "active",
+          config: {
+            connection_method: "slack-bot-token",
+          },
+        },
+        event: {
+          externalEventId: "Ev125",
+          providerEventType: "reaction_added",
+          eventType: "slack:reaction_added",
+          payload: {
+            ...createSlackMessagePayload(),
+            event: {
+              type: "reaction_added",
+              user: "U123",
+              reaction: "thumbsup",
+              item: {
+                type: "message",
+                channel: "C123",
+                ts: "1710000000.000100",
+              },
+              event_ts: "1710000000.000300",
+            },
+          },
+        },
+        connectionSecrets: {
+          botToken: "xoxb-test-token",
+        },
+        webhookSourceSecrets: {},
+        headers: {},
+        rawBody: new Uint8Array(),
+      });
+
+      expect(seenUrls).toEqual([
+        "http://127.0.0.1/slack/api/conversations.replies?channel=C123&ts=1710000000.000100",
+      ]);
+      expect(enriched.payload.event).toMatchObject({
+        channel: "C123",
+        [SlackThreadRootTimestampField]: "1710000000.000050",
+      });
+    } finally {
+      await server.stop();
+    }
   });
 
   it("normalizes Slack message subtypes away from slack:message", () => {

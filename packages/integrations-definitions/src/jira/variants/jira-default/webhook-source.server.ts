@@ -1,4 +1,4 @@
-import { buildBasicAuthorizationHeader } from "@mistle/http";
+import { buildBasicAuthorizationHeader, buildUrlWithPath } from "@mistle/http";
 import type { IntegrationWebhookSourceCapability } from "@mistle/integrations-core";
 import {
   IntegrationWebhookSourceLifecycles,
@@ -82,7 +82,7 @@ async function createJiraAdminWebhook(input: {
   apiKey: string;
   requestBody: Record<string, unknown>;
 }): Promise<z.output<typeof JiraAdminWebhookResponseSchema>> {
-  const response = await fetch(`${input.siteUrl}${JiraAdminWebhookPath}`, {
+  const response = await fetch(buildUrlWithPath(input.siteUrl, JiraAdminWebhookPath), {
     method: "POST",
     headers: {
       accept: "application/json",
@@ -109,15 +109,18 @@ async function deleteJiraAdminWebhook(input: {
   apiKey: string;
   webhookId: string;
 }): Promise<void> {
-  const response = await fetch(`${input.siteUrl}${JiraAdminWebhookPath}/${input.webhookId}`, {
-    method: "DELETE",
-    headers: {
-      authorization: buildBasicAuthorizationHeader({
-        username: input.email,
-        password: input.apiKey,
-      }),
+  const response = await fetch(
+    buildUrlWithPath(input.siteUrl, `${JiraAdminWebhookPath}/${input.webhookId}`),
+    {
+      method: "DELETE",
+      headers: {
+        authorization: buildBasicAuthorizationHeader({
+          username: input.email,
+          password: input.apiKey,
+        }),
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     const responseText = await response.text();

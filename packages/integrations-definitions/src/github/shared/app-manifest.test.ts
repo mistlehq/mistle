@@ -349,4 +349,17 @@ describe("buildGitHubAppInstallationUrl", () => {
       "https://github.example.com/github-apps/mistle-github-app/installations/select_target?state=state_123",
     );
   });
+
+  it("preserves web base path prefixes in app installation URLs", () => {
+    expect(
+      buildGitHubAppInstallationUrl({
+        appSlug: "mistle-github-app",
+        state: "state_123",
+        variantId: "github-cloud",
+        webBaseUrl: "https://proxy.example.com/github",
+      }),
+    ).toBe(
+      "https://proxy.example.com/github/apps/mistle-github-app/installations/select_target?state=state_123",
+    );
+  });
 });
