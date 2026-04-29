@@ -4,13 +4,18 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
   sandboxProfiles,
-  sandboxProfileSetupChecks,
   sandboxProfileVersionIntegrationBindings,
-  SandboxProfileSetupCheckStatuses,
   sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
+  sandboxInstances,
+  SandboxInstanceSources,
+  SandboxInstanceStatuses,
+  SandboxInstanceStarterKinds,
+} from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SandboxProvider, createSandboxAdapter } from "@mistle/sandbox";
 import { systemSleeper } from "@mistle/time";
@@ -19,12 +24,10 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import {
-  CreateSandboxProfileVersionSetupCheckResponseSchema,
   CreateSandboxProfileVersionSetupCheckBadRequestResponseSchema,
-  CreateSandboxProfileVersionSetupCheckConflictResponseSchema,
-  CreateSandboxProfileVersionSetupCheckNotFoundResponseSchema,
-  GetSandboxProfileVersionSetupCheckResponseSchema,
+  CreateSandboxProfileVersionSetupCheckResponseSchema,
   GetSandboxProfileVersionSetupCheckNotFoundResponseSchema,
+  GetSandboxProfileVersionSetupCheckResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createDisposableDataPlaneRuntime } from "./helpers/disposable-data-plane-runtime.js";
@@ -44,6 +47,7 @@ const StopWorkflowName = "data-plane.sandbox-instances.stop";
 const SetupCheckStartWorkflowInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   purpose: z.literal("setup_check"),
+  persistenceMode: z.literal("ephemeral"),
   runtimePlan: z.looseObject({
     setupScript: z.string().min(1).optional(),
   }),
@@ -218,7 +222,7 @@ async function insertGitRepositoryOptionFixture(input: {
 }
 
 describe("sandbox profile version setup checks integration", () => {
-  it("creates a queued setup check using the request setup script", async ({ fixture }) => {
+  it("starts a tableless setup check using the request setup script", async ({ fixture }) => {
     const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
       fixture,
       databaseNamePrefix: "mistle_cp_setup_check_create",
@@ -263,24 +267,19 @@ describe("sandbox profile version setup checks integration", () => {
         await response.json(),
       );
       expect(responseBody).toMatchObject({
+        id: responseBody.sandboxInstanceId,
         sandboxProfileId: "sbp_setup_check_create_001",
         sandboxProfileVersion: 1,
-        requestedByUserId: authenticatedSession.userId,
-        setupScript: "echo from-editor-buffer",
-        primaryRepositoryId: "mistlehq/platform",
-        status: SandboxProfileSetupCheckStatuses.STARTING_SANDBOX,
+        status: "starting_sandbox",
         failurePhase: null,
         failureCode: null,
         failureMessage: null,
+        startedAt: null,
         finishedAt: null,
       });
-      expect(responseBody.sandboxInstanceId).not.toBeNull();
+      expect(responseBody.sandboxInstanceId).toMatch(/^sbi_/);
       expect(responseBody.workflowRunId).not.toBeNull();
-      expect(responseBody.startedAt).not.toBeNull();
 
-      if (responseBody.sandboxInstanceId === null) {
-        throw new Error("Expected setup check to include a sandbox instance id.");
-      }
       const queuedWorkflowInput = await waitForQueuedSetupCheckStartWorkflowInput({
         dataPlaneDbPool: dataPlaneFixture.dbPool,
         workflowNamespaceId: fixture.config.workflow.namespaceId,
@@ -288,30 +287,167 @@ describe("sandbox profile version setup checks integration", () => {
       });
       expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("echo from-editor-buffer");
 
-      const persistedSetupCheck = await fixture.db.query.sandboxProfileSetupChecks.findFirst({
-        where: (table, { eq }) => eq(table.id, responseBody.id),
+      const sandboxInstance = await dataPlaneFixture.db.query.sandboxInstances.findFirst({
+        where: (table, { eq }) => eq(table.id, responseBody.sandboxInstanceId),
       });
-      expect(persistedSetupCheck).toMatchObject({
-        id: responseBody.id,
+      expect(sandboxInstance).toMatchObject({
+        id: responseBody.sandboxInstanceId,
         organizationId: authenticatedSession.organizationId,
         sandboxProfileId: "sbp_setup_check_create_001",
         sandboxProfileVersion: 1,
-        requestedByUserId: authenticatedSession.userId,
-        setupScript: "echo from-editor-buffer",
-        primaryRepositoryId: "mistlehq/platform",
-        idempotencyKey: "setup-check-create-001",
-        status: SandboxProfileSetupCheckStatuses.STARTING_SANDBOX,
-        sandboxInstanceId: responseBody.sandboxInstanceId,
-        workflowRunId: responseBody.workflowRunId,
+        purpose: SandboxInstancePurposes.SETUP_CHECK,
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       });
     } finally {
       await dataPlaneFixture.stop();
     }
   }, 60_000);
 
-  it("updates a setup check from the data-plane sandbox outcome when fetched", async ({
+  it("returns the same setup-check sandbox for duplicate idempotency input", async ({
     fixture,
   }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
+      fixture,
+      databaseNamePrefix: "mistle_cp_setup_check_idempotent",
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-idempotent@example.com",
+      });
+      await insertProfileVersionFixture({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_setup_check_idempotent_001",
+        version: 1,
+      });
+
+      const firstResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_idempotent_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo first",
+            idempotencyKey: "setup-check-idempotent-001",
+          }),
+        },
+      );
+      expect(firstResponse.status).toBe(201);
+      const firstBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await firstResponse.json(),
+      );
+
+      const secondResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_idempotent_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo second",
+            idempotencyKey: "setup-check-idempotent-001",
+          }),
+        },
+      );
+      expect(secondResponse.status).toBe(201);
+      const secondBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await secondResponse.json(),
+      );
+
+      expect(secondBody.sandboxInstanceId).toBe(firstBody.sandboxInstanceId);
+      expect(secondBody.workflowRunId).toBe(firstBody.workflowRunId);
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
+  it("returns an idempotent setup check before revalidating changed repository options", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
+      fixture,
+      databaseNamePrefix: "mistle_cp_setup_check_idempotent_repo",
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-idempotent-repo@example.com",
+      });
+      await insertProfileVersionFixture({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_setup_check_idempotent_repo_001",
+        version: 1,
+      });
+      await insertGitRepositoryOptionFixture({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_setup_check_idempotent_repo_001",
+        version: 1,
+        repository: "mistlehq/platform",
+      });
+
+      const firstResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_idempotent_repo_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo repo",
+            primaryRepositoryId: "mistlehq/platform",
+            idempotencyKey: "setup-check-idempotent-repo-001",
+          }),
+        },
+      );
+      expect(firstResponse.status).toBe(201);
+      const firstBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await firstResponse.json(),
+      );
+
+      await fixture.db
+        .delete(sandboxProfileVersionIntegrationBindings)
+        .where(
+          eq(
+            sandboxProfileVersionIntegrationBindings.id,
+            "sbp_setup_check_idempotent_repo_001_git_binding",
+          ),
+        );
+
+      const secondResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_idempotent_repo_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo repo",
+            primaryRepositoryId: "mistlehq/platform",
+            idempotencyKey: "setup-check-idempotent-repo-001",
+          }),
+        },
+      );
+      expect(secondResponse.status).toBe(201);
+      const secondBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await secondResponse.json(),
+      );
+      expect(secondBody.sandboxInstanceId).toBe(firstBody.sandboxInstanceId);
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
+  it("maps data-plane setup-check sandbox failure when fetched", async ({ fixture }) => {
     const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
       fixture,
       databaseNamePrefix: "mistle_cp_setup_check_reconcile",
@@ -342,14 +478,10 @@ describe("sandbox profile version setup checks integration", () => {
           }),
         },
       );
-
       expect(createResponse.status).toBe(201);
       const createdBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
         await createResponse.json(),
       );
-      if (createdBody.sandboxInstanceId === null) {
-        throw new Error("Expected setup check to include a sandbox instance id.");
-      }
 
       await dataPlaneFixture.db
         .update(sandboxInstances)
@@ -375,23 +507,11 @@ describe("sandbox profile version setup checks integration", () => {
       );
       expect(responseBody).toMatchObject({
         id: createdBody.id,
-        status: SandboxProfileSetupCheckStatuses.FAILED,
+        status: "failed",
         failurePhase: "start",
         failureCode: "sandbox_init_failed",
         failureMessage: "Setup script exited with status 1.",
       });
-      expect(responseBody.finishedAt).not.toBeNull();
-
-      const persistedSetupCheck = await fixture.db.query.sandboxProfileSetupChecks.findFirst({
-        where: (table, { eq }) => eq(table.id, createdBody.id),
-      });
-      expect(persistedSetupCheck).toMatchObject({
-        status: SandboxProfileSetupCheckStatuses.FAILED,
-        failurePhase: "start",
-        failureCode: "sandbox_init_failed",
-        failureMessage: "Setup script exited with status 1.",
-      });
-      expect(persistedSetupCheck?.finishedAt).not.toBeNull();
     } finally {
       await dataPlaneFixture.stop();
     }
@@ -448,9 +568,6 @@ describe("sandbox profile version setup checks integration", () => {
       const createdBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
         await createResponse.json(),
       );
-      if (createdBody.sandboxInstanceId === null) {
-        throw new Error("Expected setup check to include a sandbox instance id.");
-      }
 
       await dataPlaneFixture.db
         .update(sandboxInstances)
@@ -479,7 +596,7 @@ describe("sandbox profile version setup checks integration", () => {
       );
       expect(responseBody).toMatchObject({
         id: createdBody.id,
-        status: SandboxProfileSetupCheckStatuses.CLEANING_UP,
+        status: "cleaning_up",
         failurePhase: null,
         failureCode: null,
         failureMessage: null,
@@ -501,7 +618,7 @@ describe("sandbox profile version setup checks integration", () => {
     }
   }, 60_000);
 
-  it("rejects unavailable primary repositories before creating a setup check", async ({
+  it("rejects unavailable primary repositories before starting a setup check", async ({
     fixture,
   }) => {
     const authenticatedSession = await fixture.authSession({
@@ -518,7 +635,7 @@ describe("sandbox profile version setup checks integration", () => {
       organizationId: authenticatedSession.organizationId,
       profileId: "sbp_setup_check_invalid_repo_001",
       version: 1,
-      repository: "mistlehq/mistle",
+      repository: "mistlehq/platform",
     });
 
     const response = await fixture.request(
@@ -530,8 +647,8 @@ describe("sandbox profile version setup checks integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          setupScript: "echo invalid-repo",
-          primaryRepositoryId: "mistlehq/platform",
+          setupScript: "echo invalid repo",
+          primaryRepositoryId: "mistlehq/other",
         }),
       },
     );
@@ -540,381 +657,64 @@ describe("sandbox profile version setup checks integration", () => {
     const responseBody = CreateSandboxProfileVersionSetupCheckBadRequestResponseSchema.parse(
       await response.json(),
     );
-    if (!("code" in responseBody)) {
-      throw new Error("Expected invalid primary repository response.");
-    }
-    expect(responseBody.code).toBe("INVALID_PRIMARY_REPOSITORY");
-
-    const setupChecks = await fixture.db.query.sandboxProfileSetupChecks.findMany({
-      where: (table, { eq }) => eq(table.sandboxProfileId, "sbp_setup_check_invalid_repo_001"),
-    });
-    expect(setupChecks).toHaveLength(0);
-  });
-
-  it("accepts blank and null setup check options", async ({ fixture }) => {
-    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
-      fixture,
-      databaseNamePrefix: "mistle_cp_setup_check_blank",
-    });
-
-    try {
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-sandbox-profile-version-setup-check-blank@example.com",
-      });
-      await insertProfileVersionFixture({
-        fixture,
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_setup_check_blank_001",
-        version: 1,
-      });
-
-      const blankResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_blank_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: "",
-            primaryRepositoryId: null,
-          }),
-        },
-      );
-
-      expect(blankResponse.status).toBe(201);
-      const blankBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await blankResponse.json(),
-      );
-      expect(blankBody.setupScript).toBe("");
-      expect(blankBody.primaryRepositoryId).toBeNull();
-
-      const nullResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_blank_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: null,
-          }),
-        },
-      );
-
-      expect(nullResponse.status).toBe(201);
-      const nullBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await nullResponse.json(),
-      );
-      expect(nullBody.setupScript).toBeNull();
-      expect(nullBody.primaryRepositoryId).toBeNull();
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("returns the same setup check for duplicate idempotency input", async ({ fixture }) => {
-    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
-      fixture,
-      databaseNamePrefix: "mistle_cp_setup_check_idempotent",
-    });
-
-    try {
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-sandbox-profile-version-setup-check-idempotent@example.com",
-      });
-      await insertProfileVersionFixture({
-        fixture,
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_setup_check_idempotent_001",
-        version: 1,
-      });
-
-      const firstResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_idempotent_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: "echo first",
-            idempotencyKey: "setup-check-idempotent-001",
-          }),
-        },
-      );
-      const secondResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_idempotent_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: "echo second",
-            idempotencyKey: "setup-check-idempotent-001",
-          }),
-        },
-      );
-
-      expect(firstResponse.status).toBe(201);
-      expect(secondResponse.status).toBe(201);
-      const firstBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await firstResponse.json(),
-      );
-      const secondBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await secondResponse.json(),
-      );
-      expect(secondBody).toEqual(firstBody);
-      expect(secondBody.setupScript).toBe("echo first");
-
-      const setupChecks = await fixture.db.query.sandboxProfileSetupChecks.findMany({
-        where: (table, { eq }) => eq(table.sandboxProfileId, "sbp_setup_check_idempotent_001"),
-      });
-      expect(setupChecks).toHaveLength(1);
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("returns an idempotent setup check before revalidating changed repository options", async ({
-    fixture,
-  }) => {
-    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
-      fixture,
-      databaseNamePrefix: "mistle_cp_setup_check_idempotent_repo",
-    });
-
-    try {
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-sandbox-profile-version-setup-check-idempotent-repo@example.com",
-      });
-      await insertProfileVersionFixture({
-        fixture,
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_setup_check_idempotent_repo_001",
-        version: 1,
-      });
-      await insertGitRepositoryOptionFixture({
-        fixture,
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_setup_check_idempotent_repo_001",
-        version: 1,
-        repository: "mistlehq/mistle",
-      });
-
-      const firstResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_idempotent_repo_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: "echo first",
-            primaryRepositoryId: "mistlehq/mistle",
-            idempotencyKey: "setup-check-idempotent-repo-001",
-          }),
-        },
-      );
-
-      expect(firstResponse.status).toBe(201);
-      const firstBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await firstResponse.json(),
-      );
-
-      await fixture.db
-        .update(integrationTargets)
-        .set({
-          enabled: false,
-        })
-        .where(eq(integrationTargets.targetKey, "sbp_setup_check_idempotent_repo_001_github"));
-
-      const secondResponse = await fixture.request(
-        "/v1/sandbox/profiles/sbp_setup_check_idempotent_repo_001/versions/1/setup-checks",
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            cookie: authenticatedSession.cookie,
-          },
-          body: JSON.stringify({
-            setupScript: "echo retry",
-            primaryRepositoryId: "mistlehq/mistle",
-            idempotencyKey: "setup-check-idempotent-repo-001",
-          }),
-        },
-      );
-
-      expect(secondResponse.status).toBe(201);
-      const secondBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
-        await secondResponse.json(),
-      );
-      expect(secondBody).toEqual(firstBody);
-
-      const setupChecks = await fixture.db.query.sandboxProfileSetupChecks.findMany({
-        where: (table, { eq }) => eq(table.sandboxProfileId, "sbp_setup_check_idempotent_repo_001"),
-      });
-      expect(setupChecks).toHaveLength(1);
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("gets a persisted setup check for the selected profile version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-check-get@example.com",
-    });
-    await insertProfileVersionFixture({
-      fixture,
-      organizationId: authenticatedSession.organizationId,
-      profileId: "sbp_setup_check_get_001",
-      version: 1,
-    });
-    await fixture.db.insert(sandboxProfileSetupChecks).values({
-      id: "spc_setup_check_get_001",
-      organizationId: authenticatedSession.organizationId,
-      sandboxProfileId: "sbp_setup_check_get_001",
-      sandboxProfileVersion: 1,
-      requestedByUserId: authenticatedSession.userId,
-      setupScript: "echo persisted-check",
-      primaryRepositoryId: null,
-      idempotencyKey: "setup-check-get-001",
-      status: SandboxProfileSetupCheckStatuses.QUEUED,
-    });
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_setup_check_get_001/versions/1/setup-checks/spc_setup_check_get_001",
-      {
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(200);
-    const responseBody = GetSandboxProfileVersionSetupCheckResponseSchema.parse(
-      await response.json(),
-    );
     expect(responseBody).toMatchObject({
-      id: "spc_setup_check_get_001",
-      sandboxProfileId: "sbp_setup_check_get_001",
-      sandboxProfileVersion: 1,
-      requestedByUserId: authenticatedSession.userId,
-      setupScript: "echo persisted-check",
-      primaryRepositoryId: null,
-      status: SandboxProfileSetupCheckStatuses.QUEUED,
+      code: "INVALID_PRIMARY_REPOSITORY",
     });
   });
 
-  it("returns not found for setup checks outside the active organization", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-check-scope@example.com",
-    });
-    const otherSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-check-scope-other@example.com",
-    });
-    await insertProfileVersionFixture({
+  it("does not expose normal session sandboxes through setup-check get", async ({ fixture }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
       fixture,
-      organizationId: otherSession.organizationId,
-      profileId: "sbp_setup_check_scope_001",
-      version: 1,
+      databaseNamePrefix: "mistle_cp_setup_check_session_hidden",
     });
 
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_setup_check_scope_001/versions/1/setup-checks",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          setupScript: "echo wrong-org",
-        }),
-      },
-    );
-
-    expect(response.status).toBe(404);
-    const responseBody = CreateSandboxProfileVersionSetupCheckNotFoundResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody.code).toBe("PROFILE_NOT_FOUND");
-  });
-
-  it("returns conflict when a published profile version is not usable", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-check-conflict@example.com",
-    });
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
-        id: "sbp_setup_check_conflict_001",
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-session-hidden@example.com",
+      });
+      await insertProfileVersionFixture({
+        fixture,
         organizationId: authenticatedSession.organizationId,
-        displayName: "Setup Check Conflict Profile",
-        createdAt: "2026-04-01T00:00:00.000Z",
-      }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      ...createSandboxProfileVersionFixture({
-        sandboxProfileId: "sbp_setup_check_conflict_001",
+        profileId: "sbp_setup_check_session_hidden_001",
         version: 1,
-        state: SandboxProfileVersionStates.PUBLISHED,
-        setupScript: "echo conflict",
-      }),
-    });
+      });
 
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_setup_check_conflict_001/versions/1/setup-checks",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      await dataPlaneFixture.db.insert(sandboxInstances).values({
+        id: "sbi_setup_check_session_hidden_001",
+        organizationId: authenticatedSession.organizationId,
+        sandboxProfileId: "sbp_setup_check_session_hidden_001",
+        sandboxProfileVersion: 1,
+        runtimeProvider: SandboxProvider.DOCKER,
+        providerSandboxId: null,
+        computeGeneration: 1,
+        status: SandboxInstanceStatuses.PENDING,
+        startedByKind: SandboxInstanceStarterKinds.USER,
+        startedById: authenticatedSession.userId,
+        source: SandboxInstanceSources.DASHBOARD,
+        purpose: SandboxInstancePurposes.SESSION,
+        persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+      });
+
+      const response = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_session_hidden_001/versions/1/setup-checks/sbi_setup_check_session_hidden_001",
+        {
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
         },
-        body: JSON.stringify({
-          setupScript: "echo conflict",
-        }),
-      },
-    );
+      );
 
-    expect(response.status).toBe(409);
-    const responseBody = CreateSandboxProfileVersionSetupCheckConflictResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_USABLE");
-  });
-
-  it("returns not found for missing setup checks", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-check-missing@example.com",
-    });
-    await insertProfileVersionFixture({
-      fixture,
-      organizationId: authenticatedSession.organizationId,
-      profileId: "sbp_setup_check_missing_001",
-      version: 1,
-    });
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_setup_check_missing_001/versions/1/setup-checks/spc_missing_001",
-      {
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(404);
-    const responseBody = GetSandboxProfileVersionSetupCheckNotFoundResponseSchema.parse(
-      await response.json(),
-    );
-    expect(responseBody.code).toBe("SETUP_CHECK_NOT_FOUND");
-  });
+      expect(response.status).toBe(404);
+      const responseBody = GetSandboxProfileVersionSetupCheckNotFoundResponseSchema.parse(
+        await response.json(),
+      );
+      expect(responseBody).toMatchObject({
+        code: "SETUP_CHECK_NOT_FOUND",
+      });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
 
   it("rejects invalid setup check request bodies", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -930,7 +730,7 @@ describe("sandbox profile version setup checks integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          primaryRepositoryId: null,
+          setupScript: 123,
         }),
       },
     );

@@ -25,6 +25,7 @@ export type CreateSandboxProfilesServiceInput = {
   dataPlaneClient: Pick<
     DataPlaneSandboxInstancesClient,
     | "getSandboxInstance"
+    | "getSandboxInstanceByStartIdempotency"
     | "materializeSandboxProfileVersionSnapshotJob"
     | "startSandboxInstance"
     | "stopSandboxInstance"

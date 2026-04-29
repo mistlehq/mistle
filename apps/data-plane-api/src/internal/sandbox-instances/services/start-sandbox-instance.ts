@@ -3,13 +3,17 @@ import { randomUUID } from "node:crypto";
 import {
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { SandboxProvider } from "@mistle/sandbox";
-import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import {
+  StartSandboxInstanceWorkflowName,
+  StartSandboxInstanceWorkflowSpec,
+} from "@mistle/workflow-registry/data-plane";
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
@@ -37,7 +41,7 @@ type StartSandboxInstanceContext = {
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
 };
 
-function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): string {
+export function createStartSandboxIdempotencyKey(input: StartSandboxIdempotencyInput): string {
   const idempotencyKey = input.idempotencyKey ?? randomUUID();
 
   return JSON.stringify({
@@ -51,8 +55,62 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
   });
 }
 
+type StartSandboxIdempotencyInput = Pick<
+  StartSandboxInstanceInput,
+  | "organizationId"
+  | "sandboxProfileId"
+  | "sandboxProfileVersion"
+  | "purpose"
+  | "source"
+  | "idempotencyKey"
+>;
+
 function createSandboxInstanceId(): string {
   return typeid("sbi").toString();
+}
+
+export async function findStartedSandboxInstanceByIdempotencyKey(
+  ctx: Pick<StartSandboxInstanceContext, "workflowDbPool" | "workflowNamespaceId">,
+  input: StartSandboxIdempotencyInput,
+): Promise<StartSandboxInstanceAcceptedResponse | null> {
+  if (input.idempotencyKey === undefined) {
+    return null;
+  }
+
+  const result = await ctx.workflowDbPool.query<{
+    id: string;
+    input: unknown;
+  }>(
+    `
+      select id, input
+      from ${DataPlaneOpenWorkflowSchema}.workflow_runs
+      where namespace_id = $1
+        and workflow_name = $2
+        and idempotency_key = $3
+      limit 1
+    `,
+    [
+      ctx.workflowNamespaceId,
+      StartSandboxInstanceWorkflowName,
+      createStartSandboxIdempotencyKey(input),
+    ],
+  );
+
+  const row = result.rows[0];
+  if (row === undefined) {
+    return null;
+  }
+
+  const parsedInput = WorkflowRunInputSchema.safeParse(row.input);
+  if (!parsedInput.success) {
+    throw new Error(`Workflow run '${row.id}' has invalid stored input.`);
+  }
+
+  return {
+    status: "accepted",
+    sandboxInstanceId: parsedInput.data.sandboxInstanceId,
+    workflowRunId: row.id,
+  };
 }
 
 export function resolveSandboxInstancePersistenceMode(input: {
@@ -119,17 +177,19 @@ export async function startSandboxInstance(
   ctx: StartSandboxInstanceContext,
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
-  const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
-    {
-      organizationId: input.organizationId,
-    },
-  );
-  const persistenceMode = resolveSandboxInstancePersistenceMode({
-    organizationId: input.organizationId,
-    persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
-    sandboxProvider: ctx.sandboxProvider,
-    configuredStorageBackend: ctx.sandboxStorageBackend,
-  });
+  const persistenceMode =
+    input.purpose === SandboxInstancePurposes.SETUP_CHECK
+      ? SandboxInstancePersistenceModes.EPHEMERAL
+      : resolveSandboxInstancePersistenceMode({
+          organizationId: input.organizationId,
+          persistentSandboxesEnabled: (
+            await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode({
+              organizationId: input.organizationId,
+            })
+          ).persistentSandboxesEnabled,
+          sandboxProvider: ctx.sandboxProvider,
+          configuredStorageBackend: ctx.sandboxStorageBackend,
+        });
 
   const workflowInput = {
     sandboxInstanceId: createSandboxInstanceId(),

@@ -8613,32 +8613,24 @@ export interface paths {
           };
           content: {
             "application/json": {
-              createdAt: string;
               failureCode: string | null;
               failureMessage: string | null;
               /** @enum {string|null} */
               failurePhase: "compile" | "start" | "runtime_ready" | "script" | "cleanup" | null;
               finishedAt: string | null;
               id: string;
-              primaryRepositoryId: string | null;
-              requestedByUserId: string | null;
-              sandboxInstanceId: string | null;
+              sandboxInstanceId: string;
               sandboxProfileId: string;
               sandboxProfileVersion: number;
-              setupScript: string | null;
               startedAt: string | null;
               /** @enum {string} */
               status:
-                | "queued"
-                | "compiling_profile"
                 | "starting_sandbox"
-                | "waiting_for_runtime"
-                | "running_script"
+                | "running"
                 | "cleaning_up"
                 | "succeeded"
                 | "failed"
                 | "cleanup_failed";
-              updatedAt: string;
               workflowRunId: string | null;
             };
           };
@@ -8777,32 +8769,24 @@ export interface paths {
           };
           content: {
             "application/json": {
-              createdAt: string;
               failureCode: string | null;
               failureMessage: string | null;
               /** @enum {string|null} */
               failurePhase: "compile" | "start" | "runtime_ready" | "script" | "cleanup" | null;
               finishedAt: string | null;
               id: string;
-              primaryRepositoryId: string | null;
-              requestedByUserId: string | null;
-              sandboxInstanceId: string | null;
+              sandboxInstanceId: string;
               sandboxProfileId: string;
               sandboxProfileVersion: number;
-              setupScript: string | null;
               startedAt: string | null;
               /** @enum {string} */
               status:
-                | "queued"
-                | "compiling_profile"
                 | "starting_sandbox"
-                | "waiting_for_runtime"
-                | "running_script"
+                | "running"
                 | "cleaning_up"
                 | "succeeded"
                 | "failed"
                 | "cleanup_failed";
-              updatedAt: string;
               workflowRunId: string | null;
             };
           };

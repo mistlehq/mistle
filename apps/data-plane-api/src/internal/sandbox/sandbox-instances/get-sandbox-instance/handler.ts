@@ -22,7 +22,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
     {
       organizationId: query.organizationId,
       instanceId: params.id,
-      includeSetupChecks: query.includeSetupChecks,
+      ...(query.purpose === undefined ? {} : { purpose: query.purpose }),
     },
   );
 

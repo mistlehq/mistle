@@ -6,7 +6,7 @@ export const GetSandboxInstanceInputSchema = z
   .object({
     organizationId: z.string().min(1),
     instanceId: z.string().min(1),
-    includeSetupChecks: z.boolean().optional(),
+    purpose: z.enum(["session", "setup_check"]).optional(),
   })
   .strict();
 

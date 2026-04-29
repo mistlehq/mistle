@@ -202,15 +202,6 @@ export type {
   SandboxProfileVersionSnapshotJobTrigger,
 } from "./sandbox-profile-version-snapshot-jobs.js";
 export {
-  sandboxProfileSetupChecks,
-  SandboxProfileSetupCheckFailurePhases,
-  SandboxProfileSetupCheckStatuses,
-  type InsertSandboxProfileSetupCheck,
-  type SandboxProfileSetupCheck,
-  type SandboxProfileSetupCheckFailurePhase,
-  type SandboxProfileSetupCheckStatus,
-} from "./sandbox-profile-setup-checks.js";
-export {
   sandboxProfileSnapshotRefreshScheduleTargets,
   type InsertSandboxProfileSnapshotRefreshScheduleTarget,
   type SandboxProfileSnapshotRefreshScheduleTarget,

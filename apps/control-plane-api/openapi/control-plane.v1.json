@@ -14636,34 +14636,22 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     },
                     "sandboxProfileId": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     },
                     "sandboxProfileVersion": {
                       "type": "integer",
                       "minimum": 1
                     },
-                    "requestedByUserId": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
-                    "setupScript": {
-                      "type": ["string", "null"]
-                    },
-                    "primaryRepositoryId": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
-                        "queued",
-                        "compiling_profile",
                         "starting_sandbox",
-                        "waiting_for_runtime",
-                        "running_script",
+                        "running",
                         "cleaning_up",
                         "succeeded",
                         "failed",
@@ -14683,7 +14671,7 @@
                       "minLength": 1
                     },
                     "sandboxInstanceId": {
-                      "type": ["string", "null"],
+                      "type": "string",
                       "minLength": 1
                     },
                     "workflowRunId": {
@@ -14697,23 +14685,12 @@
                     "finishedAt": {
                       "type": ["string", "null"],
                       "minLength": 1
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "minLength": 1
                     }
                   },
                   "required": [
                     "id",
                     "sandboxProfileId",
                     "sandboxProfileVersion",
-                    "requestedByUserId",
-                    "setupScript",
-                    "primaryRepositoryId",
                     "status",
                     "failurePhase",
                     "failureCode",
@@ -14721,9 +14698,7 @@
                     "sandboxInstanceId",
                     "workflowRunId",
                     "startedAt",
-                    "finishedAt",
-                    "createdAt",
-                    "updatedAt"
+                    "finishedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -14930,7 +14905,7 @@
             "schema": {
               "type": "string",
               "minLength": 1,
-              "pattern": "^spc_[a-zA-Z0-9_-]+$"
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
             },
             "required": true,
             "name": "setupCheckId",
@@ -14946,34 +14921,22 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     },
                     "sandboxProfileId": {
-                      "type": "string"
+                      "type": "string",
+                      "minLength": 1
                     },
                     "sandboxProfileVersion": {
                       "type": "integer",
                       "minimum": 1
                     },
-                    "requestedByUserId": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
-                    "setupScript": {
-                      "type": ["string", "null"]
-                    },
-                    "primaryRepositoryId": {
-                      "type": ["string", "null"],
-                      "minLength": 1
-                    },
                     "status": {
                       "type": "string",
                       "enum": [
-                        "queued",
-                        "compiling_profile",
                         "starting_sandbox",
-                        "waiting_for_runtime",
-                        "running_script",
+                        "running",
                         "cleaning_up",
                         "succeeded",
                         "failed",
@@ -14993,7 +14956,7 @@
                       "minLength": 1
                     },
                     "sandboxInstanceId": {
-                      "type": ["string", "null"],
+                      "type": "string",
                       "minLength": 1
                     },
                     "workflowRunId": {
@@ -15007,23 +14970,12 @@
                     "finishedAt": {
                       "type": ["string", "null"],
                       "minLength": 1
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "minLength": 1
                     }
                   },
                   "required": [
                     "id",
                     "sandboxProfileId",
                     "sandboxProfileVersion",
-                    "requestedByUserId",
-                    "setupScript",
-                    "primaryRepositoryId",
                     "status",
                     "failurePhase",
                     "failureCode",
@@ -15031,9 +14983,7 @@
                     "sandboxInstanceId",
                     "workflowRunId",
                     "startedAt",
-                    "finishedAt",
-                    "createdAt",
-                    "updatedAt"
+                    "finishedAt"
                   ],
                   "additionalProperties": false
                 }

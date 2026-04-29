@@ -87,11 +87,13 @@ export type StopSandboxInstanceInput =
       stopReason: "idle";
       expectedOwnerLeaseId: string;
       idempotencyKey: string;
+      expectedPurpose?: "session" | "setup_check";
     }
   | {
       sandboxInstanceId: string;
       stopReason: "system";
       idempotencyKey: string;
+      expectedPurpose?: "session" | "setup_check";
     };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
@@ -159,21 +161,48 @@ export type MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse =
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
-  includeSetupChecks?: boolean;
+  purpose?: "session" | "setup_check";
 };
 const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    purpose: z.enum(["session", "snapshot", "setup_check"]),
     title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
+    startedAt: z.string().min(1).nullable(),
+    stoppedAt: z.string().min(1).nullable(),
+    failedAt: z.string().min(1).nullable(),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
   })
   .strict()
   .nullable();
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export type GetSandboxInstanceByStartIdempotencyInput = {
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  purpose: "session" | "setup_check";
+  source: "dashboard" | "webhook" | "system";
+  idempotencyKey: string;
+};
+const GetSandboxInstanceByStartIdempotencyResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict()
+  .nullable();
+export type GetSandboxInstanceByStartIdempotencyResponse = z.infer<
+  typeof GetSandboxInstanceByStartIdempotencyResponseSchema
+>;
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox/instances"]["get"]["parameters"]["query"];
 export type ListSandboxInstancesResponse =
@@ -219,6 +248,9 @@ export type DataPlaneSandboxInstancesClient = {
     input: MaterializeSandboxProfileVersionSnapshotJobInput,
   ) => Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
+  getSandboxInstanceByStartIdempotency: (
+    input: GetSandboxInstanceByStartIdempotencyInput,
+  ) => Promise<GetSandboxInstanceByStartIdempotencyResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
 
@@ -427,6 +459,9 @@ export function createDataPlaneSandboxInstancesClient(
           body: JSON.stringify({
             stopReason: stopInput.stopReason,
             idempotencyKey: stopInput.idempotencyKey,
+            ...(stopInput.expectedPurpose === undefined
+              ? {}
+              : { expectedPurpose: stopInput.expectedPurpose }),
             ...(stopInput.stopReason === "idle"
               ? { expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId }
               : {}),
@@ -626,9 +661,7 @@ export function createDataPlaneSandboxInstancesClient(
           instanceId: getInput.instanceId,
           query: {
             organizationId: getInput.organizationId,
-            ...(getInput.includeSetupChecks === undefined
-              ? {}
-              : { includeSetupChecks: getInput.includeSetupChecks ? "true" : "false" }),
+            ...(getInput.purpose === undefined ? {} : { purpose: getInput.purpose }),
           },
         }),
         {
@@ -642,6 +675,39 @@ export function createDataPlaneSandboxInstancesClient(
       if (response.status === 200) {
         const responseBody = await response.json();
         const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
+
+        return parsedResponse;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "read",
+      });
+    },
+
+    async getSandboxInstanceByStartIdempotency(getInput) {
+      const url = new URL("/internal/sandbox/instances/start-idempotency", internalClient.baseUrl);
+      url.searchParams.set("organizationId", getInput.organizationId);
+      url.searchParams.set("sandboxProfileId", getInput.sandboxProfileId);
+      url.searchParams.set("sandboxProfileVersion", String(getInput.sandboxProfileVersion));
+      url.searchParams.set("purpose", getInput.purpose);
+      url.searchParams.set("source", getInput.source);
+      url.searchParams.set("idempotencyKey", getInput.idempotencyKey);
+
+      const response = await fetch(url, {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
+        },
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
+
+      if (response.status === 200) {
+        const responseBody = await response.json();
+        const parsedResponse =
+          GetSandboxInstanceByStartIdempotencyResponseSchema.parse(responseBody);
 
         return parsedResponse;
       }

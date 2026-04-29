@@ -242,7 +242,7 @@ describe("internal sandbox instances get integration", () => {
     await expect(response.json()).resolves.toBeNull();
   });
 
-  it("returns setup-check-purpose sandbox instances when explicitly included", async ({
+  it("returns setup-check-purpose sandbox instances when explicitly requested", async ({
     fixture,
   }) => {
     await fixture.db.insert(sandboxInstances).values({
@@ -264,7 +264,7 @@ describe("internal sandbox instances get integration", () => {
 
     const response = await fetch(
       new URL(
-        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_setup_check_included?organizationId=org_dp_api_conventional_get&includeSetupChecks=true`,
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_setup_check_included?organizationId=org_dp_api_conventional_get&purpose=setup_check`,
         fixture.baseUrl,
       ),
       {
@@ -275,7 +275,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_setup_check_included",
       title: "Setup check included",
       status: "failed",
@@ -314,7 +314,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_pending",
       title: null,
       status: "pending",
@@ -373,7 +373,7 @@ describe("internal sandbox instances get integration", () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         id: "sbi_conventional_get_running",
         title: "Investigate runtime attach",
         status: "starting",
@@ -434,7 +434,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_starting_missing",
       title: null,
       status: "failed",
@@ -508,7 +508,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_starting_missing_persistent",
       title: null,
       status: "stopped",
@@ -585,7 +585,7 @@ describe("internal sandbox instances get integration", () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         id: "sbi_conventional_get_starting",
         title: null,
         status: "starting",
@@ -688,7 +688,7 @@ describe("internal sandbox instances get integration", () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         id: "sbi_conventional_get_running_attached",
         title: null,
         status: "running",
@@ -756,7 +756,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_missing",
       title: null,
       status: "failed",
@@ -830,7 +830,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_missing_persistent",
       title: null,
       status: "stopped",
@@ -905,7 +905,7 @@ describe("internal sandbox instances get integration", () => {
       );
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
+      await expect(response.json()).resolves.toMatchObject({
         id: "sbi_conventional_get_stopped_resumable",
         title: null,
         status: "stopped",
@@ -982,7 +982,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_stopped_missing",
       title: null,
       status: "failed",
@@ -1057,7 +1057,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_stopped_missing_persistent",
       title: null,
       status: "stopped",

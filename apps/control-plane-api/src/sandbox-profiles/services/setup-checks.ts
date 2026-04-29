@@ -1,16 +1,7 @@
-import {
-  sandboxProfileSetupChecks,
-  SandboxProfileSetupCheckFailurePhases,
-  type SandboxProfileSetupCheckFailurePhase,
-  SandboxProfileSetupCheckStatuses,
-  type SandboxProfileSetupCheckStatus,
-} from "@mistle/db/control-plane";
 import { SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
-import { eq, sql } from "drizzle-orm";
 
 import {
-  SandboxProfilesCompileError,
   SandboxProfilesBadRequestCodes,
   SandboxProfilesBadRequestError,
   SandboxProfilesNotFoundCodes,
@@ -20,23 +11,40 @@ import { listProfileVersionRepositoryOptions } from "./repository-options.js";
 import { startProfileInstance } from "./start-profile-instance.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
+const SetupCheckStatuses = {
+  STARTING_SANDBOX: "starting_sandbox",
+  RUNNING: "running",
+  CLEANING_UP: "cleaning_up",
+  SUCCEEDED: "succeeded",
+  FAILED: "failed",
+  CLEANUP_FAILED: "cleanup_failed",
+} as const;
+
+type SetupCheckStatus = (typeof SetupCheckStatuses)[keyof typeof SetupCheckStatuses];
+
+const SetupCheckFailurePhases = {
+  COMPILE: "compile",
+  START: "start",
+  RUNTIME_READY: "runtime_ready",
+  SCRIPT: "script",
+  CLEANUP: "cleanup",
+} as const;
+
+type SetupCheckFailurePhase =
+  (typeof SetupCheckFailurePhases)[keyof typeof SetupCheckFailurePhases];
+
 type SetupCheckOutput = {
   id: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  requestedByUserId: string | null;
-  setupScript: string | null;
-  primaryRepositoryId: string | null;
-  status: SandboxProfileSetupCheckStatus;
-  failurePhase: SandboxProfileSetupCheckFailurePhase | null;
+  status: SetupCheckStatus;
+  failurePhase: SetupCheckFailurePhase | null;
   failureCode: string | null;
   failureMessage: string | null;
-  sandboxInstanceId: string | null;
+  sandboxInstanceId: string;
   workflowRunId: string | null;
   startedAt: string | null;
   finishedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
 };
 
 type CreateProfileVersionSetupCheckInput = {
@@ -55,12 +63,6 @@ type GetProfileVersionSetupCheckInput = {
   profileVersion: number;
   setupCheckId: string;
 };
-
-const TerminalSetupCheckStatuses: ReadonlySet<SandboxProfileSetupCheckStatus> = new Set([
-  SandboxProfileSetupCheckStatuses.SUCCEEDED,
-  SandboxProfileSetupCheckStatuses.FAILED,
-  SandboxProfileSetupCheckStatuses.CLEANUP_FAILED,
-]);
 
 async function verifyProfileVersionExists(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
@@ -135,308 +137,70 @@ async function validatePrimaryRepositoryId(
   );
 }
 
-async function findSetupCheckByIdempotencyKey(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    idempotencyKey?: string;
-  },
-): Promise<SetupCheckOutput | null> {
-  if (input.idempotencyKey === undefined) {
-    return null;
-  }
-  const idempotencyKey = input.idempotencyKey;
-
-  const setupCheck = await db.query.sandboxProfileSetupChecks.findFirst({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, input.organizationId),
-        eq(table.sandboxProfileId, input.profileId),
-        eq(table.sandboxProfileVersion, input.profileVersion),
-        eq(table.idempotencyKey, idempotencyKey),
-      ),
-  });
-
-  if (setupCheck === undefined) {
-    return null;
-  }
-
-  return toSetupCheckOutput(setupCheck);
-}
-
-async function markSetupCheckStartFailed(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: {
-    setupCheckId: string;
-    error: unknown;
-  },
-): Promise<void> {
-  const failureMessage =
-    input.error instanceof Error ? input.error.message : "Failed to start setup check sandbox.";
-  const failurePhase =
-    input.error instanceof SandboxProfilesCompileError
-      ? SandboxProfileSetupCheckFailurePhases.COMPILE
-      : SandboxProfileSetupCheckFailurePhases.START;
-  const failureCode =
-    input.error instanceof SandboxProfilesCompileError
-      ? input.error.code
-      : "SETUP_CHECK_START_FAILED";
-
-  await db
-    .update(sandboxProfileSetupChecks)
-    .set({
-      status: SandboxProfileSetupCheckStatuses.FAILED,
-      failurePhase,
-      failureCode,
-      failureMessage,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(sandboxProfileSetupChecks.id, input.setupCheckId));
-}
-
-async function startCreatedSetupCheck(
-  {
-    db,
-    integrationsConfig,
-    dataPlaneClient,
-    defaultBaseImage,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient"> & {
-    defaultBaseImage: string;
-  },
-  input: CreateProfileVersionSetupCheckInput & {
-    setupCheckId: string;
-  },
-): Promise<SetupCheckOutput> {
-  await db
-    .update(sandboxProfileSetupChecks)
-    .set({
-      status: SandboxProfileSetupCheckStatuses.COMPILING_PROFILE,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(sandboxProfileSetupChecks.id, input.setupCheckId));
-
-  try {
-    const startedSandbox = await startProfileInstance(
-      {
-        db,
-        integrationsConfig,
-        dataPlaneClient,
-        defaultBaseImage,
-      },
-      {
-        organizationId: input.organizationId,
-        profileId: input.profileId,
-        profileVersion: input.profileVersion,
-        purpose: SandboxInstancePurposes.SETUP_CHECK,
-        idempotencyKey: input.setupCheckId,
-        setupScript: input.setupScript,
-        startedBy: {
-          kind: "user",
-          id: input.requestedByUserId,
-        },
-        actingUser: {
-          userId: input.requestedByUserId,
-        },
-        source: "dashboard",
-        ...(input.primaryRepositoryId === undefined
-          ? {}
-          : { primaryRepositoryId: input.primaryRepositoryId }),
-      },
-    );
-
-    const [startedSetupCheck] = await db
-      .update(sandboxProfileSetupChecks)
-      .set({
-        status: SandboxProfileSetupCheckStatuses.STARTING_SANDBOX,
-        sandboxInstanceId: startedSandbox.sandboxInstanceId,
-        workflowRunId: startedSandbox.workflowRunId,
-        startedAt: sql`now()`,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(sandboxProfileSetupChecks.id, input.setupCheckId))
-      .returning();
-
-    if (startedSetupCheck === undefined) {
-      throw new Error(`Setup check '${input.setupCheckId}' disappeared before start completed.`);
-    }
-
-    return toSetupCheckOutput(startedSetupCheck);
-  } catch (error) {
-    await markSetupCheckStartFailed(
-      {
-        db,
-      },
-      {
-        setupCheckId: input.setupCheckId,
-        error,
-      },
-    );
-    throw error;
-  }
-}
-
-function toSetupCheckOutput(
-  setupCheck: typeof sandboxProfileSetupChecks.$inferSelect,
-): SetupCheckOutput {
+function toAcceptedSetupCheckOutput(input: {
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  sandboxInstanceId: string;
+  workflowRunId: string;
+}): SetupCheckOutput {
   return {
-    id: setupCheck.id,
-    sandboxProfileId: setupCheck.sandboxProfileId,
-    sandboxProfileVersion: setupCheck.sandboxProfileVersion,
-    requestedByUserId: setupCheck.requestedByUserId,
-    setupScript: setupCheck.setupScript,
-    primaryRepositoryId: setupCheck.primaryRepositoryId,
-    status: setupCheck.status,
-    failurePhase: setupCheck.failurePhase,
-    failureCode: setupCheck.failureCode,
-    failureMessage: setupCheck.failureMessage,
-    sandboxInstanceId: setupCheck.sandboxInstanceId,
-    workflowRunId: setupCheck.workflowRunId,
-    startedAt: setupCheck.startedAt,
-    finishedAt: setupCheck.finishedAt,
-    createdAt: setupCheck.createdAt,
-    updatedAt: setupCheck.updatedAt,
+    id: input.sandboxInstanceId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    status: SetupCheckStatuses.STARTING_SANDBOX,
+    failurePhase: null,
+    failureCode: null,
+    failureMessage: null,
+    sandboxInstanceId: input.sandboxInstanceId,
+    workflowRunId: input.workflowRunId,
+    startedAt: null,
+    finishedAt: null,
   };
 }
 
-async function updateSetupCheckFromSandboxInstance(
-  { db, dataPlaneClient }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneClient">,
-  setupCheck: typeof sandboxProfileSetupChecks.$inferSelect,
-): Promise<typeof sandboxProfileSetupChecks.$inferSelect> {
-  if (setupCheck.sandboxInstanceId === null || TerminalSetupCheckStatuses.has(setupCheck.status)) {
-    return setupCheck;
-  }
+function toFailedSetupCheckOutput(input: {
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  sandboxInstanceId: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+  failedAt: string | null;
+}): SetupCheckOutput {
+  return {
+    id: input.sandboxInstanceId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    status: SetupCheckStatuses.FAILED,
+    failurePhase: SetupCheckFailurePhases.START,
+    failureCode: input.failureCode ?? "SETUP_CHECK_SANDBOX_FAILED",
+    failureMessage: input.failureMessage ?? "Setup check sandbox failed before it became ready.",
+    sandboxInstanceId: input.sandboxInstanceId,
+    workflowRunId: null,
+    startedAt: null,
+    finishedAt: input.failedAt,
+  };
+}
 
-  const sandboxInstance = await dataPlaneClient.getSandboxInstance({
-    organizationId: setupCheck.organizationId,
-    instanceId: setupCheck.sandboxInstanceId,
-    includeSetupChecks: true,
-  });
-
-  if (sandboxInstance === null) {
-    throw new Error(
-      `Setup check '${setupCheck.id}' references missing sandbox instance '${setupCheck.sandboxInstanceId}'.`,
-    );
-  }
-
-  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
-    return setupCheck;
-  }
-
-  if (sandboxInstance.status === "running") {
-    if (setupCheck.status === SandboxProfileSetupCheckStatuses.CLEANING_UP) {
-      return setupCheck;
-    }
-
-    const [cleaningUpSetupCheck] = await db
-      .update(sandboxProfileSetupChecks)
-      .set({
-        status: SandboxProfileSetupCheckStatuses.CLEANING_UP,
-        failurePhase: null,
-        failureCode: null,
-        failureMessage: null,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(sandboxProfileSetupChecks.id, setupCheck.id))
-      .returning();
-
-    if (cleaningUpSetupCheck === undefined) {
-      throw new Error(`Setup check '${setupCheck.id}' disappeared before cleanup started.`);
-    }
-
-    try {
-      await dataPlaneClient.stopSandboxInstance({
-        sandboxInstanceId: setupCheck.sandboxInstanceId,
-        stopReason: "system",
-        idempotencyKey: `setup-check-cleanup:${setupCheck.id}`,
-      });
-    } catch (error) {
-      const failureMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to stop setup check sandbox after successful startup.";
-
-      const [cleanupFailedSetupCheck] = await db
-        .update(sandboxProfileSetupChecks)
-        .set({
-          status: SandboxProfileSetupCheckStatuses.CLEANUP_FAILED,
-          failurePhase: SandboxProfileSetupCheckFailurePhases.CLEANUP,
-          failureCode: "SETUP_CHECK_CLEANUP_START_FAILED",
-          failureMessage,
-          finishedAt: sql`now()`,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(sandboxProfileSetupChecks.id, setupCheck.id))
-        .returning();
-
-      if (cleanupFailedSetupCheck === undefined) {
-        throw new Error(`Setup check '${setupCheck.id}' disappeared after cleanup failed.`);
-      }
-
-      return cleanupFailedSetupCheck;
-    }
-
-    return cleaningUpSetupCheck;
-  }
-
-  if (
-    sandboxInstance.status === "stopped" &&
-    setupCheck.status === SandboxProfileSetupCheckStatuses.CLEANING_UP
-  ) {
-    const [succeededSetupCheck] = await db
-      .update(sandboxProfileSetupChecks)
-      .set({
-        status: SandboxProfileSetupCheckStatuses.SUCCEEDED,
-        failurePhase: null,
-        failureCode: null,
-        failureMessage: null,
-        finishedAt: sql`now()`,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(sandboxProfileSetupChecks.id, setupCheck.id))
-      .returning();
-
-    if (succeededSetupCheck === undefined) {
-      throw new Error(`Setup check '${setupCheck.id}' disappeared before success completed.`);
-    }
-
-    return succeededSetupCheck;
-  }
-
-  const update =
-    sandboxInstance.status === "stopped"
-      ? {
-          failureCode: sandboxInstance.failureCode ?? "SETUP_CHECK_SANDBOX_STOPPED",
-          failureMessage:
-            sandboxInstance.failureMessage ??
-            "Setup check sandbox stopped before cleanup was requested.",
-        }
-      : {
-          failureCode: sandboxInstance.failureCode ?? "SETUP_CHECK_SANDBOX_FAILED",
-          failureMessage:
-            sandboxInstance.failureMessage ?? "Setup check sandbox failed before it became ready.",
-        };
-
-  const [updatedSetupCheck] = await db
-    .update(sandboxProfileSetupChecks)
-    .set({
-      status: SandboxProfileSetupCheckStatuses.FAILED,
-      failurePhase: SandboxProfileSetupCheckFailurePhases.START,
-      failureCode: update.failureCode,
-      failureMessage: update.failureMessage,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(sandboxProfileSetupChecks.id, setupCheck.id))
-    .returning();
-
-  if (updatedSetupCheck === undefined) {
-    throw new Error(`Setup check '${setupCheck.id}' disappeared before status reconciliation.`);
-  }
-
-  return updatedSetupCheck;
+function toSucceededSetupCheckOutput(input: {
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  sandboxInstanceId: string;
+  startedAt: string | null;
+  stoppedAt: string | null;
+}): SetupCheckOutput {
+  return {
+    id: input.sandboxInstanceId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    status: SetupCheckStatuses.SUCCEEDED,
+    failurePhase: null,
+    failureCode: null,
+    failureMessage: null,
+    sandboxInstanceId: input.sandboxInstanceId,
+    workflowRunId: null,
+    startedAt: input.startedAt,
+    finishedAt: input.stoppedAt,
+  };
 }
 
 export async function createProfileVersionSetupCheck(
@@ -452,54 +216,62 @@ export async function createProfileVersionSetupCheck(
 ): Promise<SetupCheckOutput> {
   await verifyProfileVersionExists({ db }, input);
 
-  const existingSetupCheck = await findSetupCheckByIdempotencyKey({ db }, input);
-  if (existingSetupCheck !== null) {
-    return existingSetupCheck;
+  if (input.idempotencyKey !== undefined) {
+    const existingSetupCheck = await dataPlaneClient.getSandboxInstanceByStartIdempotency({
+      organizationId: input.organizationId,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      source: "dashboard",
+      idempotencyKey: input.idempotencyKey,
+    });
+
+    if (existingSetupCheck !== null) {
+      return toAcceptedSetupCheckOutput({
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: input.profileVersion,
+        sandboxInstanceId: existingSetupCheck.sandboxInstanceId,
+        workflowRunId: existingSetupCheck.workflowRunId,
+      });
+    }
   }
 
   await validatePrimaryRepositoryId({ db }, input);
 
-  const [createdSetupCheck] = await db
-    .insert(sandboxProfileSetupChecks)
-    .values({
+  const startedSandbox = await startProfileInstance(
+    {
+      db,
+      integrationsConfig,
+      dataPlaneClient,
+      defaultBaseImage,
+    },
+    {
       organizationId: input.organizationId,
-      sandboxProfileId: input.profileId,
-      sandboxProfileVersion: input.profileVersion,
-      requestedByUserId: input.requestedByUserId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
       setupScript: input.setupScript,
-      primaryRepositoryId: input.primaryRepositoryId ?? null,
-      idempotencyKey: input.idempotencyKey ?? null,
-      status: SandboxProfileSetupCheckStatuses.QUEUED,
-    })
-    .onConflictDoNothing()
-    .returning();
-
-  if (createdSetupCheck !== undefined) {
-    return startCreatedSetupCheck(
-      {
-        db,
-        integrationsConfig,
-        dataPlaneClient,
-        defaultBaseImage,
+      startedBy: {
+        kind: "user",
+        id: input.requestedByUserId,
       },
-      {
-        ...input,
-        setupCheckId: createdSetupCheck.id,
+      actingUser: {
+        userId: input.requestedByUserId,
       },
-    );
-  }
+      source: "dashboard",
+      ...(input.primaryRepositoryId === undefined
+        ? {}
+        : { primaryRepositoryId: input.primaryRepositoryId }),
+    },
+  );
 
-  const idempotencyKey = input.idempotencyKey;
-  if (idempotencyKey === undefined) {
-    throw new Error("Setup check insert did not return a row and no idempotency key was provided.");
-  }
-
-  const concurrentlyCreatedSetupCheck = await findSetupCheckByIdempotencyKey({ db }, input);
-  if (concurrentlyCreatedSetupCheck === null) {
-    throw new Error("Setup check insert conflicted but the idempotent setup check was not found.");
-  }
-
-  return concurrentlyCreatedSetupCheck;
+  return toAcceptedSetupCheckOutput({
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.profileVersion,
+    sandboxInstanceId: startedSandbox.sandboxInstanceId,
+    workflowRunId: startedSandbox.workflowRunId,
+  });
 }
 
 export async function getProfileVersionSetupCheck(
@@ -508,29 +280,96 @@ export async function getProfileVersionSetupCheck(
 ): Promise<SetupCheckOutput> {
   await verifyProfileVersionExists({ db }, input);
 
-  const setupCheck = await db.query.sandboxProfileSetupChecks.findFirst({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.id, input.setupCheckId),
-        eq(table.organizationId, input.organizationId),
-        eq(table.sandboxProfileId, input.profileId),
-        eq(table.sandboxProfileVersion, input.profileVersion),
-      ),
+  const sandboxInstance = await dataPlaneClient.getSandboxInstance({
+    organizationId: input.organizationId,
+    instanceId: input.setupCheckId,
+    purpose: SandboxInstancePurposes.SETUP_CHECK,
   });
 
-  if (setupCheck === undefined) {
+  if (
+    sandboxInstance === null ||
+    sandboxInstance.sandboxProfileId !== input.profileId ||
+    sandboxInstance.sandboxProfileVersion !== input.profileVersion
+  ) {
     throw new NotFoundError("SETUP_CHECK_NOT_FOUND", "Sandbox profile setup check was not found.");
   }
 
-  const reconciledSetupCheck = await updateSetupCheckFromSandboxInstance(
-    {
-      db,
-      dataPlaneClient,
-    },
-    setupCheck,
-  );
+  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
+    return {
+      id: sandboxInstance.id,
+      sandboxProfileId: sandboxInstance.sandboxProfileId,
+      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      status: SetupCheckStatuses.STARTING_SANDBOX,
+      failurePhase: null,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      sandboxInstanceId: sandboxInstance.id,
+      workflowRunId: null,
+      startedAt: sandboxInstance.startedAt,
+      finishedAt: null,
+    };
+  }
 
-  return toSetupCheckOutput(reconciledSetupCheck);
+  if (sandboxInstance.status === "failed") {
+    return toFailedSetupCheckOutput({
+      sandboxProfileId: sandboxInstance.sandboxProfileId,
+      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      sandboxInstanceId: sandboxInstance.id,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      failedAt: sandboxInstance.failedAt,
+    });
+  }
+
+  if (sandboxInstance.status === "stopped") {
+    return toSucceededSetupCheckOutput({
+      sandboxProfileId: sandboxInstance.sandboxProfileId,
+      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      sandboxInstanceId: sandboxInstance.id,
+      startedAt: sandboxInstance.startedAt,
+      stoppedAt: sandboxInstance.stoppedAt,
+    });
+  }
+
+  try {
+    await dataPlaneClient.stopSandboxInstance({
+      sandboxInstanceId: sandboxInstance.id,
+      stopReason: "system",
+      expectedPurpose: SandboxInstancePurposes.SETUP_CHECK,
+      idempotencyKey: `setup-check-cleanup:${sandboxInstance.id}`,
+    });
+  } catch (error) {
+    return {
+      id: sandboxInstance.id,
+      sandboxProfileId: sandboxInstance.sandboxProfileId,
+      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      status: SetupCheckStatuses.CLEANUP_FAILED,
+      failurePhase: SetupCheckFailurePhases.CLEANUP,
+      failureCode: "SETUP_CHECK_CLEANUP_START_FAILED",
+      failureMessage:
+        error instanceof Error
+          ? error.message
+          : "Failed to stop setup check sandbox after successful startup.",
+      sandboxInstanceId: sandboxInstance.id,
+      workflowRunId: null,
+      startedAt: sandboxInstance.startedAt,
+      finishedAt: null,
+    };
+  }
+
+  return {
+    id: sandboxInstance.id,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    status: SetupCheckStatuses.CLEANING_UP,
+    failurePhase: null,
+    failureCode: null,
+    failureMessage: null,
+    sandboxInstanceId: sandboxInstance.id,
+    workflowRunId: null,
+    startedAt: sandboxInstance.startedAt,
+    finishedAt: null,
+  };
 }
 
 export type {

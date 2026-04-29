@@ -16,15 +16,18 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
           stopReason: body.stopReason,
           expectedOwnerLeaseId: body.expectedOwnerLeaseId,
           idempotencyKey: body.idempotencyKey,
+          ...(body.expectedPurpose === undefined ? {} : { expectedPurpose: body.expectedPurpose }),
         }
       : {
           sandboxInstanceId: params.id,
           stopReason: body.stopReason,
           idempotencyKey: body.idempotencyKey,
+          ...(body.expectedPurpose === undefined ? {} : { expectedPurpose: body.expectedPurpose }),
         };
 
   const response = await stopSandboxInstance(
     {
+      db: ctx.get("resources").db,
       openWorkflow,
     },
     stopInput,

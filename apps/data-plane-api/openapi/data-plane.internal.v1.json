@@ -1782,6 +1782,151 @@
         }
       }
     },
+    "/internal/sandbox/instances/start-idempotency": {
+      "get": {
+        "tags": ["Internal"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "organizationId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "sandboxProfileId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "sandboxProfileVersion",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["session", "setup_check"]
+            },
+            "required": true,
+            "name": "purpose",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["dashboard", "webhook", "system"]
+            },
+            "required": true,
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "required": true,
+            "name": "idempotencyKey",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Find a sandbox instance start by idempotency key for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox/instances/:id": {
       "get": {
         "tags": ["Internal"],
@@ -1807,10 +1952,10 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["true", "false"]
+              "enum": ["session", "setup_check"]
             },
             "required": false,
-            "name": "includeSetupChecks",
+            "name": "purpose",
             "in": "query"
           }
         ],
@@ -1825,6 +1970,18 @@
                     "id": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxProfileVersion": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "purpose": {
+                      "type": "string",
+                      "enum": ["session", "snapshot", "setup_check"]
                     },
                     "title": {
                       "type": ["string", "null"],
@@ -3009,16 +3166,44 @@
                         "agentRuntimes"
                       ],
                       "additionalProperties": false
+                    },
+                    "startedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "stoppedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failedAt": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
                     }
                   },
                   "required": [
                     "id",
+                    "sandboxProfileId",
+                    "sandboxProfileVersion",
+                    "purpose",
                     "title",
                     "status",
                     "connectable",
                     "failureCode",
                     "failureMessage",
-                    "runtimePlan"
+                    "runtimePlan",
+                    "startedAt",
+                    "stoppedAt",
+                    "failedAt",
+                    "createdAt",
+                    "updatedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -3566,6 +3751,10 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "expectedPurpose": {
+                        "type": "string",
+                        "enum": ["session", "setup_check"]
                       }
                     },
                     "required": ["stopReason", "expectedOwnerLeaseId", "idempotencyKey"],
@@ -3582,6 +3771,10 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 255
+                      },
+                      "expectedPurpose": {
+                        "type": "string",
+                        "enum": ["session", "setup_check"]
                       }
                     },
                     "required": ["stopReason", "idempotencyKey"],

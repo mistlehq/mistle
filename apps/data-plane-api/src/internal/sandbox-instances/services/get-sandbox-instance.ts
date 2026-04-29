@@ -26,10 +26,18 @@ export async function getSandboxInstance(
   const [sandboxInstance] = await ctx.db
     .select({
       id: sandboxInstances.id,
+      sandboxProfileId: sandboxInstances.sandboxProfileId,
+      sandboxProfileVersion: sandboxInstances.sandboxProfileVersion,
+      purpose: sandboxInstances.purpose,
       title: sandboxInstances.title,
       status: sandboxInstances.status,
       failureCode: sandboxInstances.failureCode,
       failureMessage: sandboxInstances.failureMessage,
+      startedAt: sandboxInstances.startedAt,
+      stoppedAt: sandboxInstances.stoppedAt,
+      failedAt: sandboxInstances.failedAt,
+      createdAt: sandboxInstances.createdAt,
+      updatedAt: sandboxInstances.updatedAt,
       compiledRuntimePlan: sandboxInstanceRuntimePlans.compiledRuntimePlan,
     })
     .from(sandboxInstances)
@@ -44,7 +52,7 @@ export async function getSandboxInstance(
       and(
         eq(sandboxInstances.id, input.instanceId),
         eq(sandboxInstances.organizationId, input.organizationId),
-        eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+        eq(sandboxInstances.purpose, input.purpose ?? SandboxInstancePurposes.SESSION),
       ),
     )
     .limit(1);
@@ -65,6 +73,9 @@ export async function getSandboxInstance(
 
   return {
     id: sandboxInstance.id,
+    sandboxProfileId: sandboxInstance.sandboxProfileId,
+    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    purpose: sandboxInstance.purpose,
     title: sandboxInstance.title,
     status,
     connectable: status === "running",
@@ -74,5 +85,10 @@ export async function getSandboxInstance(
       sandboxInstance.compiledRuntimePlan === null
         ? null
         : CompiledRuntimePlanSchema.parse(sandboxInstance.compiledRuntimePlan),
+    startedAt: sandboxInstance.startedAt,
+    stoppedAt: sandboxInstance.stoppedAt,
+    failedAt: sandboxInstance.failedAt,
+    createdAt: sandboxInstance.createdAt,
+    updatedAt: sandboxInstance.updatedAt,
   };
 }

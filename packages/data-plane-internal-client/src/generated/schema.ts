@@ -555,8 +555,8 @@ export interface paths {
     get: {
       parameters: {
         query: {
-          includeSetupChecks?: "true" | "false";
           organizationId: string;
+          purpose?: "session" | "setup_check";
         };
         header?: never;
         path: {
@@ -574,9 +574,13 @@ export interface paths {
           content: {
             "application/json": {
               connectable: boolean;
+              createdAt: string;
+              failedAt: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
+              /** @enum {string} */
+              purpose: "session" | "snapshot" | "setup_check";
               runtimePlan: {
                 agentRuntimes: {
                   bindingId: string;
@@ -908,9 +912,14 @@ export interface paths {
                   sourceKind: "git-clone";
                 }[];
               } | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion: number;
+              startedAt: string | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
+              stoppedAt: string | null;
               title: string | null;
+              updatedAt: string;
             } | null;
           };
         };
@@ -1405,11 +1414,15 @@ export interface paths {
           "application/json":
             | {
                 expectedOwnerLeaseId: string;
+                /** @enum {string} */
+                expectedPurpose?: "session" | "setup_check";
                 idempotencyKey: string;
                 /** @enum {string} */
                 stopReason: "idle";
               }
             | {
+                /** @enum {string} */
+                expectedPurpose?: "session" | "setup_check";
                 idempotencyKey: string;
                 /** @enum {string} */
                 stopReason: "system";
@@ -1468,6 +1481,88 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/start-idempotency": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          idempotencyKey: string;
+          organizationId: string;
+          purpose: "session" | "setup_check";
+          sandboxProfileId: string;
+          sandboxProfileVersion: number;
+          source: "dashboard" | "webhook" | "system";
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Find a sandbox instance start by idempotency key for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            } | null;
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
