@@ -7,13 +7,16 @@ import { SandboxProfilesApiError } from "./sandbox-profiles-api-errors.js";
 import type {
   CreateSandboxProfileInput,
   DeleteSandboxProfileResult,
+  DeleteSandboxProfileVersionRefreshScheduleResult,
   LaunchableSandboxProfilesResult,
+  PutSandboxProfileVersionRefreshScheduleInput,
   SandboxIntegrationBindingKind,
   SandboxProfile,
   SandboxProfileVersion,
   SandboxProfileVersionPublishability,
   SandboxProfileVersionIntegrationBinding,
   SandboxProfileVersionAutomationConfig,
+  SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
@@ -358,6 +361,27 @@ const DiscardSandboxProfileVersionDraftResultSchema = z
   })
   .strict();
 
+const SandboxProfileVersionRefreshScheduleResponseSchema = z
+  .object({
+    scheduleId: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    name: z.string().min(1),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+    enabled: z.boolean(),
+    nextScheduledAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const DeleteSandboxProfileVersionRefreshScheduleResultSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    deleted: z.boolean(),
+  })
+  .strict();
+
 function normalizeSandboxProfileVersionPublishability(
   input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
 ): SandboxProfileVersionPublishability {
@@ -597,6 +621,86 @@ export async function refreshSandboxProfileVersion(input: {
         operation: "refreshSandboxProfileVersion",
         error,
         fallbackMessage: "Could not refresh sandbox profile snapshot.",
+      }),
+    );
+  }
+}
+
+export async function putSandboxProfileVersionRefreshSchedule(
+  input: PutSandboxProfileVersionRefreshScheduleInput,
+): Promise<SandboxProfileVersionRefreshSchedule> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putSandboxProfileVersionRefreshSchedule",
+      method: "PUT",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/refresh-schedule`,
+      body: {
+        cronExpression: input.cronExpression,
+        timezone: input.timezone,
+        ...(input.name === undefined ? {} : { name: input.name }),
+      },
+      fallbackMessage: "Could not save sandbox profile snapshot refresh schedule.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      SandboxProfileVersionRefreshScheduleResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionRefreshSchedule",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile snapshot refresh schedule response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "putSandboxProfileVersionRefreshSchedule",
+        error,
+        fallbackMessage: "Could not save sandbox profile snapshot refresh schedule.",
+      }),
+    );
+  }
+}
+
+export async function deleteSandboxProfileVersionRefreshSchedule(input: {
+  profileId: string;
+  version: number;
+}): Promise<DeleteSandboxProfileVersionRefreshScheduleResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "deleteSandboxProfileVersionRefreshSchedule",
+      method: "DELETE",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/refresh-schedule`,
+      fallbackMessage: "Could not remove sandbox profile snapshot refresh schedule.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      DeleteSandboxProfileVersionRefreshScheduleResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "deleteSandboxProfileVersionRefreshSchedule",
+        status: 500,
+        body: responseBody,
+        message: "Delete sandbox profile snapshot refresh schedule response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "deleteSandboxProfileVersionRefreshSchedule",
+        error,
+        fallbackMessage: "Could not remove sandbox profile snapshot refresh schedule.",
       }),
     );
   }

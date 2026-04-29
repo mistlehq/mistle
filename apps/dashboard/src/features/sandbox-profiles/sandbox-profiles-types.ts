@@ -16,6 +16,12 @@ type DeleteSandboxProfileResponse =
   paths["/v1/sandbox/profiles/{profileId}"]["delete"]["responses"][202]["content"]["application/json"];
 type SandboxProfileVersionIntegrationBindingsResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings"]["get"]["responses"][200]["content"]["application/json"];
+type PutSandboxProfileVersionRefreshScheduleRequest =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["put"]["requestBody"]["content"]["application/json"];
+type PutSandboxProfileVersionRefreshScheduleResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["put"]["responses"][200]["content"]["application/json"];
+type DeleteSandboxProfileVersionRefreshScheduleResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["delete"]["responses"][200]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
@@ -42,6 +48,14 @@ export type SandboxIntegrationBindingKind =
   (typeof SandboxIntegrationBindingKinds)[keyof typeof SandboxIntegrationBindingKinds];
 
 export type SandboxProfileVersion = ListSandboxProfileVersionsResponse["versions"][number];
+export type SandboxProfileVersionRefreshSchedule = PutSandboxProfileVersionRefreshScheduleResponse;
+export type PutSandboxProfileVersionRefreshScheduleInput =
+  PutSandboxProfileVersionRefreshScheduleRequest & {
+    profileId: string;
+    version: number;
+  };
+export type DeleteSandboxProfileVersionRefreshScheduleResult =
+  DeleteSandboxProfileVersionRefreshScheduleResponse;
 
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
