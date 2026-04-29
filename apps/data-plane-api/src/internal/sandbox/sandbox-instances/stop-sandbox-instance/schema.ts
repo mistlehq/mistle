@@ -21,7 +21,7 @@ export const StopSandboxInstanceBodySchema = z.discriminatedUnion("stopReason", 
     .object({
       stopReason: z.literal("system"),
       idempotencyKey: z.string().min(1).max(255),
-      expectedPurpose: z.enum(["session", "setup_check"]).optional(),
+      expectedPurpose: z.literal("setup_check"),
     })
     .strict(),
 ]);

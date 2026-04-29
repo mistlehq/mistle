@@ -15,7 +15,7 @@ export const StopSandboxInstanceInputSchema = z.discriminatedUnion("stopReason",
       sandboxInstanceId: z.string().min(1),
       stopReason: z.literal("system"),
       idempotencyKey: z.string().min(1).max(255),
-      expectedPurpose: z.enum(["session", "setup_check"]).optional(),
+      expectedPurpose: z.literal("setup_check"),
     })
     .strict(),
 ]);

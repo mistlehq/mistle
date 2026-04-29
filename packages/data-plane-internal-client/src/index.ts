@@ -93,7 +93,7 @@ export type StopSandboxInstanceInput =
       sandboxInstanceId: string;
       stopReason: "system";
       idempotencyKey: string;
-      expectedPurpose?: "session" | "setup_check";
+      expectedPurpose: "setup_check";
     };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];

@@ -291,14 +291,58 @@ describe("StopSandboxInstanceInputSchema", () => {
     expect(StopSandboxInstanceInputSchema.parse(input)).toEqual(input);
   });
 
-  it("accepts a system stop request without an owner lease", () => {
+  it("accepts a setup-check system stop request without an owner lease", () => {
     const input = {
       sandboxInstanceId: "sbi_123",
       stopReason: "system",
       idempotencyKey: "stop-idempotency-123",
+      expectedPurpose: "setup_check",
     };
 
     expect(StopSandboxInstanceInputSchema.parse(input)).toEqual(input);
+  });
+
+  it("rejects system stop requests that omit the setup-check purpose", () => {
+    const result = StopSandboxInstanceInputSchema.safeParse({
+      sandboxInstanceId: "sbi_123",
+      stopReason: "system",
+      idempotencyKey: "stop-idempotency-123",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected system stop request validation to fail.");
+    }
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["expectedPurpose"],
+        }),
+      ]),
+    );
+  });
+
+  it("rejects system stop requests for session sandboxes", () => {
+    const result = StopSandboxInstanceInputSchema.safeParse({
+      sandboxInstanceId: "sbi_123",
+      stopReason: "system",
+      idempotencyKey: "stop-idempotency-123",
+      expectedPurpose: "session",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected system stop request validation to fail.");
+    }
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["expectedPurpose"],
+        }),
+      ]),
+    );
   });
 
   it("requires an explicit idempotency key", () => {

@@ -1422,7 +1422,7 @@ export interface paths {
               }
             | {
                 /** @enum {string} */
-                expectedPurpose?: "session" | "setup_check";
+                expectedPurpose: "setup_check";
                 idempotencyKey: string;
                 /** @enum {string} */
                 stopReason: "system";

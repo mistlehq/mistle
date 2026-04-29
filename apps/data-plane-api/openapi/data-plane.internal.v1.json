@@ -3774,10 +3774,10 @@
                       },
                       "expectedPurpose": {
                         "type": "string",
-                        "enum": ["session", "setup_check"]
+                        "enum": ["setup_check"]
                       }
                     },
-                    "required": ["stopReason", "idempotencyKey"],
+                    "required": ["stopReason", "idempotencyKey", "expectedPurpose"],
                     "additionalProperties": false
                   }
                 ]
