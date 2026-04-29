@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { Config } from "./schema.js";
-import { selectControlPlaneApiConfig } from "./selectors.js";
+import { ConfigSchema, type Config } from "./schema.js";
+import { selectControlPlaneApiConfig, selectDataPlaneGatewayConfig } from "./selectors.js";
 
 function createRootConfig(input: {
+  dataPlaneKv?: Config["kv"]["data_plane"];
   enabledMethods?: Array<"otp" | "google">;
   google?: {
     client_id: string;
@@ -91,7 +92,7 @@ function createRootConfig(input: {
       },
     },
     kv: {
-      data_plane: {
+      data_plane: input.dataPlaneKv ?? {
         backend: "valkey",
         url: "redis://data-valkey:6379",
         key_prefix: "mistle:data",
@@ -202,5 +203,45 @@ describe("selectControlPlaneApiConfig", () => {
     );
 
     expect(config.auth.google).toBeUndefined();
+  });
+});
+
+describe("selectDataPlaneGatewayConfig", () => {
+  it("accepts data-plane memory runtime state in root config", () => {
+    const rootConfig = createRootConfig({
+      dataPlaneKv: {
+        backend: "memory",
+      },
+    });
+
+    expect(ConfigSchema.parse(rootConfig).kv.data_plane).toEqual({
+      backend: "memory",
+    });
+  });
+
+  it("projects valkey runtime state config", () => {
+    const config = selectDataPlaneGatewayConfig(createRootConfig({}));
+
+    expect(config.runtimeState).toEqual({
+      backend: "valkey",
+      valkey: {
+        url: "redis://data-valkey:6379",
+        keyPrefix: "mistle:data",
+      },
+    });
+  });
+
+  it("projects memory runtime state config without valkey settings", () => {
+    const config = selectDataPlaneGatewayConfig(
+      createRootConfig({
+        dataPlaneKv: {
+          backend: "memory",
+        },
+      }),
+    );
+
+    expect(config.runtimeState).toEqual({
+      backend: "memory",
+    });
   });
 });

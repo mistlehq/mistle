@@ -17,6 +17,7 @@ Values:
 | `dataPlaneApi.baseUrl`          | `string`               | Internal base URL for gateway calls into `data-plane-api`.    | None    | `MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL`    |
 | `controlPlaneApi.baseUrl`       | `string`               | Internal base URL for gateway calls into `control-plane-api`. | None    | `MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL` |
 
-`runtimeState.backend = "memory"` is for local and integration-test wiring. Root TOML
-configuration projects `kv.data_plane` into the gateway and currently supports `valkey`
-for operator/self-hosted deployments.
+`runtimeState.backend = "memory"` is for local, single-node, and integration-test wiring.
+Root TOML configuration projects `kv.data_plane` into the gateway. When
+`kv.data_plane.backend = "memory"`, omit `kv.data_plane.url` and
+`kv.data_plane.key_prefix`.

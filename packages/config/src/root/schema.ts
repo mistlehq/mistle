@@ -38,13 +38,22 @@ const SandboxObjectStoreSchema = ObjectStoreSchema.extend({
 
 const AuthMethodSchema = z.enum(["otp", "google"]);
 
-const KvSchema = z
+const ValkeyKvSchema = z
   .object({
-    backend: z.enum(["valkey"]),
+    backend: z.literal("valkey"),
     url: z.string().trim().min(1),
     key_prefix: z.string().trim().min(1),
   })
   .strict();
+
+const DataPlaneKvSchema = z.discriminatedUnion("backend", [
+  z
+    .object({
+      backend: z.literal("memory"),
+    })
+    .strict(),
+  ValkeyKvSchema,
+]);
 
 const SandboxStorageArchilSchema = z
   .object({
@@ -208,8 +217,8 @@ export const ConfigSchema = z
       .strict(),
     kv: z
       .object({
-        control_plane: KvSchema.optional(),
-        data_plane: KvSchema,
+        control_plane: ValkeyKvSchema.optional(),
+        data_plane: DataPlaneKvSchema,
       })
       .strict(),
     object_store: z

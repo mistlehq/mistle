@@ -28,8 +28,9 @@ const TomlConfigComments: readonly CommentedSection[] = [
   {
     heading: "[kv.data_plane]",
     comments: [
-      "# Valkey is modeled as a shared dependency. Services consume the plane-specific",
-      "# KV backend they need instead of owning duplicated Valkey config.",
+      '# Data-plane gateway runtime state supports backend = "valkey" for shared',
+      '# deployments and backend = "memory" for local single-node runs.',
+      '# Omit url and key_prefix when backend = "memory".',
     ],
   },
   {

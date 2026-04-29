@@ -91,13 +91,14 @@ pooled_url = "postgresql://mistle:replace-with-password@pgbouncer:6432/mistle"
 direct_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 pooled_url = "postgresql://mistle:replace-with-password@pgbouncer:6432/mistle"
 
-# Valkey is modeled as a shared dependency. Services consume the plane-specific
-# KV backend they need instead of owning duplicated Valkey config.
 [kv.control_plane]
 backend = "valkey"
 url = "redis://valkey:6379"
 key_prefix = "mistle:control"
 
+# Data-plane gateway runtime state supports backend = "valkey" for shared
+# deployments and backend = "memory" for local single-node runs.
+# Omit url and key_prefix when backend = "memory".
 [kv.data_plane]
 backend = "valkey"
 url = "redis://valkey:6379"

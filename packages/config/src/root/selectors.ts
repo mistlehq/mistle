@@ -330,6 +330,18 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
 
 export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayConfig {
   const globalConfig = selectGlobalConfig(config);
+  const runtimeState: DataPlaneGatewayConfig["runtimeState"] =
+    config.kv.data_plane.backend === "memory"
+      ? {
+          backend: "memory",
+        }
+      : {
+          backend: "valkey",
+          valkey: {
+            url: config.kv.data_plane.url,
+            keyPrefix: config.kv.data_plane.key_prefix,
+          },
+        };
 
   return {
     server: {
@@ -339,13 +351,7 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     database: {
       url: config.postgres.data_plane.pooled_url,
     },
-    runtimeState: {
-      backend: config.kv.data_plane.backend,
-      valkey: {
-        url: config.kv.data_plane.url,
-        keyPrefix: config.kv.data_plane.key_prefix,
-      },
-    },
+    runtimeState,
     dataPlaneApi: {
       baseUrl: config.services.data_plane_api.internal_url,
     },
