@@ -35,6 +35,6 @@ describe("session-composer-upload-errors", () => {
 
   it("falls back to generic error messages for non-structured failures", () => {
     expect(resolveUploadErrorMessage(new Error("Upload exploded"))).toBe("Upload exploded");
-    expect(resolveUploadErrorMessage("bad")).toBe("Could not upload attached image.");
+    expect(resolveUploadErrorMessage("bad")).toBe("Could not upload attached file.");
   });
 });

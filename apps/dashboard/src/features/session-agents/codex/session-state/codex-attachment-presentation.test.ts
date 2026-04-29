@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAttachedAttachmentPathsText,
-  buildAttachedImagePathsText,
   buildMixedAttachmentTurnPrompt,
-  buildPromptWithAttachedImagePaths,
   resolveMixedAttachmentTurnRepresentation,
-  buildTurnPrompt,
-  resolveTurnRepresentation,
   type UploadedComposerAttachment,
 } from "./codex-attachment-presentation.js";
 
@@ -30,12 +26,15 @@ const UploadedFileAttachment: UploadedComposerAttachment = {
 };
 
 describe("codex-attachment-presentation", () => {
-  it("formats and injects attached image paths for the existing image-only caller", () => {
+  it("formats and injects attached image paths for image-only prompt text", () => {
     expect(
-      buildAttachedImagePathsText([
-        "/root/.local/attachments/thread_123/image-1.png",
-        "/root/.local/attachments/thread_123/image-2.webp",
-      ]),
+      buildAttachedAttachmentPathsText({
+        imageAttachments: [
+          { path: "/root/.local/attachments/thread_123/image-1.png" },
+          { path: "/root/.local/attachments/thread_123/image-2.webp" },
+        ],
+        fileAttachments: [],
+      }),
     ).toBe(
       [
         "Attached images:",
@@ -45,9 +44,15 @@ describe("codex-attachment-presentation", () => {
     );
 
     expect(
-      buildPromptWithAttachedImagePaths({
+      buildMixedAttachmentTurnPrompt({
         prompt: "  Please review these screenshots.  ",
-        attachmentPaths: ["/root/.local/attachments/thread_123/image-1.png"],
+        uploadedAttachments: [
+          {
+            ...UploadedImageAttachment,
+            path: "/root/.local/attachments/thread_123/image-1.png",
+          },
+        ],
+        supportsImageInspection: false,
       }),
     ).toBe(
       [
@@ -176,27 +181,41 @@ describe("codex-attachment-presentation", () => {
     );
   });
 
-  it("injects path text only for text-only image-only turn representations", () => {
+  it("submits image-only attachments structurally for image-capable models", () => {
     expect(
-      buildTurnPrompt({
+      resolveMixedAttachmentTurnRepresentation({
         prompt: "  Please review these screenshots.  ",
-        attachmentPaths: ["/root/.local/attachments/thread_123/image-1.png"],
+        uploadedAttachments: [UploadedImageAttachment],
         supportsImageInspection: true,
       }),
-    ).toBe("Please review these screenshots.");
+    ).toEqual({
+      prompt: "Please review these screenshots.",
+      submittedAttachments: [
+        {
+          type: "localImage",
+          path: UploadedImageAttachment.path,
+        },
+      ],
+      displayAttachments: [
+        {
+          kind: "image",
+          name: UploadedImageAttachment.originalFilename,
+          path: UploadedImageAttachment.path,
+        },
+      ],
+    });
+  });
 
-    const uploadedAttachments = [
-      {
-        type: "localImage" as const,
-        path: "/root/.local/attachments/thread_123/image-1.png",
-      },
-    ];
-
+  it("injects image path text only for text-only image-only turn representations", () => {
     expect(
-      resolveTurnRepresentation({
+      resolveMixedAttachmentTurnRepresentation({
         prompt: "Please review these screenshots.",
-        attachmentPaths: ["/root/.local/attachments/thread_123/image-1.png"],
-        uploadedAttachments,
+        uploadedAttachments: [
+          {
+            ...UploadedImageAttachment,
+            path: "/root/.local/attachments/thread_123/image-1.png",
+          },
+        ],
         supportsImageInspection: false,
       }),
     ).toEqual({
@@ -210,7 +229,7 @@ describe("codex-attachment-presentation", () => {
       displayAttachments: [
         {
           kind: "image",
-          name: "image-1.png",
+          name: UploadedImageAttachment.originalFilename,
           path: "/root/.local/attachments/thread_123/image-1.png",
         },
       ],

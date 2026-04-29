@@ -15,5 +15,5 @@ export function resolveUploadErrorMessage(error: unknown): string {
     }
   }
 
-  return error instanceof Error ? error.message : "Could not upload attached image.";
+  return error instanceof Error ? error.message : "Could not upload attached file.";
 }
