@@ -3,6 +3,7 @@
   "noUpdateNotifier": true,
   "globalPassThroughEnv": [
     "AR",
+    "CARGO_BUILD_JOBS",
     "CC",
     "CXX",
     "DEVELOPER_DIR",

@@ -247,7 +247,15 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run TS static checks in Nix shell
-        run: nix develop --command bash -c "pnpm format:check && pnpm exec oxlint --type-aware --deny-warnings --threads=1 apps packages tests && pnpm lint:openapi && pnpm lint:docs && pnpm lint:sql && pnpm typecheck:ts"
+        run: >-
+          nix develop --command bash -c
+          "threads=\"$(nproc)\";
+          pnpm exec oxfmt --check --threads=\"${threads}\" . &&
+          pnpm exec oxlint --type-aware --deny-warnings --threads=\"${threads}\" apps packages tests &&
+          pnpm lint:openapi &&
+          pnpm lint:docs &&
+          pnpm lint:sql &&
+          pnpm typecheck:ts"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-ts-turbo-cache.outputs.cache-hit != 'true' }}
@@ -385,7 +393,6 @@ jobs:
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Restore pnpm store cache
         id: static-rust-pnpm-store-cache
@@ -427,7 +434,12 @@ jobs:
         run: nix develop --command bash -c "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.integration.docker.toml pnpm turbo run build --filter=@mistle/sandboxd"
 
       - name: Run Rust static checks in Nix shell
-        run: nix develop --command bash -c "pnpm lint:rust && pnpm typecheck:rust"
+        run: >-
+          nix develop --command bash -c
+          "cargo_jobs=\"$(nproc)\";
+          pnpm --filter @mistle/sandboxd format:check &&
+          pnpm --filter @mistle/commit-sign format:check &&
+          CARGO_BUILD_JOBS=\"${cargo_jobs}\" pnpm turbo run lint typecheck --output-logs=full --concurrency=1 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
