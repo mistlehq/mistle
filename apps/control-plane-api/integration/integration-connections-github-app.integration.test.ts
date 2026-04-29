@@ -525,6 +525,10 @@ describe("integration connections GitHub App integration", () => {
         body: JSON.stringify({
           manifest: {
             name: "Mistle GitHub App",
+            default_events: ["issues"],
+            default_permissions: {
+              issues: "read",
+            },
           },
           owner: {
             kind: "personal",
@@ -561,6 +565,10 @@ describe("integration connections GitHub App integration", () => {
         body: JSON.stringify({
           manifest: {
             name: "Mistle GitHub App",
+            default_events: ["issues"],
+            default_permissions: {
+              issues: "read",
+            },
           },
           owner: {
             kind: "personal",
@@ -614,6 +622,10 @@ describe("integration connections GitHub App integration", () => {
         body: JSON.stringify({
           manifest: {
             name: "Mistle GitHub App",
+            default_events: ["issues"],
+            default_permissions: {
+              issues: "read",
+            },
           },
           owner: {
             kind: "personal",
@@ -707,7 +719,7 @@ describe("integration connections GitHub App integration", () => {
     const responseBody = StartProviderAppSetupBadRequestResponseSchema.parse(
       await startResponse.json(),
     );
-    expect(responseBody.code).toBe("INVALID_UPDATE_CONNECTION_INPUT");
+    expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_START_INPUT");
     expect(responseBody.message).toContain("missing required setup credentials");
   });
 

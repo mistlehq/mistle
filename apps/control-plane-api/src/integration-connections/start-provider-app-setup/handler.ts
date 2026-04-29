@@ -7,6 +7,22 @@ import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { startProviderAppSetup } from "../services/provider-app-setup.js";
 import { route } from "./route.js";
 
+function resolveStartInvalidInputCode(routeSegment: string) {
+  if (routeSegment === "github-app") {
+    return IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_START_INPUT;
+  }
+
+  if (routeSegment === "github-app-installation") {
+    return IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT;
+  }
+
+  if (routeSegment === "slack-app") {
+    return IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_MANIFEST_START_INPUT;
+  }
+
+  return IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT;
+}
+
 const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
@@ -29,7 +45,7 @@ const routeHandler = async (
       connectionId,
       routeSegment,
       body,
-      invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      invalidInputCode: resolveStartInvalidInputCode(routeSegment),
     },
   );
 
