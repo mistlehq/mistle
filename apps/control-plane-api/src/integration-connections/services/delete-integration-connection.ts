@@ -18,6 +18,7 @@ import {
   IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "../constants.js";
+import { listActiveSandboxProfileBindingCountsByConnectionId } from "./list-active-sandbox-profile-binding-counts-by-connection-id.js";
 import {
   resolveConnectionConfigOrThrow,
   resolveConnectionSecretsOrThrow,
@@ -89,26 +90,14 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
     connectionId: lockedConnection.id,
   });
 
-  const [activeVersionBindingUsage] = await input.db
-    .select({
-      activeVersionBindingCount: sql<number>`count(*)::int`,
-    })
-    .from(sandboxProfileVersionIntegrationBindings)
-    .innerJoin(
-      sandboxProfiles,
-      eq(sandboxProfiles.id, sandboxProfileVersionIntegrationBindings.sandboxProfileId),
-    )
-    .where(
-      and(
-        eq(sandboxProfileVersionIntegrationBindings.connectionId, lockedConnection.id),
-        eq(
-          sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-          sandboxProfiles.activeVersion,
-        ),
-      ),
-    );
+  const activeVersionBindingCountsByConnectionId =
+    await listActiveSandboxProfileBindingCountsByConnectionId({
+      db: input.db,
+      connectionIds: [lockedConnection.id],
+      organizationId: input.organizationId,
+    });
 
-  if ((activeVersionBindingUsage?.activeVersionBindingCount ?? 0) > 0) {
+  if ((activeVersionBindingCountsByConnectionId.get(lockedConnection.id) ?? 0) > 0) {
     throw new ConflictError(
       IntegrationConnectionsConflictCodes.CONNECTION_HAS_BINDINGS,
       "This integration connection cannot be deleted while it is still used by one or more active sandbox profile versions.",

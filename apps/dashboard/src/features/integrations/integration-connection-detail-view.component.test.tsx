@@ -148,6 +148,36 @@ describe("IntegrationConnectionDetailView", () => {
     ).toBeTruthy();
   });
 
+  it("explains disabled delete when a connection has webhook automations", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            automationCount: 1,
+            bindingCount: 0,
+            canDelete: false,
+            displayName: "Engineering GitHub",
+            status: "active",
+            authMethodLabel: "GitHub App installation",
+            resources: [],
+          },
+        ]}
+        onDeleteConnection={rejectUnexpectedDeleteConnection}
+      />,
+    );
+
+    const deleteButton = screen.getByRole("button", {
+      name: "Delete connection Engineering GitHub",
+    });
+
+    expect(deleteButton.getAttribute("disabled")).toBe("");
+    fireEvent.mouseEnter(deleteButton.parentElement ?? deleteButton);
+    expect(
+      screen.getByText("This connection can't be deleted while it has 1 webhook automation."),
+    ).toBeTruthy();
+  });
+
   it("hides authentication editing when a connection is configured for identity linking", () => {
     render(
       <IntegrationConnectionDetailView

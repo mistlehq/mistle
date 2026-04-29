@@ -3,8 +3,6 @@ import {
   integrationWebhookSources,
   organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
   webhookAutomations,
   type ControlPlaneDatabase,
   type IntegrationConnection,
@@ -30,6 +28,7 @@ import { z } from "zod";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { buildIntegrationConnectionResponse } from "./build-integration-connection-response.js";
+import { listActiveSandboxProfileBindingCountsByConnectionId } from "./list-active-sandbox-profile-binding-counts-by-connection-id.js";
 import { listConfiguredSecretNamesByConnectionId } from "./list-configured-secret-names-by-connection-id.js";
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
 
@@ -183,9 +182,10 @@ export async function listIntegrationConnections(
       },
     );
 
-    const bindingCountsByConnectionId = await listBindingCountsByConnectionId({
+    const bindingCountsByConnectionId = await listActiveSandboxProfileBindingCountsByConnectionId({
       db,
       connectionIds: result.items.map((connection) => connection.id),
+      organizationId: input.organizationId,
     });
     const automationCountsByConnectionId = await listAutomationCountsByConnectionId({
       db,
@@ -290,38 +290,6 @@ async function listIdentityLinkedConnectionIds(input: {
   return new Set(rows.map((row) => row.connectionId));
 }
 
-async function listBindingCountsByConnectionId(input: {
-  db: ControlPlaneDatabase;
-  connectionIds: readonly string[];
-}): Promise<Map<string, number>> {
-  if (input.connectionIds.length === 0) {
-    return new Map();
-  }
-
-  const bindingCounts = await input.db
-    .select({
-      connectionId: sandboxProfileVersionIntegrationBindings.connectionId,
-      bindingCount: sql<number>`count(*)::int`,
-    })
-    .from(sandboxProfileVersionIntegrationBindings)
-    .innerJoin(
-      sandboxProfiles,
-      eq(sandboxProfiles.id, sandboxProfileVersionIntegrationBindings.sandboxProfileId),
-    )
-    .where(
-      and(
-        inArray(sandboxProfileVersionIntegrationBindings.connectionId, [...input.connectionIds]),
-        eq(
-          sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-          sandboxProfiles.activeVersion,
-        ),
-      ),
-    )
-    .groupBy(sandboxProfileVersionIntegrationBindings.connectionId);
-
-  return new Map(bindingCounts.map((entry) => [entry.connectionId, entry.bindingCount] as const));
-}
-
 async function listAutomationCountsByConnectionId(input: {
   db: ControlPlaneDatabase;
   connectionIds: readonly string[];
@@ -347,8 +315,8 @@ async function listAutomationCountsByConnectionId(input: {
     .where(inArray(integrationConnections.id, [...input.connectionIds]))
     .groupBy(integrationConnections.id);
 
-  return new Map(
-    automationCounts.map((entry) => [entry.resolvedConnectionId, entry.automationCount] as const),
+  return new Map<string, number>(
+    automationCounts.map((entry) => [entry.resolvedConnectionId, entry.automationCount]),
   );
 }
 
