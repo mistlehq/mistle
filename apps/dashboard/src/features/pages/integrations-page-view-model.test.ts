@@ -21,6 +21,64 @@ import {
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
 
+const GitHubAppInstallationMethod = {
+  id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+  label: "GitHub App installation",
+  kind: "form",
+  connectionDetail: {
+    installation: {
+      actionLabel: "Manage installation",
+      fields: [
+        {
+          label: "App ID",
+          source: {
+            kind: "config-field",
+            field: "app_id",
+          },
+        },
+        {
+          label: "App slug",
+          source: {
+            kind: "config-field",
+            field: "app_slug",
+          },
+        },
+        {
+          label: "Installation",
+          required: true,
+          source: {
+            kind: "first-of",
+            sources: [
+              {
+                kind: "config-field",
+                field: "installation_id",
+              },
+              {
+                kind: "connection-external-subject",
+              },
+            ],
+          },
+        },
+      ],
+      hideWebhookSourceSection: true,
+      includeWebhookCallbackUrl: true,
+      postInstallationSetupPath: "/p/integration/callbacks/setup/github-app-installation",
+    },
+  },
+  secretFields: [
+    {
+      name: "appPrivateKeyPem",
+      label: "App private key PEM",
+      inputType: "textarea",
+    },
+    {
+      name: "webhookSecret",
+      label: "Webhook secret",
+      inputType: "password",
+    },
+  ],
+} satisfies IntegrationConnectionMethod;
+
 describe("integrations page view model", () => {
   it("passes through connection methods for the editor", () => {
     expect(
@@ -290,6 +348,7 @@ describe("integrations page view model", () => {
         } satisfies IntegrationConnection,
       ],
       controlPlaneApiOrigin: "https://control-plane.example.com",
+      targetConnectionMethods: [GitHubAppInstallationMethod],
       refreshingResourceKeys: new Set([
         createIntegrationConnectionResourceKey({
           connectionId: "icn_123",
@@ -319,6 +378,8 @@ describe("integrations page view model", () => {
           value: "mistle-labs",
         },
       ],
+      hideWebhookSourceSection: true,
+      includeWebhookCallbackUrl: true,
       postInstallationSetupUrl:
         "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
     });
@@ -419,6 +480,7 @@ describe("integrations page view model", () => {
         } satisfies IntegrationConnection,
       ],
       controlPlaneApiOrigin: "https://control-plane.example.com",
+      targetConnectionMethods: [GitHubAppInstallationMethod],
       refreshingResourceKeys: new Set<string>(),
     });
 
@@ -543,6 +605,7 @@ describe("integrations page view model", () => {
         } satisfies IntegrationConnection,
       ],
       controlPlaneApiOrigin: "https://control-plane.example.com",
+      targetConnectionMethods: [GitHubAppInstallationMethod],
       githubAppInstallationStateByConnectionId: new Map([
         [
           "icn_preinstall",

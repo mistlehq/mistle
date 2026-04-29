@@ -3194,6 +3194,43 @@ export interface paths {
                 };
                 connectionMethods?: (
                   | {
+                      connectionDetail?: {
+                        installation?: {
+                          actionLabel?: string;
+                          fields?: {
+                            label: string;
+                            required?: boolean;
+                            source:
+                              | {
+                                  field: string;
+                                  /** @enum {string} */
+                                  kind: "config-field";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "connection-external-subject";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "first-of";
+                                  sources: (
+                                    | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        kind: "config-field";
+                                      }
+                                    | {
+                                        /** @enum {string} */
+                                        kind: "connection-external-subject";
+                                      }
+                                  )[];
+                                };
+                          }[];
+                          hideWebhookSourceSection?: boolean;
+                          includeWebhookCallbackUrl?: boolean;
+                          postInstallationSetupPath?: string;
+                        };
+                      };
                       /** @enum {string} */
                       createBehavior?: "single-step" | "draft-then-setup";
                       id: string;
@@ -3270,6 +3307,43 @@ export interface paths {
                       };
                     }
                   | {
+                      connectionDetail?: {
+                        installation?: {
+                          actionLabel?: string;
+                          fields?: {
+                            label: string;
+                            required?: boolean;
+                            source:
+                              | {
+                                  field: string;
+                                  /** @enum {string} */
+                                  kind: "config-field";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "connection-external-subject";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "first-of";
+                                  sources: (
+                                    | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        kind: "config-field";
+                                      }
+                                    | {
+                                        /** @enum {string} */
+                                        kind: "connection-external-subject";
+                                      }
+                                  )[];
+                                };
+                          }[];
+                          hideWebhookSourceSection?: boolean;
+                          includeWebhookCallbackUrl?: boolean;
+                          postInstallationSetupPath?: string;
+                        };
+                      };
                       id: string;
                       /** @enum {string} */
                       kind: "redirect";
@@ -3282,6 +3356,43 @@ export interface paths {
                       };
                     }
                   | {
+                      connectionDetail?: {
+                        installation?: {
+                          actionLabel?: string;
+                          fields?: {
+                            label: string;
+                            required?: boolean;
+                            source:
+                              | {
+                                  field: string;
+                                  /** @enum {string} */
+                                  kind: "config-field";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "connection-external-subject";
+                                }
+                              | {
+                                  /** @enum {string} */
+                                  kind: "first-of";
+                                  sources: (
+                                    | {
+                                        field: string;
+                                        /** @enum {string} */
+                                        kind: "config-field";
+                                      }
+                                    | {
+                                        /** @enum {string} */
+                                        kind: "connection-external-subject";
+                                      }
+                                  )[];
+                                };
+                          }[];
+                          hideWebhookSourceSection?: boolean;
+                          includeWebhookCallbackUrl?: boolean;
+                          postInstallationSetupPath?: string;
+                        };
+                      };
                       id: string;
                       /** @enum {string} */
                       kind: "device-authorization";

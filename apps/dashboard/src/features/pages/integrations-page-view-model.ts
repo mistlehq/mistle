@@ -1,10 +1,9 @@
+import type { IntegrationConnectionMethodDetailFieldSource } from "@mistle/integrations-core";
+
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
-import {
-  IntegrationConnectionMethodIds,
-  type IntegrationConnectionMethod,
-} from "../integrations/integration-connection-editor.js";
+import type { IntegrationConnectionMethod } from "../integrations/integration-connection-editor.js";
 import type {
   IntegrationConnection,
   IntegrationConnectionResource,
@@ -12,8 +11,6 @@ import type {
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 import { resolveVisibleConnectionMethodConfigFields } from "./use-integration-connection-editor-state-helpers.js";
-
-const GitHubAppInstallationCompletePath = "/p/integration/callbacks/setup/github-app-installation";
 
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -144,18 +141,21 @@ export function buildIntegrationConnectionDetailItems(input: {
   return input.connections.map((connection) => {
     const bindingCount = connection.bindingCount ?? 0;
     const automationCount = connection.automationCount ?? 0;
-    const githubAppConnectionContext = resolveGitHubAppConnectionContext(
-      connection,
-      input.controlPlaneApiOrigin,
-    );
-    const githubAppInstallationState =
-      input.githubAppInstallationStateByConnectionId?.get(connection.id) ?? undefined;
     const currentMethod =
       connection.connectionMethodId === undefined
         ? null
         : (input.targetConnectionMethods?.find(
             (method) => method.id === connection.connectionMethodId,
           ) ?? null);
+    const connectionDetailContext = resolveConnectionMethodDetailContext({
+      connection,
+      currentMethod,
+      ...(input.controlPlaneApiOrigin === undefined
+        ? {}
+        : { controlPlaneApiOrigin: input.controlPlaneApiOrigin }),
+    });
+    const githubAppInstallationState =
+      input.githubAppInstallationStateByConnectionId?.get(connection.id) ?? undefined;
     const authFields = resolveAuthFields({
       connection,
       currentMethod,
@@ -187,14 +187,14 @@ export function buildIntegrationConnectionDetailItems(input: {
         : { authMethodLabel: connection.connectionMethodLabel }),
       ...(authFields.length === 0 ? {} : { authFields }),
       ...(authSecretLabels.length === 0 ? {} : { authSecretLabels }),
-      ...(githubAppConnectionContext === undefined
+      ...(connectionDetailContext === undefined
         ? {}
         : {
-            ...(githubAppConnectionContext.installation === undefined
+            ...(connectionDetailContext.installation === undefined
               ? {}
               : {
                   installation: {
-                    ...githubAppConnectionContext.installation,
+                    ...connectionDetailContext.installation,
                     ...(githubAppInstallationState?.errorMessage === undefined
                       ? {}
                       : { errorMessage: githubAppInstallationState.errorMessage }),
@@ -203,9 +203,9 @@ export function buildIntegrationConnectionDetailItems(input: {
                       : { isPending: githubAppInstallationState.isPending }),
                   },
                 }),
-            ...(githubAppConnectionContext.contextItems === undefined
+            ...(connectionDetailContext.contextItems === undefined
               ? {}
-              : { contextItems: githubAppConnectionContext.contextItems }),
+              : { contextItems: connectionDetailContext.contextItems }),
           }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
@@ -298,10 +298,11 @@ function resolveAuthFields(input: {
   return [...fields, ...visibleConfigFields];
 }
 
-function resolveGitHubAppConnectionContext(
-  connection: Pick<IntegrationConnection, "config" | "externalSubjectId">,
-  controlPlaneApiOrigin?: string,
-):
+function resolveConnectionMethodDetailContext(input: {
+  connection: Pick<IntegrationConnection, "config" | "externalSubjectId">;
+  controlPlaneApiOrigin?: string;
+  currentMethod: IntegrationConnectionMethod | null;
+}):
   | {
       contextItems?: readonly {
         label: string;
@@ -309,78 +310,105 @@ function resolveGitHubAppConnectionContext(
       }[];
       installation?:
         | {
-            actionLabel: string;
+            actionLabel?: string;
             description?: string;
             fields: readonly {
               label: string;
               value: string;
             }[];
+            hideWebhookSourceSection?: boolean;
+            includeWebhookCallbackUrl?: boolean;
             postInstallationSetupUrl?: string;
           }
         | undefined;
     }
   | undefined {
-  const config = connection.config;
-  if (
-    config === undefined ||
-    typeof config !== "object" ||
-    config === null ||
-    Array.isArray(config) ||
-    config.connection_method !== IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
-  ) {
+  const installationMetadata = input.currentMethod?.connectionDetail?.installation;
+  if (installationMetadata === undefined) {
     return undefined;
   }
 
-  const appId = typeof config.app_id === "string" ? config.app_id : null;
-  const appSlug = typeof config.app_slug === "string" ? config.app_slug : null;
-  const installationId =
-    typeof config.installation_id === "string"
-      ? config.installation_id
-      : typeof connection.externalSubjectId === "string"
-        ? connection.externalSubjectId
-        : null;
+  const config = resolveTargetConfig(input.connection.config);
+  const resolvedFields = (installationMetadata.fields ?? []).flatMap((field) => {
+    const value = resolveConnectionMethodDetailFieldValue({
+      config,
+      connection: input.connection,
+      source: field.source,
+    });
 
-  if (installationId === null) {
+    if (typeof value === "string" && value.length > 0) {
+      return [
+        {
+          label: field.label,
+          value,
+        },
+      ];
+    }
+
+    if (field.required === true) {
+      return null;
+    }
+
+    return [];
+  });
+  if (resolvedFields.includes(null)) {
     return undefined;
   }
 
-  const installationFields = [
-    ...(appId === null
-      ? []
-      : [
-          {
-            label: "App ID",
-            value: appId,
-          },
-        ]),
-    ...(appSlug === null
-      ? []
-      : [
-          {
-            label: "App slug",
-            value: appSlug,
-          },
-        ]),
-    {
-      label: "Installation",
-      value: installationId,
-    },
-  ];
+  const installationFields = resolvedFields.filter(
+    (field): field is { label: string; value: string } => field !== null,
+  );
+  const postInstallationSetupUrl =
+    input.controlPlaneApiOrigin === undefined ||
+    installationMetadata.postInstallationSetupPath === undefined
+      ? undefined
+      : new URL(
+          installationMetadata.postInstallationSetupPath,
+          input.controlPlaneApiOrigin,
+        ).toString();
 
   return {
     installation: {
-      actionLabel: "Manage installation",
-      fields: installationFields,
-      ...(controlPlaneApiOrigin === undefined
+      ...(installationMetadata.actionLabel === undefined
         ? {}
-        : {
-            postInstallationSetupUrl: new URL(
-              GitHubAppInstallationCompletePath,
-              controlPlaneApiOrigin,
-            ).toString(),
-          }),
+        : { actionLabel: installationMetadata.actionLabel }),
+      fields: installationFields,
+      ...(installationMetadata.hideWebhookSourceSection === undefined
+        ? {}
+        : { hideWebhookSourceSection: installationMetadata.hideWebhookSourceSection }),
+      ...(installationMetadata.includeWebhookCallbackUrl === undefined
+        ? {}
+        : { includeWebhookCallbackUrl: installationMetadata.includeWebhookCallbackUrl }),
+      ...(postInstallationSetupUrl === undefined ? {} : { postInstallationSetupUrl }),
     },
   };
+}
+
+function resolveConnectionMethodDetailFieldValue(input: {
+  config: Record<string, unknown>;
+  connection: Pick<IntegrationConnection, "externalSubjectId">;
+  source: IntegrationConnectionMethodDetailFieldSource;
+}): unknown {
+  if (input.source.kind === "connection-external-subject") {
+    return input.connection.externalSubjectId;
+  }
+
+  if (input.source.kind === "first-of") {
+    for (const source of input.source.sources) {
+      const value = resolveConnectionMethodDetailFieldValue({
+        config: input.config,
+        connection: input.connection,
+        source,
+      });
+      if (typeof value === "string" && value.length > 0) {
+        return value;
+      }
+    }
+
+    return undefined;
+  }
+
+  return input.config[input.source.field];
 }
 
 export function createIntegrationConnectionResourceKey(input: {

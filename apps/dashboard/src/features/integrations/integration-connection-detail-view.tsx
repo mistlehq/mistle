@@ -1,4 +1,3 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { JiraWebhookEventDisplayNameByType } from "@mistle/integrations-definitions";
 import {
   Badge,
@@ -64,6 +63,8 @@ export type IntegrationConnectionDetailItem = {
           label: string;
           value: string;
         }[];
+        hideWebhookSourceSection?: boolean;
+        includeWebhookCallbackUrl?: boolean;
         isCallbackUrlLoading?: boolean;
         isPending?: boolean;
         postInstallationSetupUrl?: string;
@@ -140,13 +141,11 @@ function resolveConnectionDetailPaneViewState(input: {
       ? undefined
       : {
           ...input.connection.installation,
-          ...(input.connection.authMethodId ===
-            IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
+          ...(input.connection.installation.includeWebhookCallbackUrl === true &&
           input.webhookSourceState?.items[0]?.callbackUrl !== undefined
             ? { callbackUrl: input.webhookSourceState.items[0].callbackUrl }
             : {}),
-          ...(input.connection.authMethodId ===
-            IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
+          ...(input.connection.installation.includeWebhookCallbackUrl === true &&
           input.webhookSourceState?.isLoading === true &&
           input.webhookSourceState.items[0]?.callbackUrl === undefined
             ? { isCallbackUrlLoading: true }
@@ -162,7 +161,7 @@ function resolveConnectionDetailPaneViewState(input: {
       installation.actionLabel !== undefined ||
       ("callbackUrl" in installation && installation.callbackUrl !== undefined));
   const hidesStandaloneWebhookSection =
-    input.connection.authMethodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
+    input.connection.installation?.hideWebhookSourceSection === true;
   const shouldRenderWebhookSection =
     hidesStandaloneWebhookSection === false &&
     input.webhookPolicy?.showWebhookSources === true &&

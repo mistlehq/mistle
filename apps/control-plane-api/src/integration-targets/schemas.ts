@@ -1,4 +1,8 @@
 import { z } from "@hono/zod-openapi";
+import type {
+  IntegrationConnectionMethodDetailFieldSource,
+  IntegrationConnectionMethodDetailMetadata,
+} from "@mistle/integrations-core";
 
 const IntegrationConnectionMethodSecretFieldSchema = z
   .object({
@@ -31,6 +35,68 @@ const IntegrationConnectionMethodPendingUiSchema = z
     description: z.string().min(1).optional(),
   })
   .strict();
+
+const IntegrationConnectionMethodDetailFieldSourceLeafSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("config-field"),
+      field: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("connection-external-subject"),
+    })
+    .strict(),
+]);
+
+const IntegrationConnectionMethodDetailFieldSourceSchema: z.ZodType<IntegrationConnectionMethodDetailFieldSource> =
+  z.discriminatedUnion("kind", [
+    z
+      .object({
+        kind: z.literal("config-field"),
+        field: z.string().min(1),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal("connection-external-subject"),
+      })
+      .strict(),
+    z
+      .object({
+        kind: z.literal("first-of"),
+        sources: z.array(IntegrationConnectionMethodDetailFieldSourceLeafSchema).min(1),
+      })
+      .strict(),
+  ]);
+
+const IntegrationConnectionMethodDetailSchema: z.ZodType<IntegrationConnectionMethodDetailMetadata> =
+  z
+    .object({
+      installation: z
+        .object({
+          actionLabel: z.string().min(1).optional(),
+          fields: z
+            .array(
+              z
+                .object({
+                  label: z.string().min(1),
+                  required: z.boolean().optional(),
+                  source: IntegrationConnectionMethodDetailFieldSourceSchema,
+                })
+                .strict(),
+            )
+            .min(1)
+            .optional(),
+          hideWebhookSourceSection: z.boolean().optional(),
+          includeWebhookCallbackUrl: z.boolean().optional(),
+          postInstallationSetupPath: z.string().min(1).optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict();
 
 const IntegrationSetupConnectionExternalSubjectRequirementSchema = z
   .object({
@@ -82,6 +148,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("form"),
+      connectionDetail: IntegrationConnectionMethodDetailSchema.optional(),
       createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
       setupFlow: z
         .object({
@@ -98,6 +165,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("redirect"),
+      connectionDetail: IntegrationConnectionMethodDetailSchema.optional(),
       ui: z
         .object({
           create: IntegrationConnectionMethodCreateUiSchema,
@@ -110,6 +178,7 @@ const IntegrationConnectionMethodSchema = z.discriminatedUnion("kind", [
       id: z.string().min(1),
       label: z.string().min(1),
       kind: z.literal("device-authorization"),
+      connectionDetail: IntegrationConnectionMethodDetailSchema.optional(),
       ui: z
         .object({
           create: IntegrationDeviceAuthorizationConnectionMethodCreateUiSchema,

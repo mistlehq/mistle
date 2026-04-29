@@ -1230,6 +1230,7 @@ describe("IntegrationConnectionDetailView", () => {
               actionLabel: "Install GitHub App",
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
+              hideWebhookSourceSection: true,
             },
           },
         ]}
@@ -1338,6 +1339,8 @@ describe("IntegrationConnectionDetailView", () => {
               actionLabel: "Install GitHub App",
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
+              hideWebhookSourceSection: true,
+              includeWebhookCallbackUrl: true,
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
             },
@@ -1483,6 +1486,8 @@ describe("IntegrationConnectionDetailView", () => {
               actionLabel: "Install GitHub App",
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
+              hideWebhookSourceSection: true,
+              includeWebhookCallbackUrl: true,
               postInstallationSetupUrl:
                 "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
             },
@@ -1532,6 +1537,8 @@ describe("IntegrationConnectionDetailView", () => {
             installation: {
               actionLabel: "Manage installation",
               fields: [{ label: "Installation", value: "116007157" }],
+              hideWebhookSourceSection: true,
+              includeWebhookCallbackUrl: true,
             },
           },
         ]}

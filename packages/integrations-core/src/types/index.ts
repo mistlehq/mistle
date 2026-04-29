@@ -494,6 +494,40 @@ export type IntegrationFormConnectionMethodSetupFlow = {
   routeSegment: string;
 };
 
+export type IntegrationConnectionMethodDetailFieldSourceLeaf =
+  | {
+      field: string;
+      kind: "config-field";
+    }
+  | {
+      kind: "connection-external-subject";
+    };
+
+export type IntegrationConnectionMethodDetailFieldSource =
+  | IntegrationConnectionMethodDetailFieldSourceLeaf
+  | {
+      kind: "first-of";
+      sources: readonly IntegrationConnectionMethodDetailFieldSourceLeaf[];
+    };
+
+export type IntegrationConnectionMethodDetailField = {
+  label: string;
+  required?: boolean | undefined;
+  source: IntegrationConnectionMethodDetailFieldSource;
+};
+
+export type IntegrationConnectionMethodDetailMetadata = {
+  installation?:
+    | {
+        actionLabel?: string | undefined;
+        fields?: ReadonlyArray<IntegrationConnectionMethodDetailField> | undefined;
+        hideWebhookSourceSection?: boolean | undefined;
+        includeWebhookCallbackUrl?: boolean | undefined;
+        postInstallationSetupPath?: string | undefined;
+      }
+    | undefined;
+};
+
 export type IntegrationProviderAppSetupStartResult =
   | {
       kind: "form-post";
@@ -633,6 +667,7 @@ type IntegrationConnectionMethodDefinitionBase<
   TBindingConfig = Record<string, unknown>,
   TConnectionConfig = Record<string, unknown>,
 > = {
+  connectionDetail?: IntegrationConnectionMethodDetailMetadata;
   id: IntegrationConnectionMethodId;
   label: string;
   configSchema?: IntegrationConfigSchema<TConnectionConfig>;

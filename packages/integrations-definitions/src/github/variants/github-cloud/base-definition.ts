@@ -66,6 +66,46 @@ export const GitHubCloudBaseDefinition: GitHubCloudBaseIntegrationDefinition = {
       id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       label: "GitHub App installation",
       kind: "form",
+      connectionDetail: {
+        installation: {
+          actionLabel: "Manage installation",
+          fields: [
+            {
+              label: "App ID",
+              source: {
+                kind: "config-field",
+                field: "app_id",
+              },
+            },
+            {
+              label: "App slug",
+              source: {
+                kind: "config-field",
+                field: "app_slug",
+              },
+            },
+            {
+              label: "Installation",
+              required: true,
+              source: {
+                kind: "first-of",
+                sources: [
+                  {
+                    kind: "config-field",
+                    field: "installation_id",
+                  },
+                  {
+                    kind: "connection-external-subject",
+                  },
+                ],
+              },
+            },
+          ],
+          hideWebhookSourceSection: true,
+          includeWebhookCallbackUrl: true,
+          postInstallationSetupPath: "/p/integration/callbacks/setup/github-app-installation",
+        },
+      },
       createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
       setupFlow: {
         completionRequirements: {

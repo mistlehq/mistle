@@ -1,5 +1,8 @@
 import type { IntegrationTarget as PersistedIntegrationTarget } from "@mistle/db/control-plane";
 import type {
+  IntegrationConnectionMethodDetailFieldSource,
+  IntegrationConnectionMethodDetailFieldSourceLeaf,
+  IntegrationConnectionMethodDetailMetadata,
   IntegrationConnectionMethodDefinition,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
@@ -94,6 +97,7 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "form";
+        connectionDetail?: IntegrationConnectionMethodDetailMetadata;
         createBehavior?: "single-step" | "draft-then-setup";
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
@@ -113,6 +117,7 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "redirect";
+        connectionDetail?: IntegrationConnectionMethodDetailMetadata;
         ui: {
           create: {
             submitLabel: string;
@@ -124,6 +129,7 @@ export type ResolvedIntegrationTargetMetadata = {
         id: string;
         label: string;
         kind: "device-authorization";
+        connectionDetail?: IntegrationConnectionMethodDetailMetadata;
         ui: {
           create: {
             submitLabel: string;
@@ -161,6 +167,9 @@ function resolveConnectionMethod(
       id: method.id,
       label: method.label,
       kind: "form",
+      ...(method.connectionDetail === undefined
+        ? {}
+        : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
       ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
       ...(method.setupFlow === undefined
         ? {}
@@ -193,6 +202,9 @@ function resolveConnectionMethod(
       id: method.id,
       label: method.label,
       kind: "device-authorization",
+      ...(method.connectionDetail === undefined
+        ? {}
+        : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
       ui: method.ui,
     };
   }
@@ -201,7 +213,74 @@ function resolveConnectionMethod(
     id: method.id,
     label: method.label,
     kind: "redirect",
+    ...(method.connectionDetail === undefined
+      ? {}
+      : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
     ui: method.ui,
+  };
+}
+
+function cloneConnectionMethodDetailMetadata(
+  metadata: IntegrationConnectionMethodDetailMetadata,
+): IntegrationConnectionMethodDetailMetadata {
+  if (metadata.installation === undefined) {
+    return {};
+  }
+
+  return {
+    installation: {
+      ...(metadata.installation.actionLabel === undefined
+        ? {}
+        : { actionLabel: metadata.installation.actionLabel }),
+      ...(metadata.installation.fields === undefined
+        ? {}
+        : {
+            fields: metadata.installation.fields.map((field) => ({
+              label: field.label,
+              ...(field.required === undefined ? {} : { required: field.required }),
+              source: cloneConnectionMethodDetailFieldSource(field.source),
+            })),
+          }),
+      ...(metadata.installation.hideWebhookSourceSection === undefined
+        ? {}
+        : { hideWebhookSourceSection: metadata.installation.hideWebhookSourceSection }),
+      ...(metadata.installation.includeWebhookCallbackUrl === undefined
+        ? {}
+        : { includeWebhookCallbackUrl: metadata.installation.includeWebhookCallbackUrl }),
+      ...(metadata.installation.postInstallationSetupPath === undefined
+        ? {}
+        : { postInstallationSetupPath: metadata.installation.postInstallationSetupPath }),
+    },
+  };
+}
+
+function cloneConnectionMethodDetailFieldSource(
+  source: IntegrationConnectionMethodDetailFieldSource,
+): IntegrationConnectionMethodDetailFieldSource {
+  if (source.kind === "connection-external-subject") {
+    return { kind: source.kind };
+  }
+
+  if (source.kind === "first-of") {
+    return {
+      kind: source.kind,
+      sources: source.sources.map(cloneConnectionMethodDetailFieldSourceLeaf),
+    };
+  }
+
+  return cloneConnectionMethodDetailFieldSourceLeaf(source);
+}
+
+function cloneConnectionMethodDetailFieldSourceLeaf(
+  source: IntegrationConnectionMethodDetailFieldSourceLeaf,
+): IntegrationConnectionMethodDetailFieldSourceLeaf {
+  if (source.kind === "connection-external-subject") {
+    return { kind: source.kind };
+  }
+
+  return {
+    kind: source.kind,
+    field: source.field,
   };
 }
 

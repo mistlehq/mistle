@@ -5840,6 +5840,127 @@
                                       "type": "string",
                                       "enum": ["form"]
                                     },
+                                    "connectionDetail": {
+                                      "type": "object",
+                                      "properties": {
+                                        "installation": {
+                                          "type": "object",
+                                          "properties": {
+                                            "actionLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "fields": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "required": {
+                                                    "type": "boolean"
+                                                  },
+                                                  "source": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["first-of"]
+                                                          },
+                                                          "sources": {
+                                                            "type": "array",
+                                                            "items": {
+                                                              "oneOf": [
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": ["config-field"]
+                                                                    },
+                                                                    "field": {
+                                                                      "type": "string",
+                                                                      "minLength": 1
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind", "field"],
+                                                                  "additionalProperties": false
+                                                                },
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": [
+                                                                        "connection-external-subject"
+                                                                      ]
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind"],
+                                                                  "additionalProperties": false
+                                                                }
+                                                              ]
+                                                            },
+                                                            "minItems": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "sources"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": ["label", "source"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1
+                                            },
+                                            "hideWebhookSourceSection": {
+                                              "type": "boolean"
+                                            },
+                                            "includeWebhookCallbackUrl": {
+                                              "type": "boolean"
+                                            },
+                                            "postInstallationSetupPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
                                     "createBehavior": {
                                       "type": "string",
                                       "enum": ["single-step", "draft-then-setup"]
@@ -6077,6 +6198,127 @@
                                       "type": "string",
                                       "enum": ["redirect"]
                                     },
+                                    "connectionDetail": {
+                                      "type": "object",
+                                      "properties": {
+                                        "installation": {
+                                          "type": "object",
+                                          "properties": {
+                                            "actionLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "fields": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "required": {
+                                                    "type": "boolean"
+                                                  },
+                                                  "source": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["first-of"]
+                                                          },
+                                                          "sources": {
+                                                            "type": "array",
+                                                            "items": {
+                                                              "oneOf": [
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": ["config-field"]
+                                                                    },
+                                                                    "field": {
+                                                                      "type": "string",
+                                                                      "minLength": 1
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind", "field"],
+                                                                  "additionalProperties": false
+                                                                },
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": [
+                                                                        "connection-external-subject"
+                                                                      ]
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind"],
+                                                                  "additionalProperties": false
+                                                                }
+                                                              ]
+                                                            },
+                                                            "minItems": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "sources"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": ["label", "source"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1
+                                            },
+                                            "hideWebhookSourceSection": {
+                                              "type": "boolean"
+                                            },
+                                            "includeWebhookCallbackUrl": {
+                                              "type": "boolean"
+                                            },
+                                            "postInstallationSetupPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
                                     "ui": {
                                       "type": "object",
                                       "properties": {
@@ -6117,6 +6359,127 @@
                                     "kind": {
                                       "type": "string",
                                       "enum": ["device-authorization"]
+                                    },
+                                    "connectionDetail": {
+                                      "type": "object",
+                                      "properties": {
+                                        "installation": {
+                                          "type": "object",
+                                          "properties": {
+                                            "actionLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "fields": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "required": {
+                                                    "type": "boolean"
+                                                  },
+                                                  "source": {
+                                                    "oneOf": [
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["config-field"]
+                                                          },
+                                                          "field": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "field"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["connection-external-subject"]
+                                                          }
+                                                        },
+                                                        "required": ["kind"],
+                                                        "additionalProperties": false
+                                                      },
+                                                      {
+                                                        "type": "object",
+                                                        "properties": {
+                                                          "kind": {
+                                                            "type": "string",
+                                                            "enum": ["first-of"]
+                                                          },
+                                                          "sources": {
+                                                            "type": "array",
+                                                            "items": {
+                                                              "oneOf": [
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": ["config-field"]
+                                                                    },
+                                                                    "field": {
+                                                                      "type": "string",
+                                                                      "minLength": 1
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind", "field"],
+                                                                  "additionalProperties": false
+                                                                },
+                                                                {
+                                                                  "type": "object",
+                                                                  "properties": {
+                                                                    "kind": {
+                                                                      "type": "string",
+                                                                      "enum": [
+                                                                        "connection-external-subject"
+                                                                      ]
+                                                                    }
+                                                                  },
+                                                                  "required": ["kind"],
+                                                                  "additionalProperties": false
+                                                                }
+                                                              ]
+                                                            },
+                                                            "minItems": 1
+                                                          }
+                                                        },
+                                                        "required": ["kind", "sources"],
+                                                        "additionalProperties": false
+                                                      }
+                                                    ]
+                                                  }
+                                                },
+                                                "required": ["label", "source"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1
+                                            },
+                                            "hideWebhookSourceSection": {
+                                              "type": "boolean"
+                                            },
+                                            "includeWebhookCallbackUrl": {
+                                              "type": "boolean"
+                                            },
+                                            "postInstallationSetupPath": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "additionalProperties": false
                                     },
                                     "ui": {
                                       "type": "object",
