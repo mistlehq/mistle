@@ -7,6 +7,7 @@ export type PageFrameProps = {
   headerActions?: React.ReactNode;
   headerIcon?: React.ReactNode;
   maxWidthClassName?: string;
+  paddingClassName?: string;
   title: React.ReactNode;
 };
 
@@ -42,9 +43,10 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
   const contentClassName =
     input.maxWidthClassName === undefined ? undefined : `mx-auto w-full ${input.maxWidthClassName}`;
+  const paddingClassName = input.paddingClassName ?? "px-4 py-6";
 
   return (
-    <div className="flex min-h-full flex-col gap-4 px-4 py-6">
+    <div className={`flex min-h-full flex-col gap-4 ${paddingClassName}`}>
       {shouldRenderHeader ? (
         <div className={contentClassName}>
           <FormPageHeader

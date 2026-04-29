@@ -57,15 +57,19 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
         </Select>
       </div>
 
-      <div className="flex flex-col gap-6 md:grid md:grid-cols-[10rem_1px_minmax(0,1fr)] md:gap-0 lg:grid-cols-[11rem_1px_minmax(0,1fr)]">
-        <div aria-label="Profile sections" className="hidden flex-col md:flex" role="tablist">
+      <div className="flex flex-col gap-0">
+        <div
+          aria-label="Profile sections"
+          className="hidden border-b border-border px-4 md:flex"
+          role="tablist"
+        >
           {input.sections.map((section) => (
             <button
               aria-controls={`sandbox-profile-editor-panel-${section.id}`}
               aria-disabled={section.disabled === true}
               aria-selected={section.id === input.activeSectionId}
               disabled={section.disabled === true}
-              className={`flex w-full items-start border-l-2 py-3 pl-4 pr-3 text-left text-sm font-medium leading-tight transition-colors ${
+              className={`-mb-px flex items-center border-b-2 px-4 py-3 text-left text-sm font-medium leading-tight transition-colors ${
                 section.id === input.activeSectionId
                   ? "border-foreground text-foreground"
                   : section.disabled === true
@@ -86,16 +90,19 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
           ))}
         </div>
 
-        <div aria-hidden className="hidden self-stretch bg-border md:block md:w-px" />
-
-        <div className="flex min-w-0 flex-1 flex-col gap-4 md:pl-8">
-          <div
-            aria-labelledby={`sandbox-profile-editor-tab-${activeSection.id}`}
-            id={`sandbox-profile-editor-panel-${activeSection.id}`}
-            role="tabpanel"
-          >
-            {input.renderPanel(input.activeSectionId)}
-          </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {input.sections.map((section) => (
+            <div
+              aria-labelledby={`sandbox-profile-editor-tab-${section.id}`}
+              className="bg-muted/30 px-4 py-6"
+              hidden={section.id !== activeSection.id}
+              id={`sandbox-profile-editor-panel-${section.id}`}
+              key={section.id}
+              role="tabpanel"
+            >
+              {input.renderPanel(section.id)}
+            </div>
+          ))}
         </div>
       </div>
     </div>

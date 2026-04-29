@@ -17,7 +17,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
-import { userEvent, within } from "storybook/test";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
@@ -51,8 +50,11 @@ import {
   formatCronExpressionBreakdownDiagram,
   resolveCronExpressionBreakdown,
   resolveSnapshotRefreshScheduleBehaviorDescription,
+} from "./sandbox-profile-editor-page-model.js";
+import {
   SandboxProfileIntegrationsSetupUnavailableState,
   SandboxProfileEditorView,
+  SandboxProfilePanelSection,
   SandboxProfileSetupScriptPanel,
 } from "./sandbox-profile-editor-page.js";
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
@@ -93,43 +95,30 @@ type SandboxProfileEditorPageStoryArgs = {
 type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
-type StorySectionId = "integrations" | "resources-and-tools" | "configurations" | "snapshot";
-type StoryIntegrationSetupSectionId = Extract<
-  StorySectionId,
-  "integrations" | "resources-and-tools"
->;
+type StorySectionId = "sandbox-profile" | "snapshot";
+type StoryIntegrationSetupSectionId = "integrations" | "resources-and-tools";
 
 const StorySections = [
   {
-    id: "integrations",
-    label: "Integrations",
-  },
-  {
-    id: "resources-and-tools",
-    label: "Resources & Tools",
-  },
-  {
-    id: "configurations",
-    label: "Configurations",
+    id: "sandbox-profile",
+    label: "Sandbox Profile",
   },
   {
     id: "snapshot",
-    label: "Snapshot",
+    label: "Snapshots",
   },
 ] as const satisfies readonly SandboxProfileEditorSection<StorySectionId>[];
 
 function createStorySections(input: {
-  snapshotDisabled: boolean;
   showMissingSnapshotAlert: boolean;
 }): readonly SandboxProfileEditorSection<StorySectionId>[] {
   return StorySections.map((section) =>
     section.id === "snapshot"
       ? {
           ...section,
-          disabled: input.snapshotDisabled,
           sideLabel: (
             <span className="inline-flex items-center gap-1.5">
-              <span>Snapshot</span>
+              <span>Snapshots</span>
               {input.showMissingSnapshotAlert ? (
                 <WarningCircleIcon
                   aria-hidden="true"
@@ -520,20 +509,22 @@ function renderUnavailableIntegrationsSectionPanel(input: {
   state: IntegrationsSectionState;
 }): React.JSX.Element {
   return (
-    <SandboxProfileIntegrationsSetupUnavailableState
-      activeSectionId={input.sectionId}
-      integrationBindingsError={
-        input.state.bindingsErrorMessage === undefined
-          ? null
-          : new Error(input.state.bindingsErrorMessage)
-      }
-      integrationDirectoryError={
-        input.state.directoryErrorMessage === undefined
-          ? null
-          : new Error(input.state.directoryErrorMessage)
-      }
-      isPending={false}
-    />
+    <SandboxProfilePanelSection title="Integrations">
+      <SandboxProfileIntegrationsSetupUnavailableState
+        activeSectionId={input.sectionId}
+        integrationBindingsError={
+          input.state.bindingsErrorMessage === undefined
+            ? null
+            : new Error(input.state.bindingsErrorMessage)
+        }
+        integrationDirectoryError={
+          input.state.directoryErrorMessage === undefined
+            ? null
+            : new Error(input.state.directoryErrorMessage)
+        }
+        isPending={false}
+      />
+    </SandboxProfilePanelSection>
   );
 }
 
@@ -561,7 +552,7 @@ function SandboxProfileEditorPageStoryView(
     "idle" | "saving" | "saved" | "saved-fading"
   >("idle");
   const [activeSectionId, setActiveSectionId] = useState<StorySectionId>(
-    input.initialSectionId ?? "integrations",
+    input.initialSectionId ?? "sandbox-profile",
   );
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
@@ -636,7 +627,6 @@ function SandboxProfileEditorPageStoryView(
     snapshotState: input.snapshotState,
   });
   const storySections = createStorySections({
-    snapshotDisabled: mode.kind === "draft",
     showMissingSnapshotAlert: shouldShowMissingSnapshotAlert({
       mode,
       snapshotStatus,
@@ -668,80 +658,88 @@ function SandboxProfileEditorPageStoryView(
         versionActionError={null}
         versionActionIsPending={false}
         renderSectionPanel={(sectionId) => {
-          if (
-            input.integrationsSectionState !== undefined &&
-            (sectionId === "integrations" || sectionId === "resources-and-tools")
-          ) {
-            return renderUnavailableIntegrationsSectionPanel({
-              sectionId,
-              state: input.integrationsSectionState,
-            });
-          }
+          if (sectionId === "sandbox-profile") {
+            if (input.integrationsSectionState !== undefined) {
+              return renderUnavailableIntegrationsSectionPanel({
+                sectionId: "integrations",
+                state: input.integrationsSectionState,
+              });
+            }
 
-          if (sectionId === "integrations") {
             return (
-              <SandboxProfileIntegrationsSetupSection
-                availableConnections={input.availableConnections ?? StoryIntegrationConnections}
-                availableTargets={input.availableTargets ?? StoryIntegrationTargets}
-                integrationBindingsQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationDirectoryQuery={{
-                  isError: false,
-                  error: null,
-                  isPending: false,
-                }}
-                integrationRows={integrationRows}
-                integrationSaveError={integrationSaveErrorMessage}
-                disabled={!isEditable}
-                onAddIntegrationBindingRow={async (nextBinding) => {
-                  setIntegrationRows((currentRows) => [
-                    ...currentRows,
-                    {
-                      clientId: `row-${String(currentRows.length + 1)}`,
-                      connectionId: nextBinding.connectionId,
-                      kind: nextBinding.kind,
-                      config: nextBinding.config,
-                    },
-                  ]);
-                  return true;
-                }}
-                onIntegrationBindingRowChange={(clientId, changes) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.map((row) =>
-                      row.clientId === clientId ? { ...row, ...changes } : row,
-                    ),
-                  );
-                }}
-                onRemoveIntegrationBindingRow={(clientId) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.filter((row) => row.clientId !== clientId),
-                  );
-                }}
-                onIntegrationSaveErrorDismiss={() => {
-                  setIntegrationSaveErrorMessage(null);
-                }}
-              />
-            );
-          }
-
-          if (sectionId === "resources-and-tools") {
-            return (
-              <SandboxProfileResourcesAndToolsSection
-                availableConnections={input.availableConnections ?? StoryIntegrationConnections}
-                availableTargets={input.availableTargets ?? StoryIntegrationTargets}
-                disabled={!isEditable}
-                onRowChange={(clientId, changes) => {
-                  setIntegrationRows((currentRows) =>
-                    currentRows.map((row) =>
-                      row.clientId === clientId ? { ...row, ...changes } : row,
-                    ),
-                  );
-                }}
-                rows={integrationRows}
-              />
+              <div className="flex w-full flex-col gap-8">
+                <SandboxProfilePanelSection title="Integrations">
+                  <SandboxProfileIntegrationsSetupSection
+                    availableConnections={input.availableConnections ?? StoryIntegrationConnections}
+                    availableTargets={input.availableTargets ?? StoryIntegrationTargets}
+                    integrationBindingsQuery={{
+                      isError: false,
+                      error: null,
+                      isPending: false,
+                    }}
+                    integrationDirectoryQuery={{
+                      isError: false,
+                      error: null,
+                      isPending: false,
+                    }}
+                    integrationRows={integrationRows}
+                    integrationSaveError={integrationSaveErrorMessage}
+                    disabled={!isEditable}
+                    onAddIntegrationBindingRow={async (nextBinding) => {
+                      setIntegrationRows((currentRows) => [
+                        ...currentRows,
+                        {
+                          clientId: `row-${String(currentRows.length + 1)}`,
+                          connectionId: nextBinding.connectionId,
+                          kind: nextBinding.kind,
+                          config: nextBinding.config,
+                        },
+                      ]);
+                      return true;
+                    }}
+                    onIntegrationBindingRowChange={(clientId, changes) => {
+                      setIntegrationRows((currentRows) =>
+                        currentRows.map((row) =>
+                          row.clientId === clientId ? { ...row, ...changes } : row,
+                        ),
+                      );
+                    }}
+                    onRemoveIntegrationBindingRow={(clientId) => {
+                      setIntegrationRows((currentRows) =>
+                        currentRows.filter((row) => row.clientId !== clientId),
+                      );
+                    }}
+                    onIntegrationSaveErrorDismiss={() => {
+                      setIntegrationSaveErrorMessage(null);
+                    }}
+                  />
+                </SandboxProfilePanelSection>
+                <SandboxProfilePanelSection title="Resources & Tools">
+                  <SandboxProfileResourcesAndToolsSection
+                    availableConnections={input.availableConnections ?? StoryIntegrationConnections}
+                    availableTargets={input.availableTargets ?? StoryIntegrationTargets}
+                    disabled={!isEditable}
+                    onRowChange={(clientId, changes) => {
+                      setIntegrationRows((currentRows) =>
+                        currentRows.map((row) =>
+                          row.clientId === clientId ? { ...row, ...changes } : row,
+                        ),
+                      );
+                    }}
+                    rows={integrationRows}
+                  />
+                </SandboxProfilePanelSection>
+                <SandboxProfilePanelSection title="Configurations">
+                  <SandboxProfileSetupScriptPanel
+                    onBlur={handleSetupScriptBlur}
+                    onChange={setSetupScriptDraft}
+                    disabled={!isEditable}
+                    repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
+                    saveStatus={setupScriptSaveStatus}
+                    value={setupScriptDraft}
+                  />
+                </SandboxProfilePanelSection>
+              </div>
             );
           }
 
@@ -755,16 +753,7 @@ function SandboxProfileEditorPageStoryView(
             );
           }
 
-          return (
-            <SandboxProfileSetupScriptPanel
-              onBlur={handleSetupScriptBlur}
-              onChange={setSetupScriptDraft}
-              disabled={!isEditable}
-              repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
-              saveStatus={setupScriptSaveStatus}
-              value={setupScriptDraft}
-            />
-          );
+          throw new Error("Unhandled story section.");
         }}
         sections={storySections}
       />
@@ -914,11 +903,6 @@ export const EmptySetupScript: Story = {
   args: {
     setupScript: null,
   },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(canvas.getByRole("tab", { name: "Configurations" }));
-  },
 };
 
 export const ResourcesAndToolsLoadError: Story = {
@@ -928,11 +912,6 @@ export const ResourcesAndToolsLoadError: Story = {
       bindingsErrorMessage: "Could not load sandbox profile integration bindings.",
       directoryErrorMessage: "Could not load integration connections.",
     },
-  },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-
-    await userEvent.click(canvas.getByRole("tab", { name: "Resources & Tools" }));
   },
 };
 

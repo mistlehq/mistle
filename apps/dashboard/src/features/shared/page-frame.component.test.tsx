@@ -47,6 +47,17 @@ describe("PageFrame", () => {
     expect(container.querySelector('[data-slot="page-header"]')).toBeDefined();
   });
 
+  it("supports replacing the generic page frame padding", () => {
+    const { container } = render(
+      <PageFrame paddingClassName="py-0" title="Generic page">
+        <div>Contained content</div>
+      </PageFrame>,
+    );
+
+    expect(container.firstElementChild?.className).toContain("py-0");
+    expect(container.firstElementChild?.className).not.toContain("px-4");
+  });
+
   it("supports constraining the generic page frame header and content", () => {
     const { container } = render(
       <PageFrame maxWidthClassName="max-w-5xl" title="Generic page">
