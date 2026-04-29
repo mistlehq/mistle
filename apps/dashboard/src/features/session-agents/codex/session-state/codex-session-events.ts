@@ -155,7 +155,6 @@ export function parseThreadTokenUsageSnapshot(notification: {
     threadId: params.data.threadId,
     turnId: params.data.turnId,
     tokenUsage: params.data.tokenUsage,
-    usageJson: JSON.stringify(params.data),
   };
 }
 

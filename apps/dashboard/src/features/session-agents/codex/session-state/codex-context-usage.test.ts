@@ -15,7 +15,6 @@ function createTokenUsageSnapshot(input: {
       last: createTokenUsageBreakdown(input.lastTotalTokens),
       modelContextWindow: input.modelContextWindow,
     },
-    usageJson: "{}",
   };
 }
 

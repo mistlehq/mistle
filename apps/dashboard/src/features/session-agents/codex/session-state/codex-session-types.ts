@@ -21,7 +21,6 @@ export type CodexThreadTokenUsageSnapshot = {
     last: CodexTokenUsageBreakdown;
     modelContextWindow: number | null;
   };
-  usageJson: string;
 };
 
 export type CodexTokenUsageBreakdown = {

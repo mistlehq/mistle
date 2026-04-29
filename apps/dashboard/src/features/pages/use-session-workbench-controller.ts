@@ -165,9 +165,9 @@ export function useSessionWorkbenchController(input: {
     sessionEventUnsubscribersRef,
   });
   const contextUsage =
-    sessionState.contextUsage.threadTokenUsageSnapshot?.threadId ===
+    sessionState.threadTokenUsageSnapshot?.threadId ===
     sessionState.lifecycle.sessionSnapshot?.activeThreadId
-      ? formatCodexContextUsage(sessionState.contextUsage.threadTokenUsageSnapshot)
+      ? formatCodexContextUsage(sessionState.threadTokenUsageSnapshot)
       : null;
   const cliPtyState = useSandboxPtyState({
     ensureTransportConnected: transportManager.ensureTransportConnected,

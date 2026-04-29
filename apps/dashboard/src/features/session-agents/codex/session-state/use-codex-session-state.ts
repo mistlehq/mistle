@@ -125,13 +125,10 @@ type CodexSessionMessageState = {
   sessionErrorMessage: string | null;
 };
 
-type CodexSessionContextUsageState = {
-  threadTokenUsageSnapshot: CodexThreadTokenUsageSnapshot | null;
-};
-
 export type UseCodexSessionStateResult = {
   lifecycle: CodexSessionConnectionLifecycleState;
   repositoryStatusRefreshEpoch: number;
+  threadTokenUsageSnapshot: CodexThreadTokenUsageSnapshot | null;
   threadAuthority: {
     providerThreadId: string | null;
     resolveCliLaunchTarget: () => Promise<CodexCliLaunchTarget>;
@@ -144,7 +141,6 @@ export type UseCodexSessionStateResult = {
   codexConfig: CodexSessionConfigState;
   serverRequests: CodexSessionServerRequestState;
   sessionMessage: CodexSessionMessageState;
-  contextUsage: CodexSessionContextUsageState;
 };
 
 export function useCodexSessionState(input: {
@@ -935,15 +931,10 @@ export function useCodexSessionState(input: {
     };
   }, [sessionErrorMessage]);
 
-  const contextUsage = useMemo<CodexSessionContextUsageState>(() => {
-    return {
-      threadTokenUsageSnapshot,
-    };
-  }, [threadTokenUsageSnapshot]);
-
   return {
     lifecycle,
     repositoryStatusRefreshEpoch,
+    threadTokenUsageSnapshot,
     threadAuthority,
     threads,
     chat,
@@ -952,6 +943,5 @@ export function useCodexSessionState(input: {
     codexConfig,
     serverRequests,
     sessionMessage,
-    contextUsage,
   };
 }

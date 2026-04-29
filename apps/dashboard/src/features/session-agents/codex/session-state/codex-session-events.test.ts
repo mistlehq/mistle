@@ -113,8 +113,6 @@ describe("codex session event parsing", () => {
         },
         modelContextWindow: 200_000,
       },
-      usageJson:
-        '{"threadId":"thread_123","turnId":"turn_123","tokenUsage":{"total":{"totalTokens":120,"inputTokens":100,"cachedInputTokens":20,"outputTokens":20,"reasoningOutputTokens":10},"last":{"totalTokens":80,"inputTokens":70,"cachedInputTokens":10,"outputTokens":10,"reasoningOutputTokens":5},"modelContextWindow":200000}}',
     });
   });
 
