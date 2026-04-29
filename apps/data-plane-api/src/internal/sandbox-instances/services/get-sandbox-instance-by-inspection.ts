@@ -469,6 +469,17 @@ async function inspectStoppedSandboxInstance(
     runtimePlan: PersistedRuntimePlan;
   } & SandboxInstanceResponseMetadata,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
+  if (sandboxInstance.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+    return {
+      ...sandboxInstanceResponseBase(sandboxInstance),
+      status: SandboxInstanceStatuses.STOPPED,
+      connectable: false,
+      failureCode: sandboxInstance.failureCode,
+      failureMessage: sandboxInstance.failureMessage,
+      runtimePlan: sandboxInstance.runtimePlan,
+    };
+  }
+
   if (
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT

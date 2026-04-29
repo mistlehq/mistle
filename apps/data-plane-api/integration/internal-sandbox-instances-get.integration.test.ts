@@ -1016,6 +1016,65 @@ describe("internal sandbox instances get integration", () => {
     });
   }, 60_000);
 
+  it("preserves stopped setup-check sandboxes when provider inspection would report the runtime missing", async ({
+    fixture,
+  }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_stopped_setup_check_missing",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_conventional_get_setup_check",
+      title: "Completed setup check",
+      sandboxProfileVersion: 7,
+      runtimeProvider: "docker",
+      providerSandboxId: "missing-provider-setup-check-runtime",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "user",
+      startedById: "usr_conventional_get",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_stopped_setup_check_missing?organizationId=org_dp_api_conventional_get&purpose=setup_check`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      id: "sbi_conventional_get_stopped_setup_check_missing",
+      title: "Completed setup check",
+      status: "stopped",
+      persistedStatus: "stopped",
+      connectable: false,
+      failureCode: null,
+      failureMessage: null,
+      runtimePlan: null,
+    });
+
+    const persistedRow = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        status: true,
+        stopReason: true,
+        failureCode: true,
+        failureMessage: true,
+      },
+      where: (table, { eq }) => eq(table.id, "sbi_conventional_get_stopped_setup_check_missing"),
+    });
+    expect(persistedRow).toEqual({
+      status: SandboxInstanceStatuses.STOPPED,
+      stopReason: null,
+      failureCode: null,
+      failureMessage: null,
+    });
+  });
+
   it("keeps persistent stopped sandboxes recoverably stopped when provider inspection reports the runtime missing", async ({
     fixture,
   }) => {
