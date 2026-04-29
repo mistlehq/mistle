@@ -1998,7 +1998,7 @@ function describeCronFieldPart(input: {
   return input.part;
 }
 
-function formatCronExpressionBreakdownDiagram(input: CronExpressionBreakdown): string {
+export function formatCronExpressionBreakdownDiagram(input: CronExpressionBreakdown): string {
   return [
     `${input.minute} ${input.hour} ${input.dayOfMonthExpression} ${input.monthExpression} ${input.dayOfWeekExpression}`,
     "| | | | |",

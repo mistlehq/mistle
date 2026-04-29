@@ -48,6 +48,7 @@ import type {
 } from "./sandbox-profile-binding-config-editor.js";
 import {
   createTimezoneOptions,
+  formatCronExpressionBreakdownDiagram,
   resolveCronExpressionBreakdown,
   resolveSnapshotRefreshScheduleBehaviorDescription,
   SandboxProfileIntegrationsSetupUnavailableState,
@@ -372,7 +373,11 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
       ? "*/15 9 * * *"
       : (existingSchedule?.cronExpression ?? "0 9 * * *"),
   );
-  const [scheduleEnabled, setScheduleEnabled] = useState(existingSchedule !== null);
+  const [scheduleEnabled, setScheduleEnabled] = useState(
+    existingSchedule !== null ||
+      input.state === "invalid-preview" ||
+      input.state === "save-failure",
+  );
   const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? "Asia/Singapore");
   const timezoneOptions = createTimezoneOptions(existingSchedule?.timezone ?? null);
   const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
@@ -503,40 +508,11 @@ function StoryCronExpressionBreakdownList(input: {
         <p className="text-muted-foreground">{input.message}</p>
       ) : (
         <pre className="overflow-x-auto rounded-sm bg-background p-2 font-mono text-xs leading-5 text-muted-foreground">
-          {[
-            `${input.breakdown.minute} ${input.breakdown.hour} ${input.breakdown.dayOfMonthExpression} ${input.breakdown.monthExpression} ${input.breakdown.dayOfWeekExpression}`,
-            "| | | | |",
-            `| | | | day of week: ${input.breakdown.dayOfWeek}`,
-            `| | | month: ${input.breakdown.month.toLowerCase()}`,
-            `| | day of month: ${input.breakdown.dayOfMonth.toLowerCase()}`,
-            `| hour: ${formatStoryCronHourLabel(input.breakdown.hour)}`,
-            `minute: ${input.breakdown.minute}`,
-          ].join("\n")}
+          {formatCronExpressionBreakdownDiagram(input.breakdown)}
         </pre>
       )}
     </div>
   );
-}
-
-function formatStoryCronHourLabel(hour: string): string {
-  const hourNumber = Number(hour);
-  if (!Number.isInteger(hourNumber) || hourNumber < 0 || hourNumber > 23) {
-    return hour;
-  }
-
-  if (hourNumber === 0) {
-    return "12 AM";
-  }
-
-  if (hourNumber < 12) {
-    return `${hourNumber} AM`;
-  }
-
-  if (hourNumber === 12) {
-    return "12 PM";
-  }
-
-  return `${hourNumber - 12} PM`;
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
