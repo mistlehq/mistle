@@ -12,6 +12,7 @@ import {
   getLocalPreparedRuntimeSandboxBaseImageRef,
 } from "../../packages/config/src/sandbox-base-images.js";
 import { ensureDevObjectStoreBucketExists } from "./ensure-object-store-bucket.ts";
+import { createControlPlaneStartupCommands } from "./start-commands.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
@@ -520,19 +521,14 @@ async function start(): Promise<void> {
     env: sharedDevEnv,
   });
 
-  console.log("Running control-plane DB migrations...");
-  runOrThrow({
-    command: "pnpm",
-    args: ["--filter", "@mistle/control-plane-api", "db:migrate"],
-    env: sharedDevEnv,
-  });
-
-  console.log("Running control-plane workflow migrations...");
-  runOrThrow({
-    command: "pnpm",
-    args: ["--filter", "@mistle/control-plane-api", "workflow:migrate"],
-    env: sharedDevEnv,
-  });
+  for (const commandInput of createControlPlaneStartupCommands()) {
+    console.log(commandInput.label);
+    runOrThrow({
+      command: commandInput.command,
+      args: commandInput.args,
+      env: sharedDevEnv,
+    });
+  }
 
   console.log("Running data-plane DB migrations...");
   runOrThrow({
