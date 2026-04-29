@@ -249,9 +249,8 @@ jobs:
       - name: Run TS static checks in Nix shell
         run: >-
           nix develop --command bash -c
-          "threads=\"$(nproc)\";
-          pnpm exec oxfmt --check --threads=\"${threads}\" . &&
-          pnpm exec oxlint --type-aware --deny-warnings --threads=\"${threads}\" apps packages tests &&
+          "pnpm exec oxfmt --check --threads=2 . &&
+          pnpm exec oxlint --type-aware --deny-warnings --threads=2 apps packages tests &&
           pnpm lint:openapi &&
           pnpm lint:docs &&
           pnpm lint:sql &&
