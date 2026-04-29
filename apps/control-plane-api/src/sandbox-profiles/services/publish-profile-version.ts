@@ -16,7 +16,10 @@ import {
 } from "../errors.js";
 import { enqueueSnapshotMaterializationJob } from "./enqueue-snapshot-materialization-job.js";
 import { getProfileVersionPublishability } from "./get-profile-version-publishability.js";
-import type { ProfileVersionRefreshScheduleSummary } from "./profile-version-refresh-schedule-summary.js";
+import {
+  loadActiveRefreshSchedulesByVersion,
+  type ProfileVersionRefreshScheduleSummary,
+} from "./profile-version-refresh-schedule-summary.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PublishProfileVersionInput = {
@@ -175,12 +178,17 @@ export async function publishProfileVersion(
       );
     }
 
+    const refreshSchedulesByVersion = await loadActiveRefreshSchedulesByVersion({
+      db: tx,
+      profileId: input.profileId,
+    });
+
     return {
       version: {
         ...publishedVersion,
         isActive: false,
         usable: false,
-        refreshSchedule: null,
+        refreshSchedule: refreshSchedulesByVersion.get(input.profileVersion) ?? null,
         latestSnapshotJob: snapshotJob,
       },
       activeVersion: sandboxProfile.activeVersion,

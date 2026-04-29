@@ -150,6 +150,23 @@ describe("sandbox profile versions publish integration", () => {
         }),
       );
 
+      const scheduleResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_version_publish_001/versions/2/refresh-schedule",
+        {
+          method: "PUT",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            name: "Draft refresh",
+            cronExpression: "0 9 * * *",
+            timezone: "Asia/Singapore",
+          }),
+        },
+      );
+      expect(scheduleResponse.status).toBe(200);
+
       const response = await fixture.request(
         "/v1/sandbox/profiles/sbp_version_publish_001/versions/2/publish",
         {
@@ -169,6 +186,14 @@ describe("sandbox profile versions publish integration", () => {
           state: SandboxProfileVersionStates.PUBLISHED,
           isActive: false,
           usable: false,
+          refreshSchedule: {
+            scheduleId: expect.any(String),
+            name: "Draft refresh",
+            cronExpression: "0 9 * * *",
+            timezone: "Asia/Singapore",
+            enabled: true,
+            nextScheduledAt: expect.any(String),
+          },
           latestSnapshotJob: {
             id: expect.any(String),
             trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
