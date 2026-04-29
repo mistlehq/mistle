@@ -102,13 +102,23 @@ function sandboxInstanceResponseBase(
   };
 }
 
+function sandboxInstanceResponseBaseWithPersistedStatus(
+  sandboxInstance: SandboxInstanceResponseMetadata,
+  persistedStatus: SandboxInstanceStatus,
+): ReturnType<typeof sandboxInstanceResponseBase> {
+  return sandboxInstanceResponseBase({
+    ...sandboxInstance,
+    status: persistedStatus,
+  });
+}
+
 async function markRunningSandboxInstanceStopped(
   ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
   input: {
     sandboxInstanceId: string;
     clearProviderSandboxId?: boolean;
   },
-): Promise<void> {
+): Promise<SandboxInstanceStatus> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -129,7 +139,7 @@ async function markRunningSandboxInstanceStopped(
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
+    return updatedRows[0].status;
   }
 
   throw new Error("Failed to transition sandbox instance status from running to stopped.");
@@ -175,7 +185,7 @@ async function markStartingSandboxInstanceFailed(
     failureCode: string;
     failureMessage: string;
   },
-): Promise<void> {
+): Promise<SandboxInstanceStatus> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -197,7 +207,7 @@ async function markStartingSandboxInstanceFailed(
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
+    return updatedRows[0].status;
   }
 
   throw new Error("Failed to transition sandbox instance status from starting to failed.");
@@ -209,7 +219,7 @@ async function markStartingSandboxInstanceStopped(
     sandboxInstanceId: string;
     clearProviderSandboxId?: boolean;
   },
-): Promise<void> {
+): Promise<SandboxInstanceStatus> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -233,7 +243,7 @@ async function markStartingSandboxInstanceStopped(
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.STOPPED) {
-    return;
+    return updatedRows[0].status;
   }
 
   throw new Error("Failed to transition sandbox instance status from starting to stopped.");
@@ -246,7 +256,7 @@ async function markRunningSandboxInstanceFailed(
     failureCode: string;
     failureMessage: string;
   },
-): Promise<void> {
+): Promise<SandboxInstanceStatus> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -268,7 +278,7 @@ async function markRunningSandboxInstanceFailed(
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
+    return updatedRows[0].status;
   }
 
   throw new Error("Failed to transition sandbox instance status from running to failed.");
@@ -281,7 +291,7 @@ async function markStoppedSandboxInstanceFailed(
     failureCode: string;
     failureMessage: string;
   },
-): Promise<void> {
+): Promise<SandboxInstanceStatus> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -303,7 +313,7 @@ async function markStoppedSandboxInstanceFailed(
     });
 
   if (updatedRows[0]?.status === SandboxInstanceStatuses.FAILED) {
-    return;
+    return updatedRows[0].status;
   }
 
   throw new Error("Failed to transition sandbox instance status from stopped to failed.");
@@ -323,12 +333,12 @@ async function inspectStartingSandboxInstance(
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
   ) {
-    await markStartingSandboxInstanceStopped(ctx, {
+    const persistedStatus = await markStartingSandboxInstanceStopped(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       clearProviderSandboxId: true,
     });
     return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
+      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
       status: SandboxInstanceStatuses.STOPPED,
       connectable: false,
       failureCode: null,
@@ -347,12 +357,12 @@ async function inspectStartingSandboxInstance(
 
   if (inspection === null) {
     if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-      await markStartingSandboxInstanceStopped(ctx, {
+      const persistedStatus = await markStartingSandboxInstanceStopped(ctx, {
         sandboxInstanceId: sandboxInstance.id,
         clearProviderSandboxId: true,
       });
       return {
-        ...sandboxInstanceResponseBase(sandboxInstance),
+        ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
         status: SandboxInstanceStatuses.STOPPED,
         connectable: false,
         failureCode: null,
@@ -361,13 +371,13 @@ async function inspectStartingSandboxInstance(
       };
     }
 
-    await markStartingSandboxInstanceFailed(ctx, {
+    const persistedStatus = await markStartingSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
     });
     return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
+      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
       status: SandboxInstanceStatuses.FAILED,
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -402,12 +412,12 @@ async function inspectStartingSandboxInstance(
   }
 
   if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-    await markStartingSandboxInstanceStopped(ctx, {
+    const persistedStatus = await markStartingSandboxInstanceStopped(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       clearProviderSandboxId: true,
     });
     return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
+      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
       status: SandboxInstanceStatuses.STOPPED,
       connectable: false,
       failureCode: null,
@@ -416,14 +426,14 @@ async function inspectStartingSandboxInstance(
     };
   }
 
-  await markStartingSandboxInstanceFailed(ctx, {
+  const persistedStatus = await markStartingSandboxInstanceFailed(ctx, {
     sandboxInstanceId: sandboxInstance.id,
     failureCode: dispositionOutcome.failureCode,
     failureMessage: dispositionOutcome.failureMessage,
   });
 
   return {
-    ...sandboxInstanceResponseBase(sandboxInstance),
+    ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
     status: SandboxInstanceStatuses.FAILED,
     connectable: false,
     failureCode: dispositionOutcome.failureCode,
@@ -495,13 +505,13 @@ async function inspectStoppedSandboxInstance(
       };
     }
 
-    await markStoppedSandboxInstanceFailed(ctx, {
+    const persistedStatus = await markStoppedSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
     return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
+      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
       status: SandboxInstanceStatuses.FAILED,
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -538,13 +548,13 @@ async function inspectStoppedSandboxInstance(
     };
   }
 
-  await markStoppedSandboxInstanceFailed(ctx, {
+  const persistedStatus = await markStoppedSandboxInstanceFailed(ctx, {
     sandboxInstanceId: sandboxInstance.id,
     failureCode: "provider_runtime_not_resumable",
     failureMessage: "Sandbox runtime was not resumable at the provider during inspection.",
   });
   return {
-    ...sandboxInstanceResponseBase(sandboxInstance),
+    ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
     status: SandboxInstanceStatuses.FAILED,
     connectable: false,
     failureCode: "provider_runtime_not_resumable",
@@ -572,12 +582,12 @@ async function inspectRunningSandboxInstance(
   const inspection = await inspectSandboxInstanceOrNull(ctx, sandboxInstance.providerSandboxId);
   if (inspection === null) {
     if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
-      await markRunningSandboxInstanceStopped(ctx, {
+      const persistedStatus = await markRunningSandboxInstanceStopped(ctx, {
         sandboxInstanceId: sandboxInstance.id,
         clearProviderSandboxId: true,
       });
       return {
-        ...sandboxInstanceResponseBase(sandboxInstance),
+        ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
         status: SandboxInstanceStatuses.STOPPED,
         connectable: false,
         failureCode: sandboxInstance.failureCode,
@@ -586,13 +596,13 @@ async function inspectRunningSandboxInstance(
       };
     }
 
-    await markRunningSandboxInstanceFailed(ctx, {
+    const persistedStatus = await markRunningSandboxInstanceFailed(ctx, {
       sandboxInstanceId: sandboxInstance.id,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
     return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
+      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
       status: SandboxInstanceStatuses.FAILED,
       connectable: false,
       failureCode: InspectionFailureCodes.PROVIDER_RUNTIME_MISSING,
@@ -622,12 +632,12 @@ async function inspectRunningSandboxInstance(
     };
   }
 
-  await markRunningSandboxInstanceStopped(ctx, {
+  const persistedStatus = await markRunningSandboxInstanceStopped(ctx, {
     sandboxInstanceId: sandboxInstance.id,
   });
 
   return {
-    ...sandboxInstanceResponseBase(sandboxInstance),
+    ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
     status: SandboxInstanceStatuses.STOPPED,
     connectable: false,
     failureCode: sandboxInstance.failureCode,
