@@ -1321,70 +1321,68 @@ function ReadySandboxProfileEditorPage(input: {
   }
 
   return (
-    <>
-      <SandboxProfileEditorView
-        activeSectionId={activeSectionId}
-        hasUnpersistedIntegrationChanges={integrationDraftState.hasUnpersistedChanges}
-        hasUnpersistedSetupScriptChanges={setupScriptDraftState.hasUnpersistedChanges}
-        isSavingProfileName={metaState.isUpdating}
-        mode={input.mode}
-        shouldBlockUnpersistedChangesNavigation={shouldBlockUnpersistedChangesNavigation}
-        deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
-        deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
-        deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
-        deleteProfileError={input.deleteProfileError}
-        deleteProfileIsPending={input.deleteProfileIsPending}
-        onMakeChanges={input.onMakeChanges}
-        onConfirmDeleteProfile={input.onConfirmDeleteProfile}
-        onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
-        onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
-        onPublish={(version) => {
-          void handlePublish(version);
-        }}
-        onActiveSectionIdChange={(sectionId) => {
-          void input.navigate(
-            createSandboxProfileEditorPath({
-              profileId: input.profileId,
-              view: input.routeView,
-              sectionId,
-            }),
-          );
-        }}
-        onSaveProfileName={metaState.onProfileNameSave}
-        onViewActive={input.onViewActive}
-        onViewDraft={input.onViewDraft}
-        profileName={metaState.formState.displayName}
-        profileNameFallback={metaState.pageTitle}
-        publishRequestIsPending={publishRequestIsPending}
-        versionActionError={publishFlushError ?? input.versionActionError}
-        versionActionIsPending={input.versionActionIsPending}
-        isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
-        renderSectionPanel={(sectionId) => (
-          <SandboxProfileEditorSectionPanels
-            activeSectionId={sectionId}
-            draftFieldsAreDisabled={draftFieldsAreDisabled}
-            integrationDraftState={integrationDraftState}
-            integrationsLoader={integrationsLoader}
-            invalidateVersionBindings={input.invalidateVersionBindings}
-            invalidateVersionSetupScript={input.invalidateVersionSetupScript}
-            mode={input.mode}
-            onIntegrationDraftStateChange={setIntegrationDraftState}
-            onPublishSuccessMessageDismiss={() => {
-              setShowPublishSuccessMessage(false);
-            }}
-            onRefreshSnapshot={input.onRefreshSnapshot}
-            onSetupScriptDraftStateChange={setSetupScriptDraftState}
-            profileId={input.profileId}
-            publishSuccessMessage={showPublishSuccessMessage}
-            publishSuccessMessageKey={publishSuccessNoticeKey}
-            setupScriptLoader={setupScriptLoader}
-            snapshotPanelState={snapshotPanelState}
-            versionActionIsPending={input.versionActionIsPending}
-          />
-        )}
-        sections={editorSections}
-      />
-    </>
+    <SandboxProfileEditorView
+      activeSectionId={activeSectionId}
+      hasUnpersistedIntegrationChanges={integrationDraftState.hasUnpersistedChanges}
+      hasUnpersistedSetupScriptChanges={setupScriptDraftState.hasUnpersistedChanges}
+      isSavingProfileName={metaState.isUpdating}
+      mode={input.mode}
+      shouldBlockUnpersistedChangesNavigation={shouldBlockUnpersistedChangesNavigation}
+      deleteProfileAutomationUsages={input.deleteProfileAutomationUsages}
+      deleteProfileAutomationUsagesError={input.deleteProfileAutomationUsagesError}
+      deleteProfileAutomationUsagesIsPending={input.deleteProfileAutomationUsagesIsPending}
+      deleteProfileError={input.deleteProfileError}
+      deleteProfileIsPending={input.deleteProfileIsPending}
+      onMakeChanges={input.onMakeChanges}
+      onConfirmDeleteProfile={input.onConfirmDeleteProfile}
+      onDeleteProfileDialogOpenChange={input.onDeleteProfileDialogOpenChange}
+      onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+      onPublish={(version) => {
+        void handlePublish(version);
+      }}
+      onActiveSectionIdChange={(sectionId) => {
+        void input.navigate(
+          createSandboxProfileEditorPath({
+            profileId: input.profileId,
+            view: input.routeView,
+            sectionId,
+          }),
+        );
+      }}
+      onSaveProfileName={metaState.onProfileNameSave}
+      onViewActive={input.onViewActive}
+      onViewDraft={input.onViewDraft}
+      profileName={metaState.formState.displayName}
+      profileNameFallback={metaState.pageTitle}
+      publishRequestIsPending={publishRequestIsPending}
+      versionActionError={publishFlushError ?? input.versionActionError}
+      versionActionIsPending={input.versionActionIsPending}
+      isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
+      renderSectionPanel={(sectionId) => (
+        <SandboxProfileEditorSectionPanels
+          activeSectionId={sectionId}
+          draftFieldsAreDisabled={draftFieldsAreDisabled}
+          integrationDraftState={integrationDraftState}
+          integrationsLoader={integrationsLoader}
+          invalidateVersionBindings={input.invalidateVersionBindings}
+          invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+          mode={input.mode}
+          onIntegrationDraftStateChange={setIntegrationDraftState}
+          onPublishSuccessMessageDismiss={() => {
+            setShowPublishSuccessMessage(false);
+          }}
+          onRefreshSnapshot={input.onRefreshSnapshot}
+          onSetupScriptDraftStateChange={setSetupScriptDraftState}
+          profileId={input.profileId}
+          publishSuccessMessage={showPublishSuccessMessage}
+          publishSuccessMessageKey={publishSuccessNoticeKey}
+          setupScriptLoader={setupScriptLoader}
+          snapshotPanelState={snapshotPanelState}
+          versionActionIsPending={input.versionActionIsPending}
+        />
+      )}
+      sections={editorSections}
+    />
   );
 }
 
