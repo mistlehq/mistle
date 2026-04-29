@@ -41,7 +41,7 @@ export function resolveComposerStatusMessage(input: {
   bootstrapState: SessionBootstrapPhase;
   composerErrorMessage: string | null;
   completedTurnErrorMessage: string | null;
-  hasPendingAttachments: boolean;
+  hasPendingImageAttachments: boolean;
   isUploadingAttachments: boolean;
   sessionErrorMessage: string | null;
   selectedModel: string | null;
@@ -87,7 +87,7 @@ export function resolveComposerStatusMessage(input: {
     };
   }
 
-  if (input.hasPendingAttachments && input.activeComposerModel !== null) {
+  if (input.hasPendingImageAttachments && input.activeComposerModel !== null) {
     if (!supportsImageInspection(input.activeComposerModel)) {
       return {
         message: buildNonImageCapableModelWarningMessage(input.activeComposerModel.displayName),

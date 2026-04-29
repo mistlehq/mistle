@@ -29,6 +29,7 @@ import type { SessionComposerConfigControl } from "./use-session-composer-config
 type PendingComposerAttachment = {
   id: string;
   file: File;
+  isImage: boolean;
   name: string;
 };
 
@@ -129,7 +130,7 @@ export function useSessionComposerState(input: {
     bootstrapState: composerStateInput.bootstrap.phase,
     composerErrorMessage,
     completedTurnErrorMessage: composerStateInput.turnControl.completedTurnErrorMessage,
-    hasPendingAttachments: pendingComposerAttachments.length > 0,
+    hasPendingImageAttachments: pendingComposerAttachments.some((attachment) => attachment.isImage),
     isUploadingAttachments: composerStateInput.attachmentControl.isUploadingAttachments,
     sessionErrorMessage,
     selectedModel: composerStateInput.configControl.selectedModel,
@@ -167,6 +168,7 @@ export function useSessionComposerState(input: {
       const nextAttachments = files.map((file) => ({
         id: crypto.randomUUID(),
         file,
+        isImage: file.type.startsWith("image/"),
         name: file.name,
       }));
 
