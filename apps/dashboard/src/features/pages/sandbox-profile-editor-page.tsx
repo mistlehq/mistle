@@ -1,3 +1,4 @@
+import { findNextScheduleOccurrence } from "@mistle/time";
 import {
   Accordion,
   AccordionContent,
@@ -284,6 +285,8 @@ const SandboxProfileEditorSectionIds = {
   CONFIGURATIONS: "configurations",
   SNAPSHOT: "snapshot",
 } satisfies Record<string, SandboxProfileEditorSectionId>;
+const SnapshotRefreshSchedulePreviewPrompt =
+  "Enter a valid cron expression and timezone to preview the schedule.";
 
 const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
   notice: "publish-success",
@@ -1620,6 +1623,11 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   const [cronExpression, setCronExpression] = useState(existingSchedule?.cronExpression ?? "");
   const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? readBrowserTimeZone());
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
+    after: new Date(),
+    cronExpression,
+    timezone,
+  });
   const saveScheduleMutation = useMutation({
     mutationFn: async () => {
       const nextCronExpression = cronExpression.trim();
@@ -1760,6 +1768,8 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
         </Field>
       </div>
 
+      <p className="text-sm text-muted-foreground">{scheduleBehaviorDescription}</p>
+
       <ButtonGroup>
         <Button disabled={fieldsAreDisabled} type="submit">
           Save schedule
@@ -1783,6 +1793,34 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
 
 function readBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
+}
+
+export function resolveSnapshotRefreshScheduleBehaviorDescription(input: {
+  after: Date;
+  cronExpression: string;
+  timezone: string;
+}): string {
+  const cronExpression = input.cronExpression.trim();
+  const timezone = input.timezone.trim();
+  if (cronExpression.length === 0 || timezone.length === 0) {
+    return SnapshotRefreshSchedulePreviewPrompt;
+  }
+
+  try {
+    const occurrence = findNextScheduleOccurrence({
+      after: input.after,
+      cronExpression,
+      timezone,
+    });
+
+    if (occurrence === null) {
+      return "No future refresh is scheduled.";
+    }
+
+    return `Next refresh: ${occurrence.localScheduledDate} ${occurrence.localScheduledTime} ${timezone}.`;
+  } catch {
+    return SnapshotRefreshSchedulePreviewPrompt;
+  }
 }
 
 function PublishSuccessSnapshotNotice(input: {

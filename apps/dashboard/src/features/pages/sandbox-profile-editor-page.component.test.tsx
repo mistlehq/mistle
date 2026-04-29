@@ -28,6 +28,7 @@ import {
   applyPublishedSandboxProfileVersionToVersions,
   resolveSandboxProfileSetupScriptIntegrationRows,
   resolveSandboxProfileEditorVersionMode,
+  resolveSnapshotRefreshScheduleBehaviorDescription,
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
@@ -849,6 +850,46 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("2026-04-30T01:00:00.000Z")).toBeDefined();
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Remove schedule" })).toBeDefined();
+  });
+
+  it("updates the automatic snapshot refresh behavior description while editing", () => {
+    renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    const cronExpressionInput = screen.getByLabelText("Cron expression");
+    const timezoneInput = screen.getByLabelText("Timezone");
+    fireEvent.change(cronExpressionInput, { target: { value: "0 9 * * *" } });
+    fireEvent.change(timezoneInput, { target: { value: "Asia/Singapore" } });
+
+    expect(
+      screen.getByText(/^Next refresh: \d{4}-\d{2}-\d{2} 09:00 Asia\/Singapore\.$/u),
+    ).toBeDefined();
+
+    fireEvent.change(cronExpressionInput, { target: { value: "not a cron expression" } });
+
+    expect(
+      screen.getByText("Enter a valid cron expression and timezone to preview the schedule."),
+    ).toBeDefined();
+  });
+
+  it("resolves automatic snapshot refresh behavior descriptions", () => {
+    expect(
+      resolveSnapshotRefreshScheduleBehaviorDescription({
+        after: new Date("2026-04-28T00:00:00.000Z"),
+        cronExpression: "0 9 * * *",
+        timezone: "Asia/Singapore",
+      }),
+    ).toBe("Next refresh: 2026-04-28 09:00 Asia/Singapore.");
+
+    expect(
+      resolveSnapshotRefreshScheduleBehaviorDescription({
+        after: new Date("2026-04-28T00:00:00.000Z"),
+        cronExpression: "*/15 9 * * *",
+        timezone: "Asia/Singapore",
+      }),
+    ).toBe("Enter a valid cron expression and timezone to preview the schedule.");
   });
 
   it("does not show a refresh snapshot action in the published version menu", () => {
