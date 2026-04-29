@@ -32,7 +32,7 @@ export type StartSandboxInstanceInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  purpose?: SandboxInstancePurpose;
+  purpose: SandboxInstancePurpose;
   runtimePlan: CompiledRuntimePlan;
   startedBy: {
     kind: SandboxInstanceStarterKind;

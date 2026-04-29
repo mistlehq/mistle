@@ -5,7 +5,11 @@ import {
   type StopSandboxInstanceInput,
   type StartSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { describe, expect } from "vitest";
 
 import { INTERNAL_SANDBOX_ROUTE_BASE_PATH } from "../src/internal/index.js";
@@ -41,6 +45,7 @@ function createStartSandboxInput(input: {
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
+    purpose: SandboxInstancePurposes.SESSION,
     runtimePlan: createRuntimePlan({
       sandboxProfileId: input.sandboxProfileId,
       version: input.sandboxProfileVersion,

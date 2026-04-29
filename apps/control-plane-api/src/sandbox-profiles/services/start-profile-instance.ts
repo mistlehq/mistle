@@ -6,7 +6,11 @@ import {
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
 } from "@mistle/db/control-plane";
-import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  type SandboxInstanceSource,
+  type SandboxInstanceStarterKind,
+} from "@mistle/db/data-plane";
 import { type CompiledRuntimePlan, type ResolvedSandboxImage } from "@mistle/integrations-core";
 import { SandboxProvider } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
@@ -271,6 +275,7 @@ export async function startProfileInstance(
     organizationId: serviceInput.organizationId,
     sandboxProfileId: serviceInput.profileId,
     sandboxProfileVersion: serviceInput.profileVersion,
+    purpose: SandboxInstancePurposes.SESSION,
     idempotencyKey,
     runtimePlan,
     startedBy: serviceInput.startedBy,

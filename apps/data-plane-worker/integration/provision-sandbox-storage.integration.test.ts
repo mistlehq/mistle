@@ -18,6 +18,7 @@ import {
   sandboxInstanceStorages,
   sandboxInstances,
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
   SandboxStorageProviders,
 } from "@mistle/db/data-plane";
 import {
@@ -530,6 +531,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr4_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr4_integration",
@@ -652,6 +654,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr4_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr4_integration",
@@ -739,6 +742,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr4_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr4_integration",
@@ -876,6 +880,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr4_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr4_integration",

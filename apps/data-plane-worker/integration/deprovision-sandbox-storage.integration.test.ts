@@ -14,6 +14,7 @@ import {
   sandboxInstanceStorages,
   sandboxInstances,
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
 } from "@mistle/db/data-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -307,6 +308,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr9_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr9_integration",
@@ -395,6 +397,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
           sandboxProfileId: "sbp_pr9_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr9_integration",

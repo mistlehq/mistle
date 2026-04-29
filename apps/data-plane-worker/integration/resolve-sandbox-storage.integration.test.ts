@@ -13,6 +13,7 @@ import {
   sandboxInstanceStorages,
   sandboxInstances,
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
   SandboxStorageCredentialKinds,
   SandboxStorageProviders,
   SandboxStorageStatuses,
@@ -239,6 +240,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
           sandboxProfileId: "sbp_pr5_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr5_integration",
@@ -321,6 +323,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
         sandboxProfileId: "sbp_pr5_integration",
         sandboxProfileVersion: 1,
         persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        purpose: SandboxInstancePurposes.SESSION,
         startedBy: {
           kind: "system",
           id: "worker_pr5_integration",
@@ -371,6 +374,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
         sandboxProfileId: "sbp_pr5_integration",
         sandboxProfileVersion: 1,
         persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        purpose: SandboxInstancePurposes.SESSION,
         startedBy: {
           kind: "system",
           id: "worker_pr5_integration",
@@ -445,6 +449,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
         sandboxProfileId: "sbp_pr5_integration",
         sandboxProfileVersion: 1,
         persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+        purpose: SandboxInstancePurposes.SESSION,
         startedBy: {
           kind: "system",
           id: "worker_pr5_integration",

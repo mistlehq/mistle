@@ -9,6 +9,7 @@ import {
   sandboxInstanceStorages,
   sandboxInstances,
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
   SandboxStorageProviders,
   SandboxStorageStatuses,
 } from "@mistle/db/data-plane";
@@ -264,6 +265,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
           sandboxProfileId: "sbp_pr12_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr12_integration",
@@ -332,6 +334,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
           sandboxProfileId: "sbp_pr12_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr12_integration",
@@ -383,6 +386,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
           sandboxProfileId: "sbp_pr13_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_pr13_integration",

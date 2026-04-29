@@ -1,5 +1,6 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { SandboxInstancePurposes } from "@mistle/db/data-plane";
 import type {
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
@@ -23,6 +24,7 @@ export async function startSandboxProfileInstance(
 
   return ctx.dataPlaneClient.startSandboxInstance({
     ...input,
+    purpose: SandboxInstancePurposes.SESSION,
     runtimePlan: input.runtimePlan,
   });
 }

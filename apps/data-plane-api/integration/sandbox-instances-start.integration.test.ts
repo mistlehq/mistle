@@ -35,13 +35,11 @@ const WorkflowRunInputSchema = z
     sandboxInstanceId: z.string().min(1),
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
-    purpose: z
-      .enum([
-        SandboxInstancePurposes.SESSION,
-        SandboxInstancePurposes.SNAPSHOT,
-        SandboxInstancePurposes.SETUP_CHECK,
-      ])
-      .optional(),
+    purpose: z.enum([
+      SandboxInstancePurposes.SESSION,
+      SandboxInstancePurposes.SNAPSHOT,
+      SandboxInstancePurposes.SETUP_CHECK,
+    ]),
     persistenceMode: z.enum([
       SandboxInstancePersistenceModes.EPHEMERAL,
       SandboxInstancePersistenceModes.PERSISTENT,
@@ -147,6 +145,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_integration_001",
       sandboxProfileId,
       sandboxProfileVersion: 7,
+      purpose: SandboxInstancePurposes.SESSION,
       runtimePlan: createRuntimePlan({
         sandboxProfileId,
         version: 7,
@@ -206,7 +205,7 @@ describe("sandboxInstances.start integration", () => {
     expect(parsedWorkflowInput.sandboxProfileId).toBe(workflowInput.sandboxProfileId);
     expect(parsedWorkflowInput.sandboxInstanceId).toBe(startedSandbox.sandboxInstanceId);
     expect(parsedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
-    expect(parsedWorkflowInput.purpose).toBeUndefined();
+    expect(parsedWorkflowInput.purpose).toBe(SandboxInstancePurposes.SESSION);
   }, 60_000);
 
   it("queues setup-check launches with a setup-check purpose", async ({ fixture }) => {
@@ -288,6 +287,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_snapshot_launch",
       sandboxProfileId,
       sandboxProfileVersion: 9,
+      purpose: SandboxInstancePurposes.SNAPSHOT,
       runtimePlan: {
         ...createRuntimePlan({
           sandboxProfileId,
@@ -356,6 +356,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_integration_idempotent",
       sandboxProfileId,
       sandboxProfileVersion: 11,
+      purpose: SandboxInstancePurposes.SESSION,
       idempotencyKey: "dashboard-start-001",
       runtimePlan: createRuntimePlan({
         sandboxProfileId,
@@ -412,6 +413,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_sync_insert",
       sandboxProfileId,
       sandboxProfileVersion: 1,
+      purpose: SandboxInstancePurposes.SESSION,
       runtimePlan: createRuntimePlan({
         sandboxProfileId,
         version: 1,
@@ -484,6 +486,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_persistent_mode",
       sandboxProfileId,
       sandboxProfileVersion: 3,
+      purpose: SandboxInstancePurposes.SESSION,
       runtimePlan: createRuntimePlan({
         sandboxProfileId,
         version: 3,
@@ -596,6 +599,7 @@ describe("sandboxInstances.start integration", () => {
         organizationId,
         sandboxProfileId,
         sandboxProfileVersion: 4,
+        purpose: SandboxInstancePurposes.SESSION,
         runtimePlan: createRuntimePlan({
           sandboxProfileId,
           version: 4,
@@ -712,6 +716,7 @@ describe("sandboxInstances.start integration", () => {
         organizationId,
         sandboxProfileId,
         sandboxProfileVersion: 5,
+        purpose: SandboxInstancePurposes.SESSION,
         runtimePlan: createRuntimePlan({
           sandboxProfileId,
           version: 5,

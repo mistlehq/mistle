@@ -59,7 +59,7 @@ export type StartSandboxInstanceWorkflowInput = {
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   persistenceMode: SandboxInstancePersistenceMode;
-  purpose?: SandboxInstancePurpose;
+  purpose: SandboxInstancePurpose;
   runtimePlan: CompiledRuntimePlan;
   startedBy: {
     kind: SandboxInstanceStarterKind;

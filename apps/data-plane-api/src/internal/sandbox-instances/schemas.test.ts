@@ -104,6 +104,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
+      purpose: "session",
       idempotencyKey: "req_123",
       runtimePlan,
       startedBy: {
@@ -138,6 +139,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
+      purpose: "session",
       runtimePlan: createRuntimePlan(),
       startedBy: {
         kind: "user",
@@ -159,6 +161,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
+      purpose: "session",
       runtimePlan: createRuntimePlan(),
       startedBy: {
         kind: "system",
@@ -180,6 +183,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
+      purpose: "session",
       runtimePlan: {
         ...createRuntimePlan(),
         agentRuntimes: undefined,
@@ -204,6 +208,38 @@ describe("StartSandboxInstanceInputSchema", () => {
       expect.arrayContaining([
         expect.objectContaining({
           path: ["runtimePlan", "agentRuntimes"],
+        }),
+      ]),
+    );
+  });
+
+  it("requires an explicit purpose", () => {
+    const result = StartSandboxInstanceInputSchema.safeParse({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      sandboxProfileVersion: 1,
+      runtimePlan: createRuntimePlan(),
+      startedBy: {
+        kind: "user",
+        id: "usr_123",
+      },
+      source: "dashboard",
+      image: {
+        imageId: "img_123",
+        createdAt: "2026-03-10T00:00:00.000Z",
+        kind: "base",
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected purpose validation to fail.");
+    }
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["purpose"],
         }),
       ]),
     );

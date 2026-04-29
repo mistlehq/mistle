@@ -143,7 +143,7 @@ export interface paths {
             };
             organizationId: string;
             /** @enum {string} */
-            purpose?: "session" | "snapshot" | "setup_check";
+            purpose: "session" | "snapshot" | "setup_check";
             runtimePlan: {
               agentRuntimes: {
                 bindingId: string;

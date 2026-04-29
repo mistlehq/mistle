@@ -1440,6 +1440,7 @@
                   "organizationId",
                   "sandboxProfileId",
                   "sandboxProfileVersion",
+                  "purpose",
                   "runtimePlan",
                   "startedBy",
                   "source",

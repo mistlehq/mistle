@@ -1,6 +1,7 @@
 import {
   createDataPlaneDatabase,
   SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
   sandboxInstanceRuntimePlans,
   sandboxInstanceStorages,
   sandboxInstances,
@@ -109,6 +110,7 @@ describe("start sandbox instance provisioning integration", () => {
           sandboxProfileId: "sbp_start_provisioning_integration",
           sandboxProfileVersion: 3,
           persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_start_provisioning_integration",
@@ -121,6 +123,7 @@ describe("start sandbox instance provisioning integration", () => {
         columns: {
           id: true,
           persistenceMode: true,
+          purpose: true,
           status: true,
         },
         where: (table, { eq }) => eq(table.id, sandboxInstanceId),
@@ -129,6 +132,7 @@ describe("start sandbox instance provisioning integration", () => {
       expect(persistedStartingInstance).toEqual({
         id: sandboxInstanceId,
         persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+        purpose: SandboxInstancePurposes.SESSION,
         status: SandboxInstanceStatuses.PENDING,
       });
 
@@ -199,6 +203,7 @@ describe("start sandbox instance provisioning integration", () => {
           sandboxProfileId: "sbp_start_storage_provisioning_integration",
           sandboxProfileVersion: 1,
           persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+          purpose: SandboxInstancePurposes.SESSION,
           startedBy: {
             kind: "system",
             id: "worker_start_storage_provisioning_integration",

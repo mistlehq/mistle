@@ -1,5 +1,4 @@
 import {
-  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
@@ -18,7 +17,7 @@ export async function ensureSandboxInstance(
     sandboxProfileId: string;
     sandboxProfileVersion: number;
     persistenceMode: "ephemeral" | "persistent";
-    purpose?: SandboxInstancePurpose;
+    purpose: SandboxInstancePurpose;
     startedBy: {
       kind: "user" | "system";
       id: string;
@@ -42,7 +41,7 @@ export async function ensureSandboxInstance(
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,
       source: input.source,
-      purpose: input.purpose ?? SandboxInstancePurposes.SESSION,
+      purpose: input.purpose,
       persistenceMode: input.persistenceMode,
     })
     .onConflictDoNothing({

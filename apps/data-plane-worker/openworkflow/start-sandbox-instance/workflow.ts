@@ -261,7 +261,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
           persistenceMode: workflowInput.persistenceMode,
-          ...(workflowInput.purpose === undefined ? {} : { purpose: workflowInput.purpose }),
+          purpose: workflowInput.purpose,
           startedBy: workflowInput.startedBy,
           source: workflowInput.source,
         },
