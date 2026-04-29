@@ -23,6 +23,11 @@ export type UploadStreamClientInput = {
 
 const DefaultBrowserFileMimeType = "application/octet-stream";
 
+export type UploadFileInput = {
+  file: File;
+  threadId: string;
+};
+
 export type UploadedSandboxFile = {
   attachmentId: string;
   kind: FileUploadCompletedEvent["kind"];
@@ -102,8 +107,8 @@ function isFileUploadCompletedEvent(message: StreamControlMessage): message is E
   return message.type === "stream.event" && message.event.type === "fileUpload.completed";
 }
 
-function normalizeBrowserFileMimeType(file: File): string {
-  return file.type.trim() === "" ? DefaultBrowserFileMimeType : file.type;
+function normalizeBrowserFileMimeType(mimeType: string): string {
+  return mimeType.trim() === "" ? DefaultBrowserFileMimeType : mimeType;
 }
 
 function getStreamMessagePump(stream: SandboxSessionStream): {
@@ -248,7 +253,7 @@ export class UploadStreamClient {
     this.#idleTimeoutMs = input.idleTimeoutMs ?? UploadIdleTimeoutMs;
   }
 
-  async uploadFile(input: { file: File; threadId: string }): Promise<UploadedSandboxFile> {
+  async uploadFile(input: UploadFileInput): Promise<UploadedSandboxFile> {
     if (this.#transport.readyState !== SandboxSessionSocketReadyStates.OPEN) {
       throw new Error("Sandbox session socket is not open.");
     }
@@ -256,7 +261,7 @@ export class UploadStreamClient {
     const stream = await this.#transport.openStream({
       channel: {
         kind: "fileUpload",
-        mimeType: normalizeBrowserFileMimeType(input.file),
+        mimeType: normalizeBrowserFileMimeType(input.file.type),
         originalFilename: input.file.name,
         sizeBytes: input.file.size,
         threadId: input.threadId,
@@ -321,7 +326,7 @@ export class UploadStreamClient {
     }
   }
 
-  async uploadImage(input: { file: File; threadId: string }): Promise<UploadedSandboxFile> {
+  async uploadImage(input: UploadFileInput): Promise<UploadedSandboxFile> {
     return await this.uploadFile(input);
   }
 }

@@ -189,13 +189,10 @@ async function startUploadTestServer(input?: {
           return;
         }
 
-        const completionKind =
-          behavior.kind === "accept" ? (behavior.completedUploadKind ?? "image") : "image";
+        const completionKind = behavior.completedUploadKind ?? "image";
         const completionPath =
-          behavior.kind === "accept"
-            ? (behavior.completedUploadPath ??
-              `/root/.local/attachments/thread_123/upload.${completionKind === "image" ? "png" : "txt"}`)
-            : "/root/.local/attachments/thread_123/upload.png";
+          behavior.completedUploadPath ??
+          `/root/.local/attachments/thread_123/upload.${completionKind === "image" ? "png" : "txt"}`;
         const uploadChannel = receivedOpenChannel;
         if (uploadChannel === undefined) {
           throw new Error("Expected file upload stream.open before stream.close.");
@@ -345,6 +342,42 @@ describe("UploadStreamClient", () => {
       mimeType: "application/octet-stream",
       originalFilename: "notes.txt",
       sizeBytes: 3,
+    });
+
+    transport.disconnect(1000, "Test completed.");
+  });
+
+  it("keeps uploadImage compatible with image upload callers", async () => {
+    const server = await startUploadTestServer();
+    openServers.add(server);
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
+
+    await expect(
+      client.uploadImage({
+        file: createImageFile({
+          bytes: new Uint8Array([8, 9]),
+        }),
+        threadId: "thread_123",
+      }),
+    ).resolves.toEqual({
+      attachmentId: "att_123",
+      kind: "image",
+      threadId: "thread_123",
+      originalFilename: "screenshot.png",
+      mimeType: "image/png",
+      sizeBytes: 2,
+      path: "/root/.local/attachments/thread_123/upload.png",
+    });
+    expect(Array.from(server.receivedBytes())).toEqual([8, 9]);
+    expect(server.receivedOpenChannel()).toEqual({
+      kind: "fileUpload",
+      threadId: "thread_123",
+      mimeType: "image/png",
+      originalFilename: "screenshot.png",
+      sizeBytes: 2,
     });
 
     transport.disconnect(1000, "Test completed.");

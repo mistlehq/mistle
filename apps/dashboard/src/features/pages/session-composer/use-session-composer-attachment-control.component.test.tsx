@@ -4,6 +4,8 @@ import {
   FileUploadRejectedError,
   FileUploadResetCodes,
   SandboxSessionTransport,
+  type UploadedSandboxFile,
+  type UploadFileInput,
 } from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { act, renderHook } from "@testing-library/react";
@@ -14,7 +16,7 @@ import {
   type SessionComposerAttachmentControlDependencies,
 } from "./use-session-composer-attachment-control.js";
 
-const UploadedImageFixture = {
+const UploadedImageFixture: UploadedSandboxFile = {
   attachmentId: "att_123",
   kind: "image",
   threadId: "thread_123",
@@ -22,7 +24,7 @@ const UploadedImageFixture = {
   mimeType: "image/png",
   sizeBytes: 4,
   path: "/root/.local/attachments/thread_123/upload.png",
-} as const;
+};
 
 const PrepareAttachmentInput = {
   prompt: "inspect this",
@@ -48,7 +50,7 @@ function createDeferredPromise<T>() {
 }
 
 function createDependencies(input: {
-  uploadImage: (input: { file: File; threadId: string }) => Promise<typeof UploadedImageFixture>;
+  uploadImage: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
 }): SessionComposerAttachmentControlDependencies {
   return {
     createUploadStreamClient: () => {

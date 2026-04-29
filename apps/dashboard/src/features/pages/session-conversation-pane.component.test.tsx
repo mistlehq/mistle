@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
-import { SandboxSessionTransport } from "@mistle/sandbox-session-client";
+import {
+  SandboxSessionTransport,
+  type UploadedSandboxFile,
+  type UploadFileInput,
+} from "@mistle/sandbox-session-client";
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { render, screen } from "@testing-library/react";
 import { fireEvent, waitFor } from "@testing-library/react";
@@ -27,7 +31,7 @@ const ComposerModelFixture: CodexModelSummary = {
   isDefault: true,
 };
 
-const UploadedImageFixture = {
+const UploadedImageFixture: UploadedSandboxFile = {
   attachmentId: "att_123",
   kind: "image",
   threadId: "thread_123",
@@ -35,14 +39,14 @@ const UploadedImageFixture = {
   mimeType: "image/png",
   sizeBytes: 4,
   path: "/root/.local/attachments/thread_123/upload.png",
-} as const;
+};
 
 function createImageFile(): File {
   return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
 }
 
 function RenderedComposerPaneHarness(input: {
-  uploadImage: (input: { file: File; threadId: string }) => Promise<typeof UploadedImageFixture>;
+  uploadImage: (input: UploadFileInput) => Promise<UploadedSandboxFile>;
 }): React.JSX.Element {
   const [sessionErrorMessage, setSessionErrorMessage] = useState<string | null>(null);
   const transport = useMemo(
