@@ -82,6 +82,14 @@ type PersistedBindingRecord = {
   config: Record<string, unknown>;
 };
 
+type SubmittedBindingRecord = {
+  id?: string;
+  clientRef: string;
+  connectionId: string;
+  kind: SandboxIntegrationBindingKind;
+  config: Record<string, unknown>;
+};
+
 export function mapBindingsToEditorRows(
   bindings: readonly PersistedBindingRecord[],
 ): SandboxProfileBindingEditorRow[] {
@@ -92,6 +100,72 @@ export function mapBindingsToEditorRows(
     kind: binding.kind,
     config: binding.config,
   }));
+}
+
+export function reconcileBindingsToEditorRows(input: {
+  currentRows: readonly SandboxProfileBindingEditorRow[];
+  submittedBindings: readonly SubmittedBindingRecord[];
+  bindings: readonly PersistedBindingRecord[];
+}): SandboxProfileBindingEditorRow[] {
+  const currentRowsByPersistedId = new Map<string, SandboxProfileBindingEditorRow>();
+  for (const row of input.currentRows) {
+    if (row.id !== undefined) {
+      currentRowsByPersistedId.set(row.id, row);
+    }
+  }
+
+  const existingBindingIds = new Set(currentRowsByPersistedId.keys());
+  const submittedDraftBindings = input.submittedBindings.filter(
+    (binding) => binding.id === undefined,
+  );
+  const returnedDraftBindings = input.bindings.filter(
+    (binding) => !existingBindingIds.has(binding.id),
+  );
+  const draftClientIdsByReturnedId = new Map<string, string>();
+
+  const unmatchedSubmittedDraftBindings = [...submittedDraftBindings];
+  const unmatchedReturnedDraftBindings: PersistedBindingRecord[] = [];
+  for (const binding of returnedDraftBindings) {
+    const matchingSubmittedIndex = unmatchedSubmittedDraftBindings.findIndex(
+      (submittedBinding) =>
+        submittedBinding.connectionId === binding.connectionId &&
+        submittedBinding.kind === binding.kind &&
+        jsonValuesEqual(submittedBinding.config, binding.config),
+    );
+    if (matchingSubmittedIndex === -1) {
+      unmatchedReturnedDraftBindings.push(binding);
+      continue;
+    }
+
+    const matchingSubmittedBinding = unmatchedSubmittedDraftBindings[matchingSubmittedIndex];
+    if (matchingSubmittedBinding !== undefined) {
+      draftClientIdsByReturnedId.set(binding.id, matchingSubmittedBinding.clientRef);
+      unmatchedSubmittedDraftBindings.splice(matchingSubmittedIndex, 1);
+    }
+  }
+
+  if (unmatchedSubmittedDraftBindings.length === unmatchedReturnedDraftBindings.length) {
+    for (const [index, binding] of unmatchedReturnedDraftBindings.entries()) {
+      const submittedBinding = unmatchedSubmittedDraftBindings[index];
+      if (submittedBinding !== undefined) {
+        draftClientIdsByReturnedId.set(binding.id, submittedBinding.clientRef);
+      }
+    }
+  }
+
+  return input.bindings.map((binding) => {
+    const currentRow = currentRowsByPersistedId.get(binding.id);
+    return {
+      clientId:
+        currentRow?.clientId ??
+        draftClientIdsByReturnedId.get(binding.id) ??
+        createIntegrationBindingClientId(),
+      id: binding.id,
+      connectionId: binding.connectionId,
+      kind: binding.kind,
+      config: binding.config,
+    };
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -308,22 +382,20 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 
   const putIntegrationBindingsMutation = useMutation({
     meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.AUTOSAVE),
-    mutationFn: async (mutationInput: {
-      bindings: Array<{
-        id?: string;
-        clientRef: string;
-        connectionId: string;
-        kind: SandboxIntegrationBindingKind;
-        config: Record<string, unknown>;
-      }>;
-    }) =>
+    mutationFn: async (mutationInput: { bindings: SubmittedBindingRecord[] }) =>
       putSandboxProfileVersionIntegrationBindings({
         profileId: input.profileId,
         version: input.version,
         bindings: mutationInput.bindings,
       }),
-    onSuccess: async (updatedBindings) => {
-      setIntegrationRows(mapBindingsToEditorRows(updatedBindings.bindings));
+    onSuccess: async (updatedBindings, mutationInput) => {
+      setIntegrationRows(
+        reconcileBindingsToEditorRows({
+          currentRows: integrationRowsRef.current,
+          submittedBindings: mutationInput.bindings,
+          bindings: updatedBindings.bindings,
+        }),
+      );
       setIntegrationSaveError(null);
       setHasUnsavedChanges(false);
       setIntegrationRowErrorsByClientId({});
@@ -376,13 +448,7 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
       return pendingSavePromiseRef.current ?? false;
     }
 
-    const parsedBindings: Array<{
-      id?: string;
-      clientRef: string;
-      connectionId: string;
-      kind: SandboxIntegrationBindingKind;
-      config: Record<string, unknown>;
-    }> = [];
+    const parsedBindings: SubmittedBindingRecord[] = [];
 
     for (const row of rowsToPersist) {
       const normalizedConnectionId = row.connectionId.trim();
