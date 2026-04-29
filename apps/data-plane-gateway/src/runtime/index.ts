@@ -278,7 +278,6 @@ export function createDataPlaneGatewayRuntime(
   });
   registerPortAccessRoutes({
     app,
-    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,
       tokenIssuer: config.app.sandbox.publish.access.tokenIssuer,
@@ -287,7 +286,6 @@ export function createDataPlaneGatewayRuntime(
     hostConfig: {
       baseDomain: config.app.sandbox.publish.baseDomain,
     },
-    portAccessTransportService,
     sessionConfig: {
       cookieSigningSecret: config.app.sandbox.publish.session.cookieSigningSecret,
     },

@@ -1,10 +1,10 @@
-//! Localhost HTTP and websocket transport for browser-based port access.
+//! Localhost transport for browser-based port access.
 //!
 //! This module owns the exact-port relays that run inside `sandboxd`. The
-//! gateway speaks `ports.http.*` and `ports.ws.*` over the bootstrap tunnel;
-//! this module dials the local upstream listener, forwards the request or
-//! websocket frames into it, and emits transport events back toward the tunnel
-//! session.
+//! authoritative Port Access path is the raw `ports.tcp.*` transport. The older
+//! semantic HTTP/WebSocket helpers remain here only as non-authoritative
+//! migration scaffolding while deletion is staged; the tunnel session dispatcher
+//! no longer routes traffic into them.
 
 use std::collections::BTreeMap;
 use std::convert::Infallible;

@@ -20,7 +20,6 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration as StdDuration, Instant};
 
-use base64::Engine;
 use bytes::Bytes;
 use futures_util::{FutureExt, SinkExt, StreamExt};
 use http_body_util::{BodyExt, Empty};
@@ -60,8 +59,7 @@ use crate::supervision::{
 use crate::time::{Clock, Duration, Sleeper};
 use crate::tunnel::port_access::{PortAccessAuthorizeDecision, authorize_target_port};
 use crate::tunnel::port_access_transport::{
-    PortAccessHttpCommand, PortAccessTcpCommand, PortAccessTransportEvent, PortAccessWsCommand,
-    spawn_http_transport, spawn_tcp_transport, spawn_websocket_transport,
+    PortAccessTcpCommand, PortAccessTransportEvent, spawn_tcp_transport,
 };
 use crate::tunnel::protocol::{
     AGENT_STREAM_WINDOW_BYTES, CONNECT_ERROR_CODE_AGENT_ENDPOINT_DIAL_FAILED,
@@ -771,8 +769,6 @@ struct TunnelSessionMutableState {
     pending_agent_opens: BTreeMap<u32, PendingAgentOpenState>,
     pending_exec_opens: BTreeMap<u32, PendingExecOpenState>,
     agent_streams: BTreeMap<u32, AgentStreamState>,
-    port_access_http_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessHttpCommand>>,
-    port_access_ws_streams: BTreeMap<u32, mpsc::UnboundedSender<PortAccessWsCommand>>,
     port_access_tcp_streams: BTreeMap<u32, PortAccessTcpStreamState>,
     processes_stream_send_windows: BTreeMap<u32, StreamSendWindow>,
     last_processes_snapshot_at_ms: Option<u64>,
@@ -1484,8 +1480,6 @@ async fn run_connected_tunnel_session(
         pending_agent_opens: BTreeMap::new(),
         pending_exec_opens: BTreeMap::new(),
         agent_streams: BTreeMap::new(),
-        port_access_http_streams: BTreeMap::new(),
-        port_access_ws_streams: BTreeMap::new(),
         port_access_tcp_streams: BTreeMap::new(),
         processes_stream_send_windows: BTreeMap::new(),
         last_processes_snapshot_at_ms: None,
@@ -3684,16 +3678,6 @@ async fn handle_tunnel_session_event(
         }
         TunnelSessionEvent::PortAccessTransport(event) => {
             match &event {
-                PortAccessTransportEvent::HttpBodyEnd(message) => {
-                    session_state
-                        .port_access_http_streams
-                        .remove(&message.stream_id);
-                }
-                PortAccessTransportEvent::WsClose(message) => {
-                    session_state
-                        .port_access_ws_streams
-                        .remove(&message.stream_id);
-                }
                 PortAccessTransportEvent::TcpClose(message) => {
                     mark_port_access_tcp_direction_closed(
                         session_state,
@@ -3708,33 +3692,32 @@ async fn handle_tunnel_session_event(
                 }
                 PortAccessTransportEvent::StreamError(message) => {
                     session_state
-                        .port_access_http_streams
-                        .remove(&message.stream_id);
-                    session_state
-                        .port_access_ws_streams
-                        .remove(&message.stream_id);
-                    session_state
                         .port_access_tcp_streams
                         .remove(&message.stream_id);
                 }
-                PortAccessTransportEvent::HttpResponseStart(_)
+                PortAccessTransportEvent::TcpConnected(_)
+                | PortAccessTransportEvent::TcpData { .. }
+                | PortAccessTransportEvent::TcpInputWindow { .. }
+                | PortAccessTransportEvent::HttpResponseStart(_)
                 | PortAccessTransportEvent::HttpBodyChunk(_)
+                | PortAccessTransportEvent::HttpBodyEnd(_)
                 | PortAccessTransportEvent::WsAccept(_)
                 | PortAccessTransportEvent::WsFrame(_)
-                | PortAccessTransportEvent::TcpConnected(_)
-                | PortAccessTransportEvent::TcpData { .. }
-                | PortAccessTransportEvent::TcpInputWindow { .. } => {}
+                | PortAccessTransportEvent::WsClose(_) => {}
             }
 
             let payload = match event {
-                PortAccessTransportEvent::HttpResponseStart(message) => {
-                    serde_json::to_string(&message)
+                PortAccessTransportEvent::HttpResponseStart(_)
+                | PortAccessTransportEvent::HttpBodyChunk(_)
+                | PortAccessTransportEvent::HttpBodyEnd(_)
+                | PortAccessTransportEvent::WsAccept(_)
+                | PortAccessTransportEvent::WsFrame(_)
+                | PortAccessTransportEvent::WsClose(_) => {
+                    return Err(TunnelSessionError::PortAccess(
+                        "legacy semantic port access transport events are not supported"
+                            .to_string(),
+                    ));
                 }
-                PortAccessTransportEvent::HttpBodyChunk(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::HttpBodyEnd(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::WsAccept(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::WsFrame(message) => serde_json::to_string(&message),
-                PortAccessTransportEvent::WsClose(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::TcpConnected(message) => serde_json::to_string(&message),
                 PortAccessTransportEvent::TcpData { stream_id, bytes } => {
                     let encoded =
@@ -4373,136 +4356,8 @@ fn handle_ports_transport_message(
                 message.stream_id
             )));
         }
-        crate::tunnel::protocol::PortsTransportMessage::HttpOpen(message) => {
-            if port_access_stream_is_active(session_state, message.stream_id) {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.open streamId {} already exists",
-                    message.stream_id
-                )));
-            }
-            let transport_event_sender = spawn_port_access_transport_event_sender(event_sender);
-            let stream_sender = spawn_http_transport(message.clone(), transport_event_sender);
-            session_state
-                .port_access_http_streams
-                .insert(message.stream_id, stream_sender);
-        }
-        crate::tunnel::protocol::PortsTransportMessage::WsOpen(message) => {
-            if port_access_stream_is_active(session_state, message.stream_id) {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.ws.open streamId {} already exists",
-                    message.stream_id
-                )));
-            }
-            let transport_event_sender = spawn_port_access_transport_event_sender(event_sender);
-            let stream_sender = spawn_websocket_transport(message.clone(), transport_event_sender);
-            session_state
-                .port_access_ws_streams
-                .insert(message.stream_id, stream_sender);
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpBodyChunk(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.chunk streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.chunk streamId {} is not bound to an active port access http stream",
-                    message.stream_id
-                )));
-            };
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(message.bytes.as_bytes())
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            stream_sender
-                .send(PortAccessHttpCommand::RequestBodyChunk { bytes })
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::HttpBodyEnd(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.end streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.http.body.end streamId {} is not bound to an active port access http stream",
-                    message.stream_id
-                )));
-            };
-            stream_sender
-                .send(PortAccessHttpCommand::RequestBodyEnd)
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::WsFrame(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.ws.frame streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state.port_access_ws_streams.get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.ws.frame streamId {} is not bound to an active port access websocket stream",
-                    message.stream_id
-                )));
-            };
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(message.bytes.as_bytes())
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            stream_sender
-                .send(PortAccessWsCommand::Frame {
-                    opcode: message.opcode.clone(),
-                    bytes,
-                })
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
-        crate::tunnel::protocol::PortsTransportMessage::WsClose(message) => {
-            if message.direction != "request" {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.ws.close streamId {} must use request direction when sent to sandboxd",
-                    message.stream_id
-                )));
-            }
-            let Some(stream_sender) = session_state.port_access_ws_streams.get(&message.stream_id)
-            else {
-                return Err(TunnelSessionError::PortAccess(format!(
-                    "ports.ws.close streamId {} is not bound to an active port access websocket stream",
-                    message.stream_id
-                )));
-            };
-            stream_sender
-                .send(PortAccessWsCommand::Close {
-                    code: message.code,
-                    reason: message.reason.clone(),
-                })
-                .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-        }
         crate::tunnel::protocol::PortsTransportMessage::StreamClose(message) => {
-            if let Some(stream_sender) = session_state
-                .port_access_http_streams
-                .remove(&message.stream_id)
-            {
-                stream_sender
-                    .send(PortAccessHttpCommand::Close)
-                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            } else if let Some(stream_sender) = session_state
-                .port_access_ws_streams
-                .remove(&message.stream_id)
-            {
-                stream_sender
-                    .send(PortAccessWsCommand::Terminate)
-                    .map_err(|error| TunnelSessionError::PortAccess(error.to_string()))?;
-            } else if let Some(stream_state) = session_state
+            if let Some(stream_state) = session_state
                 .port_access_tcp_streams
                 .remove(&message.stream_id)
             {
@@ -4517,15 +4372,51 @@ fn handle_ports_transport_message(
                 )));
             }
         }
+        crate::tunnel::protocol::PortsTransportMessage::HttpOpen(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.http.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
         crate::tunnel::protocol::PortsTransportMessage::HttpResponseStart(message) => {
             return Err(TunnelSessionError::PortAccess(format!(
-                "ports.http.response.start streamId {} must not be sent from the gateway to sandboxd",
+                "ports.http.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::HttpBodyChunk(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.http.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::HttpBodyEnd(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.http.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsOpen(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.* streamId {} is not supported",
                 message.stream_id
             )));
         }
         crate::tunnel::protocol::PortsTransportMessage::WsAccept(message) => {
             return Err(TunnelSessionError::PortAccess(format!(
-                "ports.ws.accept streamId {} must not be sent from the gateway to sandboxd",
+                "ports.ws.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsFrame(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.* streamId {} is not supported",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::WsClose(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.ws.* streamId {} is not supported",
                 message.stream_id
             )));
         }
@@ -4542,14 +4433,8 @@ fn handle_ports_transport_message(
 
 fn port_access_stream_is_active(session_state: &TunnelSessionMutableState, stream_id: u32) -> bool {
     session_state
-        .port_access_http_streams
+        .port_access_tcp_streams
         .contains_key(&stream_id)
-        || session_state
-            .port_access_ws_streams
-            .contains_key(&stream_id)
-        || session_state
-            .port_access_tcp_streams
-            .contains_key(&stream_id)
         || tunnel_stream_is_active(session_state, stream_id)
 }
 
@@ -5345,8 +5230,6 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    #[cfg(target_os = "linux")]
-    use base64::Engine;
     use serde_json::{Value, json};
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
@@ -5484,8 +5367,6 @@ mod tests {
                     stats: AgentStreamStats::new(0),
                 },
             )]),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
@@ -5551,8 +5432,6 @@ mod tests {
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::new(),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::from([(
                 55,
                 PortAccessTcpStreamState {
@@ -5689,8 +5568,6 @@ mod tests {
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::new(),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::from([(
                 56,
                 PortAccessTcpStreamState {
@@ -5737,8 +5614,6 @@ mod tests {
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::new(),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::from([(
                 57,
                 PortAccessTcpStreamState {
@@ -5784,8 +5659,6 @@ mod tests {
                     stats: AgentStreamStats::new(0),
                 },
             )]),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
@@ -5832,8 +5705,6 @@ mod tests {
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::new(),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::from([(
                 59,
                 PortAccessTcpStreamState {
@@ -5919,8 +5790,6 @@ mod tests {
             pending_agent_opens: BTreeMap::new(),
             pending_exec_opens: BTreeMap::new(),
             agent_streams: BTreeMap::new(),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::from([(
                 60,
                 PortAccessTcpStreamState {
@@ -6004,8 +5873,6 @@ mod tests {
                     stats,
                 },
             )]),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
@@ -6093,8 +5960,6 @@ mod tests {
                     stats: AgentStreamStats::new(200),
                 },
             )]),
-            port_access_http_streams: BTreeMap::new(),
-            port_access_ws_streams: BTreeMap::new(),
             port_access_tcp_streams: BTreeMap::new(),
             processes_stream_send_windows: BTreeMap::new(),
             last_processes_snapshot_at_ms: None,
@@ -9307,1146 +9172,6 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn starts_live_tunnel_session_for_ports_http_transport() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_http_transport_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "http-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.open",
-                        "streamId": 31,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "method": "POST",
-                            "path": "/echo",
-                            "query": "mode=full",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")],
-                                "content-type": ["text/plain; charset=utf-8"],
-                                "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
-                                "x-forwarded-proto": ["https"],
-                                "x-forwarded-port": ["443"],
-                                "x-request-marker": [fixture_marker.clone()]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access http stream");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.body.chunk",
-                        "streamId": 31,
-                        "direction": "request",
-                        "bytes": base64::engine::general_purpose::STANDARD.encode("hello from gateway"),
-                        "encoding": "base64"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send the request body chunk");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.body.end",
-                        "streamId": 31,
-                        "direction": "request"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send the request body end");
-
-            let response_start = read_port_access_message_for_stream(&mut websocket, 31);
-            assert_eq!(response_start["type"], "ports.http.response.start");
-            assert_eq!(response_start["status"], 201);
-            assert_eq!(
-                response_start["headers"]["content-type"],
-                json!(["application/json; charset=utf-8"])
-            );
-            assert_eq!(
-                response_start["headers"]["x-fixture"],
-                json!([fixture_marker.clone()])
-            );
-            assert_eq!(
-                response_start["headers"].get("connection"),
-                None,
-                "hop-by-hop response headers must be stripped before tunneling",
-            );
-
-            let mut response_body = Vec::new();
-            loop {
-                let message = read_port_access_message_for_stream(&mut websocket, 31);
-                match message["type"].as_str() {
-                    Some("ports.http.body.chunk") => {
-                        response_body.extend_from_slice(&decode_port_access_body_chunk(&message));
-                    }
-                    Some("ports.http.body.end") => break,
-                    other => panic!("unexpected port access response message: {other:?}"),
-                }
-            }
-
-            let echoed_request: Value =
-                serde_json::from_slice(&response_body).expect("response body should be json");
-            assert_eq!(echoed_request["method"], "POST");
-            assert_eq!(echoed_request["url"], "/echo?mode=full");
-            assert_eq!(echoed_request["body"], "hello from gateway");
-            assert_eq!(
-                echoed_request["headers"]["host"],
-                format!("127.0.0.1:{listener_port}")
-            );
-            assert_eq!(
-                echoed_request["headers"]["x-forwarded-host"],
-                "p-5173--sandbox.mistle.localhost"
-            );
-            assert_eq!(echoed_request["headers"]["x-forwarded-proto"], "https");
-            assert_eq!(echoed_request["headers"]["x-forwarded-port"], "443");
-            assert_eq!(
-                echoed_request["headers"]["x-request-marker"],
-                fixture_marker
-            );
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the http transport interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the http transport interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn sends_ports_stream_error_when_http_transport_cannot_connect_upstream() {
-        let listener_port = reserve_available_port();
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.open",
-                        "streamId": 32,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "method": "GET",
-                            "path": "/echo",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access http stream");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.body.end",
-                        "streamId": 32,
-                        "direction": "request"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should end the empty request body");
-
-            let error_message = read_port_access_message_for_stream(&mut websocket, 32);
-            assert_eq!(error_message["type"], "ports.stream.error");
-            assert_eq!(error_message["streamId"], 32);
-            assert_eq!(error_message["code"], "upstream_connect_failed");
-            assert!(
-                error_message["message"]
-                    .as_str()
-                    .is_some_and(|message| !message.is_empty()),
-                "connect failures should surface a non-empty error message",
-            );
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the failed http transport interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the failed http transport interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn sends_ports_stream_error_when_http_transport_upstream_closes_mid_response() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_http_transport_close_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "http-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.open",
-                        "streamId": 33,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "method": "GET",
-                            "path": "/close-early",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access http stream");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.http.body.end",
-                        "streamId": 33,
-                        "direction": "request"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should end the empty request body");
-
-            let response_start = read_port_access_message_for_stream(&mut websocket, 33);
-            assert_eq!(response_start["type"], "ports.http.response.start");
-            assert_eq!(response_start["status"], 200);
-
-            loop {
-                let message = read_port_access_message_for_stream(&mut websocket, 33);
-                match message["type"].as_str() {
-                    Some("ports.http.body.chunk") => continue,
-                    Some("ports.stream.error") => {
-                        assert_eq!(message["code"], "upstream_io_error");
-                        break;
-                    }
-                    other => panic!("unexpected port access response message: {other:?}"),
-                }
-            }
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the mid-response failure interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the mid-response failure interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn relays_port_access_websocket_frames_and_close_frames() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_ws_transport_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "ws-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.open",
-                        "streamId": 41,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "path": "/echo",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")],
-                                "connection": ["Upgrade"],
-                                "upgrade": ["websocket"],
-                                "sec-websocket-version": ["13"],
-                                "sec-websocket-key": ["dGhlIHNhbXBsZSBub25jZQ=="]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access websocket stream");
-
-            let accept_message = read_port_access_message_for_stream(&mut websocket, 41);
-            assert_eq!(accept_message["type"], "ports.ws.accept");
-            assert!(
-                accept_message["headers"]["sec-websocket-accept"]
-                    .as_array()
-                    .is_some_and(|values| !values.is_empty()),
-                "sandboxd should surface the upstream websocket accept header",
-            );
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.frame",
-                        "streamId": 41,
-                        "direction": "request",
-                        "opcode": "text",
-                        "bytes": base64::engine::general_purpose::STANDARD.encode("hello from gateway"),
-                        "encoding": "base64"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send a request text frame");
-
-            let response_text_frame = read_port_access_message_for_stream(&mut websocket, 41);
-            assert_eq!(response_text_frame["type"], "ports.ws.frame");
-            assert_eq!(response_text_frame["direction"], "response");
-            assert_eq!(response_text_frame["opcode"], "text");
-            assert_eq!(
-                String::from_utf8(decode_port_access_websocket_frame(&response_text_frame))
-                    .expect("response text frame should decode as utf-8"),
-                "hello from gateway",
-            );
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.frame",
-                        "streamId": 41,
-                        "direction": "request",
-                        "opcode": "ping",
-                        "bytes": base64::engine::general_purpose::STANDARD.encode("ping-one"),
-                        "encoding": "base64"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send a request ping frame");
-
-            let response_pong_frame = read_port_access_message_for_stream(&mut websocket, 41);
-            assert_eq!(response_pong_frame["type"], "ports.ws.frame");
-            assert_eq!(response_pong_frame["direction"], "response");
-            assert_eq!(response_pong_frame["opcode"], "pong");
-            assert_eq!(
-                decode_port_access_websocket_frame(&response_pong_frame),
-                b"ping-one",
-            );
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.close",
-                        "streamId": 41,
-                        "direction": "request",
-                        "code": 1000,
-                        "reason": "normal"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send a request close frame");
-
-            let response_close = read_port_access_message_for_stream(&mut websocket, 41);
-            assert_eq!(response_close["type"], "ports.ws.close");
-            assert_eq!(response_close["direction"], "response");
-            assert_eq!(response_close["code"], 1000);
-            assert_eq!(response_close["reason"], "normal");
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the websocket transport interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the websocket transport interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn relays_upstream_websocket_ping_without_auto_ponging_locally() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_ws_transport_ping_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "ws-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.open",
-                        "streamId": 42,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "path": "/ping-from-upstream",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")],
-                                "connection": ["Upgrade"],
-                                "upgrade": ["websocket"],
-                                "sec-websocket-version": ["13"],
-                                "sec-websocket-key": ["dGhlIHNhbXBsZSBub25jZQ=="]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access websocket stream");
-
-            let accept_message = read_port_access_message_for_stream(&mut websocket, 42);
-            assert_eq!(accept_message["type"], "ports.ws.accept");
-
-            let upstream_ping = read_port_access_message_for_stream(&mut websocket, 42);
-            assert_eq!(upstream_ping["type"], "ports.ws.frame");
-            assert_eq!(upstream_ping["direction"], "response");
-            assert_eq!(upstream_ping["opcode"], "ping");
-            assert_eq!(
-                decode_port_access_websocket_frame(&upstream_ping),
-                b"upstream-ping",
-            );
-
-            assert_no_websocket_message_for_duration(
-                &mut websocket,
-                std::time::Duration::from_millis(250),
-            );
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.frame",
-                        "streamId": 42,
-                        "direction": "request",
-                        "opcode": "pong",
-                        "bytes": base64::engine::general_purpose::STANDARD.encode("upstream-ping"),
-                        "encoding": "base64"
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should send the tunneled pong frame");
-
-            let pong_ack = read_port_access_message_for_stream(&mut websocket, 42);
-            assert_eq!(pong_ack["type"], "ports.ws.frame");
-            assert_eq!(pong_ack["direction"], "response");
-            assert_eq!(pong_ack["opcode"], "text");
-            assert_eq!(
-                String::from_utf8(decode_port_access_websocket_frame(&pong_ack))
-                    .expect("pong ack should decode as utf-8"),
-                "pong-ack",
-            );
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the websocket ping interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the websocket ping interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn relays_upstream_websocket_close_without_inventing_a_code() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_ws_transport_close_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "ws-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.open",
-                        "streamId": 42,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "path": "/close-no-code",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")],
-                                "connection": ["Upgrade"],
-                                "upgrade": ["websocket"],
-                                "sec-websocket-version": ["13"],
-                                "sec-websocket-key": ["dGhlIHNhbXBsZSBub25jZQ=="]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access websocket stream");
-
-            let accept_message = read_port_access_message_for_stream(&mut websocket, 42);
-            assert_eq!(accept_message["type"], "ports.ws.accept");
-
-            let close_message = read_port_access_message_for_stream(&mut websocket, 42);
-            assert_eq!(close_message["type"], "ports.ws.close");
-            assert_eq!(close_message["direction"], "response");
-            assert!(
-                close_message.get("code").is_none(),
-                "sandboxd must not invent a websocket close code when the upstream omitted one",
-            );
-            assert!(
-                close_message.get("reason").is_none(),
-                "sandboxd must not invent a websocket close reason when the upstream omitted one",
-            );
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the websocket close interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the websocket close interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    fn rejects_fragmented_upstream_websocket_frames() {
-        let listener_port = reserve_available_port();
-        let fixture_marker = format!("mistle_ws_transport_fragment_{}", std::process::id());
-        let mut server = spawn_node_fixture(
-            "ws-transport-listener.js",
-            &[&listener_port.to_string(), &fixture_marker],
-        );
-        wait_until_listening(listener_port);
-
-        let bootstrap_listener =
-            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
-        let bootstrap_url = format!(
-            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_tunnel_session",
-            bootstrap_listener
-                .local_addr()
-                .expect("bootstrap listener should expose an address")
-                .port()
-        );
-        let (gateway_done_sender, gateway_done_receiver) = mpsc::channel();
-        let gateway_thread = thread::spawn(move || {
-            let (stream, _) = bootstrap_listener
-                .accept()
-                .expect("gateway should accept the bootstrap tunnel");
-            let mut websocket = accept(stream).expect("gateway websocket handshake should succeed");
-
-            let telemetry_open = read_json_text_message(&mut websocket);
-            assert_eq!(telemetry_open["type"], "telemetry.open");
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "telemetry.open.ok",
-                        "streamId": telemetry_open["streamId"],
-                        "initialWindowBytes": 1024
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should acknowledge telemetry.open");
-
-            while read_json_text_message(&mut websocket)["type"]
-                != Value::String("keepalive.state".to_string())
-            {}
-
-            websocket
-                .send(Message::Text(
-                    json!({
-                        "type": "ports.ws.open",
-                        "streamId": 43,
-                        "target": {
-                            "kind": "port",
-                            "port": listener_port
-                        },
-                        "upstreamProtocol": "http",
-                        "request": {
-                            "path": "/fragmented-text",
-                            "headers": {
-                                "host": [format!("127.0.0.1:{listener_port}")],
-                                "connection": ["Upgrade"],
-                                "upgrade": ["websocket"],
-                                "sec-websocket-version": ["13"],
-                                "sec-websocket-key": ["dGhlIHNhbXBsZSBub25jZQ=="]
-                            }
-                        }
-                    })
-                    .to_string()
-                    .into(),
-                ))
-                .expect("gateway should open the port access websocket stream");
-
-            let accept_message = read_port_access_message_for_stream(&mut websocket, 43);
-            assert_eq!(accept_message["type"], "ports.ws.accept");
-
-            let error_message = read_port_access_message_for_stream(&mut websocket, 43);
-            assert_eq!(error_message["type"], "ports.stream.error");
-            assert_eq!(error_message["code"], "upstream_io_error");
-            assert_eq!(
-                error_message["message"],
-                "fragmented upstream websocket frames are not supported",
-            );
-
-            websocket
-                .close(None)
-                .expect("gateway websocket should close cleanly");
-            gateway_done_sender
-                .send(())
-                .expect("gateway should signal the fragmented websocket interaction finished");
-        });
-
-        let startup_input = StartupInput {
-            startup_mode: StartupMode::New,
-            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
-            bootstrap_token: "bootstrap-token-value".to_string(),
-            tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
-            tunnel_gateway_ws_url: bootstrap_url,
-            runtime_plan: serde_json::json!({
-                "sandboxProfileId": "sbp_123",
-                "version": 1,
-                "image": {
-                    "source": "base",
-                    "imageRef": crate::test_support::local_prepared_runtime_sandbox_base_image_ref()
-                },
-                "egressRoutes": [],
-                "artifacts": [],
-                "workspaceSources": [],
-                "runtimeClients": [],
-                "agentRuntimes": []
-            }),
-            egress_grant_by_rule_id: BTreeMap::new(),
-            git_identity: None,
-        };
-
-        let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
-        let runtime_readiness_manager = Arc::new(Mutex::new(RuntimeReadinessManager::default()));
-        let tunnel_session = TunnelSession::start(
-            &startup_input,
-            keepalive_manager,
-            runtime_readiness_manager,
-            None,
-            BTreeMap::new(),
-            Arc::new(SystemClock),
-            Arc::new(ThreadSleeper),
-        )
-        .expect("tunnel session should start");
-
-        gateway_done_receiver
-            .recv()
-            .expect("gateway should complete the fragmented websocket interaction");
-
-        tunnel_session.close();
-        gateway_thread
-            .join()
-            .expect("gateway thread should exit cleanly");
-        terminate_child(&mut server);
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
     fn relays_port_access_tcp_bytes_and_directional_closes() {
         let upstream_listener =
             TcpListener::bind("127.0.0.1:0").expect("upstream tcp listener should bind");
@@ -10723,58 +9448,6 @@ mod tests {
                 }
                 _ => panic!("expected websocket text or binary message"),
             }
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn decode_port_access_body_chunk(message: &Value) -> Vec<u8> {
-        let payload = message["bytes"]
-            .as_str()
-            .expect("ports.http.body.chunk should include base64 bytes");
-        base64::engine::general_purpose::STANDARD
-            .decode(payload.as_bytes())
-            .expect("ports.http.body.chunk bytes should decode")
-    }
-
-    #[cfg(target_os = "linux")]
-    fn decode_port_access_websocket_frame(message: &Value) -> Vec<u8> {
-        let payload = message["bytes"]
-            .as_str()
-            .expect("ports.ws.frame should include base64 bytes");
-        base64::engine::general_purpose::STANDARD
-            .decode(payload.as_bytes())
-            .expect("ports.ws.frame bytes should decode")
-    }
-
-    #[cfg(target_os = "linux")]
-    fn assert_no_websocket_message_for_duration(
-        socket: &mut WebSocket<std::net::TcpStream>,
-        duration: std::time::Duration,
-    ) {
-        socket
-            .get_mut()
-            .set_read_timeout(Some(duration))
-            .expect("websocket should accept a read timeout");
-        let read_result = socket.read();
-        socket
-            .get_mut()
-            .set_read_timeout(None)
-            .expect("websocket should clear the read timeout");
-
-        match read_result {
-            Err(WebSocketError::Io(error))
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                ) => {}
-            Ok(message) => panic!(
-                "expected no websocket message within {:?}, got {message:?}",
-                duration
-            ),
-            Err(error) => panic!(
-                "expected websocket read timeout within {:?}, got {error}",
-                duration
-            ),
         }
     }
 

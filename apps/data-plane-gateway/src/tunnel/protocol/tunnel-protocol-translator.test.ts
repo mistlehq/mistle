@@ -1267,6 +1267,59 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("rejects legacy semantic port access transport messages from bootstrap peers", async () => {
+    const { translator } = await createTranslatorHarness();
+    const semanticTransportPayloads = [
+      JSON.stringify({
+        type: "ports.http.response.start",
+        streamId: 17,
+        status: 200,
+        headers: {},
+      }),
+      JSON.stringify({
+        type: "ports.http.body.chunk",
+        streamId: 17,
+        direction: "response",
+        bytes: "SGVsbG8=",
+        encoding: "base64",
+      }),
+      JSON.stringify({
+        type: "ports.http.body.end",
+        streamId: 17,
+        direction: "response",
+      }),
+      JSON.stringify({
+        type: "ports.ws.accept",
+        streamId: 18,
+        headers: {},
+      }),
+      JSON.stringify({
+        type: "ports.ws.frame",
+        streamId: 18,
+        direction: "response",
+        opcode: "text",
+        bytes: "SGVsbG8=",
+        encoding: "base64",
+      }),
+      JSON.stringify({
+        type: "ports.ws.close",
+        streamId: 18,
+        direction: "response",
+      }),
+    ];
+
+    for (const payload of semanticTransportPayloads) {
+      await expect(
+        translator.translateInboundMessage({
+          clientSessionId: BootstrapSessionId,
+          payload,
+          sandboxInstanceId: SandboxInstanceId,
+          sourcePeerSide: "bootstrap",
+        }),
+      ).rejects.toThrow(TunnelProtocolViolationError);
+    }
+  });
+
   it("forwards connection ports.target.authorize requests to the bootstrap peer", async () => {
     const { relayCoordinator, translator } = await createTranslatorHarness();
     const websocketPair = await createWebSocketPair();
