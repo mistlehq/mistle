@@ -112,6 +112,7 @@ function createFailedSnapshotJobFixture(): NonNullable<SandboxProfileVersion["la
 
 function createSandboxProfileVersionsForTest(input: {
   profileId: string;
+  refreshSchedule?: SandboxProfileVersion["refreshSchedule"];
   version: number;
   versionState: SandboxProfileEditorTestVersionState;
 }): SandboxProfileVersion[] {
@@ -134,6 +135,7 @@ function createSandboxProfileVersionsForTest(input: {
       ...(versionInput.latestSnapshotJob === undefined
         ? {}
         : { latestSnapshotJob: versionInput.latestSnapshotJob }),
+      ...(input.refreshSchedule === undefined ? {} : { refreshSchedule: input.refreshSchedule }),
       ...(versionInput.usable === undefined ? {} : { usable: versionInput.usable }),
     };
   }
@@ -267,6 +269,7 @@ function renderSandboxProfileEditor(input?: {
   routeSection?: SandboxProfileEditorTestRouteSection;
   view?: SandboxProfileEditorTestRouteView;
   versionState?: SandboxProfileEditorTestVersionState;
+  refreshSchedule?: SandboxProfileVersion["refreshSchedule"];
 }) {
   const queryClient = createTestQueryClient({
     refetchOnMount: false,
@@ -288,6 +291,7 @@ function renderSandboxProfileEditor(input?: {
   });
   const versions = createSandboxProfileVersionsForTest({
     profileId,
+    ...(input?.refreshSchedule === undefined ? {} : { refreshSchedule: input.refreshSchedule }),
     version,
     versionState: resolvedVersionState,
   });
@@ -803,6 +807,46 @@ describe("SandboxProfileEditorPage", () => {
       screen.getByText("Create a snapshot to start sessions from this profile."),
     ).toBeDefined();
     expect(screen.getByRole("button", { name: "Create snapshot" })).toBeDefined();
+  });
+
+  it("shows that automatic snapshot refresh is not configured", () => {
+    renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    expect(screen.getByText("Automatic refresh")).toBeDefined();
+    expect(screen.getByText("Automatic snapshot refresh is not configured.")).toBeDefined();
+    const cronExpressionInput = screen.getByLabelText("Cron expression");
+    expect(cronExpressionInput).toBeInstanceOf(HTMLInputElement);
+    expect(cronExpressionInput).toHaveProperty("value", "");
+    expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Remove schedule" })).toBeNull();
+  });
+
+  it("shows an existing automatic snapshot refresh schedule", () => {
+    renderSandboxProfileEditor({
+      refreshSchedule: {
+        scheduleId: "sched_snapshot_refresh",
+        name: "Snapshot refresh",
+        cronExpression: "0 9 * * 1",
+        timezone: "Asia/Singapore",
+        enabled: true,
+        nextScheduledAt: "2026-04-30T01:00:00.000Z",
+      },
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    expect(
+      screen.getByText("Automatic snapshot refresh is configured for this published version."),
+    ).toBeDefined();
+    expect(screen.getByText("Cron")).toBeDefined();
+    expect(screen.getAllByDisplayValue("0 9 * * 1")).toHaveLength(1);
+    expect(screen.getByText("Asia/Singapore")).toBeDefined();
+    expect(screen.getByText("2026-04-30T01:00:00.000Z")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save schedule" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Remove schedule" })).toBeDefined();
   });
 
   it("does not show a refresh snapshot action in the published version menu", () => {

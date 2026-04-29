@@ -56,11 +56,13 @@ import {
 import {
   createSandboxProfileVersionDraft,
   deleteSandboxProfile,
+  deleteSandboxProfileVersionRefreshSchedule,
   discardSandboxProfileVersionDraft,
   getSandboxProfile,
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
+  putSandboxProfileVersionRefreshSchedule,
   refreshSandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
@@ -1376,6 +1378,7 @@ function ReadySandboxProfileEditorPage(input: {
           profileId={input.profileId}
           publishSuccessMessage={showPublishSuccessMessage}
           publishSuccessMessageKey={publishSuccessNoticeKey}
+          refreshSchedule={input.currentVersion?.refreshSchedule ?? null}
           setupScriptLoader={setupScriptLoader}
           snapshotPanelState={snapshotPanelState}
           versionActionIsPending={input.versionActionIsPending}
@@ -1401,6 +1404,7 @@ function SandboxProfileEditorSectionPanels(input: {
   profileId: string;
   publishSuccessMessage: boolean;
   publishSuccessMessageKey: Key;
+  refreshSchedule: SandboxProfileVersion["refreshSchedule"];
   setupScriptLoader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   snapshotPanelState: SnapshotPanelState;
   versionActionIsPending: boolean;
@@ -1451,7 +1455,10 @@ function SandboxProfileEditorSectionPanels(input: {
           onPublishSuccessMessageDismiss={input.onPublishSuccessMessageDismiss}
           publishSuccessMessageKey={input.publishSuccessMessageKey}
           publishSuccessMessage={input.publishSuccessMessage}
+          profileId={input.profileId}
+          refreshSchedule={input.refreshSchedule}
           state={input.snapshotPanelState}
+          version={input.mode.version}
         />
       ) : null}
     </>
@@ -1518,7 +1525,10 @@ function SandboxProfileSnapshotPanel(input: {
   onRefreshSnapshot: () => void;
   publishSuccessMessageKey: Key;
   publishSuccessMessage: boolean;
+  profileId: string;
+  refreshSchedule: SandboxProfileVersion["refreshSchedule"];
   state: SnapshotPanelState;
+  version: number;
 }): React.JSX.Element {
   const actionLabel = resolveSnapshotActionLabel(input.state);
   const activityLabel = resolveSnapshotActivityLabel(input.state);
@@ -1583,8 +1593,197 @@ function SandboxProfileSnapshotPanel(input: {
           ]}
         />
       )}
+
+      <SandboxProfileSnapshotRefreshScheduleSection
+        disabled={input.isActionPending}
+        profileId={input.profileId}
+        refreshSchedule={input.refreshSchedule}
+        version={input.version}
+      />
     </div>
   );
+}
+
+function SandboxProfileSnapshotRefreshScheduleSection(input: {
+  disabled: boolean;
+  profileId: string;
+  refreshSchedule: SandboxProfileVersion["refreshSchedule"];
+  version: number;
+}): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const existingSchedule = input.refreshSchedule;
+  const [cronExpression, setCronExpression] = useState(existingSchedule?.cronExpression ?? "");
+  const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? readBrowserTimeZone());
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const saveScheduleMutation = useMutation({
+    mutationFn: async () => {
+      const nextCronExpression = cronExpression.trim();
+      const nextTimezone = timezone.trim();
+
+      if (nextCronExpression.length === 0 || nextTimezone.length === 0) {
+        throw new Error("Enter a cron expression and timezone.");
+      }
+
+      return putSandboxProfileVersionRefreshSchedule({
+        profileId: input.profileId,
+        version: input.version,
+        cronExpression: nextCronExpression,
+        timezone: nextTimezone,
+      });
+    },
+    onSuccess: async () => {
+      setMutationError(null);
+      await queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+      });
+    },
+    onError: (error: unknown) => {
+      setMutationError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not save snapshot refresh schedule.",
+        }),
+      );
+    },
+  });
+  const removeScheduleMutation = useMutation({
+    mutationFn: async () =>
+      deleteSandboxProfileVersionRefreshSchedule({
+        profileId: input.profileId,
+        version: input.version,
+      }),
+    onSuccess: async () => {
+      setMutationError(null);
+      setCronExpression("");
+      setTimezone(readBrowserTimeZone());
+      await queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+      });
+    },
+    onError: (error: unknown) => {
+      setMutationError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not remove snapshot refresh schedule.",
+        }),
+      );
+    },
+  });
+  const isMutating = saveScheduleMutation.isPending || removeScheduleMutation.isPending;
+  const fieldsAreDisabled = input.disabled || isMutating;
+
+  useEffect(() => {
+    setCronExpression(existingSchedule?.cronExpression ?? "");
+    setTimezone(existingSchedule?.timezone ?? readBrowserTimeZone());
+    setMutationError(null);
+  }, [existingSchedule]);
+
+  function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    saveScheduleMutation.mutate();
+  }
+
+  return (
+    <form className="space-y-4 border-t pt-4" onSubmit={handleSubmit}>
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold leading-6">Automatic refresh</h2>
+        <p className="text-sm text-muted-foreground">
+          {existingSchedule === null
+            ? "Automatic snapshot refresh is not configured."
+            : "Automatic snapshot refresh is configured for this published version."}
+        </p>
+      </div>
+
+      {mutationError === null ? null : (
+        <Notice title="Schedule update failed" variant="alert">
+          {mutationError}
+        </Notice>
+      )}
+
+      {existingSchedule === null ? null : (
+        <DefinitionList
+          items={[
+            {
+              id: "snapshot-refresh-cron",
+              label: "Cron",
+              value: existingSchedule.cronExpression,
+            },
+            {
+              id: "snapshot-refresh-timezone",
+              label: "Timezone",
+              value: existingSchedule.timezone,
+            },
+            {
+              id: "snapshot-refresh-next",
+              label: "Next refresh",
+              value: existingSchedule.nextScheduledAt ?? "Not scheduled",
+            },
+          ]}
+        />
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">Cron expression</FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Input
+              disabled={fieldsAreDisabled}
+              id="sandbox-profile-snapshot-refresh-cron"
+              onChange={(event) => {
+                setCronExpression(event.target.value);
+              }}
+              placeholder="0 9 * * 1"
+              required
+              value={cronExpression}
+            />
+            <FieldDescription>Use raw cron syntax for the refresh cadence.</FieldDescription>
+          </FieldContent>
+        </Field>
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">Timezone</FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Input
+              disabled={fieldsAreDisabled}
+              id="sandbox-profile-snapshot-refresh-timezone"
+              onChange={(event) => {
+                setTimezone(event.target.value);
+              }}
+              placeholder="Asia/Singapore"
+              required
+              value={timezone}
+            />
+            <FieldDescription>Use an IANA timezone name.</FieldDescription>
+          </FieldContent>
+        </Field>
+      </div>
+
+      <ButtonGroup>
+        <Button disabled={fieldsAreDisabled} type="submit">
+          Save schedule
+        </Button>
+        {existingSchedule === null ? null : (
+          <Button
+            disabled={fieldsAreDisabled}
+            onClick={() => {
+              removeScheduleMutation.mutate();
+            }}
+            type="button"
+            variant="outline"
+          >
+            Remove schedule
+          </Button>
+        )}
+      </ButtonGroup>
+    </form>
+  );
+}
+
+function readBrowserTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
 }
 
 function PublishSuccessSnapshotNotice(input: {
