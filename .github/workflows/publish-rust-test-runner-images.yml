@@ -49,7 +49,7 @@ jobs:
           DOCKERFILE: ${{ matrix.dockerfile }}
           IMAGE_REPOSITORY: ${{ matrix.image_repository }}
         run: |
-          dockerfile_hash="$(sha256sum "${DOCKERFILE}" | awk '{print $1}')"
+          dockerfile_hash="$(node -e "const { createHash } = require('node:crypto'); const { readFileSync } = require('node:fs'); const fileHash = createHash('sha256').update(readFileSync(process.env.DOCKERFILE)).digest(); process.stdout.write(createHash('sha256').update(fileHash).digest('hex'));")"
           image_tag="dockerfile-${dockerfile_hash}"
           image_ref="${IMAGE_REPOSITORY}:${image_tag}"
 
