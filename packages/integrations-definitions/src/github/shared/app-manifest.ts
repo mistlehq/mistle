@@ -210,3 +210,14 @@ export function buildGitHubAppManifest(input: {
     ),
   };
 }
+
+export function buildGitHubAppManifestDraft(input: {
+  controlPlaneBaseUrl: string;
+  webhookCallbackUrl: string;
+}): Record<string, unknown> {
+  return buildGitHubAppManifest({
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+    manifest: GitHubAppManifestTemplate,
+    webhookCallbackUrl: input.webhookCallbackUrl,
+  });
+}

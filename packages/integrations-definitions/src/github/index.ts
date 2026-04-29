@@ -6,6 +6,7 @@ export {
   buildGitHubAppInstallationUrl,
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
+  buildGitHubAppManifestDraft,
   buildGitHubAppManifestSubmissionUrl,
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   GitHubAppManifestConversionMissingClientSecretError,

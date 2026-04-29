@@ -7,6 +7,7 @@ import {
   buildConvertedGitHubAppConnectionSecrets,
   buildGitHubAppManifest,
   buildGitHubAppManifestConversionUrl,
+  buildGitHubAppManifestDraft,
   buildGitHubAppManifestSubmissionUrl,
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
   buildGitHubAppInstallationUrl,
@@ -251,6 +252,37 @@ describe("buildGitHubAppManifest", () => {
       callback_urls: ["https://control-plane.example.com/p/identity-linking/callbacks/github"],
       setup_url:
         "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
+    });
+  });
+});
+
+describe("buildGitHubAppManifestDraft", () => {
+  it("builds the default GitHub app manifest with real Mistle callback URLs", () => {
+    const manifest = buildGitHubAppManifestDraft({
+      controlPlaneBaseUrl: "https://control-plane.example.com",
+      webhookCallbackUrl:
+        "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+    });
+
+    expect(manifest).toMatchObject({
+      name: "Mistle GitHub App",
+      hook_attributes: {
+        active: true,
+        url: "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
+      },
+      redirect_url:
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-manifest",
+      callback_urls: ["https://control-plane.example.com/p/identity-linking/callbacks/github"],
+      setup_url:
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
+    });
+    expect(manifest).not.toMatchObject({
+      hook_attributes: {
+        url: "https://mistle.example.com/api/integrations/github/webhook",
+      },
+      redirect_url: "https://mistle.example.com/api/integrations/github/manifest/callback",
+      callback_urls: ["https://mistle.example.com/api/integrations/github/install/callback"],
+      setup_url: "https://mistle.example.com/api/integrations/github/setup",
     });
   });
 });

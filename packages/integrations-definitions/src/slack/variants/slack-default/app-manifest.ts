@@ -222,3 +222,14 @@ export function buildSlackAppManifest(input: {
     },
   };
 }
+
+export function buildSlackAppManifestDraft(input: {
+  controlPlaneBaseUrl: string;
+  webhookCallbackUrl: string;
+}): Record<string, unknown> {
+  return buildSlackAppManifest({
+    controlPlaneBaseUrl: input.controlPlaneBaseUrl,
+    manifest: SlackAppManifestTemplate,
+    webhookCallbackUrl: input.webhookCallbackUrl,
+  });
+}

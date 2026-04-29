@@ -1,7 +1,6 @@
 import {
-  SlackAppManifestTemplate,
   SlackConnectionMethodId,
-  buildSlackAppManifest,
+  buildSlackAppManifestDraft,
 } from "@mistle/integrations-definitions/browser";
 import { systemScheduler } from "@mistle/time";
 import {
@@ -94,13 +93,10 @@ const SlackRequiredExistingAppSecretFieldKeys = [
   "signingSecret",
 ] satisfies readonly SlackExistingAppSecretFieldKey[];
 
-const SlackDraftManifest = createManifestJsonDraft(SlackAppManifestTemplate);
-
 function createSlackDraftManifest(webhookCallbackUrl: string): string {
   return createManifestJsonDraft(
-    buildSlackAppManifest({
+    buildSlackAppManifestDraft({
       controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
-      manifest: SlackAppManifestTemplate,
       webhookCallbackUrl,
     }),
   );
@@ -422,7 +418,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   const [setupMode, setSetupMode] = useState<SlackSetupMode>(() =>
     isSlackAppInstalled(input.connection) ? "existing-app" : "manifest",
   );
-  const [manifestValue, setManifestValue] = useState(SlackDraftManifest);
+  const [manifestValue, setManifestValue] = useState("");
   const [hasEditedManifest, setHasEditedManifest] = useState(false);
   const [appConfigToken, setAppConfigToken] = useState("");
   const [existingAppDraft, setExistingAppDraft] = useState(() =>

@@ -1,8 +1,5 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import {
-  GitHubAppManifestTemplate,
-  buildGitHubAppManifest,
-} from "@mistle/integrations-definitions/browser";
+import { buildGitHubAppManifestDraft } from "@mistle/integrations-definitions/browser";
 import { systemScheduler } from "@mistle/time";
 import {
   Button,
@@ -109,13 +106,10 @@ const GitHubExistingAppSetupSecretFieldKeys = [
 
 type GitHubExistingAppSetupSecretFieldKey = (typeof GitHubExistingAppSetupSecretFieldKeys)[number];
 
-const GitHubDraftManifest = createManifestJsonDraft(GitHubAppManifestTemplate);
-
 function createGitHubDraftManifest(webhookCallbackUrl: string): string {
   return createManifestJsonDraft(
-    buildGitHubAppManifest({
+    buildGitHubAppManifestDraft({
       controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
-      manifest: GitHubAppManifestTemplate,
       webhookCallbackUrl,
     }),
   );
@@ -617,7 +611,7 @@ export function GitHubAppSetupPane(input: {
   const [setupMode, setSetupMode] = useState<GitHubAppSetupMode>(() =>
     resolveInitialGitHubAppSetupMode(input.connection),
   );
-  const [manifestValue, setManifestValue] = useState(GitHubDraftManifest);
+  const [manifestValue, setManifestValue] = useState("");
   const [hasEditedManifest, setHasEditedManifest] = useState(false);
   const [manifestAppOwnerKind, setManifestAppOwnerKind] =
     useState<GitHubManifestAppOwnerKind | null>(null);
