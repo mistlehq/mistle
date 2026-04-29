@@ -12,7 +12,6 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
-  Notice,
   TextLink,
 } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -31,8 +30,8 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
 import {
-  ManifestJsonEditor,
   type ManifestJsonValidation,
   createManifestJsonDraft,
   parseManifestJsonObject,
@@ -286,22 +285,13 @@ function SlackManifestSetupPanel(input: {
             Slack.
           </p>
         </div>
-        {input.manifestCallbackState.kind === "ready" ? (
-          <ManifestJsonEditor
-            id="slack-app-manifest-editor"
-            onChange={input.onManifestChange}
-            validation={input.manifestValidation}
-            value={input.manifestValue}
-          />
-        ) : input.manifestCallbackState.kind === "loading" ? (
-          <Notice>Loading manifest callback URLs...</Notice>
-        ) : (
-          <Notice title="Could not load manifest callback URLs" variant="alert">
-            {input.manifestCallbackState.kind === "error"
-              ? input.manifestCallbackState.message
-              : "The integration webhook source is missing a callback URL."}
-          </Notice>
-        )}
+        <ManifestCallbackJsonEditor
+          callbackState={input.manifestCallbackState}
+          id="slack-app-manifest-editor"
+          onChange={input.onManifestChange}
+          validation={input.manifestValidation}
+          value={input.manifestValue}
+        />
       </div>
     </div>
   );
@@ -458,12 +448,16 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
   });
   const webhookCallbackUrl =
     webhookCallbackState.kind === "ready" ? webhookCallbackState.value : null;
+  const resolvedManifestValue =
+    webhookCallbackUrl === null || hasEditedManifest
+      ? manifestValue
+      : createSlackDraftManifest(webhookCallbackUrl);
 
   const startManifestMutation = useMutation({
     mutationFn: async () =>
       startSlackAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseManifestJsonObject(manifestValue),
+        manifest: parseManifestJsonObject(resolvedManifestValue),
         appConfigToken,
       }),
   });
@@ -482,14 +476,6 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
       );
     }
   }
-
-  useEffect(() => {
-    if (webhookCallbackUrl === null || hasEditedManifest) {
-      return;
-    }
-
-    setManifestValue(createSlackDraftManifest(webhookCallbackUrl));
-  }, [hasEditedManifest, webhookCallbackUrl]);
 
   useEffect(() => {
     return () => {
@@ -680,7 +666,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
     resetFieldFeedback(fieldKey);
   }
 
-  const manifestValidation = validateManifestJsonObject(manifestValue);
+  const manifestValidation = validateManifestJsonObject(resolvedManifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
@@ -764,7 +750,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
             appConfigToken={appConfigToken}
             manifestCallbackState={webhookCallbackState}
             manifestValidation={manifestValidation}
-            manifestValue={manifestValue}
+            manifestValue={resolvedManifestValue}
             onAppConfigTokenChange={setAppConfigToken}
             onManifestChange={(nextValue) => {
               setHasEditedManifest(true);

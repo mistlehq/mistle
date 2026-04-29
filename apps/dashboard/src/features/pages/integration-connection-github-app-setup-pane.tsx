@@ -33,8 +33,8 @@ import {
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
+import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
 import {
-  ManifestJsonEditor,
   type ManifestJsonValidation,
   createManifestJsonDraft,
   parseManifestJsonObject,
@@ -350,22 +350,13 @@ function GitHubManifestSetupPanel(input: {
         description="Create a GitHub App from a basic manifest. You can still change the settings later in GitHub."
         title="GitHub App Manifest"
       />
-      {input.manifestCallbackState.kind === "ready" ? (
-        <ManifestJsonEditor
-          id="github-app-manifest-editor"
-          onChange={input.onManifestChange}
-          validation={input.manifestValidation}
-          value={input.manifestValue}
-        />
-      ) : input.manifestCallbackState.kind === "loading" ? (
-        <Notice>Loading manifest callback URLs...</Notice>
-      ) : (
-        <Notice title="Could not load manifest callback URLs" variant="alert">
-          {input.manifestCallbackState.kind === "error"
-            ? input.manifestCallbackState.message
-            : "The integration webhook source is missing a callback URL."}
-        </Notice>
-      )}
+      <ManifestCallbackJsonEditor
+        callbackState={input.manifestCallbackState}
+        id="github-app-manifest-editor"
+        onChange={input.onManifestChange}
+        validation={input.manifestValidation}
+        value={input.manifestValue}
+      />
       <Field>
         <FieldHeader>
           <FieldLabel>Which account should the app be created in?</FieldLabel>
@@ -649,6 +640,10 @@ export function GitHubAppSetupPane(input: {
   });
   const webhookCallbackUrl =
     webhookCallbackState.kind === "ready" ? webhookCallbackState.value : null;
+  const resolvedManifestValue =
+    webhookCallbackUrl === null || hasEditedManifest
+      ? manifestValue
+      : createGitHubDraftManifest(webhookCallbackUrl);
 
   const startInstallationMutation = useMutation({
     mutationFn: async () =>
@@ -666,7 +661,7 @@ export function GitHubAppSetupPane(input: {
 
       return startGitHubAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseManifestJsonObject(manifestValue),
+        manifest: parseManifestJsonObject(resolvedManifestValue),
         owner:
           manifestAppOwnerKind === "personal"
             ? { kind: "personal" }
@@ -736,14 +731,6 @@ export function GitHubAppSetupPane(input: {
       );
     }
   }
-
-  useEffect(() => {
-    if (webhookCallbackUrl === null || hasEditedManifest) {
-      return;
-    }
-
-    setManifestValue(createGitHubDraftManifest(webhookCallbackUrl));
-  }, [hasEditedManifest, webhookCallbackUrl]);
 
   useEffect(() => {
     return () => {
@@ -965,7 +952,7 @@ export function GitHubAppSetupPane(input: {
     }),
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
-  const manifestValidation = validateManifestJsonObject(manifestValue);
+  const manifestValidation = validateManifestJsonObject(resolvedManifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
@@ -1065,7 +1052,7 @@ export function GitHubAppSetupPane(input: {
             appOwnerKind={manifestAppOwnerKind}
             manifestCallbackState={webhookCallbackState}
             manifestValidation={manifestValidation}
-            manifestValue={manifestValue}
+            manifestValue={resolvedManifestValue}
             onAppOwnerKindChange={setManifestAppOwnerKind}
             onManifestChange={(nextValue) => {
               setHasEditedManifest(true);

@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import { SlackAppManifestTemplate } from "@mistle/integrations-definitions/browser";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
@@ -122,33 +121,6 @@ describe("SlackAppSetupPane", () => {
     expect(
       screen.getByRole("button", { name: "Create and connect Slack app" }).hasAttribute("disabled"),
     ).toBe(true);
-  });
-
-  it("includes the Slack app permissions and event subscriptions in the default manifest", () => {
-    expect(SlackAppManifestTemplate.settings.event_subscriptions.request_url).toBe(
-      "https://mistle.example.com/api/integrations/slack/webhook",
-    );
-    expect(SlackAppManifestTemplate.settings.event_subscriptions.bot_events).toEqual([
-      "app_mention",
-      "message.channels",
-      "message.groups",
-      "reaction_added",
-      "reaction_removed",
-    ]);
-    expect(SlackAppManifestTemplate.oauth_config.redirect_urls).toEqual([
-      "https://mistle.example.com/api/integrations/slack/install/callback",
-      "https://mistle.example.com/api/identity-linking/slack/callback",
-    ]);
-    expect(SlackAppManifestTemplate.oauth_config.scopes.bot).toEqual([
-      "app_mentions:read",
-      "channels:history",
-      "channels:read",
-      "chat:write",
-      "groups:history",
-      "groups:read",
-      "reactions:read",
-      "users:read",
-    ]);
   });
 
   it("defaults a configured Slack connection to the existing app setup", () => {

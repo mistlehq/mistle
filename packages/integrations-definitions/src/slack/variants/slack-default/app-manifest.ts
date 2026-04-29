@@ -78,6 +78,10 @@ export type SlackManifestCreateErrorResponse = z.output<
   typeof SlackManifestCreateErrorResponseSchema
 >;
 
+const SlackAppManifestTemplateRedirectUrls = new Set(
+  SlackAppManifestTemplate.oauth_config.redirect_urls,
+);
+
 function mergeUniqueStrings(input: {
   excludedValues?: ReadonlySet<string>;
   existing: unknown;
@@ -87,10 +91,9 @@ function mergeUniqueStrings(input: {
     Array.isArray(input.existing) && input.existing.every((entry) => typeof entry === "string")
       ? input.existing
       : [];
+  const excludedValues = input.excludedValues;
   const retainedValues =
-    input.excludedValues === undefined
-      ? values
-      : values.filter((value) => !input.excludedValues?.has(value));
+    excludedValues === undefined ? values : values.filter((value) => !excludedValues.has(value));
   return [...new Set([...retainedValues, ...input.requiredValues])];
 }
 
@@ -202,7 +205,7 @@ export function buildSlackAppManifest(input: {
     oauth_config: {
       ...oauthConfig,
       redirect_urls: mergeUniqueStrings({
-        excludedValues: new Set(SlackAppManifestTemplate.oauth_config.redirect_urls),
+        excludedValues: SlackAppManifestTemplateRedirectUrls,
         existing: oauthConfig["redirect_urls"],
         requiredValues: [
           redirectUrl,

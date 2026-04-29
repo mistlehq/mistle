@@ -67,13 +67,13 @@ describe("buildSlackAppManifest", () => {
           },
         },
         oauth_config: {
+          redirect_urls: SlackAppManifestTemplate.oauth_config.redirect_urls,
           scopes: {
             bot: ["chat:write"],
           },
         },
       },
     });
-
     expect(manifest).toMatchObject({
       settings: {
         socket_mode_enabled: false,
@@ -102,6 +102,11 @@ describe("buildSlackAppManifest", () => {
             "reactions:read",
           ]),
         },
+      },
+    });
+    expect(manifest).not.toMatchObject({
+      oauth_config: {
+        redirect_urls: expect.arrayContaining(SlackAppManifestTemplate.oauth_config.redirect_urls),
       },
     });
   });
