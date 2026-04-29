@@ -1991,6 +1991,10 @@
                       "type": "string",
                       "enum": ["pending", "starting", "running", "stopped", "failed"]
                     },
+                    "persistedStatus": {
+                      "type": "string",
+                      "enum": ["pending", "starting", "running", "stopped", "failed"]
+                    },
                     "connectable": {
                       "type": "boolean"
                     },
@@ -3195,6 +3199,7 @@
                     "purpose",
                     "title",
                     "status",
+                    "persistedStatus",
                     "connectable",
                     "failureCode",
                     "failureMessage",

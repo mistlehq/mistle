@@ -78,6 +78,7 @@ export async function getSandboxInstance(
     purpose: sandboxInstance.purpose,
     title: sandboxInstance.title,
     status,
+    persistedStatus: sandboxInstance.status,
     connectable: status === "running",
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,

@@ -36,6 +36,7 @@ export const GetSandboxInstanceResponseSchema = z
     purpose: SandboxInstancePurposeSchema,
     title: z.string().min(1).nullable(),
     status: DataPlaneSandboxInstanceStatusSchema,
+    persistedStatus: DataPlaneSandboxInstanceStatusSchema,
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

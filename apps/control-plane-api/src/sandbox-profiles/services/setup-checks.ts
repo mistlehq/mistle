@@ -294,7 +294,11 @@ export async function getProfileVersionSetupCheck(
     throw new NotFoundError("SETUP_CHECK_NOT_FOUND", "Sandbox profile setup check was not found.");
   }
 
-  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
+  if (
+    sandboxInstance.status === "pending" ||
+    sandboxInstance.status === "starting" ||
+    sandboxInstance.persistedStatus === "starting"
+  ) {
     return {
       id: sandboxInstance.id,
       sandboxProfileId: sandboxInstance.sandboxProfileId,

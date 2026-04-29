@@ -618,6 +618,95 @@ describe("sandbox profile version setup checks integration", () => {
     }
   }, 60_000);
 
+  it("waits for durable running before starting setup-check cleanup", async ({ fixture }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
+      fixture,
+      databaseNamePrefix: "mistle_cp_setup_check_cleanup_race",
+    });
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: "/var/run/docker.sock",
+      },
+    });
+    const sandbox = await adapter.start({
+      image: {
+        provider: SandboxProvider.DOCKER,
+        imageId: "registry:3",
+        createdAt: "2026-03-27T00:00:00.000Z",
+      },
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-cleanup-race@example.com",
+      });
+      await insertProfileVersionFixture({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_setup_check_cleanup_race_001",
+        version: 1,
+      });
+
+      const createResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_cleanup_race_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo cleanup race",
+            idempotencyKey: "setup-check-cleanup-race-001",
+          }),
+        },
+      );
+
+      expect(createResponse.status).toBe(201);
+      const createdBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await createResponse.json(),
+      );
+
+      await dataPlaneFixture.db
+        .update(sandboxInstances)
+        .set({
+          providerSandboxId: sandbox.id,
+          status: SandboxInstanceStatuses.STARTING,
+        })
+        .where(eq(sandboxInstances.id, createdBody.sandboxInstanceId));
+      await dataPlaneFixture.attachSandboxRuntime({
+        sandboxInstanceId: createdBody.sandboxInstanceId,
+        runtimeReady: true,
+      });
+
+      const getResponse = await fixture.request(
+        `/v1/sandbox/profiles/sbp_setup_check_cleanup_race_001/versions/1/setup-checks/${createdBody.id}`,
+        {
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+        },
+      );
+
+      expect(getResponse.status).toBe(200);
+      const responseBody = GetSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await getResponse.json(),
+      );
+      expect(responseBody).toMatchObject({
+        id: createdBody.id,
+        status: "starting_sandbox",
+        failurePhase: null,
+        failureCode: null,
+        failureMessage: null,
+        finishedAt: null,
+      });
+    } finally {
+      await adapter.destroy({ id: sandbox.id });
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
   it("rejects unavailable primary repositories before starting a setup check", async ({
     fixture,
   }) => {

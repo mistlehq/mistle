@@ -580,6 +580,8 @@ export interface paths {
               failureMessage: string | null;
               id: string;
               /** @enum {string} */
+              persistedStatus: "pending" | "starting" | "running" | "stopped" | "failed";
+              /** @enum {string} */
               purpose: "session" | "snapshot" | "setup_check";
               runtimePlan: {
                 agentRuntimes: {

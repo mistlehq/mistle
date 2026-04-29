@@ -171,6 +171,7 @@ const GetSandboxInstanceResponseSchema = z
     purpose: z.enum(["session", "snapshot", "setup_check"]),
     title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    persistedStatus: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),

@@ -1,6 +1,7 @@
 import {
   SandboxInstancePersistenceModes,
   type SandboxInstancePurpose,
+  type SandboxInstanceStatus,
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
@@ -62,6 +63,7 @@ type SandboxInstanceResponseMetadata = {
   sandboxProfileVersion: number;
   purpose: SandboxInstancePurpose;
   title: string | null;
+  status: SandboxInstanceStatus;
   startedAt: string | null;
   stoppedAt: string | null;
   failedAt: string | null;
@@ -78,6 +80,7 @@ function sandboxInstanceResponseBase(
   | "sandboxProfileVersion"
   | "purpose"
   | "title"
+  | "persistedStatus"
   | "startedAt"
   | "stoppedAt"
   | "failedAt"
@@ -90,6 +93,7 @@ function sandboxInstanceResponseBase(
     sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
     purpose: sandboxInstance.purpose,
     title: sandboxInstance.title,
+    persistedStatus: sandboxInstance.status,
     startedAt: sandboxInstance.startedAt,
     stoppedAt: sandboxInstance.stoppedAt,
     failedAt: sandboxInstance.failedAt,
