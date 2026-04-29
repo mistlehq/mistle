@@ -426,7 +426,7 @@ export function ChatComposer({
             )}
             {pullRequest === null ? null : (
               <TextLink
-                className="min-w-0 items-center gap-1.5"
+                className="min-w-0 items-center gap-1.5 [&_[data-icon=inline-end]]:translate-y-0"
                 href={pullRequest.url}
                 opensInNewWindow
                 title={pullRequest.title}
