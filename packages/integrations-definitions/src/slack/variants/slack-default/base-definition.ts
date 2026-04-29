@@ -4,6 +4,7 @@ import {
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 
+import { buildSlackAppManifestDraft } from "./app-manifest.js";
 import {
   type SlackConnectionConfig,
   SlackConnectionConfigSchema,
@@ -47,6 +48,9 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
       kind: "form",
       createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
       setupFlow: {
+        appManifestDraft: {
+          build: buildSlackAppManifestDraft,
+        },
         completionRequirements: {
           kind: "all-of",
           allOf: [

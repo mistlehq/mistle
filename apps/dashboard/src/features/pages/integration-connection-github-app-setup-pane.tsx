@@ -1,5 +1,4 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { buildGitHubAppManifestDraft } from "@mistle/integrations-definitions/browser";
 import { systemScheduler } from "@mistle/time";
 import {
   Button,
@@ -56,6 +55,7 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
+import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
 import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -594,6 +594,7 @@ function GitHubAppSetupActions(input: {
 
 export function GitHubAppSetupPane(input: {
   connection: IntegrationConnection;
+  manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   manifestCreationSucceeded?: boolean;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -629,7 +630,7 @@ export function GitHubAppSetupPane(input: {
     webhookCallbackUrl === null || hasEditedManifest
       ? manifestValue
       : createManifestJsonDraft(
-          buildGitHubAppManifestDraft({
+          input.manifestDraftBuilder({
             controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
             webhookCallbackUrl,
           }),

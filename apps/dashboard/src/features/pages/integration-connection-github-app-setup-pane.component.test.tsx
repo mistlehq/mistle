@@ -11,6 +11,7 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
+import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
 
 function createGitHubAppSetupConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -75,9 +76,10 @@ function renderGitHubAppSetupPane(input?: {
 
   const paneProps =
     input?.manifestCreationSucceeded === undefined
-      ? { connection }
+      ? { connection, manifestDraftBuilder: resolveGitHubManifestDraftBuilder(connection) }
       : {
           connection,
+          manifestDraftBuilder: resolveGitHubManifestDraftBuilder(connection),
           manifestCreationSucceeded: input.manifestCreationSucceeded,
         };
 
@@ -86,6 +88,16 @@ function renderGitHubAppSetupPane(input?: {
       <GitHubAppSetupPane {...paneProps} />
     </QueryClientProvider>,
   );
+}
+
+function resolveGitHubManifestDraftBuilder(connection: IntegrationConnection) {
+  return resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+    connection,
+    setupRoute: {
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    },
+  });
 }
 
 describe("GitHubAppSetupPane", () => {

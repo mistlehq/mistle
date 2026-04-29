@@ -11,6 +11,7 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
+import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 function createSlackConnection(input?: {
@@ -80,7 +81,16 @@ function renderSlackAppSetupPane(input?: {
       initialEntries={[`/integrations/${connection.targetKey}/${connection.id}/slack-app/setup`]}
     >
       <QueryClientProvider client={queryClient}>
-        <SlackAppSetupPane connection={connection} />
+        <SlackAppSetupPane
+          connection={connection}
+          manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+            connection,
+            setupRoute: {
+              methodId: "slack-bot-token",
+              routeSegment: "slack-app",
+            },
+          })}
+        />
         <CurrentPath />
       </QueryClientProvider>
     </MemoryRouter>,

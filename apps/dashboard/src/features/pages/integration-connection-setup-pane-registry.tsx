@@ -3,22 +3,45 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browse
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
+import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 type IntegrationConnectionSetupPaneComponent = (input: {
   connection: IntegrationConnection;
   searchParams: URLSearchParams;
+  setupRoute: IntegrationConnectionSetupRoute;
 }) => React.JSX.Element;
 
 function renderGitHubAppSetupPane(input: {
   connection: IntegrationConnection;
   searchParams: URLSearchParams;
+  setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   return (
     <GitHubAppSetupPane
       connection={input.connection}
+      manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+        connection: input.connection,
+        setupRoute: input.setupRoute,
+      })}
       manifestCreationSucceeded={input.searchParams.get("githubAppManifest") === "created"}
+    />
+  );
+}
+
+function renderSlackAppSetupPane(input: {
+  connection: IntegrationConnection;
+  searchParams: URLSearchParams;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): React.JSX.Element {
+  return (
+    <SlackAppSetupPane
+      connection={input.connection}
+      manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+        connection: input.connection,
+        setupRoute: input.setupRoute,
+      })}
     />
   );
 }
@@ -32,7 +55,7 @@ const IntegrationConnectionSetupPaneByKey: Record<
   IntegrationConnectionSetupPaneComponent
 > = {
   "github-app-installation:github-app": renderGitHubAppSetupPane,
-  "slack-bot-token:slack-app": SlackAppSetupPane,
+  "slack-bot-token:slack-app": renderSlackAppSetupPane,
 };
 
 function resolveSetupPaneKey(
@@ -64,6 +87,7 @@ export function renderIntegrationConnectionSetupPane(input: {
       connection={input.connection}
       key={input.connection.id}
       searchParams={input.searchParams}
+      setupRoute={input.setupRoute}
     />
   );
 }

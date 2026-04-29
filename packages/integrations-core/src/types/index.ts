@@ -489,7 +489,20 @@ export const IntegrationFormConnectionMethodCreateBehaviors: {
   DRAFT_THEN_SETUP: "draft-then-setup",
 };
 
+export type IntegrationFormConnectionMethodSetupManifestDraftInput = {
+  controlPlaneBaseUrl: string;
+  webhookCallbackUrl: string;
+};
+
+export type IntegrationFormConnectionMethodSetupManifestDraft = {
+  build(
+    this: void,
+    input: IntegrationFormConnectionMethodSetupManifestDraftInput,
+  ): Record<string, unknown>;
+};
+
 export type IntegrationFormConnectionMethodSetupFlow = {
+  appManifestDraft?: IntegrationFormConnectionMethodSetupManifestDraft;
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement;
   routeSegment: string;
 };

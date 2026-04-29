@@ -1,7 +1,4 @@
-import {
-  SlackConnectionMethodId,
-  buildSlackAppManifestDraft,
-} from "@mistle/integrations-definitions/browser";
+import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { systemScheduler } from "@mistle/time";
 import {
   Button,
@@ -54,6 +51,7 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
+import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
 import {
   hasConfiguredSetupSecretField,
   resolveConfiguredSetupSecretFieldKeys,
@@ -403,7 +401,10 @@ function SlackSetupUrls(input: {
   );
 }
 
-export function SlackAppSetupPane(input: { connection: IntegrationConnection }): React.JSX.Element {
+export function SlackAppSetupPane(input: {
+  connection: IntegrationConnection;
+  manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
+}): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [setupMode, setSetupMode] = useState<SlackSetupMode>(() =>
@@ -439,7 +440,7 @@ export function SlackAppSetupPane(input: { connection: IntegrationConnection }):
     webhookCallbackUrl === null || hasEditedManifest
       ? manifestValue
       : createManifestJsonDraft(
-          buildSlackAppManifestDraft({
+          input.manifestDraftBuilder({
             controlPlaneBaseUrl: getDashboardConfig().controlPlaneApiOrigin,
             webhookCallbackUrl,
           }),
