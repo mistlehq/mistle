@@ -21,22 +21,9 @@ export function resolveIncompleteIntegrationConnectionSetupFlow(input: {
   connection: IntegrationConnection;
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
 }): IntegrationConnectionSetupRoute | null {
-  if (input.connection.connectionMethodId === undefined) {
+  const method = resolveDraftThenSetupConnectionMethod(input);
+  if (method === null || method.setupFlow === null) {
     return null;
-  }
-
-  const method =
-    input.connectionMethods?.find(
-      (candidate) => candidate.id === input.connection.connectionMethodId,
-    ) ?? null;
-  if (method?.kind !== "form" || method.createBehavior !== "draft-then-setup") {
-    return null;
-  }
-
-  if (method.setupFlow === undefined) {
-    throw new Error(
-      `Draft-then-setup connection method '${method.id}' is missing setupFlow metadata.`,
-    );
   }
 
   if (method.setupFlow.completionRequirements === undefined) {
@@ -61,24 +48,16 @@ export function resolveIntegrationConnectionSetupRouteOrThrow(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   routeSegment: string;
 }): IntegrationConnectionSetupRoute {
-  const connectionMethodId = input.connection.connectionMethodId;
-  if (connectionMethodId === undefined) {
+  if (input.connection.connectionMethodId === undefined) {
     throw new Error(
       `Integration connection '${input.connection.id}' is missing connection method metadata.`,
     );
   }
 
-  const method =
-    input.connectionMethods?.find((candidate) => candidate.id === connectionMethodId) ?? null;
-  if (method?.kind !== "form" || method.createBehavior !== "draft-then-setup") {
+  const method = resolveDraftThenSetupConnectionMethod(input);
+  if (method === null || method.setupFlow === null) {
     throw new Error(
       `Integration connection '${input.connection.id}' does not use a draft setup method.`,
-    );
-  }
-
-  if (method.setupFlow === undefined) {
-    throw new Error(
-      `Draft-then-setup connection method '${method.id}' is missing setupFlow metadata.`,
     );
   }
 
@@ -91,6 +70,43 @@ export function resolveIntegrationConnectionSetupRouteOrThrow(input: {
   return {
     methodId: method.id,
     routeSegment: method.setupFlow.routeSegment,
+  };
+}
+
+export function resolveDraftThenSetupMethodSetupFlow(input: {
+  method: IntegrationConnectionMethod | undefined;
+  methodId: string;
+}): NonNullable<Extract<IntegrationConnectionMethod, { kind: "form" }>["setupFlow"]> | null {
+  if (input.method?.kind !== "form" || input.method.createBehavior !== "draft-then-setup") {
+    return null;
+  }
+
+  if (input.method.setupFlow === undefined) {
+    throw new Error(
+      `Draft-then-setup connection method '${input.methodId}' is missing setupFlow metadata.`,
+    );
+  }
+
+  return input.method.setupFlow;
+}
+
+function resolveDraftThenSetupConnectionMethod(input: {
+  connection: IntegrationConnection;
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
+}): { id: string; setupFlow: ReturnType<typeof resolveDraftThenSetupMethodSetupFlow> } | null {
+  if (input.connection.connectionMethodId === undefined) {
+    return null;
+  }
+
+  const methodId = input.connection.connectionMethodId;
+  const method = input.connectionMethods?.find((candidate) => candidate.id === methodId) ?? null;
+
+  return {
+    id: methodId,
+    setupFlow: resolveDraftThenSetupMethodSetupFlow({
+      method: method ?? undefined,
+      methodId,
+    }),
   };
 }
 

@@ -3,6 +3,7 @@ import type {
   IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
 import { resolveSelectedConnectionMethod } from "../integrations/integration-connection-method-selection.js";
+import { resolveDraftThenSetupMethodSetupFlow } from "./integration-connection-setup-state.js";
 
 export function resolveDraftThenSetupConnectionPath(input: {
   connectionId: string | null;
@@ -18,17 +19,15 @@ export function resolveDraftThenSetupConnectionPath(input: {
     methodId: input.methodId,
   });
 
-  if (method?.kind !== "form" || method.createBehavior !== "draft-then-setup") {
+  const setupFlow = resolveDraftThenSetupMethodSetupFlow({
+    method: method ?? undefined,
+    methodId: input.methodId,
+  });
+  if (setupFlow === null) {
     return null;
-  }
-
-  if (method.setupFlow === undefined) {
-    throw new Error(
-      `Draft-then-setup connection method '${input.methodId}' is missing setupFlow metadata.`,
-    );
   }
 
   return `/integrations/${encodeURIComponent(input.editor.targetKey)}/${encodeURIComponent(
     input.connectionId,
-  )}/${method.setupFlow.routeSegment}/setup`;
+  )}/${setupFlow.routeSegment}/setup`;
 }
