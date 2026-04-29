@@ -16,10 +16,6 @@ import {
 } from "./codex-chat-state.js";
 import { readCodexThreadState } from "./codex-thread-read-state.js";
 
-function createPendingTurnId(): string {
-  return `pending:${crypto.randomUUID()}`;
-}
-
 function createSteerEntryId(): string {
   return `steer:${crypto.randomUUID()}`;
 }
@@ -172,33 +168,18 @@ export function useCodexChatController(input: {
 
       const turnRequest = buildTurnRequest(turnInput);
 
-      const clientTurnId = createPendingTurnId();
+      const startedTurn = await startCodexTurn({
+        rpcClient,
+        threadId,
+        input: turnRequest.items,
+      });
       dispatchChatAction({
-        type: "start_turn_requested",
-        clientTurnId,
+        type: "turn_started",
+        turnId: startedTurn.turnId,
+        status: startedTurn.status,
         prompt: turnRequest.transcriptPrompt,
         attachments: turnRequest.displayAttachments,
       });
-
-      try {
-        const startedTurn = await startCodexTurn({
-          rpcClient,
-          threadId,
-          input: turnRequest.items,
-        });
-        dispatchChatAction({
-          type: "turn_started_response",
-          clientTurnId,
-          turnId: startedTurn.turnId,
-          status: startedTurn.status,
-        });
-      } catch (error) {
-        dispatchChatAction({
-          type: "start_turn_failed",
-          clientTurnId,
-        });
-        throw error;
-      }
     },
   });
 

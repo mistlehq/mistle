@@ -68,6 +68,7 @@ const PendingDiffCommentsFixture: readonly PendingSessionDiffComment[] = [
 
 function SessionComposerStateHarness(input: {
   composerText: string;
+  deferSubmit?: boolean;
   pendingDiffComments: readonly PendingSessionDiffComment[];
   shouldFailSubmit?: boolean;
 }): React.JSX.Element {
@@ -75,6 +76,7 @@ function SessionComposerStateHarness(input: {
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
+  const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
 
   const composerState = useSessionComposerState({
     composerStateInput: {
@@ -126,6 +128,11 @@ function SessionComposerStateHarness(input: {
 
           setSubmittedPrompt(submittedPrompt);
           setTranscriptPrompt(transcriptPrompt ?? null);
+          if (input.deferSubmit) {
+            await new Promise<void>((resolve) => {
+              setResolveSubmit(() => resolve);
+            });
+          }
         },
         steerTurn: async ({ submittedPrompt, transcriptPrompt }) => {
           setSubmittedPrompt(submittedPrompt);
@@ -151,6 +158,11 @@ function SessionComposerStateHarness(input: {
       <button onClick={composerState.composerViewModel.onSubmit} type="button">
         Submit
       </button>
+      {resolveSubmit === null ? null : (
+        <button onClick={resolveSubmit} type="button">
+          Resolve submit
+        </button>
+      )}
       <div data-testid="submit-mode">{composerState.composerViewModel.submitMode}</div>
       <div data-testid="submit-disabled">
         {composerState.composerViewModel.submitDisabled ? "true" : "false"}
@@ -194,10 +206,36 @@ describe("useSessionComposerState", () => {
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("0");
   });
 
-  it("keeps pending diff comments in place when submit fails", async () => {
+  it("keeps the draft visible until submit resolves successfully", async () => {
     render(
       <SessionComposerStateHarness
-        composerText=""
+        composerText="Review these comments"
+        deferSubmit
+        pendingDiffComments={PendingDiffCommentsFixture}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toContain("Review these comments");
+    });
+    expect(screen.getByTestId("composer-text").textContent).toBe("Review these comments");
+    expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
+
+    fireEvent.click(screen.getByRole("button", { name: "Resolve submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("composer-text").textContent).toBe("");
+    });
+    expect(screen.getByTestId("composer-text").textContent).toBe("");
+    expect(screen.getByTestId("pending-diff-comments").textContent).toBe("0");
+  });
+
+  it("keeps the draft when submit fails", async () => {
+    render(
+      <SessionComposerStateHarness
+        composerText="Submit this with review comments"
         pendingDiffComments={PendingDiffCommentsFixture}
         shouldFailSubmit
       />,
@@ -213,6 +251,9 @@ describe("useSessionComposerState", () => {
       );
     });
     expect(screen.getByTestId("submitted-prompt").textContent).toBe("");
+    expect(screen.getByTestId("composer-text").textContent).toBe(
+      "Submit this with review comments",
+    );
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
   });
 });

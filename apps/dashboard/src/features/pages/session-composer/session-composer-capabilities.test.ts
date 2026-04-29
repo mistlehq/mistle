@@ -14,7 +14,6 @@ describe("resolveComposerSubmitAction", () => {
       type: "start_turn",
       submitMode: "start",
       prompt: "hello world",
-      shouldClearComposer: true,
     });
   });
 
@@ -28,7 +27,6 @@ describe("resolveComposerSubmitAction", () => {
     ).toEqual({
       type: "interrupt_turn",
       submitMode: "interrupt",
-      shouldClearComposer: false,
     });
   });
 
@@ -43,7 +41,6 @@ describe("resolveComposerSubmitAction", () => {
       type: "steer_turn",
       submitMode: "steer",
       prompt: "refine this",
-      shouldClearComposer: true,
     });
   });
 
@@ -58,7 +55,6 @@ describe("resolveComposerSubmitAction", () => {
       type: "start_turn",
       submitMode: "start",
       prompt: "",
-      shouldClearComposer: true,
     });
   });
 
@@ -73,7 +69,6 @@ describe("resolveComposerSubmitAction", () => {
       type: "steer_turn",
       submitMode: "steer",
       prompt: "",
-      shouldClearComposer: true,
     });
   });
 });

@@ -2,13 +2,11 @@ export type ComposerSubmitAction =
   | {
       type: "interrupt_turn";
       submitMode: "interrupt";
-      shouldClearComposer: false;
     }
   | {
       type: "start_turn" | "steer_turn";
       prompt: string;
       submitMode: "start" | "steer";
-      shouldClearComposer: true;
     };
 
 export function resolveComposerSubmitAction(input: {
@@ -24,7 +22,6 @@ export function resolveComposerSubmitAction(input: {
       type: "start_turn",
       submitMode: "start",
       prompt: trimmedComposerText,
-      shouldClearComposer: true,
     };
   }
 
@@ -32,7 +29,6 @@ export function resolveComposerSubmitAction(input: {
     return {
       type: "interrupt_turn",
       submitMode: "interrupt",
-      shouldClearComposer: false,
     };
   }
 
@@ -40,6 +36,5 @@ export function resolveComposerSubmitAction(input: {
     type: "steer_turn",
     submitMode: "steer",
     prompt: trimmedComposerText,
-    shouldClearComposer: true,
   };
 }

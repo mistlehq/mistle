@@ -141,20 +141,11 @@ export type CodexChatAction =
       type: "reset";
     }
   | {
-      type: "start_turn_requested";
-      clientTurnId: string;
-      prompt: string;
-      attachments?: readonly CodexTurnInputLocalImageItem[];
-    }
-  | {
-      type: "start_turn_failed";
-      clientTurnId: string;
-    }
-  | {
-      type: "turn_started_response";
-      clientTurnId: string;
+      type: "turn_started";
       turnId: string;
       status: string;
+      prompt: string;
+      attachments?: readonly CodexTurnInputLocalImageItem[];
     }
   | {
       type: "steer_turn_requested";
@@ -1354,53 +1345,11 @@ export function reduceCodexChatState(
     return createInitialCodexChatState();
   }
 
-  if (action.type === "start_turn_requested") {
-    return buildState({
-      pendingTurnId: action.clientTurnId,
-      turnOrder: [...state.turnOrder, action.clientTurnId],
-      turnsById: {
-        ...state.turnsById,
-        [action.clientTurnId]: {
-          id: action.clientTurnId,
-          status: "starting",
-          completedStatus: null,
-          completedErrorMessage: null,
-          planSnapshot: null,
-          userEntry: buildUserEntry(
-            action.clientTurnId,
-            action.prompt,
-            buildChatUserAttachments(action.attachments),
-          ),
-          clientSteerEntries: [],
-          itemOrder: [],
-          rawItemsById: {},
-        },
-      },
-    });
-  }
-
-  if (action.type === "start_turn_failed") {
-    const nextTurnsById: Record<string, CodexRawTurnState> = {};
-    for (const [turnId, turn] of Object.entries(state.turnsById)) {
-      if (turnId !== action.clientTurnId) {
-        nextTurnsById[turnId] = turn;
-      }
-    }
-
-    return buildState({
-      pendingTurnId: null,
-      turnOrder: state.turnOrder.filter((turnId) => turnId !== action.clientTurnId),
-      turnsById: nextTurnsById,
-    });
-  }
-
-  if (action.type === "turn_started_response") {
-    const pendingTurn =
-      state.turnsById[action.clientTurnId] ?? createTurnState(action.clientTurnId);
+  if (action.type === "turn_started") {
     const existingTurn = state.turnsById[action.turnId] ?? createTurnState(action.turnId);
     const nextTurnsById: Record<string, CodexRawTurnState> = {};
     for (const [turnId, turn] of Object.entries(state.turnsById)) {
-      if (turnId !== action.clientTurnId && turnId !== action.turnId) {
+      if (turnId !== action.turnId) {
         nextTurnsById[turnId] = turn;
       }
     }
@@ -1411,30 +1360,22 @@ export function reduceCodexChatState(
       status: action.status,
       completedStatus: null,
       completedErrorMessage: null,
-      planSnapshot: pendingTurn.planSnapshot ?? existingTurn.planSnapshot,
-      userEntry:
-        pendingTurn.userEntry === null
-          ? existingTurn.userEntry
-          : {
-              ...pendingTurn.userEntry,
-              id: `user:${action.turnId}`,
-              turnId: action.turnId,
-            },
-      clientSteerEntries: [...pendingTurn.clientSteerEntries, ...existingTurn.clientSteerEntries],
-      itemOrder: [...pendingTurn.itemOrder, ...existingTurn.itemOrder].filter(
-        (itemId, index, itemOrder) => itemOrder.indexOf(itemId) === index,
+      planSnapshot: existingTurn.planSnapshot,
+      userEntry: buildUserEntry(
+        action.turnId,
+        action.prompt,
+        buildChatUserAttachments(action.attachments),
       ),
-      rawItemsById: {
-        ...pendingTurn.rawItemsById,
-        ...existingTurn.rawItemsById,
-      },
+      clientSteerEntries: existingTurn.clientSteerEntries,
+      itemOrder: existingTurn.itemOrder,
+      rawItemsById: existingTurn.rawItemsById,
     };
 
     return buildState({
       pendingTurnId: null,
-      turnOrder: state.turnOrder
-        .map((turnId) => (turnId === action.clientTurnId ? action.turnId : turnId))
-        .filter((turnId, index, turnOrder) => turnOrder.indexOf(turnId) === index),
+      turnOrder: [...state.turnOrder, action.turnId].filter(
+        (turnId, index, turnOrder) => turnOrder.indexOf(turnId) === index,
+      ),
       turnsById: nextTurnsById,
     });
   }

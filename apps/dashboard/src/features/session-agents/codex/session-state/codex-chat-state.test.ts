@@ -1,60 +1,40 @@
 import { describe, expect, it } from "vitest";
 
-import { createInitialCodexChatState, reduceCodexChatState } from "./codex-chat-state.js";
+import {
+  createInitialCodexChatState,
+  reduceCodexChatState,
+  type CodexChatState,
+} from "./codex-chat-state.js";
+
+function startTurn(
+  state: CodexChatState = createInitialCodexChatState(),
+  input: {
+    prompt?: string;
+    status?: string;
+    turnId?: string;
+  } = {},
+): CodexChatState {
+  return reduceCodexChatState(state, {
+    type: "turn_started",
+    turnId: input.turnId ?? "turn_123",
+    status: input.status ?? "inProgress",
+    prompt: input.prompt ?? "Test prompt",
+  });
+}
 
 describe("reduceCodexChatState", () => {
-  it("appends an optimistic user message when a turn starts locally", () => {
+  it("appends a user message when a turn is accepted by the runtime", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
-      type: "start_turn_requested",
-      clientTurnId: "pending:turn_123",
-      prompt: "Reply with exactly PHASE_2_OK.",
-      attachments: [
-        {
-          type: "localImage",
-          path: "/root/.local/attachments/thread_123/screenshot.png",
-        },
-      ],
-    });
-
-    expect(state.activeTurnId).toBe("pending:turn_123");
-    expect(state.pendingTurnId).toBe("pending:turn_123");
-    expect(state.status).toBe("starting");
-    expect(state.entries).toEqual([
-      {
-        id: "user:pending:turn_123",
-        turnId: "pending:turn_123",
-        kind: "user-message",
-        text: "Reply with exactly PHASE_2_OK.",
-        attachments: [
-          {
-            kind: "image",
-            path: "/root/.local/attachments/thread_123/screenshot.png",
-            name: "screenshot.png",
-          },
-        ],
-        status: "completed",
-      },
-    ]);
-  });
-
-  it("reconciles the optimistic user message from the turn/start response", () => {
-    const requested = reduceCodexChatState(createInitialCodexChatState(), {
-      type: "start_turn_requested",
-      clientTurnId: "pending:turn_123",
-      prompt: "Reply with exactly PHASE_2_OK.",
-      attachments: [
-        {
-          type: "localImage",
-          path: "/root/.local/attachments/thread_123/screenshot.png",
-        },
-      ],
-    });
-
-    const state = reduceCodexChatState(requested, {
-      type: "turn_started_response",
-      clientTurnId: "pending:turn_123",
+      type: "turn_started",
       turnId: "turn_123",
       status: "inProgress",
+      prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/root/.local/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
     expect(state.activeTurnId).toBe("turn_123");
@@ -78,38 +58,63 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("removes the optimistic user message when turn start fails", () => {
-    const requested = reduceCodexChatState(createInitialCodexChatState(), {
-      type: "start_turn_requested",
-      clientTurnId: "pending:turn_123",
-      prompt: "Test prompt",
+  it("preserves existing turn data when the accepted turn already has streamed items", () => {
+    const bufferedDelta = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "item/agentMessage/delta",
+        params: {
+          turnId: "turn_123",
+          itemId: "msg_1",
+          delta: "streamed early",
+        },
+      },
     });
 
-    const failed = reduceCodexChatState(requested, {
-      type: "start_turn_failed",
-      clientTurnId: "pending:turn_123",
+    const state = reduceCodexChatState(bufferedDelta, {
+      type: "turn_started",
+      turnId: "turn_123",
+      status: "inProgress",
+      prompt: "Reply with exactly PHASE_2_OK.",
+      attachments: [
+        {
+          type: "localImage",
+          path: "/root/.local/attachments/thread_123/screenshot.png",
+        },
+      ],
     });
 
-    expect(failed.activeTurnId).toBeNull();
-    expect(failed.pendingTurnId).toBeNull();
-    expect(failed.status).toBeNull();
-    expect(failed.entries).toEqual([]);
+    expect(state.activeTurnId).toBe("turn_123");
+    expect(state.pendingTurnId).toBeNull();
+    expect(state.status).toBe("inProgress");
+    expect(state.entries).toEqual([
+      {
+        id: "user:turn_123",
+        turnId: "turn_123",
+        kind: "user-message",
+        text: "Reply with exactly PHASE_2_OK.",
+        attachments: [
+          {
+            kind: "image",
+            path: "/root/.local/attachments/thread_123/screenshot.png",
+            name: "screenshot.png",
+          },
+        ],
+        status: "completed",
+      },
+      {
+        id: "msg_1",
+        turnId: "turn_123",
+        kind: "assistant-message",
+        text: "streamed early",
+        phase: null,
+        status: "streaming",
+      },
+    ]);
   });
 
   it("shows steer as a transient user message and normalizes it after processing", () => {
-    const activeTurn = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const activeTurn = startTurn();
     const steering = reduceCodexChatState(activeTurn, {
       type: "steer_turn_requested",
       entryId: "steer_1",
@@ -162,19 +167,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("removes the steer delete action once the request is sending", () => {
-    const activeTurn = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const activeTurn = startTurn();
     const queued = reduceCodexChatState(activeTurn, {
       type: "steer_turn_requested",
       entryId: "steer_1",
@@ -211,36 +204,21 @@ describe("reduceCodexChatState", () => {
 
   describe("steer ordering projection", () => {
     it("keeps accepted steer entries between earlier and later assistant items", () => {
-      const completedBeforeSteer = reduceCodexChatState(
-        reduceCodexChatState(
-          reduceCodexChatState(createInitialCodexChatState(), {
-            type: "start_turn_requested",
-            clientTurnId: "pending:turn_123",
-            prompt: "Test prompt",
-          }),
-          {
-            type: "turn_started_response",
-            clientTurnId: "pending:turn_123",
+      const completedBeforeSteer = reduceCodexChatState(startTurn(), {
+        type: "notification_received",
+        notification: {
+          method: "item/completed",
+          params: {
             turnId: "turn_123",
-            status: "inProgress",
-          },
-        ),
-        {
-          type: "notification_received",
-          notification: {
-            method: "item/completed",
-            params: {
-              turnId: "turn_123",
-              item: {
-                type: "agentMessage",
-                id: "msg_before",
-                text: "First assistant chunk",
-                phase: "commentary",
-              },
+            item: {
+              type: "agentMessage",
+              id: "msg_before",
+              text: "First assistant chunk",
+              phase: "commentary",
             },
           },
         },
-      );
+      });
       const steering = reduceCodexChatState(completedBeforeSteer, {
         type: "steer_turn_requested",
         entryId: "steer_1",
@@ -303,32 +281,17 @@ describe("reduceCodexChatState", () => {
     });
 
     it("keeps accepted steers ahead of later deltas on the same assistant item", () => {
-      const streaming = reduceCodexChatState(
-        reduceCodexChatState(
-          reduceCodexChatState(createInitialCodexChatState(), {
-            type: "start_turn_requested",
-            clientTurnId: "pending:turn_123",
-            prompt: "Test prompt",
-          }),
-          {
-            type: "turn_started_response",
-            clientTurnId: "pending:turn_123",
+      const streaming = reduceCodexChatState(startTurn(), {
+        type: "notification_received",
+        notification: {
+          method: "item/agentMessage/delta",
+          params: {
             turnId: "turn_123",
-            status: "inProgress",
-          },
-        ),
-        {
-          type: "notification_received",
-          notification: {
-            method: "item/agentMessage/delta",
-            params: {
-              turnId: "turn_123",
-              itemId: "msg_1",
-              delta: "Before steer",
-            },
+            itemId: "msg_1",
+            delta: "Before steer",
           },
         },
-      );
+      });
       const steering = reduceCodexChatState(streaming, {
         type: "steer_turn_requested",
         entryId: "steer_1",
@@ -387,32 +350,17 @@ describe("reduceCodexChatState", () => {
     });
 
     it("falls back to the full assistant item when a completed payload rewrites streamed text after steer", () => {
-      const streaming = reduceCodexChatState(
-        reduceCodexChatState(
-          reduceCodexChatState(createInitialCodexChatState(), {
-            type: "start_turn_requested",
-            clientTurnId: "pending:turn_123",
-            prompt: "Test prompt",
-          }),
-          {
-            type: "turn_started_response",
-            clientTurnId: "pending:turn_123",
+      const streaming = reduceCodexChatState(startTurn(), {
+        type: "notification_received",
+        notification: {
+          method: "item/agentMessage/delta",
+          params: {
             turnId: "turn_123",
-            status: "inProgress",
-          },
-        ),
-        {
-          type: "notification_received",
-          notification: {
-            method: "item/agentMessage/delta",
-            params: {
-              turnId: "turn_123",
-              itemId: "msg_1",
-              delta: "Before steer",
-            },
+            itemId: "msg_1",
+            delta: "Before steer",
           },
         },
-      );
+      });
       const processed = reduceCodexChatState(
         reduceCodexChatState(streaming, {
           type: "steer_turn_requested",
@@ -470,19 +418,7 @@ describe("reduceCodexChatState", () => {
     });
 
     it("preserves steer request order when one steer anchors before assistant text and a later steer anchors after text", () => {
-      const activeTurn = reduceCodexChatState(
-        reduceCodexChatState(createInitialCodexChatState(), {
-          type: "start_turn_requested",
-          clientTurnId: "pending:turn_123",
-          prompt: "Test prompt",
-        }),
-        {
-          type: "turn_started_response",
-          clientTurnId: "pending:turn_123",
-          turnId: "turn_123",
-          status: "inProgress",
-        },
-      );
+      const activeTurn = startTurn();
 
       const startedAssistantItem = reduceCodexChatState(activeTurn, {
         type: "notification_received",
@@ -573,19 +509,7 @@ describe("reduceCodexChatState", () => {
     });
 
     it("keeps accepted steers behind later-normalized content from the same reasoning item", () => {
-      const activeTurn = reduceCodexChatState(
-        reduceCodexChatState(createInitialCodexChatState(), {
-          type: "start_turn_requested",
-          clientTurnId: "pending:turn_123",
-          prompt: "Test prompt",
-        }),
-        {
-          type: "turn_started_response",
-          clientTurnId: "pending:turn_123",
-          turnId: "turn_123",
-          status: "inProgress",
-        },
-      );
+      const activeTurn = startTurn();
 
       const reasoningSummary = reduceCodexChatState(
         reduceCodexChatState(activeTurn, {
@@ -691,19 +615,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("removes a transient steer message when steering fails", () => {
-    const activeTurn = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const activeTurn = startTurn();
     const steering = reduceCodexChatState(activeTurn, {
       type: "steer_turn_requested",
       entryId: "steer_1",
@@ -817,19 +729,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("accumulates assistant deltas for the active turn", () => {
-    const started = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const started = startTurn();
 
     const afterFirstDelta = reduceCodexChatState(started, {
       type: "notification_received",
@@ -874,19 +774,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("finalizes the assistant message from item/completed", () => {
-    const started = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const started = startTurn();
     const streaming = reduceCodexChatState(started, {
       type: "notification_received",
       notification: {
@@ -935,19 +823,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("captures completed command execution items", () => {
-    const started = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Run ls",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const started = startTurn(createInitialCodexChatState(), { prompt: "Run ls" });
 
     const completed = reduceCodexChatState(started, {
       type: "notification_received",
@@ -1405,19 +1281,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("updates completion status from turn/completed", () => {
-    const started = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const started = startTurn();
 
     const completed = reduceCodexChatState(started, {
       type: "notification_received",
@@ -1440,19 +1304,10 @@ describe("reduceCodexChatState", () => {
 
   it("preserves prior turns when a new turn starts", () => {
     const firstTurnCompleted = reduceCodexChatState(
-      reduceCodexChatState(
-        reduceCodexChatState(createInitialCodexChatState(), {
-          type: "start_turn_requested",
-          clientTurnId: "pending:turn_001",
-          prompt: "First prompt",
-        }),
-        {
-          type: "turn_started_response",
-          clientTurnId: "pending:turn_001",
-          turnId: "turn_001",
-          status: "inProgress",
-        },
-      ),
+      startTurn(createInitialCodexChatState(), {
+        turnId: "turn_001",
+        prompt: "First prompt",
+      }),
       {
         type: "notification_received",
         notification: {
@@ -1469,14 +1324,15 @@ describe("reduceCodexChatState", () => {
     );
 
     const secondTurnStarted = reduceCodexChatState(firstTurnCompleted, {
-      type: "start_turn_requested",
-      clientTurnId: "pending:turn_002",
+      type: "turn_started",
+      turnId: "turn_002",
+      status: "inProgress",
       prompt: "Second prompt",
     });
 
-    expect(secondTurnStarted.activeTurnId).toBe("pending:turn_002");
-    expect(secondTurnStarted.pendingTurnId).toBe("pending:turn_002");
-    expect(secondTurnStarted.status).toBe("starting");
+    expect(secondTurnStarted.activeTurnId).toBe("turn_002");
+    expect(secondTurnStarted.pendingTurnId).toBeNull();
+    expect(secondTurnStarted.status).toBe("inProgress");
     expect(secondTurnStarted.completedStatus).toBeNull();
     expect(secondTurnStarted.entries).toEqual([
       {
@@ -1487,8 +1343,8 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "user:pending:turn_002",
-        turnId: "pending:turn_002",
+        id: "user:turn_002",
+        turnId: "turn_002",
         kind: "user-message",
         text: "Second prompt",
         status: "completed",
@@ -1496,14 +1352,8 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("merges notifications that arrive before turn/start resolves into the real turn", () => {
-    const requested = reduceCodexChatState(createInitialCodexChatState(), {
-      type: "start_turn_requested",
-      clientTurnId: "pending:turn_123",
-      prompt: "Test prompt",
-    });
-
-    const bufferedDelta = reduceCodexChatState(requested, {
+  it("merges notifications that arrive before turn/start resolves into the accepted turn", () => {
+    const bufferedDelta = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
         method: "item/agentMessage/delta",
@@ -1517,13 +1367,6 @@ describe("reduceCodexChatState", () => {
 
     expect(bufferedDelta.entries).toEqual([
       {
-        id: "user:pending:turn_123",
-        turnId: "pending:turn_123",
-        kind: "user-message",
-        text: "Test prompt",
-        status: "completed",
-      },
-      {
         id: "msg_1",
         turnId: "turn_123",
         kind: "assistant-message",
@@ -1534,10 +1377,10 @@ describe("reduceCodexChatState", () => {
     ]);
 
     const started = reduceCodexChatState(bufferedDelta, {
-      type: "turn_started_response",
-      clientTurnId: "pending:turn_123",
+      type: "turn_started",
       turnId: "turn_123",
       status: "inProgress",
+      prompt: "Test prompt",
     });
 
     expect(started.entries).toEqual([
@@ -1560,19 +1403,7 @@ describe("reduceCodexChatState", () => {
   });
 
   it("records canonical notifications for other turns additively", () => {
-    const started = reduceCodexChatState(
-      reduceCodexChatState(createInitialCodexChatState(), {
-        type: "start_turn_requested",
-        clientTurnId: "pending:turn_123",
-        prompt: "Test prompt",
-      }),
-      {
-        type: "turn_started_response",
-        clientTurnId: "pending:turn_123",
-        turnId: "turn_123",
-        status: "inProgress",
-      },
-    );
+    const started = startTurn();
 
     const updated = reduceCodexChatState(started, {
       type: "notification_received",
@@ -1830,8 +1661,8 @@ describe("reduceCodexChatState", () => {
     expect(reconciled.completedStatus).toBe("completed");
   });
 
-  it("preserves local-only optimistic items after server-ordered thread/read items", () => {
-    const withOptimisticDelta = reduceCodexChatState(
+  it("preserves local-only streamed items after server-ordered thread/read items", () => {
+    const withLocalDelta = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
         type: "notification_received",
         notification: {
@@ -1857,7 +1688,7 @@ describe("reduceCodexChatState", () => {
       },
     );
 
-    const reconciled = reduceCodexChatState(withOptimisticDelta, {
+    const reconciled = reduceCodexChatState(withLocalDelta, {
       type: "hydrate_from_thread_read",
       turns: [
         {

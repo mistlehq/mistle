@@ -445,9 +445,7 @@ export function useSessionComposerState(input: {
         return;
       }
 
-      if (submitAction.shouldClearComposer) {
-        draftState.setComposerText("");
-      }
+      draftState.setComposerText("");
       draftState.clearPendingDiffComments();
       setComposerErrorMessage(null);
       setPendingComposerAttachments([]);
