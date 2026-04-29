@@ -70,6 +70,7 @@ type SandboxProfileEditorTestVersionState =
   | "draft-with-published"
   | "published"
   | "published-with-draft"
+  | "published-pending-with-active"
   | "published-manual-refresh-no-snapshot"
   | "published-no-snapshot"
   | "published-pending"
@@ -168,6 +169,22 @@ function createSandboxProfileVersionsForTest(input: {
           state: "draft",
         }),
       ];
+    case "published-pending-with-active":
+      return [
+        createVersion({
+          version: input.version - 1,
+          state: "published",
+          isActive: true,
+        }),
+        createVersion({
+          state: "published",
+          usable: false,
+          latestSnapshotJob: createRunningSnapshotJobFixture({
+            id: "ssj_pending_new_publish",
+            trigger: "publish",
+          }),
+        }),
+      ];
     case "published-manual-refresh-no-snapshot":
       return [
         createVersion({
@@ -232,6 +249,7 @@ function resolveSandboxProfileEditorTestRouteView(input: {
   switch (input.versionState) {
     case "published":
     case "published-with-draft":
+    case "published-pending-with-active":
     case "published-manual-refresh-no-snapshot":
     case "published-no-snapshot":
     case "published-pending":
@@ -258,6 +276,7 @@ function renderSandboxProfileEditor(input?: {
     config?: Record<string, unknown>;
   }[];
   setupScript?: string | null;
+  setupScriptsByVersion?: Record<number, string | null>;
   targets?: readonly {
     targetKey: string;
     displayName: string;
@@ -286,9 +305,11 @@ function renderSandboxProfileEditor(input?: {
   const activeVersion =
     input?.versionState === "published" || input?.versionState === "published-with-draft"
       ? version
-      : input?.versionState === "draft-with-published"
+      : input?.versionState === "published-pending-with-active"
         ? version - 1
-        : null;
+        : input?.versionState === "draft-with-published"
+          ? version - 1
+          : null;
   const resolvedVersionState = input?.versionState ?? "draft";
   const resolvedRouteView = resolveSandboxProfileEditorTestRouteView({
     versionState: resolvedVersionState,
@@ -348,18 +369,25 @@ function renderSandboxProfileEditor(input?: {
     connections: input?.connections ?? [],
     targets: input?.targets ?? [],
   });
-  queryClient.setQueryData(
-    sandboxProfileVersionSetupScriptQueryKey({
-      profileId,
-      version,
-    }),
-    {
-      sandboxProfileId: profileId,
-      version,
-      setupScript:
-        input?.setupScript === undefined ? "pnpm install\npnpm dev:bootstrap" : input.setupScript,
-    },
-  );
+  for (const versionFixture of versions) {
+    const versionSetupScript = input?.setupScriptsByVersion?.[versionFixture.version];
+    queryClient.setQueryData(
+      sandboxProfileVersionSetupScriptQueryKey({
+        profileId,
+        version: versionFixture.version,
+      }),
+      {
+        sandboxProfileId: profileId,
+        version: versionFixture.version,
+        setupScript:
+          versionSetupScript === undefined
+            ? input?.setupScript === undefined
+              ? "pnpm install\npnpm dev:bootstrap"
+              : input.setupScript
+            : versionSetupScript,
+      },
+    );
+  }
   const resolvedRouteSection =
     input?.routeSection === undefined ? "integrations" : input.routeSection;
   const sectionPath = resolvedRouteSection === null ? "" : `/${resolvedRouteSection}`;
@@ -723,6 +751,43 @@ describe("SandboxProfileEditorPage", () => {
         kind: "active",
         version: 1,
         activeVersion: null,
+        hasDraft: false,
+        draftVersion: null,
+      },
+    });
+  });
+
+  it("resolves the latest published version when an older active version still exists", () => {
+    const result = resolveSandboxProfileEditorVersionMode({
+      activeVersion: 1,
+      view: "published",
+      versions: [
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 1,
+          state: "published",
+          isActive: true,
+        }),
+        createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_test",
+          version: 2,
+          state: "published",
+          isActive: false,
+          usable: false,
+          latestSnapshotJob: createRunningSnapshotJobFixture({
+            id: "ssj_pending_new_publish",
+            trigger: "publish",
+          }),
+        }),
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      mode: {
+        kind: "active",
+        version: 2,
+        activeVersion: 1,
         hasDraft: false,
         draftVersion: null,
       },
@@ -1453,6 +1518,29 @@ describe("SandboxProfileEditorPage", () => {
     expect(configurationsPanel.textContent).toContain("For example, acme/web is available at");
     expect(configurationsPanel.textContent).toContain("Execution environment");
     expect(configurationsPanel.textContent).toContain("Package manager");
+  });
+
+  it("shows the latest published setup script when an older active version still exists", () => {
+    renderSandboxProfileEditor({
+      routeSection: "configurations",
+      versionState: "published-pending-with-active",
+      setupScriptsByVersion: {
+        2: null,
+        3: "pnpm install\npnpm test:setup",
+      },
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Configurations",
+      hidden: false,
+    });
+    const editor = within(configurationsPanel).getByRole("textbox", {
+      name: "Setup script",
+    });
+
+    expect(screen.getByText("Viewing: Published")).toBeDefined();
+    expect(editor.textContent).toContain("pnpm install");
+    expect(editor.textContent).toContain("pnpm test:setup");
   });
 
   it("shows selected repository locations in the setup script context", () => {

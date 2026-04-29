@@ -252,12 +252,12 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     };
   }
 
-  if (input.activeVersion !== null && activeVersion !== null) {
+  if (latestPublishedVersion !== null) {
     return {
       ok: true,
       mode: {
         kind: "active",
-        version: activeVersion.version,
+        version: latestPublishedVersion.version,
         activeVersion: input.activeVersion,
         hasDraft: draftVersion !== null,
         draftVersion: draftVersion?.version ?? null,
@@ -265,22 +265,9 @@ export function resolveSandboxProfileEditorVersionMode(input: {
     };
   }
 
-  if (latestPublishedVersion === null) {
-    return {
-      ok: false,
-      message: "Sandbox profile published version could not be loaded.",
-    };
-  }
-
   return {
-    ok: true,
-    mode: {
-      kind: "active",
-      version: latestPublishedVersion.version,
-      activeVersion: input.activeVersion,
-      hasDraft: draftVersion !== null,
-      draftVersion: draftVersion?.version ?? null,
-    },
+    ok: false,
+    message: "Sandbox profile published version could not be loaded.",
   };
 }
 
