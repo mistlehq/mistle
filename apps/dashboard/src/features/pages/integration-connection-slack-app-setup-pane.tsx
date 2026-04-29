@@ -267,6 +267,7 @@ function SlackManifestSetupPanel(input: {
       <IntegrationConnectionSetupManifestEditorSection
         description="Create a Slack app from a basic manifest. You can still change the settings later in Slack."
         editorId="slack-app-manifest-editor"
+        headingLevel="h3"
         manifestCallbackState={input.manifestCallbackState}
         manifestValidation={input.manifestValidation}
         manifestValue={input.manifestValue}

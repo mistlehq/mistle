@@ -120,7 +120,7 @@ describe("GitHubAppSetupPane", () => {
     });
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
-    expect(screen.getByText("GitHub App Manifest")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "GitHub App Manifest" })).toBeTruthy();
     expect(
       screen.getByText(
         "Create a GitHub App from a basic manifest. You can still change the settings later in GitHub.",

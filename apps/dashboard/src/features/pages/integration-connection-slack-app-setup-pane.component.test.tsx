@@ -114,7 +114,7 @@ describe("SlackAppSetupPane", () => {
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(screen.getByText("App configuration token")).toBeTruthy();
-    expect(screen.getByText("Slack app manifest")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 3, name: "Slack app manifest" })).toBeTruthy();
     expect(
       screen.getByText(
         "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",

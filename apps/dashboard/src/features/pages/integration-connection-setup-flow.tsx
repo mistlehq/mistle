@@ -90,15 +90,25 @@ export function IntegrationConnectionSetupWebhookCallbackValue(input: {
 export function IntegrationConnectionSetupManifestEditorSection(input: {
   description: string;
   editorId: string;
+  headingLevel?: "h2" | "h3";
   manifestCallbackState: ManifestWebhookCallbackState;
   manifestValidation: ManifestJsonValidation;
   manifestValue: string;
   onManifestChange: (value: string) => void;
   title: string;
 }): React.JSX.Element {
+  const titleClassName = "text-base font-medium";
+
   return (
     <div className="flex flex-col gap-2">
-      <SectionHeader description={input.description} title={input.title} />
+      <div className="flex flex-col gap-1">
+        {input.headingLevel === "h3" ? (
+          <h3 className={titleClassName}>{input.title}</h3>
+        ) : (
+          <h2 className={titleClassName}>{input.title}</h2>
+        )}
+        <p className="text-muted-foreground text-sm">{input.description}</p>
+      </div>
       <ManifestCallbackJsonEditor
         callbackState={input.manifestCallbackState}
         id={input.editorId}
