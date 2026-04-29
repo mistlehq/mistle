@@ -181,8 +181,7 @@ jobs:
 
   static-ts:
     name: TS Static
-    # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -249,8 +248,8 @@ jobs:
       - name: Run TS static checks in Nix shell
         run: >-
           nix develop --command bash -c
-          "pnpm exec oxfmt --check --threads=2 . &&
-          pnpm exec oxlint --type-aware --deny-warnings --threads=2 apps packages tests &&
+          "pnpm exec oxfmt --check --threads=4 . &&
+          pnpm exec oxlint --type-aware --deny-warnings --threads=4 apps packages tests &&
           pnpm lint:openapi &&
           pnpm lint:docs &&
           pnpm lint:sql &&
@@ -353,8 +352,7 @@ jobs:
 
   static-rust:
     name: Rust Static
-    # runs-on: blacksmith-2vcpu-ubuntu-2404
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
@@ -893,9 +891,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Setup Blacksmith Docker builder
+        uses: useblacksmith/setup-docker-builder@v1
+        with:
+          max-cache-size-mb: "20480"
+
       - name: Run Linux sandbox base packaging check
         run: |
-          docker build \
+          docker buildx build \
+            --load \
             --platform linux/amd64 \
             --target sandbox-base-tooling \
             --tag mistle-sandbox-base-tooling-check:local \
