@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+
+cd /app
+exec /usr/local/bin/mistle-control-plane-api-entrypoint

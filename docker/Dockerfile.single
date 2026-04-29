@@ -1,0 +1,118 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:25-alpine3.22 AS build-base
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+WORKDIR /app
+
+RUN npm install --global pnpm@10.30.2
+
+FROM build-base AS workspace-deps
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+
+FROM workspace-deps AS build
+ENV MISTLE_CONFIG_PATH=/app/config/config.sample.toml
+RUN pnpm --filter @mistle/control-plane-api... build && \
+  pnpm --filter @mistle/control-plane-worker... build && \
+  pnpm --filter @mistle/data-plane-api... build && \
+  pnpm --filter @mistle/data-plane-worker... build && \
+  pnpm --filter @mistle/data-plane-gateway... build && \
+  pnpm --filter @mistle/tokenizer-proxy... build && \
+  MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN=same-origin pnpm --filter @mistle/dashboard... build
+
+FROM alpine:3.22 AS commit-sign-build
+
+WORKDIR /build/packages/commit-sign
+
+RUN apk add --no-cache cargo rust build-base musl-dev
+
+COPY packages/commit-sign/Cargo.toml packages/commit-sign/Cargo.lock ./
+COPY packages/commit-sign/src ./src
+
+RUN cargo build --locked --release --bin commit-sign
+
+FROM build-base AS runtime-base
+
+ARG S6_OVERLAY_VERSION=3.2.2.0
+ARG TARGETARCH
+
+RUN apk add --no-cache nginx xz && \
+  set -eu; \
+  case "${TARGETARCH}" in \
+    amd64) s6_arch="x86_64" ;; \
+    arm64) s6_arch="aarch64" ;; \
+    *) echo "Unsupported TARGETARCH for runtime-base: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac; \
+  wget -O /tmp/s6-overlay-noarch.tar.xz \
+    "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz"; \
+  wget -O "/tmp/s6-overlay-${s6_arch}.tar.xz" \
+    "https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-${s6_arch}.tar.xz"; \
+  tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz; \
+  tar -C / -Jxpf "/tmp/s6-overlay-${s6_arch}.tar.xz"; \
+  rm -f /tmp/s6-overlay-noarch.tar.xz "/tmp/s6-overlay-${s6_arch}.tar.xz"
+
+FROM runtime-base AS base
+
+COPY --from=build /app /app
+COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
+COPY --from=commit-sign-build /build/packages/commit-sign/target/release/commit-sign /usr/local/bin/commit-sign
+
+COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
+COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-control-plane-worker-entrypoint
+COPY docker/apps/dashboard/entrypoint.sh /usr/local/bin/mistle-dashboard-entrypoint
+COPY docker/single/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
+COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
+COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
+COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
+COPY docker/single/bin/mistle-config /usr/local/bin/mistle-config
+COPY docker/single/cont-init.d/10-validate-runtime-artifacts /etc/cont-init.d/10-validate-runtime-artifacts
+COPY docker/single/cont-init.d/15-generate-runtime-config /etc/cont-init.d/15-generate-runtime-config
+COPY docker/single/services.d /etc/services.d
+
+RUN chmod +x \
+  /usr/local/bin/commit-sign \
+  /usr/local/bin/mistle-config \
+  /usr/local/bin/mistle-control-plane-api-entrypoint \
+  /usr/local/bin/mistle-control-plane-worker-entrypoint \
+  /usr/local/bin/mistle-dashboard-entrypoint \
+  /usr/local/bin/mistle-data-plane-api-entrypoint \
+  /usr/local/bin/mistle-data-plane-gateway-entrypoint \
+  /usr/local/bin/mistle-data-plane-worker-entrypoint \
+  /usr/local/bin/mistle-tokenizer-proxy-entrypoint \
+  /etc/cont-init.d/10-validate-runtime-artifacts \
+  /etc/cont-init.d/15-generate-runtime-config \
+  /etc/services.d/control-plane-api/run \
+  /etc/services.d/control-plane-worker/run \
+  /etc/services.d/dashboard/run \
+  /etc/services.d/data-plane-api/run \
+  /etc/services.d/data-plane-gateway/run \
+  /etc/services.d/data-plane-worker/run \
+  /etc/services.d/tokenizer-proxy/run
+
+EXPOSE 3000 5100 5202 5205
+
+FROM base AS remote-sandbox
+
+ENV MISTLE_PROFILE=remote-sandbox
+ENV MISTLE_CONFIG_PATH=/run/mistle/config.toml
+ENV MISTLE_GENERATED_CONFIG_PATH=/run/mistle/config.toml
+LABEL io.mistle.profile="remote-sandbox"
+
+ENTRYPOINT ["/init"]
+
+FROM base AS docker-sandbox
+
+ENV MISTLE_PROFILE=docker-sandbox
+ENV MISTLE_CONFIG_PATH=/run/mistle/config.toml
+ENV MISTLE_GENERATED_CONFIG_PATH=/run/mistle/config.toml
+LABEL io.mistle.profile="docker-sandbox"
+
+COPY docker/single/docker/cont-init.d/20-validate-docker-sandbox-runtime /etc/cont-init.d/20-validate-docker-sandbox-runtime
+
+RUN chmod +x /etc/cont-init.d/20-validate-docker-sandbox-runtime
+
+ENTRYPOINT ["/init"]

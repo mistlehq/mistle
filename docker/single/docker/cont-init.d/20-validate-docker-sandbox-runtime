@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+docker_socket_path="/var/run/docker.sock"
+
+if [ ! -S "${docker_socket_path}" ]; then
+  echo "Docker sandbox profile requires a mounted Docker socket at ${docker_socket_path}." >&2
+  exit 1
+fi

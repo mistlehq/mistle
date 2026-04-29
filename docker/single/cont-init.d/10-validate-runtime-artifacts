@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+
+require_path() {
+  required_path="$1"
+
+  if [ ! -e "${required_path}" ]; then
+    echo "Missing required single-container runtime artifact: ${required_path}" >&2
+    exit 1
+  fi
+}
+
+require_path "/app/apps/control-plane-api/dist/index.js"
+require_path "/app/apps/control-plane-worker/dist/openworkflow.config.js"
+require_path "/usr/share/nginx/html/index.html"
+require_path "/app/apps/data-plane-api/dist/index.js"
+require_path "/app/apps/data-plane-gateway/dist/index.js"
+require_path "/app/apps/data-plane-worker/dist/openworkflow.config.js"
+require_path "/app/apps/tokenizer-proxy/dist/index.js"
+require_path "/usr/local/bin/commit-sign"

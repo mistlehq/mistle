@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+config_path="${MISTLE_CONFIG_PATH:-/run/mistle/config.toml}"
+generated_config_path="${MISTLE_GENERATED_CONFIG_PATH:-/run/mistle/config.toml}"
+
+if [ "${config_path}" = "${generated_config_path}" ]; then
+  mistle-config generate --output "${config_path}"
+else
+  if [ ! -f "${config_path}" ]; then
+    echo "MISTLE_CONFIG_PATH points to a non-existent config file: ${config_path}" >&2
+    exit 1
+  fi
+fi
+
+mistle-config validate --config "${config_path}"
