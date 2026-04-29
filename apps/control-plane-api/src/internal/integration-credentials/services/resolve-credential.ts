@@ -4,6 +4,8 @@ import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   integrationCredentials,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
   type IntegrationBindingKind,
   type IntegrationTarget,
   type IntegrationCredentialSecretKind,
@@ -46,7 +48,7 @@ export type ResolveIntegrationCredentialInput = {
 export type ResolvedIntegrationCredential = IntegrationCredentialResolverResult;
 
 type ResolvePersistedCredentialInput = {
-  db: AppContext["var"]["db"];
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   organizationId: string;
   connectionId: string;
@@ -1197,7 +1199,7 @@ async function resolvePersistedCredential(
 
 export async function resolveIntegrationCredential(
   ctx: {
-    db: AppContext["var"]["db"];
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
     integrationRegistry: AppContext["var"]["integrationRegistry"];
     integrationsConfig: AppContext["var"]["config"]["integrations"];
   },

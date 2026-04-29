@@ -6,6 +6,7 @@ import {
   integrationWebhookSources,
   IntegrationWebhookSourceStatuses,
   type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
   type IntegrationWebhookSource,
 } from "@mistle/db/control-plane";
 import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
@@ -104,7 +105,7 @@ export function resolveConnectionConfigOrThrow(input: {
 }
 
 export async function resolveConnectionWithTargetOrThrow(input: {
-  db: ControlPlaneDatabase;
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
   organizationId: string;
   connectionId: string;
 }): Promise<ConnectionWithTarget> {
@@ -156,7 +157,7 @@ function resolveConnectionMethodIdOrThrow(input: {
 }
 
 export async function resolveConnectionSecretsOrThrow(input: {
-  db: ControlPlaneDatabase;
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
   integrationRegistry: IntegrationRegistry;
   connection: ConnectionWithTarget;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
