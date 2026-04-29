@@ -435,7 +435,7 @@ jobs:
           nix develop --command bash -c
           "pnpm --filter @mistle/sandboxd format:check &&
           pnpm --filter @mistle/commit-sign format:check &&
-          pnpm turbo run lint typecheck --output-logs=full --concurrency=1 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
+          pnpm turbo run lint typecheck --output-logs=full --concurrency=2 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
