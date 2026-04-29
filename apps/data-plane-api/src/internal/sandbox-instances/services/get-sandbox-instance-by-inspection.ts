@@ -71,6 +71,12 @@ type SandboxInstanceResponseMetadata = {
   updatedAt: string;
 };
 
+type SandboxInstanceWithRuntimePlan = {
+  failureCode: string | null;
+  failureMessage: string | null;
+  runtimePlan: PersistedRuntimePlan;
+} & SandboxInstanceResponseMetadata;
+
 function sandboxInstanceResponseBase(
   sandboxInstance: SandboxInstanceResponseMetadata,
 ): Pick<
@@ -110,6 +116,30 @@ function sandboxInstanceResponseBaseWithPersistedStatus(
     ...sandboxInstance,
     status: persistedStatus,
   });
+}
+
+function stoppedSandboxInstanceResponse(
+  sandboxInstance: SandboxInstanceWithRuntimePlan,
+  input: {
+    persistedStatus?: SandboxInstanceStatus;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+  } = {},
+): NonNullable<GetSandboxInstanceResponse> {
+  const base =
+    input.persistedStatus === undefined
+      ? sandboxInstanceResponseBase(sandboxInstance)
+      : sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, input.persistedStatus);
+
+  return {
+    ...base,
+    status: SandboxInstanceStatuses.STOPPED,
+    connectable: false,
+    failureCode: "failureCode" in input ? input.failureCode : sandboxInstance.failureCode,
+    failureMessage:
+      "failureMessage" in input ? input.failureMessage : sandboxInstance.failureMessage,
+    runtimePlan: sandboxInstance.runtimePlan,
+  };
 }
 
 async function markRunningSandboxInstanceStopped(
@@ -324,10 +354,7 @@ async function inspectStartingSandboxInstance(
   sandboxInstance: {
     persistenceMode: string;
     providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  } & SandboxInstanceResponseMetadata,
+  } & SandboxInstanceWithRuntimePlan,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (
     sandboxInstance.providerSandboxId === null &&
@@ -337,14 +364,11 @@ async function inspectStartingSandboxInstance(
       sandboxInstanceId: sandboxInstance.id,
       clearProviderSandboxId: true,
     });
-    return {
-      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
+    return stoppedSandboxInstanceResponse(sandboxInstance, {
+      persistedStatus,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    });
   }
 
   if (sandboxInstance.providerSandboxId === null) {
@@ -361,14 +385,11 @@ async function inspectStartingSandboxInstance(
         sandboxInstanceId: sandboxInstance.id,
         clearProviderSandboxId: true,
       });
-      return {
-        ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
+      return stoppedSandboxInstanceResponse(sandboxInstance, {
+        persistedStatus,
         failureCode: null,
         failureMessage: null,
-        runtimePlan: sandboxInstance.runtimePlan,
-      };
+      });
     }
 
     const persistedStatus = await markStartingSandboxInstanceFailed(ctx, {
@@ -416,14 +437,11 @@ async function inspectStartingSandboxInstance(
       sandboxInstanceId: sandboxInstance.id,
       clearProviderSandboxId: true,
     });
-    return {
-      ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
+    return stoppedSandboxInstanceResponse(sandboxInstance, {
+      persistedStatus,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    });
   }
 
   const persistedStatus = await markStartingSandboxInstanceFailed(ctx, {
@@ -464,34 +482,17 @@ async function inspectStoppedSandboxInstance(
   sandboxInstance: {
     persistenceMode: string;
     providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  } & SandboxInstanceResponseMetadata,
+  } & SandboxInstanceWithRuntimePlan,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.purpose === SandboxInstancePurposes.SETUP_CHECK) {
-    return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    return stoppedSandboxInstanceResponse(sandboxInstance);
   }
 
   if (
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
   ) {
-    return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    return stoppedSandboxInstanceResponse(sandboxInstance);
   }
 
   if (sandboxInstance.providerSandboxId === null) {
@@ -506,14 +507,7 @@ async function inspectStoppedSandboxInstance(
       await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
         sandboxInstanceId: sandboxInstance.id,
       });
-      return {
-        ...sandboxInstanceResponseBase(sandboxInstance),
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
-        failureCode: sandboxInstance.failureCode,
-        failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: sandboxInstance.runtimePlan,
-      };
+      return stoppedSandboxInstanceResponse(sandboxInstance);
     }
 
     const persistedStatus = await markStoppedSandboxInstanceFailed(ctx, {
@@ -535,28 +529,14 @@ async function inspectStoppedSandboxInstance(
     inspection.disposition === SandboxInspectDispositions.RESUMABLE_STOPPED ||
     inspection.disposition === SandboxInspectDispositions.ACTIVE
   ) {
-    return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    return stoppedSandboxInstanceResponse(sandboxInstance);
   }
 
   if (sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT) {
     await clearStoppedSandboxInstanceProviderSandboxId(ctx, {
       sandboxInstanceId: sandboxInstance.id,
     });
-    return {
-      ...sandboxInstanceResponseBase(sandboxInstance),
-      status: SandboxInstanceStatuses.STOPPED,
-      connectable: false,
-      failureCode: sandboxInstance.failureCode,
-      failureMessage: sandboxInstance.failureMessage,
-      runtimePlan: sandboxInstance.runtimePlan,
-    };
+    return stoppedSandboxInstanceResponse(sandboxInstance);
   }
 
   const persistedStatus = await markStoppedSandboxInstanceFailed(ctx, {
@@ -579,10 +559,7 @@ async function inspectRunningSandboxInstance(
   sandboxInstance: {
     persistenceMode: string;
     providerSandboxId: string | null;
-    failureCode: string | null;
-    failureMessage: string | null;
-    runtimePlan: PersistedRuntimePlan;
-  } & SandboxInstanceResponseMetadata,
+  } & SandboxInstanceWithRuntimePlan,
 ): Promise<NonNullable<GetSandboxInstanceResponse>> {
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
@@ -597,14 +574,7 @@ async function inspectRunningSandboxInstance(
         sandboxInstanceId: sandboxInstance.id,
         clearProviderSandboxId: true,
       });
-      return {
-        ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
-        status: SandboxInstanceStatuses.STOPPED,
-        connectable: false,
-        failureCode: sandboxInstance.failureCode,
-        failureMessage: sandboxInstance.failureMessage,
-        runtimePlan: sandboxInstance.runtimePlan,
-      };
+      return stoppedSandboxInstanceResponse(sandboxInstance, { persistedStatus });
     }
 
     const persistedStatus = await markRunningSandboxInstanceFailed(ctx, {
@@ -647,14 +617,7 @@ async function inspectRunningSandboxInstance(
     sandboxInstanceId: sandboxInstance.id,
   });
 
-  return {
-    ...sandboxInstanceResponseBaseWithPersistedStatus(sandboxInstance, persistedStatus),
-    status: SandboxInstanceStatuses.STOPPED,
-    connectable: false,
-    failureCode: sandboxInstance.failureCode,
-    failureMessage: sandboxInstance.failureMessage,
-    runtimePlan: sandboxInstance.runtimePlan,
-  };
+  return stoppedSandboxInstanceResponse(sandboxInstance, { persistedStatus });
 }
 
 async function inspectSandboxInstanceOrNull(

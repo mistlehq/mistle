@@ -13,7 +13,6 @@ import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const SetupCheckStatuses = {
   STARTING_SANDBOX: "starting_sandbox",
-  RUNNING: "running",
   CLEANING_UP: "cleaning_up",
   SUCCEEDED: "succeeded",
   FAILED: "failed",
@@ -23,10 +22,7 @@ const SetupCheckStatuses = {
 type SetupCheckStatus = (typeof SetupCheckStatuses)[keyof typeof SetupCheckStatuses];
 
 const SetupCheckFailurePhases = {
-  COMPILE: "compile",
   START: "start",
-  RUNTIME_READY: "runtime_ready",
-  SCRIPT: "script",
   CLEANUP: "cleanup",
 } as const;
 

@@ -22,7 +22,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
           sandboxInstanceId: params.id,
           stopReason: body.stopReason,
           idempotencyKey: body.idempotencyKey,
-          ...(body.expectedPurpose === undefined ? {} : { expectedPurpose: body.expectedPurpose }),
+          expectedPurpose: body.expectedPurpose,
         };
 
   const response = await stopSandboxInstance(
