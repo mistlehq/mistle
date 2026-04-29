@@ -4255,6 +4255,30 @@ fn handle_ports_transport_message(
     session_state: &mut TunnelSessionMutableState,
 ) -> Result<(), TunnelSessionError> {
     match message {
+        crate::tunnel::protocol::PortsTransportMessage::TcpOpen(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.tcp.open streamId {} is not implemented yet",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::TcpConnected(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.tcp.connected streamId {} must not be sent from the gateway to sandboxd",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::TcpClose(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.tcp.close streamId {} is not implemented yet",
+                message.stream_id
+            )));
+        }
+        crate::tunnel::protocol::PortsTransportMessage::TcpError(message) => {
+            return Err(TunnelSessionError::PortAccess(format!(
+                "ports.tcp.error streamId {} must not be sent from the gateway to sandboxd",
+                message.stream_id
+            )));
+        }
         crate::tunnel::protocol::PortsTransportMessage::HttpOpen(message) => {
             if port_access_stream_is_active(session_state, message.stream_id) {
                 return Err(TunnelSessionError::PortAccess(format!(

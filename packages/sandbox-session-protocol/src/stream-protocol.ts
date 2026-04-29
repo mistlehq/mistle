@@ -160,6 +160,31 @@ const PortsControlMessageSchema = z.union([
   PortsTargetAuthorizeResultSchema,
 ]);
 
+const PortsTcpOpenSchema = z.object({
+  type: z.literal("ports.tcp.open"),
+  streamId: PositiveIntegerSchema,
+  target: PortAccessTargetSchema,
+  upstreamProtocol: z.enum(["http", "https"]),
+});
+
+const PortsTcpConnectedSchema = z.object({
+  type: z.literal("ports.tcp.connected"),
+  streamId: PositiveIntegerSchema,
+});
+
+const PortsTcpCloseSchema = z.object({
+  type: z.literal("ports.tcp.close"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+});
+
+const PortsTcpErrorSchema = z.object({
+  type: z.literal("ports.tcp.error"),
+  streamId: PositiveIntegerSchema,
+  code: z.enum(["upstream_connect_failed", "upstream_handshake_failed", "upstream_io_error"]),
+  message: NonEmptyStringSchema,
+});
+
 const PortsHttpOpenSchema = z.object({
   type: z.literal("ports.http.open"),
   streamId: PositiveIntegerSchema,
@@ -246,6 +271,10 @@ const PortsStreamErrorSchema = z.object({
 });
 
 const PortsTransportMessageSchema = z.union([
+  PortsTcpOpenSchema,
+  PortsTcpConnectedSchema,
+  PortsTcpCloseSchema,
+  PortsTcpErrorSchema,
   PortsHttpOpenSchema,
   PortsHttpResponseStartSchema,
   PortsHttpBodyChunkSchema,
@@ -466,6 +495,10 @@ export type PortsTargetAuthorizeResult =
   | PortsTargetAuthorizeSuccessResult
   | PortsTargetAuthorizeFailureResult;
 export type PortsControlMessage = z.infer<typeof PortsControlMessageSchema>;
+export type PortsTcpOpen = z.infer<typeof PortsTcpOpenSchema>;
+export type PortsTcpConnected = z.infer<typeof PortsTcpConnectedSchema>;
+export type PortsTcpClose = z.infer<typeof PortsTcpCloseSchema>;
+export type PortsTcpError = z.infer<typeof PortsTcpErrorSchema>;
 export type PortsHttpOpen = z.infer<typeof PortsHttpOpenSchema>;
 export type PortsHttpResponseStart = z.infer<typeof PortsHttpResponseStartSchema>;
 export type PortsHttpBodyChunk = z.infer<typeof PortsHttpBodyChunkSchema>;

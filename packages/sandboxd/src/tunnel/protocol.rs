@@ -347,6 +347,47 @@ pub struct PortsTargetAuthorizeFailureResult {
 /// Repeated HTTP header values carried by `ports.http.*` messages.
 pub type RepeatedHeaderValues = BTreeMap<String, Vec<String>>;
 
+/// Inbound `ports.tcp.open` request from the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTcpOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub target: PortAccessTarget,
+    pub upstream_protocol: String,
+}
+
+/// Outbound `ports.tcp.connected` sent after the target connection is ready.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTcpConnected {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+}
+
+/// Directional TCP write close.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTcpClose {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub direction: String,
+}
+
+/// TCP stream error message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PortsTcpError {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub code: String,
+    pub message: String,
+}
+
 /// Inbound `ports.http.open` request from the gateway.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -489,6 +530,10 @@ pub enum PortsControlMessage {
 /// `ports.http.*` transport messages.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PortsTransportMessage {
+    TcpOpen(PortsTcpOpen),
+    TcpConnected(PortsTcpConnected),
+    TcpClose(PortsTcpClose),
+    TcpError(PortsTcpError),
     HttpOpen(PortsHttpOpen),
     HttpResponseStart(PortsHttpResponseStart),
     HttpBodyChunk(PortsHttpBodyChunk),
@@ -961,6 +1006,30 @@ pub fn parse_ports_transport_message(
     };
 
     match message_type {
+        "ports.tcp.open" => {
+            let message: PortsTcpOpen = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_tcp_open(&message)?;
+            Ok(Some(PortsTransportMessage::TcpOpen(message)))
+        }
+        "ports.tcp.connected" => {
+            let message: PortsTcpConnected = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_tcp_connected(&message)?;
+            Ok(Some(PortsTransportMessage::TcpConnected(message)))
+        }
+        "ports.tcp.close" => {
+            let message: PortsTcpClose = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_tcp_close(&message)?;
+            Ok(Some(PortsTransportMessage::TcpClose(message)))
+        }
+        "ports.tcp.error" => {
+            let message: PortsTcpError = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_ports_tcp_error(&message)?;
+            Ok(Some(PortsTransportMessage::TcpError(message)))
+        }
         "ports.http.open" => {
             let message: PortsHttpOpen = serde_json::from_value(parsed_payload)
                 .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
@@ -1579,6 +1648,85 @@ fn validate_repeated_header_values(
     Ok(())
 }
 
+fn validate_tcp_upstream_protocol(
+    message_type: &str,
+    upstream_protocol: &str,
+) -> Result<(), TunnelProtocolError> {
+    if upstream_protocol != "http" && upstream_protocol != "https" {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} upstreamProtocol must be 'http' or 'https', got '{upstream_protocol}'"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_ports_tcp_open(message: &PortsTcpOpen) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.tcp.open" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.open message type must be 'ports.tcp.open', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_port_access_target(&message.target)?;
+    validate_tcp_upstream_protocol("ports.tcp.open", &message.upstream_protocol)
+}
+
+fn validate_ports_tcp_connected(message: &PortsTcpConnected) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.tcp.connected" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.connected message type must be 'ports.tcp.connected', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)
+}
+
+fn validate_ports_tcp_close(message: &PortsTcpClose) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.tcp.close" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.close message type must be 'ports.tcp.close', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.direction != "request" && message.direction != "response" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.close direction must be 'request' or 'response', got '{}'",
+            message.direction
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_ports_tcp_error(message: &PortsTcpError) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "ports.tcp.error" {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.error message type must be 'ports.tcp.error', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.code != "upstream_connect_failed"
+        && message.code != "upstream_handshake_failed"
+        && message.code != "upstream_io_error"
+    {
+        return Err(TunnelProtocolError::new(format!(
+            "ports.tcp.error code is invalid: '{}'",
+            message.code
+        )));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "ports.tcp.error message is required",
+        ));
+    }
+
+    Ok(())
+}
+
 fn validate_ports_http_open(message: &PortsHttpOpen) -> Result<(), TunnelProtocolError> {
     if message.message_type != "ports.http.open" {
         return Err(TunnelProtocolError::new(format!(
@@ -1587,12 +1735,7 @@ fn validate_ports_http_open(message: &PortsHttpOpen) -> Result<(), TunnelProtoco
         )));
     }
     validate_port_access_target(&message.target)?;
-    if message.upstream_protocol != "http" && message.upstream_protocol != "https" {
-        return Err(TunnelProtocolError::new(format!(
-            "ports.http.open upstreamProtocol must be 'http' or 'https', got '{}'",
-            message.upstream_protocol
-        )));
-    }
+    validate_tcp_upstream_protocol("ports.http.open", &message.upstream_protocol)?;
     if message.request.method.trim().is_empty() {
         return Err(TunnelProtocolError::new(
             "ports.http.open request method is required",
@@ -1682,12 +1825,7 @@ fn validate_ports_ws_open(message: &PortsWsOpen) -> Result<(), TunnelProtocolErr
     }
     validate_port_access_target(&message.target)?;
     validate_stream_id(message.stream_id)?;
-    if message.upstream_protocol != "http" && message.upstream_protocol != "https" {
-        return Err(TunnelProtocolError::new(format!(
-            "ports.ws.open upstreamProtocol must be 'http' or 'https', got '{}'",
-            message.upstream_protocol
-        )));
-    }
+    validate_tcp_upstream_protocol("ports.ws.open", &message.upstream_protocol)?;
     if message.request.path.trim().is_empty() {
         return Err(TunnelProtocolError::new(
             "ports.ws.open request path is required",
@@ -2072,6 +2210,67 @@ mod tests {
             authorize,
             Some(crate::tunnel::protocol::PortsControlMessage::TargetAuthorize(_))
         ));
+    }
+
+    #[test]
+    fn parses_valid_ports_tcp_transport_messages() {
+        let tcp_open = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.open","streamId":61,"target":{"kind":"port","port":5173},"upstreamProtocol":"https"}"#,
+        )
+        .expect("ports.tcp.open should parse");
+        assert!(matches!(
+            tcp_open,
+            Some(crate::tunnel::protocol::PortsTransportMessage::TcpOpen(_))
+        ));
+
+        let connected =
+            parse_ports_transport_message(r#"{"type":"ports.tcp.connected","streamId":61}"#)
+                .expect("ports.tcp.connected should parse");
+        assert!(matches!(
+            connected,
+            Some(crate::tunnel::protocol::PortsTransportMessage::TcpConnected(_))
+        ));
+
+        let close = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.close","streamId":61,"direction":"request"}"#,
+        )
+        .expect("ports.tcp.close should parse");
+        assert!(matches!(
+            close,
+            Some(crate::tunnel::protocol::PortsTransportMessage::TcpClose(_))
+        ));
+
+        let error = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.error","streamId":61,"code":"upstream_connect_failed","message":"target refused connection"}"#,
+        )
+        .expect("ports.tcp.error should parse");
+        assert!(matches!(
+            error,
+            Some(crate::tunnel::protocol::PortsTransportMessage::TcpError(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_ports_tcp_transport_messages() {
+        let unsupported_protocol = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.open","streamId":61,"target":{"kind":"port","port":5173},"upstreamProtocol":"ftp"}"#,
+        );
+        assert!(
+            unsupported_protocol
+                .expect_err("unsupported protocol should fail validation")
+                .to_string()
+                .contains("ports.tcp.open upstreamProtocol must be 'http' or 'https'")
+        );
+
+        let invalid_direction = parse_ports_transport_message(
+            r#"{"type":"ports.tcp.close","streamId":61,"direction":"both"}"#,
+        );
+        assert!(
+            invalid_direction
+                .expect_err("invalid direction should fail validation")
+                .to_string()
+                .contains("ports.tcp.close direction must be 'request' or 'response'")
+        );
     }
 
     #[test]

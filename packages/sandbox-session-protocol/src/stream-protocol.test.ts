@@ -834,6 +834,98 @@ describe("ports control message parser", () => {
 });
 
 describe("ports transport message parser", () => {
+  it("parses ports.tcp lifecycle messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.open",
+          streamId: 61,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "https",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.tcp.open",
+      streamId: 61,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "https",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.connected",
+          streamId: 61,
+        }),
+      ),
+    ).toEqual({
+      type: "ports.tcp.connected",
+      streamId: 61,
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.close",
+          streamId: 61,
+          direction: "request",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.tcp.close",
+      streamId: 61,
+      direction: "request",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.error",
+          streamId: 61,
+          code: "upstream_connect_failed",
+          message: "target refused connection",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.tcp.error",
+      streamId: 61,
+      code: "upstream_connect_failed",
+      message: "target refused connection",
+    });
+  });
+
+  it("rejects malformed ports.tcp messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.open",
+          streamId: 61,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "ftp",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.tcp.close",
+          streamId: 61,
+          direction: "both",
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
   it("parses ports.http.open messages", () => {
     expect(
       parsePortsTransportMessage(
