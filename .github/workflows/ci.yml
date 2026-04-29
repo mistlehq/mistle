@@ -436,10 +436,9 @@ jobs:
       - name: Run Rust static checks in Nix shell
         run: >-
           nix develop --command bash -c
-          "cargo_jobs=\"$(nproc)\";
-          pnpm --filter @mistle/sandboxd format:check &&
+          "pnpm --filter @mistle/sandboxd format:check &&
           pnpm --filter @mistle/commit-sign format:check &&
-          CARGO_BUILD_JOBS=\"${cargo_jobs}\" pnpm turbo run lint typecheck --output-logs=full --concurrency=1 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
+          pnpm turbo run lint typecheck --output-logs=full --concurrency=1 --filter=@mistle/sandboxd --filter=@mistle/commit-sign"
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.static-rust-turbo-cache.outputs.cache-hit != 'true' }}
