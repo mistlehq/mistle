@@ -147,28 +147,7 @@ export const SteeringTurn: Story = {
   },
 };
 
-export const WithGitBranch: Story = {
-  args: {
-    composerText: "Summarize the current dashboard regression.",
-    gitBranchLabel: "feature/show-session-branch",
-  },
-};
-
-export const WithGitBranchAndPullRequest: Story = {
-  args: {
-    composerText: "Summarize the current dashboard regression.",
-    gitBranchLabel: "feature/show-session-branch",
-    pullRequest: {
-      isDraft: false,
-      number: 142,
-      state: "OPEN",
-      title: "Show pull request status in the composer",
-      url: "https://github.com/mistlehq/mistle/pull/142",
-    },
-  },
-};
-
-export const WithContextUsage: Story = {
+export const WithRepositoryStatusAndContextUsage: Story = {
   args: {
     composerText: "Summarize the remaining implementation risk.",
     contextUsage: {
