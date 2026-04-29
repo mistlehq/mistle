@@ -107,7 +107,12 @@ function assertCallbackRouteKeyMatchesSetupFlow(input: {
   invalidInputCode: ProviderAppSetupCompleteInvalidInputCode;
   routeSegment: string;
 }): void {
-  if (input.flow.callbackRouteKey === input.callbackRouteKey) {
+  const acceptedCallbackRouteKeys = [
+    input.flow.callbackRouteKey,
+    ...(input.flow.additionalCallbackRouteKeys ?? []),
+  ];
+
+  if (acceptedCallbackRouteKeys.includes(input.callbackRouteKey)) {
     return;
   }
 
@@ -481,6 +486,7 @@ export async function completeProviderAppSetup(
   let setupResult;
   try {
     setupResult = await flow.complete({
+      callbackRouteKey: input.callbackRouteKey,
       connection: {
         id: connection.id,
         status: connection.status,

@@ -871,6 +871,83 @@ describe("integration connections GitHub App integration", () => {
     expect(persistedWebhookSource.endpointKey).toBeTruthy();
   });
 
+  it("completes GitHub App installation when the manifest setup URL returns with manifest flow state", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
+      email: "integration-connections-github-app-manifest-setup-url-complete@example.com",
+      displayName: "GitHub Prod",
+    });
+
+    const startResponse = await fixture.request(
+      `/v1/integration/connections/${connectionId}/setup/github-app/start`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          manifest: {
+            name: "Mistle GitHub App",
+          },
+          owner: {
+            kind: "personal",
+          },
+        }),
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startResponseBody = await parseStartedProviderAppSetupFormPost(startResponse);
+    const state = resolveGitHubAppManifestSubmissionState(new URL(startResponseBody.submissionUrl));
+
+    const completeResponse = await fixture.request(
+      createGitHubAppInstallationCompletePath({
+        query: {
+          state,
+          installation_id: "12345",
+          setup_action: "install",
+        },
+      }),
+      {
+        method: "GET",
+        redirect: "manual",
+      },
+    );
+
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture, "github-cloud", {
+        connectionId,
+        connectionNotice: "installed",
+      }),
+    );
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.id, connectionId),
+        ),
+    });
+    expect(persistedConnection).toBeDefined();
+    if (persistedConnection === undefined) {
+      throw new Error("Expected persisted GitHub App connection.");
+    }
+
+    expect(persistedConnection.externalSubjectId).toBe("12345");
+    expect(persistedConnection.config).toEqual({
+      connection_method: "github-app-installation",
+      app_id: "123",
+      app_slug: "mistle-github-app",
+      client_id: "Iv1.client123",
+      installation_id: "12345",
+      setup_action: "install",
+    });
+  });
+
   it("returns 400 when GitHub App installation completion state is missing", async ({
     fixture,
   }) => {

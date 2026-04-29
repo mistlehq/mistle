@@ -269,7 +269,7 @@ export function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string):
 
 function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
+  return `/p/integration/callbacks/setup/github-app-installation?${searchParams.toString()}`;
 }
 
 export function buildSandboxSessionLinkUrl(input: {

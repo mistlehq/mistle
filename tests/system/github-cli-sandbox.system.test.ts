@@ -161,7 +161,7 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
 
 function createGitHubAppInstallationCompletePath(input: { query: Record<string, string> }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
+  return `/p/integration/callbacks/setup/github-app-installation?${searchParams.toString()}`;
 }
 
 function escapeRegex(input: string): string {

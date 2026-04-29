@@ -79,6 +79,7 @@ export function createGitHubProviderAppSetupCapability(
   return {
     flows: [
       {
+        additionalCallbackRouteKeys: ["github-app-installation"],
         callbackRouteKey: "github-app-manifest",
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         requiresWebhookCallbackUrl: true,
@@ -116,8 +117,13 @@ export function createGitHubProviderAppSetupCapability(
           };
         },
         async complete(input) {
-          const installationId = input.query.get("installation_id");
-          if (installationId !== null && installationId.length > 0) {
+          if (input.callbackRouteKey === "github-app-installation") {
+            const installationId = input.query.get("installation_id");
+            if (installationId === null || installationId.length === 0) {
+              throw new Error(
+                "GitHub App installation callback query must include `installation_id`.",
+              );
+            }
             const setupAction = input.query.get("setup_action");
             const parsedConfig = parseGitHubAppInstallationConnectionConfig(
               input.connection.config,
