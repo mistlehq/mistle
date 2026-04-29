@@ -303,9 +303,9 @@ describe("IntegrationsPage resource refresh concurrency", () => {
             JSON.stringify({
               items: [
                 {
-                  id: "icn_bound",
+                  id: "icn_inactive_binding",
                   targetKey: "github",
-                  displayName: "Bound GitHub",
+                  displayName: "Inactive Binding GitHub",
                   status: "active",
                   bindingCount: 0,
                   config: {
@@ -342,13 +342,19 @@ describe("IntegrationsPage resource refresh concurrency", () => {
         if (
           request.method === "DELETE" &&
           (requestUrl.pathname === "/v1/integration/connections/icn_free" ||
-            requestUrl.pathname === "/v1/integration/connections/icn_bound")
+            requestUrl.pathname === "/v1/integration/connections/icn_inactive_binding")
         ) {
+          const connectionId = requestUrl.pathname.split("/").at(-1);
+          if (connectionId === undefined) {
+            throw new Error(
+              `Delete request path '${requestUrl.pathname}' is missing connection id.`,
+            );
+          }
           deleteRequests.push(`${requestUrl.pathname}${requestUrl.search}`);
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
-              connectionId: requestUrl.pathname.endsWith("icn_bound") ? "icn_bound" : "icn_free",
+              connectionId,
             }),
           );
           return;
@@ -362,13 +368,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
     try {
       fireEvent.click(
-        await screen.findByRole("button", { name: "Delete connection Bound GitHub" }),
+        await screen.findByRole("button", { name: "Delete connection Inactive Binding GitHub" }),
       );
       expect(await screen.findByText("Delete integration connection")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Delete connection" }));
 
       await waitFor(() => {
-        expect(deleteRequests).toContain("/v1/integration/connections/icn_bound");
+        expect(deleteRequests).toContain("/v1/integration/connections/icn_inactive_binding");
       });
       await waitFor(() => {
         expect(screen.queryByText("Delete integration connection")).toBeNull();

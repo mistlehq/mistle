@@ -983,7 +983,7 @@ describe("IntegrationConnectionDetailView", () => {
       <IntegrationConnectionDetailView
         connections={[
           {
-            id: "icn_bound",
+            id: "icn_primary",
             bindingCount: 0,
             canDelete: true,
             displayName: "Primary connection",
@@ -1014,7 +1014,7 @@ describe("IntegrationConnectionDetailView", () => {
     });
     expect(primaryDeleteButton).not.toHaveProperty("disabled", true);
     fireEvent.click(primaryDeleteButton);
-    expect(deletedConnectionId).toBe("icn_bound");
+    expect(deletedConnectionId).toBe("icn_primary");
     deletedConnectionId = null;
 
     fireEvent.click(screen.getByRole("button", { name: "Select connection Free connection" }));
