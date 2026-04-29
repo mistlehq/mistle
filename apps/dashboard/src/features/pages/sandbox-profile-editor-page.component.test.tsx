@@ -890,6 +890,35 @@ describe("SandboxProfileEditorPage", () => {
     ).toBe("Enter a valid cron expression and timezone to preview the schedule.");
   });
 
+  it("shows schedule validation errors in the snapshot schedule section", async () => {
+    renderSandboxProfileEditor({
+      routeSection: "snapshot",
+      versionState: "published",
+    });
+
+    fireEvent.change(screen.getByLabelText("Cron expression"), { target: { value: "   " } });
+    fireEvent.change(screen.getByLabelText("Timezone"), { target: { value: "Asia/Singapore" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Schedule update failed")).toBeDefined();
+    });
+    expect(screen.getByText("Enter a cron expression and timezone.")).toBeDefined();
+  });
+
+  it("does not expose snapshot refresh scheduling on draft views", () => {
+    renderSandboxProfileEditor({
+      routeSection: "integrations",
+      versionState: "draft",
+    });
+
+    expect(screen.getByRole("tab", { name: "Snapshot" }).getAttribute("aria-disabled")).toBe(
+      "true",
+    );
+    expect(screen.queryByText("Automatic refresh")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+  });
+
   it("does not show a refresh snapshot action in the published version menu", () => {
     renderPublishedWithDraftActionsHarness();
 

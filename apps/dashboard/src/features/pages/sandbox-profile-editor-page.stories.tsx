@@ -1,5 +1,17 @@
 import { systemScheduler, type TimerHandle } from "@mistle/time";
-import { Button, DefinitionList, Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
+import {
+  Button,
+  ButtonGroup,
+  DefinitionList,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
+  Input,
+  Notice,
+  NoticeAutoHideDurationsMs,
+} from "@mistle/ui";
 import { WarningCircleIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -34,6 +46,7 @@ import type {
   SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import {
+  resolveSnapshotRefreshScheduleBehaviorDescription,
   SandboxProfileIntegrationsSetupUnavailableState,
   SandboxProfileEditorView,
   SandboxProfileSetupScriptPanel,
@@ -57,6 +70,7 @@ type SandboxProfileEditorPageStoryArgs = {
     | "snapshot-ready"
     | "snapshot-failed"
     | "refresh-failed";
+  snapshotRefreshScheduleState?: "none" | "existing" | "invalid-preview" | "save-failure";
   integrationsSectionState?: {
     bindingsErrorMessage?: string;
     directoryErrorMessage?: string;
@@ -192,6 +206,9 @@ const StoryBindings = [
 ] as const;
 
 type SnapshotStoryStatus = NonNullable<SandboxProfileEditorPageStoryArgs["snapshotState"]>;
+type SnapshotRefreshScheduleStoryState = NonNullable<
+  SandboxProfileEditorPageStoryArgs["snapshotRefreshScheduleState"]
+>;
 
 type SnapshotStoryState = {
   activityLabel: string | null;
@@ -275,6 +292,7 @@ function resolveSnapshotStoryStatus(input: {
 
 function SandboxProfileSnapshotStoryPanel(input: {
   publishSuccessMessage: boolean;
+  refreshScheduleState: SnapshotRefreshScheduleStoryState;
   status: SnapshotStoryStatus;
 }): React.JSX.Element {
   const state = SnapshotStoryStates[input.status];
@@ -327,7 +345,125 @@ function SandboxProfileSnapshotStoryPanel(input: {
           ]}
         />
       )}
+
+      {input.status === "draft-unavailable" ? null : (
+        <SandboxProfileSnapshotRefreshScheduleStorySection state={input.refreshScheduleState} />
+      )}
     </div>
+  );
+}
+
+function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
+  state: SnapshotRefreshScheduleStoryState;
+}): React.JSX.Element {
+  const existingSchedule =
+    input.state === "existing"
+      ? {
+          cronExpression: "0 9 * * 1",
+          nextScheduledAt: "2026-05-04T01:00:00.000Z",
+          timezone: "Asia/Singapore",
+        }
+      : null;
+  const [cronExpression, setCronExpression] = useState(
+    input.state === "invalid-preview"
+      ? "*/15 9 * * *"
+      : (existingSchedule?.cronExpression ?? "0 9 * * *"),
+  );
+  const [timezone, setTimezone] = useState(existingSchedule?.timezone ?? "Asia/Singapore");
+  const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
+    after: new Date("2026-04-29T00:00:00.000Z"),
+    cronExpression,
+    timezone,
+  });
+
+  return (
+    <form
+      className="space-y-4 border-t pt-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+      }}
+    >
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold leading-6">Automatic refresh</h2>
+        <p className="text-sm text-muted-foreground">
+          {existingSchedule === null
+            ? "Automatic snapshot refresh is not configured."
+            : "Automatic snapshot refresh is configured for this published version."}
+        </p>
+      </div>
+
+      {input.state === "save-failure" ? (
+        <Notice title="Schedule update failed" variant="alert">
+          Could not save snapshot refresh schedule.
+        </Notice>
+      ) : null}
+
+      {existingSchedule === null ? null : (
+        <DefinitionList
+          items={[
+            {
+              id: "snapshot-refresh-cron",
+              label: "Cron",
+              value: existingSchedule.cronExpression,
+            },
+            {
+              id: "snapshot-refresh-timezone",
+              label: "Timezone",
+              value: existingSchedule.timezone,
+            },
+            {
+              id: "snapshot-refresh-next",
+              label: "Next refresh",
+              value: existingSchedule.nextScheduledAt,
+            },
+          ]}
+        />
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="storybook-snapshot-refresh-cron">Cron expression</FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Input
+              id="storybook-snapshot-refresh-cron"
+              onChange={(event) => {
+                setCronExpression(event.target.value);
+              }}
+              value={cronExpression}
+            />
+            <FieldDescription>Use raw cron syntax for the refresh cadence.</FieldDescription>
+          </FieldContent>
+        </Field>
+        <Field>
+          <FieldHeader>
+            <FieldLabel htmlFor="storybook-snapshot-refresh-timezone">Timezone</FieldLabel>
+          </FieldHeader>
+          <FieldContent>
+            <Input
+              id="storybook-snapshot-refresh-timezone"
+              onChange={(event) => {
+                setTimezone(event.target.value);
+              }}
+              value={timezone}
+            />
+            <FieldDescription>Use an IANA timezone name.</FieldDescription>
+          </FieldContent>
+        </Field>
+      </div>
+
+      <p className="text-sm text-muted-foreground">{scheduleBehaviorDescription}</p>
+
+      <ButtonGroup>
+        <Button type="submit">Save schedule</Button>
+        {existingSchedule === null ? null : (
+          <Button type="button" variant="outline">
+            Remove schedule
+          </Button>
+        )}
+      </ButtonGroup>
+    </form>
   );
 }
 
@@ -565,6 +701,7 @@ function SandboxProfileEditorPageStoryView(
             return (
               <SandboxProfileSnapshotStoryPanel
                 publishSuccessMessage={input.publishSuccessMessage === true}
+                refreshScheduleState={input.snapshotRefreshScheduleState ?? "none"}
                 status={snapshotStatus}
               />
             );
@@ -662,6 +799,42 @@ export const SnapshotReady: Story = {
   args: {
     initialSectionId: "snapshot",
     lifecycleState: "published",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const SnapshotRefreshScheduleNotConfigured: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotRefreshScheduleState: "none",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const SnapshotRefreshScheduleExisting: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotRefreshScheduleState: "existing",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const SnapshotRefreshScheduleInvalidPreview: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotRefreshScheduleState: "invalid-preview",
+    snapshotState: "snapshot-ready",
+  },
+};
+
+export const SnapshotRefreshScheduleSaveFailure: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "published",
+    snapshotRefreshScheduleState: "save-failure",
     snapshotState: "snapshot-ready",
   },
 };
