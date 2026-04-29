@@ -1,7 +1,7 @@
 import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../types.js";
-import type { ClientStreamBinding } from "./sandbox-tunnel-session.js";
+import type { ClientStreamBinding, ReservedTunnelStream } from "./sandbox-tunnel-session.js";
 
 /**
  * Describes the observable effects of attaching a bootstrap session for a sandbox.
@@ -39,6 +39,11 @@ export interface TunnelSessionRegistryAdapter {
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding;
+  reserveTunnelStream(input: { sandboxInstanceId: string }): ReservedTunnelStream;
+  releaseReservedTunnelStream(input: {
+    sandboxInstanceId: string;
+    tunnelStreamId: number;
+  }): boolean;
   getBindingByClientStream(input: {
     sandboxInstanceId: string;
     clientSessionId: string;

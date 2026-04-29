@@ -1,7 +1,7 @@
 import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../types.js";
-import type { ClientStreamBinding } from "./sandbox-tunnel-session.js";
+import type { ClientStreamBinding, ReservedTunnelStream } from "./sandbox-tunnel-session.js";
 import type {
   AttachBootstrapSessionResult,
   DetachBootstrapSessionResult,
@@ -49,6 +49,24 @@ export class TunnelSessionRegistry {
     clientStreamId: number;
   }): ClientStreamBinding {
     return this.adapter.bindClientStream(input);
+  }
+
+  /**
+   * Reserves a tunnel stream id for non-interactive traffic that still shares
+   * the bootstrap session stream id namespace.
+   */
+  public reserveTunnelStream(input: { sandboxInstanceId: string }): ReservedTunnelStream {
+    return this.adapter.reserveTunnelStream(input);
+  }
+
+  /**
+   * Releases a previously reserved non-interactive tunnel stream id.
+   */
+  public releaseReservedTunnelStream(input: {
+    sandboxInstanceId: string;
+    tunnelStreamId: number;
+  }): boolean {
+    return this.adapter.releaseReservedTunnelStream(input);
   }
 
   /**

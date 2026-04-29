@@ -231,10 +231,12 @@ async function createTranslatorHarness() {
   );
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
   const portsTargetAuthorizeService = new PortsTargetAuthorizeService(relayCoordinator, scheduler);
-  const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
+  const portAccessTransportService = new PortAccessTransportService(relayCoordinator, registry);
 
   return {
+    portAccessTransportService,
     relayCoordinator,
+    registry,
     router,
     translator: new TunnelProtocolTranslator(
       router,

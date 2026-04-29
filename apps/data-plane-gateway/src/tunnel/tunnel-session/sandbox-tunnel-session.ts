@@ -9,6 +9,10 @@ export type ClientStreamBinding = {
   tunnelStreamId: number;
 };
 
+export type ReservedTunnelStream = {
+  tunnelStreamId: number;
+};
+
 function toClientBindingKey(input: { clientSessionId: string; clientStreamId: number }): string {
   return `${input.clientSessionId}:${String(input.clientStreamId)}`;
 }
@@ -25,6 +29,7 @@ export class SandboxTunnelSession {
   readonly #bindingsByClientKey = new Map<string, ClientStreamBinding>();
   readonly #bindingsByTunnelStreamId = new Map<number, ClientStreamBinding>();
   readonly #bindingCountsByClientSessionId = new Map<string, number>();
+  readonly #reservedTunnelStreamIds = new Set<number>();
   #nextTunnelStreamId = 1;
 
   /**
@@ -80,6 +85,19 @@ export class SandboxTunnelSession {
     return binding;
   }
 
+  public reserveTunnelStream(): ReservedTunnelStream {
+    const tunnelStreamId = this.allocateTunnelStreamId();
+    this.#reservedTunnelStreamIds.add(tunnelStreamId);
+
+    return {
+      tunnelStreamId,
+    };
+  }
+
+  public releaseReservedTunnelStream(tunnelStreamId: number): boolean {
+    return this.#reservedTunnelStreamIds.delete(tunnelStreamId);
+  }
+
   public getBindingByClientStream(input: {
     clientSessionId: string;
     clientStreamId: number;
@@ -118,6 +136,7 @@ export class SandboxTunnelSession {
     this.#bindingsByClientKey.clear();
     this.#bindingsByTunnelStreamId.clear();
     this.#bindingCountsByClientSessionId.clear();
+    this.#reservedTunnelStreamIds.clear();
     return bindings;
   }
 
@@ -156,6 +175,13 @@ export class SandboxTunnelSession {
   }
 
   private allocateTunnelStreamId(): number {
+    while (
+      this.#bindingsByTunnelStreamId.has(this.#nextTunnelStreamId) ||
+      this.#reservedTunnelStreamIds.has(this.#nextTunnelStreamId)
+    ) {
+      this.#nextTunnelStreamId += 1;
+    }
+
     const tunnelStreamId = this.#nextTunnelStreamId;
     this.#nextTunnelStreamId += 1;
     return tunnelStreamId;

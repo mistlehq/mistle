@@ -773,6 +773,21 @@ export class TunnelProtocolTranslator {
       });
     }
 
+    if (
+      controlMessage.type === "stream.window" &&
+      this.portAccessTransportService.handleBootstrapStreamWindow({
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourceBootstrapSessionId: input.clientSessionId,
+        message: controlMessage,
+      })
+    ) {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+      });
+    }
+
     const route = await this.interactiveStreamRouter.findInteractiveStreamByTunnel({
       sandboxInstanceId: input.sandboxInstanceId,
       tunnelStreamId: controlMessage.streamId,
@@ -879,6 +894,20 @@ export class TunnelProtocolTranslator {
       throw new TunnelProtocolViolationError(
         createUnsupportedBinaryPayloadErrorMessage("bootstrap"),
       );
+    }
+
+    if (
+      await this.portAccessTransportService.handleBootstrapDataFrame({
+        payload: input.payload,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourceBootstrapSessionId: input.clientSessionId,
+      })
+    ) {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+      });
     }
 
     const route = await this.interactiveStreamRouter.findInteractiveStreamByTunnel({

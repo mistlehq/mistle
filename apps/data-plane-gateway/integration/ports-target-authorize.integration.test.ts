@@ -256,7 +256,7 @@ async function createTranslator(input: {
   return new TunnelProtocolTranslator(
     router,
     input.portsTargetAuthorizeService,
-    new PortAccessTransportService(relayCoordinator),
+    new PortAccessTransportService(relayCoordinator, registry),
   );
 }
 

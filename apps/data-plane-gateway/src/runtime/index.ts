@@ -169,7 +169,14 @@ export function createDataPlaneGatewayRuntime(
     relayCoordinator,
     systemScheduler,
   );
-  const portAccessTransportService = new PortAccessTransportService(relayCoordinator);
+  const portAccessTransportService = new PortAccessTransportService(
+    relayCoordinator,
+    tunnelSessionRegistry,
+    {
+      clock: systemClock,
+      scheduler: systemScheduler,
+    },
+  );
   const sandboxSigningRequestService = new SandboxSigningRequestService({
     bootstrapTokenSecret: config.app.sandbox.bootstrap.tokenSecret,
     tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,

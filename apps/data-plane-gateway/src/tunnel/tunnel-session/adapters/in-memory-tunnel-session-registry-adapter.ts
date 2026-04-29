@@ -1,7 +1,11 @@
 import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../../types.js";
-import { SandboxTunnelSession, type ClientStreamBinding } from "../sandbox-tunnel-session.js";
+import {
+  SandboxTunnelSession,
+  type ClientStreamBinding,
+  type ReservedTunnelStream,
+} from "../sandbox-tunnel-session.js";
 import type {
   AttachBootstrapSessionResult,
   DetachBootstrapSessionResult,
@@ -79,6 +83,29 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
       clientSessionId: input.clientSessionId,
       clientStreamId: input.clientStreamId,
     });
+  }
+
+  public reserveTunnelStream(input: { sandboxInstanceId: string }): ReservedTunnelStream {
+    const session = this.#sessionsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (session === undefined) {
+      throw new Error(
+        `Bootstrap tunnel session is not registered for sandbox '${input.sandboxInstanceId}'.`,
+      );
+    }
+
+    return session.reserveTunnelStream();
+  }
+
+  public releaseReservedTunnelStream(input: {
+    sandboxInstanceId: string;
+    tunnelStreamId: number;
+  }): boolean {
+    const session = this.#sessionsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (session === undefined) {
+      return false;
+    }
+
+    return session.releaseReservedTunnelStream(input.tunnelStreamId);
   }
 
   public getBindingByClientStream(input: {
