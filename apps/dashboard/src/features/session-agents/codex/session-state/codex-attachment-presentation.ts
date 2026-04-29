@@ -3,23 +3,14 @@ import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definiti
 export const AttachedImagesHeader = "Attached images:";
 export const AttachedFilesHeader = "Attached files:";
 
-export type UploadedComposerAttachment =
-  | {
-      attachmentId: string;
-      kind: "image";
-      originalFilename: string;
-      mimeType: string;
-      sizeBytes: number;
-      path: string;
-    }
-  | {
-      attachmentId: string;
-      kind: "file";
-      originalFilename: string;
-      mimeType: string;
-      sizeBytes: number;
-      path: string;
-    };
+export type UploadedComposerAttachment = {
+  attachmentId: string;
+  kind: "image" | "file";
+  originalFilename: string;
+  mimeType: string;
+  sizeBytes: number;
+  path: string;
+};
 
 type AttachmentPromptParts = {
   imageAttachments: readonly Pick<UploadedComposerAttachment, "path">[];
@@ -175,28 +166,18 @@ export function resolveMixedAttachmentTurnRepresentation(input: {
   };
 }
 
-function toImagePathAttachments(paths: readonly string[]): readonly UploadedComposerAttachment[] {
-  return paths.map(
-    (path): UploadedComposerAttachment => ({
-      attachmentId: path,
-      kind: "image",
-      originalFilename: path,
-      mimeType: "image/*",
-      sizeBytes: 0,
-      path,
-    }),
-  );
-}
-
 export function buildTurnPrompt(input: {
   prompt: string;
   attachmentPaths: readonly string[];
   supportsImageInspection: boolean;
 }): string {
-  return buildMixedAttachmentTurnPrompt({
+  if (input.supportsImageInspection) {
+    return input.prompt.trim();
+  }
+
+  return buildPromptWithAttachedImagePaths({
     prompt: input.prompt,
-    uploadedAttachments: toImagePathAttachments(input.attachmentPaths),
-    supportsImageInspection: input.supportsImageInspection,
+    attachmentPaths: input.attachmentPaths,
   });
 }
 
