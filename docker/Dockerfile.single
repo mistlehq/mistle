@@ -14,7 +14,6 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 
 FROM workspace-deps AS build
-ENV MISTLE_CONFIG_PATH=/app/config/config.sample.toml
 RUN pnpm --filter @mistle/control-plane-api... build && \
   pnpm --filter @mistle/control-plane-worker... build && \
   pnpm --filter @mistle/data-plane-api... build && \
@@ -22,6 +21,37 @@ RUN pnpm --filter @mistle/control-plane-api... build && \
   pnpm --filter @mistle/data-plane-gateway... build && \
   pnpm --filter @mistle/tokenizer-proxy... build && \
   MISTLE_SERVICES_DASHBOARD_CONTROL_PLANE_API_ORIGIN=same-origin pnpm --filter @mistle/dashboard... build
+
+FROM build AS runtime-workspace
+
+RUN CI=true pnpm prune --prod && \
+  set -eu; \
+  mkdir -p /runtime/apps /runtime/packages /runtime/config; \
+  cp package.json pnpm-lock.yaml pnpm-workspace.yaml VERSION /runtime/; \
+  cp config/sandbox-base-images.json /runtime/config/sandbox-base-images.json; \
+  cp integration-targets.json /runtime/integration-targets.json; \
+  cp -a node_modules /runtime/node_modules; \
+  for app in \
+    control-plane-api \
+    control-plane-worker \
+    data-plane-api \
+    data-plane-worker \
+    data-plane-gateway \
+    tokenizer-proxy; do \
+    mkdir -p "/runtime/apps/${app}"; \
+    cp "apps/${app}/package.json" "/runtime/apps/${app}/package.json"; \
+    cp -a "apps/${app}/dist" "/runtime/apps/${app}/dist"; \
+    cp -a "apps/${app}/node_modules" "/runtime/apps/${app}/node_modules"; \
+  done; \
+  for package_json in packages/*/package.json; do \
+    package_name="$(basename "$(dirname "${package_json}")")"; \
+    if [ -d "packages/${package_name}/dist" ]; then \
+      mkdir -p "/runtime/packages/${package_name}"; \
+      cp "${package_json}" "/runtime/packages/${package_name}/package.json"; \
+      cp -a "packages/${package_name}/dist" "/runtime/packages/${package_name}/dist"; \
+    fi; \
+  done; \
+  cp -a packages/db/migrations /runtime/packages/db/migrations
 
 FROM alpine:3.22 AS commit-sign-build
 
@@ -56,14 +86,17 @@ RUN apk add --no-cache nginx xz && \
 
 FROM runtime-base AS base
 
-COPY --from=build /app /app
+ENV S6_KEEP_ENV=1
+ENV MISTLE_INTEGRATION_TARGETS_MANIFEST_PATH=/app/integration-targets.json
+
+COPY --from=runtime-workspace /runtime /app
 COPY --from=build /app/apps/dashboard/dist /usr/share/nginx/html
 COPY --from=commit-sign-build /build/packages/commit-sign/target/release/commit-sign /usr/local/bin/commit-sign
 
 COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
 COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-control-plane-worker-entrypoint
 COPY docker/apps/dashboard/entrypoint.sh /usr/local/bin/mistle-dashboard-entrypoint
-COPY docker/single/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/single/nginx.conf /etc/nginx/http.d/default.conf
 COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
 COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
 COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
@@ -71,6 +104,8 @@ COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-p
 COPY docker/single/bin/mistle-config /usr/local/bin/mistle-config
 COPY docker/single/cont-init.d/10-validate-runtime-artifacts /etc/cont-init.d/10-validate-runtime-artifacts
 COPY docker/single/cont-init.d/15-generate-runtime-config /etc/cont-init.d/15-generate-runtime-config
+COPY docker/single/cont-init.d/20-run-migrations /etc/cont-init.d/20-run-migrations
+COPY docker/single/cont-init.d/25-sync-integration-targets /etc/cont-init.d/25-sync-integration-targets
 COPY docker/single/services.d /etc/services.d
 
 RUN chmod +x \
@@ -85,6 +120,8 @@ RUN chmod +x \
   /usr/local/bin/mistle-tokenizer-proxy-entrypoint \
   /etc/cont-init.d/10-validate-runtime-artifacts \
   /etc/cont-init.d/15-generate-runtime-config \
+  /etc/cont-init.d/20-run-migrations \
+  /etc/cont-init.d/25-sync-integration-targets \
   /etc/services.d/control-plane-api/run \
   /etc/services.d/control-plane-worker/run \
   /etc/services.d/dashboard/run \

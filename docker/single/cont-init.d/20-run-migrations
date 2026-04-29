@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+cd /app
+
+node apps/control-plane-api/dist/scripts/run-control-plane-migrations.js
+node apps/control-plane-api/dist/scripts/run-control-plane-workflow-migrations.js
+node apps/data-plane-api/dist/scripts/run-data-plane-migrations.js
+node apps/data-plane-api/dist/scripts/run-data-plane-workflow-migrations.js

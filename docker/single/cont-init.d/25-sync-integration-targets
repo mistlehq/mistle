@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+cd /app
+
+node apps/control-plane-api/dist/scripts/run-integration-targets-sync.js
