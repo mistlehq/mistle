@@ -532,8 +532,11 @@ fn start_test_control_server<S: Sleeper + 'static>(
     accept_poll_interval: Duration,
     global_git_config_path: &Path,
 ) -> Result<control::ControlServer, control::ControlError> {
-    control::start_control_server_with_global_git_config_path(
+    control::start_control_server_with_health_endpoint(
         socket_path,
+        "127.0.0.1:0"
+            .parse()
+            .expect("test health endpoint address should parse"),
         sleeper,
         accept_poll_interval,
         global_git_config_path,

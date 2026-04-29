@@ -13,11 +13,5 @@ commit-msg:
 pre-push:
   parallel: false
   commands:
-    format-check:
-      run: pnpm format:check
-    lint:
-      run: pnpm lint
-    typecheck:
-      run: pnpm typecheck
-    test:
-      run: pnpm test
+    validate-changed:
+      run: pnpm validate:changed --base origin/main --head HEAD

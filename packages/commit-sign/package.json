@@ -5,7 +5,7 @@
     "build": "rm -rf dist && cargo build --locked --bin commit-sign && mkdir -p dist && cp target/debug/commit-sign dist/commit-sign",
     "lint": "cargo clippy --locked --all-targets -- -D warnings",
     "typecheck": "cargo check --locked --all-targets",
-    "test": "node ./scripts/run-cargo-in-container.mjs test --locked",
+    "test": "node ./scripts/run-cargo-in-container.mjs nextest run --locked",
     "format": "node ./scripts/cargo-fmt.mjs",
     "format:check": "node ./scripts/cargo-fmt.mjs --check"
   }

@@ -395,7 +395,7 @@ where
     )
 }
 
-fn start_control_server_with_health_endpoint<S>(
+pub fn start_control_server_with_health_endpoint<S>(
     socket_path: &Path,
     health_endpoint_addr: SocketAddr,
     sleeper: S,

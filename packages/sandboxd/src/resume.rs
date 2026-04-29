@@ -301,8 +301,11 @@ mod tests {
         sleeper: S,
         accept_poll_interval: std::time::Duration,
     ) -> crate::control::ControlServer {
-        control::start_control_server_with_global_git_config_path(
+        control::start_control_server_with_health_endpoint(
             socket_path,
+            "127.0.0.1:0"
+                .parse()
+                .expect("test health endpoint address should parse"),
             sleeper,
             accept_poll_interval,
             &test_global_git_config_path(socket_path),

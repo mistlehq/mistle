@@ -1,5 +1,15 @@
 FROM rust:1.89-alpine
 
-RUN apk add --no-cache build-base musl-dev
+ARG CARGO_NEXTEST_VERSION=0.9.128
+ARG TARGETARCH
+
+RUN apk add --no-cache build-base curl musl-dev
+RUN case "${TARGETARCH}" in \
+    amd64) nextest_platform="linux-musl" ;; \
+    arm64) nextest_platform="linux-arm-musl" ;; \
+    *) echo "unsupported nextest architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+  esac \
+  && curl -LsSf "https://get.nexte.st/${CARGO_NEXTEST_VERSION}/${nextest_platform}" \
+  | tar zxf - -C /usr/local/cargo/bin
 
 WORKDIR /work/packages/commit-sign

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -50,39 +50,47 @@ if (shouldBuildImage({ imageTag, buildPolicy })) {
   );
 }
 
-execFileSync(
-  "docker",
-  [
-    "run",
-    "--rm",
-    ...createUserArguments(),
-    ...createEnvironmentArguments({
-      CI: process.env.CI,
-      CARGO_HOME: "/cargo-home",
-      CARGO_TARGET_DIR: cargoTargetDirectoryPath,
-      HOME: "/tmp/mistle-home",
-      PATH: "/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
-      RUSTUP_HOME: "/usr/local/rustup",
-      TMPDIR: path.join(repositoryMountPath, ".local", "sandboxd-test", "tmp"),
-      ...readMistleEnvironmentVariables(),
-    }),
-    "--volume",
-    `${repositoryRootPath}:${repositoryMountPath}`,
-    ...createGitMountArguments(),
-    "--volume",
-    `${cargoHomeHostPath}:/cargo-home`,
-    "--workdir",
-    packageMountPath,
-    imageTag,
-    "bash",
-    "-c",
-    createCargoCommand(),
-  ],
-  {
-    cwd: repositoryRootPath,
-    stdio: "inherit",
-  },
-);
+const dockerRunArguments = [
+  "run",
+  "--rm",
+  ...createUserArguments(),
+  ...createEnvironmentArguments({
+    CI: process.env.CI,
+    CARGO_HOME: "/cargo-home",
+    CARGO_TARGET_DIR: cargoTargetDirectoryPath,
+    HOME: "/tmp/mistle-home",
+    PATH: "/usr/local/cargo/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin",
+    RUSTUP_HOME: "/usr/local/rustup",
+    TMPDIR: path.join(repositoryMountPath, ".local", "sandboxd-test", "tmp"),
+    ...readMistleEnvironmentVariables(),
+  }),
+  "--volume",
+  `${repositoryRootPath}:${repositoryMountPath}`,
+  ...createGitMountArguments(),
+  "--volume",
+  `${cargoHomeHostPath}:/cargo-home`,
+  "--workdir",
+  packageMountPath,
+  imageTag,
+  "bash",
+  "-c",
+  createCargoCommand(),
+];
+
+const dockerRunResult = spawnSync("docker", dockerRunArguments, {
+  cwd: repositoryRootPath,
+  stdio: "inherit",
+});
+
+if (dockerRunResult.error) {
+  throw dockerRunResult.error;
+}
+
+if (dockerRunResult.status !== 0) {
+  throw new Error(
+    `Sandboxd containerized cargo command failed with exit code ${String(dockerRunResult.status ?? 1)}.`,
+  );
+}
 
 function createDefaultImageTag(dockerfilePath) {
   const dockerfileContents = readFileSync(dockerfilePath, "utf8");

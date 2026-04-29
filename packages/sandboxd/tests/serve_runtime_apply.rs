@@ -67,8 +67,11 @@ fn daemon_applies_startup_input_after_init_submission() {
         git_identity: None,
     };
 
-    let server = control::start_control_server_with_global_git_config_path(
+    let server = control::start_control_server_with_health_endpoint(
         &control_socket_path,
+        "127.0.0.1:0"
+            .parse()
+            .expect("test health endpoint address should parse"),
         ThreadSleeper,
         control::DEFAULT_CONTROL_ACCEPT_POLL_INTERVAL,
         &global_git_config_path,
