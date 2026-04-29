@@ -11,6 +11,7 @@ import { IntegrationConnectionApiKeyDialog } from "../integrations/integration-c
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
   ManagedWebhookSetupResultSchema,
+  type IntegrationConnectionMethod,
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
@@ -116,9 +117,10 @@ function resolveUrlConnectionNotice(input: {
 }
 
 function resolveRouteStateConnectionNotice(input: {
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;
   locationState: unknown;
-  selectedConnection: Pick<IntegrationConnection, "id" | "targetKey"> | undefined;
+  selectedConnection: Pick<IntegrationConnection, "connectionMethodId" | "id"> | undefined;
 }): ConnectionNotice | null {
   if (
     input.detailConnectionId === null ||
@@ -128,15 +130,19 @@ function resolveRouteStateConnectionNotice(input: {
   }
 
   const managedWebhookSetup = resolveManagedWebhookSetupState(input.locationState);
-  if (managedWebhookSetup === null || input.selectedConnection.targetKey !== "jira-default") {
+  const managedWebhookSourcePostCreate = resolveManagedWebhookSourcePostCreate({
+    connectionMethods: input.connectionMethods,
+    selectedConnection: input.selectedConnection,
+  });
+  if (managedWebhookSetup === null || managedWebhookSourcePostCreate === null) {
     return null;
   }
 
   if (managedWebhookSetup.status === "created") {
     return {
       connectionId: input.detailConnectionId,
-      resetKey: `jira-webhook-created:${input.detailConnectionId}`,
-      title: "Jira connection and webhook created successfully",
+      resetKey: `managed-webhook-created:${input.detailConnectionId}`,
+      title: managedWebhookSourcePostCreate.successNoticeTitle,
       variant: "success",
     };
   }
@@ -144,10 +150,32 @@ function resolveRouteStateConnectionNotice(input: {
   return {
     connectionId: input.detailConnectionId,
     message: managedWebhookSetup.message,
-    resetKey: `jira-webhook-failed:${input.detailConnectionId}`,
-    title: "Connection created, webhook setup failed",
+    resetKey: `managed-webhook-failed:${input.detailConnectionId}`,
+    title: managedWebhookSourcePostCreate.failureNoticeTitle,
     variant: "alert",
   };
+}
+
+function resolveManagedWebhookSourcePostCreate(input: {
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
+  selectedConnection: Pick<IntegrationConnection, "connectionMethodId"> | undefined;
+}): NonNullable<
+  NonNullable<
+    Extract<IntegrationConnectionMethod, { kind: "form" }>["postCreate"]
+  >["managedWebhookSource"]
+> | null {
+  const connectionMethodId = input.selectedConnection?.connectionMethodId;
+  if (connectionMethodId === undefined) {
+    return null;
+  }
+
+  const method =
+    input.connectionMethods?.find((candidate) => candidate.id === connectionMethodId) ?? null;
+  if (method?.kind !== "form") {
+    return null;
+  }
+
+  return method.postCreate?.managedWebhookSource ?? null;
 }
 
 function resolveManagedWebhookSetupState(state: unknown): ManagedWebhookSetupResult | null {
@@ -208,6 +236,7 @@ export function IntegrationsPage() {
       (connection) => connection.id === directoryState.activeDetailConnectionId,
     ) ?? directoryState.selectedDetailConnections[0];
   const routeStateConnectionNotice = resolveRouteStateConnectionNotice({
+    connectionMethods: directoryState.selectedDetailCard?.target.connectionMethods,
     detailConnectionId,
     locationState: location.state,
     selectedConnection: selectedDetailConnection,

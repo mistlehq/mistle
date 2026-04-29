@@ -129,4 +129,53 @@ describe("IntegrationTargetSchema", () => {
       },
     });
   });
+
+  it("parses form post-create managed webhook metadata", () => {
+    const parsed = IntegrationTargetSchema.parse({
+      targetKey: "jira-default",
+      familyId: "jira",
+      variantId: "jira-default",
+      enabled: true,
+      config: {},
+      displayName: "Jira",
+      description: "Jira integration",
+      connectionMethods: [
+        {
+          id: "jira-personal-api-token",
+          label: "Personal API token",
+          kind: "form",
+          postCreate: {
+            managedWebhookSource: {
+              autoCreate: true,
+              failureNoticeTitle: "Connection created, webhook setup failed",
+              successNoticeTitle: "Jira connection and webhook created successfully",
+            },
+          },
+          secretFields: [
+            {
+              name: "apiKey",
+              label: "Personal API token",
+              inputType: "password",
+              slotKey: "jira.jira-default.jira-personal-api-token.api-key",
+            },
+          ],
+        },
+      ],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    expect(parsed.connectionMethods?.[0]).toMatchObject({
+      id: "jira-personal-api-token",
+      kind: "form",
+      postCreate: {
+        managedWebhookSource: {
+          autoCreate: true,
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Jira connection and webhook created successfully",
+        },
+      },
+    });
+  });
 });

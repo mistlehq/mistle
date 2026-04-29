@@ -56,6 +56,13 @@ export const JiraBaseDefinition: JiraBaseIntegrationDefinition = {
       ],
       configSchema: JiraPersonalApiTokenConnectionConfigSchema,
       configForm: JiraPersonalApiTokenConnectionConfigForm,
+      postCreate: {
+        managedWebhookSource: {
+          autoCreate: true,
+          failureNoticeTitle: "Connection created, webhook setup failed",
+          successNoticeTitle: "Jira connection and webhook created successfully",
+        },
+      },
     },
     {
       id: JiraConnectionMethodIds.SERVICE_ACCOUNT_API_TOKEN,

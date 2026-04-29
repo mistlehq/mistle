@@ -17,7 +17,7 @@ import {
 } from "./integration-connection-return-path.js";
 import { buildOpenCreateIntegrationConnectionInput } from "./integrations-page-view-model.js";
 import {
-  isJiraPersonalApiTokenCreateResult,
+  resolveManagedWebhookSourcePostCreate,
   useIntegrationConnectionEditorState,
 } from "./use-integration-connection-editor-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
@@ -140,7 +140,7 @@ function LoadedIntegrationConnectionCreatePage(input: {
 
       if (
         connectionId !== null &&
-        isJiraPersonalApiTokenCreateResult({ editor, methodId }) &&
+        resolveManagedWebhookSourcePostCreate({ editor, methodId }) !== null &&
         managedWebhookSetup !== undefined
       ) {
         const detailSearchParams = new URLSearchParams({

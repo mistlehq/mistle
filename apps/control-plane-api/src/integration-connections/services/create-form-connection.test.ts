@@ -2,7 +2,51 @@ import { BadRequestError, ConflictError } from "@mistle/http/errors.js";
 import { describe, expect, it } from "vitest";
 
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
-import { shouldReturnPartialManagedWebhookSetupFailure } from "./create-form-connection.js";
+import {
+  shouldAutoCreateManagedWebhookSource,
+  shouldReturnPartialManagedWebhookSetupFailure,
+} from "./create-form-connection.js";
+
+describe("shouldAutoCreateManagedWebhookSource", () => {
+  it("returns true when the method opts into managed webhook source auto-create", () => {
+    expect(
+      shouldAutoCreateManagedWebhookSource({
+        postCreate: {
+          managedWebhookSource: {
+            autoCreate: true,
+            failureNoticeTitle: "Connection created, webhook setup failed",
+            successNoticeTitle: "Connection and webhook created",
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("returns false without an explicit managed webhook source auto-create opt-in", () => {
+    expect(shouldAutoCreateManagedWebhookSource({ postCreate: undefined })).toBe(false);
+    expect(
+      shouldAutoCreateManagedWebhookSource({
+        postCreate: {
+          managedWebhookSource: {
+            failureNoticeTitle: "Connection created, webhook setup failed",
+            successNoticeTitle: "Connection and webhook created",
+          },
+        },
+      }),
+    ).toBe(false);
+    expect(
+      shouldAutoCreateManagedWebhookSource({
+        postCreate: {
+          managedWebhookSource: {
+            autoCreate: false,
+            failureNoticeTitle: "Connection created, webhook setup failed",
+            successNoticeTitle: "Connection and webhook created",
+          },
+        },
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("shouldReturnPartialManagedWebhookSetupFailure", () => {
   it("returns true for provider webhook registration failures", () => {

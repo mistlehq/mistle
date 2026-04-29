@@ -4,6 +4,7 @@ import type {
   IntegrationConnectionMethodDetailFieldSourceLeaf,
   IntegrationConnectionMethodDetailMetadata,
   IntegrationConnectionMethodDefinition,
+  IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
   IntegrationWebhookEventDefinition,
@@ -99,6 +100,7 @@ export type ResolvedIntegrationTargetMetadata = {
         kind: "form";
         connectionDetail?: IntegrationConnectionMethodDetailMetadata;
         createBehavior?: "single-step" | "draft-then-setup";
+        postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
           routeSegment: string;
@@ -171,6 +173,9 @@ function resolveConnectionMethod(
         ? {}
         : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
       ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
+      ...(method.postCreate === undefined
+        ? {}
+        : { postCreate: cloneFormConnectionMethodPostCreateMetadata(method.postCreate) }),
       ...(method.setupFlow === undefined
         ? {}
         : {
@@ -217,6 +222,24 @@ function resolveConnectionMethod(
       ? {}
       : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
     ui: method.ui,
+  };
+}
+
+function cloneFormConnectionMethodPostCreateMetadata(
+  metadata: IntegrationFormConnectionMethodPostCreateMetadata,
+): IntegrationFormConnectionMethodPostCreateMetadata {
+  if (metadata.managedWebhookSource === undefined) {
+    return {};
+  }
+
+  return {
+    managedWebhookSource: {
+      ...(metadata.managedWebhookSource.autoCreate === undefined
+        ? {}
+        : { autoCreate: metadata.managedWebhookSource.autoCreate }),
+      failureNoticeTitle: metadata.managedWebhookSource.failureNoticeTitle,
+      successNoticeTitle: metadata.managedWebhookSource.successNoticeTitle,
+    },
   };
 }
 

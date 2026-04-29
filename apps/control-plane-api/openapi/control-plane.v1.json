@@ -5965,6 +5965,30 @@
                                       "type": "string",
                                       "enum": ["single-step", "draft-then-setup"]
                                     },
+                                    "postCreate": {
+                                      "type": "object",
+                                      "properties": {
+                                        "managedWebhookSource": {
+                                          "type": "object",
+                                          "properties": {
+                                            "autoCreate": {
+                                              "type": "boolean"
+                                            },
+                                            "failureNoticeTitle": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "successNoticeTitle": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["failureNoticeTitle", "successNoticeTitle"],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
                                     "setupFlow": {
                                       "type": "object",
                                       "properties": {

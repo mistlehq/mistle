@@ -3237,6 +3237,13 @@ export interface paths {
                       /** @enum {string} */
                       kind: "form";
                       label: string;
+                      postCreate?: {
+                        managedWebhookSource?: {
+                          autoCreate?: boolean;
+                          failureNoticeTitle: string;
+                          successNoticeTitle: string;
+                        };
+                      };
                       secretFields: {
                         description?: string;
                         /** @enum {string} */

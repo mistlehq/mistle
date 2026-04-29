@@ -528,6 +528,16 @@ export type IntegrationConnectionMethodDetailMetadata = {
     | undefined;
 };
 
+export type IntegrationFormConnectionMethodPostCreateMetadata = {
+  managedWebhookSource?:
+    | {
+        autoCreate?: boolean | undefined;
+        failureNoticeTitle: string;
+        successNoticeTitle: string;
+      }
+    | undefined;
+};
+
 export type IntegrationProviderAppSetupStartResult =
   | {
       kind: "form-post";
@@ -692,6 +702,7 @@ export type IntegrationFormConnectionMethodDefinition<
 > & {
   kind: "form";
   createBehavior?: IntegrationFormConnectionMethodCreateBehavior;
+  postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
   setupFlow?: IntegrationFormConnectionMethodSetupFlow;
   secretFields: ReadonlyArray<IntegrationConnectionMethodSecretField>;
   ui?: {

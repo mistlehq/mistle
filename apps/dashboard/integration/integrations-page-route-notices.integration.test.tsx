@@ -608,6 +608,13 @@ function createJiraTarget(): IntegrationTarget {
         id: "jira-personal-api-token",
         label: "Personal API token",
         kind: "form",
+        postCreate: {
+          managedWebhookSource: {
+            autoCreate: true,
+            failureNoticeTitle: "Connection created, webhook setup failed",
+            successNoticeTitle: "Jira connection and webhook created successfully",
+          },
+        },
         secretFields: [
           {
             name: "apiKey",

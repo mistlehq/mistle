@@ -6,9 +6,12 @@ import {
   integrationCredentials,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
-import type { IntegrationConnectionMethodId, IntegrationRegistry } from "@mistle/integrations-core";
+import type {
+  IntegrationConnectionMethodId,
+  IntegrationFormConnectionMethodPostCreateMetadata,
+  IntegrationRegistry,
+} from "@mistle/integrations-core";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
-import { JiraConnectionMethodIds } from "@mistle/integrations-definitions";
 
 import {
   encryptCredentialUtf8,
@@ -41,16 +44,10 @@ export type CreateFormConnectionInput = {
   secrets: Record<string, string>;
 };
 
-function shouldAutoCreateManagedWebhookSource(input: {
-  familyId: string;
-  variantId: string;
-  methodId: IntegrationConnectionMethodId;
+export function shouldAutoCreateManagedWebhookSource(input: {
+  postCreate: IntegrationFormConnectionMethodPostCreateMetadata | undefined;
 }): boolean {
-  return (
-    input.familyId === "jira" &&
-    input.variantId === "jira-default" &&
-    input.methodId === JiraConnectionMethodIds.PERSONAL_API_TOKEN
-  );
+  return input.postCreate?.managedWebhookSource?.autoCreate === true;
 }
 
 export function shouldReturnPartialManagedWebhookSetupFailure(
@@ -249,9 +246,7 @@ export async function createFormConnection(
 
     if (
       shouldAutoCreateManagedWebhookSource({
-        familyId: target.familyId,
-        variantId: target.variantId,
-        methodId: input.methodId,
+        postCreate: formMethod.postCreate,
       })
     ) {
       return {

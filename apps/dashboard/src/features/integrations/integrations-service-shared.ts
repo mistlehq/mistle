@@ -95,6 +95,19 @@ const IntegrationConnectionMethodDetailSchema: z.ZodType<IntegrationConnectionMe
     })
     .strict();
 
+const IntegrationFormConnectionMethodPostCreateSchema = z
+  .object({
+    managedWebhookSource: z
+      .object({
+        autoCreate: z.boolean().optional(),
+        failureNoticeTitle: z.string().min(1),
+        successNoticeTitle: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 const IntegrationSetupConnectionExternalSubjectRequirementSchema = z
   .object({
     kind: z.literal("connection-external-subject"),
@@ -183,6 +196,7 @@ export const IntegrationTargetSchema = z
               kind: z.literal("form"),
               connectionDetail: IntegrationConnectionMethodDetailSchema.optional(),
               createBehavior: z.enum(["single-step", "draft-then-setup"]).optional(),
+              postCreate: IntegrationFormConnectionMethodPostCreateSchema.optional(),
               setupFlow: z
                 .object({
                   completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
