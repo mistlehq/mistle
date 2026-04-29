@@ -20,9 +20,7 @@ type RedirectStateBadRequestCode =
 
 type RequiredRedirectQueryParamBadRequestCode =
   | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT
-  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT
-  | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT
-  | typeof IntegrationConnectionsBadRequestCodes.INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT;
+  | typeof IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT;
 
 export function createRedirectState(): string {
   return randomBytes(REDIRECT_STATE_BYTE_LENGTH).toString("base64url");

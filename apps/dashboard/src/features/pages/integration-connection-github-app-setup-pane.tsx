@@ -994,7 +994,7 @@ export function GitHubAppSetupPane(input: {
             {setupMode === "existing-app" ? (
               <GitHubSetupUrls
                 setupCallbackUrl={new URL(
-                  "/p/integration/callbacks/github-app-installation",
+                  "/p/integration/callbacks/setup/github-app-installation",
                   getDashboardConfig().controlPlaneApiOrigin,
                 ).toString()}
                 webhookCallbackState={webhookCallbackState}

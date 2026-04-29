@@ -98,7 +98,7 @@ export function buildSlackAppInstallationCompleteUrl(input: {
 }): string {
   return buildUrlWithPath(
     input.controlPlaneBaseUrl,
-    "/p/integration/callbacks/slack-app-installation",
+    "/p/integration/callbacks/setup/slack-app-installation",
   );
 }
 

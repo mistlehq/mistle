@@ -119,6 +119,7 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
 > = {
   flows: [
     {
+      callbackRouteKey: "slack-app-installation",
       methodId: SlackConnectionMethodId,
       requiresWebhookCallbackUrl: true,
       routeSegment: "slack-app",

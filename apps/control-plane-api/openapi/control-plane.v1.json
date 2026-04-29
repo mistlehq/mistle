@@ -1363,10 +1363,19 @@
         }
       }
     },
-    "/p/integration/callbacks/github-app-installation": {
+    "/p/integration/callbacks/setup/:callbackRouteKey": {
       "get": {
         "tags": ["Integrations"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "required": true,
+            "name": "callbackRouteKey",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -1374,6 +1383,15 @@
             },
             "required": false,
             "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "code",
             "in": "query"
           },
           {
@@ -1424,7 +1442,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Complete GitHub App installation on an existing connection and redirect to dashboard integrations.",
+            "description": "Complete a provider app setup callback and redirect to dashboard.",
             "headers": {
               "Location": {
                 "schema": {
@@ -1447,7 +1465,8 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
+                            "INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT",
+                            "FORM_CONNECTION_METHOD_NOT_SUPPORTED",
                             "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
                             "REDIRECT_STATE_INVALID",
                             "REDIRECT_STATE_EXPIRED",
@@ -1478,247 +1497,6 @@
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Integration connection was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["CONNECTION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/p/integration/callbacks/github-app-manifest": {
-      "get": {
-        "tags": ["Integrations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "state",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "code",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "error",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "error_description",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "error_uri",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "302": {
-            "description": "Complete GitHub App manifest creation on an existing connection and redirect to dashboard setup.",
-            "headers": {
-              "Location": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "required": true
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": [
-                            "INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": ["VALIDATION_ERROR"]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Integration connection was not found.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["CONNECTION_NOT_FOUND"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/p/integration/callbacks/slack-app-installation": {
-      "get": {
-        "tags": ["Integrations"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "code",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "state",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "error",
-            "in": "query"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false,
-            "name": "error_description",
-            "in": "query"
-          }
-        ],
-        "responses": {
-          "302": {
-            "description": "Complete Slack app installation and redirect to dashboard setup.",
-            "headers": {
-              "Location": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "required": true
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT",
-                        "REDIRECT_STATE_INVALID",
-                        "REDIRECT_STATE_ALREADY_USED",
-                        "REDIRECT_STATE_EXPIRED"
-                      ]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }

@@ -246,10 +246,11 @@ describe("buildGitHubAppManifest", () => {
         active: true,
         url: "https://control-plane.example.com/p/integration/webhooks/github-default/eps_123",
       },
-      redirect_url: "https://control-plane.example.com/p/integration/callbacks/github-app-manifest",
+      redirect_url:
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-manifest",
       callback_urls: ["https://control-plane.example.com/p/identity-linking/callbacks/github"],
       setup_url:
-        "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
     });
   });
 });

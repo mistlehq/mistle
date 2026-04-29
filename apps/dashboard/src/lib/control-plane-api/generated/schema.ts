@@ -135,7 +135,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/p/integration/callbacks/github-app-installation": {
+  "/p/integration/callbacks/setup/:callbackRouteKey": {
     parameters: {
       query?: never;
       header?: never;
@@ -145,6 +145,7 @@ export interface paths {
     get: {
       parameters: {
         query?: {
+          code?: string;
           error?: string;
           error_description?: string;
           error_uri?: string;
@@ -153,12 +154,14 @@ export interface paths {
           state?: string;
         };
         header?: never;
-        path?: never;
+        path: {
+          callbackRouteKey: string;
+        };
         cookie?: never;
       };
       requestBody?: never;
       responses: {
-        /** @description Complete GitHub App installation on an existing connection and redirect to dashboard integrations. */
+        /** @description Complete a provider app setup callback and redirect to dashboard. */
         302: {
           headers: {
             Location: string;
@@ -176,7 +179,8 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
-                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT"
+                    | "FORM_CONNECTION_METHOD_NOT_SUPPORTED"
                     | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                     | "REDIRECT_STATE_INVALID"
                     | "REDIRECT_STATE_EXPIRED"
@@ -188,152 +192,6 @@ export interface paths {
                   code: "VALIDATION_ERROR";
                   message: string;
                 };
-          };
-        };
-        /** @description Integration connection was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "CONNECTION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/p/integration/callbacks/github-app-manifest": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          code?: string;
-          error?: string;
-          error_description?: string;
-          error_uri?: string;
-          state?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Complete GitHub App manifest creation on an existing connection and redirect to dashboard setup. */
-        302: {
-          headers: {
-            Location: string;
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json":
-              | {
-                  /** @enum {string} */
-                  code:
-                    | "INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT"
-                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
-                    | "REDIRECT_STATE_INVALID"
-                    | "REDIRECT_STATE_EXPIRED"
-                    | "REDIRECT_STATE_ALREADY_USED";
-                  message: string;
-                }
-              | {
-                  /** @enum {string} */
-                  code: "VALIDATION_ERROR";
-                  message: string;
-                };
-          };
-        };
-        /** @description Integration connection was not found. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "CONNECTION_NOT_FOUND";
-              message: string;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/p/integration/callbacks/slack-app-installation": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: {
-      parameters: {
-        query?: {
-          code?: string;
-          error?: string;
-          error_description?: string;
-          state?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Complete Slack app installation and redirect to dashboard setup. */
-        302: {
-          headers: {
-            Location: string;
-            [name: string]: unknown;
-          };
-          content?: never;
-        };
-        /** @description Invalid request. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "INVALID_SLACK_APP_INSTALLATION_COMPLETE_INPUT"
-                | "REDIRECT_STATE_INVALID"
-                | "REDIRECT_STATE_ALREADY_USED"
-                | "REDIRECT_STATE_EXPIRED";
-              message: string;
-            };
           };
         };
         /** @description Integration connection was not found. */

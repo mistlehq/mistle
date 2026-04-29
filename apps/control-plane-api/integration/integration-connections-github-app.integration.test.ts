@@ -12,14 +12,10 @@ import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import {
-  CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
-  CompleteGitHubAppInstallationConnectionNotFoundResponseSchema,
-  CompleteGitHubAppInstallationConnectionQuerySchema,
-} from "../src/integration-callbacks/github-app/complete-installation/schema.js";
-import {
-  CompleteGitHubAppManifestConnectionBadRequestResponseSchema,
-  CompleteGitHubAppManifestConnectionQuerySchema,
-} from "../src/integration-callbacks/github-app/complete-manifest/schema.js";
+  CompleteProviderAppSetupCallbackBadRequestResponseSchema,
+  CompleteProviderAppSetupCallbackNotFoundResponseSchema,
+  CompleteProviderAppSetupCallbackQuerySchema,
+} from "../src/integration-callbacks/provider-app-setup/schema.js";
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import {
   CreatedFormIntegrationConnectionSchema,
@@ -147,15 +143,24 @@ describe("integration connections GitHub App integration", () => {
   function createGitHubAppInstallationCompletePath(input: {
     query: Record<string, string>;
   }): string {
-    const query = CompleteGitHubAppInstallationConnectionQuerySchema.parse(input.query);
+    const query = CompleteProviderAppSetupCallbackQuerySchema.parse(input.query);
     const searchParams = new URLSearchParams(query);
-    return `/p/integration/callbacks/github-app-installation?${searchParams.toString()}`;
+    return `/p/integration/callbacks/setup/github-app-installation?${searchParams.toString()}`;
   }
 
   function createGitHubAppManifestCompletePath(input: { query: Record<string, string> }): string {
-    const query = CompleteGitHubAppManifestConnectionQuerySchema.parse(input.query);
+    const query = CompleteProviderAppSetupCallbackQuerySchema.parse(input.query);
     const searchParams = new URLSearchParams(query);
-    return `/p/integration/callbacks/github-app-manifest?${searchParams.toString()}`;
+    return `/p/integration/callbacks/setup/github-app-manifest?${searchParams.toString()}`;
+  }
+
+  function createProviderAppSetupCompletePath(input: {
+    callbackRouteKey: string;
+    query: Record<string, string>;
+  }): string {
+    const query = CompleteProviderAppSetupCallbackQuerySchema.parse(input.query);
+    const searchParams = new URLSearchParams(query);
+    return `/p/integration/callbacks/setup/${encodeURIComponent(input.callbackRouteKey)}?${searchParams.toString()}`;
   }
 
   it("creates a GitHub App installation authorization URL for an existing connection and persists redirect session state", async ({
@@ -193,6 +198,20 @@ describe("integration connections GitHub App integration", () => {
       Date.parse(redirectSession.createdAt),
     );
     expect(redirectSession.usedAt).toBeNull();
+  });
+
+  it("does not register legacy provider-specific callback routes", async ({ fixture }) => {
+    for (const path of [
+      "/p/integration/callbacks/github-app-installation",
+      "/p/integration/callbacks/github-app-manifest",
+      "/p/integration/callbacks/slack-app-installation",
+    ]) {
+      const response = await fixture.request(path, {
+        method: "GET",
+      });
+
+      expect(response.status).toBe(404);
+    }
   });
 
   it("creates a GitHub App draft connection before app credentials are provided", async ({
@@ -297,13 +316,13 @@ describe("integration connections GitHub App integration", () => {
 
     expect(manifest["name"]).toBe("Mistle GitHub App");
     expect(manifest["redirect_url"]).toBe(
-      `${fixture.config.auth.baseUrl}/p/integration/callbacks/github-app-manifest`,
+      `${fixture.config.auth.baseUrl}/p/integration/callbacks/setup/github-app-manifest`,
     );
     expect(manifest["callback_urls"]).toEqual([
       `${fixture.config.auth.baseUrl}/p/identity-linking/callbacks/github`,
     ]);
     expect(manifest["setup_url"]).toBe(
-      `${fixture.config.auth.baseUrl}/p/integration/callbacks/github-app-installation`,
+      `${fixture.config.auth.baseUrl}/p/integration/callbacks/setup/github-app-installation`,
     );
     expect(manifest["hook_attributes"]).toEqual({
       active: true,
@@ -542,7 +561,7 @@ describe("integration connections GitHub App integration", () => {
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 
-  it("returns the documented GitHub App manifest completion code when the callback code is missing", async ({
+  it("returns the provider app setup completion code when the GitHub App manifest callback code is missing", async ({
     fixture,
   }) => {
     await ensureGithubCloudTarget(fixture);
@@ -592,10 +611,10 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppManifestConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT");
+    expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
     expect(responseBody.message).toContain("must include `code`");
   });
 
@@ -658,7 +677,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppManifestConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
@@ -869,13 +888,13 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
+    expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
   });
 
-  it("returns the documented GitHub App installation completion code when installation_id is missing", async ({
+  it("returns the provider app setup completion code when GitHub App installation_id is missing", async ({
     fixture,
   }) => {
     await ensureGithubCloudTarget(fixture);
@@ -902,11 +921,57 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
+    expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
     expect(responseBody.message).toContain("must include `installation_id`");
+  });
+
+  it("returns 400 when the provider app callback route key does not match the started setup flow", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const { authenticatedSession, connectionId } = await createGitHubAppConnection(fixture, {
+      email:
+        "integration-connections-github-app-installation-mismatched-callback-route@example.com",
+      displayName: "GitHub Prod",
+    });
+    const { state } = await startGitHubAppInstallationConnection(fixture, {
+      authenticatedSession,
+      connectionId,
+    });
+
+    const response = await fixture.request(
+      createProviderAppSetupCompletePath({
+        callbackRouteKey: "github-app-manifest",
+        query: {
+          state,
+          installation_id: "12345",
+        },
+      }),
+      {
+        method: "GET",
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT");
+    expect(responseBody.message).toContain("does not match setup flow 'github-app-installation'");
+
+    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.state, state),
+        ),
+    });
+    expect(redirectSession?.usedAt).toBeNull();
   });
 
   it("returns 400 when GitHub App installation completion state is invalid", async ({
@@ -927,7 +992,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_INVALID");
@@ -965,7 +1030,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(404);
-    const responseBody = CompleteGitHubAppInstallationConnectionNotFoundResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackNotFoundResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("CONNECTION_NOT_FOUND");
@@ -999,7 +1064,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_EXPIRED");
@@ -1042,7 +1107,7 @@ describe("integration connections GitHub App integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
+    const responseBody = CompleteProviderAppSetupCallbackBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_ALREADY_USED");

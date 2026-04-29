@@ -1339,7 +1339,7 @@ describe("IntegrationConnectionDetailView", () => {
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
               postInstallationSetupUrl:
-                "http://localhost:5100/p/integration/callbacks/github-app-installation",
+                "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
             },
           },
         ]}
@@ -1400,7 +1400,9 @@ describe("IntegrationConnectionDetailView", () => {
       ),
     ).toBeNull();
     expect(
-      screen.getByText("http://localhost:5100/p/integration/callbacks/github-app-installation"),
+      screen.getByText(
+        "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
+      ),
     ).toBeTruthy();
     expect(
       screen.getAllByText(
@@ -1482,7 +1484,7 @@ describe("IntegrationConnectionDetailView", () => {
               description: "Set the URLs below in your Github App settings, then install the app",
               fields: [{ label: "Installation", value: "Pending" }],
               postInstallationSetupUrl:
-                "http://localhost:5100/p/integration/callbacks/github-app-installation",
+                "http://localhost:5100/p/integration/callbacks/setup/github-app-installation",
             },
           },
         ]}

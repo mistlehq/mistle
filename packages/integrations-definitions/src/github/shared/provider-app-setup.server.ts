@@ -79,6 +79,7 @@ export function createGitHubProviderAppSetupCapability(
   return {
     flows: [
       {
+        callbackRouteKey: "github-app-manifest",
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         requiresWebhookCallbackUrl: true,
         routeSegment: "github-app",
@@ -156,6 +157,7 @@ export function createGitHubProviderAppSetupCapability(
         },
       },
       {
+        callbackRouteKey: "github-app-installation",
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         routeSegment: "github-app-installation",
         async start(input) {

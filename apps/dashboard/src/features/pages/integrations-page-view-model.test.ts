@@ -320,7 +320,7 @@ describe("integrations page view model", () => {
         },
       ],
       postInstallationSetupUrl:
-        "https://control-plane.example.com/p/integration/callbacks/github-app-installation",
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
     });
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");

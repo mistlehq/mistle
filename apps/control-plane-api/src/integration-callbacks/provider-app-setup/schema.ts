@@ -7,22 +7,31 @@ import {
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-} from "../../../integration-connections/constants.js";
+} from "../../integration-connections/constants.js";
 
-export const CompleteGitHubAppManifestConnectionQuerySchema = z
+export const CompleteProviderAppSetupCallbackParamsSchema = z
+  .object({
+    callbackRouteKey: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+  })
+  .strict();
+
+export const CompleteProviderAppSetupCallbackQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
     code: z.string().min(1).optional(),
     error: z.string().min(1).optional(),
     error_description: z.string().min(1).optional(),
     error_uri: z.string().min(1).optional(),
+    installation_id: z.string().min(1).optional(),
+    setup_action: z.string().min(1).optional(),
   })
   .catchall(z.string());
 
-export const CompleteGitHubAppManifestConnectionBadRequestResponseSchema = z.union([
+export const CompleteProviderAppSetupCallbackBadRequestResponseSchema = z.union([
   createCodeMessageErrorSchema(
     z.enum([
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_MANIFEST_COMPLETE_INPUT,
+      IntegrationConnectionsBadRequestCodes.INVALID_PROVIDER_APP_SETUP_COMPLETE_INPUT,
+      IntegrationConnectionsBadRequestCodes.FORM_CONNECTION_METHOD_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
@@ -32,5 +41,6 @@ export const CompleteGitHubAppManifestConnectionBadRequestResponseSchema = z.uni
   ValidationErrorResponseSchema,
 ]);
 
-export const CompleteGitHubAppManifestConnectionNotFoundResponseSchema =
-  createCodeMessageErrorSchema(z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND));
+export const CompleteProviderAppSetupCallbackNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND),
+);

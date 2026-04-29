@@ -558,6 +558,7 @@ export type IntegrationProviderAppSetupFlowCapability<
   TTargetSecrets = Record<string, string>,
   TConnectionConfig = Record<string, unknown>,
 > = {
+  callbackRouteKey?: string;
   methodId: IntegrationConnectionMethodId;
   requiresWebhookCallbackUrl?: boolean;
   routeSegment: string;

@@ -91,7 +91,7 @@ describe("buildSlackAppManifest", () => {
       },
       oauth_config: {
         redirect_urls: expect.arrayContaining([
-          "https://control-plane.example.com/p/integration/callbacks/slack-app-installation",
+          "https://control-plane.example.com/p/integration/callbacks/setup/slack-app-installation",
           "https://control-plane.example.com/p/identity-linking/callbacks/slack",
         ]),
         scopes: {

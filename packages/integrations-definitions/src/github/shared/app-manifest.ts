@@ -199,14 +199,14 @@ export function buildGitHubAppManifest(input: {
     },
     redirect_url: buildUrlWithPath(
       input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/github-app-manifest",
+      "/p/integration/callbacks/setup/github-app-manifest",
     ),
     callback_urls: [
       buildUrlWithPath(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
     ],
     setup_url: buildUrlWithPath(
       input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/github-app-installation",
+      "/p/integration/callbacks/setup/github-app-installation",
     ),
   };
 }

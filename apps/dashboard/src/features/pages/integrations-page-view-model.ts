@@ -13,7 +13,7 @@ import type { OpenIntegrationConnectionEditorInput } from "./integration-connect
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 import { resolveVisibleConnectionMethodConfigFields } from "./use-integration-connection-editor-state-helpers.js";
 
-const GitHubAppInstallationCompletePath = "/p/integration/callbacks/github-app-installation";
+const GitHubAppInstallationCompletePath = "/p/integration/callbacks/setup/github-app-installation";
 
 function resolveTargetConfig(value: unknown): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
