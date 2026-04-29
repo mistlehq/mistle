@@ -1,5 +1,4 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { systemScheduler } from "@mistle/time";
 import {
   Button,
   CopyableValue,
@@ -14,15 +13,11 @@ import {
 } from "@mistle/ui";
 import { ArrowSquareOutIcon } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  ConfiguredSecretField,
-  SavingTextField,
-  type SavingFieldState,
-} from "../forms/configured-secret-field.js";
+import { type SavingFieldState } from "../forms/configured-secret-field.js";
 import {
   startGitHubAppInstallation,
   startGitHubAppManifestCreation,
@@ -30,8 +25,6 @@ import {
 } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
-  type ManifestJsonValidation,
-  createManifestJsonDraft,
   parseManifestJsonObject,
   validateManifestJsonObject,
 } from "../integrations/manifest-json-editor.js";
@@ -39,26 +32,23 @@ import {
   type ManifestWebhookCallbackState,
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
-import {
-  buildSavedFieldValuePatch,
-  clearPendingStatusTimeouts,
-  createAutoSaveFieldTimeoutRefs,
-  resolveAutoSaveFieldTimeoutRefs,
-  scheduleSavedStateReset,
-} from "../shared/auto-save-behavior.js";
+import { buildSavedFieldValuePatch } from "../shared/auto-save-behavior.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
+import {
+  ExistingAppSetupFieldsPanel,
+  getSetupFieldState,
+  useSetupFieldFeedback,
+  useSetupManifestDraft,
+} from "./integration-connection-app-setup-shared.js";
 import {
   IntegrationConnectionSetupManifestEditorSection,
   IntegrationConnectionSetupModeTabs,
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
-import {
-  type IntegrationSetupAppManifestDraftBuilder,
-  resolveManifestDraftControlPlaneBaseUrl,
-} from "./integration-connection-setup-manifest-draft.js";
+import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
 import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
@@ -153,17 +143,6 @@ function resolveInitialGitHubAppSetupMode(connection: IntegrationConnection): Gi
     (connection.configuredSecretNames?.length ?? 0) > 0;
 
   return hasConfiguredValues ? "existing-app" : "manifest";
-}
-
-function createInitialFieldStates(): Record<GitHubExistingAppSetupFieldKey, SavingFieldState> {
-  return {
-    appId: { status: "idle", errorMessage: null },
-    appSlug: { status: "idle", errorMessage: null },
-    clientId: { status: "idle", errorMessage: null },
-    clientSecret: { status: "idle", errorMessage: null },
-    appPrivateKeyPem: { status: "idle", errorMessage: null },
-    webhookSecret: { status: "idle", errorMessage: null },
-  };
 }
 
 function normalizeGitHubExistingAppSetupValue(value: string): string {
@@ -326,7 +305,7 @@ function GitHubManifestSetupPanel(input: {
   appOwnerKind: GitHubManifestAppOwnerKind | null;
   manifestCallbackState: ManifestWebhookCallbackState;
   manifestValue: string;
-  manifestValidation: ManifestJsonValidation;
+  manifestValidation: ReturnType<typeof validateManifestJsonObject>;
   onAppOwnerKindChange: (value: GitHubManifestAppOwnerKind) => void;
   onManifestChange: (value: string) => void;
   onOrganizationSlugChange: (value: string) => void;
@@ -388,136 +367,6 @@ function GitHubManifestSetupPanel(input: {
           />
         </Field>
       ) : null}
-    </div>
-  );
-}
-
-function GitHubExistingAppSetupPanel(input: {
-  configuredSecretFieldKeys: ReadonlySet<GitHubExistingAppSetupSecretFieldKey>;
-  draft: GitHubExistingAppSetupDraft;
-  fieldStates: Record<GitHubExistingAppSetupFieldKey, SavingFieldState>;
-  onCommitField: (fieldKey: GitHubExistingAppSetupFieldKey) => void;
-  onReplacementDialogOpenChange: (open: boolean) => void;
-  onRevertSecretReplacement: (fieldKey: GitHubExistingAppSetupSecretFieldKey) => void;
-  onUpdateFieldDraft: (fieldKey: GitHubExistingAppSetupFieldKey, nextValue: string) => void;
-}): React.JSX.Element {
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <SectionHeader
-          description="Paste values from a GitHub App you already created or configured in GitHub."
-          title="Existing GitHub App"
-        />
-        <SavingTextField
-          fieldState={input.fieldStates.appId}
-          id="github-app-id"
-          label="App ID"
-          onBlur={() => {
-            input.onCommitField("appId");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("appId", nextValue);
-          }}
-          required
-          value={input.draft.appId}
-        />
-
-        <SavingTextField
-          fieldState={input.fieldStates.appSlug}
-          id="github-app-slug"
-          label="App slug"
-          onBlur={() => {
-            input.onCommitField("appSlug");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("appSlug", nextValue);
-          }}
-          required
-          value={input.draft.appSlug}
-        />
-
-        <SavingTextField
-          fieldState={input.fieldStates.clientId}
-          id="github-client-id"
-          label="Client ID"
-          onBlur={() => {
-            input.onCommitField("clientId");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("clientId", nextValue);
-          }}
-          required
-          value={input.draft.clientId}
-        />
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <SectionHeader title="Secrets" />
-        <ConfiguredSecretField
-          fieldState={input.fieldStates.appPrivateKeyPem}
-          secretLabel="app private key"
-          id="github-app-private-key"
-          label="App private key"
-          multiline
-          onCancelReplace={() => {
-            input.onRevertSecretReplacement("appPrivateKeyPem");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("appPrivateKeyPem", nextValue);
-          }}
-          onCommit={() => {
-            input.onCommitField("appPrivateKeyPem");
-          }}
-          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
-          placeholder="-----BEGIN PRIVATE KEY-----"
-          configured={input.configuredSecretFieldKeys.has("appPrivateKeyPem")}
-          required
-          rows={8}
-          value={input.draft.appPrivateKeyPem}
-        />
-
-        <ConfiguredSecretField
-          fieldState={input.fieldStates.clientSecret}
-          secretLabel="client secret"
-          id="github-client-secret"
-          label="Client secret"
-          onCancelReplace={() => {
-            input.onRevertSecretReplacement("clientSecret");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("clientSecret", nextValue);
-          }}
-          onCommit={() => {
-            input.onCommitField("clientSecret");
-          }}
-          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
-          configured={input.configuredSecretFieldKeys.has("clientSecret")}
-          required
-          type="password"
-          value={input.draft.clientSecret}
-        />
-
-        <ConfiguredSecretField
-          fieldState={input.fieldStates.webhookSecret}
-          secretLabel="webhook secret"
-          id="github-webhook-secret"
-          label="Webhook secret"
-          onCancelReplace={() => {
-            input.onRevertSecretReplacement("webhookSecret");
-          }}
-          onChange={(nextValue) => {
-            input.onUpdateFieldDraft("webhookSecret", nextValue);
-          }}
-          onCommit={() => {
-            input.onCommitField("webhookSecret");
-          }}
-          onReplacementDialogOpenChange={input.onReplacementDialogOpenChange}
-          configured={input.configuredSecretFieldKeys.has("webhookSecret")}
-          required
-          type="password"
-          value={input.draft.webhookSecret}
-        />
-      </div>
     </div>
   );
 }
@@ -604,8 +453,6 @@ export function GitHubAppSetupPane(input: {
   const [setupMode, setSetupMode] = useState<GitHubAppSetupMode>(() =>
     resolveInitialGitHubAppSetupMode(input.connection),
   );
-  const [manifestValue, setManifestValue] = useState("");
-  const [hasEditedManifest, setHasEditedManifest] = useState(false);
   const [manifestAppOwnerKind, setManifestAppOwnerKind] =
     useState<GitHubManifestAppOwnerKind | null>(null);
   const [manifestOrganizationSlug, setManifestOrganizationSlug] = useState("");
@@ -614,30 +461,16 @@ export function GitHubAppSetupPane(input: {
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [isRedirectingToInstallation, setIsRedirectingToInstallation] = useState(false);
-  const [fieldStates, setFieldStates] = useState(() => createInitialFieldStates());
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
-  const fieldTimeoutRefs = useRef(
-    createAutoSaveFieldTimeoutRefs({
-      fieldKeys: GitHubExistingAppSetupFieldKeys,
-    }),
-  );
+  const fieldFeedback = useSetupFieldFeedback(GitHubExistingAppSetupFieldKeys);
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: true,
     connectionId: input.connection.id,
   });
-  const webhookCallbackUrl =
-    webhookCallbackState.kind === "ready" ? webhookCallbackState.value : null;
-  const resolvedManifestValue =
-    webhookCallbackUrl === null || hasEditedManifest
-      ? manifestValue
-      : createManifestJsonDraft(
-          input.manifestDraftBuilder({
-            controlPlaneBaseUrl: resolveManifestDraftControlPlaneBaseUrl({
-              webhookCallbackUrl,
-            }),
-            webhookCallbackUrl,
-          }),
-        );
+  const manifestDraft = useSetupManifestDraft({
+    manifestDraftBuilder: input.manifestDraftBuilder,
+    webhookCallbackState,
+  });
 
   const startInstallationMutation = useMutation({
     mutationFn: async () =>
@@ -655,7 +488,7 @@ export function GitHubAppSetupPane(input: {
 
       return startGitHubAppManifestCreation({
         connectionId: input.connection.id,
-        manifest: parseManifestJsonObject(resolvedManifestValue),
+        manifest: parseManifestJsonObject(manifestDraft.manifestValue),
         owner:
           manifestAppOwnerKind === "personal"
             ? { kind: "personal" }
@@ -726,49 +559,15 @@ export function GitHubAppSetupPane(input: {
     }
   }
 
-  useEffect(() => {
-    return () => {
-      for (const fieldKey of GitHubExistingAppSetupFieldKeys) {
-        const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
-          timeoutRefs: fieldTimeoutRefs.current,
-          fieldKey,
-        });
-        clearPendingStatusTimeouts({
-          fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
-          fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
-          scheduler: systemScheduler,
-        });
-      }
-    };
-  }, []);
-
-  function resetFieldFeedback(fieldKey: GitHubExistingAppSetupFieldKey): void {
-    const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
-      timeoutRefs: fieldTimeoutRefs.current,
-      fieldKey,
-    });
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
-      fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
-      scheduler: systemScheduler,
-    });
-    setFieldStates((currentFieldStates) => ({
-      ...currentFieldStates,
-      [fieldKey]: {
-        status: "idle",
-        errorMessage: null,
-      },
-    }));
-  }
-
   function updateFieldDraft(fieldKey: GitHubExistingAppSetupFieldKey, nextValue: string): void {
     setDraft((currentDraft) => ({
       ...currentDraft,
       [fieldKey]: nextValue,
     }));
     setActionErrorMessage(null);
-    if (fieldStates[fieldKey].status !== "idle" || fieldStates[fieldKey].errorMessage !== null) {
-      resetFieldFeedback(fieldKey);
+    const fieldState = getSetupFieldState(fieldFeedback.fieldStates, fieldKey);
+    if (fieldState.status !== "idle" || fieldState.errorMessage !== null) {
+      fieldFeedback.resetFieldFeedback(fieldKey);
     }
   }
 
@@ -776,7 +575,7 @@ export function GitHubAppSetupPane(input: {
     fieldKey: GitHubExistingAppSetupFieldKey,
     currentDraft: GitHubExistingAppSetupDraft,
   ): Promise<void> {
-    if (fieldStates[fieldKey].status === "saving") {
+    if (getSetupFieldState(fieldFeedback.fieldStates, fieldKey).status === "saving") {
       return;
     }
 
@@ -791,7 +590,7 @@ export function GitHubAppSetupPane(input: {
         ...currentDraft,
         [fieldKey]: savedDraft[fieldKey],
       }));
-      resetFieldFeedback(fieldKey);
+      fieldFeedback.resetFieldFeedback(fieldKey);
       return;
     }
 
@@ -800,13 +599,7 @@ export function GitHubAppSetupPane(input: {
       draft: currentDraft,
     });
     if (validationMessage !== null) {
-      setFieldStates((currentFieldStates) => ({
-        ...currentFieldStates,
-        [fieldKey]: {
-          status: "idle",
-          errorMessage: validationMessage,
-        },
-      }));
+      fieldFeedback.setFieldError(fieldKey, validationMessage);
       return;
     }
 
@@ -819,13 +612,7 @@ export function GitHubAppSetupPane(input: {
       return;
     }
 
-    setFieldStates((currentFieldStates) => ({
-      ...currentFieldStates,
-      [fieldKey]: {
-        status: "saving",
-        errorMessage: null,
-      },
-    }));
+    fieldFeedback.setFieldSaving(fieldKey);
 
     try {
       const secrets = buildGitHubExistingAppSetupSecrets({
@@ -864,54 +651,15 @@ export function GitHubAppSetupPane(input: {
         setConfiguredSecretFieldKeys(resolveConfiguredGitHubSecretFieldKeys(updatedConnection));
       }
       setActionErrorMessage(null);
-      setFieldStates((currentFieldStates) => ({
-        ...currentFieldStates,
-        [fieldKey]: {
-          status: "saved",
-          errorMessage: null,
-        },
-      }));
-
-      const timeoutRefs = resolveAutoSaveFieldTimeoutRefs({
-        timeoutRefs: fieldTimeoutRefs.current,
-        fieldKey,
-      });
-      scheduleSavedStateReset({
-        fadeEndTimeoutRef: timeoutRefs.fadeEndTimeoutRef,
-        fadeStartTimeoutRef: timeoutRefs.fadeStartTimeoutRef,
-        onFadeEnd: () => {
-          setFieldStates((currentFieldStates) => ({
-            ...currentFieldStates,
-            [fieldKey]: {
-              status: "idle",
-              errorMessage: null,
-            },
-          }));
-        },
-        onFadeStart: () => {
-          setFieldStates((currentFieldStates) => ({
-            ...currentFieldStates,
-            [fieldKey]: {
-              status: "saved-fading",
-              errorMessage: null,
-            },
-          }));
-        },
-        scheduler: systemScheduler,
-        successFadeDurationMs: 700,
-        successVisibleDurationMs: 2200,
-      });
+      fieldFeedback.markFieldSavedWithReset(fieldKey);
     } catch (error) {
-      setFieldStates((currentFieldStates) => ({
-        ...currentFieldStates,
-        [fieldKey]: {
-          status: "idle",
-          errorMessage: resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not save GitHub App setup.",
-          }),
-        },
-      }));
+      fieldFeedback.setFieldError(
+        fieldKey,
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not save GitHub App setup.",
+        }),
+      );
     }
   }
 
@@ -924,7 +672,7 @@ export function GitHubAppSetupPane(input: {
       ...currentDraft,
       [fieldKey]: "",
     }));
-    resetFieldFeedback(fieldKey);
+    fieldFeedback.resetFieldFeedback(fieldKey);
   }
 
   const isInstalled = hasInstalledGitHubApp(input.connection);
@@ -933,7 +681,7 @@ export function GitHubAppSetupPane(input: {
       fieldKey,
       draft,
       savedDraft,
-      fieldState: fieldStates[fieldKey],
+      fieldState: getSetupFieldState(fieldFeedback.fieldStates, fieldKey),
     }),
   );
   const requiredSecretsReady = GitHubExistingAppSetupSecretFieldKeys.every((fieldKey) =>
@@ -941,12 +689,12 @@ export function GitHubAppSetupPane(input: {
       fieldKey,
       draft,
       savedDraft,
-      fieldState: fieldStates[fieldKey],
+      fieldState: getSetupFieldState(fieldFeedback.fieldStates, fieldKey),
       isConfiguredOnServer: configuredSecretFieldKeys.has(fieldKey),
     }),
   );
   const canInstall = (requiredConfigReady && requiredSecretsReady) || isInstalled;
-  const manifestValidation = validateManifestJsonObject(resolvedManifestValue);
+  const manifestValidation = validateManifestJsonObject(manifestDraft.manifestValue);
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
@@ -994,16 +742,74 @@ export function GitHubAppSetupPane(input: {
         actionErrorMessage={actionErrorMessage}
         description="Create a new GitHub App with a manifest or connect an app you've already configured in GitHub"
         existingAppContent={
-          <GitHubExistingAppSetupPanel
+          <ExistingAppSetupFieldsPanel
+            configFields={[
+              {
+                fieldKey: "appId",
+                id: "github-app-id",
+                label: "App ID",
+                required: true,
+                value: draft.appId,
+              },
+              {
+                fieldKey: "appSlug",
+                id: "github-app-slug",
+                label: "App slug",
+                required: true,
+                value: draft.appSlug,
+              },
+              {
+                fieldKey: "clientId",
+                id: "github-client-id",
+                label: "Client ID",
+                required: true,
+                value: draft.clientId,
+              },
+            ]}
             configuredSecretFieldKeys={configuredSecretFieldKeys}
-            draft={draft}
-            fieldStates={fieldStates}
+            description="Paste values from a GitHub App you already created or configured in GitHub."
+            fieldStates={fieldFeedback.fieldStates}
             onCommitField={(fieldKey) => {
               void commitField(fieldKey);
             }}
             onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
             onRevertSecretReplacement={revertSecretReplacement}
             onUpdateFieldDraft={updateFieldDraft}
+            secretFields={[
+              {
+                configured: configuredSecretFieldKeys.has("appPrivateKeyPem"),
+                fieldKey: "appPrivateKeyPem",
+                id: "github-app-private-key",
+                label: "App private key",
+                multiline: true,
+                placeholder: "-----BEGIN PRIVATE KEY-----",
+                required: true,
+                rows: 8,
+                secretLabel: "app private key",
+                value: draft.appPrivateKeyPem,
+              },
+              {
+                configured: configuredSecretFieldKeys.has("clientSecret"),
+                fieldKey: "clientSecret",
+                id: "github-client-secret",
+                label: "Client secret",
+                required: true,
+                secretLabel: "client secret",
+                type: "password",
+                value: draft.clientSecret,
+              },
+              {
+                configured: configuredSecretFieldKeys.has("webhookSecret"),
+                fieldKey: "webhookSecret",
+                id: "github-webhook-secret",
+                label: "Webhook secret",
+                required: true,
+                secretLabel: "webhook secret",
+                type: "password",
+                value: draft.webhookSecret,
+              },
+            ]}
+            title="Existing GitHub App"
           />
         }
         footer={
@@ -1046,12 +852,9 @@ export function GitHubAppSetupPane(input: {
             appOwnerKind={manifestAppOwnerKind}
             manifestCallbackState={webhookCallbackState}
             manifestValidation={manifestValidation}
-            manifestValue={resolvedManifestValue}
+            manifestValue={manifestDraft.manifestValue}
             onAppOwnerKindChange={setManifestAppOwnerKind}
-            onManifestChange={(nextValue) => {
-              setHasEditedManifest(true);
-              setManifestValue(nextValue);
-            }}
+            onManifestChange={manifestDraft.onManifestChange}
             onOrganizationSlugChange={setManifestOrganizationSlug}
             organizationSlug={manifestOrganizationSlug}
           />
