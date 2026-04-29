@@ -59,6 +59,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-sandboxd-test-cargo-home-
 
+      - name: Restore sandboxd container target cache
+        id: sandboxd-stress-container-target-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/sandboxd-test/target-debian-container
+          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-
+            ${{ runner.os }}-sandboxd-test-target-debian-
+
       - name: Restore pnpm store cache
         id: sandboxd-stress-pnpm-store-cache
         uses: actions/cache/restore@v5
@@ -108,6 +118,13 @@ jobs:
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
+
+      - name: Save sandboxd container target cache
+        if: ${{ always() && !cancelled() && steps.sandboxd-stress-container-target-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .local/sandboxd-test/target-debian-container
+          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
 
   notify:
     name: Notify Slack

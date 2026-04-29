@@ -26,7 +26,9 @@ jobs:
       ts_build: ${{ steps.filter.outputs.ts_build }}
       ts_test: ${{ steps.filter.outputs.ts_test }}
       ts_component: ${{ steps.filter.outputs.ts_component }}
-      rust: ${{ steps.filter.outputs.rust }}
+      rust_static: ${{ steps.filter.outputs.rust_static }}
+      commit_sign: ${{ steps.filter.outputs.commit_sign }}
+      sandboxd: ${{ steps.filter.outputs.sandboxd }}
       sandbox_base_linux: ${{ steps.filter.outputs.sandbox_base_linux }}
 
     steps:
@@ -117,13 +119,42 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-            rust:
+            rust_static:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
               - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
               - '.github/workflows/ci-scheduled-system.yml'
               - '.envrc'
               - 'packages/commit-sign/**'
+              - 'packages/sandboxd/**'
+              - 'packages/sandbox-runtime-contract/**'
+              - 'packages/integrations-core/**'
+              - 'packages/integrations-definitions/**'
+              - 'packages/sandbox-session-protocol/**'
+              - 'packages/time/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+            commit_sign:
+              - '.github/workflows/ci.yml'
+              - '.envrc'
+              - 'packages/commit-sign/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+            sandboxd:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
+              - '.envrc'
               - 'packages/sandboxd/**'
               - 'packages/sandbox-runtime-contract/**'
               - 'packages/integrations-core/**'
@@ -320,7 +351,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.rust_static == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -350,6 +381,7 @@ jobs:
         with:
           shared-key: sandbox-rust
           workspaces: |
+            packages/commit-sign -> target
             packages/sandboxd -> target
           env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
           cmd-format: nix develop --command {0}
@@ -630,7 +662,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.commit_sign == 'true'
     env:
       CI: true
     steps:
@@ -662,6 +694,16 @@ jobs:
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-commit-sign-test-cargo-home-
+
+      - name: Restore commit-sign container target cache
+        id: test-commit-sign-container-target-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/commit-sign-test/target-alpine-container
+          key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-
+            ${{ runner.os }}-commit-sign-test-target-alpine-
 
       - name: Restore pnpm store cache
         id: test-commit-sign-pnpm-store-cache
@@ -706,6 +748,13 @@ jobs:
           path: .local/commit-sign-test/cargo-home
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
 
+      - name: Save commit-sign container target cache
+        if: ${{ always() && !cancelled() && steps.test-commit-sign-container-target-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .local/commit-sign-test/target-alpine-container
+          key: ${{ runner.os }}-commit-sign-test-target-alpine-${{ hashFiles('packages/commit-sign/Cargo.lock') }}-${{ github.sha }}
+
       - name: Stop Nix daemon
         if: always()
         run: |
@@ -719,7 +768,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.sandboxd == 'true'
     env:
       CI: true
 
@@ -752,6 +801,16 @@ jobs:
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-sandboxd-test-cargo-home-
+
+      - name: Restore sandboxd container target cache
+        id: test-sandboxd-container-target-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: .local/sandboxd-test/target-debian-container
+          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-
+            ${{ runner.os }}-sandboxd-test-target-debian-
 
       - name: Restore pnpm store cache
         id: test-sandboxd-pnpm-store-cache
@@ -798,18 +857,19 @@ jobs:
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/sandboxd test:integration
 
-      - name: Run sandboxd stress tests in Nix shell
-        env:
-          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:ci
-          MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
-        run: nix develop --command pnpm --filter @mistle/sandboxd test:stress
-
       - name: Save sandboxd container cargo cache
         if: steps.test-sandboxd-container-cargo-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
+
+      - name: Save sandboxd container target cache
+        if: ${{ always() && !cancelled() && steps.test-sandboxd-container-target-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .local/sandboxd-test/target-debian-container
+          key: ${{ runner.os }}-sandboxd-test-target-debian-${{ hashFiles('packages/sandboxd/Cargo.lock') }}-${{ github.sha }}
 
       - name: Stop Nix daemon
         if: always()
