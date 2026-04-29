@@ -99,12 +99,7 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
       }),
     );
 
-    expect(error).toBeInstanceOf(BadRequestError);
-    if (!(error instanceof BadRequestError)) {
-      throw new Error("Expected trigger requirements assertion to fail with BadRequestError.");
-    }
-
-    expect(error.code).toBe(AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS);
+    expectInvalidWebhookTriggerRequirementsError(error);
   });
 
   it("allows selected triggers without requirements when capability metadata is missing", () => {
@@ -124,7 +119,7 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
   });
 
   it("rejects selected triggers with requirements when capability metadata is missing", () => {
-    expect(() =>
+    const error = captureError(() =>
       assertWebhookTriggerRequirementsOrThrow({
         eventTypes: ["github.pull_request.opened"],
         providerMetadata: {},
@@ -144,7 +139,9 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
           },
         ],
       }),
-    ).toThrow(BadRequestError);
+    );
+
+    expectInvalidWebhookTriggerRequirementsError(error);
   });
 
   it("validates all advertised triggers when eventTypes is null", () => {
@@ -198,4 +195,13 @@ function captureError(action: () => void): unknown {
   }
 
   return undefined;
+}
+
+function expectInvalidWebhookTriggerRequirementsError(error: unknown): void {
+  expect(error).toBeInstanceOf(BadRequestError);
+  if (!(error instanceof BadRequestError)) {
+    throw new Error("Expected trigger requirements assertion to fail with BadRequestError.");
+  }
+
+  expect(error.code).toBe(AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS);
 }
