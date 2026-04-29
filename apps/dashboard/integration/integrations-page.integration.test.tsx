@@ -278,7 +278,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
     }
   });
 
-  it("offers delete for binding-only connections and calls the delete endpoint", async () => {
+  it("offers delete for inactive-binding connections and calls the delete endpoint", async () => {
     const deleteRequests: string[] = [];
     const renderedPage = await renderDashboardPageIntegration({
       handler: (request, response) => {

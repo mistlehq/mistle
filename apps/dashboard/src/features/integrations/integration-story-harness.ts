@@ -365,7 +365,7 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
           connectionId,
         }),
         bindingCount: 3,
-        canDelete: true,
+        canDelete: false,
         displayName: "GitHub App (Ready)",
         installation: {
           actionLabel: "Manage installation",
@@ -767,7 +767,7 @@ function createScenarioDetailViewStoryProps(
       {
         automationCount: input.automationCount ?? 0,
         bindingCount: input.bindingCount ?? 0,
-        canDelete: (input.automationCount ?? 0) === 0,
+        canDelete: (input.bindingCount ?? 0) === 0 && (input.automationCount ?? 0) === 0,
         ...(authMethod === undefined ? {} : authMethod),
         ...(input.contextItems === undefined ? {} : { contextItems: input.contextItems }),
         displayName: input.displayName,

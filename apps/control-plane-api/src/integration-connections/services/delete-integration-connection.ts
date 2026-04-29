@@ -154,15 +154,6 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
   }
 }
 
-async function deleteInactiveVersionBindings(input: {
-  db: ControlPlaneDatabase;
-  connectionId: string;
-}): Promise<void> {
-  await input.db
-    .delete(sandboxProfileVersionIntegrationBindings)
-    .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId));
-}
-
 export async function deleteIntegrationConnection(
   ctx: {
     db: ControlPlaneDatabase;
@@ -262,10 +253,9 @@ export async function deleteIntegrationConnection(
       connectionId: input.connectionId,
     });
 
-    await deleteInactiveVersionBindings({
-      db: tx,
-      connectionId: input.connectionId,
-    });
+    await tx
+      .delete(sandboxProfileVersionIntegrationBindings)
+      .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId));
 
     const connectionOwnedWebhookSources = await tx.query.integrationWebhookSources.findMany({
       columns: {
