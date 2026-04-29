@@ -36,6 +36,7 @@ describe("resolveCodexTurnStartParams", () => {
         providerConversationId: "thread_123",
         inputText: "Handle the webhook payload.",
         model: "gpt-5.3-codex",
+        modelReasoningEffort: "high",
         collaborationModeSettings: {
           developerInstructions: "Always include the automation marker.",
         },
@@ -43,6 +44,7 @@ describe("resolveCodexTurnStartParams", () => {
     ).toEqual({
       threadId: "thread_123",
       model: "gpt-5.3-codex",
+      effort: "high",
       input: [
         {
           type: "text",
@@ -52,6 +54,8 @@ describe("resolveCodexTurnStartParams", () => {
       collaborationMode: {
         mode: "default",
         settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: "high",
           developer_instructions: "Always include the automation marker.",
         },
       },
@@ -74,6 +78,36 @@ describe("resolveCodexTurnStartParams", () => {
           text: "Handle the webhook payload.",
         },
       ],
+    });
+  });
+
+  it("uses null collaboration mode reasoning effort when no model reasoning effort is provided", () => {
+    expect(
+      resolveCodexTurnStartParams({
+        providerConversationId: "thread_123",
+        inputText: "Handle the webhook payload.",
+        model: "gpt-5.3-codex",
+        collaborationModeSettings: {
+          developerInstructions: null,
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      model: "gpt-5.3-codex",
+      input: [
+        {
+          type: "text",
+          text: "Handle the webhook payload.",
+        },
+      ],
+      collaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: null,
+          developer_instructions: null,
+        },
+      },
     });
   });
 });

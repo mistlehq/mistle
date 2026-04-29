@@ -35,6 +35,7 @@ type DeliveryServer = {
 
 type DeliveryServerScenario =
   | "existing_conversation"
+  | "existing_conversation_with_collaboration_mode"
   | "create_conversation"
   | "resume_not_loaded_conversation"
   | "no_default_model";
@@ -175,22 +176,43 @@ function expectRequestModel(input: {
   method: string;
   params: Record<string, unknown> | undefined;
   expectedModel: string;
-  expectedModelReasoningEffort?: string | undefined;
+  expectedEffort?: string | undefined;
 }): void {
   if (input.params === undefined || input.params.model !== input.expectedModel) {
     throw new Error(`Expected ${input.method} to use Codex model '${input.expectedModel}'.`);
   }
-  if (input.expectedModelReasoningEffort === undefined) {
-    if ("modelReasoningEffort" in input.params) {
-      throw new Error(`Expected ${input.method} to omit Codex model reasoning effort.`);
+  if (input.expectedEffort === undefined) {
+    if ("effort" in input.params) {
+      throw new Error(`Expected ${input.method} to omit Codex reasoning effort.`);
     }
     return;
   }
-  if (input.params.modelReasoningEffort !== input.expectedModelReasoningEffort) {
+  if (input.params.effort !== input.expectedEffort) {
     throw new Error(
-      `Expected ${input.method} to use Codex model reasoning effort '${input.expectedModelReasoningEffort}'.`,
+      `Expected ${input.method} to use Codex reasoning effort '${input.expectedEffort}'.`,
     );
   }
+}
+
+function expectCollaborationModeSettings(input: {
+  params: Record<string, unknown> | undefined;
+  expectedModel: string;
+  expectedEffort: string | null;
+  expectedDeveloperInstructions: string | null;
+}): void {
+  if (input.params === undefined) {
+    throw new Error("Expected JSON-RPC params.");
+  }
+  const collaborationMode = expectRecord(input.params.collaborationMode);
+  if (collaborationMode.mode !== "default") {
+    throw new Error("Expected default Codex collaboration mode.");
+  }
+  const settings = expectRecord(collaborationMode.settings);
+  expect(settings).toEqual({
+    model: input.expectedModel,
+    reasoning_effort: input.expectedEffort,
+    developer_instructions: input.expectedDeveloperInstructions,
+  });
 }
 
 function readDeliveryContextMessage(value: unknown): DeliveryContextMessage {
@@ -404,7 +426,7 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
                 method: methodPayload.method,
                 params: methodPayload.params,
                 expectedModel: FallbackCodexModel,
-                expectedModelReasoningEffort: FallbackCodexModelReasoningEffort,
+                expectedEffort: FallbackCodexModelReasoningEffort,
               }
             : {
                 method: methodPayload.method,
@@ -412,6 +434,14 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
                 expectedModel: DefaultCodexModel,
               },
         );
+        if (scenario === "existing_conversation_with_collaboration_mode") {
+          expectCollaborationModeSettings({
+            params: methodPayload.params,
+            expectedModel: DefaultCodexModel,
+            expectedEffort: null,
+            expectedDeveloperInstructions: "Use the staged Slack workflow instructions.",
+          });
+        }
         socket.send(
           encodeAgentTextPayload({
             streamId: activeStreamId,
@@ -529,6 +559,56 @@ describe("executeConversationProviderDelivery", () => {
 
       const methodSequence = await server.methodSequence;
       expect(methodSequence).toEqual([
+        "initialize",
+        "initialized",
+        "mistle/setDeliveryContext",
+        "thread/read",
+        "model/list",
+        "turn/start",
+      ]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("sends complete Codex collaboration mode settings when automation instructions are present", async () => {
+    const server = await startDeliveryServer("existing_conversation_with_collaboration_mode");
+
+    try {
+      const activeContext = trace.setSpan(
+        context.active(),
+        trace.wrapSpanContext(ParentSpanContext),
+      );
+
+      const result = await context.with(
+        activeContext,
+        async () =>
+          await executeConversationProviderDelivery({
+            conversationId: "acv_123",
+            runtimeId: "codex",
+            connectionUrl: server.url,
+            inputText: "Handle the webhook payload.",
+            deliveryContext: {
+              webhookEventId: "iwe_123",
+              deliveryTaskId: "cdt_123",
+              automationRunId: "aru_123",
+              conversationId: "acv_123",
+              sandboxInstanceId: "sbi_123",
+              routeId: "acr_123",
+            },
+            collaborationModeSettings: {
+              developerInstructions: "Use the staged Slack workflow instructions.",
+            },
+            providerConversationId: "thread_123",
+            providerExecutionId: null,
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_123",
+        providerExecutionId: "turn_123",
+      });
+      expect(await server.methodSequence).toEqual([
         "initialize",
         "initialized",
         "mistle/setDeliveryContext",

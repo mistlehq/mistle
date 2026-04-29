@@ -429,12 +429,14 @@ export function resolveCodexTurnStartParams(input: {
 }): {
   threadId: string;
   model: string;
-  modelReasoningEffort?: string | undefined;
+  effort?: string | undefined;
   input: CodexStartExecutionInputItem[];
   collaborationMode?:
     | {
         mode: "default";
         settings: {
+          model: string;
+          reasoning_effort: string | null;
           developer_instructions: string | null;
         };
       }
@@ -443,9 +445,7 @@ export function resolveCodexTurnStartParams(input: {
   return {
     threadId: input.providerConversationId,
     model: input.model,
-    ...(input.modelReasoningEffort === undefined
-      ? {}
-      : { modelReasoningEffort: input.modelReasoningEffort }),
+    ...(input.modelReasoningEffort === undefined ? {} : { effort: input.modelReasoningEffort }),
     input: toCodexTextInputItems(input.inputText),
     ...(input.collaborationModeSettings === undefined
       ? {}
@@ -453,6 +453,8 @@ export function resolveCodexTurnStartParams(input: {
           collaborationMode: {
             mode: "default" as const,
             settings: {
+              model: input.model,
+              reasoning_effort: input.modelReasoningEffort ?? null,
               developer_instructions: input.collaborationModeSettings.developerInstructions,
             },
           },
