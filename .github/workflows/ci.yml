@@ -132,7 +132,10 @@ jobs:
             ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -202,7 +205,10 @@ jobs:
             ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -283,7 +289,10 @@ jobs:
             ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -345,7 +354,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Generate integration config
@@ -401,7 +413,10 @@ jobs:
             ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -473,7 +488,10 @@ jobs:
             ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-
             ${{ runner.os }}-turbo-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -542,7 +560,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
@@ -620,7 +641,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Install dependencies in Nix shell
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
