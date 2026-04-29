@@ -12,6 +12,9 @@ import {
   SelectValue,
   Textarea,
   TextLink,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
 import {
   ArrowCircleUpIcon,
@@ -438,10 +441,20 @@ export function ChatComposer({
             )}
           </div>
           {contextUsage === null ? null : (
-            <div className="ml-auto flex shrink-0 items-center gap-1.5" title={contextUsage.title}>
-              <GaugeIcon aria-hidden="true" className="size-4" />
-              <span>{contextUsage.label}</span>
-            </div>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span
+                    className="ml-auto flex shrink-0 cursor-default items-center gap-1.5 outline-none transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    tabIndex={0}
+                  />
+                }
+              >
+                <GaugeIcon aria-hidden="true" className="size-4" />
+                <span>{contextUsage.label}</span>
+              </TooltipTrigger>
+              <TooltipContent side="top">{contextUsage.title}</TooltipContent>
+            </Tooltip>
           )}
         </div>
       )}
