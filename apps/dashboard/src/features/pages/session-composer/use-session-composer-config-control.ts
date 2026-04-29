@@ -1,9 +1,11 @@
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useCallback, useMemo, useState } from "react";
 
-import type { CodexSessionConfigState } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
-import type { SessionBootstrapResult } from "../../session-agents/codex/session-state/session-bootstrap/index.js";
+import type {
+  CodexSessionConfigState,
+  SessionBootstrapResult,
+} from "../../session-agents/codex/session-state/session-bootstrap/index.js";
 import type { ComposerConfigSnapshot } from "./session-composer-config.js";
+import { resolveActiveComposerModel } from "./session-composer-model-readiness.js";
 
 export type SessionComposerConfigControl = {
   selectedModel: string | null;
@@ -19,22 +21,12 @@ export type SessionComposerConfigControl = {
   setReasoningEffort: (value: string) => void;
 };
 
-function findSelectedModel(input: {
-  availableModels: readonly CodexModelSummary[];
-  selectedModel: string | null;
-}): CodexModelSummary | null {
-  if (input.selectedModel !== null) {
-    return input.availableModels.find((model) => model.model === input.selectedModel) ?? null;
-  }
-
-  return input.availableModels.find((model) => model.isDefault) ?? null;
-}
-
 export function useSessionComposerConfigControl(input: {
   bootstrap: SessionBootstrapResult;
   clearSessionErrorMessage: () => void;
   codexConfig: CodexSessionConfigState;
 }): SessionComposerConfigControl {
+  const { availableModels, configSnapshot } = input.bootstrap.establishedSnapshot;
   const { batchWriteConfig, isBatchWritingConfig, isWritingConfigValue, writeConfigValue } =
     input.codexConfig;
   const [composerConfigOverrides, setComposerConfigOverrides] = useState<ComposerConfigSnapshot>({
@@ -45,47 +37,42 @@ export function useSessionComposerConfigControl(input: {
   const selectedModel = useMemo(
     () =>
       composerConfigOverrides.model ??
-      input.bootstrap.establishedSnapshot.configSnapshot.model ??
-      findSelectedModel({
-        availableModels: input.bootstrap.establishedSnapshot.availableModels,
+      configSnapshot.model ??
+      resolveActiveComposerModel({
+        availableModels,
         selectedModel: null,
       })?.model ??
       null,
-    [
-      composerConfigOverrides.model,
-      input.bootstrap.establishedSnapshot.availableModels,
-      input.bootstrap.establishedSnapshot.configSnapshot.model,
-    ],
+    [availableModels, composerConfigOverrides.model, configSnapshot.model],
   );
 
   const selectedReasoningEffort = useMemo(() => {
     const explicitReasoningEffort =
-      composerConfigOverrides.modelReasoningEffort ??
-      input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort;
+      composerConfigOverrides.modelReasoningEffort ?? configSnapshot.modelReasoningEffort;
     if (explicitReasoningEffort !== null) {
       return explicitReasoningEffort;
     }
 
     return (
-      findSelectedModel({
-        availableModels: input.bootstrap.establishedSnapshot.availableModels,
+      resolveActiveComposerModel({
+        availableModels,
         selectedModel,
       })?.defaultReasoningEffort ?? null
     );
   }, [
+    availableModels,
     composerConfigOverrides.modelReasoningEffort,
-    input.bootstrap.establishedSnapshot.availableModels,
-    input.bootstrap.establishedSnapshot.configSnapshot.modelReasoningEffort,
+    configSnapshot.modelReasoningEffort,
     selectedModel,
   ]);
 
   const modelOptions = useMemo(
     () =>
-      input.bootstrap.establishedSnapshot.availableModels.map((model) => ({
+      availableModels.map((model) => ({
         value: model.model,
         label: model.displayName,
       })),
-    [input.bootstrap.establishedSnapshot.availableModels],
+    [availableModels],
   );
 
   const setModel = useCallback(
