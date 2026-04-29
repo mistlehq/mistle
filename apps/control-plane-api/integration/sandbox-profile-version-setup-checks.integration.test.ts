@@ -47,7 +47,29 @@ const SetupCheckStartWorkflowInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   purpose: z.literal("setup_check"),
   persistenceMode: z.literal("ephemeral"),
+  image: z
+    .object({
+      imageId: z.string().min(1),
+      createdAt: z.iso.datetime().optional(),
+      kind: z.enum(["base", "snapshot"]),
+      provider: z.enum(["docker", "e2b"]).optional(),
+    })
+    .strict(),
   runtimePlan: z.looseObject({
+    image: z.discriminatedUnion("source", [
+      z
+        .object({
+          source: z.literal("base"),
+          imageRef: z.string().min(1),
+        })
+        .strict(),
+      z
+        .object({
+          source: z.literal("snapshot"),
+          imageRef: z.string().min(1),
+        })
+        .strict(),
+    ]),
     setupScript: z.string().min(1).optional(),
   }),
 });
@@ -256,6 +278,75 @@ describe("sandbox profile version setup checks integration", () => {
         purpose: SandboxInstancePurposes.SETUP_CHECK,
         persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
       });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
+  it("launches published setup checks from the base image so the setup script runs", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
+      fixture,
+      databaseNamePrefix: "mistle_cp_setup_check_published_base",
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-published-base@example.com",
+      });
+      await fixture.db.insert(sandboxProfiles).values({
+        ...createSandboxProfileFixture({
+          id: "sbp_setup_check_published_base_001",
+          organizationId: authenticatedSession.organizationId,
+          displayName: "Published Setup Check Profile",
+          activeVersion: 1,
+          createdAt: "2026-04-01T00:00:00.000Z",
+        }),
+      });
+      await fixture.db.insert(sandboxProfileVersions).values({
+        ...createSandboxProfileVersionFixture({
+          sandboxProfileId: "sbp_setup_check_published_base_001",
+          version: 1,
+          state: SandboxProfileVersionStates.PUBLISHED,
+          publishedAt: "2026-04-02T00:00:00.000Z",
+          setupScript: "echo persisted-published-script",
+        }),
+        snapshotImageProvider: "docker",
+        snapshotImageId: "sha256:published-setup-check-snapshot",
+      });
+
+      const response = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_published_base_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "exit 1",
+            idempotencyKey: "setup-check-published-base-001",
+          }),
+        },
+      );
+
+      expect(response.status).toBe(201);
+      const responseBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await response.json(),
+      );
+      const queuedWorkflowInput = await waitForQueuedSetupCheckStartWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: responseBody.sandboxInstanceId,
+      });
+
+      expect(queuedWorkflowInput.image.kind).toBe("base");
+      expect(queuedWorkflowInput.image.imageId).not.toBe("sha256:published-setup-check-snapshot");
+      expect(queuedWorkflowInput.runtimePlan.image).toMatchObject({
+        source: "base",
+      });
+      expect(queuedWorkflowInput.runtimePlan.setupScript).toBe("exit 1");
     } finally {
       await dataPlaneFixture.stop();
     }

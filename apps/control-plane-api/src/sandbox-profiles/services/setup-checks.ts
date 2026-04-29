@@ -250,6 +250,7 @@ export async function createProfileVersionSetupCheck(
       profileId: input.profileId,
       profileVersion: input.profileVersion,
       purpose: SandboxInstancePurposes.SETUP_CHECK,
+      forceBaseImage: true,
       ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
       setupScript: input.setupScript,
       startedBy: {

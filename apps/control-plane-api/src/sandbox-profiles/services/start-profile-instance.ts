@@ -47,6 +47,7 @@ type StartProfileInstanceInput = {
   source: SandboxInstanceSource;
   purpose?: SandboxInstancePurpose;
   setupScript?: string | null;
+  forceBaseImage?: boolean;
 };
 
 type StartProfileInstanceOutput = {
@@ -166,6 +167,7 @@ async function resolveLaunchImage(
     organizationId: string;
     profileId: string;
     profileVersion: number;
+    forceBaseImage?: boolean;
   },
 ): Promise<ResolvedLaunchImage> {
   const [sandboxProfileVersion] = await db
@@ -202,6 +204,21 @@ async function resolveLaunchImage(
       SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
       "Sandbox profile version was not found.",
     );
+  }
+
+  if (input.forceBaseImage === true) {
+    return {
+      versionState: sandboxProfileVersion.state,
+      compileImage: {
+        source: "base",
+        imageRef: defaultBaseImage,
+      },
+      workflowImage: {
+        imageId: defaultBaseImage,
+        createdAt: new Date().toISOString(),
+        kind: LaunchImageKinds.BASE,
+      },
+    };
   }
 
   if (sandboxProfileVersion.state === SandboxProfileVersionStates.PUBLISHED) {
@@ -265,6 +282,9 @@ export async function startProfileInstance(
       organizationId: serviceInput.organizationId,
       profileId: serviceInput.profileId,
       profileVersion: serviceInput.profileVersion,
+      ...(serviceInput.forceBaseImage === undefined
+        ? {}
+        : { forceBaseImage: serviceInput.forceBaseImage }),
     },
   );
   const compiledRuntimePlan = await compileProfileVersionRuntimePlan(
