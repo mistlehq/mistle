@@ -878,6 +878,10 @@ describe("integration connections GitHub App integration", () => {
         body: JSON.stringify({
           manifest: {
             name: "Mistle GitHub App",
+            default_events: ["issues"],
+            default_permissions: {
+              issues: "read",
+            },
           },
           owner: {
             kind: "personal",
