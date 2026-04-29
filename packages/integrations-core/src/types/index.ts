@@ -529,6 +529,10 @@ export type IntegrationProviderAppSetupResult = {
   };
 };
 
+export type IntegrationProviderAppSetupCompleteResult = IntegrationProviderAppSetupResult & {
+  completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
+};
+
 export type IntegrationProviderAppSetupConnectionSecretResolver = (input: {
   secretKind: string;
   slotKey: string;
@@ -581,7 +585,7 @@ export type IntegrationProviderAppSetupFlowCapability<
       TTargetSecrets,
       TConnectionConfig
     >,
-  ): MaybePromise<IntegrationProviderAppSetupResult>;
+  ): MaybePromise<IntegrationProviderAppSetupCompleteResult>;
   start?(
     input: IntegrationProviderAppSetupStartInput<TTargetConfig, TTargetSecrets, TConnectionConfig>,
   ): MaybePromise<
