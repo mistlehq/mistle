@@ -279,7 +279,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
   });
 
   it("offers delete for inactive-binding connections and calls the delete endpoint", async () => {
-    const deleteRequests: string[] = [];
+    const deleteRequestPaths: string[] = [];
     const renderedPage = await renderDashboardPageIntegration({
       handler: (request, response) => {
         const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -305,7 +305,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                 {
                   id: "icn_inactive_binding",
                   targetKey: "github",
-                  displayName: "Inactive Binding GitHub",
+                  displayName: "Inactive binding GitHub",
                   status: "active",
                   bindingCount: 0,
                   config: {
@@ -350,7 +350,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
               `Delete request path '${requestUrl.pathname}' is missing connection id.`,
             );
           }
-          deleteRequests.push(`${requestUrl.pathname}${requestUrl.search}`);
+          deleteRequestPaths.push(`${requestUrl.pathname}${requestUrl.search}`);
           response.writeHead(200, { "content-type": "application/json" });
           response.end(
             JSON.stringify({
@@ -368,13 +368,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
     try {
       fireEvent.click(
-        await screen.findByRole("button", { name: "Delete connection Inactive Binding GitHub" }),
+        await screen.findByRole("button", { name: "Delete connection Inactive binding GitHub" }),
       );
       expect(await screen.findByText("Delete integration connection")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Delete connection" }));
 
       await waitFor(() => {
-        expect(deleteRequests).toContain("/v1/integration/connections/icn_inactive_binding");
+        expect(deleteRequestPaths).toContain("/v1/integration/connections/icn_inactive_binding");
       });
       await waitFor(() => {
         expect(screen.queryByText("Delete integration connection")).toBeNull();
@@ -387,7 +387,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
       await waitFor(() => {
         expect(screen.queryByText("Delete integration connection")).toBeNull();
-        expect(deleteRequests).toContain("/v1/integration/connections/icn_free");
+        expect(deleteRequestPaths).toContain("/v1/integration/connections/icn_free");
       });
     } finally {
       await renderedPage.close();

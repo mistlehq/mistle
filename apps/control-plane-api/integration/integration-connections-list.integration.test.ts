@@ -494,7 +494,7 @@ describe("integration connections list integration", () => {
     });
   });
 
-  it("deletes inactive binding connections and blocks active connection usage", async ({
+  it("deletes inactive binding connections and blocks active bindings or automations", async ({
     fixture,
   }) => {
     const session = await fixture.authSession({
@@ -544,7 +544,7 @@ describe("integration connections list integration", () => {
     await insertBindingUsage(fixture, {
       organizationId: session.organizationId,
       profileId: "spf_delete_draft_binding",
-      profileDisplayName: "Delete draft binding test profile",
+      profileDisplayName: "Draft binding test profile",
       bindingId: "ibd_delete_draft_binding",
       connectionId: "icn_delete_draft_binding",
       state: SandboxProfileVersionStates.DRAFT,
@@ -635,27 +635,18 @@ describe("integration connections list integration", () => {
     const listUsagePage = ListIntegrationConnectionsResponseSchema.parse(
       await listUsageResponse.json(),
     );
-    function expectListedBindingCount(input: { bindingCount: number; connectionId: string }): void {
+    function expectListedBindingCount(connectionId: string, bindingCount: number): void {
       const listedConnection = listUsagePage.items.find(
-        (connection) => connection.id === input.connectionId,
+        (connection) => connection.id === connectionId,
       );
 
       expect(listedConnection).toBeDefined();
-      expect(listedConnection?.bindingCount).toBe(input.bindingCount);
+      expect(listedConnection?.bindingCount).toBe(bindingCount);
     }
 
-    expectListedBindingCount({
-      bindingCount: 0,
-      connectionId: "icn_delete_draft_binding",
-    });
-    expectListedBindingCount({
-      bindingCount: 0,
-      connectionId: "icn_delete_inactive_published_binding",
-    });
-    expectListedBindingCount({
-      bindingCount: 1,
-      connectionId: "icn_delete_active_version_binding",
-    });
+    expectListedBindingCount("icn_delete_draft_binding", 0);
+    expectListedBindingCount("icn_delete_inactive_published_binding", 0);
+    expectListedBindingCount("icn_delete_active_version_binding", 1);
 
     const deleteFreeResponse = await fixture.request(
       "/v1/integration/connections/icn_delete_free",
