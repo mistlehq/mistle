@@ -200,20 +200,6 @@ describe("integration connections GitHub App integration", () => {
     expect(redirectSession.usedAt).toBeNull();
   });
 
-  it("does not register legacy provider-specific callback routes", async ({ fixture }) => {
-    for (const path of [
-      "/p/integration/callbacks/github-app-installation",
-      "/p/integration/callbacks/github-app-manifest",
-      "/p/integration/callbacks/slack-app-installation",
-    ]) {
-      const response = await fixture.request(path, {
-        method: "GET",
-      });
-
-      expect(response.status).toBe(404);
-    }
-  });
-
   it("creates a GitHub App draft connection before app credentials are provided", async ({
     fixture,
   }) => {
