@@ -3,6 +3,7 @@ import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import type {
   IntegrationConnectionMethodId,
+  IntegrationProviderAppSetupCompletionRedirect,
   IntegrationProviderAppSetupFlowCapability,
   IntegrationProviderAppSetupStartResult,
   IntegrationRegistry,
@@ -42,7 +43,7 @@ const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 
 type CompletedProviderAppSetup = {
-  callbackRouteKey: string;
+  completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
   id: string;
   targetKey: string;
   routeSegment: string;
@@ -532,6 +533,13 @@ export async function completeProviderAppSetup(
     );
   }
 
+  const completionRedirect = setupResult.completionRedirect;
+  if (completionRedirect === undefined) {
+    throw new Error(
+      `Integration setup flow '${stateMetadata.routeSegment}' completed without a redirect destination.`,
+    );
+  }
+
   const formMethod = resolveFormConnectionMethodOrThrow({
     targetKey: connection.targetKey,
     methodId: flow.methodId,
@@ -559,7 +567,7 @@ export async function completeProviderAppSetup(
 
   return {
     ...completedConnection,
-    callbackRouteKey: input.callbackRouteKey,
+    completionRedirect,
     routeSegment: stateMetadata.routeSegment,
   };
 }

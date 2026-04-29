@@ -510,7 +510,18 @@ export type IntegrationProviderAppSetupConnectionUpdate = {
   externalSubjectId?: string | null;
 };
 
+export type IntegrationProviderAppSetupCompletionRedirect =
+  | {
+      kind: "connection-detail";
+      notice?: string;
+    }
+  | {
+      kind: "setup-route";
+      query?: Record<string, string>;
+    };
+
 export type IntegrationProviderAppSetupResult = {
+  completionRedirect?: IntegrationProviderAppSetupCompletionRedirect;
   connection?: IntegrationProviderAppSetupConnectionUpdate;
   secrets?: Record<string, string>;
   webhookSource?: {

@@ -130,6 +130,10 @@ export function createGitHubProviderAppSetupCapability(
             );
 
             return {
+              completionRedirect: {
+                kind: "connection-detail",
+                notice: "installed",
+              },
               connection: {
                 externalSubjectId: installationId,
                 config: {
@@ -152,6 +156,12 @@ export function createGitHubProviderAppSetupCapability(
           });
 
           return {
+            completionRedirect: {
+              kind: "setup-route",
+              query: {
+                githubAppManifest: "created",
+              },
+            },
             connection: {
               config: buildConvertedGitHubAppConnectionConfig({ conversion }),
             },
@@ -196,6 +206,10 @@ export function createGitHubProviderAppSetupCapability(
           const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
 
           return {
+            completionRedirect: {
+              kind: "connection-detail",
+              notice: "installed",
+            },
             connection: {
               externalSubjectId: installationId,
               config: {

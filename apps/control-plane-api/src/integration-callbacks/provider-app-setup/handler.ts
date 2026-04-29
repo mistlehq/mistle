@@ -1,5 +1,6 @@
 import type { RouteHandler } from "@hono/zod-openapi";
 import { withHttpErrorHandler } from "@mistle/http/errors.js";
+import type { IntegrationProviderAppSetupCompletionRedirect } from "@mistle/integrations-core";
 
 import { IntegrationConnectionsBadRequestCodes } from "../../integration-connections/constants.js";
 import { completeProviderAppSetup } from "../../integration-connections/services/provider-app-setup.js";
@@ -7,36 +8,32 @@ import { buildDashboardUrl } from "../../lib/dashboard-url.js";
 import type { AppContextBindings } from "../../types.js";
 import { route } from "./route.js";
 
-const GitHubAppManifestCallbackRouteKey = "github-app-manifest";
-const GitHubAppInstallationCallbackRouteKey = "github-app-installation";
-const SlackAppInstallationCallbackRouteKey = "slack-app-installation";
-
 function buildProviderAppSetupCallbackRedirectUrl(input: {
-  callbackRouteKey: string;
   connectionId: string;
+  completionRedirect: IntegrationProviderAppSetupCompletionRedirect;
   dashboardBaseUrl: string;
   routeSegment: string;
   targetKey: string;
 }): string {
-  if (input.callbackRouteKey === GitHubAppManifestCallbackRouteKey) {
+  if (input.completionRedirect.kind === "setup-route") {
+    const queryParams = new URLSearchParams(input.completionRedirect.query);
+    const query = queryParams.size === 0 ? "" : `?${queryParams.toString()}`;
+
     return buildDashboardUrl(
       input.dashboardBaseUrl,
-      `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.connectionId)}/${encodeURIComponent(input.routeSegment)}/setup?githubAppManifest=created`,
+      `/integrations/${encodeURIComponent(input.targetKey)}/${encodeURIComponent(input.connectionId)}/${encodeURIComponent(input.routeSegment)}/setup${query}`,
     );
   }
 
-  if (
-    input.callbackRouteKey === GitHubAppInstallationCallbackRouteKey ||
-    input.callbackRouteKey === SlackAppInstallationCallbackRouteKey
-  ) {
-    return buildDashboardUrl(
-      input.dashboardBaseUrl,
-      `/integrations/${encodeURIComponent(input.targetKey)}?connectionId=${encodeURIComponent(input.connectionId)}&connectionNotice=installed`,
-    );
+  const queryParams = new URLSearchParams();
+  queryParams.set("connectionId", input.connectionId);
+  if (input.completionRedirect.notice !== undefined) {
+    queryParams.set("connectionNotice", input.completionRedirect.notice);
   }
 
-  throw new Error(
-    `Provider app setup callback route key '${input.callbackRouteKey}' has no dashboard redirect destination.`,
+  return buildDashboardUrl(
+    input.dashboardBaseUrl,
+    `/integrations/${encodeURIComponent(input.targetKey)}?${queryParams.toString()}`,
   );
 }
 
@@ -64,8 +61,8 @@ const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContex
 
   return ctx.redirect(
     buildProviderAppSetupCallbackRedirectUrl({
-      callbackRouteKey: completedConnection.callbackRouteKey,
       connectionId: completedConnection.id,
+      completionRedirect: completedConnection.completionRedirect,
       dashboardBaseUrl: config.dashboard.baseUrl,
       routeSegment: completedConnection.routeSegment,
       targetKey: completedConnection.targetKey,

@@ -205,6 +205,10 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
         });
 
         return {
+          completionRedirect: {
+            kind: "connection-detail",
+            notice: "installed",
+          },
           connection: {
             externalSubjectId: slackOAuthAccess.team?.id ?? slackOAuthAccess.app_id ?? null,
           },
