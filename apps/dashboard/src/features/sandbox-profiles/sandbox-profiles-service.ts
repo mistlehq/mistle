@@ -272,6 +272,17 @@ export async function deleteSandboxProfile(input: {
   }
 }
 
+const SandboxProfileVersionRefreshScheduleSummarySchema = z
+  .object({
+    scheduleId: z.string().min(1),
+    name: z.string().min(1),
+    cronExpression: z.string().min(1),
+    timezone: z.string().min(1),
+    enabled: z.boolean(),
+    nextScheduledAt: z.string().min(1).nullable(),
+  })
+  .strict();
+
 const SandboxProfileVersionSchema = z
   .object({
     isActive: z.boolean(),
@@ -288,17 +299,7 @@ const SandboxProfileVersionSchema = z
       })
       .strict()
       .nullable(),
-    refreshSchedule: z
-      .object({
-        scheduleId: z.string().min(1),
-        name: z.string().min(1),
-        cronExpression: z.string().min(1),
-        timezone: z.string().min(1),
-        enabled: z.boolean(),
-        nextScheduledAt: z.string().min(1).nullable(),
-      })
-      .strict()
-      .nullable(),
+    refreshSchedule: SandboxProfileVersionRefreshScheduleSummarySchema.nullable(),
     sandboxProfileId: z.string().min(1),
     state: z.enum(["draft", "published"]),
     usable: z.boolean(),
@@ -361,18 +362,11 @@ const DiscardSandboxProfileVersionDraftResultSchema = z
   })
   .strict();
 
-const SandboxProfileVersionRefreshScheduleResponseSchema = z
-  .object({
-    scheduleId: z.string().min(1),
+const SandboxProfileVersionRefreshScheduleResponseSchema =
+  SandboxProfileVersionRefreshScheduleSummarySchema.extend({
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
-    name: z.string().min(1),
-    cronExpression: z.string().min(1),
-    timezone: z.string().min(1),
-    enabled: z.boolean(),
-    nextScheduledAt: z.string().min(1).nullable(),
-  })
-  .strict();
+  }).strict();
 
 const DeleteSandboxProfileVersionRefreshScheduleResultSchema = z
   .object({
