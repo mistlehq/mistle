@@ -58,7 +58,12 @@ describe("buildWebhookAutomationEventOptions", () => {
             callbackUrl:
               "https://control-plane.example.com/p/integration/webhooks/github-cloud/ep_github",
             status: "active",
-            providerMetadata: {},
+            providerMetadata: {
+              [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+                events: ["issue_comment"],
+                permissions: [{ permission: "issues", access: "read" }],
+              },
+            },
             createdAt: "2026-03-16T10:00:00.000Z",
             updatedAt: "2026-03-16T10:00:00.000Z",
           },

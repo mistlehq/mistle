@@ -140,8 +140,12 @@ export function isWebhookTriggerSupportedByCapabilities(input: {
   capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   requirements: IntegrationWebhookTriggerRequirements | undefined;
 }): boolean {
-  if (input.requirements === undefined || input.capabilities === undefined) {
+  if (input.requirements === undefined) {
     return true;
+  }
+
+  if (input.capabilities === undefined) {
+    return false;
   }
 
   const capabilities = input.capabilities;

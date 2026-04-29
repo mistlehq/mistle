@@ -90,6 +90,31 @@ describe("webhook trigger capabilities", () => {
     ).toBe(true);
   });
 
+  it("allows triggers without capability requirements when capabilities are missing", () => {
+    expect(
+      isWebhookTriggerSupportedByCapabilities({
+        capabilities: undefined,
+        requirements: undefined,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects triggers with capability requirements when capabilities are missing", () => {
+    expect(
+      isWebhookTriggerSupportedByCapabilities({
+        capabilities: undefined,
+        requirements: {
+          anyOf: [
+            {
+              event: "pull_request",
+              permissions: [{ permission: "pull_requests", access: "read" }],
+            },
+          ],
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("parses capability provider metadata", () => {
     expect(
       parseWebhookTriggerCapabilitiesProviderMetadata({

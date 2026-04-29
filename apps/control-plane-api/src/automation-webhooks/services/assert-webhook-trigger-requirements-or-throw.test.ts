@@ -107,7 +107,23 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
     expect(error.code).toBe(AutomationWebhooksBadRequestCodes.INVALID_WEBHOOK_TRIGGER_REQUIREMENTS);
   });
 
-  it("allows existing sources without capability metadata", () => {
+  it("allows selected triggers without requirements when capability metadata is missing", () => {
+    expect(() =>
+      assertWebhookTriggerRequirementsOrThrow({
+        eventTypes: ["github.issues.opened"],
+        providerMetadata: {},
+        supportedWebhookEvents: [
+          {
+            eventType: "github.issues.opened",
+            providerEventType: "issues",
+            displayName: "Issue opened",
+          },
+        ],
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects selected triggers with requirements when capability metadata is missing", () => {
     expect(() =>
       assertWebhookTriggerRequirementsOrThrow({
         eventTypes: ["github.pull_request.opened"],
@@ -128,7 +144,7 @@ describe("assertWebhookTriggerRequirementsOrThrow", () => {
           },
         ],
       }),
-    ).not.toThrow();
+    ).toThrow(BadRequestError);
   });
 
   it("validates all advertised triggers when eventTypes is null", () => {

@@ -13,9 +13,6 @@ export function assertWebhookTriggerRequirementsOrThrow(input: {
   supportedWebhookEvents: readonly IntegrationWebhookEventDefinition[];
 }): void {
   const capabilities = parseWebhookTriggerCapabilitiesProviderMetadata(input.providerMetadata);
-  if (capabilities === undefined) {
-    return;
-  }
 
   const selectedEvents =
     input.eventTypes === null
