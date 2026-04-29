@@ -35,7 +35,7 @@ import type { PortsTargetAuthorizeService } from "./ports-target-authorize-servi
 
 const PortAccessBootstrapPath = "/_mistle/access/bootstrap";
 
-function readCookieValue(input: {
+export function readCookieValue(input: {
   cookieHeader: string | undefined;
   cookieName: string;
 }): string | undefined {
@@ -356,7 +356,7 @@ export function registerPortAccessRoutes(input: {
   });
 }
 
-async function resolvePortAccessRequest(input: {
+export async function resolvePortAccessRequest(input: {
   clock: Clock;
   cookieHeader: string | undefined;
   forwardedProto: string | undefined;
@@ -372,6 +372,7 @@ async function resolvePortAccessRequest(input: {
       browserEdgePort: string;
       browserEdgeProto: "http" | "https";
       parsedHost: ReturnType<typeof parsePortAccessHost>;
+      portAccessSessionId: string;
       verifiedSession: Awaited<ReturnType<typeof verifyPortAccessSession>>;
     }
 > {
@@ -399,13 +400,14 @@ async function resolvePortAccessRequest(input: {
     cookieHeader: input.cookieHeader,
     cookieName: PortAccessSessionCookieName,
   });
+  const portAccessSessionId = cookie ?? "";
 
   let verifiedSession;
   try {
     verifiedSession = await verifyPortAccessSession({
       config: input.sessionConfig,
       clock: input.clock,
-      cookie: cookie ?? "",
+      cookie: portAccessSessionId,
     });
   } catch (error) {
     if (error instanceof PortAccessSessionError) {
@@ -452,6 +454,7 @@ async function resolvePortAccessRequest(input: {
     }),
     browserEdgeProto,
     parsedHost,
+    portAccessSessionId,
     verifiedSession,
   };
 }

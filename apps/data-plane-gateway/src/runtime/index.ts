@@ -14,6 +14,7 @@ import {
   SandboxInstanceDeadlineService,
 } from "../deadlines/sandbox-instance-deadline-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
 import { registerPortAccessRoutes } from "../publishing/register-port-access-routes.js";
@@ -32,7 +33,7 @@ import {
   type ValkeyClient,
   closeValkeyClient,
 } from "../runtime-state/valkey-client.js";
-import { startServer } from "../server.js";
+import { installPortAccessUpgradeEntrypoint, startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
@@ -177,6 +178,22 @@ export function createDataPlaneGatewayRuntime(
       scheduler: systemScheduler,
     },
   );
+  const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
+    bootstrapTokenConfig: {
+      tokenSecret: config.app.sandbox.publish.access.tokenSecret,
+      tokenIssuer: config.app.sandbox.publish.access.tokenIssuer,
+      tokenAudience: config.app.sandbox.publish.access.tokenAudience,
+    },
+    clock: systemClock,
+    hostConfig: {
+      baseDomain: config.app.sandbox.publish.baseDomain,
+    },
+    portAccessTransportService,
+    portsTargetAuthorizeService,
+    sessionConfig: {
+      cookieSigningSecret: config.app.sandbox.publish.session.cookieSigningSecret,
+    },
+  });
   const sandboxSigningRequestService = new SandboxSigningRequestService({
     bootstrapTokenSecret: config.app.sandbox.bootstrap.tokenSecret,
     tokenIssuer: config.app.sandbox.bootstrap.tokenIssuer,
@@ -322,9 +339,14 @@ export function createDataPlaneGatewayRuntime(
       startedServer = startServer({
         app,
         host: config.app.server.host,
+        portAccessNodeEntrypoint,
         port: config.app.server.port,
       });
       nodeWebSocket.injectWebSocket(startedServer.server);
+      installPortAccessUpgradeEntrypoint({
+        portAccessNodeEntrypoint,
+        server: startedServer.server,
+      });
     },
     stop: async () => {
       if (stopped) {

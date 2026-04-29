@@ -3,6 +3,7 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Context, Hono } from "hono";
 
+import type { PortAccessNodeEntrypoint } from "./publishing/port-access-node-entrypoint.js";
 import type {
   PortAccessTransportService,
   PortAccessWebSocketHandle,
@@ -37,6 +38,7 @@ export type StartServerInput = {
   app: DataPlaneGatewayApp;
   host: string;
   port: number;
+  portAccessNodeEntrypoint?: PortAccessNodeEntrypoint;
 };
 
 export type StartedServer = {

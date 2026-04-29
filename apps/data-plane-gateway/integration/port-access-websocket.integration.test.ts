@@ -2,9 +2,14 @@
  * This suite uses an extended integration `it` fixture imported from test context.
  */
 
+import { connect, type Socket } from "node:net";
+
 import { derivePortAccessHost } from "@mistle/port-access-auth";
 import {
+  decodeDataFrame,
+  encodeDataFrame,
   parsePortsTransportMessage,
+  PayloadKindRawBytes,
   type PortsTransportMessage,
 } from "@mistle/sandbox-session-protocol";
 import { systemClock, systemScheduler, type TimerHandle } from "@mistle/time";
@@ -22,32 +27,28 @@ import {
   mintValidBootstrapToken,
 } from "./runtime-state-test-helpers.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
-import {
-  closeWebSocket,
-  sendWebSocketMessage,
-  waitForWebSocketClose,
-  waitForWebSocketMessage,
-} from "./websocket-test-helpers.js";
+import { closeWebSocket, sendWebSocketMessage } from "./websocket-test-helpers.js";
 
 const StepTimeoutMs = 5_000;
 
-type UnexpectedResponse = {
-  headers: {
-    [key: string]: string | string[] | undefined;
-  };
-  on: (event: "data", listener: (chunk: Buffer) => void) => void;
-  once: (event: "end", listener: () => void) => void;
-  statusCode?: number;
-};
+type BootstrapInbound =
+  | {
+      kind: "control";
+      message: PortsTransportMessage;
+    }
+  | {
+      frame: ReturnType<typeof decodeDataFrame>;
+      kind: "data";
+    };
 
-type FailedWebSocketConnectResult = {
-  error: unknown;
-  responseStatusCode: number | undefined;
-};
-
-type WebSocketMessageQueue = {
+type BootstrapMessageQueue = {
   close: () => void;
-  next: () => Promise<PortsTransportMessage>;
+  next: () => Promise<BootstrapInbound>;
+};
+
+type FailedRawUpgradeResult = {
+  body: string;
+  statusLine: string;
 };
 
 function toBuffer(data: RawData): Buffer {
@@ -112,16 +113,20 @@ function parseTransportMessage(input: string | Buffer): PortsTransportMessage {
   return parsedMessage;
 }
 
-function createWebSocketMessageQueue(socket: WebSocket): WebSocketMessageQueue {
-  const queuedMessages: PortsTransportMessage[] = [];
-  const waitingResolvers: Array<(message: PortsTransportMessage) => void> = [];
+function createBootstrapMessageQueue(socket: WebSocket): BootstrapMessageQueue {
+  const queuedMessages: BootstrapInbound[] = [];
+  const waitingResolvers: Array<(message: BootstrapInbound) => void> = [];
 
   const onMessage = (data: RawData, isBinary: boolean): void => {
-    if (isBinary) {
-      throw new Error("Expected text websocket payload.");
-    }
-
-    const message = parseTransportMessage(toBuffer(data).toString("utf8"));
+    const message: BootstrapInbound = isBinary
+      ? {
+          frame: decodeDataFrame(toBuffer(data)),
+          kind: "data",
+        }
+      : {
+          kind: "control",
+          message: parseTransportMessage(toBuffer(data).toString("utf8")),
+        };
     const waitingResolver = waitingResolvers.shift();
     if (waitingResolver !== undefined) {
       waitingResolver(message);
@@ -143,7 +148,7 @@ function createWebSocketMessageQueue(socket: WebSocket): WebSocketMessageQueue {
         return queuedMessage;
       }
 
-      return new Promise<PortsTransportMessage>((resolve) => {
+      return new Promise<BootstrapInbound>((resolve) => {
         waitingResolvers.push(resolve);
       });
     },
@@ -177,31 +182,23 @@ async function withTimeout<T>(input: {
   }
 }
 
-async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
-  if (socket !== undefined && socket.readyState === WebSocket.OPEN) {
-    await closeWebSocket(socket);
+function connectRawClient(fixture: DataPlaneGatewayIntegrationFixture): Promise<Socket> {
+  const baseUrl = new URL(fixture.baseUrl);
+  const port = Number.parseInt(baseUrl.port, 10);
+  if (!Number.isInteger(port)) {
+    throw new Error("Expected fixture baseUrl to include an integer port.");
   }
-}
 
-function connectPortAccessWebSocket(input: {
-  cookieHeader?: string;
-  fixture: DataPlaneGatewayIntegrationFixture;
-  host: string;
-  origin?: string;
-  path: string;
-}): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`${input.fixture.websocketBaseUrl}${input.path}`, {
-      autoPong: false,
-      handshakeTimeout: StepTimeoutMs,
-      headers: {
-        host: input.host,
-        ...(input.cookieHeader === undefined ? {} : { cookie: input.cookieHeader }),
-        ...(input.origin === undefined ? {} : { origin: input.origin }),
-      },
+    const socket = connect({
+      host: baseUrl.hostname,
+      port,
     });
-
-    const onOpen = (): void => {
+    const cleanup = (): void => {
+      socket.off("connect", onConnect);
+      socket.off("error", onError);
+    };
+    const onConnect = (): void => {
       cleanup();
       resolve(socket);
     };
@@ -209,98 +206,145 @@ function connectPortAccessWebSocket(input: {
       cleanup();
       reject(error);
     };
-    const onUnexpectedResponse = (_request: unknown, response: UnexpectedResponse): void => {
-      cleanup();
-      reject(
-        Object.assign(new Error("Websocket upgrade failed."), {
-          statusCode: response.statusCode,
-        }),
-      );
-    };
-    const cleanup = (): void => {
-      socket.off("open", onOpen);
-      socket.off("error", onError);
-      socket.off("unexpected-response", onUnexpectedResponse);
-    };
 
-    socket.once("open", onOpen);
+    socket.once("connect", onConnect);
     socket.once("error", onError);
-    socket.once("unexpected-response", onUnexpectedResponse);
   });
 }
 
-function connectPortAccessWebSocketExpectFailure(input: {
+function closeRawClient(socket: Socket | undefined): Promise<void> {
+  if (socket === undefined || socket.destroyed) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    socket.once("close", () => {
+      resolve();
+    });
+    socket.destroy();
+  });
+}
+
+async function closeWebSocketIfOpen(socket: WebSocket): Promise<void> {
+  if (socket.readyState === WebSocket.OPEN) {
+    await closeWebSocket(socket);
+  }
+}
+
+function waitForSocketBytes(input: {
+  label: string;
+  socket: Socket;
+  predicate: (bytes: Buffer) => boolean;
+}): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+
+  return withTimeout({
+    label: input.label,
+    promise: new Promise((resolve, reject) => {
+      const cleanup = (): void => {
+        input.socket.off("data", onData);
+        input.socket.off("error", onError);
+      };
+      const onData = (chunk: Buffer): void => {
+        chunks.push(chunk);
+        const bytes = Buffer.concat(chunks);
+        if (input.predicate(bytes)) {
+          cleanup();
+          resolve(bytes);
+        }
+      };
+      const onError = (error: Error): void => {
+        cleanup();
+        reject(error);
+      };
+
+      input.socket.on("data", onData);
+      input.socket.once("error", onError);
+    }),
+  });
+}
+
+async function sendTcpConnected(input: {
+  bootstrapSocket: WebSocket;
+  streamId: number;
+}): Promise<void> {
+  await sendWebSocketMessage(
+    input.bootstrapSocket,
+    JSON.stringify({
+      type: "ports.tcp.connected",
+      streamId: input.streamId,
+    }),
+  );
+}
+
+async function sendTargetBytes(input: {
+  bootstrapSocket: WebSocket;
+  bytes: Buffer;
+  streamId: number;
+}): Promise<void> {
+  await sendWebSocketMessage(
+    input.bootstrapSocket,
+    Buffer.from(
+      encodeDataFrame({
+        payload: input.bytes,
+        payloadKind: PayloadKindRawBytes,
+        streamId: input.streamId,
+      }),
+    ),
+  );
+}
+
+async function connectPortAccessUpgradeExpectFailure(input: {
   cookieHeader?: string;
   fixture: DataPlaneGatewayIntegrationFixture;
   host: string;
   path: string;
-}): Promise<FailedWebSocketConnectResult> {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`${input.fixture.websocketBaseUrl}${input.path}`, {
-      handshakeTimeout: StepTimeoutMs,
-      headers: {
-        host: input.host,
-        ...(input.cookieHeader === undefined ? {} : { cookie: input.cookieHeader }),
-      },
+}): Promise<FailedRawUpgradeResult> {
+  const socket = await connectRawClient(input.fixture);
+  try {
+    socket.write(
+      [
+        `GET ${input.path} HTTP/1.1`,
+        `Host: ${input.host}`,
+        "Connection: Upgrade",
+        "Upgrade: websocket",
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+        "Sec-WebSocket-Version: 13",
+        ...(input.cookieHeader === undefined ? [] : [`Cookie: ${input.cookieHeader}`]),
+        "",
+        "",
+      ].join("\r\n"),
+    );
+    const bytes = await waitForSocketBytes({
+      label: "waiting for failed websocket upgrade response",
+      predicate: (receivedBytes) => receivedBytes.includes("\r\n\r\n"),
+      socket,
     });
+    const rawResponse = bytes.toString("utf8");
+    const separatorIndex = rawResponse.indexOf("\r\n\r\n");
+    if (separatorIndex === -1) {
+      throw new Error("Expected HTTP response header separator.");
+    }
 
-    socket.once("open", () => {
-      socket.close();
-      reject(new Error("Expected websocket connection to fail but it opened successfully."));
-    });
-
-    socket.once("unexpected-response", (_request: unknown, response: UnexpectedResponse) => {
-      const chunks: Buffer[] = [];
-      response.on("data", (chunk: Buffer) => {
-        chunks.push(Buffer.from(chunk));
-      });
-      response.once("end", () => {
-        resolve({
-          error: new Error(Buffer.concat(chunks).toString("utf8") || "Websocket upgrade failed."),
-          responseStatusCode: response.statusCode,
-        });
-      });
-    });
-
-    socket.once("error", (error: Error) => {
-      resolve({
-        error,
-        responseStatusCode: undefined,
-      });
-    });
-  });
-}
-
-function waitForWebSocketPong(socket: WebSocket): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const onPong = (data: Buffer): void => {
-      cleanup();
-      resolve(Buffer.from(data));
+    return {
+      body: rawResponse.slice(separatorIndex + 4),
+      statusLine: rawResponse.slice(0, rawResponse.indexOf("\r\n")),
     };
-    const onError = (error: Error): void => {
-      cleanup();
-      reject(error);
-    };
-    const cleanup = (): void => {
-      socket.off("pong", onPong);
-      socket.off("error", onError);
-    };
-
-    socket.once("pong", onPong);
-    socket.once("error", onError);
-  });
+  } finally {
+    await closeRawClient(socket);
+  }
 }
 
 describe("port access websocket integration", () => {
-  it("upgrades the browser websocket and relays frames, control frames, and upstream closes", async ({
+  it("routes websocket upgrades through raw ports.tcp bytes before Hono websocket handling", async ({
     fixture,
   }) => {
-    const sandboxInstanceId = "sbi_port_access_websocket_success";
+    const sandboxInstanceId = "sbi_port_access_websocket_tcp_success";
     const port = 5173;
     await insertSandboxInstanceRow({
       fixture,
       sandboxInstanceId,
-      testId: "port_access_websocket_success",
+      testId: "port_access_websocket_tcp_success",
     });
     const bootstrapSocket = await connectBootstrapSocket({
       fixture,
@@ -321,328 +365,131 @@ describe("port access websocket integration", () => {
       port,
       host,
     });
-    const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
-    let accessSocket: WebSocket | undefined;
+    const messageQueue = createBootstrapMessageQueue(bootstrapSocket);
+    let clientSocket: Socket | undefined;
 
     try {
-      const accessSocketPromise = connectPortAccessWebSocket({
-        cookieHeader: createCookieHeader(sessionToken),
-        fixture,
-        host,
-        origin: "https://dashboard.mistle.localhost",
-        path: "/socket/echo?mode=full",
-      });
+      clientSocket = await connectRawClient(fixture);
+      clientSocket.write(
+        [
+          "GET /socket/echo?mode=full HTTP/1.1",
+          `Host: ${host}`,
+          `Cookie: ${createCookieHeader(sessionToken)}; theme=dark`,
+          "Connection: Upgrade",
+          "Upgrade: websocket",
+          "Origin: https://dashboard.mistle.localhost",
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+          "Sec-WebSocket-Version: 13",
+          "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits",
+          "Sec-WebSocket-Protocol: chat, superchat",
+          "",
+          "prefetched-upgrade-bytes",
+        ].join("\r\n"),
+      );
 
       const openMessage = await withTimeout({
-        label: "waiting for ports.ws.open",
+        label: "waiting for ports.tcp.open",
         promise: messageQueue.next(),
       });
-      if (openMessage.type !== "ports.ws.open") {
-        throw new Error("Expected ports.ws.open message.");
+      if (openMessage.kind !== "control" || openMessage.message.type !== "ports.tcp.open") {
+        throw new Error("Expected ports.tcp.open message.");
       }
 
-      expect(openMessage).toEqual({
-        type: "ports.ws.open",
+      expect(openMessage.message).toEqual({
+        type: "ports.tcp.open",
         streamId: expect.any(Number),
         target: {
           kind: "port",
           port,
         },
         upstreamProtocol: "http",
-        request: {
-          path: "/socket/echo",
-          query: "mode=full",
-          headers: expect.objectContaining({
-            connection: ["Upgrade"],
-            host: [`127.0.0.1:${String(port)}`],
-            origin: [`http://127.0.0.1:${String(port)}`],
-            upgrade: ["websocket"],
-            "x-forwarded-host": [host],
-            "x-forwarded-port": ["80"],
-            "x-forwarded-proto": ["http"],
-          }),
+      });
+
+      await sendTcpConnected({
+        bootstrapSocket,
+        streamId: openMessage.message.streamId,
+      });
+
+      const requestFrame = await withTimeout({
+        label: "waiting for websocket request head bytes",
+        promise: messageQueue.next(),
+      });
+      if (requestFrame.kind !== "data") {
+        throw new Error("Expected raw TCP data frame.");
+      }
+
+      const requestHead = Buffer.from(requestFrame.frame.payload).toString("utf8");
+      expect(requestHead).toContain("GET /socket/echo?mode=full HTTP/1.1\r\n");
+      expect(requestHead).toContain(`Host: 127.0.0.1:${String(port)}\r\n`);
+      expect(requestHead).toContain(`Origin: http://127.0.0.1:${String(port)}\r\n`);
+      expect(requestHead).toContain("Connection: Upgrade\r\n");
+      expect(requestHead).toContain("Upgrade: websocket\r\n");
+      expect(requestHead).toContain("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n");
+      expect(requestHead).toContain("Sec-WebSocket-Version: 13\r\n");
+      expect(requestHead).toContain(
+        "Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits\r\n",
+      );
+      expect(requestHead).toContain("Sec-WebSocket-Protocol: chat, superchat\r\n");
+      expect(requestHead).toContain("Cookie: theme=dark\r\n");
+      expect(requestHead).toContain(`X-Forwarded-Host: ${host}\r\n`);
+      expect(requestHead).toContain("X-Forwarded-Proto: http\r\n");
+      expect(requestHead).toContain("X-Forwarded-Port: 80\r\n");
+      expect(requestHead).toContain("\r\n\r\nprefetched-upgrade-bytes");
+      expect(requestHead).not.toContain(PortAccessSessionCookieName);
+
+      await sendTargetBytes({
+        bootstrapSocket,
+        bytes: Buffer.from(
+          [
+            "HTTP/1.1 101 Switching Protocols",
+            "Connection: Upgrade",
+            "Upgrade: websocket",
+            "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+            "Sec-WebSocket-Protocol: superchat",
+            "",
+            "",
+          ].join("\r\n"),
+          "utf8",
+        ),
+        streamId: openMessage.message.streamId,
+      });
+      const clientResponse = await waitForSocketBytes({
+        label: "waiting for raw upgrade response",
+        predicate: (bytes) => bytes.includes("HTTP/1.1 101 Switching Protocols\r\n"),
+        socket: clientSocket,
+      });
+      expect(clientResponse.toString("utf8")).toContain("Sec-WebSocket-Protocol: superchat");
+
+      const windowMessage = await withTimeout({
+        label: "waiting for response byte window",
+        promise: messageQueue.next(),
+      });
+      expect(windowMessage).toEqual({
+        kind: "control",
+        message: {
+          type: "stream.window",
+          bytes: expect.any(Number),
+          streamId: openMessage.message.streamId,
         },
       });
 
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.accept",
-          streamId: openMessage.streamId,
-          headers: {
-            "sec-websocket-accept": ["accept-value"],
-          },
-        }),
-      );
-
-      accessSocket = await withTimeout({
-        label: "waiting for browser websocket upgrade",
-        promise: accessSocketPromise,
-      });
-
-      accessSocket.send("hello from browser");
-      const requestTextFrame = await withTimeout({
-        label: "waiting for request text frame",
-        promise: messageQueue.next(),
-      });
-      expect(requestTextFrame).toEqual({
-        type: "ports.ws.frame",
-        streamId: openMessage.streamId,
-        direction: "request",
-        opcode: "text",
-        bytes: Buffer.from("hello from browser", "utf8").toString("base64"),
-        encoding: "base64",
-      });
-
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.frame",
-          streamId: openMessage.streamId,
-          direction: "response",
-          opcode: "text",
-          bytes: Buffer.from("hello from sandboxd", "utf8").toString("base64"),
-          encoding: "base64",
-        }),
-      );
-      await expect(
-        withTimeout({
-          label: "waiting for browser response text frame",
-          promise: waitForWebSocketMessage(accessSocket),
-        }),
-      ).resolves.toEqual({
-        data: "hello from sandboxd",
-        isBinary: false,
-      });
-
-      accessSocket.ping(Buffer.from("browser-ping", "utf8"));
-      const requestPingFrame = await withTimeout({
-        label: "waiting for request ping frame",
-        promise: messageQueue.next(),
-      });
-      expect(requestPingFrame).toEqual({
-        type: "ports.ws.frame",
-        streamId: openMessage.streamId,
-        direction: "request",
-        opcode: "ping",
-        bytes: Buffer.from("browser-ping", "utf8").toString("base64"),
-        encoding: "base64",
-      });
-
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.frame",
-          streamId: openMessage.streamId,
-          direction: "response",
-          opcode: "pong",
-          bytes: Buffer.from("browser-ping", "utf8").toString("base64"),
-          encoding: "base64",
-        }),
-      );
-      await expect(
-        withTimeout({
-          label: "waiting for browser pong",
-          promise: waitForWebSocketPong(accessSocket),
-        }),
-      ).resolves.toEqual(Buffer.from("browser-ping", "utf8"));
-
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.close",
-          streamId: openMessage.streamId,
-          direction: "response",
-          code: 1000,
-          reason: "done",
-        }),
-      );
-      await expect(
-        withTimeout({
-          label: "waiting for browser websocket close",
-          promise: waitForWebSocketClose(accessSocket),
-        }),
-      ).resolves.toEqual({
-        code: 1000,
-        reason: "done",
-      });
-      accessSocket = undefined;
-    } finally {
-      messageQueue.close();
-      await closeWebSocketIfOpen(accessSocket);
-      await closeWebSocketIfOpen(bootstrapSocket);
-    }
-  });
-
-  it("forwards browser close frames as ports.ws.close", async ({ fixture }) => {
-    const sandboxInstanceId = "sbi_port_access_websocket_browser_close";
-    const port = 5173;
-    await insertSandboxInstanceRow({
-      fixture,
-      sandboxInstanceId,
-      testId: "port_access_websocket_browser_close",
-    });
-    const bootstrapSocket = await connectBootstrapSocket({
-      fixture,
-      sandboxInstanceId,
-      token: await mintValidBootstrapToken({
-        fixture,
-        sandboxInstanceId,
-      }),
-    });
-    const host = deriveAccessHost({
-      fixture,
-      sandboxInstanceId,
-      port,
-    });
-    const sessionToken = await mintSessionToken({
-      fixture,
-      sandboxInstanceId,
-      port,
-      host,
-    });
-    const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
-    let accessSocket: WebSocket | undefined;
-
-    try {
-      const accessSocketPromise = connectPortAccessWebSocket({
-        cookieHeader: createCookieHeader(sessionToken),
-        fixture,
-        host,
-        path: "/socket/close",
-      });
-
-      const openMessage = await withTimeout({
-        label: "waiting for ports.ws.open",
-        promise: messageQueue.next(),
-      });
-      if (openMessage.type !== "ports.ws.open") {
-        throw new Error("Expected ports.ws.open message.");
-      }
-
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.accept",
-          streamId: openMessage.streamId,
-          headers: {},
-        }),
-      );
-
-      accessSocket = await withTimeout({
-        label: "waiting for browser websocket upgrade",
-        promise: accessSocketPromise,
-      });
-
-      const browserClosePromise = waitForWebSocketClose(accessSocket);
-      accessSocket.close(1000, "browser-done");
+      clientSocket.destroy();
+      clientSocket = undefined;
       const closeMessage = await withTimeout({
-        label: "waiting for request close frame",
+        label: "waiting for client close propagation",
         promise: messageQueue.next(),
       });
       expect(closeMessage).toEqual({
-        type: "ports.ws.close",
-        streamId: openMessage.streamId,
-        direction: "request",
-        code: 1000,
-        reason: "browser-done",
+        kind: "control",
+        message: {
+          type: "ports.tcp.close",
+          direction: "request",
+          streamId: openMessage.message.streamId,
+        },
       });
-
-      await expect(
-        withTimeout({
-          label: "waiting for browser websocket close",
-          promise: browserClosePromise,
-        }),
-      ).resolves.toEqual({
-        code: 1000,
-        reason: "browser-done",
-      });
-      accessSocket = undefined;
     } finally {
       messageQueue.close();
-      await closeWebSocketIfOpen(accessSocket);
-      await closeWebSocketIfOpen(bootstrapSocket);
-    }
-  });
-
-  it("closes accepted port access websockets when the bootstrap disconnects without any active HTTP streams", async ({
-    fixture,
-  }) => {
-    const sandboxInstanceId = "sbi_port_access_websocket_bootstrap_disconnect";
-    const port = 5173;
-    await insertSandboxInstanceRow({
-      fixture,
-      sandboxInstanceId,
-      testId: "port_access_websocket_bootstrap_disconnect",
-    });
-    const bootstrapSocket = await connectBootstrapSocket({
-      fixture,
-      sandboxInstanceId,
-      token: await mintValidBootstrapToken({
-        fixture,
-        sandboxInstanceId,
-      }),
-    });
-    const host = deriveAccessHost({
-      fixture,
-      sandboxInstanceId,
-      port,
-    });
-    const sessionToken = await mintSessionToken({
-      fixture,
-      sandboxInstanceId,
-      port,
-      host,
-    });
-    const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
-    let accessSocket: WebSocket | undefined;
-
-    try {
-      const accessSocketPromise = connectPortAccessWebSocket({
-        cookieHeader: createCookieHeader(sessionToken),
-        fixture,
-        host,
-        path: "/socket/disconnect",
-      });
-
-      const openMessage = await withTimeout({
-        label: "waiting for ports.ws.open",
-        promise: messageQueue.next(),
-      });
-      if (openMessage.type !== "ports.ws.open") {
-        throw new Error("Expected ports.ws.open message.");
-      }
-
-      await sendWebSocketMessage(
-        bootstrapSocket,
-        JSON.stringify({
-          type: "ports.ws.accept",
-          streamId: openMessage.streamId,
-          headers: {},
-        }),
-      );
-
-      accessSocket = await withTimeout({
-        label: "waiting for browser websocket upgrade",
-        promise: accessSocketPromise,
-      });
-
-      const browserClosePromise = waitForWebSocketClose(accessSocket);
-      await closeWebSocket(bootstrapSocket);
-
-      await expect(
-        withTimeout({
-          label: "waiting for browser websocket close after bootstrap disconnect",
-          promise: browserClosePromise,
-        }),
-      ).resolves.toEqual({
-        code: 1011,
-        reason: "Sandbox bootstrap tunnel disconnected.",
-      });
-      accessSocket = undefined;
-    } finally {
-      messageQueue.close();
-      await closeWebSocketIfOpen(accessSocket);
+      await closeRawClient(clientSocket);
       await closeWebSocketIfOpen(bootstrapSocket);
     }
   });
@@ -650,7 +497,7 @@ describe("port access websocket integration", () => {
   it("rejects the websocket upgrade with 401 when the port access session cookie is missing", async ({
     fixture,
   }) => {
-    const result = await connectPortAccessWebSocketExpectFailure({
+    const result = await connectPortAccessUpgradeExpectFailure({
       fixture,
       host: deriveAccessHost({
         fixture,
@@ -660,13 +507,14 @@ describe("port access websocket integration", () => {
       path: "/socket/auth",
     });
 
-    expect(result.responseStatusCode).toBe(401);
+    expect(result.statusLine).toBe("HTTP/1.1 401 Unauthorized");
+    expect(result.body).toBe("Invalid or expired Port Access session.");
   });
 
   it("rejects the websocket upgrade with 401 when the port access session cookie is invalid", async ({
     fixture,
   }) => {
-    const result = await connectPortAccessWebSocketExpectFailure({
+    const result = await connectPortAccessUpgradeExpectFailure({
       cookieHeader: createCookieHeader("not-a-valid-session-token"),
       fixture,
       host: deriveAccessHost({
@@ -677,7 +525,8 @@ describe("port access websocket integration", () => {
       path: "/socket/auth",
     });
 
-    expect(result.responseStatusCode).toBe(401);
+    expect(result.statusLine).toBe("HTTP/1.1 401 Unauthorized");
+    expect(result.body).toBe("Invalid or expired Port Access session.");
   });
 
   it("rejects the websocket upgrade with 401 when the port access session cookie is expired", async ({
@@ -692,24 +541,25 @@ describe("port access websocket integration", () => {
     });
     const expiredClock = createMutableClock(1_000);
     const sessionToken = await mintSessionToken({
-      fixture,
-      sandboxInstanceId,
-      port,
-      host,
       clock: expiredClock,
+      fixture,
+      host,
+      port,
+      sandboxInstanceId,
     });
 
-    const result = await connectPortAccessWebSocketExpectFailure({
+    const result = await connectPortAccessUpgradeExpectFailure({
       cookieHeader: createCookieHeader(sessionToken),
       fixture,
       host,
       path: "/socket/auth",
     });
 
-    expect(result.responseStatusCode).toBe(401);
+    expect(result.statusLine).toBe("HTTP/1.1 401 Unauthorized");
+    expect(result.body).toBe("Invalid or expired Port Access session.");
   });
 
-  it("rejects the websocket upgrade with 401 when the port access session cookie host binding does not match", async ({
+  it("rejects the websocket upgrade with 401 when the port access session cookie binding does not match", async ({
     fixture,
   }) => {
     const sandboxInstanceId = "sbi_port_access_websocket_binding_mismatch";
@@ -721,22 +571,23 @@ describe("port access websocket integration", () => {
     });
     const sessionToken = await mintSessionToken({
       fixture,
-      sandboxInstanceId,
-      port,
       host,
+      port,
+      sandboxInstanceId,
     });
 
-    const result = await connectPortAccessWebSocketExpectFailure({
+    const result = await connectPortAccessUpgradeExpectFailure({
       cookieHeader: createCookieHeader(sessionToken),
       fixture,
       host: deriveAccessHost({
         fixture,
-        sandboxInstanceId,
         port: 5174,
+        sandboxInstanceId,
       }),
       path: "/socket/auth",
     });
 
-    expect(result.responseStatusCode).toBe(401);
+    expect(result.statusLine).toBe("HTTP/1.1 401 Unauthorized");
+    expect(result.body).toBe("Invalid or expired Port Access session.");
   });
 });
