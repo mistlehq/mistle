@@ -1,6 +1,7 @@
 import {
   decodeDataFrame,
   FileUploadResetCodes,
+  type FileUploadStreamChannel,
   parseStreamControlMessage,
   PayloadKindRawBytes,
 } from "@mistle/sandbox-session-protocol";
@@ -32,12 +33,15 @@ function toText(data: RawData): string {
 type TestUploadServer = {
   close: () => Promise<void>;
   receivedBytes: () => Uint8Array;
+  receivedOpenChannel: () => FileUploadStreamChannel | undefined;
   url: string;
 };
 
 type UploadServerBehavior =
   | {
       kind: "accept";
+      completedUploadKind?: "image" | "file";
+      completedUploadPath?: string;
     }
   | {
       kind: "complete_without_event";
@@ -59,6 +63,16 @@ function createImageFile(input?: { bytes?: Uint8Array; name?: string }): File {
 
   return new File([fileBytes], input?.name ?? "screenshot.png", {
     type: "image/png",
+  });
+}
+
+function createGenericFile(input?: { bytes?: Uint8Array; name?: string; type?: string }): File {
+  const rawBytes = input?.bytes ?? new Uint8Array([5, 6, 7]);
+  const fileBytes = new Uint8Array(rawBytes.byteLength);
+  fileBytes.set(rawBytes);
+
+  return new File([fileBytes], input?.name ?? "notes.txt", {
+    type: input?.type ?? "",
   });
 }
 
@@ -87,20 +101,27 @@ function sendStreamReset(
 
 function sendFileUploadCompleted(
   socket: WebSocket,
-  input: { sizeBytes: number; streamId: number },
+  input: {
+    kind: "image" | "file";
+    mimeType: string;
+    originalFilename: string;
+    path: string;
+    sizeBytes: number;
+    streamId: number;
+  },
 ): void {
   sendControlMessage(socket, {
     type: "stream.event",
     streamId: input.streamId,
     event: {
       type: "fileUpload.completed",
-      kind: "image",
+      kind: input.kind,
       attachmentId: "att_123",
       threadId: "thread_123",
-      originalFilename: "screenshot.png",
-      mimeType: "image/png",
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
       sizeBytes: input.sizeBytes,
-      path: "/root/.local/attachments/thread_123/upload.png",
+      path: input.path,
     },
   });
 }
@@ -125,6 +146,7 @@ async function startUploadTestServer(input?: {
 }): Promise<TestUploadServer> {
   const behavior = createUploadServerBehavior(input?.behavior);
   const receivedChunks: Uint8Array[] = [];
+  let receivedOpenChannel: FileUploadStreamChannel | undefined;
   const openSockets = new Set<WebSocket>();
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
@@ -146,8 +168,9 @@ async function startUploadTestServer(input?: {
 
     socket.on("message", (message) => {
       const controlMessage = parseStreamControlMessage(toText(message));
-      if (controlMessage?.type === "stream.open") {
+      if (controlMessage?.type === "stream.open" && controlMessage.channel.kind === "fileUpload") {
         streamId = controlMessage.streamId;
+        receivedOpenChannel = controlMessage.channel;
         sendStreamOpenResponse(socket, streamId);
         return;
       }
@@ -166,7 +189,23 @@ async function startUploadTestServer(input?: {
           return;
         }
 
+        const completionKind =
+          behavior.kind === "accept" ? (behavior.completedUploadKind ?? "image") : "image";
+        const completionPath =
+          behavior.kind === "accept"
+            ? (behavior.completedUploadPath ??
+              `/root/.local/attachments/thread_123/upload.${completionKind === "image" ? "png" : "txt"}`)
+            : "/root/.local/attachments/thread_123/upload.png";
+        const uploadChannel = receivedOpenChannel;
+        if (uploadChannel === undefined) {
+          throw new Error("Expected file upload stream.open before stream.close.");
+        }
+
         sendFileUploadCompleted(socket, {
+          kind: completionKind,
+          mimeType: uploadChannel.mimeType,
+          originalFilename: uploadChannel.originalFilename,
+          path: completionPath,
           streamId,
           sizeBytes: receivedChunks.reduce((total, chunk) => total + chunk.byteLength, 0),
         });
@@ -212,6 +251,9 @@ async function startUploadTestServer(input?: {
     receivedBytes: () => {
       return Uint8Array.from(receivedChunks.flatMap((chunk) => Array.from(chunk)));
     },
+    receivedOpenChannel: () => {
+      return receivedOpenChannel;
+    },
     url: `ws://127.0.0.1:${String(address.port)}`,
   };
 }
@@ -243,12 +285,13 @@ describe("UploadStreamClient", () => {
     });
 
     await expect(
-      client.uploadImage({
+      client.uploadFile({
         file: createImageFile(),
         threadId: "thread_123",
       }),
     ).resolves.toEqual({
       attachmentId: "att_123",
+      kind: "image",
       threadId: "thread_123",
       originalFilename: "screenshot.png",
       mimeType: "image/png",
@@ -256,6 +299,53 @@ describe("UploadStreamClient", () => {
       path: "/root/.local/attachments/thread_123/upload.png",
     });
     expect(Array.from(server.receivedBytes())).toEqual([1, 2, 3, 4]);
+    expect(server.receivedOpenChannel()).toEqual({
+      kind: "fileUpload",
+      threadId: "thread_123",
+      mimeType: "image/png",
+      originalFilename: "screenshot.png",
+      sizeBytes: 4,
+    });
+
+    transport.disconnect(1000, "Test completed.");
+  });
+
+  it("uploads a generic file with normalized browser MIME metadata", async () => {
+    const server = await startUploadTestServer({
+      behavior: {
+        kind: "accept",
+        completedUploadKind: "file",
+        completedUploadPath: "/root/.local/attachments/thread_123/upload.txt",
+      },
+    });
+    openServers.add(server);
+    const transport = await connectTransport(server.url);
+    const client = new UploadStreamClient({
+      transport,
+    });
+
+    await expect(
+      client.uploadFile({
+        file: createGenericFile(),
+        threadId: "thread_123",
+      }),
+    ).resolves.toEqual({
+      attachmentId: "att_123",
+      kind: "file",
+      threadId: "thread_123",
+      originalFilename: "notes.txt",
+      mimeType: "application/octet-stream",
+      sizeBytes: 3,
+      path: "/root/.local/attachments/thread_123/upload.txt",
+    });
+    expect(Array.from(server.receivedBytes())).toEqual([5, 6, 7]);
+    expect(server.receivedOpenChannel()).toEqual({
+      kind: "fileUpload",
+      threadId: "thread_123",
+      mimeType: "application/octet-stream",
+      originalFilename: "notes.txt",
+      sizeBytes: 3,
+    });
 
     transport.disconnect(1000, "Test completed.");
   });
@@ -275,7 +365,7 @@ describe("UploadStreamClient", () => {
     });
 
     await expect(
-      client.uploadImage({
+      client.uploadFile({
         file: createImageFile(),
         threadId: "thread_123",
       }),
@@ -301,7 +391,7 @@ describe("UploadStreamClient", () => {
     });
 
     await expect(
-      client.uploadImage({
+      client.uploadFile({
         file: createImageFile(),
         threadId: "thread_123",
       }),

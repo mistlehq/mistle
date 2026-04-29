@@ -29,6 +29,7 @@ const ComposerModelFixture: CodexModelSummary = {
 
 const UploadedImageFixture = {
   attachmentId: "att_123",
+  kind: "image",
   threadId: "thread_123",
   originalFilename: "screenshot.png",
   mimeType: "image/png",

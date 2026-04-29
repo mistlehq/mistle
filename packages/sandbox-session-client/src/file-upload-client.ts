@@ -21,8 +21,11 @@ export type UploadStreamClientInput = {
   transport: SandboxSessionTransport;
 };
 
-export type UploadedSandboxImage = {
+const DefaultBrowserFileMimeType = "application/octet-stream";
+
+export type UploadedSandboxFile = {
   attachmentId: string;
+  kind: FileUploadCompletedEvent["kind"];
   threadId: string;
   originalFilename: string;
   mimeType: string;
@@ -74,9 +77,10 @@ const UploadTimeoutRuntime = {
   },
 };
 
-function normalizeCompletionEvent(event: FileUploadCompletedEvent): UploadedSandboxImage {
+function normalizeCompletionEvent(event: FileUploadCompletedEvent): UploadedSandboxFile {
   return {
     attachmentId: event.attachmentId,
+    kind: event.kind,
     threadId: event.threadId,
     originalFilename: event.originalFilename,
     mimeType: event.mimeType,
@@ -96,6 +100,10 @@ function isFileUploadCompletedEvent(message: StreamControlMessage): message is E
   event: FileUploadCompletedEvent;
 } {
   return message.type === "stream.event" && message.event.type === "fileUpload.completed";
+}
+
+function normalizeBrowserFileMimeType(file: File): string {
+  return file.type.trim() === "" ? DefaultBrowserFileMimeType : file.type;
 }
 
 function getStreamMessagePump(stream: SandboxSessionStream): {
@@ -240,7 +248,7 @@ export class UploadStreamClient {
     this.#idleTimeoutMs = input.idleTimeoutMs ?? UploadIdleTimeoutMs;
   }
 
-  async uploadImage(input: { file: File; threadId: string }): Promise<UploadedSandboxImage> {
+  async uploadFile(input: { file: File; threadId: string }): Promise<UploadedSandboxFile> {
     if (this.#transport.readyState !== SandboxSessionSocketReadyStates.OPEN) {
       throw new Error("Sandbox session socket is not open.");
     }
@@ -248,14 +256,14 @@ export class UploadStreamClient {
     const stream = await this.#transport.openStream({
       channel: {
         kind: "fileUpload",
-        mimeType: input.file.type,
+        mimeType: normalizeBrowserFileMimeType(input.file),
         originalFilename: input.file.name,
         sizeBytes: input.file.size,
         threadId: input.threadId,
       },
     });
     const { pump, unsubscribe } = getStreamMessagePump(stream);
-    let completedUpload: UploadedSandboxImage | null = null;
+    let completedUpload: UploadedSandboxFile | null = null;
 
     try {
       let offset = 0;
@@ -311,5 +319,9 @@ export class UploadStreamClient {
       unsubscribe();
       stream.dispose();
     }
+  }
+
+  async uploadImage(input: { file: File; threadId: string }): Promise<UploadedSandboxFile> {
+    return await this.uploadFile(input);
   }
 }
