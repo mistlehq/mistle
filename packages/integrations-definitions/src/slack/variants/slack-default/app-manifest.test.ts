@@ -41,6 +41,8 @@ describe("SlackAppManifestTemplate", () => {
             "channels:history",
             "channels:read",
             "chat:write",
+            "files:read",
+            "files:write",
             "groups:history",
             "groups:read",
             "reactions:read",
@@ -99,6 +101,8 @@ describe("buildSlackAppManifest", () => {
           bot: expect.arrayContaining([
             "chat:write",
             "channels:history",
+            "files:read",
+            "files:write",
             "groups:history",
             "reactions:read",
           ]),
