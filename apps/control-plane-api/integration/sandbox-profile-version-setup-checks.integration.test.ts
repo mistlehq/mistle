@@ -19,7 +19,7 @@ import {
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SandboxProvider, createSandboxAdapter } from "@mistle/sandbox";
 import { systemSleeper } from "@mistle/time";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -561,6 +561,79 @@ describe("sandbox profile version setup checks integration", () => {
         failureCode: "sandbox_init_failed",
         failureMessage: "Setup script exited with status 1.",
       });
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
+
+  it("reports cleanup failures as terminal setup-check results", async ({ fixture }) => {
+    const dataPlaneFixture = await createSetupCheckDataPlaneRuntime({
+      fixture,
+      databaseNamePrefix: "mistle_cp_setup_check_cleanup_failed",
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-version-setup-check-cleanup-failed@example.com",
+      });
+      await insertProfileVersionFixture({
+        fixture,
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_setup_check_cleanup_failed_001",
+        version: 1,
+      });
+
+      const createResponse = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_check_cleanup_failed_001/versions/1/setup-checks",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: authenticatedSession.cookie,
+          },
+          body: JSON.stringify({
+            setupScript: "echo cleanup failed",
+            idempotencyKey: "setup-check-cleanup-failed-001",
+          }),
+        },
+      );
+
+      expect(createResponse.status).toBe(201);
+      const createdBody = CreateSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await createResponse.json(),
+      );
+
+      await dataPlaneFixture.db
+        .update(sandboxInstances)
+        .set({
+          status: SandboxInstanceStatuses.FAILED,
+          failedAt: sql`now()`,
+          failureCode: "setup_check_cleanup_failed",
+          failureMessage: "Setup-check sandbox cleanup failed after successful startup.",
+        })
+        .where(eq(sandboxInstances.id, createdBody.sandboxInstanceId));
+
+      const getResponse = await fixture.request(
+        `/v1/sandbox/profiles/sbp_setup_check_cleanup_failed_001/versions/1/setup-checks/${createdBody.id}`,
+        {
+          headers: {
+            cookie: authenticatedSession.cookie,
+          },
+        },
+      );
+
+      expect(getResponse.status).toBe(200);
+      const responseBody = GetSandboxProfileVersionSetupCheckResponseSchema.parse(
+        await getResponse.json(),
+      );
+      expect(responseBody).toMatchObject({
+        id: createdBody.id,
+        status: "cleanup_failed",
+        failurePhase: "cleanup",
+        failureCode: "setup_check_cleanup_failed",
+        failureMessage: "Setup-check sandbox cleanup failed after successful startup.",
+      });
+      expect(responseBody.finishedAt).not.toBeNull();
     } finally {
       await dataPlaneFixture.stop();
     }

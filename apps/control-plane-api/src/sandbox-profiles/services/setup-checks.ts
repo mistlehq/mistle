@@ -33,6 +33,10 @@ const SetupCheckFailurePhases = {
 type SetupCheckFailurePhase =
   (typeof SetupCheckFailurePhases)[keyof typeof SetupCheckFailurePhases];
 
+const SetupCheckFailureCodes = {
+  CLEANUP_FAILED: "setup_check_cleanup_failed",
+} as const;
+
 type SetupCheckOutput = {
   id: string;
   sandboxProfileId: string;
@@ -166,6 +170,22 @@ function toFailedSetupCheckOutput(input: {
   failureMessage: string | null;
   failedAt: string | null;
 }): SetupCheckOutput {
+  if (input.failureCode === SetupCheckFailureCodes.CLEANUP_FAILED) {
+    return {
+      id: input.sandboxInstanceId,
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      status: SetupCheckStatuses.CLEANUP_FAILED,
+      failurePhase: SetupCheckFailurePhases.CLEANUP,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage ?? "Setup check sandbox cleanup failed.",
+      sandboxInstanceId: input.sandboxInstanceId,
+      workflowRunId: null,
+      startedAt: null,
+      finishedAt: input.failedAt,
+    };
+  }
+
   return {
     id: input.sandboxInstanceId,
     sandboxProfileId: input.sandboxProfileId,

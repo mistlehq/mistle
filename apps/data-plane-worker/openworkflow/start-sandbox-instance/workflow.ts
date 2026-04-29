@@ -32,6 +32,7 @@ const StartSandboxFailureCodes = {
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
+  SETUP_CHECK_CLEANUP_FAILED: "setup_check_cleanup_failed",
 } as const;
 
 export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
@@ -757,34 +758,79 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     if (workflowInput.purpose === SandboxInstancePurposes.SETUP_CHECK) {
-      await step.run({ name: "stop-setup-check-sandbox" }, async () => {
+      try {
+        await step.run({ name: "stop-setup-check-sandbox" }, async () => {
+          logger.info(
+            {
+              providerSandboxId: startedSandbox.providerSandboxId,
+            },
+            "Stopping setup-check sandbox after successful startup.",
+          );
+          await stopSandboxInstance(
+            {
+              config: ctx.config,
+              db: ctx.db,
+              controlPlaneInternalClient: ctx.controlPlaneInternalClient,
+              sandboxAdapter: ctx.sandboxAdapter,
+              runtimeStateReader: ctx.runtimeStateReader,
+              clock: ctx.clock,
+            },
+            {
+              sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+              stopReason: "system",
+            },
+          );
+        });
         logger.info(
           {
             providerSandboxId: startedSandbox.providerSandboxId,
           },
-          "Stopping setup-check sandbox after successful startup.",
+          "Stopped setup-check sandbox after successful startup.",
         );
-        await stopSandboxInstance(
+      } catch (error) {
+        logger.error(
           {
-            config: ctx.config,
-            db: ctx.db,
-            controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-            sandboxAdapter: ctx.sandboxAdapter,
-            runtimeStateReader: ctx.runtimeStateReader,
-            clock: ctx.clock,
+            err: error,
+            providerSandboxId: startedSandbox.providerSandboxId,
           },
-          {
-            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
-            stopReason: "system",
-          },
+          "Failed to stop setup-check sandbox after successful startup.",
         );
-      });
-      logger.info(
-        {
-          providerSandboxId: startedSandbox.providerSandboxId,
-        },
-        "Stopped setup-check sandbox after successful startup.",
-      );
+        try {
+          await step.run({ name: "mark-setup-check-cleanup-failed" }, async () => {
+            await markSandboxInstanceFailed(
+              {
+                db: ctx.db,
+              },
+              {
+                sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+                failureCode: StartSandboxFailureCodes.SETUP_CHECK_CLEANUP_FAILED,
+                failureMessage: formatPersistedFailureMessage({
+                  summary: "Setup-check sandbox cleanup failed after successful startup.",
+                  error,
+                }),
+                allowRunningCurrentStatus: true,
+              },
+            );
+          });
+        } catch (markFailedError) {
+          throw new Error(
+            "Failed setup-check cleanup and failed to mark sandbox instance cleanup failure.",
+            {
+              cause: {
+                cleanupError: error,
+                markFailedError,
+              },
+            },
+          );
+        }
+
+        logger.info(
+          {
+            providerSandboxId: startedSandbox.providerSandboxId,
+          },
+          "Marked setup-check sandbox cleanup failure.",
+        );
+      }
     }
 
     return {
