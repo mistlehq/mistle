@@ -169,6 +169,10 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-ts-${{ github.sha }}
 
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
+
   build-ts:
     name: TS Build
     runs-on: blacksmith-2vcpu-ubuntu-2404
@@ -252,6 +256,10 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-build-ts-${{ github.sha }}
+
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
 
   static-rust:
     name: Rust Static
@@ -351,6 +359,10 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-static-rust-${{ github.sha }}
+
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
 
   knip:
     name: Knip
@@ -485,6 +497,10 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-${{ github.sha }}
 
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
+
   test-ts-component:
     name: TS Component Test
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -568,6 +584,10 @@ jobs:
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
+
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
 
   test-commit-sign:
     name: Commit Sign Test
@@ -659,6 +679,10 @@ jobs:
         with:
           path: .local/commit-sign-test/cargo-home
           key: ${{ runner.os }}-commit-sign-test-cargo-home-${{ hashFiles('packages/commit-sign/Cargo.lock') }}
+
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
 
   test-sandboxd:
     name: Sandboxd Test
@@ -766,6 +790,10 @@ jobs:
         with:
           path: .local/sandboxd-test/cargo-home
           key: ${{ runner.os }}-sandboxd-test-cargo-home-${{ hashFiles('packages/sandboxd/Cargo.lock') }}
+
+      - name: Stop Nix daemon
+        if: always()
+        run: sudo systemctl stop nix-daemon.service
 
   sandbox-base-linux:
     name: Sandbox Base Image (Linux)
