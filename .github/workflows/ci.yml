@@ -105,6 +105,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
+
       - name: Restore pnpm store cache
         id: static-ts-pnpm-store-cache
         uses: actions/cache/restore@v5
@@ -166,6 +174,14 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
 
       - name: Restore pnpm store cache
         id: build-ts-pnpm-store-cache
@@ -229,6 +245,14 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
 
       - name: Restore Rust cache
         uses: Swatinem/rust-cache@v2
@@ -304,6 +328,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
+
       - name: Restore pnpm store cache
         id: knip-pnpm-store-cache
         uses: actions/cache/restore@v5
@@ -341,6 +373,14 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
 
       - name: Restore pnpm store cache
         id: test-ts-pnpm-store-cache
@@ -406,6 +446,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
+
       - name: Restore pnpm store cache
         id: test-ts-component-pnpm-store-cache
         uses: actions/cache/restore@v5
@@ -467,6 +515,14 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
 
       - name: Restore commit-sign container cargo cache
         id: test-commit-sign-container-cargo-cache
@@ -537,6 +593,14 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
 
       - name: Restore sandboxd container cargo cache
         id: test-sandboxd-container-cargo-cache

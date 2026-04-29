@@ -33,6 +33,14 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Set up Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+        with:
+          use-gha-cache: enabled
+          use-flakehub: disabled
+          diagnostic-endpoint: ""
+          source-url: https://github.com/DeterminateSystems/magic-nix-cache/releases/download/v0.1.6/magic-nix-cache-X64-Linux
+
       - name: Restore pnpm store cache
         id: pnpm-store-cache
         uses: actions/cache/restore@v5
