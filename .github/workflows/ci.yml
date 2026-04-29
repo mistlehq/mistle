@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -746,17 +745,23 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Log in to GitHub Container Registry
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Setup Blacksmith Docker builder
+        uses: useblacksmith/setup-docker-builder@v1
+        with:
+          max-cache-size-mb: "10240"
 
-      - name: Pull commit-sign test runner image
-        run: docker pull "ghcr.io/mistlehq/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}"
+      - name: Build commit-sign test runner image
+        run: >-
+          docker buildx build
+          --load
+          --pull=false
+          --tag "mistle/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}"
+          --file packages/commit-sign/Dockerfile.test
+          packages/commit-sign
 
       - name: Run commit-sign tests in Nix shell
         env:
-          MISTLE_COMMIT_SIGN_TEST_IMAGE: ghcr.io/mistlehq/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}
+          MISTLE_COMMIT_SIGN_TEST_IMAGE: mistle/commit-sign-test-runner:dockerfile-${{ hashFiles('packages/commit-sign/Dockerfile.test') }}
           MISTLE_COMMIT_SIGN_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/commit-sign test
 
@@ -854,23 +859,29 @@ jobs:
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
-      - name: Log in to GitHub Container Registry
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Setup Blacksmith Docker builder
+        uses: useblacksmith/setup-docker-builder@v1
+        with:
+          max-cache-size-mb: "20480"
 
-      - name: Pull sandboxd test runner image
-        run: docker pull "ghcr.io/mistlehq/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}"
+      - name: Build sandboxd test runner image
+        run: >-
+          docker buildx build
+          --load
+          --pull=false
+          --tag "mistle/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}"
+          --file packages/sandboxd/Dockerfile.test
+          packages/sandboxd
 
       - name: Run sandboxd tests in Nix shell
         env:
-          MISTLE_SANDBOXD_TEST_IMAGE: ghcr.io/mistlehq/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/sandboxd test
 
       - name: Run sandboxd integration tests in Nix shell
         env:
-          MISTLE_SANDBOXD_TEST_IMAGE: ghcr.io/mistlehq/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
+          MISTLE_SANDBOXD_TEST_IMAGE: mistle/sandboxd-test-runner:dockerfile-${{ hashFiles('packages/sandboxd/Dockerfile.test') }}
           MISTLE_SANDBOXD_TEST_RUNNER_BUILD_POLICY: never
         run: nix develop --command pnpm --filter @mistle/sandboxd test:integration
 
