@@ -131,7 +131,7 @@ function jsonValuesEqual(left: unknown, right: unknown): boolean {
   });
 }
 
-export function sandboxProfileBindingEditorRowsEqual(
+function sandboxProfileBindingEditorRowsEqual(
   left: SandboxProfileBindingEditorRow,
   right: SandboxProfileBindingEditorRow,
 ): boolean {
@@ -149,25 +149,23 @@ export function applySandboxProfileBindingEditorRowChanges(input: {
   clientId: string;
   changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>;
 }): SandboxProfileBindingEditorRow[] | null {
-  let didChange = false;
-  const nextRows = input.rows.map((row) => {
-    if (row.clientId !== input.clientId) {
-      return row;
-    }
+  const rowIndex = input.rows.findIndex((row) => row.clientId === input.clientId);
+  const currentRow = input.rows[rowIndex];
+  if (currentRow === undefined) {
+    throw new Error(`Sandbox profile integration row '${input.clientId}' was not found.`);
+  }
 
-    const nextRow = {
-      ...row,
-      ...input.changes,
-    };
-    if (sandboxProfileBindingEditorRowsEqual(row, nextRow)) {
-      return row;
-    }
+  const nextRow = {
+    ...currentRow,
+    ...input.changes,
+  };
+  if (sandboxProfileBindingEditorRowsEqual(currentRow, nextRow)) {
+    return null;
+  }
 
-    didChange = true;
-    return nextRow;
-  });
-
-  return didChange ? nextRows : null;
+  const nextRows = [...input.rows];
+  nextRows[rowIndex] = nextRow;
+  return nextRows;
 }
 
 export function useSandboxProfileIntegrationsLoader(input: {
