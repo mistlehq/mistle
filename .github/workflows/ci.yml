@@ -22,7 +22,10 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      ts: ${{ steps.filter.outputs.ts }}
+      ts_static: ${{ steps.filter.outputs.ts_static }}
+      ts_build: ${{ steps.filter.outputs.ts_build }}
+      ts_test: ${{ steps.filter.outputs.ts_test }}
+      ts_component: ${{ steps.filter.outputs.ts_component }}
       rust: ${{ steps.filter.outputs.rust }}
       sandbox_base_linux: ${{ steps.filter.outputs.sandbox_base_linux }}
 
@@ -35,7 +38,7 @@ jobs:
         uses: dorny/paths-filter@v4
         with:
           filters: |
-            ts:
+            ts_static:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
               - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
@@ -53,6 +56,67 @@ jobs:
               - 'turbo.json'
               - 'tsconfig.base.json'
               - '!packages/sandboxd/**'
+            ts_build:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
+              - '.envrc'
+              - 'apps/**'
+              - 'packages/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '!packages/commit-sign/**'
+              - '!packages/docs/**'
+              - '!packages/sandboxd/**'
+            ts_test:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
+              - '.envrc'
+              - 'apps/**'
+              - 'packages/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '!packages/commit-sign/**'
+              - '!packages/docs/**'
+              - '!packages/sandboxd/**'
+            ts_component:
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/ci-scheduled-integration.yml'
+              - '.github/workflows/ci-scheduled-sandboxd-stress.yml'
+              - '.github/workflows/ci-scheduled-system.yml'
+              - '.envrc'
+              - 'apps/dashboard/**'
+              - 'packages/config/**'
+              - 'packages/http/**'
+              - 'packages/integrations-core/**'
+              - 'packages/integrations-definitions/**'
+              - 'packages/sandbox-session-client/**'
+              - 'packages/sandbox-session-protocol/**'
+              - 'packages/time/**'
+              - 'packages/ui/**'
+              - 'flake.nix'
+              - 'flake.lock'
+              - 'package.json'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
             rust:
               - '.github/workflows/ci.yml'
               - '.github/workflows/ci-scheduled-integration.yml'
@@ -91,7 +155,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts_static == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -173,7 +237,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts_build == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -399,7 +463,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts_test == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -483,7 +547,7 @@ jobs:
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.ts == 'true'
+    if: needs.changes.outputs.ts_component == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
