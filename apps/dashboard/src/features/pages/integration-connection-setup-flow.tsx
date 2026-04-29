@@ -1,7 +1,9 @@
 import { CopyableValue, Notice, Tabs, TabsContent, TabsList, TabsTrigger } from "@mistle/ui";
 
-import { ManifestCallbackJsonEditor } from "../integrations/manifest-callback-json-editor.js";
-import type { ManifestJsonValidation } from "../integrations/manifest-json-editor.js";
+import {
+  ManifestJsonEditor,
+  type ManifestJsonValidation,
+} from "../integrations/manifest-json-editor.js";
 import type { ManifestWebhookCallbackState } from "../integrations/manifest-webhook-callback-state.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
@@ -109,13 +111,22 @@ export function IntegrationConnectionSetupManifestEditorSection(input: {
         )}
         <p className="text-muted-foreground text-sm">{input.description}</p>
       </div>
-      <ManifestCallbackJsonEditor
-        callbackState={input.manifestCallbackState}
-        id={input.editorId}
-        onChange={input.onManifestChange}
-        validation={input.manifestValidation}
-        value={input.manifestValue}
-      />
+      {input.manifestCallbackState.kind === "ready" ? (
+        <ManifestJsonEditor
+          id={input.editorId}
+          onChange={input.onManifestChange}
+          validation={input.manifestValidation}
+          value={input.manifestValue}
+        />
+      ) : input.manifestCallbackState.kind === "loading" ? (
+        <Notice>Loading manifest callback URLs...</Notice>
+      ) : (
+        <Notice title="Could not load manifest callback URLs" variant="alert">
+          {input.manifestCallbackState.kind === "error"
+            ? input.manifestCallbackState.message
+            : "The integration webhook source is missing a callback URL."}
+        </Notice>
+      )}
     </div>
   );
 }
