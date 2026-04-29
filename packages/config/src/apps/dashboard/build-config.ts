@@ -5,8 +5,6 @@ import { fileURLToPath } from "node:url";
 import { parse } from "smol-toml";
 import { z } from "zod";
 
-import { deriveDashboardAuthMethods } from "../control-plane-api/dashboard-auth-methods.js";
-
 export type DashboardBuildEnvironment = "development" | "production";
 
 type UnknownRecord = Record<string, unknown>;
@@ -16,68 +14,12 @@ const DashboardBuildConfigSchema = z.object({
     dashboard: z.object({
       control_plane_api_origin: z.string().min(1),
     }),
-    control_plane_api: z
-      .object({
-        auth: z
-          .object({
-            enabled_methods: z.array(z.enum(["otp", "google"])).min(1),
-            google: z
-              .object({
-                client_id: z.string().min(1),
-                client_secret: z.string().min(1),
-              })
-              .optional(),
-          })
-          .optional(),
-      })
-      .optional(),
   }),
 });
 
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
-  authMethods: {
-    google: boolean;
-  };
 };
-
-function resolveGoogleAuthConfig(
-  environment: NodeJS.ProcessEnv,
-  parsedConfig: z.infer<typeof DashboardBuildConfigSchema>,
-): { clientId: string; clientSecret: string } | undefined {
-  const googleClientId = environment.MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID;
-  const googleClientSecret =
-    environment.MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET;
-
-  if (googleClientId !== undefined || googleClientSecret !== undefined) {
-    if (googleClientId === undefined || googleClientSecret === undefined) {
-      throw new Error(
-        "Dashboard build config requires both MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-      );
-    }
-
-    return {
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
-    };
-  }
-
-  const authConfig = parsedConfig.services.control_plane_api?.auth;
-  if (authConfig === undefined || !authConfig.enabled_methods.includes("google")) {
-    return undefined;
-  }
-
-  if (authConfig.google === undefined) {
-    throw new Error(
-      "services.control_plane_api.auth.google is required when google auth is enabled.",
-    );
-  }
-
-  return {
-    clientId: authConfig.google.client_id,
-    clientSecret: authConfig.google.client_secret,
-  };
-}
 
 function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -155,12 +97,8 @@ export function loadDashboardBuildConfig(
     parsedConfig.services.dashboard.control_plane_api_origin,
     "services.dashboard.control_plane_api_origin",
   );
-  const authMethods = deriveDashboardAuthMethods({
-    google: resolveGoogleAuthConfig(environment, parsedConfig),
-  });
 
   return {
     controlPlaneApiOrigin,
-    authMethods,
   };
 }

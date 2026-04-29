@@ -9,6 +9,52 @@
     "parameters": {}
   },
   "paths": {
+    "/v1/auth/methods": {
+      "get": {
+        "tags": ["Auth"],
+        "responses": {
+          "200": {
+            "description": "Get the auth methods available for dashboard login.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "methods": {
+                      "type": "object",
+                      "properties": {
+                        "emailOtp": {
+                          "type": "boolean",
+                          "enum": [true]
+                        },
+                        "google": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["emailOtp", "google"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["methods"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/automations/webhooks": {
       "get": {
         "tags": ["Automations"],

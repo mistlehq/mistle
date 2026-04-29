@@ -154,6 +154,8 @@ export function selectGlobalConfig(config: Config): GlobalConfig {
 
 export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConfig {
   const googleAuth = config.services.control_plane_api.auth.google;
+  const isGoogleAuthEnabled =
+    config.services.control_plane_api.auth.enabled_methods?.includes("google") === true;
 
   return {
     server: {
@@ -179,7 +181,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       otpLength: config.services.control_plane_api.auth.otp.length,
       otpExpiresInSeconds: config.services.control_plane_api.auth.otp.expires_in_seconds,
       otpAllowedAttempts: config.services.control_plane_api.auth.otp.allowed_attempts,
-      ...(googleAuth === undefined
+      ...(googleAuth === undefined || !isGoogleAuthEnabled
         ? {}
         : {
             google: {

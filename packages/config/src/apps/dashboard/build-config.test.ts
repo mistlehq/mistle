@@ -52,28 +52,14 @@ afterEach(() => {
   }
 });
 
-function createDashboardConfigFile(input?: {
-  dashboardOrigin?: string;
-  enabledMethods?: readonly string[];
-  googleTomlBlock?: string;
-}): string {
+function createDashboardConfigFile(input?: { dashboardOrigin?: string }): string {
   const directory = createTempDirectory();
   const configPath = join(directory, "config.toml");
   const dashboardOrigin = input?.dashboardOrigin ?? "http://127.0.0.1:5100";
-  const enabledMethods = input?.enabledMethods ?? ["otp"];
-  const googleTomlBlock = input?.googleTomlBlock ?? "";
 
   writeFileSync(
     configPath,
-    [
-      "[services.dashboard]",
-      `control_plane_api_origin = "${dashboardOrigin}"`,
-      "",
-      "[services.control_plane_api.auth]",
-      `enabled_methods = [${enabledMethods.map((method) => `"${method}"`).join(", ")}]`,
-      "",
-      googleTomlBlock,
-    ]
+    ["[services.dashboard]", `control_plane_api_origin = "${dashboardOrigin}"`]
       .filter((line) => line.length > 0)
       .join("\n"),
     "utf8",
@@ -122,9 +108,6 @@ describe("loadDashboardBuildConfig", () => {
     const config = loadDashboardBuildConfig({}, "production");
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
-    expect(config.authMethods).toEqual({
-      google: false,
-    });
   });
 
   it("loads dashboard origin from MISTLE_CONFIG_PATH", () => {
@@ -133,9 +116,6 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
-    expect(config.authMethods).toEqual({
-      google: false,
-    });
   });
 
   it("loads dashboard origin from dashboard-only config shape", () => {
@@ -152,82 +132,6 @@ describe("loadDashboardBuildConfig", () => {
     });
 
     expect(config.controlPlaneApiOrigin).toBe("http://127.0.0.1:5100");
-    expect(config.authMethods).toEqual({
-      google: false,
-    });
-  });
-
-  it("derives google auth availability from control-plane auth config", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createDashboardConfigFile({
-        enabledMethods: ["otp", "google"],
-        googleTomlBlock: [
-          "[services.control_plane_api.auth.google]",
-          'client_id = "google-client-id"',
-          'client_secret = "google-client-secret"',
-        ].join("\n"),
-      }),
-    });
-
-    expect(config.authMethods).toEqual({
-      google: true,
-    });
-  });
-
-  it("fails when google auth is enabled without provider config", () => {
-    expect(() =>
-      loadDashboardBuildConfigForTest({
-        configPath: createDashboardConfigFile({
-          enabledMethods: ["otp", "google"],
-        }),
-      }),
-    ).toThrow("services.control_plane_api.auth.google is required when google auth is enabled.");
-  });
-
-  it("derives google auth availability from new env-only control-plane auth config", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createDashboardConfigFile(),
-      env: {
-        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id",
-        MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret",
-      },
-    });
-
-    expect(config.authMethods).toEqual({
-      google: true,
-    });
-  });
-
-  it("ignores unrecognized google auth env config", () => {
-    const config = loadDashboardBuildConfigForTest({
-      configPath: createDashboardConfigFile(),
-      env: {
-        MISTLE_UNKNOWN_GOOGLE_CLIENT_ID: "google-client-id",
-        MISTLE_UNKNOWN_GOOGLE_CLIENT_SECRET: "google-client-secret",
-      },
-    });
-
-    expect(config.authMethods).toEqual({
-      google: false,
-    });
-  });
-
-  it.each([
-    [
-      { MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID: "google-client-id" },
-      "Dashboard build config requires both MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-    ],
-    [
-      { MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET: "google-client-secret" },
-      "Dashboard build config requires both MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_ID and MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_GOOGLE_CLIENT_SECRET when either is set.",
-    ],
-  ])("fails when google env config is partial: %j", (env, message) => {
-    expect(() =>
-      loadDashboardBuildConfigForTest({
-        configPath: createDashboardConfigFile(),
-        env,
-      }),
-    ).toThrow(message);
   });
 
   it("fails when services.dashboard.control_plane_api_origin is missing", () => {

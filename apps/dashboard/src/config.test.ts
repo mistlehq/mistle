@@ -1,17 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  buildDashboardConfig,
-  getDashboardConfig,
-  getDashboardGoogleAuthMethodEnabled,
-  resetDashboardConfigForTest,
-} from "./config.js";
-
-function setDashboardGoogleAuthMethodFlag(value: string): void {
-  Object.assign(import.meta.env, {
-    VITE_AUTH_METHOD_GOOGLE: value,
-  });
-}
+import { buildDashboardConfig, getDashboardConfig, resetDashboardConfigForTest } from "./config.js";
 
 function setDashboardControlPlaneApiOrigin(value: string): void {
   Object.assign(import.meta.env, {
@@ -22,7 +11,6 @@ function setDashboardControlPlaneApiOrigin(value: string): void {
 afterEach(() => {
   resetDashboardConfigForTest();
   setDashboardControlPlaneApiOrigin("http://localhost:3000");
-  setDashboardGoogleAuthMethodFlag("true");
 });
 
 describe("dashboard config", () => {
@@ -46,29 +34,9 @@ describe("dashboard config", () => {
     expect(() => buildDashboardConfig({})).toThrow("VITE_CONTROL_PLANE_API_ORIGIN is required.");
   });
 
-  it("parses the google auth method flag separately", () => {
-    setDashboardGoogleAuthMethodFlag("true");
-
-    expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
-  });
-
   it("reads control-plane API origin from build-time env", () => {
     setDashboardControlPlaneApiOrigin("http://localhost:8080");
 
     expect(getDashboardConfig().controlPlaneApiOrigin).toBe("http://localhost:8080");
-  });
-
-  it("reads the google auth method flag from build-time env", () => {
-    setDashboardGoogleAuthMethodFlag("true");
-
-    expect(getDashboardGoogleAuthMethodEnabled()).toBe(true);
-  });
-
-  it.each([["yes"], [""]])("rejects an invalid google auth method flag: %s", (value) => {
-    setDashboardGoogleAuthMethodFlag(value);
-
-    expect(() => getDashboardGoogleAuthMethodEnabled()).toThrow(
-      'VITE_AUTH_METHOD_GOOGLE must be either "true" or "false".',
-    );
   });
 });

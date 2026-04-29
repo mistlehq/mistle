@@ -21,10 +21,6 @@ export {
   type PublishedSandboxBaseImageRefResolver,
 } from "./sandbox-base-images.js";
 export {
-  deriveDashboardAuthMethods,
-  type DashboardAuthMethodsConfig,
-} from "./apps/control-plane-api/dashboard-auth-methods.js";
-export {
   loadDashboardBuildConfig,
   type DashboardBuildConfig,
   type DashboardBuildEnvironment,

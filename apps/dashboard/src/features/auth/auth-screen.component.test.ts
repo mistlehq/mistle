@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
+import { AUTH_METHODS_QUERY_KEY } from "./auth-methods-query.js";
 import {
   resolvePostLoginPath,
   resolveRequestedPostLoginPath,
@@ -16,9 +17,15 @@ import {
 import { AuthScreen } from "./auth-screen.js";
 import { resolveOAuthCallbackError } from "./messages.js";
 
-function renderAuthScreen(input: { initialEntry: string }) {
-  const queryClient = createTestQueryClient();
+function renderAuthScreen(input: { initialEntry: string; googleAuthEnabled?: boolean }) {
+  const queryClient = createTestQueryClient({ staleTime: Number.POSITIVE_INFINITY });
   queryClient.setQueryData(SESSION_QUERY_KEY, null);
+  queryClient.setQueryData(AUTH_METHODS_QUERY_KEY, {
+    methods: {
+      emailOtp: true,
+      google: input.googleAuthEnabled ?? true,
+    },
+  });
 
   const router = createMemoryRouter(
     [
@@ -157,5 +164,18 @@ describe("AuthScreen", () => {
     renderAuthScreen({ initialEntry });
 
     expect(await screen.findByText(expectedMessage)).toBeTruthy();
+  });
+
+  it("shows Google sign-in when the control plane reports Google auth is enabled", async () => {
+    renderAuthScreen({ initialEntry: "/auth/login", googleAuthEnabled: true });
+
+    expect(await screen.findByRole("button", { name: "Continue with Google" })).toBeTruthy();
+  });
+
+  it("hides Google sign-in when the control plane reports Google auth is disabled", async () => {
+    renderAuthScreen({ initialEntry: "/auth/login", googleAuthEnabled: false });
+
+    expect(await screen.findByRole("button", { name: "Continue with email" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Continue with Google" })).toBeNull();
   });
 });
