@@ -77,10 +77,16 @@ type SandboxInstanceWithRuntimePlan = {
   runtimePlan: PersistedRuntimePlan;
 } & SandboxInstanceResponseMetadata;
 
+type SandboxInstanceInspectionResult = SandboxInstanceWithRuntimePlan & {
+  persistedStatus: SandboxInstanceStatus;
+  status: NonNullable<GetSandboxInstanceResponse>["status"];
+  connectable: boolean;
+};
+
 function sandboxInstanceResponseBase(
   sandboxInstance: SandboxInstanceResponseMetadata,
 ): Pick<
-  NonNullable<GetSandboxInstanceResponse>,
+  SandboxInstanceInspectionResult,
   | "id"
   | "sandboxProfileId"
   | "sandboxProfileVersion"
@@ -125,7 +131,7 @@ function stoppedSandboxInstanceResponse(
     failureCode?: string | null;
     failureMessage?: string | null;
   } = {},
-): NonNullable<GetSandboxInstanceResponse> {
+): SandboxInstanceInspectionResult {
   const base =
     input.persistedStatus === undefined
       ? sandboxInstanceResponseBase(sandboxInstance)
@@ -355,7 +361,7 @@ async function inspectStartingSandboxInstance(
     persistenceMode: string;
     providerSandboxId: string | null;
   } & SandboxInstanceWithRuntimePlan,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResult> {
   if (
     sandboxInstance.providerSandboxId === null &&
     sandboxInstance.persistenceMode === SandboxInstancePersistenceModes.PERSISTENT
@@ -466,7 +472,7 @@ function readPendingSandboxInstance(
     failureMessage: string | null;
     runtimePlan: PersistedRuntimePlan;
   } & SandboxInstanceResponseMetadata,
-): NonNullable<GetSandboxInstanceResponse> {
+): SandboxInstanceInspectionResult {
   return {
     ...sandboxInstanceResponseBase(sandboxInstance),
     status: SandboxInstanceStatuses.PENDING,
@@ -483,7 +489,7 @@ async function inspectStoppedSandboxInstance(
     persistenceMode: string;
     providerSandboxId: string | null;
   } & SandboxInstanceWithRuntimePlan,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResult> {
   if (sandboxInstance.purpose === SandboxInstancePurposes.SETUP_CHECK) {
     return stoppedSandboxInstanceResponse(sandboxInstance);
   }
@@ -560,7 +566,7 @@ async function inspectRunningSandboxInstance(
     persistenceMode: string;
     providerSandboxId: string | null;
   } & SandboxInstanceWithRuntimePlan,
-): Promise<NonNullable<GetSandboxInstanceResponse>> {
+): Promise<SandboxInstanceInspectionResult> {
   if (sandboxInstance.providerSandboxId === null) {
     throw new Error(
       `Expected running sandbox instance '${sandboxInstance.id}' to have a providerSandboxId.`,
@@ -637,10 +643,28 @@ async function inspectSandboxInstanceOrNull(
   }
 }
 
-export async function getSandboxInstanceByInspection(
+function toGetSandboxInstanceResponse(
+  sandboxInstance: SandboxInstanceInspectionResult,
+): NonNullable<GetSandboxInstanceResponse> {
+  return {
+    id: sandboxInstance.id,
+    title: sandboxInstance.title,
+    status: sandboxInstance.status,
+    connectable: sandboxInstance.connectable,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
+    runtimePlan: sandboxInstance.runtimePlan,
+  };
+}
+
+async function inspectSandboxInstance(
   ctx: GetSandboxInstanceByInspectionContext,
-  input: GetSandboxInstanceInput,
-): Promise<GetSandboxInstanceResponse> {
+  input: GetSandboxInstanceInput & {
+    purpose?: SandboxInstancePurpose;
+    sandboxProfileId?: string;
+    sandboxProfileVersion?: number;
+  },
+): Promise<SandboxInstanceInspectionResult | null> {
   const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
     columns: {
       id: true,
@@ -665,6 +689,12 @@ export async function getSandboxInstanceByInspection(
         eq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
         whereEq(table.purpose, input.purpose ?? SandboxInstancePurposes.SESSION),
+        ...(input.sandboxProfileId === undefined
+          ? []
+          : [whereEq(table.sandboxProfileId, input.sandboxProfileId)]),
+        ...(input.sandboxProfileVersion === undefined
+          ? []
+          : [whereEq(table.sandboxProfileVersion, input.sandboxProfileVersion)]),
       ),
   });
   if (sandboxInstance === undefined) {
@@ -717,4 +747,58 @@ export async function getSandboxInstanceByInspection(
     default:
       throw new Error("Unsupported sandbox instance status.");
   }
+}
+
+export async function getSandboxInstanceByInspection(
+  ctx: GetSandboxInstanceByInspectionContext,
+  input: GetSandboxInstanceInput,
+): Promise<GetSandboxInstanceResponse> {
+  const sandboxInstance = await inspectSandboxInstance(ctx, input);
+  if (sandboxInstance === null) {
+    return null;
+  }
+
+  return toGetSandboxInstanceResponse(sandboxInstance);
+}
+
+export async function getSetupCheckSandboxInstanceByInspection(
+  ctx: GetSandboxInstanceByInspectionContext,
+  input: {
+    organizationId: string;
+    instanceId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+): Promise<{
+  id: string;
+  status: NonNullable<GetSandboxInstanceResponse>["status"];
+  failureCode: string | null;
+  failureMessage: string | null;
+  startedAt: string | null;
+  stoppedAt: string | null;
+  failedAt: string | null;
+} | null> {
+  const sandboxInstance = await inspectSandboxInstance(ctx, {
+    organizationId: input.organizationId,
+    instanceId: input.instanceId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    purpose: SandboxInstancePurposes.SETUP_CHECK,
+  });
+  if (sandboxInstance === null) {
+    return null;
+  }
+
+  return {
+    id: sandboxInstance.id,
+    status:
+      sandboxInstance.persistedStatus === SandboxInstanceStatuses.STARTING
+        ? SandboxInstanceStatuses.STARTING
+        : sandboxInstance.status,
+    failureCode: sandboxInstance.failureCode,
+    failureMessage: sandboxInstance.failureMessage,
+    startedAt: sandboxInstance.startedAt,
+    stoppedAt: sandboxInstance.stoppedAt,
+    failedAt: sandboxInstance.failedAt,
+  };
 }

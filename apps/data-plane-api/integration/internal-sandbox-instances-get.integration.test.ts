@@ -242,7 +242,7 @@ describe("internal sandbox instances get integration", () => {
     await expect(response.json()).resolves.toBeNull();
   });
 
-  it("returns setup-check-purpose sandbox instances when explicitly requested", async ({
+  it("returns setup-check-purpose sandbox instances from the setup-check read endpoint", async ({
     fixture,
   }) => {
     await fixture.db.insert(sandboxInstances).values({
@@ -264,7 +264,7 @@ describe("internal sandbox instances get integration", () => {
 
     const response = await fetch(
       new URL(
-        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_setup_check_included?organizationId=org_dp_api_conventional_get&purpose=setup_check`,
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/setup-checks/sbi_conventional_get_setup_check_included?organizationId=org_dp_api_conventional_get&sandboxProfileId=sbp_setup_check_included&sandboxProfileVersion=1`,
         fixture.baseUrl,
       ),
       {
@@ -277,13 +277,46 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_setup_check_included",
-      title: "Setup check included",
       status: "failed",
-      connectable: false,
       failureCode: "sandbox_init_failed",
       failureMessage: "Setup script exited with status 1.",
-      runtimePlan: null,
     });
+  });
+
+  it("does not return setup-check sandboxes for a different profile version", async ({
+    fixture,
+  }) => {
+    await fixture.db.insert(sandboxInstances).values({
+      id: "sbi_conventional_get_setup_check_wrong_version",
+      organizationId: "org_dp_api_conventional_get",
+      sandboxProfileId: "sbp_setup_check_wrong_version",
+      title: "Wrong setup check version",
+      sandboxProfileVersion: 3,
+      runtimeProvider: "docker",
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.FAILED,
+      failureCode: "sandbox_init_failed",
+      failureMessage: "Setup script exited with status 1.",
+      startedByKind: "user",
+      startedById: "usr_setup_check_wrong_version",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+    });
+
+    const response = await fetch(
+      new URL(
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/setup-checks/sbi_conventional_get_setup_check_wrong_version?organizationId=org_dp_api_conventional_get&sandboxProfileId=sbp_setup_check_wrong_version&sandboxProfileVersion=4`,
+        fixture.baseUrl,
+      ),
+      {
+        headers: {
+          [DATA_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toBeNull();
   });
 
   it("returns pending before provider provisioning begins", async ({ fixture }) => {
@@ -438,7 +471,6 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_starting_missing",
       title: null,
       status: "failed",
-      persistedStatus: "failed",
       connectable: false,
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during startup inspection.",
@@ -513,7 +545,6 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_starting_missing_persistent",
       title: null,
       status: "stopped",
-      persistedStatus: "stopped",
       connectable: false,
       failureCode: null,
       failureMessage: null,
@@ -591,7 +622,6 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_starting",
         title: null,
         status: "starting",
-        persistedStatus: "starting",
         connectable: false,
         failureCode: null,
         failureMessage: null,
@@ -695,7 +725,6 @@ describe("internal sandbox instances get integration", () => {
         id: "sbi_conventional_get_running_attached",
         title: null,
         status: "running",
-        persistedStatus: "running",
         connectable: true,
         failureCode: null,
         failureMessage: null,
@@ -764,7 +793,6 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_missing",
       title: null,
       status: "failed",
-      persistedStatus: "failed",
       connectable: false,
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
@@ -839,7 +867,6 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_missing_persistent",
       title: null,
       status: "stopped",
-      persistedStatus: "stopped",
       connectable: false,
       failureCode: null,
       failureMessage: null,
@@ -992,7 +1019,6 @@ describe("internal sandbox instances get integration", () => {
       id: "sbi_conventional_get_stopped_missing",
       title: null,
       status: "failed",
-      persistedStatus: "failed",
       connectable: false,
       failureCode: "provider_runtime_missing",
       failureMessage: "Sandbox runtime was not found at the provider during inspection.",
@@ -1036,7 +1062,7 @@ describe("internal sandbox instances get integration", () => {
 
     const response = await fetch(
       new URL(
-        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/sbi_conventional_get_stopped_setup_check_missing?organizationId=org_dp_api_conventional_get&purpose=setup_check`,
+        `${INTERNAL_SANDBOX_ROUTE_BASE_PATH}/instances/setup-checks/sbi_conventional_get_stopped_setup_check_missing?organizationId=org_dp_api_conventional_get&sandboxProfileId=sbp_conventional_get_setup_check&sandboxProfileVersion=7`,
         fixture.baseUrl,
       ),
       {
@@ -1049,13 +1075,9 @@ describe("internal sandbox instances get integration", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       id: "sbi_conventional_get_stopped_setup_check_missing",
-      title: "Completed setup check",
       status: "stopped",
-      persistedStatus: "stopped",
-      connectable: false,
       failureCode: null,
       failureMessage: null,
-      runtimePlan: null,
     });
 
     const persistedRow = await fixture.db.query.sandboxInstances.findFirst({

@@ -556,7 +556,6 @@ export interface paths {
       parameters: {
         query: {
           organizationId: string;
-          purpose?: "session" | "setup_check";
         };
         header?: never;
         path: {
@@ -574,15 +573,9 @@ export interface paths {
           content: {
             "application/json": {
               connectable: boolean;
-              createdAt: string;
-              failedAt: string | null;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;
-              /** @enum {string} */
-              persistedStatus: "pending" | "starting" | "running" | "stopped" | "failed";
-              /** @enum {string} */
-              purpose: "session" | "snapshot" | "setup_check";
               runtimePlan: {
                 agentRuntimes: {
                   bindingId: string;
@@ -914,14 +907,9 @@ export interface paths {
                   sourceKind: "git-clone";
                 }[];
               } | null;
-              sandboxProfileId: string;
-              sandboxProfileVersion: number;
-              startedAt: string | null;
               /** @enum {string} */
               status: "pending" | "starting" | "running" | "stopped" | "failed";
-              stoppedAt: string | null;
               title: string | null;
-              updatedAt: string;
             } | null;
           };
         };
@@ -1483,6 +1471,91 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/internal/sandbox/instances/setup-checks/:id": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          organizationId: string;
+          sandboxProfileId: string;
+          sandboxProfileVersion: number;
+        };
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get setup-check sandbox instance status for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              failedAt: string | null;
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              startedAt: string | null;
+              /** @enum {string} */
+              status: "pending" | "starting" | "running" | "stopped" | "failed";
+              stoppedAt: string | null;
+            } | null;
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

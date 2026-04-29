@@ -26,26 +26,16 @@ export const SandboxInstanceStartedBySchema = z
   .strict();
 
 export const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook", "system"]);
-export const SandboxInstancePurposeSchema = z.enum(["session", "snapshot", "setup_check"]);
 
 export const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
-    sandboxProfileId: z.string().min(1),
-    sandboxProfileVersion: z.number().int().min(1),
-    purpose: SandboxInstancePurposeSchema,
     title: z.string().min(1).nullable(),
     status: DataPlaneSandboxInstanceStatusSchema,
-    persistedStatus: DataPlaneSandboxInstanceStatusSchema,
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
-    startedAt: z.string().min(1).nullable(),
-    stoppedAt: z.string().min(1).nullable(),
-    failedAt: z.string().min(1).nullable(),
-    createdAt: z.string().min(1),
-    updatedAt: z.string().min(1),
   })
   .strict()
   .nullable();

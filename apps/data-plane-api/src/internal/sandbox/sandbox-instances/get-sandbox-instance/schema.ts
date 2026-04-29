@@ -9,6 +9,5 @@ export const GetSandboxInstanceParamsSchema = z
 export const GetSandboxInstanceQuerySchema = z
   .object({
     organizationId: z.string().min(1),
-    purpose: z.enum(["session", "setup_check"]).optional(),
   })
   .strict();

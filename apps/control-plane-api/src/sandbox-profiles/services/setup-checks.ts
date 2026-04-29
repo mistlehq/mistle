@@ -297,29 +297,22 @@ export async function getProfileVersionSetupCheck(
 ): Promise<SetupCheckOutput> {
   await verifyProfileVersionExists({ db }, input);
 
-  const sandboxInstance = await dataPlaneClient.getSandboxInstance({
+  const sandboxInstance = await dataPlaneClient.getSetupCheckSandboxInstance({
     organizationId: input.organizationId,
     instanceId: input.setupCheckId,
-    purpose: SandboxInstancePurposes.SETUP_CHECK,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.profileVersion,
   });
 
-  if (
-    sandboxInstance === null ||
-    sandboxInstance.sandboxProfileId !== input.profileId ||
-    sandboxInstance.sandboxProfileVersion !== input.profileVersion
-  ) {
+  if (sandboxInstance === null) {
     throw new NotFoundError("SETUP_CHECK_NOT_FOUND", "Sandbox profile setup check was not found.");
   }
 
-  if (
-    sandboxInstance.status === "pending" ||
-    sandboxInstance.status === "starting" ||
-    sandboxInstance.persistedStatus === "starting"
-  ) {
+  if (sandboxInstance.status === "pending" || sandboxInstance.status === "starting") {
     return {
       id: sandboxInstance.id,
-      sandboxProfileId: sandboxInstance.sandboxProfileId,
-      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
       status: SetupCheckStatuses.STARTING_SANDBOX,
       failurePhase: null,
       failureCode: sandboxInstance.failureCode,
@@ -333,8 +326,8 @@ export async function getProfileVersionSetupCheck(
 
   if (sandboxInstance.status === "failed") {
     return toFailedSetupCheckOutput({
-      sandboxProfileId: sandboxInstance.sandboxProfileId,
-      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
       sandboxInstanceId: sandboxInstance.id,
       failureCode: sandboxInstance.failureCode,
       failureMessage: sandboxInstance.failureMessage,
@@ -344,8 +337,8 @@ export async function getProfileVersionSetupCheck(
 
   if (sandboxInstance.status === "stopped") {
     return toSucceededSetupCheckOutput({
-      sandboxProfileId: sandboxInstance.sandboxProfileId,
-      sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: input.profileVersion,
       sandboxInstanceId: sandboxInstance.id,
       startedAt: sandboxInstance.startedAt,
       stoppedAt: sandboxInstance.stoppedAt,
@@ -354,8 +347,8 @@ export async function getProfileVersionSetupCheck(
 
   return {
     id: sandboxInstance.id,
-    sandboxProfileId: sandboxInstance.sandboxProfileId,
-    sandboxProfileVersion: sandboxInstance.sandboxProfileVersion,
+    sandboxProfileId: input.profileId,
+    sandboxProfileVersion: input.profileVersion,
     status: SetupCheckStatuses.CLEANING_UP,
     failurePhase: null,
     failureCode: null,

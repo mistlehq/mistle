@@ -161,30 +161,41 @@ export type MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse =
 export type GetSandboxInstanceInput = {
   organizationId: string;
   instanceId: string;
-  purpose?: "session" | "setup_check";
 };
 const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
-    sandboxProfileId: z.string().min(1),
-    sandboxProfileVersion: z.number().int().min(1),
-    purpose: z.enum(["session", "snapshot", "setup_check"]),
     title: z.string().min(1).nullable(),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
-    persistedStatus: z.enum(["pending", "starting", "running", "stopped", "failed"]),
     connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
     runtimePlan: CompiledRuntimePlanSchema.nullable(),
-    startedAt: z.string().min(1).nullable(),
-    stoppedAt: z.string().min(1).nullable(),
-    failedAt: z.string().min(1).nullable(),
-    createdAt: z.string().min(1),
-    updatedAt: z.string().min(1),
   })
   .strict()
   .nullable();
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export type GetSetupCheckSandboxInstanceInput = {
+  organizationId: string;
+  instanceId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+};
+const GetSetupCheckSandboxInstanceResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+    startedAt: z.string().min(1).nullable(),
+    stoppedAt: z.string().min(1).nullable(),
+    failedAt: z.string().min(1).nullable(),
+  })
+  .strict()
+  .nullable();
+export type GetSetupCheckSandboxInstanceResponse = z.infer<
+  typeof GetSetupCheckSandboxInstanceResponseSchema
+>;
 export type GetSandboxInstanceByStartIdempotencyInput = {
   organizationId: string;
   sandboxProfileId: string;
@@ -249,6 +260,9 @@ export type DataPlaneSandboxInstancesClient = {
     input: MaterializeSandboxProfileVersionSnapshotJobInput,
   ) => Promise<MaterializeSandboxProfileVersionSnapshotJobAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
+  getSetupCheckSandboxInstance: (
+    input: GetSetupCheckSandboxInstanceInput,
+  ) => Promise<GetSetupCheckSandboxInstanceResponse>;
   getSandboxInstanceByStartIdempotency: (
     input: GetSandboxInstanceByStartIdempotencyInput,
   ) => Promise<GetSandboxInstanceByStartIdempotencyResponse>;
@@ -342,11 +356,12 @@ function createAuthedJsonHeaders(serviceToken: string): Record<string, string> {
 function createSandboxInstanceMemberUrl(input: {
   baseUrl: string;
   instanceId: string;
+  routePrefix?: string;
   suffix?: string;
   query?: Record<string, string>;
 }): URL {
   const url = new URL(
-    `/internal/sandbox/instances/${encodeURIComponent(input.instanceId)}${input.suffix ?? ""}`,
+    `${input.routePrefix ?? "/internal/sandbox/instances"}/${encodeURIComponent(input.instanceId)}${input.suffix ?? ""}`,
     input.baseUrl,
   );
 
@@ -662,7 +677,6 @@ export function createDataPlaneSandboxInstancesClient(
           instanceId: getInput.instanceId,
           query: {
             organizationId: getInput.organizationId,
-            ...(getInput.purpose === undefined ? {} : { purpose: getInput.purpose }),
           },
         }),
         {
@@ -676,6 +690,42 @@ export function createDataPlaneSandboxInstancesClient(
       if (response.status === 200) {
         const responseBody = await response.json();
         const parsedResponse = GetSandboxInstanceResponseSchema.parse(responseBody);
+
+        return parsedResponse;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "read",
+      });
+    },
+
+    async getSetupCheckSandboxInstance(getInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: getInput.instanceId,
+          routePrefix: "/internal/sandbox/instances/setup-checks",
+          query: {
+            organizationId: getInput.organizationId,
+            sandboxProfileId: getInput.sandboxProfileId,
+            sandboxProfileVersion: String(getInput.sandboxProfileVersion),
+          },
+        }),
+        {
+          headers: {
+            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
+          },
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = await response.json();
+        const parsedResponse = GetSetupCheckSandboxInstanceResponseSchema.parse(responseBody);
 
         return parsedResponse;
       }

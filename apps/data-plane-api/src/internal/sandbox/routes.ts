@@ -8,6 +8,7 @@ import * as createSandboxInstance from "./sandbox-instances/create-sandbox-insta
 import * as deleteSandboxInstanceDeadline from "./sandbox-instances/delete-sandbox-instance-deadline/index.js";
 import * as getSandboxInstanceByStartIdempotency from "./sandbox-instances/get-sandbox-instance-by-start-idempotency/index.js";
 import * as getSandboxInstance from "./sandbox-instances/get-sandbox-instance/index.js";
+import * as getSetupCheckSandboxInstance from "./sandbox-instances/get-setup-check-sandbox-instance/index.js";
 import * as listSandboxInstances from "./sandbox-instances/list-sandbox-instances/index.js";
 import * as patchSandboxInstanceTitle from "./sandbox-instances/patch-sandbox-instance-title/index.js";
 import * as putSandboxInstanceDeadline from "./sandbox-instances/put-sandbox-instance-deadline/index.js";
@@ -36,6 +37,7 @@ export function createInternalSandboxRoutes(): AppRoutes<typeof INTERNAL_SANDBOX
     getSandboxInstanceByStartIdempotency.route,
     getSandboxInstanceByStartIdempotency.handler,
   );
+  routes.openapi(getSetupCheckSandboxInstance.route, getSetupCheckSandboxInstance.handler);
   routes.openapi(getSandboxInstance.route, getSandboxInstance.handler);
   routes.openapi(patchSandboxInstanceTitle.route, patchSandboxInstanceTitle.handler);
   routes.openapi(reconcileSandboxInstance.route, reconcileSandboxInstance.handler);
