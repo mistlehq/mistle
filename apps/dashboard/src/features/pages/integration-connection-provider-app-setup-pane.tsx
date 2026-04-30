@@ -5,7 +5,7 @@ import type {
 import { Button, CopyableValue } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 
 import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -109,6 +109,17 @@ function SetupUrls(input: {
   );
 }
 
+function ManifestCreatedState(): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionHeader
+        description="The GitHub App was created successfully. Install it in GitHub to finish connecting it to Mistle."
+        title="GitHub App created"
+      />
+    </div>
+  );
+}
+
 function submitProviderAppSetupFormPost(input: {
   submissionUrl: string;
   fields: Record<string, string>;
@@ -161,13 +172,17 @@ export function ProviderAppSetupPane(input: {
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isManifestCreatedReturn = searchParams.get("githubAppManifest") === "created";
   const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
-    hasProviderAppSetupDraftValues({
-      connection: input.connection,
-      providerAppSetup: input.providerAppSetup,
-    })
-      ? "existing-app"
-      : "manifest",
+    isManifestCreatedReturn
+      ? "manifest"
+      : hasProviderAppSetupDraftValues({
+            connection: input.connection,
+            providerAppSetup: input.providerAppSetup,
+          })
+        ? "existing-app"
+        : "manifest",
   );
   const setupStartFormState = useIntegrationConnectionSetupStartForm(input.setupStartForm);
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
@@ -410,6 +425,7 @@ export function ProviderAppSetupPane(input: {
     connection: input.connection,
     providerAppSetup: input.providerAppSetup,
   });
+  const showManifestCreatedState = isManifestCreatedReturn && !isExistingAppStartActionInstalled;
   const canConnectExistingApp =
     isExistingAppStartActionInstalled ||
     (requiredFieldsReady &&
@@ -455,14 +471,14 @@ export function ProviderAppSetupPane(input: {
         }
         footer={
           <>
-            {setupMode === "existing-app" ? (
+            {setupMode === "existing-app" || showManifestCreatedState ? (
               <SetupUrls
                 providerAppSetup={input.providerAppSetup}
                 webhookCallbackState={webhookCallbackState}
               />
             ) : null}
 
-            {setupMode === "existing-app" ? (
+            {setupMode === "existing-app" || showManifestCreatedState ? (
               <FormPageActionBar>
                 <Button
                   aria-busy={isExistingAppStartActionPending}
@@ -503,18 +519,22 @@ export function ProviderAppSetupPane(input: {
           </>
         }
         manifestContent={
-          <IntegrationConnectionSetupManifestPanel
-            editorId={`${input.routeSegment}-manifest-editor`}
-            manifestCallbackState={webhookCallbackState}
-            manifestDescription={input.providerAppSetup.manifest.description}
-            manifestTitle={input.providerAppSetup.manifest.title}
-            manifestValidation={manifestValidation}
-            manifestValue={manifestDraft.manifestValue}
-            onManifestChange={manifestDraft.onManifestChange}
-            onSetupStartFormValueChange={setupStartFormState.updateValue}
-            setupStartForm={input.setupStartForm}
-            setupStartFormValues={setupStartFormState.values}
-          />
+          showManifestCreatedState ? (
+            <ManifestCreatedState />
+          ) : (
+            <IntegrationConnectionSetupManifestPanel
+              editorId={`${input.routeSegment}-manifest-editor`}
+              manifestCallbackState={webhookCallbackState}
+              manifestDescription={input.providerAppSetup.manifest.description}
+              manifestTitle={input.providerAppSetup.manifest.title}
+              manifestValidation={manifestValidation}
+              manifestValue={manifestDraft.manifestValue}
+              onManifestChange={manifestDraft.onManifestChange}
+              onSetupStartFormValueChange={setupStartFormState.updateValue}
+              setupStartForm={input.setupStartForm}
+              setupStartFormValues={setupStartFormState.values}
+            />
+          )
         }
         onModeChange={setSetupMode}
         title={input.providerAppSetup.title}

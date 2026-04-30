@@ -76,6 +76,7 @@ function CurrentPath(): React.JSX.Element {
 function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   controlPlaneApiOrigin?: string;
+  initialEntry?: string;
   methodId?: string;
   routeSegment?: string;
   webhookCallbackUrl?: string;
@@ -118,7 +119,8 @@ function renderProviderAppSetupPane(input?: {
   return render(
     <MemoryRouter
       initialEntries={[
-        `/integrations/${connection.targetKey}/${connection.id}/${routeSegment}/setup`,
+        input?.initialEntry ??
+          `/integrations/${connection.targetKey}/${connection.id}/${routeSegment}/setup`,
       ]}
     >
       <QueryClientProvider client={queryClient}>
@@ -298,6 +300,36 @@ describe("ProviderAppSetupPane", () => {
         "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
       ),
     ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  it("keeps the manifest tab selected after GitHub App creation and asks the user to install", () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection({
+        config: {
+          app_id: "12345",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.providerowned",
+        },
+        configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+      }),
+      initialEntry:
+        "/integrations/github-cloud/icn_github_app_setup/github-app/setup?githubAppManifest=created",
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
+    expect(screen.getByText("GitHub App created")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The GitHub App was created successfully. Install it in GitHub to finish connecting it to Mistle.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("Existing GitHub App")).toBeNull();
+    expect(screen.getByText("Hook URLs")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);
