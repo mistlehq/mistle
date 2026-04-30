@@ -131,6 +131,8 @@ export function SandboxProfileSnapshotPanel(input: {
   if (input.state.kind === "draft-unavailable" || input.version === null) {
     return (
       <SandboxProfileEditorHorizontalTabContent>
+        <SnapshotPanelDescription />
+
         <Notice title="Publish this sandbox profile before managing snapshots.">
           Snapshots are available after the sandbox profile has a published version.
         </Notice>
@@ -144,10 +146,7 @@ export function SandboxProfileSnapshotPanel(input: {
 
   return (
     <SandboxProfileEditorHorizontalTabContent>
-      <p className="text-sm text-muted-foreground">
-        A snapshot is the prepared sandbox image created from this published profile version and its
-        setup script. New sessions can only start after a snapshot is ready.
-      </p>
+      <SnapshotPanelDescription />
 
       <PublishSuccessSnapshotNotice
         onDismiss={input.onPublishSuccessMessageDismiss}
@@ -227,6 +226,15 @@ export function SandboxProfileSnapshotPanel(input: {
         version={input.version}
       />
     </SandboxProfileEditorHorizontalTabContent>
+  );
+}
+
+function SnapshotPanelDescription(): React.JSX.Element {
+  return (
+    <p className="text-sm text-muted-foreground">
+      A snapshot is the prepared sandbox image created from this published profile version and its
+      setup script. New sessions can only start after a snapshot is ready.
+    </p>
   );
 }
 

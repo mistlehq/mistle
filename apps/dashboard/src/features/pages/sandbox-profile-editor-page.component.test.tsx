@@ -1002,6 +1002,11 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(
+      screen.getByText(
+        "A snapshot is the prepared sandbox image created from this published profile version and its setup script. New sessions can only start after a snapshot is ready.",
+      ),
+    ).toBeDefined();
+    expect(
       screen.getByText("Publish this sandbox profile before managing snapshots."),
     ).toBeDefined();
     expect(
