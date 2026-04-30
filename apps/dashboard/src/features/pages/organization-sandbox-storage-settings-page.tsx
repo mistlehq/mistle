@@ -22,7 +22,7 @@ import {
   organizationSandboxStorageSettingsQueryKey,
   updateOrganizationSandboxStorageSettings,
 } from "../settings/organization/sandbox-storage-service.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { OrganizationSandboxStorageSettingsPageView } from "./organization-sandbox-storage-settings-page-view.js";
 
@@ -96,9 +96,9 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
 
   if (membershipCapabilitiesQuery.isPending) {
     return (
-      <FormPageFrame description={description} title={title}>
+      <PageFrame width="form" description={description} title={title}>
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -134,14 +134,14 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
     (draftState === null && !organizationSandboxStorageSettingsQuery.isError)
   ) {
     return (
-      <FormPageFrame description={description} title={title}>
+      <PageFrame width="form" description={description} title={title}>
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame width="form" description={description} title={title}>
       <OrganizationSandboxStorageSettingsPageView
         hasUnsavedChanges={hasUnsavedChanges}
         isSaving={saveMutation.isPending}
@@ -175,7 +175,7 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
         state={resolvedDraftState}
         visibleErrors={visibleErrors}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

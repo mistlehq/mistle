@@ -1,6 +1,10 @@
 {
   "name": "@mistle/sandbox-session-client",
   "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
   "type": "module",
   "main": "./index.js",
   "module": "./index.js",

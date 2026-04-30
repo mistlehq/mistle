@@ -11,7 +11,6 @@ import {
   useParams,
 } from "react-router";
 
-import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { useAppHeaderLeadingModel } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
@@ -160,6 +159,8 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     activeOrganizationId: "org_123",
     organizationName: "Mistle Labs",
     pageMeta: {
+      appShellHeaderLeadingVisible: isExistingSandboxSessionPath(location.pathname),
+      appShellHeaderVisible: isExistingSandboxSessionPath(location.pathname),
       appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
       appShellViewportMode: "document",
       title: null,
@@ -215,11 +216,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
         {...appShellFrame}
         autosaveIndicator={null}
         headerLeadingContent={
-          headerLeadingModel.kind === "custom" ? (
-            <>{headerLeadingModel.content}</>
-          ) : headerLeadingModel.kind === "breadcrumbs" ? (
-            <AppBreadcrumbs breadcrumbs={headerLeadingModel.breadcrumbs} />
-          ) : null
+          headerLeadingModel.kind === "custom" ? <>{headerLeadingModel.content}</> : null
         }
         headerActions={headerActions}
         mainContent={<Outlet />}

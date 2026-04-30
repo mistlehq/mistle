@@ -10,6 +10,7 @@ describe("route handles", () => {
   it("defines titles and descriptions for settings leaf pages", () => {
     expect(ROUTE_HANDLES.dashboard.title).toBe("Home");
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
+    expect(ROUTE_HANDLES.dashboard.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.integrations.description).toBe("");
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
@@ -20,6 +21,7 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.integrationSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationDetail.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
     expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
@@ -34,14 +36,17 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.sandboxProfiles.title).toBe("Sandbox Profiles");
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
+    expect(ROUTE_HANDLES.sandboxProfiles.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
     expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
     expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfilesNew.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilesDetail.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.description).toBe(
       "Edit sandbox profile configuration.",
     );
     expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfilesDetail).not.toHaveProperty("pageBreadcrumbVisible");
     expect(ROUTE_HANDLES.sandboxProfilePublished.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilePublished.description).toBe(
       "Edit sandbox profile configuration.",
@@ -55,12 +60,15 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
     expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
+    expect(ROUTE_HANDLES.automations.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
     expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.automationsNew.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.automationsDetail.pageBreadcrumbVisible).toBe(true);
 
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
     expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
@@ -165,13 +173,17 @@ describe("route handles", () => {
 
   it("defines sandbox profile published and draft breadcrumbs", () => {
     expect(ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb).toBe("Profile");
+    expect(ROUTE_HANDLES.sandboxProfileEditor.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
     expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
-    expect(typeof ROUTE_HANDLES.sandboxProfilePublished.header?.leading).toBe("function");
-    expect(typeof ROUTE_HANDLES.sandboxProfileDraft.header?.leading).toBe("function");
+    expect(ROUTE_HANDLES.sandboxProfilePublished).not.toHaveProperty("pageBreadcrumb");
+    expect(ROUTE_HANDLES.sandboxProfileDraft).not.toHaveProperty("pageBreadcrumb");
+    expect(ROUTE_HANDLES.sandboxProfileSnapshots).not.toHaveProperty("pageBreadcrumb");
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {
+    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderLeadingVisible).toBe(true);
+    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
     expect(typeof ROUTE_HANDLES.sessionsDetail.header?.leading).toBe("function");
   });

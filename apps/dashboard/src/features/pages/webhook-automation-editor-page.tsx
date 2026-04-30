@@ -13,9 +13,10 @@ import { toWebhookAutomationFormValues } from "../automations/webhook-automation
 import { WebhookAutomationForm } from "../automations/webhook-automation-form.js";
 import { webhookAutomationDetailQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { getWebhookAutomation } from "../automations/webhook-automations-service.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 
 type WebhookAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -25,15 +26,16 @@ export function WebhookAutomationEditorPage(
   input: WebhookAutomationEditorPageProps,
 ): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const params = useParams();
   const fallbackTitle = input.mode === "create" ? "Create automation" : "Edit automation";
   const { title, description } = resolvePageFrameText(pageMeta, fallbackTitle);
   if (input.mode === "create") {
     return (
-      <FormPageFrame description={description} title={title}>
+      <PageFrame width="form" breadcrumbs={breadcrumbs} description={description} title={title}>
         <CreateWebhookAutomationEditor navigate={navigate} />
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -43,9 +45,9 @@ export function WebhookAutomationEditorPage(
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame width="form" breadcrumbs={breadcrumbs} description={description} title={title}>
       <EditWebhookAutomationEditor automationId={automationId} navigate={navigate} />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

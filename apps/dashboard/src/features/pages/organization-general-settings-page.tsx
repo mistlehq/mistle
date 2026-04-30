@@ -15,7 +15,7 @@ import {
   deleteOrganizationLogo,
   uploadOrganizationLogo,
 } from "../settings/organization/organization-logo-service.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
@@ -148,14 +148,14 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
   if (organizationQuery.isPending) {
     return (
-      <FormPageFrame description={description} title={title}>
+      <PageFrame width="form" description={description} title={title}>
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame width="form" description={description} title={title}>
       <OrganizationGeneralSettingsPageView
         key={`${activeOrganizationId}:${organizationQuery.data?.slug ?? "unknown"}`}
         isSaving={saveMutation.isPending}
@@ -189,6 +189,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           await uploadOrganizationLogoMutation.mutateAsync(file);
         }}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }

@@ -48,6 +48,7 @@ import {
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
 import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
@@ -73,7 +74,7 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
-import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createSandboxBaseSetupScriptContextFromGeneratedInventory,
   resolveSandboxBaseRepositoryHandles,
@@ -313,6 +314,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
 function CreateSandboxProfileEditorPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { title, description } = resolvePageFrameText(pageMeta, "Create");
@@ -331,7 +333,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame breadcrumbs={breadcrumbs} description={description} title={title} width="form">
       <div className="gap-4 flex flex-col">
         {metaState.saveError ? (
           <Notice title="Create failed" variant="alert">
@@ -378,7 +380,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
           </CardContent>
         </Card>
       </div>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 
@@ -432,11 +434,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
   });
 
   if (profileQuery.isPending || profileVersionsQuery.isPending) {
-    return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
-        {null}
-      </PageFrame>
-    );
+    return <PageFrame width="normal">{null}</PageFrame>;
   }
 
   if (profileQuery.isError || profileQuery.data === undefined) {
@@ -444,43 +442,40 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
-        <div className="gap-4 flex flex-col">
-          <h1 className="text-xl font-semibold">Edit profile</h1>
-          <Card>
-            <CardContent className="gap-3 flex flex-col pt-4">
-              <Notice
-                title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
-                variant="alert"
+      <PageFrame width="normal" title="Edit profile">
+        <Card>
+          <CardContent className="gap-3 flex flex-col pt-4">
+            <Notice
+              title={isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
+              variant="alert"
+            >
+              {resolveApiErrorMessage({
+                error: profileQuery.error,
+                fallbackMessage: isNotFoundError
+                  ? "The sandbox profile was not found."
+                  : "Could not load sandbox profile.",
+              })}
+            </Notice>
+            <div>
+              <Button
+                onClick={() => {
+                  void navigate("/sandbox-profiles");
+                }}
+                type="button"
+                variant="outline"
               >
-                {resolveApiErrorMessage({
-                  error: profileQuery.error,
-                  fallbackMessage: isNotFoundError
-                    ? "The sandbox profile was not found."
-                    : "Could not load sandbox profile.",
-                })}
-              </Notice>
-              <div>
-                <Button
-                  onClick={() => {
-                    void navigate("/sandbox-profiles");
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Back to profiles
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                Back to profiles
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </PageFrame>
     );
   }
 
   if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
     return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
+      <PageFrame width="normal" title="Edit profile">
         <Notice title="Could not load profile versions" variant="alert">
           {resolveApiErrorMessage({
             error: profileVersionsQuery.error,
@@ -492,49 +487,47 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
   }
 
   return (
-    <PageFrame paddingClassName="py-0" title="">
-      <Outlet
-        context={
-          {
-            profileId,
-            profile: profileQuery.data,
-            versions: profileVersionsQuery.data.versions,
-            navigate,
-            invalidateSandboxProfiles: async () => {
-              await queryClient.invalidateQueries({
-                queryKey: ["sandbox-profiles"],
-              });
-            },
-            invalidateProfileDetail: async (invalidateProfileId) => {
-              await queryClient.invalidateQueries({
-                queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
-              });
-            },
-            invalidateProfileVersions: async (invalidateProfileId) => {
-              await queryClient.invalidateQueries({
-                queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
-              });
-            },
-            invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
-              await queryClient.invalidateQueries({
-                queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-                  profileId: invalidateProfileId,
-                  version,
-                }),
-              });
-            },
-            invalidateVersionSetupScript: async ({ profileId: invalidateProfileId, version }) => {
-              await queryClient.invalidateQueries({
-                queryKey: sandboxProfileVersionSetupScriptQueryKey({
-                  profileId: invalidateProfileId,
-                  version,
-                }),
-              });
-            },
-          } satisfies SandboxProfileEditorShellContext
-        }
-      />
-    </PageFrame>
+    <Outlet
+      context={
+        {
+          profileId,
+          profile: profileQuery.data,
+          versions: profileVersionsQuery.data.versions,
+          navigate,
+          invalidateSandboxProfiles: async () => {
+            await queryClient.invalidateQueries({
+              queryKey: ["sandbox-profiles"],
+            });
+          },
+          invalidateProfileDetail: async (invalidateProfileId) => {
+            await queryClient.invalidateQueries({
+              queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+            });
+          },
+          invalidateProfileVersions: async (invalidateProfileId) => {
+            await queryClient.invalidateQueries({
+              queryKey: sandboxProfileVersionsQueryKey(invalidateProfileId),
+            });
+          },
+          invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
+            await queryClient.invalidateQueries({
+              queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+                profileId: invalidateProfileId,
+                version,
+              }),
+            });
+          },
+          invalidateVersionSetupScript: async ({ profileId: invalidateProfileId, version }) => {
+            await queryClient.invalidateQueries({
+              queryKey: sandboxProfileVersionSetupScriptQueryKey({
+                profileId: invalidateProfileId,
+                version,
+              }),
+            });
+          },
+        } satisfies SandboxProfileEditorShellContext
+      }
+    />
   );
 }
 
@@ -864,9 +857,11 @@ function LoadedSandboxProfileEditorPage(
 
   if (!resolvedMode.ok) {
     return (
-      <Notice title="Could not load profile version" variant="alert">
-        {resolvedMode.message}
-      </Notice>
+      <PageFrame title="Edit profile" width="normal">
+        <Notice title="Could not load profile version" variant="alert">
+          {resolvedMode.message}
+        </Notice>
+      </PageFrame>
     );
   }
 
@@ -1412,7 +1407,7 @@ export function SandboxProfileEditorView(input: {
   );
 
   return (
-    <div className="flex min-h-[calc(100svh-3rem)] flex-col">
+    <>
       <NavigationBlockerDialog
         title="Leave before draft changes are saved?"
         description="Some draft changes have not been saved yet. If you leave this page, those changes will be discarded."
@@ -1421,33 +1416,6 @@ export function SandboxProfileEditorView(input: {
           : { shouldBlockNavigation: input.shouldBlockUnpersistedChangesNavigation })}
         enabled={hasUnpersistedDraftChanges}
       />
-
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-6 pb-3">
-        <div className="min-w-0">
-          <AutoSaveTitleHeading
-            ariaLabel="Profile name"
-            emptyDisplayText={input.profileNameFallback}
-            onSave={input.onSaveProfileName}
-            requiredLabel="Profile name"
-            value={input.profileName}
-            disabled={input.isSavingProfileName === true}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          {input.versionActions ??
-            (input.deleteProfileIsPending ? null : (
-              <MoreActionsMenu triggerLabel="More actions">{deleteProfileMenuItem}</MoreActionsMenu>
-            ))}
-        </div>
-      </div>
-
-      {input.versionActionError === null ? null : (
-        <div className="px-4 pb-4">
-          <Notice title="Profile version action failed" variant="alert">
-            {input.versionActionError}
-          </Notice>
-        </div>
-      )}
 
       <DeleteSandboxProfileDialog
         automationUsages={input.deleteProfileAutomationUsages}
@@ -1461,32 +1429,65 @@ export function SandboxProfileEditorView(input: {
         profileName={input.profileName ?? input.profileNameFallback}
       />
 
-      <SandboxProfileEditorSections<SandboxProfileEditorSectionId>
-        activeSectionId={input.activeSectionId}
-        onActiveSectionIdChange={input.onActiveSectionIdChange}
-        renderPanel={(sectionId) =>
-          sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE ? (
-            <SandboxProfileEditorHorizontalTabContent>
-              <SandboxProfileLifecycleActions
-                hasUnpersistedDraftChanges={hasUnpersistedDraftChanges}
-                mode={input.mode}
-                onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
-                onMakeChanges={input.onMakeChanges}
-                onPublish={input.onPublish}
-                onViewActive={input.onViewActive}
-                onViewDraft={input.onViewDraft}
-                publishRequestIsPending={input.publishRequestIsPending === true}
-                versionActionIsPending={input.versionActionIsPending}
-              />
-              {input.renderSectionPanel(sectionId)}
-            </SandboxProfileEditorHorizontalTabContent>
-          ) : (
-            input.renderSectionPanel(sectionId)
-          )
+      <PageFrame
+        headerActions={
+          input.versionActions ??
+          (input.deleteProfileIsPending ? null : (
+            <MoreActionsMenu triggerLabel="More actions">{deleteProfileMenuItem}</MoreActionsMenu>
+          ))
         }
-        sections={input.sections}
-      />
-    </div>
+        titleSlot={
+          <div className="min-w-0">
+            <AutoSaveTitleHeading
+              ariaLabel="Profile name"
+              emptyDisplayText={input.profileNameFallback}
+              onSave={input.onSaveProfileName}
+              requiredLabel="Profile name"
+              value={input.profileName}
+              disabled={input.isSavingProfileName === true}
+            />
+          </div>
+        }
+        variant="tabbed"
+        width="normal"
+      >
+        {input.versionActionError === null ? null : (
+          <div className="px-4 pb-4">
+            <div className="mx-auto w-full max-w-5xl">
+              <Notice title="Profile version action failed" variant="alert">
+                {input.versionActionError}
+              </Notice>
+            </div>
+          </div>
+        )}
+
+        <SandboxProfileEditorSections<SandboxProfileEditorSectionId>
+          activeSectionId={input.activeSectionId}
+          onActiveSectionIdChange={input.onActiveSectionIdChange}
+          renderPanel={(sectionId) =>
+            sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE ? (
+              <SandboxProfileEditorHorizontalTabContent>
+                <SandboxProfileLifecycleActions
+                  hasUnpersistedDraftChanges={hasUnpersistedDraftChanges}
+                  mode={input.mode}
+                  onDiscardChangesAndLeaveDraft={input.onDiscardChangesAndLeaveDraft}
+                  onMakeChanges={input.onMakeChanges}
+                  onPublish={input.onPublish}
+                  onViewActive={input.onViewActive}
+                  onViewDraft={input.onViewDraft}
+                  publishRequestIsPending={input.publishRequestIsPending === true}
+                  versionActionIsPending={input.versionActionIsPending}
+                />
+                {input.renderSectionPanel(sectionId)}
+              </SandboxProfileEditorHorizontalTabContent>
+            ) : (
+              input.renderSectionPanel(sectionId)
+            )
+          }
+          sections={input.sections}
+        />
+      </PageFrame>
+    </>
   );
 }
 

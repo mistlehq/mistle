@@ -1,6 +1,9 @@
 {
   "name": "@mistle/control-plane-worker",
   "private": true,
+  "files": [
+    "dist/**"
+  ],
   "type": "module",
   "scripts": {
     "dev": "tsx watch --import ./instrument.ts ./node_modules/@openworkflow/cli/dist/cli.js worker start --config ./openworkflow.config.ts",

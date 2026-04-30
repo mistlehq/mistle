@@ -13,7 +13,7 @@ import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import {
   AgentInstructionsNoTriggerHelpText,
@@ -41,7 +41,8 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
   });
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
       description="Configure the instructions sent to the agent for each webhook event."
       title="Automation Editor"
     >
@@ -86,7 +87,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
           </div>
         </FormPageSection>
       </FormPageStack>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 
@@ -106,7 +107,8 @@ function PlaygroundHarness(): React.JSX.Element {
   });
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
       description="Preview the editor inside the automation form page shell."
       title="Automation Editor"
     >
@@ -196,7 +198,7 @@ function PlaygroundHarness(): React.JSX.Element {
           </div>
         </FormPageSection>
       </FormPageStack>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

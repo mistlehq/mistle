@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { validateWebhookAutomationFormValues } from "./webhook-automation-form-helpers.js";
 import {
   WebhookAutomationForm,
@@ -406,7 +406,7 @@ function StoryHarness(input: {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <FormPageFrame title={pageTitle}>
+      <PageFrame width="form" title={pageTitle}>
         <WebhookAutomationForm
           connectionOptions={input.connectionOptions ?? ConnectionOptions}
           fieldErrors={fieldErrors}
@@ -450,7 +450,7 @@ function StoryHarness(input: {
           webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
           values={values}
         />
-      </FormPageFrame>
+      </PageFrame>
     </QueryClientProvider>
   );
 }

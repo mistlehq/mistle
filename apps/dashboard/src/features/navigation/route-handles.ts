@@ -4,10 +4,6 @@ import { createElement } from "react";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
-import {
-  SandboxProfileBreadcrumbs,
-  type SandboxProfileBreadcrumbView,
-} from "./sandbox-profile-breadcrumbs.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
   breadcrumb: RouteTextValue;
@@ -140,23 +136,9 @@ function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): stri
   return "Edit";
 }
 
-function resolveSandboxProfileHeaderLeading(
-  input: RouteTextResolverInput,
-  view: SandboxProfileBreadcrumbView,
-): React.ReactNode | null {
-  const profileId = input.params["profileId"];
-  if (profileId === undefined || profileId.trim().length === 0) {
-    return null;
-  }
-
-  return createElement(SandboxProfileBreadcrumbs, {
-    profileId,
-    view,
-  });
-}
-
 export const ROUTE_HANDLES = {
   dashboard: {
+    appShellInsetOwner: "child",
     breadcrumb: "Home",
     title: "Home",
     description: "",
@@ -171,6 +153,7 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: resolveIntegrationDetailTitle,
     breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
+    pageBreadcrumbVisible: true,
     title: resolveIntegrationDetailTitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
@@ -212,6 +195,8 @@ export const ROUTE_HANDLES = {
     description: "Start a sandbox-backed session from a sandbox profile.",
   },
   sessionsDetail: {
+    appShellHeaderLeadingVisible: true,
+    appShellHeaderVisible: true,
     hideBreadcrumb: true,
     header: {
       leading: resolveSessionDetailHeaderLeading,
@@ -225,6 +210,7 @@ export const ROUTE_HANDLES = {
     description: "",
   },
   sandboxProfiles: {
+    appShellInsetOwner: "child",
     breadcrumb: "Sandbox Profiles",
     title: "Sandbox Profiles",
     description: "Manage sandbox profile configuration.",
@@ -232,6 +218,7 @@ export const ROUTE_HANDLES = {
   sandboxProfilesNew: {
     appShellInsetOwner: "child",
     breadcrumb: "Create",
+    pageBreadcrumbVisible: true,
     title: "Create",
     description: "Create a sandbox profile.",
   },
@@ -242,6 +229,7 @@ export const ROUTE_HANDLES = {
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileEditor: {
+    appShellHeaderVisible: true,
     appShellInsetOwner: "child",
     breadcrumb: "Sandbox Profile",
     title: "Edit profile",
@@ -252,29 +240,21 @@ export const ROUTE_HANDLES = {
     breadcrumb: "Published",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "published"),
-    },
   },
   sandboxProfileDraft: {
     appShellInsetOwner: "child",
     breadcrumb: "Draft",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
-    },
   },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
     breadcrumb: "Snapshots",
     title: "Edit profile",
     description: "Manage sandbox profile snapshots.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "snapshots"),
-    },
   },
   automations: {
+    appShellInsetOwner: "child",
     breadcrumb: "Automations",
     title: "Automations",
     description: "Manage webhook automations.",
@@ -282,12 +262,14 @@ export const ROUTE_HANDLES = {
   automationsNew: {
     appShellInsetOwner: "child",
     breadcrumb: "Create",
+    pageBreadcrumbVisible: true,
     title: "Create automation",
     description: "",
   },
   automationsDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
+    pageBreadcrumbVisible: true,
     title: "",
     description: "",
   },

@@ -17,8 +17,8 @@ const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
 const RepositoryRootPath = resolve(ScriptDirectoryPath, "../../..");
 const DefaultEnvFilePath = resolve(ScriptDirectoryPath, "../local/.env");
 const DashboardBaseUrl = "http://localhost:3000";
-const ControlPlaneApiBaseUrl = "http://localhost:8080";
-const DataPlaneGatewayBaseUrl = "http://localhost:8084";
+const ControlPlaneApiBaseUrl = "http://localhost:5100";
+const DataPlaneGatewayBaseUrl = "http://localhost:5202";
 const MailpitBaseUrl = "http://localhost:8025";
 const AuthOrigin = DashboardBaseUrl;
 const WaitTimeoutMs = 3 * 60_000;
@@ -516,7 +516,7 @@ async function authenticateThroughMailpit(): Promise<AuthSession> {
     timeoutMs: 15_000,
     description: `OTP email for ${email}`,
     matcher: ({ message: candidate }) =>
-      candidate.Subject === "Your sign-in code" &&
+      candidate.Subject === "Your Mistle sign-in code" &&
       candidate.To.some((address) => address.Address === email),
   });
   const messageSummary = await mailpitInbox.getMessageSummary(message.ID);
@@ -835,8 +835,18 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
         cwd: "/root",
         command: "sh",
       });
+      await waitForPtyOutput({
+        getOutput: () => output,
+        description: "initial shell prompt",
+      });
 
-      await ptyClient.write(`printf '%s\\n' ${shellQuote(marker)}\nexit\n`);
+      await ptyClient.write(`printf '%s\\n' ${shellQuote(marker)}\r`);
+      await waitForPtyOutput({
+        getOutput: () => output,
+        description: `marker '${marker}'`,
+        includes: marker,
+      });
+      await ptyClient.write("exit\r");
 
       await waitForPtyExit;
     } catch (error) {
@@ -846,6 +856,25 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
   } finally {
     transport.disconnect(1000, "local compose smoke test cleanup");
   }
+}
+
+async function waitForPtyOutput(input: {
+  getOutput: () => string;
+  description: string;
+  includes?: string;
+}): Promise<void> {
+  const deadlineMs = systemClock.nowMs() + 10_000;
+
+  while (systemClock.nowMs() < deadlineMs) {
+    const output = input.getOutput();
+    if (input.includes === undefined ? output.length > 0 : output.includes(input.includes)) {
+      return;
+    }
+
+    await systemSleeper.sleep(100);
+  }
+
+  throw new Error(`Timed out waiting for PTY ${input.description}.`);
 }
 
 async function restartLocalComposeStack(envFilePath: string): Promise<void> {
@@ -869,8 +898,8 @@ async function waitForCoreServicesAfterRestart(envFilePath: string): Promise<voi
       await assertHttpOk(MailpitBaseUrl, "Mailpit");
       await waitForComposeServices({
         envFilePath,
-        services: ["control-plane-worker", "data-plane-worker", "mailpit"],
-        description: "local worker and Mailpit services after docker compose restart",
+        services: ["mistle", "mailpit"],
+        description: "local Mistle and Mailpit services after docker compose restart",
       });
       return;
     } catch {}
@@ -895,8 +924,8 @@ async function run(): Promise<void> {
   await assertHttpOk(MailpitBaseUrl, "Mailpit");
   await waitForComposeServices({
     envFilePath: config.envFilePath,
-    services: ["control-plane-worker", "data-plane-worker", "mailpit"],
-    description: "local worker and Mailpit services",
+    services: ["mistle", "mailpit"],
+    description: "local Mistle and Mailpit services",
   });
 
   console.log("Authenticating through Mailpit-backed OTP...");

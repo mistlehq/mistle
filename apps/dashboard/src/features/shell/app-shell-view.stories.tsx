@@ -158,6 +158,10 @@ const meta = {
       description:
         "Optional leading header content shown when `showHeaderLeadingContent` is enabled.",
     },
+    showHeader: {
+      control: "boolean",
+      description: "Toggles whether the sticky app shell header is rendered.",
+    },
     contentInsetOwner: {
       control: "inline-radio",
       description:
@@ -221,6 +225,7 @@ const meta = {
       include: [
         "contentInsetOwner",
         "viewportMode",
+        "showHeader",
         "showHeaderLeadingContent",
         "showSessionsSidebar",
         "locationPathname",
@@ -254,6 +259,7 @@ const meta = {
         </p>
       </div>
     ),
+    showHeader: true,
     showHeaderLeadingContent: true,
     showSessionsSidebar: false,
     sidebarContent: null,

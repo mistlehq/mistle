@@ -4,24 +4,9 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { HomePageStoryModels } from "./home-page-view-model.js";
-import { HomePageShell, HomePageView } from "./home-page-view.js";
+import { HomePageView } from "./home-page-view.js";
 
 describe("HomePageView", () => {
-  it("centers the constrained home page shell content", () => {
-    const { container } = render(
-      <HomePageShell>
-        <HomePageView onboarding={HomePageStoryModels.addIntegrations} />
-      </HomePageShell>,
-    );
-
-    const title = screen.getByRole("heading", { name: "Get started" });
-    const contentContainer = title.parentElement;
-
-    expect(container.firstElementChild?.className).toContain("px-4");
-    expect(contentContainer?.className).toContain("mx-auto");
-    expect(contentContainer?.className).toContain("max-w-4xl");
-  });
-
   it("renders the current step status mark in desktop and mobile title positions", () => {
     render(<HomePageView onboarding={HomePageStoryModels.addIntegrations} />);
 

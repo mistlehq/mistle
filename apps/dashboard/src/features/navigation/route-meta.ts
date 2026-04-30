@@ -14,12 +14,16 @@ export type AppRouteHeaderHandle = {
 };
 
 export type AppRouteHandle = {
+  appShellHeaderLeadingVisible?: boolean;
+  appShellHeaderVisible?: boolean;
   appShellInsetOwner?: "app-shell" | "child";
   appShellViewportMode?: "document" | "workspace";
   breadcrumbIcon?: RouteNodeValue;
   breadcrumb?: RouteTextValue;
   breadcrumbTo?: RouteHrefValue;
   breadcrumbClickable?: boolean;
+  pageBreadcrumb?: RouteNodeValue;
+  pageBreadcrumbVisible?: boolean;
   title?: RouteTextValue;
   description?: RouteTextValue;
   header?: AppRouteHeaderHandle;
@@ -34,6 +38,8 @@ export type AppBreadcrumb = {
 };
 
 export type AppPageMeta = {
+  appShellHeaderLeadingVisible: boolean;
+  appShellHeaderVisible: boolean;
   appShellInsetOwner: "app-shell" | "child";
   appShellViewportMode: "document" | "workspace";
   title: string | null;
@@ -42,6 +48,19 @@ export type AppPageMeta = {
 };
 
 export type AppHeaderLeadingModel =
+  | {
+      kind: "none";
+    }
+  | {
+      kind: "breadcrumbs";
+      breadcrumbs: AppBreadcrumb[];
+    }
+  | {
+      kind: "custom";
+      content: React.ReactNode;
+    };
+
+export type AppPageBreadcrumbModel =
   | {
       kind: "none";
     }
@@ -139,16 +158,28 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   }
 
   const parsedHandle: AppRouteHandle = {};
+  const appShellHeaderLeadingVisible = handle["appShellHeaderLeadingVisible"];
+  const appShellHeaderVisible = handle["appShellHeaderVisible"];
   const appShellInsetOwner = handle["appShellInsetOwner"];
   const appShellViewportMode = handle["appShellViewportMode"];
   const breadcrumb = handle["breadcrumb"];
   const breadcrumbIcon = handle["breadcrumbIcon"];
   const breadcrumbTo = handle["breadcrumbTo"];
   const breadcrumbClickable = handle["breadcrumbClickable"];
+  const pageBreadcrumb = handle["pageBreadcrumb"];
+  const pageBreadcrumbVisible = handle["pageBreadcrumbVisible"];
   const title = handle["title"];
   const description = handle["description"];
   const header = handle["header"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
+
+  if (typeof appShellHeaderLeadingVisible === "boolean") {
+    parsedHandle.appShellHeaderLeadingVisible = appShellHeaderLeadingVisible;
+  }
+
+  if (typeof appShellHeaderVisible === "boolean") {
+    parsedHandle.appShellHeaderVisible = appShellHeaderVisible;
+  }
 
   if (appShellInsetOwner === "app-shell" || appShellInsetOwner === "child") {
     parsedHandle.appShellInsetOwner = appShellInsetOwner;
@@ -174,6 +205,14 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.breadcrumbClickable = breadcrumbClickable;
   }
 
+  if (isRouteNodeValue(pageBreadcrumb)) {
+    parsedHandle.pageBreadcrumb = pageBreadcrumb;
+  }
+
+  if (typeof pageBreadcrumbVisible === "boolean") {
+    parsedHandle.pageBreadcrumbVisible = pageBreadcrumbVisible;
+  }
+
   if (isRouteTextValue(title)) {
     parsedHandle.title = title;
   }
@@ -192,12 +231,16 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   }
 
   if (
+    parsedHandle.appShellHeaderLeadingVisible === undefined &&
+    parsedHandle.appShellHeaderVisible === undefined &&
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
     parsedHandle.breadcrumbIcon === undefined &&
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&
     parsedHandle.breadcrumbClickable === undefined &&
+    parsedHandle.pageBreadcrumb === undefined &&
+    parsedHandle.pageBreadcrumbVisible === undefined &&
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.header === undefined &&
@@ -309,6 +352,11 @@ export function useAppHeaderLeadingModel(): AppHeaderLeadingModel {
   return resolveAppHeaderLeadingModelFromMatches(matches);
 }
 
+export function useAppPageBreadcrumbModel(): AppPageBreadcrumbModel {
+  const matches = useMatches();
+  return resolveAppPageBreadcrumbModelFromMatches(matches);
+}
+
 export function resolveAppHeaderLeadingModelFromMatches(matches: unknown[]): AppHeaderLeadingModel {
   if (!Array.isArray(matches)) {
     return { kind: "none" };
@@ -334,6 +382,41 @@ export function resolveAppHeaderLeadingModelFromMatches(matches: unknown[]): App
     };
   }
 
+  return { kind: "none" };
+}
+
+export function resolveAppPageBreadcrumbModelFromMatches(
+  matches: unknown[],
+): AppPageBreadcrumbModel {
+  if (!Array.isArray(matches)) {
+    return { kind: "none" };
+  }
+
+  const pageBreadcrumbVisible = resolvePageBreadcrumbVisibilityFromMatches(matches);
+  if (!pageBreadcrumbVisible) {
+    return { kind: "none" };
+  }
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.pageBreadcrumb === undefined) {
+      continue;
+    }
+
+    return {
+      kind: "custom",
+      content: handle.pageBreadcrumb({
+        params: normalizeParams(match.params),
+        data: match.data,
+      }),
+    };
+  }
+
   const breadcrumbs = resolveAppBreadcrumbsFromMatches(matches);
   return breadcrumbs.length > 0 ? { kind: "breadcrumbs", breadcrumbs } : { kind: "none" };
 }
@@ -344,10 +427,15 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       title: null,
       headerIcon: null,
       supportingText: null,
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
     };
   }
+
+  const appShellHeaderLeadingVisible = resolveAppShellHeaderLeadingVisibilityFromMatches(matches);
+  const appShellHeaderVisible = resolveAppShellHeaderVisibilityFromMatches(matches);
 
   for (let index = matches.length - 1; index >= 0; index -= 1) {
     const match = matches.at(index);
@@ -370,6 +458,8 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         title,
         headerIcon,
         supportingText,
+        appShellHeaderLeadingVisible,
+        appShellHeaderVisible,
         appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
         appShellViewportMode: handle.appShellViewportMode ?? "document",
       };
@@ -380,7 +470,57 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     title: null,
     headerIcon: null,
     supportingText: null,
+    appShellHeaderLeadingVisible,
+    appShellHeaderVisible,
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "document",
   };
+}
+
+function resolveAppShellHeaderLeadingVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.appShellHeaderLeadingVisible !== undefined) {
+      return handle.appShellHeaderLeadingVisible;
+    }
+  }
+
+  return false;
+}
+
+function resolvePageBreadcrumbVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.pageBreadcrumbVisible !== undefined) {
+      return handle.pageBreadcrumbVisible;
+    }
+  }
+
+  return false;
+}
+
+function resolveAppShellHeaderVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.appShellHeaderVisible !== undefined) {
+      return handle.appShellHeaderVisible;
+    }
+  }
+
+  return false;
 }

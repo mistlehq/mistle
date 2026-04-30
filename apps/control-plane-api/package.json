@@ -1,6 +1,9 @@
 {
   "name": "@mistle/control-plane-api",
   "private": true,
+  "files": [
+    "dist/**"
+  ],
   "type": "module",
   "scripts": {
     "dev": "tsx scripts/run-dev.ts",
@@ -50,6 +53,7 @@
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "sharp": "0.34.5",
+    "smol-toml": "^1.6.1",
     "sshpk": "^1.18.0",
     "typeid-js": "^1.2.0",
     "zod": "^4.3.6"

@@ -4,8 +4,9 @@ import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useHomeSummary } from "../home/use-home-summary.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { createHomeOnboardingViewModel } from "./home-page-view-model.js";
-import { HomePageShell, HomePageView } from "./home-page-view.js";
+import { HomePageView } from "./home-page-view.js";
 
 export function HomePage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -13,29 +14,33 @@ export function HomePage(): React.JSX.Element {
 
   if (homeSummaryQuery.isError) {
     return (
-      <HomePageShell>
+      <PageFrame width="normal" title="Get started">
         <Notice title="Could not load home" variant="alert">
           {resolveApiErrorMessage({
             error: homeSummaryQuery.error,
             fallbackMessage: "Could not load home summary.",
           })}
         </Notice>
-      </HomePageShell>
+      </PageFrame>
     );
   }
 
   if (homeSummaryQuery.isPending || homeSummaryQuery.data === undefined) {
-    return <HomePageShell>{null}</HomePageShell>;
+    return (
+      <PageFrame width="normal" title="Get started">
+        {null}
+      </PageFrame>
+    );
   }
 
   return (
-    <HomePageShell>
+    <PageFrame width="normal" title="Get started">
       <HomePageView
         onboarding={createHomeOnboardingViewModel(homeSummaryQuery.data.onboarding)}
         onNavigate={(href) => {
           void navigate(href);
         }}
       />
-    </HomePageShell>
+    </PageFrame>
   );
 }

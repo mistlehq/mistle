@@ -9,7 +9,7 @@ import {
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-editor.js";
 import type { IntegrationConnectionMethod } from "../integrations/integrations-service-shared.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 import {
@@ -319,7 +319,8 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
         });
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
       description={initialEditorInput.targetKey}
       title={`Add ${initialEditorInput.targetDisplayName} Connection`}
     >
@@ -415,7 +416,7 @@ export function IntegrationSettingsAddFlowStory(spec: StoryIntegrationSpec): Rea
           secrets={draft.secrets}
         />
       </div>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

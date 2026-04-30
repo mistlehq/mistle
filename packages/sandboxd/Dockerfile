@@ -177,6 +177,12 @@ COPY --from=nix /etc/nix /etc/nix
 
 FROM sandbox-base-tooling AS sandbox-base
 
+LABEL org.opencontainers.image.title="Mistle Sandbox Base"
+LABEL org.opencontainers.image.description="Sandbox base image for Mistle coding agent runtimes"
+LABEL org.opencontainers.image.url="https://github.com/mistlehq/mistle"
+LABEL org.opencontainers.image.source="https://github.com/mistlehq/mistle"
+LABEL org.opencontainers.image.vendor="Mistle"
+
 COPY --from=sandboxd-build /app/packages/sandboxd/target/release/sandboxd /opt/mistle/bin/sandboxd
 
 RUN chmod +x /opt/mistle/bin/sandboxd \

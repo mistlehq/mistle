@@ -38,62 +38,70 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div className="md:hidden">
-        <Select
-          onValueChange={(value) => {
-            const nextSection = input.sections.find((section) => section.id === value);
-            if (nextSection === undefined) {
-              return;
-            }
+      <div className="px-4 md:hidden">
+        <div className="mx-auto w-full max-w-5xl">
+          <Select
+            onValueChange={(value) => {
+              const nextSection = input.sections.find((section) => section.id === value);
+              if (nextSection === undefined) {
+                return;
+              }
 
-            updateActiveSectionId(nextSection.id);
-          }}
-          value={input.activeSectionId}
-        >
-          <SelectTrigger aria-label="Select profile editor section" className="w-full">
-            <SelectValue placeholder="Select section">{activeSection.label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {input.sections.map((section) => (
-              <SelectItem disabled={section.disabled === true} key={section.id} value={section.id}>
-                {section.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              updateActiveSectionId(nextSection.id);
+            }}
+            value={input.activeSectionId}
+          >
+            <SelectTrigger aria-label="Select profile editor section" className="w-full">
+              <SelectValue placeholder="Select section">{activeSection.label}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {input.sections.map((section) => (
+                <SelectItem
+                  disabled={section.disabled === true}
+                  key={section.id}
+                  value={section.id}
+                >
+                  {section.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0">
-        <div
-          aria-label="Profile sections"
-          className="hidden border-b border-border px-4 md:flex"
-          role="tablist"
-        >
-          {input.sections.map((section) => (
-            <button
-              aria-controls={`sandbox-profile-editor-panel-${section.id}`}
-              aria-disabled={section.disabled === true}
-              aria-selected={section.id === input.activeSectionId}
-              disabled={section.disabled === true}
-              className={`-mb-px flex items-center border-b-2 px-4 py-3 text-left text-sm font-medium leading-tight transition-colors ${
-                section.id === input.activeSectionId
-                  ? "border-foreground text-foreground"
-                  : section.disabled === true
-                    ? "border-transparent text-muted-foreground/50"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-              id={`sandbox-profile-editor-tab-${section.id}`}
-              key={section.id}
-              onClick={() => {
-                updateActiveSectionId(section.id);
-              }}
-              role="tab"
-              tabIndex={section.id === input.activeSectionId ? 0 : -1}
-              type="button"
-            >
-              {section.sideLabel ?? section.label}
-            </button>
-          ))}
+        <div className="hidden border-b border-border px-4 md:block">
+          <div
+            aria-label="Profile sections"
+            className="mx-auto flex w-full max-w-5xl"
+            role="tablist"
+          >
+            {input.sections.map((section) => (
+              <button
+                aria-controls={`sandbox-profile-editor-panel-${section.id}`}
+                aria-disabled={section.disabled === true}
+                aria-selected={section.id === input.activeSectionId}
+                disabled={section.disabled === true}
+                className={`-mb-px flex items-center border-b-2 px-4 py-3 text-left text-sm font-medium leading-tight transition-colors ${
+                  section.id === input.activeSectionId
+                    ? "border-foreground text-foreground"
+                    : section.disabled === true
+                      ? "border-transparent text-muted-foreground/50"
+                      : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+                id={`sandbox-profile-editor-tab-${section.id}`}
+                key={section.id}
+                onClick={() => {
+                  updateActiveSectionId(section.id);
+                }}
+                role="tab"
+                tabIndex={section.id === input.activeSectionId ? 0 : -1}
+                type="button"
+              >
+                {section.sideLabel ?? section.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">

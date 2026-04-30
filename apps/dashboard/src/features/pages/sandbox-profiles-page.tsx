@@ -32,6 +32,7 @@ import {
   createSandboxProfile,
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
@@ -210,14 +211,14 @@ export function SandboxProfilesPage(): React.JSX.Element {
   const isCreateProfileInvalid = createProfileDisplayName.trim().length === 0;
 
   return (
-    <div className="gap-4 flex flex-col">
-      <div className="gap-3 flex flex-row items-start justify-between">
-        <h1 className="text-xl font-semibold">Sandbox Profiles</h1>
+    <PageFrame
+      headerActions={
         <Button onClick={openCreateDialog} type="button">
           Create profile
         </Button>
-      </div>
-
+      }
+      title="Sandbox Profiles"
+    >
       <Dialog
         isBusy={createMutation.isPending}
         isDismissible={!createMutation.isPending}
@@ -363,6 +364,6 @@ export function SandboxProfilesPage(): React.JSX.Element {
           />
         </>
       ) : null}
-    </div>
+    </PageFrame>
   );
 }

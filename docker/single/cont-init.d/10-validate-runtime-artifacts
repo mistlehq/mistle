@@ -10,11 +10,131 @@ require_path() {
   fi
 }
 
-require_path "/app/apps/control-plane-api/dist/index.js"
-require_path "/app/apps/control-plane-worker/dist/openworkflow.config.js"
+require_path "/app/node_modules/@mistle/control-plane-api/dist/index.js"
+require_path "/app/node_modules/@mistle/control-plane-worker/dist/openworkflow.config.js"
 require_path "/usr/share/nginx/html/index.html"
-require_path "/app/apps/data-plane-api/dist/index.js"
-require_path "/app/apps/data-plane-gateway/dist/index.js"
-require_path "/app/apps/data-plane-worker/dist/openworkflow.config.js"
-require_path "/app/apps/tokenizer-proxy/dist/index.js"
+require_path "/app/node_modules/@mistle/data-plane-api/dist/index.js"
+require_path "/app/node_modules/@mistle/data-plane-gateway/dist/index.js"
+require_path "/app/node_modules/@mistle/data-plane-worker/dist/openworkflow.config.js"
+require_path "/app/node_modules/@mistle/tokenizer-proxy/dist/index.js"
+require_path "/app/node_modules/.bin/mistle-config"
+require_path "/app/node_modules/@mistle/config/package.json"
 require_path "/usr/local/bin/commit-sign"
+
+node <<'EOF'
+const fs = require("node:fs");
+const path = require("node:path");
+
+const missingTargets = [];
+
+for (const packageRoot of findMistlePackageRoots("/app/node_modules")) {
+  const packageJsonPath = path.join(packageRoot, "package.json");
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+
+  for (const target of collectExportTargets(packageJson.exports)) {
+    const targetPath = path.join(packageRoot, target);
+
+    if (!fs.existsSync(targetPath)) {
+      missingTargets.push(`${packageJson.name}: ${target}`);
+    }
+  }
+}
+
+if (missingTargets.length > 0) {
+  console.error(
+    `Missing required single-container package export targets:\n${missingTargets.join("\n")}`,
+  );
+  process.exit(1);
+}
+
+function findMistlePackageRoots(nodeModulesRoot) {
+  const packageRootsByName = new Map();
+
+  visitNodeModules(nodeModulesRoot, packageRootsByName);
+
+  return [...packageRootsByName.values()].sort();
+}
+
+function visitNodeModules(nodeModulesRoot, packageRootsByName) {
+  if (!fs.existsSync(nodeModulesRoot)) {
+    return;
+  }
+
+  const pnpmStoreRoot = path.join(nodeModulesRoot, ".pnpm");
+
+  if (fs.existsSync(pnpmStoreRoot)) {
+    for (const storeEntry of fs.readdirSync(pnpmStoreRoot)) {
+      if (!storeEntry.startsWith("@mistle+")) {
+        continue;
+      }
+
+      const scopedRoot = path.join(pnpmStoreRoot, storeEntry, "node_modules", "@mistle");
+
+      if (!fs.existsSync(scopedRoot)) {
+        continue;
+      }
+
+      for (const packageName of fs.readdirSync(scopedRoot)) {
+        const packageRoot = path.join(scopedRoot, packageName);
+        const packageJsonPath = path.join(packageRoot, "package.json");
+
+        if (!fs.existsSync(packageJsonPath)) {
+          continue;
+        }
+
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+        packageRootsByName.set(packageJson.name, packageRoot);
+      }
+    }
+  }
+
+  const scopedRoot = path.join(nodeModulesRoot, "@mistle");
+
+  if (!fs.existsSync(scopedRoot)) {
+    return;
+  }
+
+  for (const packageName of fs.readdirSync(scopedRoot)) {
+    const packageRoot = fs.realpathSync(path.join(scopedRoot, packageName));
+    const packageJsonPath = path.join(packageRoot, "package.json");
+
+    if (!fs.existsSync(packageJsonPath)) {
+      continue;
+    }
+
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
+    packageRootsByName.set(packageJson.name, packageRoot);
+  }
+}
+
+function collectExportTargets(exportsField) {
+  const targets = new Set();
+
+  visitExports(exportsField, targets);
+
+  return [...targets];
+}
+
+function visitExports(value, targets) {
+  if (typeof value === "string") {
+    addExportTarget(value, targets);
+    return;
+  }
+
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return;
+  }
+
+  for (const entry of Object.values(value)) {
+    visitExports(entry, targets);
+  }
+}
+
+function addExportTarget(value, targets) {
+  if (!value.endsWith(".js") || value.includes("*")) {
+    return;
+  }
+
+  targets.add(value.replace(/^\.\//, ""));
+}
+EOF

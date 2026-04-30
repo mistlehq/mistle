@@ -1,0 +1,15 @@
+{
+  "name": "@mistle/container",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@mistle/config": "workspace:*",
+    "@mistle/control-plane-api": "workspace:*",
+    "@mistle/control-plane-worker": "workspace:*",
+    "@mistle/data-plane-api": "workspace:*",
+    "@mistle/data-plane-gateway": "workspace:*",
+    "@mistle/data-plane-worker": "workspace:*",
+    "@mistle/tokenizer-proxy": "workspace:*"
+  }
+}

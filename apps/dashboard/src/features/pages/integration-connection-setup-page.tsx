@@ -5,15 +5,17 @@ import { useNavigate, useParams } from "react-router";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import { resolveIntegrationConnectionSetupRouteOrThrow } from "./integration-connection-setup-state.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 export function IntegrationConnectionSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const params = useParams();
   const { title, description } = resolvePageFrameText(pageMeta, "Setup integration");
@@ -41,7 +43,9 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
 
   if (directoryQuery.isError) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
@@ -67,19 +71,21 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
             </div>
           </div>
         </FormPageSection>
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   if (directoryQuery.isPending || directoryQuery.data === undefined) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
       >
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -103,7 +109,9 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
   });
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
+      breadcrumbs={breadcrumbs}
       description={description}
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}
@@ -112,6 +120,6 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
         connection,
         setupRoute,
       })}
-    </FormPageFrame>
+    </PageFrame>
   );
 }

@@ -38,6 +38,17 @@
     "packages/control-plane-internal-client": {
       "ignoreDependencies": ["openapi-typescript"],
     },
+    "packages/container": {
+      "ignoreDependencies": [
+        "@mistle/config",
+        "@mistle/control-plane-api",
+        "@mistle/control-plane-worker",
+        "@mistle/data-plane-api",
+        "@mistle/data-plane-gateway",
+        "@mistle/data-plane-worker",
+        "@mistle/tokenizer-proxy",
+      ],
+    },
     "packages/data-plane-internal-client": {
       "ignoreDependencies": ["openapi-typescript"],
     },
