@@ -78,12 +78,6 @@ GitHub examples:
 - PAT/API key: no inbound callback required
 - GitHub App installation: requires a reachable webhook URL and shared webhook secret
 
-## Advanced Customization
-
-To customize the default provisioned targets:
-
-1. Edit `integration-targets.json`
-
 ## Stop And Reset
 
 Stop the stack:

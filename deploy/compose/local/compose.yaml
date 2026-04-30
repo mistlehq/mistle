@@ -22,15 +22,8 @@ services:
     volumes:
       - mistle-data:/var/lib/mistle
       - type: bind
-        source: ../../../integration-targets.json
-        target: /app/integration-targets.json
-        read_only: true
-      - type: bind
         source: /var/run/docker.sock
         target: /var/run/docker.sock
-      - type: bind
-        source: /tmp
-        target: /tmp
     healthcheck:
       test:
         - CMD-SHELL
