@@ -40,6 +40,11 @@ import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-secti
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import {
+  SandboxProfileSetupScriptTestButton,
+  SandboxProfileSetupScriptTestPanel,
+  type SetupScriptTestStatus,
+} from "./sandbox-profile-setup-script-test.js";
+import {
   SandboxProfileSnapshotPanelView,
   SandboxProfileSnapshotRefreshScheduleForm,
   shouldShowMissingSnapshotAlert,
@@ -75,6 +80,7 @@ type SandboxProfileEditorPageStoryArgs = {
     config: Record<string, unknown>;
   }[];
   setupScript: string | null;
+  setupScriptTestStatus?: SetupScriptTestStatus;
 };
 
 type IntegrationsSectionState = NonNullable<
@@ -398,6 +404,8 @@ function SandboxProfileEditorPageStoryView(
   const storySections = createStorySections({
     showMissingSnapshotAlert: shouldShowMissingSnapshotAlert(snapshotPanelState),
   });
+  const setupScriptTestStatus =
+    input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -486,6 +494,18 @@ function SandboxProfileEditorPageStoryView(
                     disabled={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
                     saveStatus={setupScriptSaveStatus}
+                    testControl={
+                      <SandboxProfileSetupScriptTestButton
+                        isDraft={mode.kind === "draft"}
+                        status={setupScriptTestStatus}
+                      />
+                    }
+                    testPanel={
+                      <SandboxProfileSetupScriptTestPanel
+                        isDraft={mode.kind === "draft"}
+                        status={setupScriptTestStatus}
+                      />
+                    }
                     value={setupScriptDraft}
                   />
                 </SandboxProfilePanelSection>
@@ -683,6 +703,37 @@ export const IntegrationAutosaveFailure: Story = {
 export const EmptySetupScript: Story = {
   args: {
     setupScript: null,
+  },
+};
+
+export const SetupScriptTestStarting: Story = {
+  args: {
+    setupScriptTestStatus: "starting",
+  },
+};
+
+export const SetupScriptTestRunning: Story = {
+  args: {
+    setupScriptTestStatus: "running",
+  },
+};
+
+export const SetupScriptTestSucceeded: Story = {
+  args: {
+    setupScriptTestStatus: "success",
+  },
+};
+
+export const SetupScriptTestFailed: Story = {
+  args: {
+    setupScriptTestStatus: "failed",
+  },
+};
+
+export const SetupScriptTestUnavailablePublished: Story = {
+  args: {
+    lifecycleState: "published",
+    setupScriptTestStatus: "idle",
   },
 };
 
