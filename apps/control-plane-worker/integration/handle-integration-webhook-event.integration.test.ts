@@ -24,7 +24,6 @@ import {
 } from "@mistle/db/migrator";
 import {
   createIntegrationRegistry,
-  createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiApiKeyDefinition,
 } from "@mistle/integrations-definitions/server";
 import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
@@ -56,7 +55,6 @@ import { it } from "./test-context.js";
 const TestTimeoutMs = 120_000;
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
-  binding_capabilities_by_connection_method: createOpenAiRawBindingCapabilitiesByConnectionMethod(),
 };
 const tracing = installInMemoryTracing();
 

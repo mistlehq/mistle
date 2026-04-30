@@ -26,10 +26,7 @@ import {
   OpenAiDeviceAuthorizationCapability,
   OpenAiDeviceAuthorizationOAuth2Capability,
 } from "./device-authorization.js";
-import {
-  OpenAiConnectionMethodIds,
-  resolveOpenAiCapabilitySetForConnectionMethod,
-} from "./model-capabilities.js";
+import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
   resolveOpenAiChatGptBaseUrlForConnectionMethod,
@@ -104,18 +101,6 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   capabilities: {
     resolveCapabilities: (input) => {
       const connectionConfig = OpenAiConnectionConfigSchema.parse(input.connection.config);
-      const capabilitySet = resolveOpenAiCapabilitySetForConnectionMethod({
-        bindingCapabilitiesByConnectionMethod:
-          input.target.config.bindingCapabilitiesByConnectionMethod,
-        connectionMethod: connectionConfig.connection_method,
-      });
-      const defaultModel = capabilitySet.models[0];
-      if (defaultModel === undefined) {
-        throw new Error(
-          `OpenAI connection method '${connectionConfig.connection_method}' has no supported models.`,
-        );
-      }
-
       return {
         agentProviderAccess: {
           providerFamilyId: input.target.familyId,
@@ -149,8 +134,6 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
             connectionConfig.connection_method === OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE
               ? ["/"]
               : ["/"],
-          defaultModel,
-          allowedModels: [...capabilitySet.models],
           providerMetadata: {
             responsesApiBaseUrl: resolveOpenAiResponsesApiBaseUrlForConnectionMethod({
               targetConfig: input.target.config,

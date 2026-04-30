@@ -93,8 +93,6 @@ describe("compileCodexRuntime", () => {
         },
         allowedMethods: ["GET", "POST"],
         allowedPathPrefixes: ["/"],
-        defaultModel: "gpt-5.3-codex",
-        allowedModels: ["gpt-5.3-codex"],
         providerMetadata: {
           responsesApiBaseUrl: "https://api.openai.com",
         },
@@ -329,8 +327,6 @@ describe("compileCodexRuntime", () => {
         },
         allowedMethods: ["GET", "POST"],
         allowedPathPrefixes: ["/"],
-        defaultModel: "gpt-5.4",
-        allowedModels: ["gpt-5.4"],
         providerMetadata: {
           responsesApiBaseUrl: "https://chatgpt.com/backend-api/codex",
           chatgptBaseUrl: "https://chatgpt.com/backend-api",

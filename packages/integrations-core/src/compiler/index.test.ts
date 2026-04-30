@@ -170,7 +170,6 @@ function createDefinitionsBundle(registry: IntegrationRegistry) {
           setup: {
             env: {
               OPENAI_BASE_URL: input.providerAccess.apiBaseUrl,
-              OPENAI_MODEL: input.providerAccess.defaultModel,
             },
             files: [
               {
@@ -371,8 +370,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
           },
           allowedMethods: ["POST"],
           allowedPathPrefixes: ["/v1"],
-          defaultModel: input.binding.config.model.defaultModel,
-          allowedModels: [input.binding.config.model.defaultModel],
         },
       }),
     },
@@ -413,8 +410,6 @@ function createJsonAgentDefinition(): IntegrationDefinition<
           },
           allowedMethods: ["POST"],
           allowedPathPrefixes: ["/v1/messages"],
-          defaultModel: input.binding.config.model.defaultModel,
-          allowedModels: [input.binding.config.model.defaultModel],
         },
       }),
     },

@@ -1,4 +1,3 @@
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import { projectTargetUi } from "./project-target-ui.js";
@@ -10,8 +9,6 @@ describe("project-target-ui", () => {
       variantId: "openai-default",
       config: {
         api_base_url: "https://api.openai.com",
-        binding_capabilities_by_connection_method:
-          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
     });
 
@@ -23,7 +20,7 @@ describe("project-target-ui", () => {
       familyId: "openai",
       variantId: "openai-default",
       config: {
-        api_base_url: "https://api.openai.com",
+        api_base_url: "not-a-url",
       },
     });
 

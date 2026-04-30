@@ -14,7 +14,6 @@ import {
 } from "@mistle/integrations-core";
 import {
   DatadogToolIds,
-  createOpenAiRawBindingCapabilitiesByConnectionMethod,
   OpenAiChatGptBaseUrl,
   OpenAiChatGptOriginBaseUrl,
   OpenAiChatGptResponsesApiBaseUrl,
@@ -99,8 +98,6 @@ describe("sandbox profile compile runtime plan integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       })
       .onConflictDoNothing();
@@ -323,8 +320,6 @@ describe("sandbox profile compile runtime plan integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       })
       .onConflictDoNothing();
@@ -740,8 +735,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com/v1",
-            binding_capabilities_by_connection_method:
-              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
         },
         {
@@ -860,8 +853,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com/v1",
-            binding_capabilities_by_connection_method:
-              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
         },
         {
@@ -983,8 +974,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com/v1",
-            binding_capabilities_by_connection_method:
-              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
         },
         {

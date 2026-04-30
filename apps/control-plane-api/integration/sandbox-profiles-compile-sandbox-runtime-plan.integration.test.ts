@@ -9,10 +9,7 @@ import {
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import {
-  createDefinitionsBundle,
-  createOpenAiRawBindingCapabilitiesByConnectionMethod,
-} from "@mistle/integrations-definitions";
+import { createDefinitionsBundle } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -51,8 +48,6 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       })
       .onConflictDoNothing();

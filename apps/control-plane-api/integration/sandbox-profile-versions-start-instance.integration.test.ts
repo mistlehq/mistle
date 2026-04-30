@@ -19,7 +19,6 @@ import {
   CompiledRuntimePlanSchema,
   IntegrationConnectionMethodIds,
 } from "@mistle/integrations-core";
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -381,8 +380,6 @@ describe("sandbox profile version start instance integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       });
       await fixture.db.insert(integrationConnections).values({
@@ -474,8 +471,6 @@ describe("sandbox profile version start instance integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       },
       {
@@ -606,8 +601,6 @@ describe("sandbox profile version start instance integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com/v1",
-        binding_capabilities_by_connection_method:
-          createOpenAiRawBindingCapabilitiesByConnectionMethod(),
       },
     });
     await fixture.db.insert(integrationConnections).values({
@@ -701,8 +694,6 @@ describe("sandbox profile version start instance integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       },
       {
@@ -864,8 +855,6 @@ describe("sandbox profile version start instance integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       },
       {

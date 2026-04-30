@@ -1,6 +1,5 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { IntegrationTargetsPageSchema as DashboardIntegrationTargetsPageSchema } from "../../dashboard/src/features/integrations/integrations-service-shared.js";
@@ -63,8 +62,6 @@ describe("integration targets discovery integration", () => {
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com",
-            binding_capabilities_by_connection_method:
-              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
         },
         {
@@ -503,8 +500,6 @@ describe("integration targets discovery integration", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       })
       .onConflictDoUpdate({
@@ -515,8 +510,6 @@ describe("integration targets discovery integration", () => {
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com",
-            binding_capabilities_by_connection_method:
-              createOpenAiRawBindingCapabilitiesByConnectionMethod(),
           },
         },
       });

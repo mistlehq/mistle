@@ -16,7 +16,6 @@ import {
 } from "@mistle/db/control-plane";
 import { sandboxInstances } from "@mistle/db/data-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "@mistle/integrations-definitions";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -409,8 +408,6 @@ describe("internal sandbox runtime", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       },
       {
@@ -601,8 +598,6 @@ describe("internal sandbox runtime", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
-          binding_capabilities_by_connection_method:
-            createOpenAiRawBindingCapabilitiesByConnectionMethod(),
         },
       },
       {

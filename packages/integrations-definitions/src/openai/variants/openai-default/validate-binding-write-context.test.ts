@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
-import { createOpenAiRawBindingCapabilitiesByConnectionMethod } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 function createTargetConfig() {
   return OpenAiApiKeyTargetConfigSchema.parse({
     api_base_url: "https://api.openai.com",
-    binding_capabilities_by_connection_method:
-      createOpenAiRawBindingCapabilitiesByConnectionMethod(),
   });
 }
 

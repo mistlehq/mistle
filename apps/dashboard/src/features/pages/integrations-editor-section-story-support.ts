@@ -1,7 +1,4 @@
-import {
-  PlanetScaleToolIds,
-  createOpenAiRawBindingCapabilitiesByConnectionMethod,
-} from "@mistle/integrations-definitions";
+import { PlanetScaleToolIds } from "@mistle/integrations-definitions";
 import { QueryClient } from "@tanstack/react-query";
 
 import { createGithubRepositoryResources } from "../forms/integration-resource-picker-story-support.js";
@@ -46,8 +43,6 @@ export const StoryOpenAiTarget: IntegrationTargetSummary = {
   variantId: "openai-default",
   config: {
     api_base_url: "https://api.openai.com",
-    binding_capabilities_by_connection_method:
-      createOpenAiRawBindingCapabilitiesByConnectionMethod(),
   },
   targetHealth: {
     configStatus: "valid",
