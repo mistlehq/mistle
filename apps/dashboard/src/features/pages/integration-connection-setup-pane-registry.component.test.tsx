@@ -24,7 +24,6 @@ describe("renderIntegrationConnectionSetupPane", () => {
             methodId: "github-app-installation",
             routeSegment: "github-app",
           },
-          searchParams: new URLSearchParams(),
         }),
       ),
     ).toBe(true);
@@ -38,7 +37,6 @@ describe("renderIntegrationConnectionSetupPane", () => {
           methodId: "unsupported-method",
           routeSegment: "unsupported",
         },
-        searchParams: new URLSearchParams(),
       }),
     ).toThrow(
       "Integration setup flow 'unsupported-method/unsupported' has no browser definition method for target 'github-cloud'.",

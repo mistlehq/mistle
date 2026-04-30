@@ -6,7 +6,7 @@ import { hasConfiguredSetupSecretField } from "./integration-connection-setup-se
 
 export type ProviderAppSetupFieldKey = string;
 
-export type ProviderAppSetupStartFormState = {
+type ProviderAppSetupStartFormState = {
   isFieldVisible: (fieldName: string) => boolean;
   resolveRequiredValue: (fieldName: string) => string;
   values: Record<string, string>;
