@@ -2,6 +2,7 @@ import type { AppPageMeta } from "../navigation/route-meta.js";
 import { FormPageHeader } from "./form-page.js";
 
 export type PageFrameProps = {
+  breadcrumbs?: React.ReactNode;
   children: React.ReactNode;
   description?: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -41,20 +42,26 @@ function shouldRenderPageFrameHeader(input: Omit<PageFrameProps, "children">): b
 
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
+  const hasBreadcrumbs = input.breadcrumbs !== undefined && input.breadcrumbs !== null;
   const contentClassName =
     input.maxWidthClassName === undefined ? undefined : `mx-auto w-full ${input.maxWidthClassName}`;
   const paddingClassName = input.paddingClassName ?? "px-4 py-6";
 
   return (
     <div className={`flex min-h-full flex-col gap-4 ${paddingClassName}`}>
-      {shouldRenderHeader ? (
+      {hasBreadcrumbs || shouldRenderHeader ? (
         <div className={contentClassName}>
-          <FormPageHeader
-            actions={input.headerActions}
-            description={input.description}
-            icon={input.headerIcon}
-            title={input.title}
-          />
+          <div className="flex flex-col gap-2">
+            {input.breadcrumbs}
+            {shouldRenderHeader ? (
+              <FormPageHeader
+                actions={input.headerActions}
+                description={input.description}
+                icon={input.headerIcon}
+                title={input.title}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
       <div className={contentClassName}>{input.children}</div>
@@ -64,17 +71,23 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
 
 export function FormPageFrame(input: PageFrameProps): React.JSX.Element {
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
+  const hasBreadcrumbs = input.breadcrumbs !== undefined && input.breadcrumbs !== null;
 
   return (
     <div className="flex min-h-full flex-col gap-6 bg-muted/30 px-4 py-6">
-      {shouldRenderHeader ? (
+      {hasBreadcrumbs || shouldRenderHeader ? (
         <div className="mx-auto w-full max-w-2xl">
-          <FormPageHeader
-            actions={input.headerActions}
-            description={input.description}
-            icon={input.headerIcon}
-            title={input.title}
-          />
+          <div className="flex flex-col gap-2">
+            {input.breadcrumbs}
+            {shouldRenderHeader ? (
+              <FormPageHeader
+                actions={input.headerActions}
+                description={input.description}
+                icon={input.headerIcon}
+                title={input.title}
+              />
+            ) : null}
+          </div>
         </div>
       ) : null}
       <div className="mx-auto w-full max-w-2xl">{input.children}</div>

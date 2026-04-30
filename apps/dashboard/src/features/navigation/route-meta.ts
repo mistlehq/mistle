@@ -22,6 +22,8 @@ export type AppRouteHandle = {
   breadcrumb?: RouteTextValue;
   breadcrumbTo?: RouteHrefValue;
   breadcrumbClickable?: boolean;
+  pageBreadcrumb?: RouteNodeValue;
+  pageBreadcrumbVisible?: boolean;
   title?: RouteTextValue;
   description?: RouteTextValue;
   header?: AppRouteHeaderHandle;
@@ -46,6 +48,19 @@ export type AppPageMeta = {
 };
 
 export type AppHeaderLeadingModel =
+  | {
+      kind: "none";
+    }
+  | {
+      kind: "breadcrumbs";
+      breadcrumbs: AppBreadcrumb[];
+    }
+  | {
+      kind: "custom";
+      content: React.ReactNode;
+    };
+
+export type AppPageBreadcrumbModel =
   | {
       kind: "none";
     }
@@ -151,6 +166,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const breadcrumbIcon = handle["breadcrumbIcon"];
   const breadcrumbTo = handle["breadcrumbTo"];
   const breadcrumbClickable = handle["breadcrumbClickable"];
+  const pageBreadcrumb = handle["pageBreadcrumb"];
+  const pageBreadcrumbVisible = handle["pageBreadcrumbVisible"];
   const title = handle["title"];
   const description = handle["description"];
   const header = handle["header"];
@@ -188,6 +205,14 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.breadcrumbClickable = breadcrumbClickable;
   }
 
+  if (isRouteNodeValue(pageBreadcrumb)) {
+    parsedHandle.pageBreadcrumb = pageBreadcrumb;
+  }
+
+  if (typeof pageBreadcrumbVisible === "boolean") {
+    parsedHandle.pageBreadcrumbVisible = pageBreadcrumbVisible;
+  }
+
   if (isRouteTextValue(title)) {
     parsedHandle.title = title;
   }
@@ -214,6 +239,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&
     parsedHandle.breadcrumbClickable === undefined &&
+    parsedHandle.pageBreadcrumb === undefined &&
+    parsedHandle.pageBreadcrumbVisible === undefined &&
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
     parsedHandle.header === undefined &&
@@ -325,6 +352,11 @@ export function useAppHeaderLeadingModel(): AppHeaderLeadingModel {
   return resolveAppHeaderLeadingModelFromMatches(matches);
 }
 
+export function useAppPageBreadcrumbModel(): AppPageBreadcrumbModel {
+  const matches = useMatches();
+  return resolveAppPageBreadcrumbModelFromMatches(matches);
+}
+
 export function resolveAppHeaderLeadingModelFromMatches(matches: unknown[]): AppHeaderLeadingModel {
   if (!Array.isArray(matches)) {
     return { kind: "none" };
@@ -344,6 +376,41 @@ export function resolveAppHeaderLeadingModelFromMatches(matches: unknown[]): App
     return {
       kind: "custom",
       content: handle.header.leading({
+        params: normalizeParams(match.params),
+        data: match.data,
+      }),
+    };
+  }
+
+  return { kind: "none" };
+}
+
+export function resolveAppPageBreadcrumbModelFromMatches(
+  matches: unknown[],
+): AppPageBreadcrumbModel {
+  if (!Array.isArray(matches)) {
+    return { kind: "none" };
+  }
+
+  const pageBreadcrumbVisible = resolvePageBreadcrumbVisibilityFromMatches(matches);
+  if (!pageBreadcrumbVisible) {
+    return { kind: "none" };
+  }
+
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.pageBreadcrumb === undefined) {
+      continue;
+    }
+
+    return {
+      kind: "custom",
+      content: handle.pageBreadcrumb({
         params: normalizeParams(match.params),
         data: match.data,
       }),
@@ -420,6 +487,22 @@ function resolveAppShellHeaderLeadingVisibilityFromMatches(matches: unknown[]): 
     const handle = parseAppRouteHandle(match.handle);
     if (handle?.appShellHeaderLeadingVisible !== undefined) {
       return handle.appShellHeaderLeadingVisible;
+    }
+  }
+
+  return false;
+}
+
+function resolvePageBreadcrumbVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.pageBreadcrumbVisible !== undefined) {
+      return handle.pageBreadcrumbVisible;
     }
   }
 

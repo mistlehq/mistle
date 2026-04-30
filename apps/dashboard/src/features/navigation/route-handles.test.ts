@@ -20,6 +20,7 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.integrationSetup.appShellInsetOwner).toBe("child");
     expect(typeof ROUTE_HANDLES.integrationDetail.title).toBe("function");
     expect(ROUTE_HANDLES.integrationDetail.header?.icon).toBeDefined();
+    expect(ROUTE_HANDLES.integrationDetail.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
     expect(ROUTE_HANDLES.sessionsNew.title).toBe("New session");
@@ -37,11 +38,13 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
     expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
     expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfilesNew.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilesDetail.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilesDetail.description).toBe(
       "Edit sandbox profile configuration.",
     );
     expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.sandboxProfilesDetail.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilePublished.description).toBe(
       "Edit sandbox profile configuration.",
@@ -58,9 +61,11 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
     expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.automationsNew.pageBreadcrumbVisible).toBe(true);
     expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.automationsDetail.pageBreadcrumbVisible).toBe(true);
 
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
     expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
@@ -168,8 +173,8 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfileEditor.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
     expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
-    expect(typeof ROUTE_HANDLES.sandboxProfilePublished.header?.leading).toBe("function");
-    expect(typeof ROUTE_HANDLES.sandboxProfileDraft.header?.leading).toBe("function");
+    expect(typeof ROUTE_HANDLES.sandboxProfilePublished.pageBreadcrumb).toBe("function");
+    expect(typeof ROUTE_HANDLES.sandboxProfileDraft.pageBreadcrumb).toBe("function");
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {

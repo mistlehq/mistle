@@ -5,6 +5,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
@@ -14,6 +15,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 
 export function IntegrationConnectionSetupPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams] = useSearchParams();
@@ -43,6 +45,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
   if (directoryQuery.isError) {
     return (
       <FormPageFrame
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
@@ -75,6 +78,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
   if (directoryQuery.isPending || directoryQuery.data === undefined) {
     return (
       <FormPageFrame
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
@@ -105,6 +109,7 @@ export function IntegrationConnectionSetupPage(): React.JSX.Element {
 
   return (
     <FormPageFrame
+      breadcrumbs={breadcrumbs}
       description={description}
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}

@@ -35,6 +35,22 @@ describe("PageFrame", () => {
     expect(screen.getByText("Contained content")).toBeDefined();
   });
 
+  it("renders breadcrumbs above the form page header", () => {
+    render(
+      <FormPageFrame
+        breadcrumbs={<nav aria-label="Page breadcrumbs">Parent / Child</nav>}
+        title="Editor Shell"
+      >
+        <div>Contained content</div>
+      </FormPageFrame>,
+    );
+
+    const breadcrumbs = screen.getByLabelText("Page breadcrumbs");
+    const header = screen.getByText("Editor Shell");
+
+    expect(breadcrumbs.compareDocumentPosition(header)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
   it("keeps the generic page frame unconstrained", () => {
     const { container } = render(
       <PageFrame title="Generic page">

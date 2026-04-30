@@ -171,6 +171,7 @@ export const ROUTE_HANDLES = {
     appShellInsetOwner: "child",
     breadcrumb: resolveIntegrationDetailTitle,
     breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
+    pageBreadcrumbVisible: true,
     title: resolveIntegrationDetailTitle,
     header: {
       icon: resolveIntegrationDetailHeaderIcon,
@@ -234,12 +235,14 @@ export const ROUTE_HANDLES = {
   sandboxProfilesNew: {
     appShellInsetOwner: "child",
     breadcrumb: "Create",
+    pageBreadcrumbVisible: true,
     title: "Create",
     description: "Create a sandbox profile.",
   },
   sandboxProfilesDetail: {
     appShellInsetOwner: "child",
     breadcrumb: "Profile",
+    pageBreadcrumbVisible: true,
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
@@ -253,29 +256,23 @@ export const ROUTE_HANDLES = {
   sandboxProfilePublished: {
     appShellInsetOwner: "child",
     breadcrumb: "Published",
+    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "published"),
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "published"),
-    },
   },
   sandboxProfileDraft: {
     appShellInsetOwner: "child",
     breadcrumb: "Draft",
+    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
-    },
   },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
     breadcrumb: "Snapshots",
+    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "snapshots"),
     title: "Edit profile",
     description: "Manage sandbox profile snapshots.",
-    header: {
-      leading: (input) => resolveSandboxProfileHeaderLeading(input, "snapshots"),
-    },
   },
   automations: {
     breadcrumb: "Automations",
@@ -285,12 +282,14 @@ export const ROUTE_HANDLES = {
   automationsNew: {
     appShellInsetOwner: "child",
     breadcrumb: "Create",
+    pageBreadcrumbVisible: true,
     title: "Create automation",
     description: "",
   },
   automationsDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
+    pageBreadcrumbVisible: true,
     title: "",
     description: "",
   },

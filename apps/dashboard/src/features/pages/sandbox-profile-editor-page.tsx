@@ -48,6 +48,7 @@ import {
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listWebhookAutomationsForSandboxProfile } from "../automations/webhook-automations-service.js";
 import type { WebhookAutomationSandboxProfileUsage } from "../automations/webhook-automations-types.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { NavigationBlockerDialog } from "../navigation/navigation-blocker-dialog.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
@@ -313,6 +314,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
 function CreateSandboxProfileEditorPage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { title, description } = resolvePageFrameText(pageMeta, "Create");
@@ -331,7 +333,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <FormPageFrame breadcrumbs={breadcrumbs} description={description} title={title}>
       <div className="gap-4 flex flex-col">
         {metaState.saveError ? (
           <Notice title="Create failed" variant="alert">
@@ -395,6 +397,7 @@ type SandboxProfileEditorShellContext = {
 };
 
 export function SandboxProfileEditorShell(): React.JSX.Element {
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const params = useParams();
@@ -433,7 +436,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
   if (profileQuery.isPending || profileVersionsQuery.isPending) {
     return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
         {null}
       </PageFrame>
     );
@@ -444,7 +447,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
         <div className="gap-4 flex flex-col">
           <h1 className="text-xl font-semibold">Edit profile</h1>
           <Card>
@@ -480,7 +483,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
   if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
     return (
-      <PageFrame maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
         <Notice title="Could not load profile versions" variant="alert">
           {resolveApiErrorMessage({
             error: profileVersionsQuery.error,
@@ -492,7 +495,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
   }
 
   return (
-    <PageFrame paddingClassName="py-0" title="">
+    <PageFrame breadcrumbs={breadcrumbs} paddingClassName="py-0" title="">
       <Outlet
         context={
           {
