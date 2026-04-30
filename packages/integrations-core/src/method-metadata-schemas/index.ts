@@ -270,6 +270,13 @@ const IntegrationFormConnectionMethodProviderAppSetupSchema = z
     urls: z
       .object({
         description: z.string().min(1),
+        setupCallback: z
+          .object({
+            label: z.string().min(1),
+            path: z.string().regex(/^\/[^\s]*$/),
+          })
+          .strict()
+          .optional(),
         title: z.string().min(1),
         webhookCallback: z
           .object({

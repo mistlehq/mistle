@@ -292,6 +292,12 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.getByDisplayValue("mistle-github-app")).toBeTruthy();
     expect(screen.getByDisplayValue("Iv1.providerowned")).toBeTruthy();
     expect(screen.getByText("Hook URLs")).toBeTruthy();
+    expect(screen.getByText("Post-installation setup URL")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "https://control-plane.example.com/p/integration/callbacks/setup/github-app-installation",
+      ),
+    ).toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);

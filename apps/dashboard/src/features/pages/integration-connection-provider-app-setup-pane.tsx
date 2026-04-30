@@ -2,11 +2,12 @@ import type {
   IntegrationFormConnectionMethodProviderAppSetup,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
-import { Button } from "@mistle/ui";
+import { Button, CopyableValue } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
+import { getDashboardConfig } from "../../config.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   startProviderAppSetup,
@@ -78,6 +79,7 @@ function SetupUrls(input: {
   webhookCallbackState: ManifestWebhookCallbackState;
 }): React.JSX.Element {
   const webhookCallbackInstructions = input.providerAppSetup.urls.webhookCallback;
+  const setupCallbackInstructions = input.providerAppSetup.urls.setupCallback;
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,6 +88,15 @@ function SetupUrls(input: {
         title={input.providerAppSetup.urls.title}
       />
       <div className="flex flex-col gap-4">
+        {setupCallbackInstructions === undefined ? null : (
+          <CopyableValue
+            label={setupCallbackInstructions.label}
+            value={new URL(
+              setupCallbackInstructions.path,
+              getDashboardConfig().controlPlaneApiOrigin,
+            ).toString()}
+          />
+        )}
         <IntegrationConnectionSetupWebhookCallbackValue
           errorTitle={webhookCallbackInstructions.errorTitle}
           label={webhookCallbackInstructions.label}

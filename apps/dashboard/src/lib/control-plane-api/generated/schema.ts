@@ -3416,6 +3416,10 @@ export interface paths {
                           title: string;
                           urls: {
                             description: string;
+                            setupCallback?: {
+                              label: string;
+                              path: string;
+                            };
                             title: string;
                             webhookCallback: {
                               errorTitle: string;

@@ -108,6 +108,10 @@ export function createGitHubProviderAppSetupMetadata(
       title: "Hook URLs",
       description:
         "Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks and webhook events.",
+      setupCallback: {
+        label: "Post-installation setup URL",
+        path: "/p/integration/callbacks/setup/github-app-installation",
+      },
       webhookCallback: {
         label: "Webhook callback URL",
         errorTitle: "Could not load webhook URL",

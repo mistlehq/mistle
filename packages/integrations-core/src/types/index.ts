@@ -599,6 +599,12 @@ export type IntegrationFormConnectionMethodProviderAppSetup = {
   title: string;
   urls: {
     description: string;
+    setupCallback?:
+      | {
+          label: string;
+          path: string;
+        }
+      | undefined;
     title: string;
     webhookCallback: {
       errorTitle: string;

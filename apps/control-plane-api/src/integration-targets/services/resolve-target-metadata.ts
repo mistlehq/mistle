@@ -332,6 +332,14 @@ function cloneProviderAppSetup(
     title: setup.title,
     urls: {
       description: setup.urls.description,
+      ...(setup.urls.setupCallback === undefined
+        ? {}
+        : {
+            setupCallback: {
+              label: setup.urls.setupCallback.label,
+              path: setup.urls.setupCallback.path,
+            },
+          }),
       title: setup.urls.title,
       webhookCallback: {
         errorTitle: setup.urls.webhookCallback.errorTitle,
