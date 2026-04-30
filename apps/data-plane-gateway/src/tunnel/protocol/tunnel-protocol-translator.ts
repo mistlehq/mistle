@@ -687,6 +687,9 @@ export class TunnelProtocolTranslator {
     const portsTransportMessage = parsePortsTransportMessage(input.payload);
     if (portsTransportMessage !== undefined) {
       if (
+        portsTransportMessage.type === "ports.http.response.start" ||
+        portsTransportMessage.type === "ports.http.body.chunk" ||
+        portsTransportMessage.type === "ports.http.body.end" ||
         portsTransportMessage.type === "ports.tcp.connected" ||
         portsTransportMessage.type === "ports.tcp.close" ||
         portsTransportMessage.type === "ports.tcp.error" ||

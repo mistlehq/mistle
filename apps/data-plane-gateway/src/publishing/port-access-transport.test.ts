@@ -17,7 +17,11 @@ import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../tunnel/types.js";
-import { PortAccessTransportService } from "./port-access-transport.js";
+import {
+  buildPortAccessRequestHeaders,
+  PortAccessTransportService,
+  toPortAccessResponseHeaders,
+} from "./port-access-transport.js";
 
 type ReceivedWebSocketMessage = {
   data: string | Buffer;
@@ -396,6 +400,10 @@ function createTunnelSessionRegistryWithBootstrap(input: {
   return registry;
 }
 
+function createEmptyTunnelSessionRegistry(): TunnelSessionRegistry {
+  return new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
+}
+
 afterEach(async () => {
   while (openTcpSocketPairs.length > 0) {
     await openTcpSocketPairs.pop()?.closeAll();
@@ -403,6 +411,74 @@ afterEach(async () => {
   while (openWebSocketPairs.length > 0) {
     await openWebSocketPairs.pop()?.closeAll();
   }
+});
+
+describe("port access transport helpers", () => {
+  it("rewrites browser request headers for tunneled upstream delivery", () => {
+    const requestHeaders = new Headers([
+      ["accept", "text/html"],
+      ["cookie", "mistle_port_access_session=session-token; theme=dark"],
+      ["connection", "keep-alive"],
+      ["host", "p-5173--sandbox.mistle.localhost"],
+      ["origin", "https://p-5173--sandbox.mistle.localhost"],
+      ["x-request-marker", "req-123"],
+    ]);
+
+    expect(
+      buildPortAccessRequestHeaders({
+        browserEdgePort: "443",
+        browserEdgeProto: "https",
+        browserVisibleHost: "p-5173--sandbox.mistle.localhost",
+        requestHeaders,
+        targetPort: 5173,
+        upstreamProtocol: "http",
+      }),
+    ).toEqual({
+      accept: ["text/html"],
+      cookie: ["theme=dark"],
+      host: ["127.0.0.1:5173"],
+      origin: ["http://127.0.0.1:5173"],
+      "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
+      "x-forwarded-port": ["443"],
+      "x-forwarded-proto": ["https"],
+      "x-request-marker": ["req-123"],
+    });
+  });
+
+  it("drops the cookie header when it only contains the port access session cookie", () => {
+    const requestHeaders = new Headers([
+      ["cookie", "mistle_port_access_session=session-token"],
+      ["host", "p-5173--sandbox.mistle.localhost"],
+    ]);
+
+    expect(
+      buildPortAccessRequestHeaders({
+        browserEdgePort: "80",
+        browserEdgeProto: "http",
+        browserVisibleHost: "p-5173--sandbox.mistle.localhost",
+        requestHeaders,
+        targetPort: 5173,
+        upstreamProtocol: "https",
+      }),
+    ).toEqual({
+      host: ["127.0.0.1:5173"],
+      "x-forwarded-host": ["p-5173--sandbox.mistle.localhost"],
+      "x-forwarded-port": ["80"],
+      "x-forwarded-proto": ["http"],
+    });
+  });
+
+  it("builds browser response headers from repeated tunneled header values", () => {
+    const responseHeaders = toPortAccessResponseHeaders({
+      "cache-control": ["no-store"],
+      "set-cookie": ["a=1; Path=/", "b=2; Path=/"],
+      vary: ["origin", "accept-encoding"],
+    });
+
+    expect(responseHeaders.get("cache-control")).toBe("no-store");
+    expect(responseHeaders.getSetCookie()).toEqual(["a=1; Path=/", "b=2; Path=/"]);
+    expect(responseHeaders.get("vary")).toBe("origin, accept-encoding");
+  });
 });
 
 describe("port access transport session fencing", () => {
@@ -1003,6 +1079,192 @@ describe("port access transport session fencing", () => {
     ).toEqual({
       type: "ports.tcp.close",
       streamId: handle.streamId,
+      direction: "request",
+    });
+  });
+
+  it("does not send follow-up HTTP request body messages to a replacement bootstrap", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(
+      relayCoordinator,
+      createEmptyTunnelSessionRegistry(),
+    );
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    const handle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "POST",
+        path: "/submit",
+        headers: {},
+      },
+    });
+
+    const openMessage = JSON.parse(
+      String((await waitForWebSocketMessage(firstBootstrap.clientSocket)).data),
+    );
+    expect(openMessage).toEqual({
+      type: "ports.http.open",
+      streamId: 1,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "POST",
+        path: "/submit",
+        headers: {},
+      },
+    });
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    await handle.sendRequestBodyChunk(Uint8Array.from([1, 2, 3]));
+
+    await waitForNoWebSocketMessage(replacementBootstrap.clientSocket);
+  });
+
+  it("ignores stale HTTP responses from the bootstrap session that no longer owns the stream", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(
+      relayCoordinator,
+      createEmptyTunnelSessionRegistry(),
+    );
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/",
+        headers: {},
+      },
+    });
+
+    await waitForWebSocketMessage(firstBootstrap.clientSocket);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    await expect(
+      service.handleBootstrapTransportMessage({
+        sandboxInstanceId: SandboxInstanceId,
+        sourceBootstrapSessionId: "sess_bootstrap_a",
+        message: {
+          type: "ports.http.response.start",
+          streamId: 1,
+          status: 200,
+          headers: {},
+        },
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("does not reject replacement bootstrap streams when the old bootstrap closes", async () => {
+    const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
+    const service = new PortAccessTransportService(
+      relayCoordinator,
+      createEmptyTunnelSessionRegistry(),
+    );
+    const firstBootstrap = await createWebSocketPair();
+    const replacementBootstrap = await createWebSocketPair();
+    openWebSocketPairs.push(firstBootstrap, replacementBootstrap);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_a",
+      }),
+      socket: firstBootstrap.peerSocket,
+    });
+
+    const oldHandle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/old",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(firstBootstrap.clientSocket);
+
+    relayCoordinator.attachPeer({
+      ...createBootstrapTarget({
+        sessionId: "sess_bootstrap_b",
+      }),
+      socket: replacementBootstrap.peerSocket,
+    });
+
+    const replacementHandle = await service.openHttpStream({
+      sandboxInstanceId: SandboxInstanceId,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "http",
+      request: {
+        method: "GET",
+        path: "/new",
+        headers: {},
+      },
+    });
+    await waitForWebSocketMessage(replacementBootstrap.clientSocket);
+
+    service.rejectPendingStreamsForBootstrapSession({
+      sandboxInstanceId: SandboxInstanceId,
+      targetBootstrapSessionId: "sess_bootstrap_a",
+    });
+    await expect(oldHandle.responseStart).rejects.toBeInstanceOf(Error);
+
+    await replacementHandle.finishRequestBody();
+
+    expect(
+      JSON.parse(String((await waitForWebSocketMessage(replacementBootstrap.clientSocket)).data)),
+    ).toEqual({
+      type: "ports.http.body.end",
+      streamId: 2,
       direction: "request",
     });
   });

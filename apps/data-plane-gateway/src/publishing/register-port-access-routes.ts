@@ -9,6 +9,7 @@ import {
 } from "@mistle/port-access-auth";
 import type { Clock } from "@mistle/time";
 
+import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import {
   PortAccessSessionCookieName,
@@ -17,6 +18,14 @@ import {
   verifyPortAccessSession,
 } from "./auth/port-access-session.js";
 import { bootstrapPortAccess } from "./port-access-bootstrap.js";
+import {
+  buildPortAccessRequestHeaders,
+  type PortAccessHttpRequestHandle,
+  PortAccessTransportBootstrapDisconnectedError,
+  PortAccessTransportService,
+  PortAccessTransportStreamError,
+  toPortAccessResponseHeaders,
+} from "./port-access-transport.js";
 import type { PortsTargetAuthorizeService } from "./ports-target-authorize-service.js";
 
 const PortAccessBootstrapPath = "/_mistle/access/bootstrap";
@@ -82,10 +91,93 @@ function resolveBrowserEdgePort(input: {
   return input.browserEdgeProto === "https" ? "443" : "80";
 }
 
+async function pipeBrowserRequestBody(input: {
+  requestBody: ReadableStream<Uint8Array> | null;
+  sendChunk: (chunk: Uint8Array) => Promise<void>;
+  sendEnd: () => Promise<void>;
+}): Promise<void> {
+  if (input.requestBody === null) {
+    await input.sendEnd();
+    return;
+  }
+
+  const reader = input.requestBody.getReader();
+  try {
+    while (true) {
+      const result = await reader.read();
+      if (result.done) {
+        await input.sendEnd();
+        return;
+      }
+
+      await input.sendChunk(result.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function wrapPortAccessResponseBody(input: {
+  close: () => Promise<void>;
+  responseBody: ReadableStream<Uint8Array>;
+}): ReadableStream<Uint8Array> {
+  const reader = input.responseBody.getReader();
+
+  return new ReadableStream<Uint8Array>({
+    async cancel() {
+      await input.close();
+      await reader.cancel();
+    },
+    async pull(controller) {
+      const result = await reader.read();
+      if (result.done) {
+        controller.close();
+        return;
+      }
+
+      controller.enqueue(result.value);
+    },
+  });
+}
+
+function neverSettlingPromise<T>(): Promise<T> {
+  return new Promise(() => undefined);
+}
+
+function isNullBodyHttpStatus(status: number): boolean {
+  return status === 204 || status === 205 || status === 304;
+}
+
+export function createPortAccessHttpResponse(input: {
+  close: () => Promise<void>;
+  responseBody: ReadableStream<Uint8Array>;
+  responseStart: Awaited<PortAccessHttpRequestHandle["responseStart"]>;
+}): Response {
+  const headers = toPortAccessResponseHeaders(input.responseStart.headers);
+  if (isNullBodyHttpStatus(input.responseStart.status)) {
+    return new Response(null, {
+      status: input.responseStart.status,
+      headers,
+    });
+  }
+
+  return new Response(
+    wrapPortAccessResponseBody({
+      close: input.close,
+      responseBody: input.responseBody,
+    }),
+    {
+      status: input.responseStart.status,
+      headers,
+    },
+  );
+}
+
 export function registerPortAccessRoutes(input: {
   app: DataPlaneGatewayApp;
   bootstrapTokenConfig: PortAccessBootstrapTokenConfig;
   hostConfig: PortAccessHostConfig;
+  portAccessTransportService: PortAccessTransportService;
   sessionConfig: PortAccessSessionConfig;
   portsTargetAuthorizeService: PortsTargetAuthorizeService;
   clock: Clock;
@@ -115,6 +207,100 @@ export function registerPortAccessRoutes(input: {
     const response = ctx.redirect(result.location, 302);
     response.headers.append("set-cookie", result.setCookieHeader);
     return response;
+  });
+
+  input.app.all("*", async (ctx, next) => {
+    if (new URL(ctx.req.url).pathname === PortAccessBootstrapPath) {
+      return next();
+    }
+
+    const requestHost = ctx.req.header("host");
+    if (requestHost === undefined) {
+      return next();
+    }
+
+    const resolvedRequest = await resolvePortAccessRequest({
+      clock: input.clock,
+      cookieHeader: ctx.req.header("cookie"),
+      forwardedProto: ctx.req.header("x-forwarded-proto"),
+      hostConfig: input.hostConfig,
+      requestHost,
+      requestUrl: ctx.req.url,
+      sessionConfig: input.sessionConfig,
+    });
+    if (resolvedRequest.kind === "not-port-access-host") {
+      return next();
+    }
+    if (resolvedRequest.kind === "failure") {
+      return resolvedRequest.response;
+    }
+
+    const requestUrl = new URL(ctx.req.url);
+    const requestHandle = await input.portAccessTransportService.openHttpStream({
+      sandboxInstanceId: resolvedRequest.verifiedSession.sandboxInstanceId,
+      target: {
+        kind: "port",
+        port: resolvedRequest.verifiedSession.port,
+      },
+      upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+      request: {
+        method: ctx.req.method,
+        path: requestUrl.pathname,
+        query: requestUrl.search.length > 1 ? requestUrl.search.slice(1) : undefined,
+        headers: buildPortAccessRequestHeaders({
+          browserEdgePort: resolvedRequest.browserEdgePort,
+          browserEdgeProto: resolvedRequest.browserEdgeProto,
+          browserVisibleHost: resolvedRequest.parsedHost.host,
+          requestHeaders: ctx.req.raw.headers,
+          targetPort: resolvedRequest.verifiedSession.port,
+          upstreamProtocol: resolvedRequest.verifiedSession.upstreamProtocol,
+        }),
+      },
+    });
+
+    const requestBodyFailureSignal = pipeBrowserRequestBody({
+      requestBody: ctx.req.raw.body,
+      sendChunk: requestHandle.sendRequestBodyChunk,
+      sendEnd: requestHandle.finishRequestBody,
+    }).then(
+      () => neverSettlingPromise<Awaited<PortAccessHttpRequestHandle["responseStart"]>>(),
+      async (error: unknown) => {
+        await requestHandle.close();
+        if (error instanceof Error) {
+          throw error;
+        }
+
+        throw new Error(String(error));
+      },
+    );
+    void requestBodyFailureSignal.catch(() => undefined);
+
+    try {
+      const responseStart = await Promise.race([
+        requestHandle.responseStart,
+        requestBodyFailureSignal,
+      ]);
+      return createPortAccessHttpResponse({
+        close: requestHandle.close,
+        responseBody: requestHandle.responseBody,
+        responseStart,
+      });
+    } catch (error) {
+      if (
+        error instanceof BootstrapTunnelNotConnectedError ||
+        error instanceof PortAccessTransportBootstrapDisconnectedError ||
+        error instanceof PortAccessTransportStreamError
+      ) {
+        return new Response("Port Access upstream request failed.", {
+          status: 502,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+          },
+        });
+      }
+
+      throw error;
+    }
   });
 }
 

@@ -5,6 +5,10 @@ import {
   encodeDataFrame,
   MaxStreamWindowBytes,
   type PortAccessTarget,
+  type PortsHttpBodyChunk,
+  type PortsHttpBodyEnd,
+  type PortsHttpOpen,
+  type PortsHttpResponseStart,
   type PortsTcpClose,
   type PortsTcpConnected,
   type PortsTcpOpen,
@@ -23,11 +27,23 @@ import {
 } from "@mistle/time";
 import { metrics, SpanStatusCode, trace, type Attributes, type Span } from "@opentelemetry/api";
 
+import { logger } from "../logger.js";
 import { BootstrapTunnelNotConnectedError } from "../tunnel/bootstrap-tunnel-not-connected-error.js";
 import type { TunnelRelayCoordinator } from "../tunnel/relay-coordinator.js";
 import type { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type { RelayTarget } from "../tunnel/types.js";
+import { PortAccessSessionCookieName } from "./auth/port-access-session.js";
 
+const HopByHopHeaderNames = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+]);
 const DefaultTcpConnectTimeoutMs = 10_000;
 const DefaultTcpIdleTimeoutMs = 30 * 60 * 1_000;
 const DefaultMaxActiveTcpStreamsPerSandbox = 256;
@@ -55,10 +71,12 @@ const PortAccessStreamDurationMs = PortAccessMeter.createHistogram(
   },
 );
 
-type PortAccessStreamKind = "tcp";
+type RepeatedHeaderValues = Record<string, string[]>;
+type PortAccessStreamKind = "http" | "tcp";
 type PortAccessStreamOutcome =
   | "opened"
   | "connected"
+  | "response_started"
   | "completed"
   | "client_closed"
   | "client_error"
@@ -69,6 +87,18 @@ type PortAccessStreamOutcome =
   | "stream_error";
 
 type TcpStreamCloseDirection = "request" | "response";
+
+type ActivePortAccessHttpStream = {
+  attributes: Attributes;
+  observabilityFinished: boolean;
+  openedAtMs: number;
+  portAccessSpan: Span;
+  responseStarted: boolean;
+  rejectResponseStart: (error: Error) => void;
+  resolveResponseStart: (responseStart: PortsHttpResponseStart) => void;
+  responseBodyWriter: WritableStreamDefaultWriter<Uint8Array>;
+  targetBootstrapSessionId: string;
+};
 
 type ActivePortAccessTcpStream = {
   attributes: Attributes;
@@ -96,6 +126,14 @@ type ActivePortAccessTcpStream = {
   targetBootstrapSessionId: string;
   totalRequestBytes: number;
   totalResponseBytes: number;
+};
+
+export type PortAccessHttpRequestHandle = {
+  close: () => Promise<void>;
+  finishRequestBody: () => Promise<void>;
+  responseBody: ReadableStream<Uint8Array>;
+  responseStart: Promise<PortsHttpResponseStart>;
+  sendRequestBodyChunk: (bytes: Uint8Array) => Promise<void>;
 };
 
 export type PortAccessTcpStreamHandle = {
@@ -142,6 +180,20 @@ export class PortAccessTcpStreamTimeoutError extends Error {
     super(message);
     this.name = "PortAccessTcpStreamTimeoutError";
   }
+}
+
+function stripPortAccessSessionCookie(cookieHeader: string): string | undefined {
+  const remainingSegments = cookieHeader
+    .split(";")
+    .map((segment) => segment.trim())
+    .filter(
+      (segment) => segment.length > 0 && !segment.startsWith(`${PortAccessSessionCookieName}=`),
+    );
+  if (remainingSegments.length === 0) {
+    return undefined;
+  }
+
+  return remainingSegments.join("; ");
 }
 
 function getPortAccessTargetAttributes(target: PortAccessTarget): Attributes {
@@ -242,12 +294,72 @@ function finishPortAccessStream(input: {
   input.span.end();
 }
 
+export function buildPortAccessRequestHeaders(input: {
+  browserEdgePort: string;
+  browserEdgeProto: "http" | "https";
+  browserVisibleHost: string;
+  requestHeaders: Headers;
+  targetPort: number;
+  upstreamProtocol: "http" | "https";
+}): RepeatedHeaderValues {
+  const tunneledHeaders: RepeatedHeaderValues = {};
+
+  for (const [headerName, value] of input.requestHeaders.entries()) {
+    const normalizedHeaderName = headerName.toLowerCase();
+    if (HopByHopHeaderNames.has(normalizedHeaderName) || normalizedHeaderName === "host") {
+      continue;
+    }
+
+    if (normalizedHeaderName === "cookie") {
+      const sanitizedCookieHeader = stripPortAccessSessionCookie(value);
+      if (sanitizedCookieHeader === undefined) {
+        continue;
+      }
+
+      tunneledHeaders.cookie = [sanitizedCookieHeader];
+      continue;
+    }
+
+    if (normalizedHeaderName === "origin") {
+      tunneledHeaders.origin = [
+        `${input.upstreamProtocol}://127.0.0.1:${String(input.targetPort)}`,
+      ];
+      continue;
+    }
+
+    tunneledHeaders[normalizedHeaderName] = [value];
+  }
+
+  tunneledHeaders.host = [`127.0.0.1:${String(input.targetPort)}`];
+  tunneledHeaders["x-forwarded-host"] = [input.browserVisibleHost];
+  tunneledHeaders["x-forwarded-proto"] = [input.browserEdgeProto];
+  tunneledHeaders["x-forwarded-port"] = [input.browserEdgePort];
+
+  return tunneledHeaders;
+}
+
+export function toPortAccessResponseHeaders(headers: PortsHttpResponseStart["headers"]): Headers {
+  const responseHeaders = new Headers();
+  for (const [headerName, values] of Object.entries(headers)) {
+    for (const value of values) {
+      responseHeaders.append(headerName, value);
+    }
+  }
+
+  return responseHeaders;
+}
+
 export class PortAccessTransportService {
+  readonly #activeHttpStreamsBySandboxInstanceId = new Map<
+    string,
+    Map<number, ActivePortAccessHttpStream>
+  >();
   readonly #activeTcpStreamsBySandboxInstanceId = new Map<
     string,
     Map<number, ActivePortAccessTcpStream>
   >();
   readonly #activeTcpStreamCountsByPortAccessSessionKey = new Map<string, number>();
+  #nextStreamId = 1;
   readonly #clock: Clock;
   readonly #connectTimeoutMs: number;
   readonly #idleTimeoutMs: number;
@@ -278,6 +390,168 @@ export class PortAccessTransportService {
     this.#maxActiveTcpStreamsPerSandbox =
       options.maxActiveTcpStreamsPerSandbox ?? DefaultMaxActiveTcpStreamsPerSandbox;
     this.#scheduler = options.scheduler ?? systemScheduler;
+  }
+
+  public async openHttpStream(input: {
+    request: PortsHttpOpen["request"];
+    sandboxInstanceId: string;
+    target: PortAccessTarget;
+    upstreamProtocol: "http" | "https";
+  }): Promise<PortAccessHttpRequestHandle> {
+    const bootstrapTarget = this.requireBootstrapTarget({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+
+    const streamId = this.allocateStreamId();
+    const openedAtMs = this.#clock.nowMs();
+    const streamAttributes = buildPortAccessStreamAttributes({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId,
+      streamKind: "http",
+      target: input.target,
+      targetBootstrapSessionId: bootstrapTarget.sessionId,
+      upstreamProtocol: input.upstreamProtocol,
+    });
+    const portAccessSpan = startPortAccessStreamSpan({
+      attributes: streamAttributes,
+      streamKind: "http",
+    });
+    recordPortAccessStreamEvent({
+      attributes: streamAttributes,
+      outcome: "opened",
+    });
+    logger.debug(
+      {
+        ...streamAttributes,
+        eventName: "gateway.port_access.http_stream.opened",
+      },
+      "Port Access HTTP stream opened",
+    );
+    const responseStream = new TransformStream<Uint8Array, Uint8Array>();
+    const responseBodyWriter = responseStream.writable.getWriter();
+    let resolveResponseStart: ((responseStart: PortsHttpResponseStart) => void) | undefined;
+    let rejectResponseStart: ((error: Error) => void) | undefined;
+    const responseStart = new Promise<PortsHttpResponseStart>((resolve, reject) => {
+      resolveResponseStart = resolve;
+      rejectResponseStart = reject;
+    });
+    if (resolveResponseStart === undefined || rejectResponseStart === undefined) {
+      throw new Error("Port access responseStart promise callbacks were not initialized.");
+    }
+
+    this.setActiveHttpStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      streamId,
+      stream: {
+        attributes: streamAttributes,
+        observabilityFinished: false,
+        openedAtMs,
+        portAccessSpan,
+        responseStarted: false,
+        rejectResponseStart,
+        resolveResponseStart,
+        responseBodyWriter,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
+      },
+    });
+
+    try {
+      await this.forwardMessage({
+        sandboxInstanceId: input.sandboxInstanceId,
+        targetBootstrapSessionId: bootstrapTarget.sessionId,
+        payload: JSON.stringify({
+          type: "ports.http.open",
+          streamId,
+          target: input.target,
+          upstreamProtocol: input.upstreamProtocol,
+          request: input.request,
+        } satisfies PortsHttpOpen),
+      });
+    } catch (error) {
+      this.deleteActiveHttpStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        streamId,
+      });
+      await responseBodyWriter.abort(error);
+      const streamError = error instanceof Error ? error : new Error(String(error));
+      finishPortAccessStream({
+        attributes: streamAttributes,
+        durationMs: this.#clock.nowMs() - openedAtMs,
+        error: streamError,
+        outcome: "stream_error",
+        span: portAccessSpan,
+      });
+      logger.warn(
+        {
+          ...streamAttributes,
+          err: streamError,
+          eventName: "gateway.port_access.http_stream.open_failed",
+        },
+        "Port Access HTTP stream failed to open",
+      );
+      throw error;
+    }
+
+    return {
+      close: async () => {
+        const activeStream = this.getActiveHttpStream({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
+        this.deleteActiveHttpStream({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId,
+        });
+        await responseBodyWriter.abort();
+        if (activeStream !== undefined) {
+          this.finishHttpStreamObservability({
+            outcome: "client_closed",
+            stream: activeStream,
+          });
+        }
+        logger.debug(
+          {
+            ...streamAttributes,
+            eventName: "gateway.port_access.http_stream.browser_closed",
+          },
+          "Port Access HTTP stream closed by browser",
+        );
+        await this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
+          payload: JSON.stringify({
+            type: "ports.stream.close",
+            streamId,
+          }),
+        });
+      },
+      finishRequestBody: async () => {
+        await this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
+          payload: JSON.stringify({
+            type: "ports.http.body.end",
+            streamId,
+            direction: "request",
+          } satisfies PortsHttpBodyEnd),
+        });
+      },
+      responseBody: responseStream.readable,
+      responseStart,
+      sendRequestBodyChunk: async (bytes) => {
+        await this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: bootstrapTarget.sessionId,
+          payload: JSON.stringify({
+            type: "ports.http.body.chunk",
+            streamId,
+            direction: "request",
+            bytes: Buffer.from(bytes).toString("base64"),
+            encoding: "base64",
+          } satisfies PortsHttpBodyChunk),
+        });
+      },
+    };
   }
 
   public async openTcpStream(input: {
@@ -440,6 +714,11 @@ export class PortAccessTransportService {
     sandboxInstanceId: string;
     sourceBootstrapSessionId: string;
   }): Promise<boolean> {
+    const activeHttpStream = this.getMatchingActiveHttpStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
     const activeTcpStream = this.getMatchingActiveTcpStream({
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
@@ -447,7 +726,88 @@ export class PortAccessTransportService {
     });
 
     switch (input.message.type) {
+      case "ports.http.response.start": {
+        if (activeHttpStream === undefined) {
+          return false;
+        }
+        activeHttpStream.responseStarted = true;
+        activeHttpStream.resolveResponseStart(input.message);
+        activeHttpStream.portAccessSpan.addEvent("gateway.port_access.http.response_start", {
+          "mistle.port_access.http.status_code": input.message.status,
+        });
+        recordPortAccessStreamEvent({
+          attributes: {
+            ...activeHttpStream.attributes,
+            "mistle.port_access.http.status_code": input.message.status,
+          },
+          outcome: "response_started",
+        });
+        logger.debug(
+          {
+            ...activeHttpStream.attributes,
+            eventName: "gateway.port_access.http_stream.response_started",
+            status: input.message.status,
+          },
+          "Port Access HTTP response started",
+        );
+        return true;
+      }
+      case "ports.http.body.chunk": {
+        if (activeHttpStream === undefined) {
+          return false;
+        }
+        if (input.message.direction !== "response") {
+          await this.failHttpStream({
+            error: new PortAccessTransportStreamError({
+              code: "upstream_io_error",
+              message: "Gateway received a non-response body chunk from sandboxd.",
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
+        await activeHttpStream.responseBodyWriter.write(
+          Uint8Array.from(Buffer.from(input.message.bytes, "base64")),
+        );
+        return true;
+      }
+      case "ports.http.body.end": {
+        if (activeHttpStream === undefined) {
+          return false;
+        }
+        this.deleteActiveHttpStream({
+          sandboxInstanceId: input.sandboxInstanceId,
+          streamId: input.message.streamId,
+        });
+        await activeHttpStream.responseBodyWriter.close();
+        this.finishHttpStreamObservability({
+          outcome: "completed",
+          stream: activeHttpStream,
+        });
+        logger.debug(
+          {
+            ...activeHttpStream.attributes,
+            eventName: "gateway.port_access.http_stream.completed",
+          },
+          "Port Access HTTP stream completed",
+        );
+        return true;
+      }
       case "ports.stream.error": {
+        if (activeHttpStream !== undefined) {
+          await this.failHttpStream({
+            error: new PortAccessTransportStreamError({
+              code: input.message.code,
+              message: input.message.message,
+            }),
+            sandboxInstanceId: input.sandboxInstanceId,
+            streamId: input.message.streamId,
+          });
+          return true;
+        }
+
         if (activeTcpStream !== undefined) {
           await this.failTcpStream({
             error: new PortAccessTransportStreamError({
@@ -517,11 +877,9 @@ export class PortAccessTransportService {
         });
         return true;
       }
+      case "ports.http.open":
       case "ports.tcp.open":
       case "ports.stream.close": {
-        return false;
-      }
-      default: {
         return false;
       }
     }
@@ -595,6 +953,48 @@ export class PortAccessTransportService {
     sandboxInstanceId: string;
     targetBootstrapSessionId: string;
   }): void {
+    const activeStreams = this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (activeStreams !== undefined) {
+      for (const [streamId, stream] of activeStreams) {
+        if (stream.targetBootstrapSessionId !== input.targetBootstrapSessionId) {
+          continue;
+        }
+
+        activeStreams.delete(streamId);
+        const disconnectError = new PortAccessTransportBootstrapDisconnectedError(
+          input.sandboxInstanceId,
+        );
+        if (!stream.responseStarted) {
+          stream.rejectResponseStart(disconnectError);
+        }
+        void stream.responseBodyWriter.abort(disconnectError);
+        this.finishHttpStreamObservability({
+          error: disconnectError,
+          outcome: "bootstrap_disconnected",
+          stream,
+        });
+        logger.debug(
+          {
+            ...stream.attributes,
+            err: disconnectError,
+            eventName: "gateway.port_access.http_stream.bootstrap_disconnected",
+          },
+          "Port Access HTTP stream rejected because bootstrap disconnected",
+        );
+        void this.forwardMessage({
+          sandboxInstanceId: input.sandboxInstanceId,
+          targetBootstrapSessionId: stream.targetBootstrapSessionId,
+          payload: JSON.stringify({
+            type: "ports.stream.close",
+            streamId,
+          }),
+        }).catch(() => undefined);
+      }
+      if (activeStreams.size === 0) {
+        this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+      }
+    }
+
     const activeTcpStreams = this.#activeTcpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
     if (activeTcpStreams !== undefined) {
       for (const [streamId, stream] of activeTcpStreams) {
@@ -611,6 +1011,73 @@ export class PortAccessTransportService {
         });
       }
     }
+  }
+
+  private allocateStreamId(): number {
+    const streamId = this.#nextStreamId;
+    this.#nextStreamId += 1;
+    return streamId;
+  }
+
+  private deleteActiveHttpStream(input: { sandboxInstanceId: string; streamId: number }): void {
+    const sandboxStreams = this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (sandboxStreams === undefined) {
+      return;
+    }
+
+    sandboxStreams.delete(input.streamId);
+    if (sandboxStreams.size === 0) {
+      this.#activeHttpStreamsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    }
+  }
+
+  private finishHttpStreamObservability(input: {
+    error?: Error;
+    outcome: PortAccessStreamOutcome;
+    stream: ActivePortAccessHttpStream;
+  }): void {
+    if (input.stream.observabilityFinished) {
+      return;
+    }
+
+    input.stream.observabilityFinished = true;
+    finishPortAccessStream({
+      attributes: input.stream.attributes,
+      durationMs: this.#clock.nowMs() - input.stream.openedAtMs,
+      ...(input.error === undefined ? {} : { error: input.error }),
+      outcome: input.outcome,
+      span: input.stream.portAccessSpan,
+    });
+  }
+
+  private async failHttpStream(input: {
+    error: Error;
+    sandboxInstanceId: string;
+    streamId: number;
+  }): Promise<void> {
+    const activeStream = this.getActiveHttpStream(input);
+    if (activeStream === undefined) {
+      return;
+    }
+
+    this.deleteActiveHttpStream(input);
+    if (!activeStream.responseStarted) {
+      activeStream.rejectResponseStart(input.error);
+    }
+    await activeStream.responseBodyWriter.abort(input.error);
+    this.finishHttpStreamObservability({
+      error: input.error,
+      outcome: "stream_error",
+      stream: activeStream,
+    });
+    logger.warn(
+      {
+        ...activeStream.attributes,
+        err: input.error,
+        eventName: "gateway.port_access.http_stream.failed",
+      },
+      "Port Access HTTP stream failed",
+    );
   }
 
   private attachTcpClientSocket(input: {
@@ -973,6 +1440,43 @@ export class PortAccessTransportService {
     }
 
     return bootstrapTarget;
+  }
+
+  private getActiveHttpStream(input: {
+    sandboxInstanceId: string;
+    streamId: number;
+  }): ActivePortAccessHttpStream | undefined {
+    return this.#activeHttpStreamsBySandboxInstanceId
+      .get(input.sandboxInstanceId)
+      ?.get(input.streamId);
+  }
+
+  private getMatchingActiveHttpStream(input: {
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): ActivePortAccessHttpStream | undefined {
+    if (!this.isCurrentBootstrapSession(input)) {
+      return undefined;
+    }
+
+    const activeStream = this.getActiveHttpStream(input);
+    if (activeStream?.targetBootstrapSessionId !== input.sourceBootstrapSessionId) {
+      return undefined;
+    }
+
+    return activeStream;
+  }
+
+  private setActiveHttpStream(input: {
+    sandboxInstanceId: string;
+    stream: ActivePortAccessHttpStream;
+    streamId: number;
+  }): void {
+    const sandboxStreams =
+      this.#activeHttpStreamsBySandboxInstanceId.get(input.sandboxInstanceId) ?? new Map();
+    sandboxStreams.set(input.streamId, input.stream);
+    this.#activeHttpStreamsBySandboxInstanceId.set(input.sandboxInstanceId, sandboxStreams);
   }
 
   private assertTcpStreamLimits(input: {

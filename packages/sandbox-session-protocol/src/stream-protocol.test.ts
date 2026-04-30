@@ -954,25 +954,218 @@ describe("ports transport message parser", () => {
     ).toBeUndefined();
   });
 
-  it("does not parse legacy semantic port access transport messages", () => {
-    for (const type of [
-      "ports.http.open",
-      "ports.http.response.start",
-      "ports.http.body.chunk",
-      "ports.http.body.end",
-      "ports.ws.open",
-      "ports.ws.accept",
-      "ports.ws.frame",
-      "ports.ws.close",
-    ]) {
-      expect(
-        parsePortsTransportMessage(
-          JSON.stringify({
-            type,
-            streamId: 41,
-          }),
-        ),
-      ).toBeUndefined();
-    }
+  it("parses ports.http.open messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.open",
+          streamId: 41,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "https",
+          request: {
+            method: "GET",
+            path: "/src/main.ts",
+            query: "import=1",
+            headers: {
+              accept: ["text/plain"],
+              "x-forwarded-host": ["p-5173--sandbox.mistle.example.test"],
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.open",
+      streamId: 41,
+      target: {
+        kind: "port",
+        port: 5173,
+      },
+      upstreamProtocol: "https",
+      request: {
+        method: "GET",
+        path: "/src/main.ts",
+        query: "import=1",
+        headers: {
+          accept: ["text/plain"],
+          "x-forwarded-host": ["p-5173--sandbox.mistle.example.test"],
+        },
+      },
+    });
+  });
+
+  it("parses ports.http response and body messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 41,
+          status: 200,
+          headers: {
+            "content-type": ["text/html; charset=utf-8"],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.response.start",
+      streamId: 41,
+      status: 200,
+      headers: {
+        "content-type": ["text/html; charset=utf-8"],
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 42,
+          status: 200,
+          headers: {
+            "content-type": [""],
+            etag: ['W/"favicon"'],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.response.start",
+      streamId: 42,
+      status: 200,
+      headers: {
+        "content-type": [""],
+        etag: ['W/"favicon"'],
+      },
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.body.chunk",
+          streamId: 41,
+          direction: "response",
+          bytes: "SGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.body.chunk",
+      streamId: 41,
+      direction: "response",
+      bytes: "SGVsbG8=",
+      encoding: "base64",
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.body.end",
+          streamId: 41,
+          direction: "response",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.http.body.end",
+      streamId: 41,
+      direction: "response",
+    });
+  });
+
+  it("parses ports stream close and error messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.stream.close",
+          streamId: 41,
+        }),
+      ),
+    ).toEqual({
+      type: "ports.stream.close",
+      streamId: 41,
+    });
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.stream.error",
+          streamId: 41,
+          code: "upstream_io_error",
+          message: "upstream closed early",
+        }),
+      ),
+    ).toEqual({
+      type: "ports.stream.error",
+      streamId: 41,
+      code: "upstream_io_error",
+      message: "upstream closed early",
+    });
+  });
+
+  it("rejects malformed ports.http messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.open",
+          streamId: 41,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "http",
+          request: {
+            method: "GET",
+            path: "/",
+            headers: {
+              accept: "text/plain",
+            },
+          },
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 41,
+          status: 199,
+          headers: {},
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.http.response.start",
+          streamId: 41,
+          status: 600,
+          headers: {},
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("rejects semantic ports.ws messages", () => {
+    expect(
+      parsePortsTransportMessage(
+        JSON.stringify({
+          type: "ports.ws.open",
+          streamId: 55,
+          target: {
+            kind: "port",
+            port: 5173,
+          },
+          upstreamProtocol: "tcp",
+          request: {
+            path: "/hmr",
+            headers: {
+              upgrade: ["websocket"],
+            },
+          },
+        }),
+      ),
+    ).toBeUndefined();
   });
 });

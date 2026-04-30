@@ -286,6 +286,7 @@ export function createDataPlaneGatewayRuntime(
     hostConfig: {
       baseDomain: config.app.sandbox.publish.baseDomain,
     },
+    portAccessTransportService,
     sessionConfig: {
       cookieSigningSecret: config.app.sandbox.publish.session.cookieSigningSecret,
     },
@@ -337,7 +338,6 @@ export function createDataPlaneGatewayRuntime(
       startedServer = startServer({
         app,
         host: config.app.server.host,
-        portAccessNodeEntrypoint,
         port: config.app.server.port,
       });
       nodeWebSocket.injectWebSocket(startedServer.server);

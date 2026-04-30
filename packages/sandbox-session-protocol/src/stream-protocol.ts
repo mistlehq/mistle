@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const PositiveIntegerSchema = z.int().positive();
+const HttpResponseStatusSchema = z.int().min(200).max(599);
 const NonEmptyStringSchema = z.string().min(1);
 
 export const FileUploadResetCodes = {
@@ -122,6 +123,8 @@ const ProcessesStreamMessageSchema = z.discriminatedUnion("type", [
   ProcessesSnapshotSchema,
 ]);
 
+const RepeatedHeaderValuesSchema = z.record(NonEmptyStringSchema, z.array(z.string()));
+
 const PortAccessTargetSchema = z.object({
   kind: z.literal("port"),
   port: PositiveIntegerSchema,
@@ -183,6 +186,40 @@ const PortsTcpErrorSchema = z.object({
   message: NonEmptyStringSchema,
 });
 
+const PortsHttpOpenSchema = z.object({
+  type: z.literal("ports.http.open"),
+  streamId: PositiveIntegerSchema,
+  target: PortAccessTargetSchema,
+  upstreamProtocol: z.enum(["http", "https"]),
+  request: z.object({
+    method: NonEmptyStringSchema,
+    path: NonEmptyStringSchema,
+    query: NonEmptyStringSchema.optional(),
+    headers: RepeatedHeaderValuesSchema,
+  }),
+});
+
+const PortsHttpResponseStartSchema = z.object({
+  type: z.literal("ports.http.response.start"),
+  streamId: PositiveIntegerSchema,
+  status: HttpResponseStatusSchema,
+  headers: RepeatedHeaderValuesSchema,
+});
+
+const PortsHttpBodyChunkSchema = z.object({
+  type: z.literal("ports.http.body.chunk"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const PortsHttpBodyEndSchema = z.object({
+  type: z.literal("ports.http.body.end"),
+  streamId: PositiveIntegerSchema,
+  direction: z.enum(["request", "response"]),
+});
+
 const PortsStreamCloseSchema = z.object({
   type: z.literal("ports.stream.close"),
   streamId: PositiveIntegerSchema,
@@ -200,6 +237,10 @@ const PortsTransportMessageSchema = z.union([
   PortsTcpConnectedSchema,
   PortsTcpCloseSchema,
   PortsTcpErrorSchema,
+  PortsHttpOpenSchema,
+  PortsHttpResponseStartSchema,
+  PortsHttpBodyChunkSchema,
+  PortsHttpBodyEndSchema,
   PortsStreamCloseSchema,
   PortsStreamErrorSchema,
 ]);
@@ -416,6 +457,10 @@ export type PortsTcpOpen = z.infer<typeof PortsTcpOpenSchema>;
 export type PortsTcpConnected = z.infer<typeof PortsTcpConnectedSchema>;
 export type PortsTcpClose = z.infer<typeof PortsTcpCloseSchema>;
 export type PortsTcpError = z.infer<typeof PortsTcpErrorSchema>;
+export type PortsHttpOpen = z.infer<typeof PortsHttpOpenSchema>;
+export type PortsHttpResponseStart = z.infer<typeof PortsHttpResponseStartSchema>;
+export type PortsHttpBodyChunk = z.infer<typeof PortsHttpBodyChunkSchema>;
+export type PortsHttpBodyEnd = z.infer<typeof PortsHttpBodyEndSchema>;
 export type PortsStreamClose = z.infer<typeof PortsStreamCloseSchema>;
 export type PortsStreamError = z.infer<typeof PortsStreamErrorSchema>;
 export type PortsTransportMessage = z.infer<typeof PortsTransportMessageSchema>;
