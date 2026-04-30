@@ -1327,17 +1327,6 @@ export async function resolveIntegrationCredential(
         const connectionMethod = definition.connectionMethods.find(
           (method) => method.id === connectionMethodId,
         );
-        const resolvedConnectionSecrets =
-          connectionMethod?.kind === "form"
-            ? await resolveResolverContextConnectionSecrets({
-                db,
-                integrationsConfig,
-                organizationId: connection.organizationId,
-                connectionId: connection.id,
-                connectionMethod,
-              })
-            : undefined;
-
         span.setAttributes(
           createResolveCredentialTelemetryAttributes({
             connectionId: connection.id,
@@ -1352,19 +1341,8 @@ export async function resolveIntegrationCredential(
             ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
             ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
             hasBindingContext: bindingResolverContext !== undefined,
-            hasHydratedConnectionSecrets: resolvedConnectionSecrets !== undefined,
           }),
         );
-
-        const connectionResolverContext = resolveResolverContextConnection({
-          id: connection.id,
-          status: connection.status,
-          externalSubjectId: connection.externalSubjectId,
-          config: connection.config,
-          ...(resolvedConnectionSecrets === undefined
-            ? {}
-            : { secrets: resolvedConnectionSecrets }),
-        });
 
         if (input.resolverKey !== undefined) {
           const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
@@ -1380,6 +1358,29 @@ export async function resolveIntegrationCredential(
             target,
             definition,
             integrationsConfig,
+          });
+          const resolvedConnectionSecrets =
+            connectionMethod?.kind === "form"
+              ? await resolveResolverContextConnectionSecrets({
+                  db,
+                  integrationsConfig,
+                  organizationId: connection.organizationId,
+                  connectionId: connection.id,
+                  connectionMethod,
+                })
+              : undefined;
+          span.setAttribute(
+            "mistle.integration.resolve.has_hydrated_connection_secrets",
+            resolvedConnectionSecrets !== undefined,
+          );
+          const connectionResolverContext = resolveResolverContextConnection({
+            id: connection.id,
+            status: connection.status,
+            externalSubjectId: connection.externalSubjectId,
+            config: connection.config,
+            ...(resolvedConnectionSecrets === undefined
+              ? {}
+              : { secrets: resolvedConnectionSecrets }),
           });
 
           const resolvedCredential = await customResolver.resolve({
@@ -1485,6 +1486,29 @@ export async function resolveIntegrationCredential(
             target,
             definition,
             integrationsConfig,
+          });
+          const resolvedConnectionSecrets =
+            connectionMethod?.kind === "form"
+              ? await resolveResolverContextConnectionSecrets({
+                  db,
+                  integrationsConfig,
+                  organizationId: connection.organizationId,
+                  connectionId: connection.id,
+                  connectionMethod,
+                })
+              : undefined;
+          span.setAttribute(
+            "mistle.integration.resolve.has_hydrated_connection_secrets",
+            resolvedConnectionSecrets !== undefined,
+          );
+          const connectionResolverContext = resolveResolverContextConnection({
+            id: connection.id,
+            status: connection.status,
+            externalSubjectId: connection.externalSubjectId,
+            config: connection.config,
+            ...(resolvedConnectionSecrets === undefined
+              ? {}
+              : { secrets: resolvedConnectionSecrets }),
           });
 
           const resolvedCredential = await defaultResolver.resolve({

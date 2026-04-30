@@ -20,6 +20,7 @@ import {
   IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
+import { SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -419,6 +420,120 @@ describe("internal integration credentials resolve", () => {
     await expect(resolveResponse.json()).resolves.toEqual({
       kind: "value",
       value: "sk-integration-test",
+    });
+  });
+
+  it("resolves a persisted setup credential when another required form secret is not configured yet", async ({
+    fixture,
+  }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "slack_manifest_setup_partial",
+      familyId: "slack",
+      variantId: "slack-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_slack_manifest_setup_partial",
+      organizationId: authSession.organizationId,
+      targetKey: "slack_manifest_setup_partial",
+      displayName: "Slack manifest setup partial",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "slack-bot-token",
+        client_id: "slack-client-id",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial: masterKeyMaterial,
+    });
+
+    try {
+      const encryptedClientSecret = encryptCredentialUtf8({
+        plaintext: "slack-client-secret",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+      const encryptedSigningSecret = encryptCredentialUtf8({
+        plaintext: "slack-signing-secret",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values([
+        {
+          id: "icr_slack_manifest_setup_client_secret",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+          ciphertext: encryptedClientSecret.ciphertext,
+          nonce: encryptedClientSecret.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: "slack",
+        },
+        {
+          id: "icr_slack_manifest_setup_signing_secret",
+          organizationId: authSession.organizationId,
+          secretKind: IntegrationCredentialSecretKinds.API_KEY,
+          ciphertext: encryptedSigningSecret.ciphertext,
+          nonce: encryptedSigningSecret.nonce,
+          organizationCredentialKeyVersion: organizationCredentialKey.version,
+          intendedFamilyId: "slack",
+        },
+      ]);
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values([
+      {
+        connectionId: "icn_slack_manifest_setup_partial",
+        credentialId: "icr_slack_manifest_setup_client_secret",
+        slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
+      },
+      {
+        connectionId: "icn_slack_manifest_setup_partial",
+        credentialId: "icr_slack_manifest_setup_signing_secret",
+        slotKey: SlackCredentialSlotKeys.SIGNING_SECRET,
+      },
+    ]);
+
+    const resolveResponse = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          connectionId: "icn_slack_manifest_setup_partial",
+          secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+          slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
+        }),
+      },
+    );
+
+    expect(resolveResponse.status).toBe(200);
+    await expect(resolveResponse.json()).resolves.toEqual({
+      kind: "value",
+      value: "slack-client-secret",
     });
   });
 
