@@ -31,7 +31,6 @@ import {
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
-  SandboxProfileSectionDefaultRedirect,
 } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
@@ -84,19 +83,13 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":profileId"
           >
             <Route element={<SandboxProfileDefaultRedirect />} index />
-            <Route handle={ROUTE_HANDLES.sandboxProfilePublished} path="published">
-              <Route
-                element={<SandboxProfileEditorPage mode="edit" view="published" />}
-                path=":sectionId"
-              />
-              <Route element={<SandboxProfileSectionDefaultRedirect view="published" />} index />
-            </Route>
-            <Route handle={ROUTE_HANDLES.sandboxProfileDraft} path="draft">
-              <Route
-                element={<SandboxProfileEditorPage mode="edit" view="draft" />}
-                path=":sectionId"
-              />
-              <Route element={<SandboxProfileSectionDefaultRedirect view="draft" />} index />
+            <Route element={<SandboxProfileEditorPage mode="edit" />}>
+              <Route handle={ROUTE_HANDLES.sandboxProfileEditor} path="sandbox-profile">
+                <Route index />
+                <Route handle={ROUTE_HANDLES.sandboxProfileDraft} path="draft" />
+                <Route handle={ROUTE_HANDLES.sandboxProfilePublished} path="published" />
+              </Route>
+              <Route handle={ROUTE_HANDLES.sandboxProfileSnapshots} path="snapshots" />
             </Route>
           </Route>
         </Route>

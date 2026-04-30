@@ -38,7 +38,6 @@ import {
   SandboxProfileDefaultRedirect,
   SandboxProfileEditorPage,
   SandboxProfileEditorShell,
-  SandboxProfileSectionDefaultRedirect,
   SandboxProfileEditorView,
 } from "./sandbox-profile-editor-page.js";
 
@@ -79,11 +78,7 @@ type SandboxProfileEditorTestVersionState =
   | "published-failed";
 
 type SandboxProfileEditorTestRouteView = "published" | "draft" | "default";
-type SandboxProfileEditorTestRouteSection =
-  | "sandbox-profile"
-  | "snapshot"
-  | "unknown-section"
-  | null;
+type SandboxProfileEditorTestRouteSection = "sandbox-profile" | "snapshot" | null;
 
 function createRunningSnapshotJobFixture(input: {
   id: string;
@@ -390,30 +385,31 @@ function renderSandboxProfileEditor(input?: {
   }
   const resolvedRouteSection =
     input?.routeSection === undefined ? "sandbox-profile" : input.routeSection;
-  const sectionPath = resolvedRouteSection === null ? "" : `/${resolvedRouteSection}`;
+  const sectionPath =
+    resolvedRouteSection === null
+      ? ""
+      : resolvedRouteSection === "snapshot"
+        ? "/snapshots"
+        : resolvedRouteView === "default"
+          ? "/sandbox-profile"
+          : `/sandbox-profile/${resolvedRouteView}`;
   const initialPath =
     resolvedRouteView === "default"
       ? `/sandbox-profiles/${profileId}`
-      : `/sandbox-profiles/${profileId}/${resolvedRouteView}${sectionPath}`;
+      : `/sandbox-profiles/${profileId}${sectionPath}`;
   const router = createMemoryRouter(
     createRoutesFromElements(
       <Route element={<Outlet />} path="/">
         <Route element={<div>Outside page</div>} path="outside" />
         <Route element={<SandboxProfileEditorShell />} path="sandbox-profiles/:profileId">
           <Route element={<SandboxProfileDefaultRedirect />} index />
-          <Route path="published">
-            <Route
-              element={<SandboxProfileEditorPage mode="edit" view="published" />}
-              path=":sectionId"
-            />
-            <Route element={<SandboxProfileSectionDefaultRedirect view="published" />} index />
-          </Route>
-          <Route path="draft">
-            <Route
-              element={<SandboxProfileEditorPage mode="edit" view="draft" />}
-              path=":sectionId"
-            />
-            <Route element={<SandboxProfileSectionDefaultRedirect view="draft" />} index />
+          <Route element={<SandboxProfileEditorPage mode="edit" />}>
+            <Route path="sandbox-profile">
+              <Route index />
+              <Route path="published" />
+              <Route path="draft" />
+            </Route>
+            <Route path="snapshots" />
           </Route>
         </Route>
       </Route>,
@@ -1029,19 +1025,15 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/snapshot`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
-    fireEvent.click(screen.getByRole("button", { name: "Resume editing" }));
 
     expect(screen.getByRole("tab", { name: "Sandbox Profile" }).getAttribute("aria-selected")).toBe(
       "true",
     );
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/draft/sandbox-profile`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
+    expect(screen.getByText("Viewing: Draft")).toBeDefined();
   });
 
   it("does not show the publish success notice again after it is dismissed and the panel remounts", () => {
@@ -1073,9 +1065,7 @@ describe("SandboxProfileEditorPage", () => {
       versionState: "published-pending",
     });
 
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/snapshot`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
     expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
       "true",
     );
@@ -1088,19 +1078,13 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/snapshot`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/sandbox-profile`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
 
     await router.navigate(-1);
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/snapshot`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
   });
 
   it("keeps draft setup script edits across section route changes", async () => {
@@ -1123,15 +1107,13 @@ describe("SandboxProfileEditorPage", () => {
 
     await waitFor(() => {
       expect(screen.queryByText("Leave before draft changes are saved?")).toBeNull();
-      expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/draft/snapshot`);
+      expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
     });
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe(
-        `/sandbox-profiles/${profileId}/draft/sandbox-profile`,
-      );
+      expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
     });
 
     const restoredPanel = screen.getByRole("tabpanel", {
@@ -1171,7 +1153,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(await screen.findByText("Leave before draft changes are saved?")).toBeDefined();
     expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/draft/sandbox-profile`,
+      `/sandbox-profiles/${profileId}/sandbox-profile/draft`,
     );
   });
 
@@ -1184,7 +1166,7 @@ describe("SandboxProfileEditorPage", () => {
       "true",
     );
 
-    await router.navigate(`/sandbox-profiles/${profileId}/published/snapshot`, {
+    await router.navigate(`/sandbox-profiles/${profileId}/snapshots`, {
       state: {
         notice: "publish-success",
       },
@@ -1698,28 +1680,24 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
-  it("redirects the profile default route to published when a published version exists", async () => {
+  it("opens the sandbox profile tab from the profile default route when a published version exists", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
       versionState: "published",
     });
 
     expect(await screen.findByText("Viewing: Published")).toBeDefined();
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/sandbox-profile`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
   });
 
-  it("redirects the profile default route to draft when only a draft exists", async () => {
+  it("opens the sandbox profile tab from the profile default route when only a draft exists", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       view: "default",
       versionState: "draft",
     });
 
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/draft/sandbox-profile`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/sandbox-profile`);
   });
 
   it("redirects the published route to draft when the profile has no published version", async () => {
@@ -1730,7 +1708,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(await screen.findByText("Viewing: Draft")).toBeDefined();
     expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/draft/sandbox-profile`,
+      `/sandbox-profiles/${profileId}/sandbox-profile/draft`,
     );
   });
 
@@ -1742,49 +1720,33 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(await screen.findByText("Viewing: Published")).toBeDefined();
     expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/sandbox-profile`,
+      `/sandbox-profiles/${profileId}/sandbox-profile/published`,
     );
   });
 
-  it("shows the snapshots publish-first state on draft snapshot routes", async () => {
+  it("shows the snapshots publish-first state on the snapshots route", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       routeSection: "snapshot",
       view: "draft",
       versionState: "draft",
     });
 
-    expect(await screen.findByText("Viewing: Draft")).toBeDefined();
-    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/draft/snapshot`);
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
     expect(
       screen.getByText("Publish this sandbox profile before managing snapshots."),
     ).toBeDefined();
   });
 
-  it("redirects draft snapshot routes to the published snapshot when one exists", async () => {
+  it("shows published snapshots without draft route coupling when a draft exists", async () => {
     const { profileId, router } = renderSandboxProfileEditor({
       routeSection: "snapshot",
       view: "draft",
       versionState: "draft-with-published",
     });
 
-    expect(await screen.findByText("Viewing: Published")).toBeDefined();
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/snapshot`,
-    );
+    expect(router.state.location.pathname).toBe(`/sandbox-profiles/${profileId}/snapshots`);
     expect(screen.getByRole("tab", { name: "Snapshots" }).getAttribute("aria-selected")).toBe(
       "true",
-    );
-  });
-
-  it("redirects an unknown section route to the sandbox profile tab", async () => {
-    const { profileId, router } = renderSandboxProfileEditor({
-      routeSection: "unknown-section",
-      versionState: "published",
-    });
-
-    expect(await screen.findByText("Viewing: Published")).toBeDefined();
-    expect(router.state.location.pathname).toBe(
-      `/sandbox-profiles/${profileId}/published/sandbox-profile`,
     );
   });
 

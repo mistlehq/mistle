@@ -4,19 +4,10 @@ import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profil
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 
-export type SandboxProfileBreadcrumbView = "published" | "draft";
+export type SandboxProfileBreadcrumbView = "published" | "draft" | "snapshots";
 
-function resolveSandboxProfileDefaultPath(input: {
-  profileId: string;
-  activeVersion: number | null | undefined;
-}): string {
-  if (input.activeVersion === undefined) {
-    return `/sandbox-profiles/${input.profileId}`;
-  }
-
-  return `/sandbox-profiles/${input.profileId}/${
-    input.activeVersion === null ? "draft" : "published"
-  }`;
+function resolveSandboxProfileDefaultPath(input: { profileId: string }): string {
+  return `/sandbox-profiles/${input.profileId}/sandbox-profile`;
 }
 
 export function SandboxProfileBreadcrumbs(input: {
@@ -35,9 +26,9 @@ export function SandboxProfileBreadcrumbs(input: {
   const profileName = profileQuery.data?.displayName ?? "Profile";
   const profileDefaultPath = resolveSandboxProfileDefaultPath({
     profileId: input.profileId,
-    activeVersion: profileQuery.data?.activeVersion,
   });
-  const viewLabel = input.view === "draft" ? "Draft" : "Published";
+  const viewLabel =
+    input.view === "draft" ? "Draft" : input.view === "published" ? "Published" : "Snapshots";
 
   return (
     <AppBreadcrumbs

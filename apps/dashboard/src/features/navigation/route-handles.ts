@@ -241,6 +241,12 @@ export const ROUTE_HANDLES = {
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
+  sandboxProfileEditor: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Sandbox Profile",
+    title: "Edit profile",
+    description: "Edit sandbox profile configuration.",
+  },
   sandboxProfilePublished: {
     appShellInsetOwner: "child",
     breadcrumb: "Published",
@@ -257,6 +263,15 @@ export const ROUTE_HANDLES = {
     description: "Edit sandbox profile configuration.",
     header: {
       leading: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
+    },
+  },
+  sandboxProfileSnapshots: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Snapshots",
+    title: "Edit profile",
+    description: "Manage sandbox profile snapshots.",
+    header: {
+      leading: (input) => resolveSandboxProfileHeaderLeading(input, "snapshots"),
     },
   },
   automations: {

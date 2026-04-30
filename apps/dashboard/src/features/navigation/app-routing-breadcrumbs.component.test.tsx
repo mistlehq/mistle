@@ -126,15 +126,23 @@ describe("app routing breadcrumb integration", () => {
         <Route element={<PageHarness />} handle={ROUTE_HANDLES.sandboxProfilesNew} path="new" />
         <Route element={<Outlet />} handle={ROUTE_HANDLES.sandboxProfilesDetail} path=":profileId">
           <Route element={<PageHarness />} index />
+          <Route handle={ROUTE_HANDLES.sandboxProfileEditor} path="sandbox-profile">
+            <Route element={<PageHarness />} index />
+            <Route
+              element={<PageHarness />}
+              handle={ROUTE_HANDLES.sandboxProfilePublished}
+              path="published"
+            />
+            <Route
+              element={<PageHarness />}
+              handle={ROUTE_HANDLES.sandboxProfileDraft}
+              path="draft"
+            />
+          </Route>
           <Route
             element={<PageHarness />}
-            handle={ROUTE_HANDLES.sandboxProfilePublished}
-            path="published"
-          />
-          <Route
-            element={<PageHarness />}
-            handle={ROUTE_HANDLES.sandboxProfileDraft}
-            path="draft"
+            handle={ROUTE_HANDLES.sandboxProfileSnapshots}
+            path="snapshots"
           />
         </Route>
       </Route>
@@ -294,11 +302,11 @@ describe("app routing breadcrumb integration", () => {
       updatedAt: "2026-04-23T00:00:00.000Z",
     });
 
-    await router.navigate("/sandbox-profiles/sbp_abc/published");
+    await router.navigate("/sandbox-profiles/sbp_abc/sandbox-profile/published");
     markup = renderRoutingMarkup(router, queryClient);
 
     expectMarkupToContainHref(markup, "/sandbox-profiles");
-    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/published");
+    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/sandbox-profile");
     expect(markup).toContain("Customer Support Sandbox");
     expectMarkupToContainCurrentPageLabel(markup, "Published");
     expectMarkupToContainMetaTitle(markup, "Edit profile");
@@ -314,12 +322,18 @@ describe("app routing breadcrumb integration", () => {
       updatedAt: "2026-04-23T00:00:00.000Z",
     });
 
-    await router.navigate("/sandbox-profiles/sbp_draft/draft");
+    await router.navigate("/sandbox-profiles/sbp_draft/sandbox-profile/draft");
     markup = renderRoutingMarkup(router, queryClient);
 
-    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_draft/draft");
+    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_draft/sandbox-profile");
     expect(markup).toContain("Draft Only Sandbox");
     expectMarkupToContainCurrentPageLabel(markup, "Draft");
+
+    await router.navigate("/sandbox-profiles/sbp_abc/snapshots");
+    markup = renderRoutingMarkup(router, queryClient);
+
+    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/sandbox-profile");
+    expectMarkupToContainCurrentPageLabel(markup, "Snapshots");
   });
 
   it("renders home and sessions breadcrumbs", async () => {

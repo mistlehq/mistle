@@ -34,7 +34,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type Key,
   type ReactNode,
@@ -134,7 +133,6 @@ type SandboxProfileEditorPageProps =
     }
   | {
       mode: "edit";
-      view: SandboxProfileRouteView;
     };
 
 type SandboxProfileEditorSectionId = "sandbox-profile" | "snapshot";
@@ -198,12 +196,34 @@ const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
   notice: "publish-success",
 };
 
+function createSandboxProfileDefaultPath(profileId: string): string {
+  return `/sandbox-profiles/${profileId}/sandbox-profile`;
+}
+
 function createSandboxProfileEditorPath(input: {
   profileId: string;
-  view: SandboxProfileRouteView;
-  sectionId: SandboxProfileEditorSectionId;
+  view?: SandboxProfileRouteView;
 }): string {
-  return `/sandbox-profiles/${input.profileId}/${input.view}/${input.sectionId}`;
+  return input.view === undefined
+    ? createSandboxProfileDefaultPath(input.profileId)
+    : `/sandbox-profiles/${input.profileId}/sandbox-profile/${input.view}`;
+}
+
+function createSandboxProfileSnapshotsPath(profileId: string): string {
+  return `/sandbox-profiles/${profileId}/snapshots`;
+}
+
+function createSandboxProfileTabPath(input: {
+  profileId: string;
+  sectionId: SandboxProfileEditorSectionId;
+  view?: SandboxProfileRouteView;
+}): string {
+  return input.sectionId === SandboxProfileEditorSectionIds.SNAPSHOT
+    ? createSandboxProfileSnapshotsPath(input.profileId)
+    : createSandboxProfileEditorPath({
+        profileId: input.profileId,
+        ...(input.view === undefined ? {} : { view: input.view }),
+      });
 }
 
 function resolveLatestPublishedSandboxProfileVersion(
@@ -279,59 +299,79 @@ function readSandboxProfileEditorNavigationState(
   };
 }
 
-function readSandboxProfileEditorRouteSectionId(
-  value: string | undefined,
-): SandboxProfileEditorSectionId | null {
-  if (isSandboxProfileEditorSectionId(value)) {
-    return value;
+function readSandboxProfileEditorSectionPathSegment(input: {
+  pathname: string;
+  profileId: string;
+}): SandboxProfileEditorSectionId | null {
+  if (
+    input.pathname === createSandboxProfileDefaultPath(input.profileId) ||
+    input.pathname.startsWith(`${createSandboxProfileDefaultPath(input.profileId)}/`)
+  ) {
+    return SandboxProfileEditorSectionIds.SANDBOX_PROFILE;
+  }
+
+  if (input.pathname === createSandboxProfileSnapshotsPath(input.profileId)) {
+    return SandboxProfileEditorSectionIds.SNAPSHOT;
   }
 
   return null;
 }
 
-function isSandboxProfileEditorSectionId(value: unknown): value is SandboxProfileEditorSectionId {
-  return (
-    value === SandboxProfileEditorSectionIds.SANDBOX_PROFILE ||
-    value === SandboxProfileEditorSectionIds.SNAPSHOT
-  );
-}
-
-function readSandboxProfileEditorSectionPathSegment(input: {
+function readSandboxProfileEditorRoute(input: {
   pathname: string;
   profileId: string;
-  view: SandboxProfileRouteView;
-}): SandboxProfileEditorSectionId | null {
-  const prefix = `/sandbox-profiles/${input.profileId}/${input.view}/`;
-  if (!input.pathname.startsWith(prefix)) {
-    return null;
+}): { sectionId: SandboxProfileEditorSectionId; view?: SandboxProfileRouteView } | null {
+  const sandboxProfilePath = createSandboxProfileDefaultPath(input.profileId);
+  if (input.pathname === sandboxProfilePath) {
+    return {
+      sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
+    };
   }
 
-  const sectionId = input.pathname.slice(prefix.length);
-  if (!isSandboxProfileEditorSectionId(sectionId)) {
-    return null;
+  if (input.pathname === `${sandboxProfilePath}/draft`) {
+    return {
+      sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
+      view: "draft",
+    };
   }
 
-  return sectionId;
+  if (input.pathname === `${sandboxProfilePath}/published`) {
+    return {
+      sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
+      view: "published",
+    };
+  }
+
+  if (input.pathname === createSandboxProfileSnapshotsPath(input.profileId)) {
+    return {
+      sectionId: SandboxProfileEditorSectionIds.SNAPSHOT,
+    };
+  }
+
+  return null;
 }
 
 function shouldBlockSandboxProfileEditorUnpersistedChangesNavigation(input: {
   profileId: string;
-  view: SandboxProfileRouteView;
   currentPathname: string;
   nextPathname: string;
 }): boolean {
   const currentSectionId = readSandboxProfileEditorSectionPathSegment({
     pathname: input.currentPathname,
     profileId: input.profileId,
-    view: input.view,
   });
   const nextSectionId = readSandboxProfileEditorSectionPathSegment({
     pathname: input.nextPathname,
     profileId: input.profileId,
-    view: input.view,
   });
 
   return currentSectionId === null || nextSectionId === null;
+}
+
+function resolveDefaultSandboxProfileEditorView(input: {
+  versions: readonly SandboxProfileVersion[];
+}): SandboxProfileRouteView {
+  return input.versions.some((version) => version.state === "draft") ? "draft" : "published";
 }
 
 function shouldRedirectPublishedSandboxProfileViewToDraft(input: {
@@ -348,7 +388,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     return <CreateSandboxProfileEditorPage />;
   }
 
-  return <EditSandboxProfileEditorPage view={props.view} />;
+  return <EditSandboxProfileEditorPage />;
 }
 
 function CreateSandboxProfileEditorPage(): React.JSX.Element {
@@ -580,49 +620,29 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
 export function SandboxProfileDefaultRedirect(): React.JSX.Element {
   const shellContext = useSandboxProfileEditorShellContext();
-  const defaultView = shellContext.profile.activeVersion === null ? "draft" : "published";
 
-  return (
-    <Navigate
-      replace
-      to={createSandboxProfileEditorPath({
-        profileId: shellContext.profileId,
-        view: defaultView,
-        sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
-      })}
-    />
-  );
-}
-
-export function SandboxProfileSectionDefaultRedirect(input: {
-  view: SandboxProfileRouteView;
-}): React.JSX.Element {
-  const shellContext = useSandboxProfileEditorShellContext();
-
-  return (
-    <Navigate
-      replace
-      to={createSandboxProfileEditorPath({
-        profileId: shellContext.profileId,
-        view: input.view,
-        sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
-      })}
-    />
-  );
+  return <Navigate replace to={createSandboxProfileDefaultPath(shellContext.profileId)} />;
 }
 
 function useSandboxProfileEditorShellContext(): SandboxProfileEditorShellContext {
   return useOutletContext<SandboxProfileEditorShellContext>();
 }
 
-function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }): React.JSX.Element {
+function EditSandboxProfileEditorPage(): React.JSX.Element {
   const shellContext = useSandboxProfileEditorShellContext();
   const location = useLocation();
-  const params = useParams();
   const navigationState = readSandboxProfileEditorNavigationState(location.state);
-  const routeSectionId = readSandboxProfileEditorRouteSectionId(params["sectionId"]);
+  const route = readSandboxProfileEditorRoute({
+    pathname: location.pathname,
+    profileId: shellContext.profileId,
+  });
   const publishSuccessMessage = navigationState.notice === "publish-success";
   const navigate = shellContext.navigate;
+  const routeView =
+    route?.view ??
+    resolveDefaultSandboxProfileEditorView({
+      versions: shellContext.versions,
+    });
   const onPublishSuccessNavigationConsumed = useCallback(() => {
     void navigate(location.pathname + location.search, {
       replace: true,
@@ -630,43 +650,18 @@ function EditSandboxProfileEditorPage(input: { view: SandboxProfileRouteView }):
     });
   }, [location.pathname, location.search, navigate]);
 
-  if (routeSectionId === null) {
-    return (
-      <Navigate
-        replace
-        to={createSandboxProfileEditorPath({
-          profileId: shellContext.profileId,
-          view: input.view,
-          sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
-        })}
-      />
-    );
-  }
-
-  if (
-    input.view === "draft" &&
-    routeSectionId === SandboxProfileEditorSectionIds.SNAPSHOT &&
-    resolveLatestPublishedSandboxProfileVersion(shellContext.versions) !== null
-  ) {
-    return (
-      <Navigate
-        replace
-        to={createSandboxProfileEditorPath({
-          profileId: shellContext.profileId,
-          view: "published",
-          sectionId: SandboxProfileEditorSectionIds.SNAPSHOT,
-        })}
-      />
-    );
+  if (route === null) {
+    return <Navigate replace to={createSandboxProfileDefaultPath(shellContext.profileId)} />;
   }
 
   return (
     <LoadedSandboxProfileEditorPage
-      routeSectionId={routeSectionId}
+      routeSectionId={route.sectionId}
       publishSuccessNavigationKey={publishSuccessMessage ? location.key : null}
       onPublishSuccessNavigationConsumed={onPublishSuccessNavigationConsumed}
       publishSuccessMessage={publishSuccessMessage}
-      view={input.view}
+      explicitView={route.view}
+      view={routeView}
       navigate={shellContext.navigate}
       profileId={shellContext.profileId}
       profile={shellContext.profile}
@@ -686,6 +681,7 @@ type LoadedSandboxProfileEditorPageInput = {
   publishSuccessNavigationKey: string | null;
   onPublishSuccessNavigationConsumed: () => void;
   publishSuccessMessage: boolean;
+  explicitView: SandboxProfileRouteView | undefined;
   profileId: string;
   profile: SandboxProfile;
   versions: readonly SandboxProfileVersion[];
@@ -701,7 +697,6 @@ function LoadedSandboxProfileEditorPage(
   input: LoadedSandboxProfileEditorPageInput,
 ): React.JSX.Element {
   const queryClient = useQueryClient();
-  const pendingPublishedSectionIdRef = useRef<SandboxProfileEditorSectionId | null>(null);
   const [versionActionError, setVersionActionError] = useState<string | null>(null);
   const [isDeleteProfileDialogOpen, setIsDeleteProfileDialogOpen] = useState(false);
   const [deleteProfileError, setDeleteProfileError] = useState<string | null>(null);
@@ -731,7 +726,6 @@ function LoadedSandboxProfileEditorPage(
         createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "draft",
-          sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
         }),
       );
     },
@@ -763,7 +757,6 @@ function LoadedSandboxProfileEditorPage(
     },
     onSuccess: async (result) => {
       setVersionActionError(null);
-      pendingPublishedSectionIdRef.current = SandboxProfileEditorSectionIds.SNAPSHOT;
       queryClient.setQueryData<SandboxProfile | undefined>(
         sandboxProfileDetailQueryKey(input.profileId),
         (currentProfile) =>
@@ -783,16 +776,9 @@ function LoadedSandboxProfileEditorPage(
           return nextVersions === undefined ? currentVersions : { versions: nextVersions };
         },
       );
-      void input.navigate(
-        createSandboxProfileEditorPath({
-          profileId: input.profileId,
-          view: "published",
-          sectionId: SandboxProfileEditorSectionIds.SNAPSHOT,
-        }),
-        {
-          state: PublishSuccessNavigationState,
-        },
-      );
+      void input.navigate(createSandboxProfileSnapshotsPath(input.profileId), {
+        state: PublishSuccessNavigationState,
+      });
 
       void Promise.all([
         input.invalidateProfileVersions(input.profileId),
@@ -834,7 +820,6 @@ function LoadedSandboxProfileEditorPage(
         createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "published",
-          sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
         }),
       );
     },
@@ -913,7 +898,6 @@ function LoadedSandboxProfileEditorPage(
     },
   });
   const onPublishSuccessNavigationConsumed = useCallback(() => {
-    pendingPublishedSectionIdRef.current = null;
     input.onPublishSuccessNavigationConsumed();
   }, [input.onPublishSuccessNavigationConsumed]);
 
@@ -930,7 +914,6 @@ function LoadedSandboxProfileEditorPage(
         to={createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "draft",
-          sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
         })}
       />
     );
@@ -942,15 +925,12 @@ function LoadedSandboxProfileEditorPage(
       versions: input.versions,
     })
   ) {
-    const pendingSectionId = pendingPublishedSectionIdRef.current;
     return (
       <Navigate
         replace
-        state={pendingSectionId === null ? undefined : PublishSuccessNavigationState}
         to={createSandboxProfileEditorPath({
           profileId: input.profileId,
           view: "published",
-          sectionId: pendingSectionId ?? SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
         })}
       />
     );
@@ -993,6 +973,7 @@ function LoadedSandboxProfileEditorPage(
       publishSuccessNavigationKey={input.publishSuccessNavigationKey}
       onPublishSuccessNavigationConsumed={onPublishSuccessNavigationConsumed}
       publishSuccessMessage={input.publishSuccessMessage}
+      explicitRouteView={input.explicitView}
       routeView={input.view}
       onViewActive={() => {
         setVersionActionError(null);
@@ -1000,7 +981,6 @@ function LoadedSandboxProfileEditorPage(
           createSandboxProfileEditorPath({
             profileId: input.profileId,
             view: "published",
-            sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
           }),
         );
       }}
@@ -1010,7 +990,6 @@ function LoadedSandboxProfileEditorPage(
           createSandboxProfileEditorPath({
             profileId: input.profileId,
             view: "draft",
-            sectionId: SandboxProfileEditorSectionIds.SANDBOX_PROFILE,
           }),
         );
       }}
@@ -1072,6 +1051,7 @@ function ReadySandboxProfileEditorPage(input: {
   publishSuccessNavigationKey: string | null;
   onPublishSuccessNavigationConsumed: () => void;
   publishSuccessMessage: boolean;
+  explicitRouteView: SandboxProfileRouteView | undefined;
   routeView: SandboxProfileRouteView;
   versionActionError: string | null;
   versionActionIsPending: boolean;
@@ -1135,11 +1115,10 @@ function ReadySandboxProfileEditorPage(input: {
     ({ currentLocation, nextLocation }) =>
       shouldBlockSandboxProfileEditorUnpersistedChangesNavigation({
         profileId: input.profileId,
-        view: input.routeView,
         currentPathname: currentLocation.pathname,
         nextPathname: nextLocation.pathname,
       }),
-    [input.profileId, input.routeView],
+    [input.profileId],
   );
 
   useEffect(() => {
@@ -1210,11 +1189,28 @@ function ReadySandboxProfileEditorPage(input: {
         void handlePublish(version);
       }}
       onActiveSectionIdChange={(sectionId) => {
+        if (
+          sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE &&
+          input.explicitRouteView === undefined
+        ) {
+          void input.navigate(createSandboxProfileEditorPath({ profileId: input.profileId }));
+          return;
+        }
+
+        const view =
+          sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE
+            ? input.explicitRouteView
+            : input.routeView;
+
+        if (view === undefined) {
+          throw new Error("Sandbox profile tab navigation view could not be resolved.");
+        }
+
         void input.navigate(
-          createSandboxProfileEditorPath({
+          createSandboxProfileTabPath({
             profileId: input.profileId,
-            view: input.routeView,
             sectionId,
+            view,
           }),
         );
       }}
