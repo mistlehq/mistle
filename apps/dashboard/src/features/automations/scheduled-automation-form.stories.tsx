@@ -1,0 +1,246 @@
+import {
+  Field,
+  FieldContent,
+  FieldHeader,
+  FieldLabel,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@mistle/ui";
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useState } from "react";
+
+import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { FormPageFrame } from "../shared/page-frame.js";
+import { validateScheduledAutomationFormValues } from "./scheduled-automation-form-helpers.js";
+import {
+  ScheduledAutomationForm,
+  type ScheduledAutomationFormOption,
+  type ScheduledAutomationFormValueKey,
+  type ScheduledAutomationFormValues,
+} from "./scheduled-automation-form.js";
+
+const SandboxProfileOptions: readonly ScheduledAutomationFormOption[] = [
+  {
+    value: "sbp_repo_maintainer",
+    label: "Repo Maintainer",
+  },
+  {
+    value: "sbp_finance_investigator",
+    label: "Finance Investigator",
+  },
+];
+
+const PrimaryRepositoryOptions: readonly ScheduledAutomationFormOption[] = [
+  {
+    value: "__workspace_root__",
+    label: "None",
+    path: "workspace root",
+  },
+  {
+    value: "mistlehq/platform",
+    label: "mistlehq/platform",
+    path: "/root/mistlehq/platform",
+  },
+  {
+    value: "mistlehq/dashboard",
+    label: "mistlehq/dashboard",
+    path: "/root/mistlehq/dashboard",
+  },
+];
+
+const EmptyCreateValues: ScheduledAutomationFormValues = {
+  name: "",
+  sandboxProfileId: "",
+  primaryRepositoryId: "",
+  enabled: true,
+  cronExpression: "0 9 * * *",
+  timezone: "Asia/Singapore",
+  inputTemplate: "",
+};
+
+const ExistingAutomationValues: ScheduledAutomationFormValues = {
+  name: "Daily repository triage",
+  sandboxProfileId: "sbp_repo_maintainer",
+  primaryRepositoryId: "mistlehq/platform",
+  enabled: true,
+  cronExpression: "0 9 * * 1-5",
+  timezone: "Asia/Singapore",
+  inputTemplate: "Review open pull requests and summarize anything blocked.",
+};
+
+function StoryHarness(input: {
+  mode: "create" | "edit";
+  values: ScheduledAutomationFormValues;
+  fieldErrors?: Partial<Record<ScheduledAutomationFormValueKey, string>>;
+  validationSummaryError?: string | null;
+  formError?: string | null;
+  isSaving?: boolean;
+  isDeleting?: boolean;
+  onDelete?: (() => void) | null;
+  primaryRepositoryOptions?: readonly ScheduledAutomationFormOption[];
+  sandboxProfileOptions?: readonly ScheduledAutomationFormOption[];
+  enableSubmitValidation?: boolean;
+}): React.JSX.Element {
+  const [values, setValues] = useState(input.values);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<ScheduledAutomationFormValueKey, string>>
+  >({
+    ...(input.fieldErrors ?? {}),
+  });
+  const [validationSummaryError, setValidationSummaryError] = useState<string | null>(
+    input.validationSummaryError ?? null,
+  );
+  const pageTitle = input.mode === "create" ? "Create automation" : "";
+
+  return (
+    <FormPageFrame title={pageTitle}>
+      <ScheduledAutomationForm
+        fieldErrors={fieldErrors}
+        formError={input.formError ?? null}
+        validationSummaryError={validationSummaryError}
+        isDeleting={input.isDeleting ?? false}
+        isSaving={input.isSaving ?? false}
+        automationTypeField={
+          input.mode === "create" ? <AutomationTypeField value="scheduled" /> : undefined
+        }
+        mode={input.mode}
+        onDelete={input.onDelete ?? null}
+        onSubmit={() => {
+          if (input.enableSubmitValidation !== true) {
+            return;
+          }
+
+          const nextFieldErrors = validateScheduledAutomationFormValues(values);
+          setFieldErrors(nextFieldErrors);
+          setValidationSummaryError(
+            Object.keys(nextFieldErrors).length > 0
+              ? "Please address the fields highlighted in red."
+              : null,
+          );
+        }}
+        onValueChange={(key, value) => {
+          setValues((currentValues) => ({
+            ...currentValues,
+            [key]: value,
+          }));
+          if (input.enableSubmitValidation === true) {
+            setFieldErrors({});
+            setValidationSummaryError(null);
+          }
+        }}
+        {...(input.primaryRepositoryOptions === undefined
+          ? {}
+          : { primaryRepositoryOptions: input.primaryRepositoryOptions })}
+        sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
+        values={values}
+      />
+    </FormPageFrame>
+  );
+}
+
+function AutomationTypeField(input: { value: "trigger" | "scheduled" }): React.JSX.Element {
+  const label = input.value === "scheduled" ? "Scheduled" : "Trigger";
+
+  return (
+    <Field orientation="horizontal">
+      <FieldHeader>
+        <FieldLabel>Automation type</FieldLabel>
+      </FieldHeader>
+      <FieldContent>
+        <Select value={input.value}>
+          <SelectTrigger>
+            <SelectValue>{label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="trigger">Trigger</SelectItem>
+            <SelectItem value="scheduled">Scheduled</SelectItem>
+          </SelectContent>
+        </Select>
+      </FieldContent>
+    </Field>
+  );
+}
+
+const meta = {
+  title: "Dashboard/Automations/ScheduledAutomation/Form",
+  component: StoryHarness,
+  decorators: [withDashboardPageStory],
+  parameters: {
+    layout: "fullscreen",
+  },
+} satisfies Meta<typeof StoryHarness>;
+
+export default meta;
+
+type Story = StoryObj<typeof meta>;
+
+export const CreatePageLayout: Story = {
+  args: {
+    mode: "create",
+    values: EmptyCreateValues,
+  },
+};
+
+export const EditPageLayout: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: ExistingAutomationValues,
+  },
+};
+
+export const WithPrimaryRepositorySelection: Story = {
+  args: {
+    mode: "create",
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: {
+      ...EmptyCreateValues,
+      sandboxProfileId: "sbp_repo_maintainer",
+      primaryRepositoryId: "mistlehq/platform",
+    },
+  },
+};
+
+export const InvalidCronPreview: Story = {
+  args: {
+    mode: "create",
+    values: {
+      ...EmptyCreateValues,
+      cronExpression: "not a cron expression",
+    },
+  },
+};
+
+export const ValidationErrors: Story = {
+  args: {
+    mode: "create",
+    validationSummaryError: "Please address the fields highlighted in red.",
+    fieldErrors: {
+      name: "Automation name is required.",
+      sandboxProfileId: "Select a sandbox profile.",
+      cronExpression: "Cron expression is required.",
+      timezone: "Timezone is required.",
+      inputTemplate: "User message is required.",
+    },
+    values: {
+      ...EmptyCreateValues,
+      cronExpression: "",
+      timezone: "",
+    },
+  },
+};
+
+export const Saving: Story = {
+  args: {
+    mode: "edit",
+    isDeleting: false,
+    isSaving: true,
+    onDelete: function onDelete() {},
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: ExistingAutomationValues,
+  },
+};
