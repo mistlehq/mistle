@@ -96,7 +96,6 @@ type IntegrationsSectionState = NonNullable<
   SandboxProfileEditorPageStoryArgs["integrationsSectionState"]
 >;
 type StorySectionId = "sandbox-profile" | "snapshot";
-type StoryIntegrationSetupSectionId = "integrations" | "resources-and-tools";
 
 const StorySections = [
   {
@@ -514,13 +513,11 @@ function StoryCronExpressionBreakdownList(input: {
 }
 
 function renderUnavailableIntegrationsSectionPanel(input: {
-  sectionId: StoryIntegrationSetupSectionId;
   state: IntegrationsSectionState;
 }): React.JSX.Element {
   return (
     <SandboxProfilePanelSection>
       <SandboxProfileIntegrationsSetupUnavailableState
-        activeSectionId={input.sectionId}
         integrationBindingsError={
           input.state.bindingsErrorMessage === undefined
             ? null
@@ -670,7 +667,6 @@ function SandboxProfileEditorPageStoryView(
           if (sectionId === "sandbox-profile") {
             if (input.integrationsSectionState !== undefined) {
               return renderUnavailableIntegrationsSectionPanel({
-                sectionId: "integrations",
                 state: input.integrationsSectionState,
               });
             }

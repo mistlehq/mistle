@@ -6,8 +6,8 @@ import { AppBreadcrumbs } from "./app-breadcrumbs.js";
 
 export type SandboxProfileBreadcrumbView = "published" | "draft" | "snapshots";
 
-function resolveSandboxProfileDefaultPath(input: { profileId: string }): string {
-  return `/sandbox-profiles/${input.profileId}/sandbox-profile`;
+function resolveSandboxProfileDefaultPath(profileId: string): string {
+  return `/sandbox-profiles/${profileId}/sandbox-profile`;
 }
 
 export function SandboxProfileBreadcrumbs(input: {
@@ -24,9 +24,7 @@ export function SandboxProfileBreadcrumbs(input: {
     retry: false,
   });
   const profileName = profileQuery.data?.displayName ?? "Profile";
-  const profileDefaultPath = resolveSandboxProfileDefaultPath({
-    profileId: input.profileId,
-  });
+  const profileDefaultPath = resolveSandboxProfileDefaultPath(input.profileId);
   const viewLabel =
     input.view === "draft" ? "Draft" : input.view === "published" ? "Published" : "Snapshots";
 

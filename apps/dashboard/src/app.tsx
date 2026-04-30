@@ -85,11 +85,23 @@ export const APP_ROUTES = createRoutesFromElements(
             <Route element={<SandboxProfileDefaultRedirect />} index />
             <Route element={<SandboxProfileEditorPage mode="edit" />}>
               <Route handle={ROUTE_HANDLES.sandboxProfileEditor} path="sandbox-profile">
-                <Route index />
-                <Route handle={ROUTE_HANDLES.sandboxProfileDraft} path="draft" />
-                <Route handle={ROUTE_HANDLES.sandboxProfilePublished} path="published" />
+                <Route element={<RouteOutlet />} index />
+                <Route
+                  element={<RouteOutlet />}
+                  handle={ROUTE_HANDLES.sandboxProfileDraft}
+                  path="draft"
+                />
+                <Route
+                  element={<RouteOutlet />}
+                  handle={ROUTE_HANDLES.sandboxProfilePublished}
+                  path="published"
+                />
               </Route>
-              <Route handle={ROUTE_HANDLES.sandboxProfileSnapshots} path="snapshots" />
+              <Route
+                element={<RouteOutlet />}
+                handle={ROUTE_HANDLES.sandboxProfileSnapshots}
+                path="snapshots"
+              />
             </Route>
           </Route>
         </Route>

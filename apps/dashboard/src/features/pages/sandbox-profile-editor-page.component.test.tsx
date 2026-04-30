@@ -405,11 +405,11 @@ function renderSandboxProfileEditor(input?: {
           <Route element={<SandboxProfileDefaultRedirect />} index />
           <Route element={<SandboxProfileEditorPage mode="edit" />}>
             <Route path="sandbox-profile">
-              <Route index />
-              <Route path="published" />
-              <Route path="draft" />
+              <Route element={<Outlet />} index />
+              <Route element={<Outlet />} path="published" />
+              <Route element={<Outlet />} path="draft" />
             </Route>
-            <Route path="snapshots" />
+            <Route element={<Outlet />} path="snapshots" />
           </Route>
         </Route>
       </Route>,

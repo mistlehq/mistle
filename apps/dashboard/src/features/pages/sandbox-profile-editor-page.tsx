@@ -169,7 +169,6 @@ type SandboxProfileDraftSectionState = {
   integrationRows?: readonly SandboxProfileBindingEditorRow[] | null;
   isSaving: boolean;
 };
-type SandboxProfileIntegrationSetupSectionId = "integrations" | "resources-and-tools";
 
 function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSectionState {
   return {
@@ -189,10 +188,6 @@ const SandboxProfileEditorSectionIds = {
   SANDBOX_PROFILE: "sandbox-profile",
   SNAPSHOT: "snapshot",
 } satisfies Record<string, SandboxProfileEditorSectionId>;
-const SandboxProfileIntegrationSetupSectionIds = {
-  INTEGRATIONS: "integrations",
-  RESOURCES_AND_TOOLS: "resources-and-tools",
-} satisfies Record<string, SandboxProfileIntegrationSetupSectionId>;
 const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
   notice: "publish-success",
 };
@@ -2112,7 +2107,6 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
     return (
       <SandboxProfilePanelSection>
         <SandboxProfileIntegrationsSetupUnavailableState
-          activeSectionId={SandboxProfileIntegrationSetupSectionIds.INTEGRATIONS}
           integrationBindingsError={
             showBindingsUnavailableNotice ? input.loader.integrationBindingsQuery.error : null
           }
@@ -2147,14 +2141,13 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
 }
 
 export function SandboxProfileIntegrationsSetupUnavailableState(input: {
-  activeSectionId: SandboxProfileIntegrationSetupSectionId;
   integrationBindingsError: unknown;
   integrationDirectoryError: unknown;
   isPending: boolean;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
-      {input.isPending && input.activeSectionId !== "resources-and-tools" ? (
+      {input.isPending ? (
         <div
           aria-live="polite"
           className="text-muted-foreground flex items-center gap-2 text-sm"
