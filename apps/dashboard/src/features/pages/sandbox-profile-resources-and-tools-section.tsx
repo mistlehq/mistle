@@ -1,6 +1,7 @@
 import { Checkbox, DetailLabel } from "@mistle/ui";
 import { useDebouncedValue } from "@tanstack/react-pacer";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -9,14 +10,7 @@ import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
-import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { sandboxProfileIntegrationDirectoryQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  ResponsiveFieldList,
-  ResponsiveFieldListCell,
-  type ResponsiveFieldListColumn,
-  ResponsiveFieldListRow,
-} from "../shared/responsive-field-list.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -26,27 +20,9 @@ import {
   resolveBindingConfigSummaryItems,
   resolveBindingToolToggleModel,
 } from "./sandbox-profile-binding-config-editor.js";
-import { resolveRowBindingMetadata } from "./sandbox-profile-binding-shared.js";
 
 const SearchDebounceMs = 300;
-
-const ToolBindingsColumns = [
-  { key: "integration", label: "Integration", desktopWidth: "minmax(0,12rem)" },
-  { key: "tools", label: "Tools", desktopWidth: "minmax(0,1fr)" },
-  {
-    key: "actions",
-    label: <span className="sr-only">Actions</span>,
-    desktopWidth: "auto",
-    align: "end",
-    hideMobileLabel: true,
-  },
-] satisfies readonly ResponsiveFieldListColumn[];
-
-function resolveGitBindingRow(
-  rows: readonly SandboxProfileBindingEditorRow[],
-): SandboxProfileBindingEditorRow | null {
-  return rows.find((row) => row.kind === "git") ?? null;
-}
+const SandboxProfileResourcesAndToolsSimpleControlClassName = "flex min-h-9 items-center";
 
 function resolveRepositorySummary(
   connection: IntegrationConnectionSummary | undefined,
@@ -241,8 +217,67 @@ function RepositoryResourcesPicker(input: {
   );
 }
 
-function ToolBindingsSection(input: {
-  rows: readonly SandboxProfileBindingEditorRow[];
+function BindingToolsControl(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  onRowChange: (
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ) => void;
+  disabled?: boolean | undefined;
+}): ReactNode {
+  const toolToggleModel = resolveBindingToolToggleModel({
+    row: input.row,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
+  });
+
+  if (toolToggleModel.mode !== "supported") {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {toolToggleModel.options.map((option) => (
+        <label className="flex min-h-9 items-center gap-2 text-sm" key={option.value}>
+          <Checkbox
+            aria-label={option.label}
+            checked={option.checked}
+            disabled={input.disabled === true}
+            onCheckedChange={(checked) => {
+              if (input.disabled === true) {
+                return;
+              }
+
+              input.onRowChange(input.row.clientId, {
+                config: {
+                  ...toolToggleModel.config,
+                  tools:
+                    checked === true
+                      ? toolToggleModel.options
+                          .filter(
+                            (candidate) => candidate.checked || candidate.value === option.value,
+                          )
+                          .map((candidate) => candidate.value)
+                      : toolToggleModel.options
+                          .filter(
+                            (candidate) => candidate.checked && candidate.value !== option.value,
+                          )
+                          .map((candidate) => candidate.value),
+                },
+              });
+            }}
+          />
+          <span>{option.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+export function SandboxProfileBindingResourcesAndToolsCell(input: {
+  row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   onRowChange: (
@@ -251,202 +286,72 @@ function ToolBindingsSection(input: {
   ) => void;
   disabled?: boolean | undefined;
 }): React.JSX.Element {
-  const toolRows = input.rows.filter((row) => {
-    const toolToggleModel = resolveBindingToolToggleModel({
-      row,
-      connections: input.availableConnections,
-      targets: input.availableTargets,
-    });
-
-    return toolToggleModel.mode === "supported";
+  const connection = input.availableConnections.find(
+    (candidate) => candidate.id === input.row.connectionId,
+  );
+  const target =
+    connection === undefined
+      ? undefined
+      : input.availableTargets.find((candidate) => candidate.targetKey === connection.targetKey);
+  const issue =
+    connection === undefined
+      ? "missing-connection"
+      : target === undefined
+        ? "missing-target"
+        : null;
+  const summaryItems = resolveBindingConfigSummaryItems({
+    row: input.row,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
+    excludedPropertyKeys: ["repositories", "tools"],
+    maxItems: 3,
   });
 
-  if (toolRows.length === 0) {
+  if (issue === "missing-connection") {
     return (
-      <p className="text-muted-foreground text-sm">
-        Choose integrations with CLI tools in Integrations before selecting tools here.
-      </p>
+      <div className={SandboxProfileResourcesAndToolsSimpleControlClassName}>
+        <p className="text-destructive text-sm">Connection cannot be found.</p>
+      </div>
+    );
+  }
+
+  if (issue === "missing-target") {
+    return (
+      <div className={SandboxProfileResourcesAndToolsSimpleControlClassName}>
+        <p className="text-destructive text-sm">Integration no longer available.</p>
+      </div>
     );
   }
 
   return (
-    <ResponsiveFieldList columns={ToolBindingsColumns}>
-      {toolRows.map((row) => {
-        const toolToggleModel = resolveBindingToolToggleModel({
-          row,
-          connections: input.availableConnections,
-          targets: input.availableTargets,
-        });
-        const rowMetadata = resolveRowBindingMetadata({
-          row,
-          availableConnections: input.availableConnections,
-          availableTargets: input.availableTargets,
-        });
-        const summaryItems = resolveBindingConfigSummaryItems({
-          row,
-          connections: input.availableConnections,
-          targets: input.availableTargets,
-          excludedPropertyKeys: ["tools", "repositories"],
-          maxItems: 3,
-        });
-
-        if (toolToggleModel.mode !== "supported") {
-          return null;
-        }
-
-        return (
-          <ResponsiveFieldListRow className="py-4" key={row.clientId}>
-            <ResponsiveFieldListCell columnKey="integration">
-              <div className="flex items-center gap-2 text-sm">
-                {rowMetadata?.target?.logoKey === undefined ? null : (
-                  <img
-                    alt=""
-                    className="h-5 w-5 rounded-sm"
-                    src={resolveIntegrationLogoPath({ logoKey: rowMetadata.target.logoKey })}
-                  />
-                )}
-                <div className="min-w-0 truncate font-medium">
-                  {rowMetadata?.target?.displayName ?? "Integration"}
-                </div>
-              </div>
-            </ResponsiveFieldListCell>
-            <ResponsiveFieldListCell columnKey="tools">
-              <div className="flex flex-col gap-2">
-                {summaryItems.length === 0 ? null : (
-                  <div className="mb-1 flex flex-col gap-2">
-                    {summaryItems.map((item) => (
-                      <div className="flex min-w-0 flex-col gap-0.5" key={item.label}>
-                        <DetailLabel as="p">{item.label}</DetailLabel>
-                        <p className="text-sm">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {toolToggleModel.options.map((option) => (
-                  <label className="flex items-center gap-2 text-sm" key={option.value}>
-                    <Checkbox
-                      aria-label={option.label}
-                      checked={option.checked}
-                      disabled={input.disabled === true}
-                      onCheckedChange={(checked) => {
-                        if (input.disabled === true) {
-                          return;
-                        }
-
-                        input.onRowChange(row.clientId, {
-                          config: {
-                            ...toolToggleModel.config,
-                            tools:
-                              checked === true
-                                ? toolToggleModel.options
-                                    .filter(
-                                      (candidate) =>
-                                        candidate.checked || candidate.value === option.value,
-                                    )
-                                    .map((candidate) => candidate.value)
-                                : toolToggleModel.options
-                                    .filter(
-                                      (candidate) =>
-                                        candidate.checked && candidate.value !== option.value,
-                                    )
-                                    .map((candidate) => candidate.value),
-                          },
-                        });
-                      }}
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </ResponsiveFieldListCell>
-            <ResponsiveFieldListCell columnKey="actions" />
-          </ResponsiveFieldListRow>
-        );
-      })}
-    </ResponsiveFieldList>
-  );
-}
-
-export function SandboxProfileResourcesAndToolsSection(input: {
-  rows: readonly SandboxProfileBindingEditorRow[];
-  availableConnections: readonly IntegrationConnectionSummary[];
-  availableTargets: readonly IntegrationTargetSummary[];
-  onRowChange: (
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ) => void;
-  disabled?: boolean | undefined;
-}): React.JSX.Element {
-  const gitRow = resolveGitBindingRow(input.rows);
-  const gitConnection =
-    gitRow === null
-      ? undefined
-      : input.availableConnections.find((connection) => connection.id === gitRow.connectionId);
-  const gitTarget =
-    gitConnection === undefined
-      ? undefined
-      : input.availableTargets.find((target) => target.targetKey === gitConnection.targetKey);
-  const gitIssue =
-    gitRow === null
-      ? null
-      : gitConnection === undefined
-        ? "missing-connection"
-        : gitTarget === undefined
-          ? "missing-target"
-          : null;
-  const gitSummaryItems =
-    gitRow === null
-      ? []
-      : resolveBindingConfigSummaryItems({
-          row: gitRow,
-          connections: input.availableConnections,
-          targets: input.availableTargets,
-          excludedPropertyKeys: ["repositories", "tools"],
-        });
-
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <DetailLabel as="p">Repository Resources</DetailLabel>
-        {gitIssue !== null ? (
-          <p className="text-destructive text-sm">
-            Fix the Git provider in Integrations before selecting repository resources.
-          </p>
-        ) : gitRow === null || gitConnection === undefined ? (
-          <p className="text-muted-foreground text-sm">
-            Choose a Git provider in Integrations before selecting repository resources.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <RepositoryResourcesPicker
-              connection={gitConnection}
-              disabled={input.disabled}
-              onRowChange={input.onRowChange}
-              row={gitRow}
-            />
-            {gitSummaryItems.length === 0 ? null : (
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {gitSummaryItems.map((item) => (
-                  <div className="flex flex-col gap-1" key={item.label}>
-                    <DetailLabel as="p">{item.label}</DetailLabel>
-                    <p className="text-sm">{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-col gap-3">
-        <ToolBindingsSection
-          availableConnections={input.availableConnections}
-          availableTargets={input.availableTargets}
+    <div className="flex min-w-0 flex-col gap-3">
+      {input.row.kind === "git" && connection !== undefined ? (
+        <RepositoryResourcesPicker
+          connection={connection}
           disabled={input.disabled}
           onRowChange={input.onRowChange}
-          rows={input.rows}
+          row={input.row}
         />
-      </div>
+      ) : null}
+
+      {summaryItems.length === 0 ? null : (
+        <div className="grid grid-cols-1 gap-2">
+          {summaryItems.map((item) => (
+            <div className="flex min-w-0 flex-col gap-1" key={item.label}>
+              <DetailLabel as="p">{item.label}</DetailLabel>
+              <p className="text-sm">{item.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <BindingToolsControl
+        availableConnections={input.availableConnections}
+        availableTargets={input.availableTargets}
+        disabled={input.disabled}
+        onRowChange={input.onRowChange}
+        row={input.row}
+      />
     </div>
   );
 }

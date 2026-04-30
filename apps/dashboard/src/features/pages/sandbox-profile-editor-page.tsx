@@ -121,7 +121,6 @@ import {
   useCreateSandboxProfileMetaState,
   useEditSandboxProfileMetaState,
 } from "./sandbox-profile-meta-state.js";
-import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resources-and-tools-section.js";
 import {
   useLoadedSandboxProfileSetupScriptState,
   useSandboxProfileSetupScriptLoader,
@@ -1309,7 +1308,7 @@ function SandboxProfileEditorSectionPanels(input: {
         version={input.mode.version}
         invalidateVersionBindings={input.invalidateVersionBindings}
       />
-      <SandboxProfilePanelSection title="Configurations">
+      <SandboxProfilePanelSection>
         <LoadedSandboxProfileSetupScriptSection
           disabled={input.draftFieldsAreDisabled}
           key={`${input.profileId}:${String(input.mode.version)}:setup-script`}
@@ -1328,16 +1327,8 @@ function SandboxProfileEditorSectionPanels(input: {
   );
 }
 
-export function SandboxProfilePanelSection(input: {
-  title: string;
-  children: ReactNode;
-}): React.JSX.Element {
-  return (
-    <section className="flex flex-col gap-4">
-      <h2 className="text-base font-semibold leading-6">{input.title}</h2>
-      {input.children}
-    </section>
-  );
+export function SandboxProfilePanelSection(input: { children: ReactNode }): React.JSX.Element {
+  return <section className="flex flex-col gap-4">{input.children}</section>;
 }
 
 const SandboxProfileEditorTabs = [
@@ -2109,7 +2100,7 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
     input.loader.integrationDirectoryQuery.isError
   ) {
     return (
-      <SandboxProfilePanelSection title="Integrations">
+      <SandboxProfilePanelSection>
         <SandboxProfileIntegrationsSetupUnavailableState
           activeSectionId={SandboxProfileIntegrationSetupSectionIds.INTEGRATIONS}
           integrationBindingsError={
@@ -2223,7 +2214,7 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
 
   return (
     <>
-      <SandboxProfilePanelSection title="Integrations">
+      <SandboxProfilePanelSection>
         <SandboxProfileIntegrationsSetupSection
           availableConnections={integrationsState.availableConnections}
           availableTargets={integrationsState.availableTargets}
@@ -2240,15 +2231,6 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
           onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
           onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
           onIntegrationSaveErrorDismiss={integrationsState.onIntegrationSaveErrorDismiss}
-        />
-      </SandboxProfilePanelSection>
-      <SandboxProfilePanelSection title="Resources & Tools">
-        <SandboxProfileResourcesAndToolsSection
-          availableConnections={integrationsState.availableConnections}
-          availableTargets={integrationsState.availableTargets}
-          disabled={input.disabled}
-          onRowChange={integrationsState.onIntegrationBindingRowChange}
-          rows={integrationsState.integrationRows}
         />
       </SandboxProfilePanelSection>
     </>

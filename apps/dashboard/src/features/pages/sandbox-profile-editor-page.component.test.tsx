@@ -777,10 +777,10 @@ describe("SandboxProfileEditorPage", () => {
       "bg-muted/30",
     );
     expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain("flex-1");
-    expect(screen.getByRole("heading", { name: "Integrations" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Resources & Tools" })).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Configurations" })).toBeDefined();
-    expect(screen.getByText("Repository Resources")).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Integrations" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Resources & Tools" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Configurations" })).toBeNull();
+    expect(screen.getAllByText("Resources & Tools").length).toBeGreaterThan(0);
     expect(screen.getByRole("textbox", { name: "Setup script" })).toBeDefined();
   });
 
@@ -1380,16 +1380,17 @@ describe("SandboxProfileEditorPage", () => {
     ]);
   });
 
-  it("shows resources guidance when no git provider is configured", () => {
+  it("keeps resources and tools inline with the integration rows", () => {
     renderSandboxProfileEditor();
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
+    expect(screen.getAllByText("Resources & Tools").length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
+      screen.queryByText(
         "Choose a Git provider in Integrations before selecting repository resources.",
       ),
-    ).toBeDefined();
+    ).toBeNull();
   });
 
   it("shows stale git guidance when a persisted git binding cannot be resolved", () => {
@@ -1406,11 +1407,7 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Sandbox Profile" }));
 
-    expect(
-      screen.getByText(
-        "Fix the Git provider in Integrations before selecting repository resources.",
-      ),
-    ).toBeDefined();
+    expect(screen.getAllByText("Connection cannot be found.").length).toBeGreaterThan(0);
   });
 
   it("shows no loading placeholder in resources and tools while integrations are loading", () => {

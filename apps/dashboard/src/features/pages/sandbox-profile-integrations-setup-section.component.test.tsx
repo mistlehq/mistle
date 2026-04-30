@@ -98,7 +98,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     expect(
       screen.getByText("Remove or replace integrations where the connection cannot be found."),
     ).toBeDefined();
-    expect(screen.getByText("Integration no longer available.")).toBeDefined();
+    expect(screen.getAllByText("Integration no longer available.").length).toBeGreaterThan(0);
   });
 
   it("keeps stale git provider bindings visible so they can be removed", () => {
@@ -144,7 +144,7 @@ describe("SandboxProfileIntegrationsSetupSection", () => {
     );
 
     expect(screen.getByText("Some integrations need attention")).toBeDefined();
-    expect(screen.getByText("Integration no longer available.")).toBeDefined();
+    expect(screen.getAllByText("Integration no longer available.").length).toBeGreaterThan(0);
   });
 
   it("dismisses save failure notices", () => {

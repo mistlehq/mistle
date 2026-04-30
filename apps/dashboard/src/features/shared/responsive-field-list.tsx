@@ -108,6 +108,7 @@ export function ResponsiveFieldListRow(input: {
   children: ReactNode;
   className?: string;
   gapClassName?: string;
+  gridClassName?: string;
   isLastRow?: boolean;
   status?: ReactNode;
   statusClassName?: string;
@@ -126,6 +127,7 @@ export function ResponsiveFieldListRow(input: {
         className={cn(
           "grid md:items-center md:grid-cols-[var(--responsive-field-list-grid-template)]",
           input.gapClassName ?? "gap-4",
+          input.gridClassName,
         )}
         data-slot="responsive-field-list-row-grid"
         style={gridStyle}

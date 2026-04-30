@@ -60,7 +60,6 @@ import {
 import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-sections.js";
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
-import { SandboxProfileResourcesAndToolsSection } from "./sandbox-profile-resources-and-tools-section.js";
 
 type SandboxProfileEditorPageStoryArgs = {
   displayName: string;
@@ -509,7 +508,7 @@ function renderUnavailableIntegrationsSectionPanel(input: {
   state: IntegrationsSectionState;
 }): React.JSX.Element {
   return (
-    <SandboxProfilePanelSection title="Integrations">
+    <SandboxProfilePanelSection>
       <SandboxProfileIntegrationsSetupUnavailableState
         activeSectionId={input.sectionId}
         integrationBindingsError={
@@ -668,7 +667,7 @@ function SandboxProfileEditorPageStoryView(
 
             return (
               <div className="flex w-full flex-col gap-8">
-                <SandboxProfilePanelSection title="Integrations">
+                <SandboxProfilePanelSection>
                   <SandboxProfileIntegrationsSetupSection
                     availableConnections={input.availableConnections ?? StoryIntegrationConnections}
                     availableTargets={input.availableTargets ?? StoryIntegrationTargets}
@@ -714,22 +713,7 @@ function SandboxProfileEditorPageStoryView(
                     }}
                   />
                 </SandboxProfilePanelSection>
-                <SandboxProfilePanelSection title="Resources & Tools">
-                  <SandboxProfileResourcesAndToolsSection
-                    availableConnections={input.availableConnections ?? StoryIntegrationConnections}
-                    availableTargets={input.availableTargets ?? StoryIntegrationTargets}
-                    disabled={!isEditable}
-                    onRowChange={(clientId, changes) => {
-                      setIntegrationRows((currentRows) =>
-                        currentRows.map((row) =>
-                          row.clientId === clientId ? { ...row, ...changes } : row,
-                        ),
-                      );
-                    }}
-                    rows={integrationRows}
-                  />
-                </SandboxProfilePanelSection>
-                <SandboxProfilePanelSection title="Configurations">
+                <SandboxProfilePanelSection>
                   <SandboxProfileSetupScriptPanel
                     onBlur={handleSetupScriptBlur}
                     onChange={setSetupScriptDraft}
