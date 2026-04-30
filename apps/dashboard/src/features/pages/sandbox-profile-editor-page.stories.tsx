@@ -398,9 +398,7 @@ function SandboxProfileEditorPageStoryView(
     snapshotRefreshScheduleState,
   );
   const storySections = createStorySections({
-    showMissingSnapshotAlert: shouldShowMissingSnapshotAlert({
-      snapshotState: snapshotPanelState,
-    }),
+    showMissingSnapshotAlert: shouldShowMissingSnapshotAlert(snapshotPanelState),
   });
 
   return (

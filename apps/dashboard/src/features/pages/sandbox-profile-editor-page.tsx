@@ -1162,7 +1162,6 @@ function ReadySandboxProfileEditorPage(input: {
           profileId={input.profileId}
           publishSuccessMessage={showPublishSuccessMessage}
           publishSuccessMessageKey={publishSuccessNoticeKey}
-          refreshSchedule={input.currentVersion?.refreshSchedule ?? null}
           setupScriptLoader={setupScriptLoader}
           snapshotPanelState={snapshotPanelState}
           snapshotVersion={snapshotVersion}
@@ -1190,7 +1189,6 @@ function SandboxProfileEditorSectionPanels(input: {
   profileId: string;
   publishSuccessMessage: boolean;
   publishSuccessMessageKey: Key;
-  refreshSchedule: SandboxProfileVersion["refreshSchedule"];
   setupScriptLoader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   snapshotPanelState: SnapshotPanelState;
   snapshotVersion: SandboxProfileVersion | null;
@@ -1272,9 +1270,7 @@ function createSandboxProfileEditorSections(input: {
           sideLabel: (
             <span className="inline-flex items-center gap-1.5">
               <span>Snapshots</span>
-              {shouldShowMissingSnapshotAlert({
-                snapshotState: input.snapshotState,
-              }) ? (
+              {shouldShowMissingSnapshotAlert(input.snapshotState) ? (
                 <WarningCircleIcon
                   aria-hidden="true"
                   className="size-4 shrink-0 text-destructive"

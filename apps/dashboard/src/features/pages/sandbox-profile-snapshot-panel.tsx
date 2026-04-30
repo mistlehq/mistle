@@ -105,10 +105,8 @@ export function resolveSnapshotPanelState(
   };
 }
 
-export function shouldShowMissingSnapshotAlert(input: {
-  snapshotState: SnapshotPanelState;
-}): boolean {
-  return input.snapshotState.kind === "no-snapshot";
+export function shouldShowMissingSnapshotAlert(snapshotState: SnapshotPanelState): boolean {
+  return snapshotState.kind === "no-snapshot";
 }
 
 export function SandboxProfileSnapshotPanel(input: {
@@ -340,7 +338,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   );
 }
 
-export function SandboxProfileSnapshotRefreshScheduleForm(input: {
+function SandboxProfileSnapshotRefreshScheduleForm(input: {
   disabled: boolean;
   existingSchedule: SnapshotRefreshSchedule;
   initialDraft?: {
