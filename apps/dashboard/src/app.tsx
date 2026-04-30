@@ -33,6 +33,7 @@ import {
   SandboxProfileEditorShell,
 } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
+import { ScheduledAutomationEditorPage } from "./features/pages/scheduled-automation-editor-page.js";
 import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
 import { WebhookAutomationEditorPage } from "./features/pages/webhook-automation-editor-page.js";
@@ -111,6 +112,16 @@ export const APP_ROUTES = createRoutesFromElements(
             element={<WebhookAutomationEditorPage mode="create" />}
             handle={ROUTE_HANDLES.automationsNew}
             path="new"
+          />
+          <Route
+            element={<ScheduledAutomationEditorPage mode="create" />}
+            handle={ROUTE_HANDLES.scheduledAutomationsNew}
+            path="schedules/new"
+          />
+          <Route
+            element={<ScheduledAutomationEditorPage mode="edit" />}
+            handle={ROUTE_HANDLES.scheduledAutomationsDetail}
+            path="schedules/:automationId"
           />
           <Route
             element={<WebhookAutomationEditorPage mode="edit" />}

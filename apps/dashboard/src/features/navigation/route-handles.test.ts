@@ -54,13 +54,19 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfileDraft.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
-    expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
+    expect(ROUTE_HANDLES.automations.description).toBe("Manage automations.");
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
     expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.scheduledAutomationsNew.title).toBe("Create scheduled automation");
+    expect(ROUTE_HANDLES.scheduledAutomationsNew.description).toBe("");
+    expect(ROUTE_HANDLES.scheduledAutomationsNew.appShellInsetOwner).toBe("child");
+    expect(ROUTE_HANDLES.scheduledAutomationsDetail.title).toBe("");
+    expect(ROUTE_HANDLES.scheduledAutomationsDetail.description).toBe("");
+    expect(ROUTE_HANDLES.scheduledAutomationsDetail.appShellInsetOwner).toBe("child");
 
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
     expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");

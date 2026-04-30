@@ -74,16 +74,27 @@ export function AutomationsPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-row items-start justify-between gap-3">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row">
         <h1 className="text-xl font-semibold">Automations</h1>
-        <Button
-          onClick={() => {
-            void navigate("/automations/new");
-          }}
-          type="button"
-        >
-          Create
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button
+            onClick={() => {
+              void navigate("/automations/new");
+            }}
+            type="button"
+            variant="outline"
+          >
+            Create webhook
+          </Button>
+          <Button
+            onClick={() => {
+              void navigate("/automations/schedules/new");
+            }}
+            type="button"
+          >
+            Create scheduled
+          </Button>
+        </div>
       </div>
 
       {automationsQuery.isPending ? null : (

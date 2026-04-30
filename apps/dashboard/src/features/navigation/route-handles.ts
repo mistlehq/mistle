@@ -277,7 +277,7 @@ export const ROUTE_HANDLES = {
   automations: {
     breadcrumb: "Automations",
     title: "Automations",
-    description: "Manage webhook automations.",
+    description: "Manage automations.",
   },
   automationsNew: {
     appShellInsetOwner: "child",
@@ -286,6 +286,18 @@ export const ROUTE_HANDLES = {
     description: "",
   },
   automationsDetail: {
+    appShellInsetOwner: "child",
+    breadcrumb: resolveAutomationDetailBreadcrumb,
+    title: "",
+    description: "",
+  },
+  scheduledAutomationsNew: {
+    appShellInsetOwner: "child",
+    breadcrumb: "Create scheduled",
+    title: "Create scheduled automation",
+    description: "",
+  },
+  scheduledAutomationsDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,
     title: "",
