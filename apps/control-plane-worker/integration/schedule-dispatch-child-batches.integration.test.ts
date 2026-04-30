@@ -1,6 +1,7 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationKinds,
+  automationTargets,
   automations,
   CONTROL_PLANE_SCHEMA_NAME,
   createControlPlaneDatabase,
@@ -21,7 +22,11 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
-import { ScheduleDispatchBatchWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import {
+  HandleAutomationRunWorkflowSpec,
+  ScheduleDispatchBatchWorkflowSpec,
+} from "@mistle/workflow-registry/control-plane";
+import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -43,6 +48,18 @@ function createDispatchTestContext(input: { db: ReturnType<typeof createControlP
       serviceToken: "unused-schedule-dispatch-test-token",
     }),
     defaultBaseImage: "test-default-base-image",
+  };
+}
+
+function createDispatchTestContextWithWorkflow(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
+}) {
+  return {
+    ...createDispatchTestContext({
+      db: input.db,
+    }),
+    openWorkflow: input.openWorkflow,
   };
 }
 
@@ -90,6 +107,11 @@ async function seedAutomationSchedule(input: {
   organizationId: string;
   automationId: string;
   scheduleId: string;
+  automationEnabled?: boolean;
+  includeAutomationTarget?: boolean;
+  includeScheduleAutomation?: boolean;
+  scheduleDeletedAt?: string | null;
+  scheduleEnabled?: boolean;
 }) {
   await input.db.insert(organizations).values({
     id: input.organizationId,
@@ -99,10 +121,25 @@ async function seedAutomationSchedule(input: {
   await input.db.insert(automations).values({
     id: input.automationId,
     organizationId: input.organizationId,
-    kind: AutomationKinds.WEBHOOK,
+    kind: AutomationKinds.SCHEDULE,
     name: input.automationId,
-    enabled: true,
+    enabled: input.automationEnabled ?? true,
   });
+  if (input.includeAutomationTarget ?? false) {
+    const sandboxProfileId = `sbp_${input.automationId}`;
+    await input.db.insert(sandboxProfiles).values({
+      id: sandboxProfileId,
+      organizationId: input.organizationId,
+      displayName: sandboxProfileId,
+      status: "active",
+    });
+    await input.db.insert(automationTargets).values({
+      id: `atg_${input.automationId}`,
+      automationId: input.automationId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+    });
+  }
   await input.db.insert(schedules).values({
     id: input.scheduleId,
     organizationId: input.organizationId,
@@ -110,16 +147,19 @@ async function seedAutomationSchedule(input: {
     name: input.scheduleId,
     cronExpression: "0 9 * * *",
     timezone: "Asia/Singapore",
-    enabled: true,
+    enabled: input.scheduleEnabled ?? true,
     nextScheduledAt: "2026-04-29T01:00:00.000Z",
+    deletedAt: input.scheduleDeletedAt,
   });
-  await input.db.insert(scheduleAutomations).values({
-    scheduleId: input.scheduleId,
-    automationId: input.automationId,
-    inputTemplate: "{}",
-    conversationKeyTemplate: `conversation-${input.scheduleId}`,
-    idempotencyKeyTemplate: `idempotency-${input.scheduleId}`,
-  });
+  if (input.includeScheduleAutomation ?? true) {
+    await input.db.insert(scheduleAutomations).values({
+      scheduleId: input.scheduleId,
+      automationId: input.automationId,
+      inputTemplate: "{}",
+      conversationKeyTemplate: `conversation-${input.scheduleId}`,
+      idempotencyKeyTemplate: `idempotency-${input.scheduleId}`,
+    });
+  }
 }
 
 async function seedScheduledAction(input: {
@@ -134,6 +174,7 @@ async function seedScheduledAction(input: {
   scheduledAt?: string;
   targetWorkflowId?: string | null;
   targetWorkflowStartedAt?: string | null;
+  targetPayloadAutomationId?: string;
 }) {
   await input.db.insert(scheduledActions).values({
     id: input.id,
@@ -141,7 +182,7 @@ async function seedScheduledAction(input: {
     organizationId: input.organizationId,
     targetType: ScheduleTargetTypes.AUTOMATION_RUN,
     targetPayload: {
-      automationId: "atm_schedule_batch_claim",
+      automationId: input.targetPayloadAutomationId ?? "atm_schedule_batch_claim",
     },
     scheduledAt: input.scheduledAt ?? "2026-04-28T01:00:00.000Z",
     localScheduledDate: "2026-04-28",
@@ -658,49 +699,283 @@ describe("schedule dispatch child batches", () => {
     }
   });
 
-  it("fails the child action path without terminal failure when a known target has no handler", async ({
+  it("creates one automation run and starts the automation run workflow for scheduled automation actions", async ({
     fixture,
   }) => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
+    const backend = await createControlPlaneBackend({
+      url: fixture.databaseStack.directUrl,
+      namespaceId: fixture.config.workflow.namespaceId,
+      runMigrations: false,
+    });
+    const openWorkflow = createControlPlaneOpenWorkflow({
+      backend,
+    });
 
     try {
       await seedAutomationSchedule({
         db: database.db,
-        organizationId: "org_schedule_batch_missing_handler",
+        organizationId: "org_schedule_batch_automation_run",
         automationId: "atm_schedule_batch_claim",
-        scheduleId: "sch_schedule_batch_missing_handler",
+        scheduleId: "sch_schedule_batch_automation_run",
+        includeAutomationTarget: true,
       });
       await seedScheduledAction({
         db: database.db,
-        id: "sca_schedule_batch_missing_handler",
-        organizationId: "org_schedule_batch_missing_handler",
-        scheduleId: "sch_schedule_batch_missing_handler",
+        id: "sca_schedule_batch_automation_run",
+        organizationId: "org_schedule_batch_automation_run",
+        scheduleId: "sch_schedule_batch_automation_run",
       });
 
-      await expect(
-        dispatchScheduledAction(createDispatchTestContext({ db: database.db }), {
-          scheduledActionId: "sca_schedule_batch_missing_handler",
-          dispatchClaimKey: "schedule-dispatch-batch:missing-handler",
-          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      const result = await dispatchScheduledAction(
+        createDispatchTestContextWithWorkflow({
+          db: database.db,
+          openWorkflow,
         }),
-      ).rejects.toThrow(
-        `No schedule dispatch target handler is registered for ${ScheduleTargetTypes.AUTOMATION_RUN}.`,
+        {
+          scheduledActionId: "sca_schedule_batch_automation_run",
+          dispatchClaimKey: "schedule-dispatch-batch:automation-run",
+          staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+        },
+      );
+
+      expect(result).toEqual({
+        scheduledActionId: "sca_schedule_batch_automation_run",
+        status: "dispatched",
+      });
+
+      const automationRunsForAction = await database.db.query.automationRuns.findMany({
+        where: (table, { eq }) =>
+          eq(table.sourceScheduledActionId, "sca_schedule_batch_automation_run"),
+      });
+      expect(automationRunsForAction).toHaveLength(1);
+      expect(automationRunsForAction[0]).toEqual(
+        expect.objectContaining({
+          automationId: "atm_schedule_batch_claim",
+          automationTargetId: "atg_atm_schedule_batch_claim",
+          status: "queued",
+          sourceScheduledActionId: "sca_schedule_batch_automation_run",
+        }),
+      );
+
+      const workflowRuns = await backend.listWorkflowRuns({
+        limit: 20,
+      });
+      const automationRunWorkflow = workflowRuns.data.find(
+        (workflowRun) =>
+          workflowRun.workflowName === HandleAutomationRunWorkflowSpec.name &&
+          workflowRun.idempotencyKey === automationRunsForAction[0]?.id,
+      );
+      expect(automationRunWorkflow).toEqual(
+        expect.objectContaining({
+          workflowName: HandleAutomationRunWorkflowSpec.name,
+          status: "pending",
+          input: {
+            automationRunId: automationRunsForAction[0]?.id,
+          },
+        }),
       );
 
       const persistedAction = await database.db.query.scheduledActions.findFirst({
-        where: (table, { eq }) => eq(table.id, "sca_schedule_batch_missing_handler"),
+        where: (table, { eq }) => eq(table.id, "sca_schedule_batch_automation_run"),
       });
       expect(persistedAction).toEqual(
         expect.objectContaining({
-          status: ScheduledActionStatuses.DISPATCHING,
-          dispatchClaimKey: "schedule-dispatch-batch:missing-handler",
-          failedAt: null,
-          failureCode: null,
+          status: ScheduledActionStatuses.DISPATCHED,
+          dispatchClaimKey: "schedule-dispatch-batch:automation-run",
+          targetWorkflowId: automationRunWorkflow?.id,
         }),
       );
+      expect(persistedAction?.dispatchedAt).not.toBeNull();
     } finally {
+      await backend.stop();
+      await database.stop();
+    }
+  });
+
+  it("reuses the automation run and workflow when retrying the same scheduled automation action", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+    const backend = await createControlPlaneBackend({
+      url: fixture.databaseStack.directUrl,
+      namespaceId: fixture.config.workflow.namespaceId,
+      runMigrations: false,
+    });
+    const openWorkflow = createControlPlaneOpenWorkflow({
+      backend,
+    });
+
+    try {
+      await seedAutomationSchedule({
+        db: database.db,
+        organizationId: "org_schedule_batch_automation_retry",
+        automationId: "atm_schedule_batch_claim",
+        scheduleId: "sch_schedule_batch_automation_retry",
+        includeAutomationTarget: true,
+      });
+      await seedScheduledAction({
+        db: database.db,
+        id: "sca_schedule_batch_automation_retry",
+        organizationId: "org_schedule_batch_automation_retry",
+        scheduleId: "sch_schedule_batch_automation_retry",
+      });
+
+      const context = createDispatchTestContextWithWorkflow({
+        db: database.db,
+        openWorkflow,
+      });
+      await dispatchScheduledAction(context, {
+        scheduledActionId: "sca_schedule_batch_automation_retry",
+        dispatchClaimKey: "schedule-dispatch-batch:automation-retry",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
+      await database.db
+        .update(scheduledActions)
+        .set({
+          status: ScheduledActionStatuses.DISPATCHING,
+          dispatchedAt: null,
+          targetWorkflowId: null,
+          targetWorkflowStartedAt: null,
+        })
+        .where(eq(scheduledActions.id, "sca_schedule_batch_automation_retry"));
+
+      await dispatchScheduledAction(context, {
+        scheduledActionId: "sca_schedule_batch_automation_retry",
+        dispatchClaimKey: "schedule-dispatch-batch:automation-retry",
+        staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+      });
+
+      const automationRunsForAction = await database.db.query.automationRuns.findMany({
+        where: (table, { eq }) =>
+          eq(table.sourceScheduledActionId, "sca_schedule_batch_automation_retry"),
+      });
+      expect(automationRunsForAction).toHaveLength(1);
+
+      const workflowRuns = await backend.listWorkflowRuns({
+        limit: 20,
+      });
+      const matchingWorkflowRuns = workflowRuns.data.filter(
+        (workflowRun) =>
+          workflowRun.workflowName === HandleAutomationRunWorkflowSpec.name &&
+          workflowRun.idempotencyKey === automationRunsForAction[0]?.id,
+      );
+      expect(matchingWorkflowRuns).toHaveLength(1);
+    } finally {
+      await backend.stop();
+      await database.stop();
+    }
+  });
+
+  it("marks deterministic scheduled automation handoff failures as terminal", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+    const backend = await createControlPlaneBackend({
+      url: fixture.databaseStack.directUrl,
+      namespaceId: fixture.config.workflow.namespaceId,
+      runMigrations: false,
+    });
+    const openWorkflow = createControlPlaneOpenWorkflow({
+      backend,
+    });
+
+    try {
+      const cases = [
+        {
+          id: "missing_target",
+          seed: {
+            includeScheduleAutomation: false,
+          },
+          expectedFailureCode: "schedule_automation_not_found",
+        },
+        {
+          id: "disabled_automation",
+          seed: {
+            automationEnabled: false,
+            includeAutomationTarget: true,
+          },
+          expectedFailureCode: "automation_disabled",
+        },
+        {
+          id: "disabled_schedule",
+          seed: {
+            includeAutomationTarget: true,
+            scheduleEnabled: false,
+          },
+          expectedFailureCode: "schedule_disabled",
+        },
+        {
+          id: "deleted_schedule",
+          seed: {
+            includeAutomationTarget: true,
+            scheduleDeletedAt: "2026-04-28T00:00:00.000Z",
+          },
+          expectedFailureCode: "schedule_deleted",
+        },
+        {
+          id: "missing_automation_target",
+          seed: {},
+          expectedFailureCode: "automation_target_not_found",
+        },
+      ] as const;
+
+      for (const testCase of cases) {
+        const organizationId = `org_schedule_batch_${testCase.id}`;
+        const automationId = `atm_schedule_batch_${testCase.id}`;
+        const scheduleId = `sch_schedule_batch_${testCase.id}`;
+        const scheduledActionId = `sca_schedule_batch_${testCase.id}`;
+        await seedAutomationSchedule({
+          db: database.db,
+          organizationId,
+          automationId,
+          scheduleId,
+          ...testCase.seed,
+        });
+        await seedScheduledAction({
+          db: database.db,
+          id: scheduledActionId,
+          organizationId,
+          scheduleId,
+          targetPayloadAutomationId: automationId,
+        });
+
+        const result = await dispatchScheduledAction(
+          createDispatchTestContextWithWorkflow({
+            db: database.db,
+            openWorkflow,
+          }),
+          {
+            scheduledActionId,
+            dispatchClaimKey: `schedule-dispatch-batch:${testCase.id}`,
+            staleDispatchingBefore: new Date("2026-04-28T01:00:00.000Z"),
+          },
+        );
+
+        expect(result).toEqual({
+          scheduledActionId,
+          status: "failed",
+        });
+
+        const persistedAction = await database.db.query.scheduledActions.findFirst({
+          where: (table, { eq }) => eq(table.id, scheduledActionId),
+        });
+        expect(persistedAction).toEqual(
+          expect.objectContaining({
+            status: ScheduledActionStatuses.FAILED,
+            failureCode: testCase.expectedFailureCode,
+          }),
+        );
+        expect(persistedAction?.failedAt).not.toBeNull();
+      }
+    } finally {
+      await backend.stop();
       await database.stop();
     }
   });
