@@ -117,6 +117,56 @@ describe("control-plane schedules integration", () => {
       );
       await pool.query(
         `
+          insert into control_plane.schedules
+            (
+              id,
+              organization_id,
+              target_type,
+              name,
+              cron_expression,
+              timezone,
+              enabled,
+              next_scheduled_at
+            )
+          values ($1, $2, $3, $4, $5, $6, $7, $8)
+        `,
+        [
+          "sch_schedule_test_duplicate_automation",
+          "org_schedule_test",
+          "automation_run",
+          "Duplicate Automation Schedule",
+          "0 10 * * *",
+          "Asia/Singapore",
+          true,
+          "2026-04-28T02:00:00.000Z",
+        ],
+      );
+      const duplicateScheduleAutomationError = await capturePgErrorCode(
+        pool.query(
+          `
+            insert into control_plane.schedule_automations
+              (
+                schedule_id,
+                automation_id,
+                input_template,
+                conversation_key_template
+              )
+            values ($1, $2, $3, $4)
+          `,
+          [
+            "sch_schedule_test_duplicate_automation",
+            "atm_schedule_test",
+            "{}",
+            "conversation-{{schedule.id}}",
+          ],
+        ),
+      );
+      assertPgUniqueViolation(
+        duplicateScheduleAutomationError,
+        "duplicate schedule automation automation_id insert",
+      );
+      await pool.query(
+        `
           insert into control_plane.sandbox_profile_snapshot_refresh_schedule_targets
             (schedule_id, sandbox_profile_id, sandbox_profile_version)
           values ($1, $2, $3)
@@ -294,6 +344,147 @@ describe("control-plane schedules integration", () => {
         "duplicate snapshot job scheduled action source insert",
       );
 
+      await pool.query(
+        `
+          insert into control_plane.automation_conversations
+            (
+              id,
+              organization_id,
+              owner_kind,
+              owner_id,
+              created_by_kind,
+              created_by_id,
+              sandbox_profile_id,
+              integration_family_id,
+              runtime_id,
+              conversation_key,
+              status
+            )
+          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `,
+        [
+          "cnv_schedule_test",
+          "org_schedule_test",
+          "automation_target",
+          "atg_schedule_test",
+          "schedule",
+          "atm_schedule_test",
+          "sbp_schedule_test",
+          "openai",
+          "codex",
+          "schedule-test",
+          "active",
+        ],
+      );
+      await pool.query(
+        `
+          insert into control_plane.automation_targets
+            (id, automation_id, sandbox_profile_id, sandbox_profile_version)
+          values ($1, $2, $3, $4)
+        `,
+        ["atg_schedule_test", "atm_schedule_test", "sbp_schedule_test", 1],
+      );
+      await pool.query(
+        `
+          insert into control_plane.automation_runs
+            (id, automation_id, automation_target_id, conversation_id)
+          values ($1, $2, $3, $4)
+        `,
+        [
+          "aru_schedule_test_delivery",
+          "atm_schedule_test",
+          "atg_schedule_test",
+          "cnv_schedule_test",
+        ],
+      );
+      await pool.query(
+        `
+          insert into control_plane.automation_conversation_delivery_tasks
+            (
+              id,
+              conversation_id,
+              automation_run_id,
+              source_scheduled_action_id,
+              source_order_key
+            )
+          values ($1, $2, $3, $4, $5)
+        `,
+        [
+          "cdt_schedule_test_scheduled_source",
+          "cnv_schedule_test",
+          "aru_schedule_test_delivery",
+          "sca_schedule_test_one",
+          "2026-04-28T01:00:00.000Z:sca_schedule_test_one",
+        ],
+      );
+
+      await pool.query(
+        `
+          insert into control_plane.automation_runs
+            (id, automation_id, automation_target_id, conversation_id)
+          values ($1, $2, $3, $4), ($5, $6, $7, $8)
+        `,
+        [
+          "aru_schedule_test_delivery_without_source",
+          "atm_schedule_test",
+          "atg_schedule_test",
+          "cnv_schedule_test",
+          "aru_schedule_test_delivery_with_two_sources",
+          "atm_schedule_test",
+          "atg_schedule_test",
+          "cnv_schedule_test",
+        ],
+      );
+      const deliveryTaskWithoutSourceError = await capturePgErrorCode(
+        pool.query(
+          `
+            insert into control_plane.automation_conversation_delivery_tasks
+              (id, conversation_id, automation_run_id, source_order_key)
+            values ($1, $2, $3, $4)
+          `,
+          [
+            "cdt_schedule_test_no_source",
+            "cnv_schedule_test",
+            "aru_schedule_test_delivery_without_source",
+            "2026-04-28T01:00:00.000Z:no_source",
+          ],
+        ),
+      );
+      assertPgCheckViolation(
+        deliveryTaskWithoutSourceError,
+        "delivery task without a source insert",
+      );
+
+      await insertWebhookDeliverySourceFixtures(pool);
+      const deliveryTaskWithTwoSourcesError = await capturePgErrorCode(
+        pool.query(
+          `
+            insert into control_plane.automation_conversation_delivery_tasks
+              (
+                id,
+                conversation_id,
+                automation_run_id,
+                source_webhook_event_id,
+                source_scheduled_action_id,
+                source_order_key
+              )
+            values ($1, $2, $3, $4, $5, $6)
+          `,
+          [
+            "cdt_schedule_test_two_sources",
+            "cnv_schedule_test",
+            "aru_schedule_test_delivery_with_two_sources",
+            "iwe_schedule_test",
+            "sca_schedule_test_one",
+            "2026-04-28T01:00:00.000Z:two_sources",
+          ],
+        ),
+      );
+      assertPgCheckViolation(
+        deliveryTaskWithTwoSourcesError,
+        "delivery task with two sources insert",
+      );
+
       const scheduleAutomationColumnsResult = await pool.query<{ column_name: string }>(
         `
           select column_name
@@ -350,6 +541,102 @@ async function insertScheduleTestFixtures(pool: Pool): Promise<void> {
       values ($1, $2, $3, $4)
     `,
     ["sbp_schedule_test", 1, "published", "2026-04-01T00:00:00.000Z"],
+  );
+}
+
+async function insertWebhookDeliverySourceFixtures(pool: Pool): Promise<void> {
+  await pool.query(
+    `
+      insert into control_plane.integration_targets
+        (target_key, family_id, variant_id, enabled, config)
+      values ($1, $2, $3, $4, $5)
+    `,
+    [
+      "github-cloud-schedule-test",
+      "github",
+      "github-cloud",
+      true,
+      {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    ],
+  );
+  await pool.query(
+    `
+      insert into control_plane.integration_connections
+        (
+          id,
+          organization_id,
+          target_key,
+          display_name,
+          status,
+          external_subject_id,
+          config
+        )
+      values ($1, $2, $3, $4, $5, $6, $7)
+    `,
+    [
+      "icn_schedule_test",
+      "org_schedule_test",
+      "github-cloud-schedule-test",
+      "Schedule Test Connection",
+      "active",
+      "subject-schedule-test",
+      {},
+    ],
+  );
+  await pool.query(
+    `
+      insert into control_plane.integration_webhook_sources
+        (
+          id,
+          organization_id,
+          integration_connection_id,
+          target_key,
+          endpoint_key,
+          status
+        )
+      values ($1, $2, $3, $4, $5, $6)
+    `,
+    [
+      "iws_schedule_test",
+      "org_schedule_test",
+      "icn_schedule_test",
+      "github-cloud-schedule-test",
+      "endpoint-schedule-test",
+      "active",
+    ],
+  );
+  await pool.query(
+    `
+      insert into control_plane.integration_webhook_events
+        (
+          id,
+          organization_id,
+          integration_connection_id,
+          integration_webhook_source_id,
+          target_key,
+          external_event_id,
+          provider_event_type,
+          event_type,
+          payload,
+          status
+        )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `,
+    [
+      "iwe_schedule_test",
+      "org_schedule_test",
+      "icn_schedule_test",
+      "iws_schedule_test",
+      "github-cloud-schedule-test",
+      "evt-schedule-test",
+      "issue_comment",
+      "github.issue_comment.created",
+      {},
+      "processed",
+    ],
   );
 }
 
@@ -414,6 +701,14 @@ function assertPgUniqueViolation(errorCode: string | undefined, context: string)
   if (errorCode !== "23505") {
     throw new Error(
       `Expected ${context} to fail with Postgres unique violation 23505, got '${errorCode ?? "no_error"}'.`,
+    );
+  }
+}
+
+function assertPgCheckViolation(errorCode: string | undefined, context: string): void {
+  if (errorCode !== "23514") {
+    throw new Error(
+      `Expected ${context} to fail with Postgres check violation 23514, got '${errorCode ?? "no_error"}'.`,
     );
   }
 }
