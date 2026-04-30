@@ -7,6 +7,7 @@ import {
   SlackAppManifestBotScopes,
   SlackAppManifestTemplate,
 } from "./manifest.js";
+import { SlackAppInstallationSetupPath } from "./provider-app-setup-routes.js";
 
 const SlackOAuthAccessSuccessResponseSchema = z
   .object({
@@ -83,7 +84,7 @@ const SlackAppManifestTemplateRedirectUrls = new Set(
 );
 
 const MistleOwnedSlackRedirectUrlPaths = new Set([
-  "/p/integration/callbacks/setup/slack-app-installation",
+  SlackAppInstallationSetupPath,
   "/p/identity-linking/callbacks/slack",
 ]);
 
@@ -120,10 +121,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 export function buildSlackAppInstallationCompleteUrl(input: {
   controlPlaneBaseUrl: string;
 }): string {
-  return buildUrlWithPath(
-    input.controlPlaneBaseUrl,
-    "/p/integration/callbacks/setup/slack-app-installation",
-  );
+  return buildUrlWithPath(input.controlPlaneBaseUrl, SlackAppInstallationSetupPath);
 }
 
 export function buildSlackAppManifestCreateUrl(input: { apiBaseUrl: string }): string {

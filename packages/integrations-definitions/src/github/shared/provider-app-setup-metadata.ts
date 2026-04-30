@@ -6,6 +6,11 @@ import type {
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 
+import {
+  GitHubAppInstallationCallbackRouteKey,
+  GitHubAppInstallationSetupPath,
+} from "./provider-app-setup-routes.js";
+
 type GitHubProviderAppSetupMetadataOptions = {
   supportsClientSecret: boolean;
 };
@@ -92,7 +97,7 @@ export function createGitHubProviderAppSetupMetadata(
       secretFields,
       startAction: {
         expectedResultKind: "redirect",
-        routeSegment: "github-app-installation",
+        routeSegment: GitHubAppInstallationCallbackRouteKey,
         startErrorMessage: "Could not start GitHub App installation.",
         unexpectedResultMessage: "GitHub App installation setup did not return a redirect URL.",
         pendingLabel: "Starting install...",
@@ -110,7 +115,7 @@ export function createGitHubProviderAppSetupMetadata(
         "Copy these URLs into your GitHub App settings so Mistle can receive installation callbacks and webhook events.",
       setupCallback: {
         label: "Post-installation setup URL",
-        path: "/p/integration/callbacks/setup/github-app-installation",
+        path: GitHubAppInstallationSetupPath,
       },
       webhookCallback: {
         label: "Webhook callback URL",

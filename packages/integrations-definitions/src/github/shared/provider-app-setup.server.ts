@@ -17,6 +17,10 @@ import {
 } from "./app-manifest.js";
 import type { GitHubConnectionConfig } from "./auth.js";
 import { parseGitHubAppInstallationConnectionConfig } from "./auth.js";
+import {
+  GitHubAppInstallationCallbackRouteKey,
+  GitHubAppManifestCallbackRouteKey,
+} from "./provider-app-setup-routes.js";
 import { GitHubCredentialSlotKeys } from "./slot-keys.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
@@ -118,8 +122,8 @@ export function createGitHubProviderAppSetupCapability(
   return {
     flows: [
       {
-        additionalCallbackRouteKeys: ["github-app-installation"],
-        callbackRouteKey: "github-app-manifest",
+        additionalCallbackRouteKeys: [GitHubAppInstallationCallbackRouteKey],
+        callbackRouteKey: GitHubAppManifestCallbackRouteKey,
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         requiresWebhookCallbackUrl: true,
         routeSegment: "github-app",
@@ -156,7 +160,7 @@ export function createGitHubProviderAppSetupCapability(
           };
         },
         async complete(input) {
-          if (input.callbackRouteKey === "github-app-installation") {
+          if (input.callbackRouteKey === GitHubAppInstallationCallbackRouteKey) {
             return completeGitHubAppInstallation({
               connectionConfig: input.connection.config,
               query: input.query,
@@ -191,9 +195,9 @@ export function createGitHubProviderAppSetupCapability(
         },
       },
       {
-        callbackRouteKey: "github-app-installation",
+        callbackRouteKey: GitHubAppInstallationCallbackRouteKey,
         methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        routeSegment: "github-app-installation",
+        routeSegment: GitHubAppInstallationCallbackRouteKey,
         async start(input) {
           const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connection.config);
           for (const secret of options.requiredInstallationSecrets) {

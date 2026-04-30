@@ -22,6 +22,7 @@ import {
   GitHubProviderAppSetupPane,
   GitHubProviderAppSetupStartForm,
 } from "../../shared/provider-app-setup-metadata.js";
+import { GitHubAppInstallationSetupPath } from "../../shared/provider-app-setup-routes.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
@@ -107,7 +108,7 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
             ],
             hideWebhookSourceSection: true,
             includeWebhookCallbackUrl: true,
-            postInstallationSetupPath: "/p/integration/callbacks/setup/github-app-installation",
+            postInstallationSetupPath: GitHubAppInstallationSetupPath,
           },
         },
         createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
