@@ -114,6 +114,11 @@ import {
   useSandboxProfileSetupScriptLoader,
 } from "./sandbox-profile-setup-script-state.js";
 import {
+  SandboxProfileSetupScriptTestButton,
+  SandboxProfileSetupScriptTestPanel,
+  useSandboxProfileSetupScriptTestRun,
+} from "./sandbox-profile-setup-script-test.js";
+import {
   SandboxProfileSnapshotPanel,
   resolveSnapshotPanelState,
   shouldShowMissingSnapshotAlert,
@@ -1233,6 +1238,7 @@ function SandboxProfileEditorSectionPanels(input: {
           profileId={input.profileId}
           invalidateVersionSetupScript={input.invalidateVersionSetupScript}
           onDraftStateChange={input.onSetupScriptDraftStateChange}
+          isDraft={input.mode.kind === "draft"}
           version={input.mode.version}
         />
       </SandboxProfilePanelSection>
@@ -1767,6 +1773,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   integrationRows: readonly SandboxProfileBindingEditorRow[] | null;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  isDraft: boolean;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   if (input.loader.setupScriptQuery.isPending) {
@@ -1790,6 +1797,7 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   return (
     <ReadySandboxProfileSetupScriptSection
       invalidateVersionSetupScript={input.invalidateVersionSetupScript}
+      isDraft={input.isDraft}
       profileId={input.profileId}
       disabled={input.disabled}
       integrationRows={input.integrationRows}
@@ -1809,6 +1817,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
   integrationRows: readonly SandboxProfileBindingEditorRow[] | null;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
+  isDraft: boolean;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const setupScriptState = useLoadedSandboxProfileSetupScriptState({
@@ -1816,6 +1825,13 @@ function ReadySandboxProfileSetupScriptSection(input: {
     version: input.version,
     setupScript: input.setupScript,
     invalidateVersionSetupScript: input.invalidateVersionSetupScript,
+  });
+  const setupScriptTest = useSandboxProfileSetupScriptTestRun({
+    disabled: input.disabled,
+    isDraft: input.isDraft,
+    profileId: input.profileId,
+    setupScript: setupScriptState.draftValue,
+    version: input.version,
   });
   const onDraftStateChange = input.onDraftStateChange;
 
@@ -1839,6 +1855,8 @@ function ReadySandboxProfileSetupScriptSection(input: {
       onBlur={setupScriptState.onBlur}
       onChange={setupScriptState.onChange}
       saveStatus={setupScriptState.saveStatus}
+      testControl={<SandboxProfileSetupScriptTestButton {...setupScriptTest.buttonProps} />}
+      testPanel={<SandboxProfileSetupScriptTestPanel {...setupScriptTest.panelProps} />}
       value={setupScriptState.draftValue}
       disabled={input.disabled}
       repositoryHandles={resolveSandboxBaseRepositoryHandles(input.integrationRows)}
@@ -1881,6 +1899,8 @@ export function SandboxProfileSetupScriptPanel(input: {
   onChange?: (nextValue: string) => void;
   onBlur?: () => void;
   repositoryHandles?: readonly string[];
+  testControl?: ReactNode;
+  testPanel?: ReactNode;
 }): React.JSX.Element {
   const liveMessage =
     input.errorMessage !== null && input.errorMessage !== undefined
@@ -1896,7 +1916,10 @@ export function SandboxProfileSetupScriptPanel(input: {
     <div className="max-w-5xl">
       <Field>
         <FieldHeader>
-          <FieldLabel id="sandbox-setup-script-label">Setup script</FieldLabel>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <FieldLabel id="sandbox-setup-script-label">Setup script</FieldLabel>
+            {input.testControl}
+          </div>
         </FieldHeader>
         <FieldContent>
           <p aria-live="polite" className="sr-only" role="status">
@@ -1913,6 +1936,7 @@ export function SandboxProfileSetupScriptPanel(input: {
               value={input.value}
               {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
             />
+            {input.testPanel}
             {input.disabled === true ? null : (
               <div className="flex flex-col pt-1">
                 <Accordion className="border-border/70 w-full border-y" multiple>

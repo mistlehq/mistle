@@ -1569,6 +1569,51 @@ describe("SandboxProfileEditorPage", () => {
     expect(editorRoot?.getAttribute("data-editor-state")).toBe("empty");
   });
 
+  it("allows setup script testing for draft scripts with content", () => {
+    renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      versionState: "draft",
+    });
+
+    const testButton = screen.getByRole("button", {
+      name: "Test",
+    });
+
+    expect(testButton.hasAttribute("disabled")).toBe(false);
+    expect(testButton.getAttribute("title")).toBe("Test setup script");
+  });
+
+  it("disables setup script testing for empty and published scripts", () => {
+    renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: null,
+      versionState: "draft",
+    });
+
+    const emptyDraftTestButton = screen.getByRole("button", {
+      name: "Test",
+    });
+    expect(emptyDraftTestButton.hasAttribute("disabled")).toBe(true);
+    expect(emptyDraftTestButton.getAttribute("title")).toBe("Add a setup script before testing.");
+
+    cleanup();
+
+    renderSandboxProfileEditor({
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install",
+      versionState: "published",
+    });
+
+    const publishedTestButton = screen.getByRole("button", {
+      name: "Test",
+    });
+    expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
+    expect(publishedTestButton.getAttribute("title")).toBe(
+      "Setup script testing is only available while editing a draft.",
+    );
+  });
+
   it("renders published profiles as read-only", () => {
     renderSandboxProfileEditor({
       versionState: "published",
