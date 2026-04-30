@@ -191,8 +191,8 @@ pnpm test
 
 Testing guidance:
 
-- [No Mocking](docs/testing/no-mocking.md)
-- [Property-Based Testing](docs/testing/property-based-testing.md)
+- [No Mocking](docs/development/no-mocking.md)
+- [Property-Based Testing](docs/development/property-based-testing.md)
 
 ## Contribution Process
 

@@ -19,7 +19,7 @@
 - Disallowed assertion style includes interaction assertions on doubles (for example `toHaveBeenCalled*`). Assert observable behavior instead (HTTP response, persisted state, emitted events, UI output).
 - Do not use fake timers or patched global time (`Date`, timers, `setSystemTime`, etc.). For time-sensitive behavior, use explicit injected dependencies from `@mistle/time` (for example `Clock` / `Sleeper` / `Scheduler`) and test with concrete deterministic implementations.
 - Prefer real boundaries: pure unit tests for pure logic only; all dependency-bearing behavior should be covered by integration/system/e2e tests against real dependencies.
-- Read `docs/testing/no-mocking.md` before adding or changing tests.
+- Read `docs/development/no-mocking.md` before adding or changing tests.
 - Test **everything**. Tests must be rigorous. Our intent is ensuring a new person contributing to the same code base cannot break our stuff and that nothing slips by.
 - Unless the user asks otherwise, run only the tests you added or modified instead of the entire suite to avoid wasting time.
 - For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, `pnpm --filter <pkg> exec vitest run -c vitest.component.config.ts <file>` for package-local component runs, and `pnpm test:integration -- --project <project> <file>` for the root integration runner.

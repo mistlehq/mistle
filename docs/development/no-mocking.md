@@ -38,7 +38,7 @@ Property-based tests are compatible with this policy:
 - Use real code paths and real dependency boundaries.
 - Keep generators deterministic (seeded where needed).
 - For time/random/IDs, inject dependencies explicitly rather than patching globals.
-- Follow shared PBT setup and replay guidance in `docs/testing/property-based-testing.md`.
+- Follow shared PBT setup and replay guidance in `docs/development/property-based-testing.md`.
 
 ## Exception Handling
 
