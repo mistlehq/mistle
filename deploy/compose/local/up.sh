@@ -49,15 +49,65 @@ read_env_value() {
   ' "${ENV_FILE_PATH}"
 }
 
-configured_auth_base_url="$(read_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL")"
-image_tag="$(read_env_value "MISTLE_IMAGE_TAG")"
+set_runtime_env_value() {
+  local key="$1"
+  local value="$2"
 
-if [[ -z "${image_tag}" ]]; then
-  echo "MISTLE_IMAGE_TAG must be set in ${ENV_FILE_PATH}." >&2
+  if grep -q "^${key}=" "${RUNTIME_ENV_PATH}"; then
+    awk -v target_key="${key}" -v replacement_value="${value}" '
+      index($0, target_key "=") == 1 {
+        print target_key "=" replacement_value
+        next
+      }
+      {
+        print $0
+      }
+    ' "${RUNTIME_ENV_PATH}" >"${RUNTIME_ENV_PATH}.tmp"
+    mv "${RUNTIME_ENV_PATH}.tmp" "${RUNTIME_ENV_PATH}"
+  else
+    printf '%s=%s\n' "${key}" "${value}" >>"${RUNTIME_ENV_PATH}"
+  fi
+}
+
+run_compose() {
+  MISTLE_LOCAL_ENV_FILE="${RUNTIME_ENV_PATH}" docker compose \
+    -f "${COMPOSE_PATH}" \
+    --env-file "${RUNTIME_ENV_PATH}" \
+    "$@"
+}
+
+ensure_object_store_bucket() {
+  local bucket_name="$1"
+
+  if [[ -z "${bucket_name}" ]]; then
+    echo "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME must be set in ${RUNTIME_ENV_PATH}." >&2
+    exit 1
+  fi
+
+  echo "Ensuring SeaweedFS bucket exists: ${bucket_name}"
+
+  if run_compose exec -T -e BUCKET_NAME="${bucket_name}" seaweedfs sh -lc \
+    'printf "s3.bucket.list\nexit\n" | weed shell -master=seaweedfs:9333 | grep -Fq -- "$BUCKET_NAME"'; then
+    return
+  fi
+
+  run_compose exec -T -e BUCKET_NAME="${bucket_name}" seaweedfs sh -lc \
+    'printf "s3.bucket.create -name %s\nexit\n" "$BUCKET_NAME" | weed shell -master=seaweedfs:9333'
+}
+
+configured_auth_base_url="$(read_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL")"
+runtime_docker_image="$(read_env_value "MISTLE_DOCKER_IMAGE")"
+runtime_sandbox_base_image="$(read_env_value "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE")"
+
+if [[ -z "${runtime_docker_image}" ]]; then
+  echo "MISTLE_DOCKER_IMAGE must be set in ${ENV_FILE_PATH}." >&2
   exit 1
 fi
 
-runtime_sandbox_base_image="ghcr.io/mistlehq/sandbox-base:${image_tag}"
+if [[ -z "${runtime_sandbox_base_image}" ]]; then
+  echo "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE must be set in ${ENV_FILE_PATH}." >&2
+  exit 1
+fi
 
 runtime_auth_base_url="${configured_auth_base_url}"
 
@@ -74,7 +124,7 @@ if [[ -z "${runtime_auth_base_url}" ]]; then
     "${CLOUDFLARED_IMAGE_REFERENCE}" \
     tunnel \
     --url \
-    "http://host.docker.internal:8080" >/dev/null
+    "http://host.docker.internal:5100" >/dev/null
 
   docker logs -f "${cloudflared_container_name}" >"${CLOUDFLARED_LOG_PATH}" 2>&1 &
   cloudflared_logs_pid="$!"
@@ -118,49 +168,21 @@ else
 fi
 
 cp "${ENV_FILE_PATH}" "${RUNTIME_ENV_PATH}"
-if grep -q '^MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=' "${RUNTIME_ENV_PATH}"; then
-  awk -v auth_base_url="${runtime_auth_base_url}" -v sandbox_base_image="${runtime_sandbox_base_image}" '
-    BEGIN {
-      replaced_auth_base_url = 0
-      replaced_sandbox_base_image = 0
-    }
-    /^MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=/ {
-      print "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=" auth_base_url
-      replaced_auth_base_url = 1
-      next
-    }
-    /^MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=/ {
-      print "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
-      replaced_sandbox_base_image = 1
-      next
-    }
-    {
-      print $0
-    }
-    END {
-      if (replaced_auth_base_url == 0) {
-        print "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=" auth_base_url
-      }
-      if (replaced_sandbox_base_image == 0) {
-        print "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=" sandbox_base_image
-      }
-    }
-  ' "${RUNTIME_ENV_PATH}" >"${RUNTIME_ENV_PATH}.tmp"
-  mv "${RUNTIME_ENV_PATH}.tmp" "${RUNTIME_ENV_PATH}"
-else
-  printf '\nMISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL=%s\n' "${runtime_auth_base_url}" >>"${RUNTIME_ENV_PATH}"
-  printf 'MISTLE_SANDBOX_DEFAULT_BASE_IMAGE=%s\n' "${runtime_sandbox_base_image}" >>"${RUNTIME_ENV_PATH}"
-fi
+set_runtime_env_value "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL" "${runtime_auth_base_url}"
+set_runtime_env_value "MISTLE_SANDBOX_DEFAULT_BASE_IMAGE" "${runtime_sandbox_base_image}"
 
-echo "Starting local Compose stack..."
-MISTLE_LOCAL_ENV_FILE="${RUNTIME_ENV_PATH}" docker compose \
-  -f "${COMPOSE_PATH}" \
-  --env-file "${RUNTIME_ENV_PATH}" \
-  up -d --build
+echo "Starting local infrastructure..."
+run_compose up -d --wait postgres valkey seaweedfs mailpit
+ensure_object_store_bucket "$(read_env_value "MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME")"
+
+echo "Starting Mistle..."
+run_compose up -d mistle
 
 echo "Active callback base URL: ${runtime_auth_base_url}"
-echo "Published image tag: ${image_tag}"
+echo "Mistle image: ${runtime_docker_image}"
+echo "Sandbox base image: ${runtime_sandbox_base_image}"
 echo "Dashboard: http://localhost:3000"
-echo "Control Plane API: http://localhost:8080"
-echo "Data Plane Gateway: http://localhost:8084"
+echo "Control Plane API: http://localhost:5100"
+echo "Data Plane Gateway: http://localhost:5202"
+echo "Tokenizer Proxy: http://localhost:5205"
 echo "Mailpit UI: http://localhost:8025"
