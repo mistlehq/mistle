@@ -4,6 +4,10 @@ import { describe, expect, it } from "vitest";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
+import {
+  shouldRenderAppShellSidebarTrigger,
+  shouldRenderAppShellStickyHeader,
+} from "./app-shell-view.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
@@ -148,5 +152,45 @@ describe("resolveAppShellFrame", () => {
 
     expect(frame.showHeader).toBe(false);
     expect(frame.showHeaderLeadingContent).toBe(false);
+  });
+});
+
+describe("app shell sticky header visibility", () => {
+  it("keeps the sticky header available when only the sidebar trigger is needed", () => {
+    expect(
+      shouldRenderAppShellStickyHeader({
+        hasHeaderContent: false,
+        hasSidebarTrigger: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("omits the sticky header when neither header content nor sidebar trigger is needed", () => {
+    expect(
+      shouldRenderAppShellStickyHeader({
+        hasHeaderContent: false,
+        hasSidebarTrigger: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("renders the sidebar trigger on mobile when the mobile sidebar is closed", () => {
+    expect(
+      shouldRenderAppShellSidebarTrigger({
+        isMobile: true,
+        openMobile: false,
+        sidebarState: "expanded",
+      }),
+    ).toBe(true);
+  });
+
+  it("renders the sidebar trigger on desktop when the sidebar is collapsed", () => {
+    expect(
+      shouldRenderAppShellSidebarTrigger({
+        isMobile: false,
+        openMobile: false,
+        sidebarState: "collapsed",
+      }),
+    ).toBe(true);
   });
 });
