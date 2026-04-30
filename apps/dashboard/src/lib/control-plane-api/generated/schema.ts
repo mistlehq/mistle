@@ -6282,7 +6282,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
               message: string;
             };
           };
@@ -6523,7 +6523,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
               message: string;
             };
           };
@@ -6636,6 +6636,128 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/instances/{instanceId}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Stop a sandbox instance when its purpose supports user-requested stops. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted" | "already_stopped" | "already_terminal";
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance cannot be stopped from its current state or purpose. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

@@ -69,6 +69,14 @@ const PatchSandboxInstanceTitleResponseSchema = z
   })
   .strict();
 
+const StopSandboxInstanceResponseSchema = z
+  .object({
+    status: z.enum(["accepted", "already_stopped", "already_terminal"]),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1).nullable(),
+  })
+  .strict();
+
 export type StartSandboxInstanceResult = {
   workflowRunId: string;
   sandboxInstanceId: string;
@@ -96,6 +104,8 @@ export type PatchSandboxInstanceTitleResult = {
   title: string;
   updatedAt: string;
 };
+
+export type StopSandboxInstanceResult = z.output<typeof StopSandboxInstanceResponseSchema>;
 
 export async function listSandboxInstances(input: {
   limit: number;
@@ -379,6 +389,46 @@ export async function resumeSandboxInstance(input: {
         operation: "resumeSandboxInstance",
         error,
         fallbackMessage: "Could not resume sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function stopSandboxInstance(input: {
+  instanceId: string;
+  idempotencyKey: string;
+  signal?: AbortSignal;
+}): Promise<StopSandboxInstanceResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "stopSandboxInstance",
+      method: "POST",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/stop`,
+      body: {
+        idempotencyKey: input.idempotencyKey,
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not stop sandbox session.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = StopSandboxInstanceResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "stopSandboxInstance",
+        status: 500,
+        body: responseBody,
+        message: "Stop sandbox instance response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "stopSandboxInstance",
+        error,
+        fallbackMessage: "Could not stop sandbox session.",
       }),
     );
   }

@@ -1,8 +1,10 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
   type SandboxInstancePersistenceMode,
+  type SandboxInstancePurpose,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
 import type { SandboxAdapter } from "@mistle/sandbox";
@@ -20,6 +22,7 @@ import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
   persistenceMode: SandboxInstancePersistenceMode;
+  purpose: SandboxInstancePurpose;
   runtimeProvider: SandboxInstanceProvider;
   providerSandboxId: string;
 };
@@ -36,15 +39,31 @@ export type StopSandboxInstanceResult = {
   outcome: StopSandboxInstanceOutcome;
 };
 
+function includeExpectedOwnerLeaseId(input: { expectedOwnerLeaseId: string | undefined }): {
+  expectedOwnerLeaseId?: string;
+} {
+  return input.expectedOwnerLeaseId === undefined
+    ? {}
+    : { expectedOwnerLeaseId: input.expectedOwnerLeaseId };
+}
+
 /**
  * Returns `true` when the current runtime-state snapshot still permits the
  * requested fenced stop.
  */
 export function shouldExecuteSandboxStop(input: {
   stopReason: SandboxStopReason;
-  expectedOwnerLeaseId: string;
+  expectedOwnerLeaseId?: string;
   snapshot: SandboxRuntimeStateSnapshot;
 }): boolean {
+  if (input.stopReason === "user") {
+    return true;
+  }
+
+  if (input.expectedOwnerLeaseId === undefined) {
+    return false;
+  }
+
   return (
     input.stopReason === "idle" &&
     input.snapshot.ownerLeaseId === input.expectedOwnerLeaseId &&
@@ -59,6 +78,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
       persistenceMode: true,
+      purpose: true,
       runtimeProvider: true,
       providerSandboxId: true,
       status: true,
@@ -88,6 +108,7 @@ async function resolveRunningSandboxInstanceStopState(input: {
 
   return {
     persistenceMode: sandboxInstance.persistenceMode,
+    purpose: sandboxInstance.purpose,
     runtimeProvider: sandboxInstance.runtimeProvider,
     providerSandboxId: sandboxInstance.providerSandboxId,
   };
@@ -98,7 +119,7 @@ async function isSandboxStopStillPermitted(ctx: {
   clock: Clock;
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
-  expectedOwnerLeaseId: string;
+  expectedOwnerLeaseId?: string;
 }): Promise<boolean> {
   const snapshot = await ctx.runtimeStateReader.readSnapshot({
     sandboxInstanceId: ctx.sandboxInstanceId,
@@ -107,9 +128,25 @@ async function isSandboxStopStillPermitted(ctx: {
 
   return shouldExecuteSandboxStop({
     stopReason: ctx.stopReason,
-    expectedOwnerLeaseId: ctx.expectedOwnerLeaseId,
     snapshot,
+    ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: ctx.expectedOwnerLeaseId }),
   });
+}
+
+function assertUserStopIsScopedToSetupCheck(input: {
+  sandboxInstanceId: string;
+  stopReason: SandboxStopReason;
+  purpose: SandboxInstancePurpose;
+}): void {
+  if (input.stopReason !== "user") {
+    return;
+  }
+
+  if (input.purpose !== SandboxInstancePurposes.SETUP_CHECK) {
+    throw new Error(
+      `User-requested stop is only supported for setup-check sandbox instances; sandbox instance '${input.sandboxInstanceId}' has purpose '${input.purpose}'.`,
+    );
+  }
 }
 
 export async function stopSandboxInstance(
@@ -124,7 +161,7 @@ export async function stopSandboxInstance(
   input: {
     sandboxInstanceId: string;
     stopReason: SandboxStopReason;
-    expectedOwnerLeaseId: string;
+    expectedOwnerLeaseId?: string;
   },
 ): Promise<StopSandboxInstanceResult> {
   if (
@@ -133,7 +170,7 @@ export async function stopSandboxInstance(
       clock: ctx.clock,
       sandboxInstanceId: input.sandboxInstanceId,
       stopReason: input.stopReason,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
     }))
   ) {
     return {
@@ -153,13 +190,19 @@ export async function stopSandboxInstance(
     };
   }
 
+  assertUserStopIsScopedToSetupCheck({
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: input.stopReason,
+    purpose: sandboxInstanceState.purpose,
+  });
+
   if (
     !(await isSandboxStopStillPermitted({
       runtimeStateReader: ctx.runtimeStateReader,
       clock: ctx.clock,
       sandboxInstanceId: input.sandboxInstanceId,
       stopReason: input.stopReason,
-      expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+      ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
     }))
   ) {
     return {
@@ -199,7 +242,7 @@ export async function stopSandboxInstance(
         clock: ctx.clock,
         sandboxInstanceId: input.sandboxInstanceId,
         stopReason: input.stopReason,
-        expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+        ...includeExpectedOwnerLeaseId({ expectedOwnerLeaseId: input.expectedOwnerLeaseId }),
       }),
   });
 

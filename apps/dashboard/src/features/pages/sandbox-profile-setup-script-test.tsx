@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { startSandboxProfileSetupScriptTestRun } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
+import { getSandboxInstanceStatus, stopSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   SandboxBaseRuntimeShell,
@@ -370,6 +370,7 @@ export function useSandboxProfileSetupScriptTestRun(
   const [isOpenRequested, setIsOpenRequested] = useState(false);
   const [failOnFirstError, setFailOnFirstError] = useState(true);
   const openedPtySessionIdRef = useRef<string | null>(null);
+  const stoppedSandboxInstanceIdsRef = useRef<ReadonlySet<string>>(new Set());
   const transportManager = useSessionWorkbenchTransport({
     sandboxInstanceId: startedRun?.sandboxInstanceId ?? null,
   });
@@ -392,6 +393,25 @@ export function useSandboxProfileSetupScriptTestRun(
       void disconnectPty();
     });
   }, [closePty, disconnectPty]);
+  const stopCompletedTestSandbox = useCallback(
+    (run: StartedSetupScriptTestRun): void => {
+      if (stoppedSandboxInstanceIdsRef.current.has(run.sandboxInstanceId)) {
+        return;
+      }
+
+      stoppedSandboxInstanceIdsRef.current = new Set([
+        ...stoppedSandboxInstanceIdsRef.current,
+        run.sandboxInstanceId,
+      ]);
+
+      void closePty().catch(() => undefined);
+      void stopSandboxInstance({
+        instanceId: run.sandboxInstanceId,
+        idempotencyKey: `setup-script-test-stop:${run.ptySessionId}`,
+      }).catch(() => undefined);
+    },
+    [closePty],
+  );
   const startMutation = useMutation({
     mutationFn: async (request: SetupScriptTestRunRequest) =>
       startSandboxProfileSetupScriptTestRun({
@@ -503,6 +523,14 @@ export function useSandboxProfileSetupScriptTestRun(
       );
     });
   }, [openPty, sandboxStatusQuery.data?.connectable, startedRun]);
+
+  useEffect(() => {
+    if (startedRun === null || ptyState.lifecycle.exitInfo === null) {
+      return;
+    }
+
+    stopCompletedTestSandbox(startedRun);
+  }, [ptyState.lifecycle.exitInfo, startedRun, stopCompletedTestSandbox]);
 
   const handleRun = useCallback((): void => {
     if (

@@ -1,5 +1,6 @@
 import {
   StopSandboxInstanceWorkflowSpec,
+  type StopSandboxInstanceWorkflowInput,
   type StopSandboxInstanceWorkflowOutput,
 } from "@mistle/workflow-registry/data-plane";
 import { trace } from "@opentelemetry/api";
@@ -7,6 +8,18 @@ import { trace } from "@opentelemetry/api";
 import { getWorkflowContext } from "../core/context.js";
 import { defineTracedDataPlaneWorkflow } from "../core/tracing.js";
 import { stopSandboxInstance } from "./stop-sandbox-instance.js";
+
+function resolveExpectedOwnerLeaseId(input: StopSandboxInstanceWorkflowInput): {
+  expectedOwnerLeaseId?: string;
+} {
+  if (input.stopReason !== "idle") {
+    return {};
+  }
+
+  return {
+    expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+  };
+}
 
 export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
   StopSandboxInstanceWorkflowSpec,
@@ -26,7 +39,7 @@ export const StopSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         {
           sandboxInstanceId: input.sandboxInstanceId,
           stopReason: input.stopReason,
-          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+          ...resolveExpectedOwnerLeaseId(input),
         },
       );
     });

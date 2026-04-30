@@ -12503,7 +12503,200 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_FAILED", "INSTANCE_NOT_RESUMABLE"]
+                      "enum": [
+                        "INSTANCE_FAILED",
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_STOP_NOT_SUPPORTED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/instances/{instanceId}/stop": {
+      "post": {
+        "tags": ["Sandbox Instances"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbi_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "instanceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["idempotencyKey"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stop a sandbox instance when its purpose supports user-requested stops.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted", "already_stopped", "already_terminal"]
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "workflowRunId": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox instance was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["INSTANCE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox instance cannot be stopped from its current state or purpose.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "INSTANCE_FAILED",
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_STOP_NOT_SUPPORTED"
+                      ]
                     },
                     "message": {
                       "type": "string",
@@ -12685,7 +12878,11 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_FAILED", "INSTANCE_NOT_RESUMABLE"]
+                      "enum": [
+                        "INSTANCE_FAILED",
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_STOP_NOT_SUPPORTED"
+                      ]
                     },
                     "message": {
                       "type": "string",

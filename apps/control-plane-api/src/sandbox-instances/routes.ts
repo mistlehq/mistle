@@ -10,6 +10,7 @@ import * as getSandboxInstance from "./get-sandbox-instance/index.js";
 import * as listSandboxInstances from "./list-sandbox-instances/index.js";
 import * as patchSandboxInstanceTitle from "./patch-sandbox-instance-title/index.js";
 import * as resumeSandboxInstance from "./resume-sandbox-instance/index.js";
+import * as stopSandboxInstance from "./stop-sandbox-instance/index.js";
 
 export function createSandboxInstancesRoutes(): AppRoutes<
   typeof SANDBOX_INSTANCES_ROUTE_BASE_PATH
@@ -23,6 +24,7 @@ export function createSandboxInstancesRoutes(): AppRoutes<
   routes.openapi(getSandboxInstanceSessionLink.route, getSandboxInstanceSessionLink.handler);
   routes.openapi(patchSandboxInstanceTitle.route, patchSandboxInstanceTitle.handler);
   routes.openapi(resumeSandboxInstance.route, resumeSandboxInstance.handler);
+  routes.openapi(stopSandboxInstance.route, stopSandboxInstance.handler);
   routes.openapi(
     createSandboxInstanceConnectionToken.route,
     createSandboxInstanceConnectionToken.handler,

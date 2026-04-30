@@ -1467,6 +1467,103 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox/instances/:id/user-stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey: string;
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Stop a sandbox instance for an internal user-requested stop. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted" | "already_stopped" | "already_terminal";
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance cannot be stopped from its current state or purpose. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "USER_STOP_NOT_SUPPORTED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox/profile-version-snapshot-jobs/materialize": {
     parameters: {
       query?: never;

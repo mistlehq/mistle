@@ -89,6 +89,21 @@ export type StopSandboxInstanceInput = {
 };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
+export type StopUserRequestedSandboxInstanceInput = {
+  organizationId: string;
+  sandboxInstanceId: string;
+  idempotencyKey: string;
+};
+const StopUserRequestedSandboxInstanceResponseSchema = z
+  .object({
+    status: z.enum(["accepted", "already_stopped", "already_terminal"]),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type StopUserRequestedSandboxInstanceResponse = z.infer<
+  typeof StopUserRequestedSandboxInstanceResponseSchema
+>;
 export type ReconcileSandboxInstanceInput = {
   sandboxInstanceId: string;
   reason: "disconnect_grace_elapsed";
@@ -196,6 +211,9 @@ export type DataPlaneSandboxInstancesClient = {
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
+  stopUserRequestedSandboxInstance: (
+    input: StopUserRequestedSandboxInstanceInput,
+  ) => Promise<StopUserRequestedSandboxInstanceResponse>;
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
@@ -430,6 +448,37 @@ export function createDataPlaneSandboxInstancesClient(
         const responseBody: StopSandboxInstanceAcceptedResponse = await response.json();
 
         return responseBody;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "stop",
+      });
+    },
+
+    async stopUserRequestedSandboxInstance(stopInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: stopInput.sandboxInstanceId,
+          suffix: "/user-stop",
+        }),
+        {
+          method: "POST",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            organizationId: stopInput.organizationId,
+            idempotencyKey: stopInput.idempotencyKey,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        return StopUserRequestedSandboxInstanceResponseSchema.parse(await response.json());
       }
 
       const errorBody = await readResponseBody(response);

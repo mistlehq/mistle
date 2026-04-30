@@ -52,4 +52,25 @@ describe("shouldExecuteSandboxStop", () => {
       }),
     ).toBe(false);
   });
+
+  it("allows user-requested setup-check stops without an owner lease fence", () => {
+    expect(
+      shouldExecuteSandboxStop({
+        stopReason: "user",
+        snapshot: {
+          ownerLeaseId: null,
+          attachment: null,
+          presence: {
+            activeCount: 0,
+          },
+          keepalive: {
+            active: false,
+          },
+          runtime: {
+            ready: false,
+          },
+        },
+      }),
+    ).toBe(true);
+  });
 });
