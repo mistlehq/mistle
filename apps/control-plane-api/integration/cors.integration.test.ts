@@ -1,34 +1,67 @@
-import { describe, expect } from "vitest";
+import {
+  createTestRegistry,
+  startTestEnvironment,
+  type TestEnvironment,
+  type TestHttpClient,
+  type TestServiceHandle,
+} from "@mistle/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { it } from "./test-context.js";
+const DockerSampleConfigPathInContainer = "/app/config/config.docker.sample.toml";
+const TrustedOrigin = "http://localhost:5100";
 
-function getTrustedOrigin(trustedOrigins: readonly string[]): string {
-  const trustedOrigin = trustedOrigins[0];
+type ControlPlaneApiEnvironment = TestEnvironment<"control-plane-api">;
 
-  if (trustedOrigin === undefined) {
-    throw new Error("Expected at least one trusted origin in test fixture config.");
+let environment: ControlPlaneApiEnvironment | undefined;
+
+function readEnvironment(): ControlPlaneApiEnvironment {
+  if (environment === undefined) {
+    throw new Error("Expected the control-plane-api test environment to be started.");
   }
 
-  return trustedOrigin;
+  return environment;
+}
+
+function readHttpClient(service: TestServiceHandle): TestHttpClient {
+  if (service.http === undefined) {
+    throw new Error(`Expected ${service.id} to expose an HTTP client.`);
+  }
+
+  return service.http;
+}
+
+function controlPlaneApiClient(): TestHttpClient {
+  return readHttpClient(readEnvironment().services.get("control-plane-api"));
 }
 
 describe("cors integration", () => {
-  it("adds CORS headers for trusted origins on standard requests", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
+  beforeAll(async () => {
+    environment = await startTestEnvironment({
+      registry: createTestRegistry({
+        configPathInContainer: DockerSampleConfigPathInContainer,
+      }),
+      services: [{ service: "control-plane-api", mode: "docker" }],
+    });
+  }, 180_000);
 
-    const response = await fixture.request("/__healthz", {
+  afterAll(async () => {
+    await environment?.stop();
+  });
+
+  it("adds CORS headers for trusted origins on standard requests", async () => {
+    const response = await controlPlaneApiClient().fetch("/__healthz", {
       method: "GET",
       headers: {
-        origin: trustedOrigin,
+        origin: TrustedOrigin,
       },
     });
     expect(response.status).toBe(200);
-    expect(response.headers.get("access-control-allow-origin")).toBe(trustedOrigin);
+    expect(response.headers.get("access-control-allow-origin")).toBe(TrustedOrigin);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("does not allow untrusted origins on standard requests", async ({ fixture }) => {
-    const response = await fixture.request("/__healthz", {
+  it("does not allow untrusted origins on standard requests", async () => {
+    const response = await controlPlaneApiClient().fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: "http://malicious.example",
@@ -40,19 +73,17 @@ describe("cors integration", () => {
     expect(allowOrigin === null || allowOrigin === "").toBe(true);
   });
 
-  it("handles preflight requests for trusted origins", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
-
-    const response = await fixture.request("/__healthz", {
+  it("handles preflight requests for trusted origins", async () => {
+    const response = await controlPlaneApiClient().fetch("/__healthz", {
       method: "OPTIONS",
       headers: {
-        origin: trustedOrigin,
+        origin: TrustedOrigin,
         "access-control-request-method": "PUT",
         "access-control-request-headers": "content-type,authorization",
       },
     });
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-origin")).toBe(trustedOrigin);
+    expect(response.headers.get("access-control-allow-origin")).toBe(TrustedOrigin);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
     expect(response.headers.get("access-control-allow-methods")).toContain("PUT");
     expect(response.headers.get("access-control-allow-methods")).toContain("OPTIONS");
