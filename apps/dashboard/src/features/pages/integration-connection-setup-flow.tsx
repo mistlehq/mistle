@@ -8,6 +8,8 @@ import {
   FieldLabel,
   Input,
   Notice,
+  RadioGroup,
+  RadioGroupItem,
   Tabs,
   TabsContent,
   TabsList,
@@ -28,6 +30,7 @@ import { SectionHeader } from "../shared/section-header.js";
 export type IntegrationConnectionSetupMode = "manifest" | "existing-app";
 
 type IntegrationConnectionSetupStartFormState = {
+  isFieldVisible: (fieldName: string) => boolean;
   requiredFieldsComplete: boolean;
   resolveRequiredValue: (fieldName: string) => string;
   updateValue: (fieldName: string, value: string) => void;
@@ -54,11 +57,24 @@ export function useIntegrationConnectionSetupStartForm(
     });
   }
 
+  function isFieldVisible(fieldName: string): boolean {
+    const field = form.fields.find((candidate) => candidate.name === fieldName) ?? null;
+    if (field === null) {
+      throw new Error(`Setup start form does not define field '${fieldName}'.`);
+    }
+
+    return isSetupStartFormFieldVisible({
+      field,
+      values,
+    });
+  }
+
   return {
     requiredFieldsComplete: areRequiredSetupStartFormFieldsComplete({
       form,
       values,
     }),
+    isFieldVisible,
     resolveRequiredValue,
     updateValue,
     values,
@@ -242,7 +258,9 @@ function areRequiredSetupStartFormFieldsComplete(input: {
 }): boolean {
   return input.form.fields.every(
     (field) =>
-      field.required !== true || normalizeSetupStartFormValue(input.values[field.name]).length > 0,
+      !isSetupStartFormFieldVisible({ field, values: input.values }) ||
+      field.required !== true ||
+      normalizeSetupStartFormValue(input.values[field.name]).length > 0,
   );
 }
 
@@ -265,6 +283,17 @@ function resolveRequiredSetupStartFormValue(input: {
   return value;
 }
 
+function isSetupStartFormFieldVisible(input: {
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number];
+  values: Record<string, string>;
+}): boolean {
+  if (input.field.visibleWhen === undefined) {
+    return true;
+  }
+
+  return input.values[input.field.visibleWhen.field] === input.field.visibleWhen.value;
+}
+
 function IntegrationConnectionSetupStartForm(input: {
   form: IntegrationFormConnectionMethodSetupStartForm;
   values: Record<string, string>;
@@ -272,14 +301,16 @@ function IntegrationConnectionSetupStartForm(input: {
 }): React.JSX.Element {
   return (
     <>
-      {input.form.fields.map((field) => (
-        <IntegrationConnectionSetupStartFormField
-          field={field}
-          key={field.name}
-          onValueChange={input.onValueChange}
-          value={input.values[field.name] ?? ""}
-        />
-      ))}
+      {input.form.fields
+        .filter((field) => isSetupStartFormFieldVisible({ field, values: input.values }))
+        .map((field) => (
+          <IntegrationConnectionSetupStartFormField
+            field={field}
+            key={field.name}
+            onValueChange={input.onValueChange}
+            value={input.values[field.name] ?? ""}
+          />
+        ))}
     </>
   );
 }
@@ -320,7 +351,25 @@ function IntegrationConnectionSetupStartFormField(input: {
         ) : null}
       </FieldHeader>
       <FieldContent>
-        {input.field.inputType === "textarea" ? (
+        {input.field.inputType === "radio" ? (
+          <RadioGroup
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            aria-label={input.field.label}
+            onValueChange={(nextValue) => {
+              input.onValueChange(input.field.name, nextValue);
+            }}
+            value={input.value}
+          >
+            {resolveSetupStartFormRadioOptions(input.field).map((option) => (
+              <div className="flex items-start gap-3" key={option.value}>
+                <RadioGroupItem id={`${inputId}-${option.value}`} value={option.value} />
+                <label className="text-sm" htmlFor={`${inputId}-${option.value}`}>
+                  {option.label}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
+        ) : input.field.inputType === "textarea" ? (
           <Textarea
             aria-describedby={hasDescription ? fieldDescriptionId : undefined}
             autoComplete="off"
@@ -343,4 +392,18 @@ function IntegrationConnectionSetupStartFormField(input: {
       </FieldContent>
     </Field>
   );
+}
+
+function resolveSetupStartFormRadioOptions(
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number],
+): readonly { label: string; value: string }[] {
+  if (field.inputType !== "radio") {
+    throw new Error(`Setup start form field '${field.name}' is not a radio field.`);
+  }
+
+  if (field.options === undefined) {
+    throw new Error(`Setup start form radio field '${field.name}' does not define options.`);
+  }
+
+  return field.options;
 }

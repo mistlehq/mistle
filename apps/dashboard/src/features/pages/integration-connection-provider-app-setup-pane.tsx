@@ -12,6 +12,7 @@ import {
   startProviderAppSetup,
   updateFormIntegrationConnection,
 } from "../integrations/integrations-service.js";
+import type { StartedProviderAppSetup } from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   parseManifestJsonObject,
@@ -21,6 +22,7 @@ import {
   type ManifestWebhookCallbackState,
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
+import { openDeferredExternalWindow } from "../shared/external-window.js";
 import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
@@ -37,7 +39,8 @@ import {
   buildProviderAppSetupStartBody,
   createInitialProviderAppSetupDraft,
   getProviderAppSetupFieldValidationMessage,
-  isProviderAppInstalled,
+  hasProviderAppSetupDraftValues,
+  isProviderAppExistingAppStartActionInstalled,
   isProviderAppRequiredFieldReady,
   isProviderAppSetupFieldStable,
   isProviderAppSetupSecretFieldKey,
@@ -95,6 +98,48 @@ function SetupUrls(input: {
   );
 }
 
+function submitProviderAppSetupFormPost(input: {
+  submissionUrl: string;
+  fields: Record<string, string>;
+}): void {
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = input.submissionUrl;
+  form.target = "_self";
+  form.style.display = "none";
+
+  for (const [name, value] of Object.entries(input.fields)) {
+    const field = document.createElement("input");
+    field.type = "hidden";
+    field.name = name;
+    field.value = value;
+    form.append(field);
+  }
+
+  document.body.append(form);
+  form.submit();
+}
+
+function completeProviderAppSetupStart(input: {
+  expectedResultKind: "form-post" | "redirect";
+  result: StartedProviderAppSetup;
+  unexpectedResultMessage: string;
+}): void {
+  if (input.result.kind !== input.expectedResultKind) {
+    throw new Error(input.unexpectedResultMessage);
+  }
+
+  if (input.result.kind === "redirect") {
+    globalThis.location.assign(input.result.authorizationUrl);
+    return;
+  }
+
+  submitProviderAppSetupFormPost({
+    submissionUrl: input.result.submissionUrl,
+    fields: input.result.fields,
+  });
+}
+
 export function ProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
@@ -106,7 +151,7 @@ export function ProviderAppSetupPane(input: {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
-    isProviderAppInstalled({
+    hasProviderAppSetupDraftValues({
       connection: input.connection,
       providerAppSetup: input.providerAppSetup,
     })
@@ -121,6 +166,8 @@ export function ProviderAppSetupPane(input: {
     }),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
+  const [isRedirectingToExistingAppStartAction, setIsRedirectingToExistingAppStartAction] =
+    useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const existingAppFieldKeys = useMemo(
     () => resolveProviderAppSetupFieldKeys(input.providerAppSetup),
@@ -224,21 +271,102 @@ export function ProviderAppSetupPane(input: {
         fallbackMessage: input.providerAppSetup.manifest.createErrorMessage,
       }),
   });
+  const startExistingAppActionMutation = useMutation({
+    mutationFn: async () => {
+      const startAction = input.providerAppSetup.existingApp.startAction;
+      if (startAction === undefined) {
+        throw new Error("Provider app setup does not define an existing app start action.");
+      }
+
+      return startProviderAppSetup({
+        connectionId: input.connection.id,
+        routeSegment: startAction.routeSegment,
+        body: {},
+        fallbackMessage: startAction.startErrorMessage,
+      });
+    },
+  });
 
   async function createProviderApp(): Promise<void> {
     setActionErrorMessage(null);
     try {
       const started = await startManifestMutation.mutateAsync();
-      if (started.kind !== input.providerAppSetup.manifest.startAction.expectedResultKind) {
-        throw new Error(input.providerAppSetup.manifest.startAction.unexpectedResultMessage);
-      }
-
-      globalThis.location.assign(started.authorizationUrl);
+      completeProviderAppSetupStart({
+        expectedResultKind: input.providerAppSetup.manifest.startAction.expectedResultKind,
+        result: started,
+        unexpectedResultMessage:
+          input.providerAppSetup.manifest.startAction.unexpectedResultMessage,
+      });
     } catch (error) {
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
           fallbackMessage: input.providerAppSetup.manifest.createErrorMessage,
+        }),
+      );
+    }
+  }
+
+  async function startExistingAppAction(): Promise<void> {
+    const startAction = input.providerAppSetup.existingApp.startAction;
+    if (startAction === undefined) {
+      void navigate(`/integrations/${input.connection.targetKey}`);
+      return;
+    }
+
+    setActionErrorMessage(null);
+    try {
+      const started = await startExistingAppActionMutation.mutateAsync();
+      setIsRedirectingToExistingAppStartAction(true);
+      completeProviderAppSetupStart({
+        expectedResultKind: startAction.expectedResultKind,
+        result: started,
+        unexpectedResultMessage: startAction.unexpectedResultMessage,
+      });
+    } catch (error) {
+      setIsRedirectingToExistingAppStartAction(false);
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: startAction.startErrorMessage,
+        }),
+      );
+    }
+  }
+
+  async function startExistingAppManagementAction(): Promise<void> {
+    const startAction = input.providerAppSetup.existingApp.startAction;
+    if (startAction === undefined) {
+      void navigate(`/integrations/${input.connection.targetKey}`);
+      return;
+    }
+
+    setActionErrorMessage(null);
+    const setupWindow = openDeferredExternalWindow({
+      loadingMessage: startAction.pendingLabel ?? input.providerAppSetup.existingApp.connectLabel,
+      title: startAction.pendingLabel ?? input.providerAppSetup.existingApp.connectLabel,
+    });
+    if (setupWindow === null) {
+      setActionErrorMessage("Browser blocked opening a new window.");
+      return;
+    }
+
+    try {
+      const started = await startExistingAppActionMutation.mutateAsync();
+      if (started.kind !== startAction.expectedResultKind) {
+        throw new Error(startAction.unexpectedResultMessage);
+      }
+      if (started.kind !== "redirect") {
+        throw new Error(startAction.unexpectedResultMessage);
+      }
+
+      setupWindow.navigate(started.authorizationUrl);
+    } catch (error) {
+      setupWindow.close();
+      setActionErrorMessage(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: startAction.startErrorMessage,
         }),
       );
     }
@@ -267,11 +395,23 @@ export function ProviderAppSetupPane(input: {
       fieldState: getSetupFieldState(existingAppAutoSave.fieldStates, fieldKey),
     }),
   );
+  const isExistingAppStartActionInstalled = isProviderAppExistingAppStartActionInstalled({
+    connection: input.connection,
+    providerAppSetup: input.providerAppSetup,
+  });
   const canConnectExistingApp =
-    requiredFieldsReady &&
-    allFieldsStable &&
-    !isSecretReplacementDialogOpen &&
-    webhookCallbackState.kind === "ready";
+    isExistingAppStartActionInstalled ||
+    (requiredFieldsReady &&
+      allFieldsStable &&
+      !isSecretReplacementDialogOpen &&
+      webhookCallbackState.kind === "ready");
+  const existingAppConnectLabel =
+    isExistingAppStartActionInstalled &&
+    input.providerAppSetup.existingApp.startAction?.installedLabel !== undefined
+      ? input.providerAppSetup.existingApp.startAction.installedLabel
+      : input.providerAppSetup.existingApp.connectLabel;
+  const isExistingAppStartActionPending =
+    startExistingAppActionMutation.isPending || isRedirectingToExistingAppStartAction;
 
   return (
     <FormPageStack>
@@ -314,13 +454,26 @@ export function ProviderAppSetupPane(input: {
             {setupMode === "existing-app" ? (
               <FormPageActionBar>
                 <Button
-                  disabled={!canConnectExistingApp}
+                  aria-busy={isExistingAppStartActionPending}
+                  disabled={!canConnectExistingApp || isExistingAppStartActionPending}
                   onClick={() => {
-                    void navigate(`/integrations/${input.connection.targetKey}`);
+                    if (
+                      isExistingAppStartActionInstalled &&
+                      input.providerAppSetup.existingApp.startAction?.installedOpensInNewWindow ===
+                        true
+                    ) {
+                      void startExistingAppManagementAction();
+                      return;
+                    }
+
+                    void startExistingAppAction();
                   }}
                   type="button"
                 >
-                  {input.providerAppSetup.existingApp.connectLabel}
+                  {isExistingAppStartActionPending
+                    ? (input.providerAppSetup.existingApp.startAction?.pendingLabel ??
+                      existingAppConnectLabel)
+                    : existingAppConnectLabel}
                 </Button>
               </FormPageActionBar>
             ) : setupMode === "manifest" ? (

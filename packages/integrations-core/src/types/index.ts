@@ -510,11 +510,23 @@ export type IntegrationFormConnectionMethodSetupStartFormAction = {
 export type IntegrationFormConnectionMethodSetupStartFormField = {
   actions?: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormAction> | undefined;
   description?: string | undefined;
-  inputType: "password" | "text" | "textarea";
+  inputType: "password" | "radio" | "text" | "textarea";
   label: string;
   name: string;
+  options?:
+    | ReadonlyArray<{
+        label: string;
+        value: string;
+      }>
+    | undefined;
   placeholder?: string | undefined;
   required?: boolean | undefined;
+  visibleWhen?:
+    | {
+        field: string;
+        value: string;
+      }
+    | undefined;
 };
 
 export type IntegrationFormConnectionMethodSetupStartForm = {
@@ -534,12 +546,29 @@ export type IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigFiel
 };
 
 export type IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField = {
-  inputType: "password";
+  inputType: "password" | "textarea";
   label: string;
   name: string;
   placeholder?: string | undefined;
+  rows?: number | undefined;
   required: boolean;
   secretLabel: string;
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction = {
+  expectedResultKind: "redirect";
+  installedDetection?:
+    | {
+        configFields?: ReadonlyArray<string> | undefined;
+        externalSubject?: boolean | undefined;
+      }
+    | undefined;
+  installedLabel?: string | undefined;
+  installedOpensInNewWindow?: boolean | undefined;
+  pendingLabel?: string | undefined;
+  routeSegment: string;
+  startErrorMessage: string;
+  unexpectedResultMessage: string;
 };
 
 export type IntegrationFormConnectionMethodProviderAppSetup = {
@@ -554,13 +583,14 @@ export type IntegrationFormConnectionMethodProviderAppSetup = {
     };
     saveErrorMessage: string;
     secretFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField>;
+    startAction?: IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction | undefined;
     title: string;
   };
   manifest: {
     createErrorMessage: string;
     description: string;
     startAction: {
-      expectedResultKind: "redirect";
+      expectedResultKind: "form-post" | "redirect";
       manifestBodyField: string;
       unexpectedResultMessage: string;
     };

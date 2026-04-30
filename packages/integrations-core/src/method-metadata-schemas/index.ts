@@ -141,13 +141,40 @@ const IntegrationFormConnectionMethodSetupStartFormFieldSchema = z
   .object({
     actions: z.array(IntegrationFormConnectionMethodSetupStartFormActionSchema).min(1).optional(),
     description: z.string().min(1).optional(),
-    inputType: z.enum(["password", "text", "textarea"]),
+    inputType: z.enum(["password", "radio", "text", "textarea"]),
     label: z.string().min(1),
     name: z.string().min(1),
+    options: z
+      .array(
+        z
+          .object({
+            label: z.string().min(1),
+            value: z.string().min(1),
+          })
+          .strict(),
+      )
+      .min(1)
+      .optional(),
     placeholder: z.string().min(1).optional(),
     required: z.boolean().optional(),
+    visibleWhen: z
+      .object({
+        field: z.string().min(1),
+        value: z.string().min(1),
+      })
+      .strict()
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((field, context) => {
+    if (field.inputType === "radio" && field.options === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: `Setup start form radio field '${field.name}' must define options.`,
+        path: ["options"],
+      });
+    }
+  });
 
 const IntegrationFormConnectionMethodSetupStartFormSchema = z
   .object({
@@ -192,16 +219,36 @@ const IntegrationFormConnectionMethodProviderAppSetupSchema = z
           .array(
             z
               .object({
-                inputType: z.literal("password"),
+                inputType: z.enum(["password", "textarea"]),
                 label: z.string().min(1),
                 name: z.string().min(1),
                 placeholder: z.string().min(1).optional(),
+                rows: z.number().int().min(1).optional(),
                 required: z.boolean(),
                 secretLabel: z.string().min(1),
               })
               .strict(),
           )
           .min(1),
+        startAction: z
+          .object({
+            expectedResultKind: z.literal("redirect"),
+            installedDetection: z
+              .object({
+                configFields: z.array(z.string().min(1)).optional(),
+                externalSubject: z.boolean().optional(),
+              })
+              .strict()
+              .optional(),
+            installedLabel: z.string().min(1).optional(),
+            installedOpensInNewWindow: z.boolean().optional(),
+            pendingLabel: z.string().min(1).optional(),
+            routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+            startErrorMessage: z.string().min(1),
+            unexpectedResultMessage: z.string().min(1),
+          })
+          .strict()
+          .optional(),
         title: z.string().min(1),
       })
       .strict(),
@@ -211,7 +258,7 @@ const IntegrationFormConnectionMethodProviderAppSetupSchema = z
         description: z.string().min(1),
         startAction: z
           .object({
-            expectedResultKind: z.literal("redirect"),
+            expectedResultKind: z.enum(["form-post", "redirect"]),
             manifestBodyField: z.string().min(1),
             unexpectedResultMessage: z.string().min(1),
           })

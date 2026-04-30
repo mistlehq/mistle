@@ -3378,13 +3378,28 @@ export interface paths {
                             saveErrorMessage: string;
                             secretFields: {
                               /** @enum {string} */
-                              inputType: "password";
+                              inputType: "password" | "textarea";
                               label: string;
                               name: string;
                               placeholder?: string;
                               required: boolean;
+                              rows?: number;
                               secretLabel: string;
                             }[];
+                            startAction?: {
+                              /** @enum {string} */
+                              expectedResultKind: "redirect";
+                              installedDetection?: {
+                                configFields?: string[];
+                                externalSubject?: boolean;
+                              };
+                              installedLabel?: string;
+                              installedOpensInNewWindow?: boolean;
+                              pendingLabel?: string;
+                              routeSegment: string;
+                              startErrorMessage: string;
+                              unexpectedResultMessage: string;
+                            };
                             title: string;
                           };
                           manifest: {
@@ -3392,7 +3407,7 @@ export interface paths {
                             description: string;
                             startAction: {
                               /** @enum {string} */
-                              expectedResultKind: "redirect";
+                              expectedResultKind: "form-post" | "redirect";
                               manifestBodyField: string;
                               unexpectedResultMessage: string;
                             };
@@ -3425,11 +3440,19 @@ export interface paths {
                             }[];
                             description?: string;
                             /** @enum {string} */
-                            inputType: "password" | "text" | "textarea";
+                            inputType: "password" | "radio" | "text" | "textarea";
                             label: string;
                             name: string;
+                            options?: {
+                              label: string;
+                              value: string;
+                            }[];
                             placeholder?: string;
                             required?: boolean;
+                            visibleWhen?: {
+                              field: string;
+                              value: string;
+                            };
                           }[];
                           submitLabel: string;
                         };

@@ -7,6 +7,7 @@ import { hasConfiguredSetupSecretField } from "./integration-connection-setup-se
 export type ProviderAppSetupFieldKey = string;
 
 export type ProviderAppSetupStartFormState = {
+  isFieldVisible: (fieldName: string) => boolean;
   resolveRequiredValue: (fieldName: string) => string;
   values: Record<string, string>;
 };
@@ -92,6 +93,42 @@ export function isProviderAppInstalled(input: {
       }),
     )
   );
+}
+
+export function hasProviderAppSetupDraftValues(input: {
+  connection: IntegrationConnection;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+}): boolean {
+  return (
+    input.providerAppSetup.existingApp.configFields.some(
+      (field) => typeof input.connection.config?.[field.configKey] === "string",
+    ) ||
+    input.providerAppSetup.existingApp.secretFields.some((field) =>
+      hasConfiguredSetupSecretField({
+        configuredSecretNames: input.connection.configuredSecretNames,
+        fieldName: field.name,
+      }),
+    )
+  );
+}
+
+export function isProviderAppExistingAppStartActionInstalled(input: {
+  connection: IntegrationConnection;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
+}): boolean {
+  const installedDetection = input.providerAppSetup.existingApp.startAction?.installedDetection;
+  if (installedDetection === undefined) {
+    return false;
+  }
+
+  const hasDetectedConfigFields = (installedDetection.configFields ?? []).every(
+    (configKey) => typeof input.connection.config?.[configKey] === "string",
+  );
+  const hasDetectedExternalSubject =
+    installedDetection.externalSubject !== true ||
+    typeof input.connection.externalSubjectId === "string";
+
+  return hasDetectedConfigFields && hasDetectedExternalSubject;
 }
 
 export function normalizeProviderAppSetupValue(value: string): string {
@@ -247,6 +284,10 @@ export function buildProviderAppSetupStartBody(input: {
   };
 
   for (const field of input.setupStartFormFields) {
+    if (!input.setupStartFormState.isFieldVisible(field.name)) {
+      continue;
+    }
+
     body[field.name] =
       field.required === true
         ? input.setupStartFormState.resolveRequiredValue(field.name)
@@ -286,10 +327,12 @@ export function buildProviderAppSetupSecretFieldInputs(input: {
   fieldKey: ProviderAppSetupFieldKey;
   id: string;
   label: string;
+  multiline?: boolean;
   placeholder?: string;
   required: boolean;
+  rows?: number;
   secretLabel: string;
-  type: "password";
+  type?: "password";
   value: string;
 }[] {
   return input.providerAppSetup.existingApp.secretFields.map((field) => ({
@@ -297,10 +340,11 @@ export function buildProviderAppSetupSecretFieldInputs(input: {
     fieldKey: field.name,
     id: `${input.routeSegment}-${field.name}`,
     label: field.label,
+    ...(field.inputType === "textarea" ? { multiline: true } : { type: field.inputType }),
     ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
     required: field.required && !input.configuredSecretFieldKeys.has(field.name),
+    ...(field.rows === undefined ? {} : { rows: field.rows }),
     secretLabel: field.secretLabel,
-    type: field.inputType,
     value: input.draft[field.name] ?? "",
   }));
 }

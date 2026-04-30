@@ -41,6 +41,33 @@ function createSlackConnection(input?: {
   };
 }
 
+function createGitHubConnection(input?: {
+  config?: Record<string, unknown>;
+  configuredSecretNames?: readonly string[];
+  externalSubjectId?: string;
+}): IntegrationConnection {
+  return {
+    id: "icn_github_app_setup",
+    targetKey: "github-cloud",
+    displayName: "Engineering GitHub",
+    status: "active",
+    connectionMethodId: "github-app-installation",
+    connectionMethodLabel: "GitHub App installation",
+    config: {
+      connection_method: "github-app-installation",
+      ...(input?.config ?? {}),
+    },
+    ...(input?.configuredSecretNames === undefined
+      ? {}
+      : { configuredSecretNames: [...input.configuredSecretNames] }),
+    ...(input?.externalSubjectId === undefined
+      ? {}
+      : { externalSubjectId: input.externalSubjectId }),
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  };
+}
+
 function CurrentPath(): React.JSX.Element {
   const location = useLocation();
   return <div data-testid="current-path">{location.pathname}</div>;
@@ -49,6 +76,8 @@ function CurrentPath(): React.JSX.Element {
 function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   controlPlaneApiOrigin?: string;
+  methodId?: string;
+  routeSegment?: string;
   webhookCallbackUrl?: string;
   webhookSource?: IntegrationWebhookSource | null;
 }) {
@@ -63,15 +92,17 @@ function renderProviderAppSetupPane(input?: {
     staleTime: Number.POSITIVE_INFINITY,
   });
   const connection = input?.connection ?? createSlackConnection();
+  const methodId = input?.methodId ?? "slack-bot-token";
+  const routeSegment = input?.routeSegment ?? "slack-app";
   const defaultWebhookSource = {
-    id: "iws_slack_app_setup",
+    id: "iws_provider_app_setup",
     targetKey: connection.targetKey,
     integrationConnectionId: connection.id,
-    displayName: "Slack Events API webhook",
-    endpointKey: "eps_slack_app_setup",
+    displayName: "Provider app webhook",
+    endpointKey: "eps_provider_app_setup",
     callbackUrl:
       input?.webhookCallbackUrl ??
-      "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+      `https://control-plane.example.com/p/integration/webhooks/${connection.targetKey}/eps_provider_app_setup`,
     status: "active",
     providerMetadata: {},
     createdAt: "2026-04-26T00:00:00.000Z",
@@ -86,7 +117,9 @@ function renderProviderAppSetupPane(input?: {
 
   return render(
     <MemoryRouter
-      initialEntries={[`/integrations/${connection.targetKey}/${connection.id}/slack-app/setup`]}
+      initialEntries={[
+        `/integrations/${connection.targetKey}/${connection.id}/${routeSegment}/setup`,
+      ]}
     >
       <QueryClientProvider client={queryClient}>
         <ProviderAppSetupPane
@@ -94,24 +127,24 @@ function renderProviderAppSetupPane(input?: {
           manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
             connection,
             setupRoute: {
-              methodId: "slack-bot-token",
-              routeSegment: "slack-app",
+              methodId,
+              routeSegment,
             },
           })}
-          methodId="slack-bot-token"
-          routeSegment="slack-app"
+          methodId={methodId}
+          routeSegment={routeSegment}
           setupStartForm={resolveIntegrationSetupStartFormOrThrow({
             connection,
             setupRoute: {
-              methodId: "slack-bot-token",
-              routeSegment: "slack-app",
+              methodId,
+              routeSegment,
             },
           })}
           providerAppSetup={resolveIntegrationProviderAppSetupOrThrow({
             connection,
             setupRoute: {
-              methodId: "slack-bot-token",
-              routeSegment: "slack-app",
+              methodId,
+              routeSegment,
             },
           })}
         />
@@ -150,7 +183,7 @@ describe("ProviderAppSetupPane", () => {
     ).toBeTruthy();
     await waitFor(() => {
       expect(rendered.container.textContent).toContain(
-        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_provider_app_setup",
       );
     });
     expect(rendered.container.textContent).toContain(
@@ -208,7 +241,7 @@ describe("ProviderAppSetupPane", () => {
     expect(screen.getByText("Events API Request URL")).toBeTruthy();
     expect(
       screen.getByText(
-        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_app_setup",
+        "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_provider_app_setup",
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Save Slack App" })).toBeNull();
@@ -216,6 +249,52 @@ describe("ProviderAppSetupPane", () => {
     expect(connectButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(connectButton);
     expect(screen.getByTestId("current-path").textContent).toBe("/integrations/slack-default");
+  });
+
+  it("renders GitHub provider-owned manifest setup fields", async () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection(),
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
+    expect(
+      screen.getByRole("radio", {
+        name: "Personal account",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Organization" })).toBeTruthy();
+    expect(screen.queryByLabelText("GitHub organization")).toBeNull();
+    expect(screen.getByRole("heading", { level: 3, name: "GitHub App Manifest" })).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText("Create app in GitHub").hasAttribute("disabled")).toBe(true);
+    });
+  });
+
+  it("renders GitHub provider-owned existing app setup fields", () => {
+    renderProviderAppSetupPane({
+      connection: createGitHubConnection({
+        config: {
+          app_id: "12345",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.providerowned",
+        },
+        configuredSecretNames: ["appPrivateKeyPem", "clientSecret", "webhookSecret"],
+      }),
+      methodId: "github-app-installation",
+      routeSegment: "github-app",
+    });
+
+    expect(screen.getByRole("tab", { name: "Use existing app", selected: true })).toBeTruthy();
+    expect(screen.getByText("Existing GitHub App")).toBeTruthy();
+    expect(screen.getByDisplayValue("12345")).toBeTruthy();
+    expect(screen.getByDisplayValue("mistle-github-app")).toBeTruthy();
+    expect(screen.getByDisplayValue("Iv1.providerowned")).toBeTruthy();
+    expect(screen.getByText("Hook URLs")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
+    ).toBe(false);
   });
 
   it("keeps the existing Slack app completion action disabled until required local setup is ready", () => {

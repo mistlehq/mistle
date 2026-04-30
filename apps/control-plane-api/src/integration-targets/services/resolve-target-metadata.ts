@@ -270,9 +270,53 @@ function cloneProviderAppSetup(
         label: field.label,
         name: field.name,
         ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        ...(field.rows === undefined ? {} : { rows: field.rows }),
         required: field.required,
         secretLabel: field.secretLabel,
       })),
+      ...(setup.existingApp.startAction === undefined
+        ? {}
+        : {
+            startAction: {
+              expectedResultKind: setup.existingApp.startAction.expectedResultKind,
+              ...(setup.existingApp.startAction.installedDetection === undefined
+                ? {}
+                : {
+                    installedDetection: {
+                      ...(setup.existingApp.startAction.installedDetection.configFields ===
+                      undefined
+                        ? {}
+                        : {
+                            configFields: [
+                              ...setup.existingApp.startAction.installedDetection.configFields,
+                            ],
+                          }),
+                      ...(setup.existingApp.startAction.installedDetection.externalSubject ===
+                      undefined
+                        ? {}
+                        : {
+                            externalSubject:
+                              setup.existingApp.startAction.installedDetection.externalSubject,
+                          }),
+                    },
+                  }),
+              ...(setup.existingApp.startAction.installedLabel === undefined
+                ? {}
+                : { installedLabel: setup.existingApp.startAction.installedLabel }),
+              ...(setup.existingApp.startAction.installedOpensInNewWindow === undefined
+                ? {}
+                : {
+                    installedOpensInNewWindow:
+                      setup.existingApp.startAction.installedOpensInNewWindow,
+                  }),
+              ...(setup.existingApp.startAction.pendingLabel === undefined
+                ? {}
+                : { pendingLabel: setup.existingApp.startAction.pendingLabel }),
+              routeSegment: setup.existingApp.startAction.routeSegment,
+              startErrorMessage: setup.existingApp.startAction.startErrorMessage,
+              unexpectedResultMessage: setup.existingApp.startAction.unexpectedResultMessage,
+            },
+          }),
       title: setup.existingApp.title,
     },
     manifest: {
@@ -328,8 +372,24 @@ function cloneSetupStartForm(
       inputType: field.inputType,
       label: field.label,
       name: field.name,
+      ...(field.options === undefined
+        ? {}
+        : {
+            options: field.options.map((option) => ({
+              label: option.label,
+              value: option.value,
+            })),
+          }),
       ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
       ...(field.required === undefined ? {} : { required: field.required }),
+      ...(field.visibleWhen === undefined
+        ? {}
+        : {
+            visibleWhen: {
+              field: field.visibleWhen.field,
+              value: field.visibleWhen.value,
+            },
+          }),
     })),
   };
 }

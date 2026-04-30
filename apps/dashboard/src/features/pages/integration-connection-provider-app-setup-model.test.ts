@@ -10,6 +10,7 @@ import {
   buildProviderAppSetupStartBody,
   createInitialProviderAppSetupDraft,
   getProviderAppSetupFieldValidationMessage,
+  hasProviderAppSetupDraftValues,
   isProviderAppInstalled,
   isProviderAppRequiredFieldReady,
   resolveProviderAppSetupRequiredFieldKeys,
@@ -106,6 +107,12 @@ describe("provider app setup model", () => {
       clientSecret: "",
     });
     expect(resolveProviderAppSetupRequiredFieldKeys(ProviderAppSetup)).toEqual(["botToken"]);
+    expect(
+      hasProviderAppSetupDraftValues({
+        connection: ProviderConnection,
+        providerAppSetup: ProviderAppSetup,
+      }),
+    ).toBe(true);
     expect(
       isProviderAppInstalled({
         connection: ProviderConnection,
@@ -205,6 +212,7 @@ describe("provider app setup model", () => {
           values: {
             appConfigToken: "token-value",
           },
+          isFieldVisible: () => true,
           resolveRequiredValue: (fieldName) => {
             if (fieldName !== "appConfigToken") {
               throw new Error(`Unexpected required field '${fieldName}'.`);
@@ -222,6 +230,46 @@ describe("provider app setup model", () => {
       },
       appConfigToken: "token-value",
       optionalNote: "",
+    });
+  });
+
+  it("omits hidden provider app manifest start form fields", () => {
+    expect(
+      buildProviderAppSetupStartBody({
+        manifest: {
+          name: "Provider app",
+        },
+        providerAppSetup: ProviderAppSetup,
+        setupStartFormFields: [
+          {
+            name: "ownerKind",
+            required: true,
+          },
+          {
+            name: "organizationSlug",
+            required: true,
+          },
+        ],
+        setupStartFormState: {
+          values: {
+            ownerKind: "personal",
+            organizationSlug: "",
+          },
+          isFieldVisible: (fieldName) => fieldName !== "organizationSlug",
+          resolveRequiredValue: (fieldName) => {
+            if (fieldName !== "ownerKind") {
+              throw new Error(`Unexpected required field '${fieldName}'.`);
+            }
+
+            return "personal";
+          },
+        },
+      }),
+    ).toEqual({
+      manifest: {
+        name: "Provider app",
+      },
+      ownerKind: "personal",
     });
   });
 

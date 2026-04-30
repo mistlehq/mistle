@@ -12,7 +12,6 @@ import {
   buildGitHubAppManifestConversionUrl,
   buildGitHubAppManifestSubmissionUrl,
   buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
-  GitHubAppManifestOwnerSchema,
   parseGitHubAppManifestConversionResponse,
 } from "./app-manifest.js";
 import type { GitHubConnectionConfig } from "./auth.js";
@@ -37,9 +36,20 @@ type GitHubProviderAppSetupCapabilityOptions = {
 const GitHubAppManifestStartBodySchema = z
   .object({
     manifest: z.record(z.string(), z.unknown()),
-    owner: GitHubAppManifestOwnerSchema,
+    organizationSlug: z.string().optional(),
+    ownerKind: z.enum(["organization", "personal"]),
   })
-  .strict();
+  .strict()
+  .transform((body) => ({
+    manifest: body.manifest,
+    owner:
+      body.ownerKind === "personal"
+        ? { kind: body.ownerKind }
+        : {
+            kind: body.ownerKind,
+            organizationSlug: z.string().min(1).parse(body.organizationSlug),
+          },
+  }));
 
 async function convertGitHubAppManifest(input: {
   apiBaseUrl: string;

@@ -186,6 +186,12 @@ const StoryDraftConnectionRequestBodySchema = z.object({
   displayName: z.string(),
 });
 
+const StoryGitHubManifestStartRequestBodySchema = z.object({
+  manifest: z.record(z.string(), z.unknown()),
+  ownerKind: z.enum(["organization", "personal"]),
+  organizationSlug: z.string().optional(),
+});
+
 function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -276,6 +282,23 @@ function useGitHubStoryControlPlane(input: { queryClient: QueryClient }): void {
         return createJsonResponse({
           kind: "redirect",
           authorizationUrl: `${StoryControlPlaneApiOrigin}/storybook/github-app-install`,
+        });
+      }
+
+      const startManifestMatch = path.match(
+        /^\/v1\/integration\/connections\/([^/]+)\/setup\/github-app\/start$/,
+      );
+      if (method === "POST" && startManifestMatch !== null) {
+        const requestBody: unknown = await request.json();
+        StoryGitHubManifestStartRequestBodySchema.parse(requestBody);
+        return createJsonResponse({
+          kind: "form-post",
+          submissionUrl: "https://github.com/settings/apps/new",
+          fields: {
+            manifest: JSON.stringify({
+              name: "Mistle GitHub App",
+            }),
+          },
         });
       }
 

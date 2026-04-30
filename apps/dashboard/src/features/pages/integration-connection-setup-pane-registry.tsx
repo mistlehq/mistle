@@ -1,7 +1,4 @@
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
 import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
@@ -16,23 +13,6 @@ type IntegrationConnectionSetupPaneComponent = (input: {
   searchParams: URLSearchParams;
   setupRoute: IntegrationConnectionSetupRoute;
 }) => React.JSX.Element;
-
-function renderGitHubAppSetupPane(input: {
-  connection: IntegrationConnection;
-  searchParams: URLSearchParams;
-  setupRoute: IntegrationConnectionSetupRoute;
-}): React.JSX.Element {
-  return (
-    <GitHubAppSetupPane
-      connection={input.connection}
-      manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
-        connection: input.connection,
-        setupRoute: input.setupRoute,
-      })}
-      manifestCreationSucceeded={input.searchParams.get("githubAppManifest") === "created"}
-    />
-  );
-}
 
 function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
@@ -64,13 +44,6 @@ function resolveSetupPane(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
 }): IntegrationConnectionSetupPaneComponent {
-  if (
-    input.setupRoute.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
-    input.setupRoute.routeSegment === "github-app"
-  ) {
-    return renderGitHubAppSetupPane;
-  }
-
   const setupPane = resolveIntegrationSetupPaneOrThrow(input);
   if (setupPane.kind === "provider-app") {
     return renderProviderAppSetupPane;

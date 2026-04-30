@@ -155,8 +155,8 @@ describe("resolveIntegrationSetupStartFormOrThrow", () => {
     });
   });
 
-  it("fails fast when the setup flow has no start form", () => {
-    expect(() =>
+  it("resolves the GitHub setup start form from the browser definition", () => {
+    expect(
       resolveIntegrationSetupStartFormOrThrow({
         connection: GitHubConnection,
         setupRoute: {
@@ -164,9 +164,25 @@ describe("resolveIntegrationSetupStartFormOrThrow", () => {
           routeSegment: "github-app",
         },
       }),
-    ).toThrow(
-      "Integration setup flow 'github-app-installation/github-app' does not define a setup start form for target 'github-cloud'.",
-    );
+    ).toMatchObject({
+      submitLabel: "Create app in GitHub",
+      fields: [
+        {
+          name: "ownerKind",
+          inputType: "radio",
+          required: true,
+        },
+        {
+          name: "organizationSlug",
+          inputType: "text",
+          required: true,
+          visibleWhen: {
+            field: "ownerKind",
+            value: "organization",
+          },
+        },
+      ],
+    });
   });
 });
 
@@ -203,8 +219,8 @@ describe("resolveIntegrationProviderAppSetupOrThrow", () => {
     });
   });
 
-  it("fails fast when the setup flow has no provider app setup", () => {
-    expect(() =>
+  it("resolves GitHub provider app setup from the browser definition", () => {
+    expect(
       resolveIntegrationProviderAppSetupOrThrow({
         connection: GitHubConnection,
         setupRoute: {
@@ -212,9 +228,25 @@ describe("resolveIntegrationProviderAppSetupOrThrow", () => {
           routeSegment: "github-app",
         },
       }),
-    ).toThrow(
-      "Integration setup flow 'github-app-installation/github-app' does not define provider app setup for target 'github-cloud'.",
-    );
+    ).toMatchObject({
+      title: "Choose a setup method",
+      manifest: {
+        startAction: {
+          expectedResultKind: "form-post",
+        },
+      },
+      existingApp: {
+        title: "Existing GitHub App",
+        connectLabel: "Install GitHub App",
+        startAction: {
+          routeSegment: "github-app-installation",
+          installedLabel: "Manage Installation",
+        },
+      },
+      urls: {
+        title: "Hook URLs",
+      },
+    });
   });
 });
 
@@ -233,8 +265,8 @@ describe("resolveIntegrationSetupPaneOrThrow", () => {
     });
   });
 
-  it("fails fast when the setup flow has no setup pane metadata", () => {
-    expect(() =>
+  it("resolves GitHub setup pane metadata from the browser definition", () => {
+    expect(
       resolveIntegrationSetupPaneOrThrow({
         connection: GitHubConnection,
         setupRoute: {
@@ -242,8 +274,8 @@ describe("resolveIntegrationSetupPaneOrThrow", () => {
           routeSegment: "github-app",
         },
       }),
-    ).toThrow(
-      "Integration setup flow 'github-app-installation/github-app' does not define a setup pane for target 'github-cloud'.",
-    );
+    ).toEqual({
+      kind: "provider-app",
+    });
   });
 });

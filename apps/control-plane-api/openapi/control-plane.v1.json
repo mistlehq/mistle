@@ -6284,7 +6284,7 @@
                                                     "properties": {
                                                       "inputType": {
                                                         "type": "string",
-                                                        "enum": ["password"]
+                                                        "enum": ["password", "textarea"]
                                                       },
                                                       "label": {
                                                         "type": "string",
@@ -6297,6 +6297,10 @@
                                                       "placeholder": {
                                                         "type": "string",
                                                         "minLength": 1
+                                                      },
+                                                      "rows": {
+                                                        "type": "integer",
+                                                        "minimum": 1
                                                       },
                                                       "required": {
                                                         "type": "boolean"
@@ -6316,6 +6320,61 @@
                                                     "additionalProperties": false
                                                   },
                                                   "minItems": 1
+                                                },
+                                                "startAction": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "expectedResultKind": {
+                                                      "type": "string",
+                                                      "enum": ["redirect"]
+                                                    },
+                                                    "installedDetection": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "configFields": {
+                                                          "type": "array",
+                                                          "items": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                          }
+                                                        },
+                                                        "externalSubject": {
+                                                          "type": "boolean"
+                                                        }
+                                                      },
+                                                      "additionalProperties": false
+                                                    },
+                                                    "installedLabel": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "installedOpensInNewWindow": {
+                                                      "type": "boolean"
+                                                    },
+                                                    "pendingLabel": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "routeSegment": {
+                                                      "type": "string",
+                                                      "pattern": "^[a-z0-9][a-z0-9-]*$"
+                                                    },
+                                                    "startErrorMessage": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "unexpectedResultMessage": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "expectedResultKind",
+                                                    "routeSegment",
+                                                    "startErrorMessage",
+                                                    "unexpectedResultMessage"
+                                                  ],
+                                                  "additionalProperties": false
                                                 },
                                                 "title": {
                                                   "type": "string",
@@ -6349,7 +6408,7 @@
                                                   "properties": {
                                                     "expectedResultKind": {
                                                       "type": "string",
-                                                      "enum": ["redirect"]
+                                                      "enum": ["form-post", "redirect"]
                                                     },
                                                     "manifestBodyField": {
                                                       "type": "string",
@@ -6492,7 +6551,12 @@
                                                   },
                                                   "inputType": {
                                                     "type": "string",
-                                                    "enum": ["password", "text", "textarea"]
+                                                    "enum": [
+                                                      "password",
+                                                      "radio",
+                                                      "text",
+                                                      "textarea"
+                                                    ]
                                                   },
                                                   "label": {
                                                     "type": "string",
@@ -6502,12 +6566,46 @@
                                                     "type": "string",
                                                     "minLength": 1
                                                   },
+                                                  "options": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "label": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "value": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        }
+                                                      },
+                                                      "required": ["label", "value"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1
+                                                  },
                                                   "placeholder": {
                                                     "type": "string",
                                                     "minLength": 1
                                                   },
                                                   "required": {
                                                     "type": "boolean"
+                                                  },
+                                                  "visibleWhen": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "field": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "value": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    },
+                                                    "required": ["field", "value"],
+                                                    "additionalProperties": false
                                                   }
                                                 },
                                                 "required": ["inputType", "label", "name"],
