@@ -25,6 +25,7 @@ import {
   clearPendingStatusTimeouts,
   scheduleSavedStateReset,
 } from "../shared/auto-save-behavior.js";
+import { FormPageSection } from "../shared/form-page.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
@@ -291,6 +292,11 @@ function SandboxProfileSnapshotStoryPanel(input: {
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
+      <p className="text-sm text-muted-foreground">
+        A snapshot is the prepared sandbox image created from this published profile version and its
+        setup script. New sessions can only start after a snapshot is ready.
+      </p>
+
       {input.publishSuccessMessage ? (
         <Notice
           autoHideAfterMs={NoticeAutoHideDurationsMs.MEDIUM}
@@ -304,39 +310,36 @@ function SandboxProfileSnapshotStoryPanel(input: {
         <Notice title={state.notice.title} variant={state.notice.variant} />
       )}
 
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold leading-6">About snapshots</h2>
-        <p className="text-sm text-muted-foreground">
-          A snapshot is the prepared sandbox image created from this published profile version and
-          its setup script. New sessions can only start after a snapshot is ready.
-        </p>
-      </div>
+      <FormPageSection>
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <DefinitionList
+              className="min-w-0 flex-1 md:grid-cols-1"
+              items={[
+                {
+                  id: "snapshot-created",
+                  label: "Latest snapshot",
+                  value: state.latestSnapshotCreatedAt ?? "N/A",
+                },
+              ]}
+            />
 
-      {state.bodyActionLabel === null ? null : (
-        <div>
-          <Button type="button">{state.bodyActionLabel}</Button>
+            {state.activityLabel === null ? null : (
+              <ActivityStatus
+                className="shrink-0 justify-start text-muted-foreground sm:min-w-48 sm:justify-end"
+                label={state.activityLabel}
+                labelKey={input.status}
+              />
+            )}
+
+            {state.activityLabel !== null || state.bodyActionLabel === null ? null : (
+              <Button className="w-fit shrink-0" type="button">
+                {state.bodyActionLabel}
+              </Button>
+            )}
+          </div>
         </div>
-      )}
-
-      {state.activityLabel === null ? null : (
-        <ActivityStatus
-          className="justify-start text-muted-foreground"
-          label={state.activityLabel}
-          labelKey={input.status}
-        />
-      )}
-
-      {state.latestSnapshotCreatedAt === null ? null : (
-        <DefinitionList
-          items={[
-            {
-              id: "snapshot-created",
-              label: "Latest snapshot",
-              value: state.latestSnapshotCreatedAt,
-            },
-          ]}
-        />
-      )}
+      </FormPageSection>
 
       {input.status === "draft-unavailable" ? null : (
         <SandboxProfileSnapshotRefreshScheduleStorySection state={input.refreshScheduleState} />
@@ -381,108 +384,115 @@ function SandboxProfileSnapshotRefreshScheduleStorySection(input: {
     : "Snapshots will not refresh automatically.";
 
   return (
-    <form
-      className="space-y-4 border-t pt-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-      }}
-    >
-      <div className="space-y-1">
-        <div className="flex min-h-10 items-center justify-between gap-3">
+    <FormPageSection>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+        }}
+      >
+        <div className="flex flex-col gap-4 p-4">
           <div className="space-y-1">
-            <FieldLabel htmlFor="storybook-snapshot-refresh-enabled">Automatic refresh</FieldLabel>
-            <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+            <div className="flex min-h-10 items-center justify-between gap-3">
+              <div className="space-y-1">
+                <FieldLabel htmlFor="storybook-snapshot-refresh-enabled">
+                  Automatic refresh
+                </FieldLabel>
+                <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+              </div>
+              <Switch
+                aria-label="Automatic refresh"
+                checked={scheduleEnabled}
+                id="storybook-snapshot-refresh-enabled"
+                onCheckedChange={(checked) => {
+                  setScheduleEnabled(checked);
+                }}
+              />
+            </div>
           </div>
-          <Switch
-            aria-label="Automatic refresh"
-            checked={scheduleEnabled}
-            id="storybook-snapshot-refresh-enabled"
-            onCheckedChange={(checked) => {
-              setScheduleEnabled(checked);
-            }}
-          />
+
+          {input.state === "save-failure" ? (
+            <Notice title="Schedule update failed" variant="alert">
+              Could not save snapshot refresh schedule.
+            </Notice>
+          ) : null}
+
+          {existingSchedule === null || !scheduleEnabled ? null : (
+            <DefinitionList
+              items={[
+                {
+                  id: "snapshot-refresh-cron",
+                  label: "Cron",
+                  value: existingSchedule.cronExpression,
+                },
+                {
+                  id: "snapshot-refresh-timezone",
+                  label: "Timezone",
+                  value: existingSchedule.timezone,
+                },
+                {
+                  id: "snapshot-refresh-next",
+                  label: "Next refresh",
+                  value: existingSchedule.nextScheduledAt,
+                },
+              ]}
+            />
+          )}
+
+          {scheduleEnabled ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldHeader>
+                    <FieldLabel htmlFor="storybook-snapshot-refresh-cron">
+                      Cron expression
+                    </FieldLabel>
+                  </FieldHeader>
+                  <FieldContent>
+                    <Input
+                      id="storybook-snapshot-refresh-cron"
+                      onChange={(event) => {
+                        setCronExpression(event.target.value);
+                      }}
+                      value={cronExpression}
+                    />
+                  </FieldContent>
+                </Field>
+                <Field>
+                  <FieldHeader>
+                    <FieldLabel htmlFor="storybook-snapshot-refresh-timezone">Timezone</FieldLabel>
+                  </FieldHeader>
+                  <FieldContent>
+                    <SingleSelectStringComboboxField
+                      contentClassName="max-h-80"
+                      emptyMessage="No matching timezones."
+                      inputId="storybook-snapshot-refresh-timezone"
+                      inputLabel="Timezone"
+                      onChange={(value) => {
+                        setTimezone(value ?? "");
+                      }}
+                      options={timezoneOptions}
+                      placeholder="Asia/Singapore"
+                      value={timezone}
+                    />
+                  </FieldContent>
+                </Field>
+              </div>
+
+              <StoryCronExpressionBreakdownList
+                breakdown={cronExpressionBreakdown}
+                message={scheduleBehaviorDescription}
+              />
+            </>
+          ) : null}
+
+          {scheduleEnabled || existingSchedule !== null ? (
+            <ButtonGroup>
+              <Button type="submit">{scheduleEnabled ? "Save schedule" : "Save changes"}</Button>
+            </ButtonGroup>
+          ) : null}
         </div>
-      </div>
-
-      {input.state === "save-failure" ? (
-        <Notice title="Schedule update failed" variant="alert">
-          Could not save snapshot refresh schedule.
-        </Notice>
-      ) : null}
-
-      {existingSchedule === null || !scheduleEnabled ? null : (
-        <DefinitionList
-          items={[
-            {
-              id: "snapshot-refresh-cron",
-              label: "Cron",
-              value: existingSchedule.cronExpression,
-            },
-            {
-              id: "snapshot-refresh-timezone",
-              label: "Timezone",
-              value: existingSchedule.timezone,
-            },
-            {
-              id: "snapshot-refresh-next",
-              label: "Next refresh",
-              value: existingSchedule.nextScheduledAt,
-            },
-          ]}
-        />
-      )}
-
-      {scheduleEnabled ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldHeader>
-                <FieldLabel htmlFor="storybook-snapshot-refresh-cron">Cron expression</FieldLabel>
-              </FieldHeader>
-              <FieldContent>
-                <Input
-                  id="storybook-snapshot-refresh-cron"
-                  onChange={(event) => {
-                    setCronExpression(event.target.value);
-                  }}
-                  value={cronExpression}
-                />
-              </FieldContent>
-            </Field>
-            <Field>
-              <FieldHeader>
-                <FieldLabel htmlFor="storybook-snapshot-refresh-timezone">Timezone</FieldLabel>
-              </FieldHeader>
-              <FieldContent>
-                <SingleSelectStringComboboxField
-                  contentClassName="max-h-80"
-                  emptyMessage="No matching timezones."
-                  inputId="storybook-snapshot-refresh-timezone"
-                  inputLabel="Timezone"
-                  onChange={(value) => {
-                    setTimezone(value ?? "");
-                  }}
-                  options={timezoneOptions}
-                  placeholder="Asia/Singapore"
-                  value={timezone}
-                />
-              </FieldContent>
-            </Field>
-          </div>
-
-          <StoryCronExpressionBreakdownList
-            breakdown={cronExpressionBreakdown}
-            message={scheduleBehaviorDescription}
-          />
-        </>
-      ) : null}
-
-      {scheduleEnabled || existingSchedule !== null ? (
-        <ButtonGroup>
-          <Button type="submit">{scheduleEnabled ? "Save schedule" : "Save changes"}</Button>
-        </ButtonGroup>
-      ) : null}
-    </form>
+      </form>
+    </FormPageSection>
   );
 }
 

@@ -826,6 +826,8 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByText("Create a snapshot to start sessions from this profile."),
     ).toBeDefined();
+    expect(screen.getByText("Latest snapshot")).toBeDefined();
+    expect(screen.getByText("N/A")).toBeDefined();
     expect(screen.getByRole("button", { name: "Create snapshot" })).toBeDefined();
   });
 
@@ -1594,6 +1596,8 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
     expect(screen.queryByRole("combobox", { name: "agent harness connection" })).toBeNull();
     expect(screen.getByText("Codex connection")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Setup script behavior" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Environment and installed tools" })).toBeNull();
   });
 
   it("renders published profiles with existing drafts as resumable", () => {

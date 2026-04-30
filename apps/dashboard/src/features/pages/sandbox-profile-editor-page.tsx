@@ -81,6 +81,7 @@ import type {
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { ActivityStatus } from "../shared/activity-status.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
+import { FormPageSection } from "../shared/form-page.js";
 import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createSandboxBaseSetupScriptContextFromGeneratedInventory,
@@ -1395,6 +1396,11 @@ function SandboxProfileSnapshotPanel(input: {
 
   return (
     <SandboxProfileEditorHorizontalTabContent>
+      <p className="text-sm text-muted-foreground">
+        A snapshot is the prepared sandbox image created from this published profile version and its
+        setup script. New sessions can only start after a snapshot is ready.
+      </p>
+
       <PublishSuccessSnapshotNotice
         onDismiss={input.onPublishSuccessMessageDismiss}
         noticeKey={input.publishSuccessMessageKey}
@@ -1417,41 +1423,41 @@ function SandboxProfileSnapshotPanel(input: {
         </Notice>
       ) : null}
 
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold leading-6">About snapshots</h2>
-        <p className="text-sm text-muted-foreground">
-          A snapshot is the prepared sandbox image created from this published profile version and
-          its setup script. New sessions can only start after a snapshot is ready.
-        </p>
-      </div>
+      <FormPageSection>
+        <div className="flex flex-col gap-4 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <DefinitionList
+              className="min-w-0 flex-1 md:grid-cols-1"
+              items={[
+                {
+                  id: "snapshot-created",
+                  label: "Latest snapshot",
+                  value: latestSnapshotCreatedAt ?? "N/A",
+                },
+              ]}
+            />
 
-      {actionLabel === null ? null : (
-        <div>
-          <Button disabled={input.isActionPending} onClick={input.onRefreshSnapshot} type="button">
-            {actionLabel}
-          </Button>
+            {activityLabel === null ? null : (
+              <ActivityStatus
+                className="shrink-0 justify-start text-muted-foreground sm:min-w-48 sm:justify-end"
+                label={activityLabel}
+                labelKey={input.state.kind}
+              />
+            )}
+
+            {activityLabel !== null || actionLabel === null ? null : (
+              <Button
+                className="w-fit shrink-0"
+                disabled={input.isActionPending}
+                onClick={input.onRefreshSnapshot}
+                type="button"
+              >
+                {actionLabel}
+              </Button>
+            )}
+          </div>
         </div>
-      )}
-
-      {activityLabel === null ? null : (
-        <ActivityStatus
-          className="justify-start text-muted-foreground"
-          label={activityLabel}
-          labelKey={input.state.kind}
-        />
-      )}
-
-      {latestSnapshotCreatedAt === null ? null : (
-        <DefinitionList
-          items={[
-            {
-              id: "snapshot-created",
-              label: "Latest snapshot",
-              value: latestSnapshotCreatedAt,
-            },
-          ]}
-        />
-      )}
+      </FormPageSection>
 
       <SandboxProfileSnapshotRefreshScheduleSection
         disabled={input.isActionPending}
@@ -1563,116 +1569,120 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   }
 
   return (
-    <form className="space-y-4 border-t pt-4" onSubmit={handleSubmit}>
-      <div className="space-y-1">
-        <div className="flex min-h-10 items-center justify-between gap-3">
+    <FormPageSection>
+      <form onSubmit={handleSubmit}>
+        <div className="flex flex-col gap-4 p-4">
           <div className="space-y-1">
-            <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-enabled">
-              Automatic refresh
-            </FieldLabel>
-            <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+            <div className="flex min-h-10 items-center justify-between gap-3">
+              <div className="space-y-1">
+                <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-enabled">
+                  Automatic refresh
+                </FieldLabel>
+                <p className="text-sm text-muted-foreground">{scheduleStatusMessage}</p>
+              </div>
+              <Switch
+                aria-label="Automatic refresh"
+                checked={scheduleEnabled}
+                disabled={fieldsAreDisabled}
+                id="sandbox-profile-snapshot-refresh-enabled"
+                onCheckedChange={(checked) => {
+                  setScheduleEnabled(checked);
+                }}
+              />
+            </div>
           </div>
-          <Switch
-            aria-label="Automatic refresh"
-            checked={scheduleEnabled}
-            disabled={fieldsAreDisabled}
-            id="sandbox-profile-snapshot-refresh-enabled"
-            onCheckedChange={(checked) => {
-              setScheduleEnabled(checked);
-            }}
-          />
+
+          {mutationError === null ? null : (
+            <Notice title="Schedule update failed" variant="alert">
+              {mutationError}
+            </Notice>
+          )}
+
+          {existingSchedule === null || !scheduleEnabled ? null : (
+            <DefinitionList
+              items={[
+                {
+                  id: "snapshot-refresh-cron",
+                  label: "Cron",
+                  value: existingSchedule.cronExpression,
+                },
+                {
+                  id: "snapshot-refresh-timezone",
+                  label: "Timezone",
+                  value: existingSchedule.timezone,
+                },
+                {
+                  id: "snapshot-refresh-next",
+                  label: "Next refresh",
+                  value: existingSchedule.nextScheduledAt ?? "Not scheduled",
+                },
+              ]}
+            />
+          )}
+
+          {scheduleEnabled ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldHeader>
+                    <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">
+                      Cron expression
+                    </FieldLabel>
+                  </FieldHeader>
+                  <FieldContent>
+                    <Input
+                      disabled={fieldsAreDisabled}
+                      id="sandbox-profile-snapshot-refresh-cron"
+                      onChange={(event) => {
+                        setCronExpression(event.target.value);
+                      }}
+                      placeholder="0 9 * * 1"
+                      required
+                      value={cronExpression}
+                    />
+                  </FieldContent>
+                </Field>
+                <Field>
+                  <FieldHeader>
+                    <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">
+                      Timezone
+                    </FieldLabel>
+                  </FieldHeader>
+                  <FieldContent>
+                    <SingleSelectStringComboboxField
+                      contentClassName="max-h-80"
+                      disabled={fieldsAreDisabled}
+                      emptyMessage="No matching timezones."
+                      inputId="sandbox-profile-snapshot-refresh-timezone"
+                      inputLabel="Timezone"
+                      onChange={(value) => {
+                        setTimezone(value ?? "");
+                      }}
+                      options={timezoneOptions}
+                      placeholder="Asia/Singapore"
+                      value={timezone}
+                    />
+                  </FieldContent>
+                </Field>
+              </div>
+
+              <CronExpressionBreakdownList
+                breakdown={cronExpressionBreakdown}
+                message={scheduleBehaviorDescription}
+              />
+            </>
+          ) : null}
+
+          {scheduleEnabled || existingSchedule !== null ? (
+            <ButtonGroup>
+              <Button disabled={submitIsDisabled} type="submit">
+                {scheduleEnabled ? "Save schedule" : "Save changes"}
+              </Button>
+            </ButtonGroup>
+          ) : null}
         </div>
-      </div>
-
-      {mutationError === null ? null : (
-        <Notice title="Schedule update failed" variant="alert">
-          {mutationError}
-        </Notice>
-      )}
-
-      {existingSchedule === null || !scheduleEnabled ? null : (
-        <DefinitionList
-          items={[
-            {
-              id: "snapshot-refresh-cron",
-              label: "Cron",
-              value: existingSchedule.cronExpression,
-            },
-            {
-              id: "snapshot-refresh-timezone",
-              label: "Timezone",
-              value: existingSchedule.timezone,
-            },
-            {
-              id: "snapshot-refresh-next",
-              label: "Next refresh",
-              value: existingSchedule.nextScheduledAt ?? "Not scheduled",
-            },
-          ]}
-        />
-      )}
-
-      {scheduleEnabled ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldHeader>
-                <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-cron">
-                  Cron expression
-                </FieldLabel>
-              </FieldHeader>
-              <FieldContent>
-                <Input
-                  disabled={fieldsAreDisabled}
-                  id="sandbox-profile-snapshot-refresh-cron"
-                  onChange={(event) => {
-                    setCronExpression(event.target.value);
-                  }}
-                  placeholder="0 9 * * 1"
-                  required
-                  value={cronExpression}
-                />
-              </FieldContent>
-            </Field>
-            <Field>
-              <FieldHeader>
-                <FieldLabel htmlFor="sandbox-profile-snapshot-refresh-timezone">
-                  Timezone
-                </FieldLabel>
-              </FieldHeader>
-              <FieldContent>
-                <SingleSelectStringComboboxField
-                  contentClassName="max-h-80"
-                  disabled={fieldsAreDisabled}
-                  emptyMessage="No matching timezones."
-                  inputId="sandbox-profile-snapshot-refresh-timezone"
-                  inputLabel="Timezone"
-                  onChange={(value) => {
-                    setTimezone(value ?? "");
-                  }}
-                  options={timezoneOptions}
-                  placeholder="Asia/Singapore"
-                  value={timezone}
-                />
-              </FieldContent>
-            </Field>
-          </div>
-
-          <CronExpressionBreakdownList
-            breakdown={cronExpressionBreakdown}
-            message={scheduleBehaviorDescription}
-          />
-        </>
-      ) : null}
-
-      {scheduleEnabled || existingSchedule !== null ? (
-        <ButtonGroup>
-          <Button disabled={submitIsDisabled} type="submit">
-            {scheduleEnabled ? "Save schedule" : "Save changes"}
-          </Button>
-        </ButtonGroup>
-      ) : null}
-    </form>
+      </form>
+    </FormPageSection>
   );
 }
 
@@ -2390,58 +2400,60 @@ export function SandboxProfileSetupScriptPanel(input: {
               value={input.value}
               {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
             />
-            <div className="flex flex-col pt-1">
-              <Accordion className="border-border/70 w-full border-y" multiple>
-                <AccordionItem className="border-border/70" value="how-setup-script-works">
-                  <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
-                    Setup script behavior
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <div className="gap-3 flex flex-col">
-                      <div className="gap-1 flex flex-col">
-                        <FieldDescription>{SetupScriptTimingDescription}</FieldDescription>
-                        <FieldDescription>
-                          Repositories are cloned under the working directory, using their
-                          <InlineCode variant="muted">owner/repository</InlineCode> path.
-                        </FieldDescription>
-                        {setupScriptContext.repositoryLocationGroup === null ? (
+            {input.disabled === true ? null : (
+              <div className="flex flex-col pt-1">
+                <Accordion className="border-border/70 w-full border-y" multiple>
+                  <AccordionItem className="border-border/70" value="how-setup-script-works">
+                    <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+                      Setup script behavior
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-3">
+                      <div className="gap-3 flex flex-col">
+                        <div className="gap-1 flex flex-col">
+                          <FieldDescription>{SetupScriptTimingDescription}</FieldDescription>
                           <FieldDescription>
-                            For example,{" "}
-                            <InlineCode variant="muted">
-                              {setupScriptContext.repositoryLocationExample.handle}
-                            </InlineCode>{" "}
-                            is available at{" "}
-                            <InlineCode variant="muted">
-                              {setupScriptContext.repositoryLocationExample.path}
-                            </InlineCode>
-                            .
+                            Repositories are cloned under the working directory, using their
+                            <InlineCode variant="muted">owner/repository</InlineCode> path.
                           </FieldDescription>
-                        ) : null}
+                          {setupScriptContext.repositoryLocationGroup === null ? (
+                            <FieldDescription>
+                              For example,{" "}
+                              <InlineCode variant="muted">
+                                {setupScriptContext.repositoryLocationExample.handle}
+                              </InlineCode>{" "}
+                              is available at{" "}
+                              <InlineCode variant="muted">
+                                {setupScriptContext.repositoryLocationExample.path}
+                              </InlineCode>
+                              .
+                            </FieldDescription>
+                          ) : null}
+                        </div>
+
+                        {setupScriptContext.repositoryLocationGroup === null ? null : (
+                          <SetupScriptContextGroupRows
+                            group={setupScriptContext.repositoryLocationGroup}
+                          />
+                        )}
                       </div>
+                    </AccordionContent>
+                  </AccordionItem>
 
-                      {setupScriptContext.repositoryLocationGroup === null ? null : (
-                        <SetupScriptContextGroupRows
-                          group={setupScriptContext.repositoryLocationGroup}
-                        />
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem className="border-border/70" value="environment-and-tools">
-                  <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
-                    Environment and installed tools
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <div className="gap-5 flex flex-col">
-                      {setupScriptContext.environmentAndToolGroups.map((group) => (
-                        <SetupScriptContextGroupRows group={group} key={group.id} />
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
+                  <AccordionItem className="border-border/70" value="environment-and-tools">
+                    <AccordionTrigger className="rounded-none border-0 px-0 py-2.5 text-sm font-medium hover:no-underline focus-visible:border-transparent focus-visible:ring-1">
+                      Environment and installed tools
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-3">
+                      <div className="gap-5 flex flex-col">
+                        {setupScriptContext.environmentAndToolGroups.map((group) => (
+                          <SetupScriptContextGroupRows group={group} key={group.id} />
+                        ))}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+            )}
 
             {input.errorMessage ? (
               <div aria-live="polite" className="text-destructive text-xs" role="status">
