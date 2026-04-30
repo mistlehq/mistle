@@ -49,7 +49,7 @@ Remember to delete the necessary Docker volumes, as well as images that were pul
 ## Other notes
 
 - Mistle is still early, so do expect bugs.
-- We are currently not accepting contributions yet.
+- We are currently not accepting contributions yet. Please open an issue for bug reports, feature requests, and discussion.
 - Bug reports, feature requests, etc. are still welcome though! Please feel free to open an issue.
 
 ## Architecture
