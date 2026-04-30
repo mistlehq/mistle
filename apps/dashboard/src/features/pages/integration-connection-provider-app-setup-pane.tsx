@@ -206,14 +206,12 @@ export function ProviderAppSetupPane(input: {
   const [searchParams] = useSearchParams();
   const isManifestCreatedReturn = searchParams.get("githubAppManifest") === "created";
   const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
-    isManifestCreatedReturn
-      ? "manifest"
-      : hasProviderAppSetupDraftValues({
-            connection: input.connection,
-            providerAppSetup: input.providerAppSetup,
-          })
-        ? "existing-app"
-        : "manifest",
+    hasProviderAppSetupDraftValues({
+      connection: input.connection,
+      providerAppSetup: input.providerAppSetup,
+    })
+      ? "existing-app"
+      : "manifest",
   );
   const setupStartFormState = useIntegrationConnectionSetupStartForm(input.setupStartForm);
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>

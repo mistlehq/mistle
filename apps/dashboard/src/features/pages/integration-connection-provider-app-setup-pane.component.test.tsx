@@ -305,7 +305,7 @@ describe("ProviderAppSetupPane", () => {
     ).toBe(false);
   });
 
-  it("keeps the manifest tab selected after GitHub App creation and asks the user to install", () => {
+  it("renders a dedicated GitHub App created screen after the manifest callback", () => {
     renderProviderAppSetupPane({
       connection: createGitHubConnection({
         config: {
