@@ -253,6 +253,52 @@ async function resolveResolverContextConnectionSecrets(input: {
   );
 }
 
+async function resolveHydratedResolverContextConnection(input: {
+  db: AppContext["var"]["db"];
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+  organizationId: string;
+  connection: {
+    id: string;
+    status: "active" | "error" | "revoked";
+    externalSubjectId: string | null;
+    config: unknown;
+  };
+  connectionMethod?: {
+    kind: "form";
+    secretFields: readonly {
+      name: string;
+      optional?: boolean;
+      secretType: string;
+      slotKey: string;
+    }[];
+  };
+}): Promise<{
+  connection: ResolverContextConnection;
+  hasHydratedConnectionSecrets: boolean;
+}> {
+  const resolvedConnectionSecrets =
+    input.connectionMethod === undefined
+      ? undefined
+      : await resolveResolverContextConnectionSecrets({
+          db: input.db,
+          integrationsConfig: input.integrationsConfig,
+          organizationId: input.organizationId,
+          connectionId: input.connection.id,
+          connectionMethod: input.connectionMethod,
+        });
+
+  return {
+    connection: resolveResolverContextConnection({
+      id: input.connection.id,
+      status: input.connection.status,
+      externalSubjectId: input.connection.externalSubjectId,
+      config: input.connection.config,
+      ...(resolvedConnectionSecrets === undefined ? {} : { secrets: resolvedConnectionSecrets }),
+    }),
+    hasHydratedConnectionSecrets: resolvedConnectionSecrets !== undefined,
+  };
+}
+
 function resolveResolverContextTarget(input: {
   target: Pick<
     IntegrationTarget,
@@ -1359,36 +1405,29 @@ export async function resolveIntegrationCredential(
             definition,
             integrationsConfig,
           });
-          const resolvedConnectionSecrets =
-            connectionMethod?.kind === "form"
-              ? await resolveResolverContextConnectionSecrets({
-                  db,
-                  integrationsConfig,
-                  organizationId: connection.organizationId,
-                  connectionId: connection.id,
-                  connectionMethod,
-                })
-              : undefined;
+          const hydratedConnection = await resolveHydratedResolverContextConnection({
+            db,
+            integrationsConfig,
+            organizationId: connection.organizationId,
+            connection: {
+              id: connection.id,
+              status: connection.status,
+              externalSubjectId: connection.externalSubjectId,
+              config: connection.config,
+            },
+            ...(connectionMethod?.kind === "form" ? { connectionMethod } : {}),
+          });
           span.setAttribute(
             "mistle.integration.resolve.has_hydrated_connection_secrets",
-            resolvedConnectionSecrets !== undefined,
+            hydratedConnection.hasHydratedConnectionSecrets,
           );
-          const connectionResolverContext = resolveResolverContextConnection({
-            id: connection.id,
-            status: connection.status,
-            externalSubjectId: connection.externalSubjectId,
-            config: connection.config,
-            ...(resolvedConnectionSecrets === undefined
-              ? {}
-              : { secrets: resolvedConnectionSecrets }),
-          });
 
           const resolvedCredential = await customResolver.resolve({
             organizationId: connection.organizationId,
             targetKey: connection.targetKey,
             connectionId: connection.id,
             target: targetResolverContext,
-            connection: connectionResolverContext,
+            connection: hydratedConnection.connection,
             ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
             secretType: input.secretType,
             ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
@@ -1487,36 +1526,29 @@ export async function resolveIntegrationCredential(
             definition,
             integrationsConfig,
           });
-          const resolvedConnectionSecrets =
-            connectionMethod?.kind === "form"
-              ? await resolveResolverContextConnectionSecrets({
-                  db,
-                  integrationsConfig,
-                  organizationId: connection.organizationId,
-                  connectionId: connection.id,
-                  connectionMethod,
-                })
-              : undefined;
+          const hydratedConnection = await resolveHydratedResolverContextConnection({
+            db,
+            integrationsConfig,
+            organizationId: connection.organizationId,
+            connection: {
+              id: connection.id,
+              status: connection.status,
+              externalSubjectId: connection.externalSubjectId,
+              config: connection.config,
+            },
+            ...(connectionMethod?.kind === "form" ? { connectionMethod } : {}),
+          });
           span.setAttribute(
             "mistle.integration.resolve.has_hydrated_connection_secrets",
-            resolvedConnectionSecrets !== undefined,
+            hydratedConnection.hasHydratedConnectionSecrets,
           );
-          const connectionResolverContext = resolveResolverContextConnection({
-            id: connection.id,
-            status: connection.status,
-            externalSubjectId: connection.externalSubjectId,
-            config: connection.config,
-            ...(resolvedConnectionSecrets === undefined
-              ? {}
-              : { secrets: resolvedConnectionSecrets }),
-          });
 
           const resolvedCredential = await defaultResolver.resolve({
             organizationId: connection.organizationId,
             targetKey: connection.targetKey,
             connectionId: connection.id,
             target: targetResolverContext,
-            connection: connectionResolverContext,
+            connection: hydratedConnection.connection,
             ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
             secretType: input.secretType,
             ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
