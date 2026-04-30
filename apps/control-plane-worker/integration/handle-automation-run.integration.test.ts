@@ -660,9 +660,10 @@ describe("handleAutomationRun integration", () => {
         await database.db.insert(scheduleAutomations).values({
           scheduleId,
           automationId,
-          inputTemplate: "Run scheduled summary for {{scheduledAction.localScheduledDate}}",
-          conversationKeyTemplate: "schedule-{{scheduledAction.scheduleId}}",
-          idempotencyKeyTemplate: "{{scheduledAction.id}}",
+          inputTemplate:
+            "Run {{schedule.id}}/{{schedule.scheduledActionId}} at {{schedule.scheduledAt}} {{schedule.localScheduledDate}} {{schedule.localScheduledTime}} {{schedule.timezone}}",
+          conversationKeyTemplate: "schedule-{{schedule.id}}",
+          idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
         });
         await database.db.insert(scheduledActions).values({
           id: scheduledActionId,
@@ -722,7 +723,8 @@ describe("handleAutomationRun integration", () => {
           scheduledAt: "2026-04-30T01:00:00.000Z",
           localScheduledDate: "2026-04-30",
           localScheduledTime: "09:00",
-          renderedInput: "Run scheduled summary for 2026-04-30",
+          renderedInput:
+            "Run sch_worker_schedule_prepare/sca_worker_schedule_prepare at 2026-04-30T01:00:00.000Z 2026-04-30 09:00 Asia/Singapore",
           renderedConversationKey: "schedule-sch_worker_schedule_prepare",
           renderedIdempotencyKey: scheduledActionId,
           instructions: null,
@@ -738,7 +740,8 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun).toMatchObject({
           id: automationRunId,
           conversationId: preparedRun?.conversationId,
-          renderedInput: "Run scheduled summary for 2026-04-30",
+          renderedInput:
+            "Run sch_worker_schedule_prepare/sca_worker_schedule_prepare at 2026-04-30T01:00:00.000Z 2026-04-30 09:00 Asia/Singapore",
           renderedConversationKey: "schedule-sch_worker_schedule_prepare",
           renderedIdempotencyKey: scheduledActionId,
           instructions: null,

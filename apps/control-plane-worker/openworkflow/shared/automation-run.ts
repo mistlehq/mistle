@@ -8,6 +8,7 @@ import {
   AutomationConversationCreatedByKinds,
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
+  ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -45,6 +46,7 @@ export const AutomationRunFailureCodes = {
   WEBHOOK_EVENT_REFERENCE_MISSING: "webhook_event_reference_missing",
   WEBHOOK_EVENT_NOT_FOUND: "webhook_event_not_found",
   WEBHOOK_AUTOMATION_NOT_FOUND: "webhook_automation_not_found",
+  SCHEDULE_NOT_FOUND: "schedule_not_found",
   SCHEDULED_ACTION_NOT_FOUND: "scheduled_action_not_found",
   SCHEDULE_AUTOMATION_NOT_FOUND: "schedule_automation_not_found",
   AGENT_BINDING_NOT_FOUND: "agent_binding_not_found",
@@ -657,6 +659,28 @@ async function prepareScheduledAutomationRun(
     });
   }
 
+  const schedule = await ctx.db.query.schedules.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, scheduledAction.scheduleId),
+  });
+  if (schedule === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.SCHEDULE_NOT_FOUND,
+      message: `Schedule '${scheduledAction.scheduleId}' for scheduled action '${scheduledAction.id}' was not found.`,
+    });
+  }
+  if (schedule.organizationId !== input.automation.organizationId) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Schedule '${schedule.id}' organization does not match automation run '${input.automationRun.id}'.`,
+    });
+  }
+  if (schedule.targetType !== ScheduleTargetTypes.AUTOMATION_RUN) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Schedule '${schedule.id}' target type '${schedule.targetType}' does not match automation run '${input.automationRun.id}'.`,
+    });
+  }
+
   const scheduleAutomation = await ctx.db.query.scheduleAutomations.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.scheduleId, scheduledAction.scheduleId),
   });
@@ -735,12 +759,13 @@ async function prepareScheduledAutomationRun(
   try {
     compiledTemplates = compileTemplates({
       context: {
-        scheduledAction: {
-          id: scheduledAction.id,
-          scheduleId: scheduledAction.scheduleId,
+        schedule: {
+          id: schedule.id,
+          scheduledActionId: scheduledAction.id,
           scheduledAt,
           localScheduledDate: scheduledAction.localScheduledDate,
           localScheduledTime: scheduledAction.localScheduledTime,
+          timezone: schedule.timezone,
         },
         automationRun: {
           id: input.automationRun.id,
