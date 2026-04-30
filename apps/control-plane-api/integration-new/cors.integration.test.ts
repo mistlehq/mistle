@@ -1,22 +1,17 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The test cases use an extended Vitest fixture imported from ./fixture.js.
+ */
+
 import { describe, expect } from "vitest";
 
-import { it } from "./test-context.js";
-
-function getTrustedOrigin(trustedOrigins: readonly string[]): string {
-  const trustedOrigin = trustedOrigins[0];
-
-  if (trustedOrigin === undefined) {
-    throw new Error("Expected at least one trusted origin in test fixture config.");
-  }
-
-  return trustedOrigin;
-}
+import { it } from "./fixture.js";
 
 describe("cors integration", () => {
-  it("adds CORS headers for trusted origins on standard requests", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
-
-    const response = await fixture.request("/__healthz", {
+  it("adds CORS headers for trusted origins on standard requests", async ({
+    controlPlaneApi,
+    trustedOrigin,
+  }) => {
+    const response = await controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: trustedOrigin,
@@ -27,8 +22,8 @@ describe("cors integration", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("does not allow untrusted origins on standard requests", async ({ fixture }) => {
-    const response = await fixture.request("/__healthz", {
+  it("does not allow untrusted origins on standard requests", async ({ controlPlaneApi }) => {
+    const response = await controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: "http://malicious.example",
@@ -40,10 +35,11 @@ describe("cors integration", () => {
     expect(allowOrigin === null || allowOrigin === "").toBe(true);
   });
 
-  it("handles preflight requests for trusted origins", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
-
-    const response = await fixture.request("/__healthz", {
+  it("handles preflight requests for trusted origins", async ({
+    controlPlaneApi,
+    trustedOrigin,
+  }) => {
+    const response = await controlPlaneApi.http.fetch("/__healthz", {
       method: "OPTIONS",
       headers: {
         origin: trustedOrigin,

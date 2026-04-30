@@ -47,10 +47,21 @@ const HostGatewayName = "host.testcontainers.internal";
 const DockerSocketPath = "/var/run/docker.sock";
 const DeadServiceBaseUrl = "http://host.testcontainers.internal:9";
 
-const InfraIds = {
+export const MistleTestInfraIds = {
   POSTGRES: "postgres",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
+};
+
+const InfraIds = MistleTestInfraIds;
+
+export const MistlePostgresInfraValues = {
+  HOST_DIRECT_URL: "host.directUrl",
+  HOST_POOLED_URL: "host.pooledUrl",
+  CONTAINER_DIRECT_URL: "container.directUrl",
+  CONTAINER_POOLED_URL: "container.pooledUrl",
+  CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
+  DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
 };
 
 const InfraKinds = {
@@ -59,14 +70,7 @@ const InfraKinds = {
   MAILPIT: "mailpit",
 };
 
-const PostgresValues = {
-  HOST_DIRECT_URL: "host.directUrl",
-  HOST_POOLED_URL: "host.pooledUrl",
-  CONTAINER_DIRECT_URL: "container.directUrl",
-  CONTAINER_POOLED_URL: "container.pooledUrl",
-  CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
-  DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
-};
+const PostgresValues = MistlePostgresInfraValues;
 
 const ValkeyValues = {
   HOST_URL: "host.url",
@@ -119,12 +123,15 @@ type LocalValkeyLease = {
   leaseCount: number;
 };
 
+export type CreateMistlePostgresInfraRequirementInput = {
+  buildContextHostPath?: string;
+  configPathInContainer?: string;
+  sharedInfraKey?: string;
+  startupTimeoutMs?: number;
+};
+
 export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleTestRegistry {
-  const context = {
-    buildContextHostPath: input.buildContextHostPath ?? DefaultBuildContextHostPath,
-    configPathInContainer: input.configPathInContainer ?? DockerIntegrationConfigPathInContainer,
-    startupTimeoutMs: input.startupTimeoutMs ?? DefaultStartupTimeoutMs,
-  };
+  const context = createMistleRegistryContext(input);
   const sharedInfraKey = input.sharedInfraKey ?? DefaultSharedInfraKey;
   const postgres = createPostgresRequirement({
     sharedInfraKey,
@@ -169,6 +176,27 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
           __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
         }),
   });
+}
+
+export function createMistlePostgresInfraRequirement(
+  input: CreateMistlePostgresInfraRequirementInput = {},
+): TestInfraRequirement {
+  return createPostgresRequirement({
+    sharedInfraKey: input.sharedInfraKey ?? DefaultSharedInfraKey,
+    context: createMistleRegistryContext(input),
+  });
+}
+
+function createMistleRegistryContext(input: {
+  buildContextHostPath?: string;
+  configPathInContainer?: string;
+  startupTimeoutMs?: number;
+}): MistleRegistryContext {
+  return {
+    buildContextHostPath: input.buildContextHostPath ?? DefaultBuildContextHostPath,
+    configPathInContainer: input.configPathInContainer ?? DockerIntegrationConfigPathInContainer,
+    startupTimeoutMs: input.startupTimeoutMs ?? DefaultStartupTimeoutMs,
+  };
 }
 
 function createPostgresRequirement(input: {
