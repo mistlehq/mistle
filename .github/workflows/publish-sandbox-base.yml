@@ -58,6 +58,10 @@ jobs:
             --file packages/sandboxd/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=Mistle Sandbox Base" \
+            --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle" \
             "${tags[@]}" \
             .
 

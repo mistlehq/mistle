@@ -63,6 +63,12 @@ RUN apk add --no-cache nginx xz && \
 
 FROM runtime-base AS base
 
+LABEL org.opencontainers.image.title="Mistle"
+LABEL org.opencontainers.image.description="Open-source platform for running sandboxed coding agents"
+LABEL org.opencontainers.image.url="https://github.com/mistlehq/mistle"
+LABEL org.opencontainers.image.source="https://github.com/mistlehq/mistle"
+LABEL org.opencontainers.image.vendor="Mistle"
+
 ENV S6_KEEP_ENV=1
 ENV MISTLE_INTEGRATION_TARGETS_MANIFEST_PATH=/app/integration-targets.json
 

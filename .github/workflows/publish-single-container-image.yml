@@ -139,7 +139,10 @@ jobs:
             --file docker/Dockerfile.single \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --label "org.opencontainers.image.title=mistle-${{ matrix.profile }}" \
+            --label "org.opencontainers.image.title=Mistle" \
+            --label "org.opencontainers.image.description=Open-source platform for running sandboxed coding agents" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle" \
             "${tags[@]}" \
             .
 
