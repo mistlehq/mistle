@@ -167,7 +167,7 @@ function resolveSetupScriptTestOutput(input: SetupScriptTestViewProps): string {
   return input.status === "failed" ? FailedSetupScriptTestOutput : DefaultSetupScriptTestOutput;
 }
 
-function resolveSetupScriptTestStatus(input: {
+export function resolveSetupScriptTestStatus(input: {
   isOpenRequested: boolean;
   ptyErrorMessage: string | null;
   ptyExitCode: number | null;
@@ -176,10 +176,6 @@ function resolveSetupScriptTestStatus(input: {
   startIsPending: boolean;
   startedRun: StartedSetupScriptTestRun | null;
 }): SetupScriptTestStatus {
-  if (input.scriptIsBlank) {
-    return "blank";
-  }
-
   if (input.runErrorMessage !== null || input.ptyErrorMessage !== null) {
     return "failed";
   }
@@ -194,6 +190,10 @@ function resolveSetupScriptTestStatus(input: {
 
   if (input.startIsPending || input.startedRun !== null) {
     return "starting";
+  }
+
+  if (input.scriptIsBlank) {
+    return "blank";
   }
 
   return "idle";
@@ -369,7 +369,17 @@ export function useSandboxProfileSetupScriptTestRun(
   const ptyState = useSandboxPtyState({
     ensureTransportConnected: transportManager.ensureTransportConnected,
   });
+  const closePty = ptyState.actions.closePty;
+  const disconnectPty = ptyState.actions.disconnectPty;
+  const openPty = ptyState.actions.openPty;
+  const resizePty = ptyState.actions.resizePty;
+  const writeInput = ptyState.actions.writeInput;
   const scriptIsBlank = input.setupScript.trim().length === 0;
+  const closeActivePtySession = useCallback((): void => {
+    void closePty().catch(() => {
+      void disconnectPty();
+    });
+  }, [closePty, disconnectPty]);
   const startMutation = useMutation({
     mutationFn: async () =>
       startSandboxProfileSetupScriptTestRun({
@@ -460,30 +470,34 @@ export function useSandboxProfileSetupScriptTestRun(
     openedPtySessionIdRef.current = startedRun.ptySessionId;
     setIsOpenRequested(true);
 
-    void ptyState.actions
-      .openPty({
-        ...INITIAL_PTY_DIMENSIONS,
-        args: [
-          "-lc",
-          createSetupScriptTestShellPayload({
-            failOnFirstError,
-            setupScript: startedRun.setupScript,
-          }),
-        ],
-        command: SandboxBaseRuntimeShell,
-        cwd: SandboxBaseRuntimeWorkingDirectory,
-        ptySessionId: startedRun.ptySessionId,
-        sandboxInstanceId: startedRun.sandboxInstanceId,
-      })
-      .catch((error: unknown) => {
-        setRunErrorMessage(
-          error instanceof Error ? error.message : "Could not open setup script test terminal.",
-        );
-      });
-  }, [failOnFirstError, ptyState.actions, sandboxStatusQuery.data?.connectable, startedRun]);
+    void openPty({
+      ...INITIAL_PTY_DIMENSIONS,
+      args: [
+        "-lc",
+        createSetupScriptTestShellPayload({
+          failOnFirstError,
+          setupScript: startedRun.setupScript,
+        }),
+      ],
+      command: SandboxBaseRuntimeShell,
+      cwd: SandboxBaseRuntimeWorkingDirectory,
+      ptySessionId: startedRun.ptySessionId,
+      sandboxInstanceId: startedRun.sandboxInstanceId,
+    }).catch((error: unknown) => {
+      setRunErrorMessage(
+        error instanceof Error ? error.message : "Could not open setup script test terminal.",
+      );
+    });
+  }, [failOnFirstError, openPty, sandboxStatusQuery.data?.connectable, startedRun]);
 
   const handleRun = useCallback((): void => {
-    if (!input.isDraft || input.disabled === true || scriptIsBlank || status === "running") {
+    if (
+      !input.isDraft ||
+      input.disabled === true ||
+      scriptIsBlank ||
+      status === "starting" ||
+      status === "running"
+    ) {
       return;
     }
 
@@ -491,17 +505,23 @@ export function useSandboxProfileSetupScriptTestRun(
     setStartedRun(null);
     openedPtySessionIdRef.current = null;
     setIsOpenRequested(false);
-    void ptyState.actions.disconnectPty();
+    closeActivePtySession();
     startMutation.mutate();
-  }, [input.disabled, input.isDraft, ptyState.actions, scriptIsBlank, startMutation, status]);
+  }, [closeActivePtySession, input.disabled, input.isDraft, scriptIsBlank, startMutation, status]);
 
   const handleClose = useCallback((): void => {
     setRunErrorMessage(null);
     setStartedRun(null);
     openedPtySessionIdRef.current = null;
     setIsOpenRequested(false);
-    void ptyState.actions.disconnectPty();
-  }, [ptyState.actions]);
+    closeActivePtySession();
+  }, [closeActivePtySession]);
+
+  useEffect(() => {
+    return () => {
+      closeActivePtySession();
+    };
+  }, [closeActivePtySession]);
 
   return {
     buttonProps: {
@@ -515,8 +535,8 @@ export function useSandboxProfileSetupScriptTestRun(
     panelProps: {
       isDraft: input.isDraft,
       onClose: handleClose,
-      onResize: ptyState.actions.resizePty,
-      onWriteInput: ptyState.actions.writeInput,
+      onResize: resizePty,
+      onWriteInput: writeInput,
       outputChunks: ptyState.output.chunks,
       ptyLifecycleState: ptyState.lifecycle.state,
       status,
