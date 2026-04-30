@@ -15,6 +15,10 @@ import { startSandboxProfileSetupScriptTestRun } from "../sandbox-profiles/sandb
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import {
+  SandboxBaseRuntimeShell,
+  SandboxBaseRuntimeWorkingDirectory,
+} from "./sandbox-base-inventory-copy.js";
 import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
 import { useSessionWorkbenchTransport } from "./use-session-workbench-transport.js";
 
@@ -57,7 +61,6 @@ type StartedSetupScriptTestRun = {
 
 const SetupScriptTestPtySessionPrefix = "setup-script-test";
 const SetupScriptTestSandboxStatusRefetchIntervalMs = 1_000;
-const SetupScriptTestWorkingDirectory = "/root";
 
 const DefaultSetupScriptTestOutput = `$ pnpm install
 Lockfile is up to date, resolution step is skipped
@@ -108,7 +111,7 @@ export function createSetupScriptTestShellPayload(input: {
     'if head -c 2 "$setup_script_path" | grep -q "^#!"; then',
     '  exec "$setup_script_path"',
     "fi",
-    `exec /bin/bash ${shellArgs} "$setup_script_path"`,
+    `exec ${SandboxBaseRuntimeShell} ${shellArgs} "$setup_script_path"`,
   ].join("\n");
 }
 
@@ -467,8 +470,8 @@ export function useSandboxProfileSetupScriptTestRun(
             setupScript: startedRun.setupScript,
           }),
         ],
-        command: "/bin/bash",
-        cwd: SetupScriptTestWorkingDirectory,
+        command: SandboxBaseRuntimeShell,
+        cwd: SandboxBaseRuntimeWorkingDirectory,
         ptySessionId: startedRun.ptySessionId,
         sandboxInstanceId: startedRun.sandboxInstanceId,
       })
