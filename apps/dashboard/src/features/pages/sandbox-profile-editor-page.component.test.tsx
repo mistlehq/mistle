@@ -776,6 +776,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain(
       "bg-muted/30",
     );
+    expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain("flex-1");
     expect(screen.getByRole("heading", { name: "Integrations" })).toBeDefined();
     expect(screen.getByRole("heading", { name: "Resources & Tools" })).toBeDefined();
     expect(screen.getByRole("heading", { name: "Configurations" })).toBeDefined();
@@ -1001,6 +1002,9 @@ describe("SandboxProfileEditorPage", () => {
     expect(
       screen.getByText("Publish this sandbox profile before managing snapshots."),
     ).toBeDefined();
+    expect(
+      screen.getByRole("tabpanel", { name: "Snapshots" }).querySelector(".max-w-5xl"),
+    ).not.toBeNull();
     expect(screen.queryByText("Automatic refresh")).toBeNull();
     expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
   });

@@ -8,6 +8,12 @@ export type SandboxProfileEditorSection<TSectionId extends string = string> = {
   disabled?: boolean;
 };
 
+export function SandboxProfileEditorHorizontalTabContent(input: {
+  children: ReactNode;
+}): React.JSX.Element {
+  return <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">{input.children}</div>;
+}
+
 export function SandboxProfileEditorSections<TSectionId extends string>(input: {
   sections: readonly SandboxProfileEditorSection<TSectionId>[];
   activeSectionId: TSectionId;
@@ -31,7 +37,7 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="md:hidden">
         <Select
           onValueChange={(value) => {
@@ -57,7 +63,7 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
         </Select>
       </div>
 
-      <div className="flex flex-col gap-0">
+      <div className="flex min-h-0 flex-1 flex-col gap-0">
         <div
           aria-label="Profile sections"
           className="hidden border-b border-border px-4 md:flex"
@@ -94,7 +100,7 @@ export function SandboxProfileEditorSections<TSectionId extends string>(input: {
           {input.sections.map((section) => (
             <div
               aria-labelledby={`sandbox-profile-editor-tab-${section.id}`}
-              className="bg-muted/30 px-4 py-6"
+              className="flex-1 bg-muted/30 px-4 py-6"
               hidden={section.id !== activeSection.id}
               id={`sandbox-profile-editor-panel-${section.id}`}
               key={section.id}

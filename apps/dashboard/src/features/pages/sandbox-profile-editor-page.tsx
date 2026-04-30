@@ -108,6 +108,7 @@ import {
   type SandboxProfileRouteView,
 } from "./sandbox-profile-editor-page-model.js";
 import {
+  SandboxProfileEditorHorizontalTabContent,
   SandboxProfileEditorSections,
   type SandboxProfileEditorSection,
 } from "./sandbox-profile-editor-sections.js";
@@ -1389,11 +1390,11 @@ function SandboxProfileSnapshotPanel(input: {
 }): React.JSX.Element {
   if (input.state.kind === "draft-unavailable" || input.version === null) {
     return (
-      <div className="flex max-w-3xl flex-col gap-4">
+      <SandboxProfileEditorHorizontalTabContent>
         <Notice title="Publish this sandbox profile before managing snapshots.">
           Snapshots are available after the sandbox profile has a published version.
         </Notice>
-      </div>
+      </SandboxProfileEditorHorizontalTabContent>
     );
   }
 
@@ -1402,7 +1403,7 @@ function SandboxProfileSnapshotPanel(input: {
   const latestSnapshotCreatedAt = resolveLatestSnapshotCreatedAt(input.state);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <SandboxProfileEditorHorizontalTabContent>
       <PublishSuccessSnapshotNotice
         onDismiss={input.onPublishSuccessMessageDismiss}
         noticeKey={input.publishSuccessMessageKey}
@@ -1468,7 +1469,7 @@ function SandboxProfileSnapshotPanel(input: {
         refreshSchedule={input.refreshSchedule}
         version={input.version}
       />
-    </div>
+    </SandboxProfileEditorHorizontalTabContent>
   );
 }
 
@@ -1896,7 +1897,7 @@ export function SandboxProfileEditorView(input: {
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-[calc(100svh-3rem)] flex-col">
       <NavigationBlockerDialog
         title="Leave before draft changes are saved?"
         description="Some draft changes have not been saved yet. If you leave this page, those changes will be discarded."
@@ -1950,7 +1951,7 @@ export function SandboxProfileEditorView(input: {
         onActiveSectionIdChange={input.onActiveSectionIdChange}
         renderPanel={(sectionId) =>
           sectionId === SandboxProfileEditorSectionIds.SANDBOX_PROFILE ? (
-            <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
+            <SandboxProfileEditorHorizontalTabContent>
               <SandboxProfileLifecycleActions
                 hasUnpersistedDraftChanges={hasUnpersistedDraftChanges}
                 mode={input.mode}
@@ -1963,7 +1964,7 @@ export function SandboxProfileEditorView(input: {
                 versionActionIsPending={input.versionActionIsPending}
               />
               {input.renderSectionPanel(sectionId)}
-            </div>
+            </SandboxProfileEditorHorizontalTabContent>
           ) : (
             input.renderSectionPanel(sectionId)
           )
