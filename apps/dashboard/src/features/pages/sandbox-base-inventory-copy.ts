@@ -1,5 +1,8 @@
 import SandboxBaseInventory from "../../../../../packages/sandboxd/sandbox-base-inventory.generated.json" with { type: "json" };
 
+export const SandboxBaseRuntimeShell = SandboxBaseInventory.runtimeBase.shell;
+export const SandboxBaseRuntimeWorkingDirectory = SandboxBaseInventory.runtimeBase.workingDirectory;
+
 type SandboxBaseInventoryRuntimeBase = Pick<
   typeof SandboxBaseInventory.runtimeBase,
   "packageManagers" | "shell" | "user" | "workingDirectory"
