@@ -1592,10 +1592,8 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Viewing: Published")).toBeDefined();
     expect(screen.getByRole("button", { name: "Edit" })).toBeDefined();
-    expect(screen.getByRole("combobox", { name: "agent harness connection" })).toHaveProperty(
-      "disabled",
-      true,
-    );
+    expect(screen.queryByRole("combobox", { name: "agent harness connection" })).toBeNull();
+    expect(screen.getByText("Codex connection")).toBeDefined();
   });
 
   it("renders published profiles with existing drafts as resumable", () => {

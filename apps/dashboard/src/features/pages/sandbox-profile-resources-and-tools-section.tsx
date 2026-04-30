@@ -22,7 +22,7 @@ import {
 } from "./sandbox-profile-binding-config-editor.js";
 
 const SearchDebounceMs = 300;
-const SandboxProfileResourcesAndToolsSimpleControlClassName = "flex min-h-9 items-center";
+const SandboxProfileResourcesAndToolsSimpleControlClassName = "flex items-center md:min-h-9";
 
 function resolveRepositorySummary(
   connection: IntegrationConnectionSummary | undefined,
@@ -240,7 +240,7 @@ function BindingToolsControl(input: {
   return (
     <div className="flex flex-col gap-2">
       {toolToggleModel.options.map((option) => (
-        <label className="flex min-h-9 items-center gap-2 text-sm" key={option.value}>
+        <label className="flex items-center gap-2 text-sm md:min-h-9" key={option.value}>
           <Checkbox
             aria-label={option.label}
             checked={option.checked}
@@ -274,6 +274,43 @@ function BindingToolsControl(input: {
       ))}
     </div>
   );
+}
+
+export function hasSandboxProfileBindingResourcesAndToolsCellContent(input: {
+  row: SandboxProfileBindingEditorRow;
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+}): boolean {
+  const connection = input.availableConnections.find(
+    (candidate) => candidate.id === input.row.connectionId,
+  );
+  const target =
+    connection === undefined
+      ? undefined
+      : input.availableTargets.find((candidate) => candidate.targetKey === connection.targetKey);
+
+  if (connection === undefined || target === undefined) {
+    return true;
+  }
+
+  if (input.row.kind === "git") {
+    return true;
+  }
+
+  const summaryItems = resolveBindingConfigSummaryItems({
+    row: input.row,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
+    excludedPropertyKeys: ["repositories", "tools"],
+    maxItems: 3,
+  });
+  const toolToggleModel = resolveBindingToolToggleModel({
+    row: input.row,
+    connections: input.availableConnections,
+    targets: input.availableTargets,
+  });
+
+  return summaryItems.length > 0 || toolToggleModel.mode === "supported";
 }
 
 export function SandboxProfileBindingResourcesAndToolsCell(input: {

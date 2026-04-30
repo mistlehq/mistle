@@ -791,6 +791,14 @@ export const Published: Story = {
   },
 };
 
+export const SnapshotUnavailableNoPublishedVersion: Story = {
+  args: {
+    initialSectionId: "snapshot",
+    lifecycleState: "draft",
+    snapshotState: "draft-unavailable",
+  },
+};
+
 export const SnapshotNoSnapshot: Story = {
   args: {
     initialSectionId: "snapshot",
