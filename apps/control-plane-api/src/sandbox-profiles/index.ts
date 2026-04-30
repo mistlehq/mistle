@@ -26,8 +26,10 @@ export {
   sandboxProfileIdParamsSchema as SandboxProfileIdParamsSchema,
   sandboxProfileVersionParamsSchema as SandboxProfileVersionParamsSchema,
   startSandboxProfileInstanceBodySchema as StartSandboxProfileInstanceBodySchema,
+  startSandboxProfileSetupScriptTestRunBodySchema as StartSandboxProfileSetupScriptTestRunBodySchema,
   sandboxProfileDeletionAcceptedResponseSchema as SandboxProfileDeletionAcceptedResponseSchema,
   startSandboxProfileInstanceResponseSchema as StartSandboxProfileInstanceResponseSchema,
+  startSandboxProfileSetupScriptTestRunResponseSchema as StartSandboxProfileSetupScriptTestRunResponseSchema,
   listSandboxProfilesQuerySchema as ListSandboxProfilesQuerySchema,
   listSandboxProfilesResponseSchema as ListSandboxProfilesResponseSchema,
   listLaunchableSandboxProfilesResponseSchema as ListLaunchableSandboxProfilesResponseSchema,
@@ -52,6 +54,7 @@ export { route as discardSandboxProfileVersionDraftRoute } from "./discard-sandb
 export { route as putSandboxProfileVersionIntegrationBindingsRoute } from "./put-sandbox-profile-version-integration-bindings/route.js";
 export { route as putSandboxProfileVersionSetupScriptRoute } from "./put-sandbox-profile-version-setup-script/route.js";
 export { route as startSandboxProfileInstanceRoute } from "./start-sandbox-profile-instance/route.js";
+export { route as startSandboxProfileSetupScriptTestRunRoute } from "./start-sandbox-profile-setup-script-test-run/route.js";
 export { badRequestResponseSchema as ListSandboxProfilesBadRequestResponseSchema } from "./list-sandbox-profiles/schema.js";
 export { notFoundResponseSchema as NotFoundResponseSchema } from "./get-sandbox-profile/schema.js";
 export { notFoundResponseSchema as SandboxProfileVersionNotFoundResponseSchema } from "./get-sandbox-profile-version-integration-bindings/schema.js";
