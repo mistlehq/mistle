@@ -27,6 +27,25 @@ The script:
 - Preserves an existing `~/.mistle/local/.env`.
 - Starts Mistle by running `~/.mistle/local/up.sh`.
 
+Once this succeeds, you can open the dashboard at [http://localhost:3000](http://localhost:3000). Note that for email OTP auth, you'll need to use the locally running Mailpit at [http://localhost:8025](http://localhost:8025) to retrieve the OTP.
+
+This runs Mistle locally using Docker containers as sandboxes. We support remote sandboxes using [E2B](https://e2b.dev).
+
+If you want to wind down the stack, run:
+
+```bash
+~/.mistle/local/down.sh
+```
+
+If you want to remove the installation:
+
+```bash
+# Remove the docker compose related files and scripts
+rm -rf ~/.mistle/local/down.sh
+```
+
+Remember to delete the necessary Docker volumes, as well as images that were pulled.
+
 ## Other notes
 
 - Mistle is still early, so do expect bugs.
