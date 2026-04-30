@@ -109,9 +109,11 @@ export function createSetupScriptTestShellPayload(input: {
     "MISTLE_SETUP_SCRIPT",
     'chmod 700 "$setup_script_path"',
     'if head -c 2 "$setup_script_path" | grep -q "^#!"; then',
-    '  exec "$setup_script_path"',
+    '  "$setup_script_path"',
+    '  exit "$?"',
     "fi",
-    `exec ${SandboxBaseRuntimeShell} ${shellArgs} "$setup_script_path"`,
+    `${SandboxBaseRuntimeShell} ${shellArgs} "$setup_script_path"`,
+    'exit "$?"',
   ].join("\n");
 }
 
@@ -201,7 +203,6 @@ export function resolveSetupScriptTestStatus(input: {
 
 export function resolveSetupScriptTestStatusMessage(input: {
   ptyErrorMessage: string | null;
-  ptyExitCode: number | null;
   runErrorMessage: string | null;
   sandboxFailureMessage: string | null;
 }): string | null {
@@ -375,7 +376,12 @@ export function useSandboxProfileSetupScriptTestRun(
   const resizePty = ptyState.actions.resizePty;
   const writeInput = ptyState.actions.writeInput;
   const scriptIsBlank = input.setupScript.trim().length === 0;
+  const startedRunRef = useRef<StartedSetupScriptTestRun | null>(null);
   const closeActivePtySession = useCallback((): void => {
+    if (startedRunRef.current === null) {
+      return;
+    }
+
     void closePty().catch(() => {
       void disconnectPty();
     });
@@ -392,11 +398,13 @@ export function useSandboxProfileSetupScriptTestRun(
       setRunErrorMessage(null);
       setIsOpenRequested(false);
       openedPtySessionIdRef.current = null;
-      setStartedRun({
+      const nextStartedRun = {
         ptySessionId: createSetupScriptTestPtySessionId(),
         sandboxInstanceId: result.sandboxInstanceId,
         setupScript: input.setupScript,
-      });
+      };
+      startedRunRef.current = nextStartedRun;
+      setStartedRun(nextStartedRun);
     },
     onError: (error: unknown) => {
       setRunErrorMessage(
@@ -453,7 +461,6 @@ export function useSandboxProfileSetupScriptTestRun(
   });
   const statusMessage = resolveSetupScriptTestStatusMessage({
     ptyErrorMessage: ptyState.lifecycle.errorMessage,
-    ptyExitCode: ptyState.lifecycle.exitInfo?.exitCode ?? null,
     runErrorMessage: sandboxStatusErrorMessage ?? runErrorMessage,
     sandboxFailureMessage,
   });
@@ -502,19 +509,21 @@ export function useSandboxProfileSetupScriptTestRun(
     }
 
     setRunErrorMessage(null);
+    closeActivePtySession();
     setStartedRun(null);
+    startedRunRef.current = null;
     openedPtySessionIdRef.current = null;
     setIsOpenRequested(false);
-    closeActivePtySession();
     startMutation.mutate();
   }, [closeActivePtySession, input.disabled, input.isDraft, scriptIsBlank, startMutation, status]);
 
   const handleClose = useCallback((): void => {
     setRunErrorMessage(null);
+    closeActivePtySession();
     setStartedRun(null);
+    startedRunRef.current = null;
     openedPtySessionIdRef.current = null;
     setIsOpenRequested(false);
-    closeActivePtySession();
   }, [closeActivePtySession]);
 
   useEffect(() => {

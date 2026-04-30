@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SandboxBaseRuntimeShell } from "./sandbox-base-inventory-copy.js";
 import {
   createSetupScriptTestShellPayload,
   resolveSetupScriptTestStatus,
@@ -14,7 +15,7 @@ describe("createSetupScriptTestShellPayload", () => {
     });
 
     expect(payload).toContain("base64 -d");
-    expect(payload).toContain("exec /bin/bash -l -e");
+    expect(payload).toContain(`${SandboxBaseRuntimeShell} -l -e`);
   });
 
   it("runs non-shebang scripts without fail-fast shell options when disabled", () => {
@@ -24,8 +25,8 @@ describe("createSetupScriptTestShellPayload", () => {
     });
 
     expect(payload).toContain("base64 -d");
-    expect(payload).toContain("exec /bin/bash -l");
-    expect(payload).not.toContain("exec /bin/bash -l -e");
+    expect(payload).toContain(`${SandboxBaseRuntimeShell} -l`);
+    expect(payload).not.toContain(`${SandboxBaseRuntimeShell} -l -e`);
   });
 
   it("executes shebang scripts directly from the generated script file", () => {
@@ -35,7 +36,8 @@ describe("createSetupScriptTestShellPayload", () => {
     });
 
     expect(payload).toContain('if head -c 2 "$setup_script_path" | grep -q "^#!"; then');
-    expect(payload).toContain('  exec "$setup_script_path"');
+    expect(payload).toContain('  "$setup_script_path"');
+    expect(payload).toContain('  exit "$?"');
   });
 });
 
@@ -92,11 +94,10 @@ describe("resolveSetupScriptTestStatus", () => {
 });
 
 describe("resolveSetupScriptTestStatusMessage", () => {
-  it("does not summarize setup script exit codes without a more specific error", () => {
+  it("does not render a summary without a specific error", () => {
     expect(
       resolveSetupScriptTestStatusMessage({
         ptyErrorMessage: null,
-        ptyExitCode: 127,
         runErrorMessage: null,
         sandboxFailureMessage: null,
       }),
@@ -107,7 +108,6 @@ describe("resolveSetupScriptTestStatusMessage", () => {
     expect(
       resolveSetupScriptTestStatusMessage({
         ptyErrorMessage: null,
-        ptyExitCode: null,
         runErrorMessage: "Could not check setup script test sandbox status.",
         sandboxFailureMessage: null,
       }),
