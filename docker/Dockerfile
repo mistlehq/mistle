@@ -52,7 +52,9 @@ FROM base AS control-plane-worker-runtime
 COPY --from=control-plane-worker-build /app /app
 COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-control-plane-worker-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/control-plane-worker /app/node_modules/@mistle/control-plane-worker && \
+  chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
 
 EXPOSE 5101
 
@@ -75,7 +77,9 @@ FROM base AS data-plane-api-runtime
 COPY --from=data-plane-api-build /app /app
 COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-data-plane-api-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/data-plane-api /app/node_modules/@mistle/data-plane-api && \
+  chmod +x /usr/local/bin/mistle-data-plane-api-entrypoint
 
 EXPOSE 5200
 
@@ -86,7 +90,9 @@ FROM base AS data-plane-worker-runtime
 COPY --from=data-plane-worker-build /app /app
 COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-data-plane-worker-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/data-plane-worker /app/node_modules/@mistle/data-plane-worker && \
+  chmod +x /usr/local/bin/mistle-data-plane-worker-entrypoint
 
 EXPOSE 5201
 
@@ -97,7 +103,9 @@ FROM base AS data-plane-gateway-runtime
 COPY --from=data-plane-gateway-build /app /app
 COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/data-plane-gateway /app/node_modules/@mistle/data-plane-gateway && \
+  chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
 
 EXPOSE 5202
 
@@ -108,7 +116,9 @@ FROM base AS tokenizer-proxy-runtime
 COPY --from=tokenizer-proxy-build /app /app
 COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
 
-RUN chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/tokenizer-proxy /app/node_modules/@mistle/tokenizer-proxy && \
+  chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
 
 EXPOSE 5205
 
@@ -120,7 +130,9 @@ COPY --from=control-plane-api-build /app /app
 COPY --from=commit-sign-build /build/packages/commit-sign/target/release/commit-sign /usr/local/bin/commit-sign
 COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
 
-RUN chmod +x /usr/local/bin/commit-sign /usr/local/bin/mistle-control-plane-api-entrypoint
+RUN mkdir -p /app/node_modules/@mistle && \
+  ln -s ../../apps/control-plane-api /app/node_modules/@mistle/control-plane-api && \
+  chmod +x /usr/local/bin/commit-sign /usr/local/bin/mistle-control-plane-api-entrypoint
 
 EXPOSE 5100
 
