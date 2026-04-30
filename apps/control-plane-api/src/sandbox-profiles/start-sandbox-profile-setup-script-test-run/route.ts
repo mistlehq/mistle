@@ -1,16 +1,15 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import {
-  ForbiddenResponseSchema,
-  UnauthorizedResponseSchema,
-  ValidationErrorResponseSchema,
-} from "@mistle/http/errors.js";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
   sandboxProfileVersionParamsSchema,
   startSandboxProfileSetupScriptTestRunBodySchema,
   startSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../schemas.js";
-import { notFoundResponseSchema } from "../start-sandbox-profile-instance/schema.js";
+import {
+  badRequestResponseSchema,
+  notFoundResponseSchema,
+} from "../start-sandbox-profile-instance/schema.js";
 
 export const route = createRoute({
   method: "post",
@@ -40,7 +39,7 @@ export const route = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: badRequestResponseSchema,
         },
       },
     },
