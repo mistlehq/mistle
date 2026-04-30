@@ -16,7 +16,7 @@ export const InternalSandboxRuntimeStartProfileInstanceRequestSchema = z
       .object({ userId: z.string().min(1) })
       .strict()
       .optional(),
-    source: z.union([z.literal("dashboard"), z.literal("webhook")]),
+    source: z.union([z.literal("dashboard"), z.literal("webhook"), z.literal("schedule")]),
   })
   .strict();
 

@@ -11,7 +11,7 @@ import type { ListSandboxInstancesResult } from "./types.js";
 
 function assertUserVisibleSandboxSource(
   source: ListSandboxInstancesResponse["items"][number]["source"],
-): "dashboard" | "webhook" {
+): "dashboard" | "webhook" | "schedule" {
   if (source === "system") {
     throw new Error("Internal snapshot sandbox instances must not be exposed to control-plane.");
   }

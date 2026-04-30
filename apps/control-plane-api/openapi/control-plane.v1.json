@@ -11198,7 +11198,7 @@
                           },
                           "source": {
                             "type": "string",
-                            "enum": ["dashboard", "webhook"]
+                            "enum": ["dashboard", "webhook", "schedule"]
                           },
                           "createdAt": {
                             "type": "string",

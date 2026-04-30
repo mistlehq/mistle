@@ -64,7 +64,7 @@ export type SandboxInstanceStatus = {
 export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {
   items: Array<
     Omit<ListSandboxInstancesResponse["items"][number], "source" | "startedBy"> & {
-      source: "dashboard" | "webhook";
+      source: "dashboard" | "webhook" | "schedule";
       title: string | null;
       sandboxProfileDisplayName: string | null;
       startedBy: ListSandboxInstancesResponse["items"][number]["startedBy"] & {

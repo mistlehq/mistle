@@ -243,11 +243,14 @@ export async function acquireAutomationConnection(
               ...(input.preparedAutomationRun.actingUserId === undefined
                 ? {}
                 : { actingUserId: input.preparedAutomationRun.actingUserId }),
-              webhookEventId: input.preparedAutomationRun.webhookEventId,
+              ...(input.preparedAutomationRun.webhookEventId === undefined
+                ? {}
+                : { webhookEventId: input.preparedAutomationRun.webhookEventId }),
               deliveryTaskId: input.deliveryTaskId,
               automationRunId: input.preparedAutomationRun.automationRunId,
               conversationId: input.preparedAutomationRun.conversationId,
-              ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+              ...(input.preparedAutomationRun.webhookExternalDeliveryId === null ||
+              input.preparedAutomationRun.webhookExternalDeliveryId === undefined
                 ? {}
                 : {
                     externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,

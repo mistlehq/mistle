@@ -524,6 +524,7 @@ describe("executeConversationProviderDelivery", () => {
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             deliveryContext: {
+              source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               externalDeliveryId: "slack_delivery_123",
@@ -547,6 +548,7 @@ describe("executeConversationProviderDelivery", () => {
         method: "mistle/setDeliveryContext",
         params: {
           traceparent: expectedTraceparentValue,
+          source: "webhook",
           webhookEventId: "iwe_123",
           deliveryTaskId: "cdt_123",
           externalDeliveryId: "slack_delivery_123",
@@ -589,6 +591,7 @@ describe("executeConversationProviderDelivery", () => {
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             deliveryContext: {
+              source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               automationRunId: "aru_123",
@@ -640,6 +643,7 @@ describe("executeConversationProviderDelivery", () => {
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             deliveryContext: {
+              source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               automationRunId: "aru_123",
@@ -655,6 +659,7 @@ describe("executeConversationProviderDelivery", () => {
         method: "mistle/setDeliveryContext",
         params: {
           traceparent: expectedTraceparentValue,
+          source: "webhook",
           webhookEventId: "iwe_123",
           deliveryTaskId: "cdt_123",
           automationRunId: "aru_123",
@@ -690,6 +695,7 @@ describe("executeConversationProviderDelivery", () => {
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             deliveryContext: {
+              source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               automationRunId: "aru_123",
@@ -729,6 +735,7 @@ describe("executeConversationProviderDelivery", () => {
             connectionUrl: server.url,
             inputText: "Handle the webhook payload.",
             deliveryContext: {
+              source: "webhook",
               webhookEventId: "iwe_123",
               deliveryTaskId: "cdt_123",
               automationRunId: "aru_123",
@@ -760,6 +767,7 @@ describe("executeConversationProviderDelivery", () => {
   it("requires an active trace context for delivery-context notification params", () => {
     expect(() =>
       resolveDeliveryContextNotificationParams({
+        source: "webhook",
         webhookEventId: "iwe_123",
         deliveryTaskId: "cdt_123",
         automationRunId: "aru_123",

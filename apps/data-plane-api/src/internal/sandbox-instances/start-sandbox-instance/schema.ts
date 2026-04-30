@@ -34,7 +34,7 @@ export const StartSandboxInstanceInputSchema = z
       })
       .strict()
       .optional(),
-    source: z.enum(["dashboard", "webhook", "system"]),
+    source: z.enum(["dashboard", "webhook", "schedule", "system"]),
     image: z
       .object({
         imageId: z.string().min(1),

@@ -21,6 +21,11 @@ import {
   sandboxProfiles,
   sandboxProfileVersions,
   sandboxProfileVersionIntegrationBindings,
+  scheduleAutomations,
+  scheduledActions,
+  ScheduledActionStatuses,
+  schedules,
+  ScheduleTargetTypes,
   CONTROL_PLANE_SCHEMA_NAME,
   users,
   webhookAutomations,
@@ -589,6 +594,178 @@ describe("handleAutomationRun integration", () => {
           conversationKey: "issue-777",
           status: AutomationConversationStatuses.PENDING,
         });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "prepares scheduled automation runs and enqueues delivery from the scheduled action source",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_schedule_prepare";
+        const sandboxProfileId = "sbp_worker_schedule_prepare";
+        const automationId = "atm_worker_schedule_prepare";
+        const automationTargetId = "atg_worker_schedule_prepare";
+        const scheduleId = "sch_worker_schedule_prepare";
+        const scheduledActionId = "sca_worker_schedule_prepare";
+        const automationRunId = "aru_worker_schedule_prepare";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Schedule Prepare",
+          slug: "worker-schedule-prepare",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Schedule Prepare Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          suffix: "worker_schedule_prepare",
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.SCHEDULE,
+          name: "Schedule Prepare",
+          enabled: true,
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+        });
+        await database.db.insert(schedules).values({
+          id: scheduleId,
+          organizationId,
+          targetType: ScheduleTargetTypes.AUTOMATION_RUN,
+          name: "Daily schedule",
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+          enabled: true,
+          nextScheduledAt: "2026-04-30T01:00:00.000Z",
+        });
+        await database.db.insert(scheduleAutomations).values({
+          scheduleId,
+          automationId,
+          inputTemplate: "Run scheduled summary for {{scheduledAction.localScheduledDate}}",
+          conversationKeyTemplate: "schedule-{{scheduledAction.scheduleId}}",
+          idempotencyKeyTemplate: "{{scheduledAction.id}}",
+        });
+        await database.db.insert(scheduledActions).values({
+          id: scheduledActionId,
+          scheduleId,
+          organizationId,
+          targetType: ScheduleTargetTypes.AUTOMATION_RUN,
+          targetPayload: {
+            automationId,
+          },
+          scheduledAt: "2026-04-30T01:00:00.000Z",
+          localScheduledDate: "2026-04-30",
+          localScheduledTime: "09:00",
+          status: ScheduledActionStatuses.DISPATCHED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceScheduledActionId: scheduledActionId,
+          status: AutomationRunStatuses.QUEUED,
+        });
+
+        const preparedRun = await prepareAndHandoffAutomationRun({
+          db: database.db,
+          automationRunId,
+        });
+        const replayedRun = await prepareAndHandoffAutomationRun({
+          db: database.db,
+          automationRunId,
+        });
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
+        const persistedAutomationConversation =
+          await database.db.query.automationConversations.findFirst({
+            where: (table, { eq }) => eq(table.id, preparedRun?.conversationId ?? ""),
+          });
+        const deliveryTask = await database.db.query.automationConversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+        });
+        const deliveryTasks = await database.db.query.automationConversationDeliveryTasks.findMany({
+          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+        });
+
+        expect(preparedRun).toMatchObject({
+          automationRunId,
+          automationId,
+          conversationId: expect.stringMatching(/^cnv_/),
+          automationTargetId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          sourceKind: "schedule",
+          sourceOrderKey: "2026-04-30T01:00:00.000Z#sca_worker_schedule_prepare",
+          sourceScheduledActionId: scheduledActionId,
+          scheduledActionId,
+          scheduledAt: "2026-04-30T01:00:00.000Z",
+          localScheduledDate: "2026-04-30",
+          localScheduledTime: "09:00",
+          renderedInput: "Run scheduled summary for 2026-04-30",
+          renderedConversationKey: "schedule-sch_worker_schedule_prepare",
+          renderedIdempotencyKey: scheduledActionId,
+          instructions: null,
+          collaborationModeSettings: null,
+        });
+        expect(replayedRun).toMatchObject({
+          automationRunId,
+          conversationId: preparedRun?.conversationId,
+          deliveryTaskId: preparedRun?.deliveryTaskId,
+          sourceKind: "schedule",
+          sourceScheduledActionId: scheduledActionId,
+        });
+        expect(persistedRun).toMatchObject({
+          id: automationRunId,
+          conversationId: preparedRun?.conversationId,
+          renderedInput: "Run scheduled summary for 2026-04-30",
+          renderedConversationKey: "schedule-sch_worker_schedule_prepare",
+          renderedIdempotencyKey: scheduledActionId,
+          instructions: null,
+        });
+        expect(persistedAutomationConversation).toMatchObject({
+          id: preparedRun?.conversationId,
+          organizationId,
+          ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+          ownerId: automationTargetId,
+          createdByKind: AutomationConversationCreatedByKinds.SCHEDULE,
+          createdById: scheduledActionId,
+          sandboxProfileId,
+          integrationFamilyId: OpenAiApiKeyDefinition.familyId,
+          runtimeId: "codex",
+          conversationKey: "schedule-sch_worker_schedule_prepare",
+          status: AutomationConversationStatuses.PENDING,
+        });
+        expect(deliveryTask).toMatchObject({
+          automationRunId,
+          conversationId: preparedRun?.conversationId,
+          sourceWebhookEventId: null,
+          sourceScheduledActionId: scheduledActionId,
+          sourceOrderKey: "2026-04-30T01:00:00.000Z#sca_worker_schedule_prepare",
+          status: AutomationConversationDeliveryTaskStatuses.QUEUED,
+        });
+        expect(deliveryTasks).toHaveLength(1);
       } finally {
         await database.stop();
       }

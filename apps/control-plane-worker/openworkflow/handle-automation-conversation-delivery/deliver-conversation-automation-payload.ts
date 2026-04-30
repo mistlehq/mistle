@@ -170,9 +170,16 @@ export async function deliverConversationAutomationPayload(
         connectionUrl: input.acquiredAutomationConnection.url,
         inputText: input.preparedAutomationRun.renderedInput,
         deliveryContext: {
-          webhookEventId: input.preparedAutomationRun.webhookEventId,
+          source: input.preparedAutomationRun.sourceKind,
+          ...(input.preparedAutomationRun.sourceWebhookEventId === undefined
+            ? {}
+            : { webhookEventId: input.preparedAutomationRun.sourceWebhookEventId }),
+          ...(input.preparedAutomationRun.sourceScheduledActionId === undefined
+            ? {}
+            : { scheduledActionId: input.preparedAutomationRun.sourceScheduledActionId }),
           deliveryTaskId: input.taskId,
-          ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+          ...(input.preparedAutomationRun.webhookExternalDeliveryId === null ||
+          input.preparedAutomationRun.webhookExternalDeliveryId === undefined
             ? {}
             : {
                 externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,
@@ -334,11 +341,14 @@ async function mintSandboxTitleConnectionUrl(
       ...(input.preparedAutomationRun.actingUserId === undefined
         ? {}
         : { actingUserId: input.preparedAutomationRun.actingUserId }),
-      webhookEventId: input.preparedAutomationRun.webhookEventId,
+      ...(input.preparedAutomationRun.webhookEventId === undefined
+        ? {}
+        : { webhookEventId: input.preparedAutomationRun.webhookEventId }),
       deliveryTaskId: input.deliveryTaskId,
       automationRunId: input.preparedAutomationRun.automationRunId,
       conversationId: input.preparedAutomationRun.conversationId,
-      ...(input.preparedAutomationRun.webhookExternalDeliveryId === null
+      ...(input.preparedAutomationRun.webhookExternalDeliveryId === null ||
+      input.preparedAutomationRun.webhookExternalDeliveryId === undefined
         ? {}
         : {
             externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,

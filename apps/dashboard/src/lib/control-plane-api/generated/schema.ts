@@ -5881,7 +5881,7 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
                 /** @enum {string} */
-                source: "dashboard" | "webhook";
+                source: "dashboard" | "webhook" | "schedule";
                 startedBy: {
                   id: string;
                   /** @enum {string} */

@@ -40,7 +40,7 @@ export interface paths {
                 sandboxProfileId: string;
                 sandboxProfileVersion: number;
                 /** @enum {string} */
-                source: "dashboard" | "webhook" | "system";
+                source: "dashboard" | "webhook" | "schedule" | "system";
                 startedBy: {
                   id: string;
                   /** @enum {string} */
@@ -478,7 +478,7 @@ export interface paths {
             sandboxProfileId: string;
             sandboxProfileVersion: number;
             /** @enum {string} */
-            source: "dashboard" | "webhook" | "system";
+            source: "dashboard" | "webhook" | "schedule" | "system";
             startedBy: {
               id: string;
               /** @enum {string} */

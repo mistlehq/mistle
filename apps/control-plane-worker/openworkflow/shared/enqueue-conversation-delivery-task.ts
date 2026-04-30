@@ -12,7 +12,8 @@ import {
 export type EnqueueAutomationConversationDeliveryTaskInput = {
   conversationId: string;
   automationRunId: string;
-  sourceWebhookEventId: string;
+  sourceWebhookEventId?: string | undefined;
+  sourceScheduledActionId?: string | undefined;
   sourceOrderKey: string;
 };
 
@@ -22,12 +23,26 @@ export async function enqueueAutomationConversationDeliveryTask(
   },
   input: EnqueueAutomationConversationDeliveryTaskInput,
 ) {
+  if (
+    (input.sourceWebhookEventId === undefined && input.sourceScheduledActionId === undefined) ||
+    (input.sourceWebhookEventId !== undefined && input.sourceScheduledActionId !== undefined)
+  ) {
+    throw new AutomationConversationPersistenceError({
+      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_INPUT_MISMATCH,
+      message:
+        "AutomationConversation delivery task enqueue requires exactly one source reference.",
+    });
+  }
+  const sourceWebhookEventId = input.sourceWebhookEventId ?? null;
+  const sourceScheduledActionId = input.sourceScheduledActionId ?? null;
+
   const insertedRows = await ctx.db
     .insert(automationConversationDeliveryTasks)
     .values({
       conversationId: input.conversationId,
       automationRunId: input.automationRunId,
-      sourceWebhookEventId: input.sourceWebhookEventId,
+      sourceWebhookEventId,
+      sourceScheduledActionId,
       sourceOrderKey: input.sourceOrderKey,
       status: AutomationConversationDeliveryTaskStatuses.QUEUED,
     })
@@ -53,7 +68,8 @@ export async function enqueueAutomationConversationDeliveryTask(
 
   if (
     existingTask.conversationId !== input.conversationId ||
-    existingTask.sourceWebhookEventId !== input.sourceWebhookEventId ||
+    existingTask.sourceWebhookEventId !== sourceWebhookEventId ||
+    existingTask.sourceScheduledActionId !== sourceScheduledActionId ||
     existingTask.sourceOrderKey !== input.sourceOrderKey
   ) {
     throw new AutomationConversationPersistenceError({

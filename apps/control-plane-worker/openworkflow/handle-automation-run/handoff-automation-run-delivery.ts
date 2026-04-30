@@ -24,8 +24,9 @@ export async function handoffAutomationRunDelivery(
     {
       conversationId: input.preparedAutomationRun.conversationId,
       automationRunId: input.preparedAutomationRun.automationRunId,
-      sourceWebhookEventId: input.preparedAutomationRun.webhookEventId,
-      sourceOrderKey: input.preparedAutomationRun.webhookSourceOrderKey,
+      sourceWebhookEventId: input.preparedAutomationRun.sourceWebhookEventId,
+      sourceScheduledActionId: input.preparedAutomationRun.sourceScheduledActionId,
+      sourceOrderKey: input.preparedAutomationRun.sourceOrderKey,
     },
   );
 

@@ -22,7 +22,7 @@ export async function ensureSandboxInstance(
       kind: "user" | "system";
       id: string;
     };
-    source: "dashboard" | "webhook" | "system";
+    source: "dashboard" | "webhook" | "schedule" | "system";
   },
 ): Promise<{
   sandboxInstanceId: string;

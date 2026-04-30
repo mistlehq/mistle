@@ -35,6 +35,7 @@ export function createWorkerEnvironment(
 ): Record<string, string> {
   return {
     NODE_ENV: "development",
+    MISTLE_ENV: "development",
     MISTLE_TELEMETRY_ENABLED: "false",
     MISTLE_TELEMETRY_DEBUG: "false",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: fixture.internalAuthServiceToken,

@@ -1303,7 +1303,7 @@ export interface paths {
             primaryRepositoryId?: string | null;
             profileId: string;
             profileVersion: number;
-            source: "dashboard" | "webhook";
+            source: "dashboard" | "webhook" | "schedule";
             startedBy: {
               id: string;
               kind: "user" | "system";
