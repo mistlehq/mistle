@@ -44,36 +44,49 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Build sandbox base image
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push sandbox base image
+        id: publish
         run: |
           tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
+          metadata_file="$(mktemp)"
 
           if [ "${{ inputs.publish_latest }}" = "true" ]; then
             tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
-          docker build \
-            --platform linux/amd64 \
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
             --target sandbox-base \
             --file packages/sandboxd/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             "${tags[@]}" \
+            --metadata-file "${metadata_file}" \
+            --push \
             .
 
-      - name: Push sandbox base image
-        run: |
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          METADATA_FILE="${metadata_file}" python3 <<'PY'
+          import json
+          import os
 
-          if [ "${{ inputs.publish_latest }}" = "true" ]; then
-            docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
-          fi
+          metadata_path = os.environ["METADATA_FILE"]
+          with open(metadata_path, encoding="utf-8") as fh:
+              metadata = json.load(fh)
 
-      - name: Resolve pushed digest
-        id: publish
-        run: |
-          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_TAG}")"
-          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+          digest = metadata.get("containerimage.digest")
+          if not isinstance(digest, str) or not digest:
+              raise RuntimeError("Buildx metadata did not include containerimage.digest.")
+
+          image_repository = os.environ["IMAGE_REPOSITORY"]
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"image_ref={image_repository}@{digest}\n")
+          PY
 
       - name: Summarize published image
         run: |
