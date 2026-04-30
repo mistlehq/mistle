@@ -55,6 +55,994 @@
         }
       }
     },
+    "/v1/automations/schedules": {
+      "post": {
+        "tags": ["Automations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "schedule": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cronExpression": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["cronExpression", "timezone"],
+                    "additionalProperties": false
+                  },
+                  "inputTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conversationKeyTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKeyTemplate": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sandboxProfileVersion": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "primaryRepositoryId": {
+                        "type": ["string", "null"],
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["sandboxProfileId"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["name", "schedule", "inputTemplate", "target"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Create a scheduled automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["schedule"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "schedule": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cronExpression": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "nextScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "lastScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "cronExpression",
+                        "timezone",
+                        "enabled",
+                        "nextScheduledAt",
+                        "lastScheduledAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "schedule",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_SCHEDULE",
+                            "INVALID_SANDBOX_PROFILE_REFERENCE",
+                            "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE",
+                            "INVALID_PRIMARY_REPOSITORY"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automations/schedules/{automationId}": {
+      "get": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a scheduled automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["schedule"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "schedule": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cronExpression": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "nextScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "lastScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "cronExpression",
+                        "timezone",
+                        "enabled",
+                        "nextScheduledAt",
+                        "lastScheduledAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "schedule",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scheduled automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "schedule": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "cronExpression": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "inputTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conversationKeyTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKeyTemplate": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sandboxProfileVersion": {
+                        "type": "integer",
+                        "minimum": 1
+                      },
+                      "primaryRepositoryId": {
+                        "type": ["string", "null"],
+                        "minLength": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update a scheduled automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["schedule"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "schedule": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cronExpression": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "nextScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "lastScheduledAt": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "cronExpression",
+                        "timezone",
+                        "enabled",
+                        "nextScheduledAt",
+                        "lastScheduledAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "primaryRepositoryId": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "sandboxProfileId",
+                        "sandboxProfileVersion",
+                        "primaryRepositoryId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "schedule",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_SCHEDULE",
+                            "INVALID_SANDBOX_PROFILE_REFERENCE",
+                            "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE",
+                            "INVALID_PRIMARY_REPOSITORY"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scheduled automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete a scheduled automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "automationId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["automationId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scheduled automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/automations/webhooks": {
       "get": {
         "tags": ["Automations"],

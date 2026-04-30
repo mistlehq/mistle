@@ -427,6 +427,455 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/automations/schedules": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate: string;
+            name: string;
+            schedule: {
+              cronExpression: string;
+              name?: string;
+              timezone: string;
+            };
+            target: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Create a scheduled automation. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_SCHEDULE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/automations/schedules/{automationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a scheduled automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete a scheduled automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              automationId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate?: string;
+            name?: string;
+            schedule?: {
+              cronExpression?: string;
+              name?: string;
+              timezone?: string;
+            };
+            target?: {
+              primaryRepositoryId?: string | null;
+              sandboxProfileId?: string;
+              sandboxProfileVersion?: number;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Update a scheduled automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              /** @enum {string} */
+              kind: "schedule";
+              name: string;
+              schedule: {
+                cronExpression: string;
+                enabled: boolean;
+                id: string;
+                lastScheduledAt: string | null;
+                name: string;
+                nextScheduledAt: string | null;
+                timezone: string;
+              };
+              target: {
+                id: string;
+                primaryRepositoryId: string | null;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_SCHEDULE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE"
+                    | "INVALID_SANDBOX_PROFILE_VERSION_REFERENCE"
+                    | "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Scheduled automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   "/v1/automations/webhooks": {
     parameters: {
       query?: never;

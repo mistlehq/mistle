@@ -6,6 +6,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { OpenWorkflow } from "openworkflow";
 
 import { createAuthRoutes } from "./auth/routes.js";
+import { createAutomationSchedulesRoutes } from "./automation-schedules/index.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
 import { createHomeRoutes } from "./home/index.js";
 import { createIdentityLinkingCallbacksRoutes } from "./identity-linking-callbacks/index.js";
@@ -117,6 +118,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
+  const automationSchedulesRoutes = withActiveOrganizationAccess(createAutomationSchedulesRoutes());
   const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
   const homeRoutes = withActiveOrganizationAccess(createHomeRoutes());
   const identityLinkingCallbacksRoutes = createIdentityLinkingCallbacksRoutes();
@@ -133,6 +135,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
+  app.route(automationSchedulesRoutes.basePath, automationSchedulesRoutes.routes);
   app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);
   app.route(homeRoutes.basePath, homeRoutes.routes);
   app.route(identityLinkingCallbacksRoutes.basePath, identityLinkingCallbacksRoutes.routes);
