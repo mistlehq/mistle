@@ -358,7 +358,7 @@ function buildUpgradeRequestHeaders(input: {
     if (normalizedHeaderName === "origin") {
       rewrittenHeaders.push({
         name: header.name,
-        value: `${input.upstreamProtocol}://127.0.0.1:${String(input.targetPort)}`,
+        value: `${input.browserEdgeProto}://${input.browserVisibleHost}`,
       });
       continue;
     }

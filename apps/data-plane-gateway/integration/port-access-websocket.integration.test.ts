@@ -421,7 +421,7 @@ describe("port access websocket integration", () => {
       const requestHead = Buffer.from(requestFrame.frame.payload).toString("utf8");
       expect(requestHead).toContain("GET /socket/echo?mode=full HTTP/1.1\r\n");
       expect(requestHead).toContain(`Host: 127.0.0.1:${String(port)}\r\n`);
-      expect(requestHead).toContain(`Origin: http://127.0.0.1:${String(port)}\r\n`);
+      expect(requestHead).toContain(`Origin: http://${host}\r\n`);
       expect(requestHead).toContain("Connection: Upgrade\r\n");
       expect(requestHead).toContain("Upgrade: websocket\r\n");
       expect(requestHead).toContain("Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n");
