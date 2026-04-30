@@ -1,14 +1,3 @@
-import {
-  Field,
-  FieldContent,
-  FieldHeader,
-  FieldLabel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
@@ -16,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { FormPageFrame } from "../shared/page-frame.js";
+import { AutomationTypeDisplayField, AutomationTypeSelectField } from "./automation-type-field.js";
 import { validateWebhookAutomationFormValues } from "./webhook-automation-form-helpers.js";
 import {
   WebhookAutomationForm,
@@ -415,6 +405,13 @@ function StoryHarness(input: {
     input.validationSummaryError ?? null,
   );
   const pageTitle = input.mode === "create" ? "Create automation" : "";
+  const automationTypeField =
+    input.automationTypeField ??
+    (input.mode === "create" ? (
+      <AutomationTypeSelectField value="trigger" />
+    ) : (
+      <AutomationTypeDisplayField value="trigger" />
+    ));
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -426,11 +423,7 @@ function StoryHarness(input: {
           validationSummaryError={validationSummaryError}
           isDeleting={input.isDeleting ?? false}
           isSaving={input.isSaving ?? false}
-          {...(input.automationTypeField === undefined
-            ? input.mode === "create"
-              ? { automationTypeField: <AutomationTypeField value="trigger" /> }
-              : {}
-            : { automationTypeField: input.automationTypeField })}
+          automationTypeField={automationTypeField}
           mode={input.mode}
           onDelete={input.onDelete ?? null}
           onSubmit={() => {
@@ -469,29 +462,6 @@ function StoryHarness(input: {
         />
       </FormPageFrame>
     </QueryClientProvider>
-  );
-}
-
-function AutomationTypeField(input: { value: "trigger" | "scheduled" }): React.JSX.Element {
-  const label = input.value === "scheduled" ? "Scheduled" : "Trigger";
-
-  return (
-    <Field orientation="horizontal">
-      <FieldHeader>
-        <FieldLabel>Automation type</FieldLabel>
-      </FieldHeader>
-      <FieldContent>
-        <Select value={input.value}>
-          <SelectTrigger>
-            <SelectValue>{label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
-          </SelectContent>
-        </Select>
-      </FieldContent>
-    </Field>
   );
 }
 

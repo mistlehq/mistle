@@ -1,19 +1,9 @@
-import {
-  Field,
-  FieldContent,
-  FieldHeader,
-  FieldLabel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { FormPageFrame } from "../shared/page-frame.js";
+import { AutomationTypeDisplayField, AutomationTypeSelectField } from "./automation-type-field.js";
 import { validateScheduledAutomationFormValues } from "./scheduled-automation-form-helpers.js";
 import {
   ScheduledAutomationForm,
@@ -104,7 +94,11 @@ function StoryHarness(input: {
         isDeleting={input.isDeleting ?? false}
         isSaving={input.isSaving ?? false}
         automationTypeField={
-          input.mode === "create" ? <AutomationTypeField value="scheduled" /> : undefined
+          input.mode === "create" ? (
+            <AutomationTypeSelectField value="scheduled" />
+          ) : (
+            <AutomationTypeDisplayField value="scheduled" />
+          )
         }
         mode={input.mode}
         onDelete={input.onDelete ?? null}
@@ -138,29 +132,6 @@ function StoryHarness(input: {
         values={values}
       />
     </FormPageFrame>
-  );
-}
-
-function AutomationTypeField(input: { value: "trigger" | "scheduled" }): React.JSX.Element {
-  const label = input.value === "scheduled" ? "Scheduled" : "Trigger";
-
-  return (
-    <Field orientation="horizontal">
-      <FieldHeader>
-        <FieldLabel>Automation type</FieldLabel>
-      </FieldHeader>
-      <FieldContent>
-        <Select value={input.value}>
-          <SelectTrigger>
-            <SelectValue>{label}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
-          </SelectContent>
-        </Select>
-      </FieldContent>
-    </Field>
   );
 }
 

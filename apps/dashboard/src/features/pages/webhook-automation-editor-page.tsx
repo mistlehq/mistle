@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { AutomationTypeDisplayField } from "../automations/automation-type-field.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import {
   resolveWebhookAutomationEditInitialValues,
@@ -175,6 +176,7 @@ function EditWebhookAutomationEditor(input: {
       key={input.automationId}
       mode="edit"
       automationId={input.automationId}
+      automationTypeField={<AutomationTypeDisplayField value="trigger" />}
       navigate={input.navigate}
       initialValues={initialValues}
       preservedWebhookSourceId={automationQuery.data.integrationWebhookSourceId}

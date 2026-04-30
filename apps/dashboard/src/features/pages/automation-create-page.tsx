@@ -1,29 +1,16 @@
-import {
-  Field,
-  FieldContent,
-  FieldHeader,
-  FieldLabel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@mistle/ui";
 import { useNavigate, useSearchParams } from "react-router";
 
+import {
+  AutomationTypeSelectField,
+  type AutomationTypeValue,
+} from "../automations/automation-type-field.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { CreateScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
 import { CreateWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
 
-type AutomationCreateKind = "trigger" | "scheduled";
-
-function parseAutomationCreateKind(value: string | null): AutomationCreateKind {
+function parseAutomationCreateKind(value: string | null): AutomationTypeValue {
   return value === "scheduled" ? "scheduled" : "trigger";
-}
-
-function formatAutomationCreateKind(kind: AutomationCreateKind): string {
-  return kind === "scheduled" ? "Scheduled" : "Trigger";
 }
 
 export function AutomationCreatePage(): React.JSX.Element {
@@ -33,7 +20,7 @@ export function AutomationCreatePage(): React.JSX.Element {
   const kind = parseAutomationCreateKind(searchParams.get("type"));
   const { title, description } = resolvePageFrameText(pageMeta, "Create automation");
 
-  function updateKind(nextKind: AutomationCreateKind): void {
+  function updateKind(nextKind: AutomationTypeValue): void {
     const nextSearchParams = new URLSearchParams(searchParams);
     if (nextKind === "trigger") {
       nextSearchParams.delete("type");
@@ -43,31 +30,7 @@ export function AutomationCreatePage(): React.JSX.Element {
     setSearchParams(nextSearchParams, { replace: true });
   }
 
-  const automationTypeField = (
-    <Field orientation="horizontal">
-      <FieldHeader>
-        <FieldLabel>Automation type</FieldLabel>
-      </FieldHeader>
-      <FieldContent>
-        <Select
-          onValueChange={(value) => {
-            if (value === "trigger" || value === "scheduled") {
-              updateKind(value);
-            }
-          }}
-          value={kind}
-        >
-          <SelectTrigger>
-            <SelectValue>{formatAutomationCreateKind(kind)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
-          </SelectContent>
-        </Select>
-      </FieldContent>
-    </Field>
-  );
+  const automationTypeField = <AutomationTypeSelectField onValueChange={updateKind} value={kind} />;
 
   return (
     <FormPageFrame description={description} title={title}>

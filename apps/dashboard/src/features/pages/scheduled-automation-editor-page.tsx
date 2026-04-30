@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { AutomationTypeDisplayField } from "../automations/automation-type-field.js";
 import { DeleteWebhookAutomationDialog } from "../automations/delete-webhook-automation-dialog.js";
 import { toScheduledAutomationFormValues } from "../automations/scheduled-automation-form-helpers.js";
 import { ScheduledAutomationForm } from "../automations/scheduled-automation-form.js";
@@ -140,6 +141,7 @@ function EditScheduledAutomationEditor(input: {
       key={input.automationId}
       mode="edit"
       automationId={input.automationId}
+      automationTypeField={<AutomationTypeDisplayField value="scheduled" />}
       navigate={input.navigate}
       initialValues={toScheduledAutomationFormValues(automationQuery.data)}
       sandboxProfileOptions={prerequisites.sandboxProfileOptions}
