@@ -236,7 +236,6 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     webhookProviderEventType: input.webhookEvent.providerEventType,
     webhookExternalEventId: input.webhookEvent.externalEventId,
     webhookExternalDeliveryId: input.webhookEvent.externalDeliveryId,
-    webhookSourceOrderKey: input.webhookEvent.sourceOrderKey ?? "",
     webhookPayload: input.webhookEvent.payload,
     scheduledActionId: undefined,
     scheduledAt: undefined,
@@ -494,8 +493,8 @@ export async function prepareAutomationRun(
   }
 
   const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
-  const webhookSourceOrderKey = webhookEvent.sourceOrderKey;
-  if (webhookSourceOrderKey === null || webhookSourceOrderKey.trim().length === 0) {
+  const sourceOrderKey = webhookEvent.sourceOrderKey;
+  if (sourceOrderKey === null || sourceOrderKey.trim().length === 0) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING,
       message: `Webhook event '${webhookEvent.id}' is missing source order key.`,
@@ -585,7 +584,7 @@ export async function prepareAutomationRun(
     sandboxProfileVersion,
     primaryRepositoryId: automationTarget.primaryRepositoryId,
     sourceKind: "webhook",
-    sourceOrderKey: webhookSourceOrderKey,
+    sourceOrderKey,
     sourceWebhookEventId: webhookEvent.id,
     sourceScheduledActionId: undefined,
     integrationConnectionId: webhookEvent.integrationConnectionId,
@@ -595,7 +594,6 @@ export async function prepareAutomationRun(
     webhookProviderEventType: webhookEvent.providerEventType,
     webhookExternalEventId: webhookEvent.externalEventId,
     webhookExternalDeliveryId: webhookEvent.externalDeliveryId,
-    webhookSourceOrderKey,
     webhookPayload: webhookEvent.payload,
     scheduledActionId: undefined,
     scheduledAt: undefined,
@@ -677,6 +675,37 @@ async function prepareScheduledAutomationRun(
 
   const scheduledAt = normalizeScheduledAt(scheduledAction.scheduledAt, scheduledAction.id);
   const sourceOrderKey = `${scheduledAt}#${scheduledAction.id}`;
+  const preparedRunBase = {
+    automationRunId: input.automationRun.id,
+    automationRunCreatedAt: input.automationRun.createdAt,
+    automationId: input.automationRun.automationId,
+    automationTargetId: input.automationTarget.id,
+    organizationId: input.automation.organizationId,
+    sandboxProfileId: input.automationTarget.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    primaryRepositoryId: input.automationTarget.primaryRepositoryId,
+    sourceKind: "schedule",
+    sourceOrderKey,
+    sourceWebhookEventId: undefined,
+    sourceScheduledActionId: scheduledAction.id,
+    integrationConnectionId: undefined,
+    targetKey: undefined,
+    webhookEventId: undefined,
+    webhookEventType: undefined,
+    webhookProviderEventType: undefined,
+    webhookExternalEventId: undefined,
+    webhookExternalDeliveryId: undefined,
+    webhookPayload: undefined,
+    scheduledActionId: scheduledAction.id,
+    scheduledAt,
+    localScheduledDate: scheduledAction.localScheduledDate,
+    localScheduledTime: scheduledAction.localScheduledTime,
+    instructions: null,
+    collaborationModeSettings: null,
+  } satisfies Omit<
+    PreparedAutomationRun,
+    "conversationId" | "renderedInput" | "renderedConversationKey" | "renderedIdempotencyKey"
+  >;
   const hasPersistedSnapshot =
     input.automationRun.renderedInput !== null ||
     input.automationRun.renderedConversationKey !== null ||
@@ -694,37 +723,11 @@ async function prepareScheduledAutomationRun(
     }
 
     return {
-      automationRunId: input.automationRun.id,
-      automationRunCreatedAt: input.automationRun.createdAt,
-      automationId: input.automationRun.automationId,
+      ...preparedRunBase,
       conversationId: input.automationRun.conversationId,
-      automationTargetId: input.automationTarget.id,
-      organizationId: input.automation.organizationId,
-      sandboxProfileId: input.automationTarget.sandboxProfileId,
-      sandboxProfileVersion: input.sandboxProfileVersion,
-      primaryRepositoryId: input.automationTarget.primaryRepositoryId,
-      sourceKind: "schedule",
-      sourceOrderKey,
-      sourceWebhookEventId: undefined,
-      sourceScheduledActionId: scheduledAction.id,
-      integrationConnectionId: undefined,
-      targetKey: undefined,
-      webhookEventId: undefined,
-      webhookEventType: undefined,
-      webhookProviderEventType: undefined,
-      webhookExternalEventId: undefined,
-      webhookExternalDeliveryId: undefined,
-      webhookSourceOrderKey: undefined,
-      webhookPayload: undefined,
-      scheduledActionId: scheduledAction.id,
-      scheduledAt,
-      localScheduledDate: scheduledAction.localScheduledDate,
-      localScheduledTime: scheduledAction.localScheduledTime,
       renderedInput: input.automationRun.renderedInput,
       renderedConversationKey: input.automationRun.renderedConversationKey,
       renderedIdempotencyKey: input.automationRun.renderedIdempotencyKey,
-      instructions: null,
-      collaborationModeSettings: null,
     };
   }
 
@@ -801,37 +804,11 @@ async function prepareScheduledAutomationRun(
   });
 
   return {
-    automationRunId: input.automationRun.id,
-    automationRunCreatedAt: input.automationRun.createdAt,
-    automationId: input.automationRun.automationId,
+    ...preparedRunBase,
     conversationId: claimedConversationId,
-    automationTargetId: input.automationTarget.id,
-    organizationId: input.automation.organizationId,
-    sandboxProfileId: input.automationTarget.sandboxProfileId,
-    sandboxProfileVersion: input.sandboxProfileVersion,
-    primaryRepositoryId: input.automationTarget.primaryRepositoryId,
-    sourceKind: "schedule",
-    sourceOrderKey,
-    sourceWebhookEventId: undefined,
-    sourceScheduledActionId: scheduledAction.id,
-    integrationConnectionId: undefined,
-    targetKey: undefined,
-    webhookEventId: undefined,
-    webhookEventType: undefined,
-    webhookProviderEventType: undefined,
-    webhookExternalEventId: undefined,
-    webhookExternalDeliveryId: undefined,
-    webhookSourceOrderKey: undefined,
-    webhookPayload: undefined,
-    scheduledActionId: scheduledAction.id,
-    scheduledAt,
-    localScheduledDate: scheduledAction.localScheduledDate,
-    localScheduledTime: scheduledAction.localScheduledTime,
     renderedInput: compiledTemplates.renderedInput,
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
-    instructions: null,
-    collaborationModeSettings: null,
   };
 }
 

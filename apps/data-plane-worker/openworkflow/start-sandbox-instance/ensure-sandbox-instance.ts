@@ -3,6 +3,7 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
   type SandboxInstancePurpose,
+  type SandboxInstanceSource,
 } from "@mistle/db/data-plane";
 import type { SandboxProvider } from "@mistle/sandbox";
 
@@ -22,7 +23,7 @@ export async function ensureSandboxInstance(
       kind: "user" | "system";
       id: string;
     };
-    source: "dashboard" | "webhook" | "schedule" | "system";
+    source: SandboxInstanceSource;
   },
 ): Promise<{
   sandboxInstanceId: string;

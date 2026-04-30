@@ -555,7 +555,6 @@ describe("handleAutomationRun integration", () => {
           webhookProviderEventType: "issue_comment",
           webhookExternalEventId: "evt_prepare",
           webhookExternalDeliveryId: "delivery_prepare",
-          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0001",
           actingUserId: "usr_automation_actor",
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
@@ -913,7 +912,6 @@ describe("handleAutomationRun integration", () => {
           webhookProviderEventType: "message",
           webhookExternalEventId: "evt_slack_thread_prepare",
           webhookExternalDeliveryId: null,
-          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0001",
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "slack:thread:C123:1710000000.000100",
           renderedIdempotencyKey: "evt_slack_thread_prepare",
@@ -1210,7 +1208,6 @@ describe("handleAutomationRun integration", () => {
 
         expect(firstPreparedRun).toMatchObject({
           conversationId: expect.stringMatching(/^cnv_/),
-          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0002",
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",

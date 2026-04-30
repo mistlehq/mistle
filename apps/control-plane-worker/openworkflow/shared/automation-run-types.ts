@@ -21,7 +21,6 @@ export type PreparedAutomationRun = {
   webhookProviderEventType: string | undefined;
   webhookExternalEventId: string | undefined;
   webhookExternalDeliveryId: string | null | undefined;
-  webhookSourceOrderKey: string | undefined;
   webhookPayload: Record<string, unknown> | undefined;
   scheduledActionId: string | undefined;
   scheduledAt: string | undefined;
