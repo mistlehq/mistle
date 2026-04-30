@@ -6206,6 +6206,73 @@
                                         "routeSegment": {
                                           "type": "string",
                                           "pattern": "^[a-z0-9][a-z0-9-]*$"
+                                        },
+                                        "startForm": {
+                                          "type": "object",
+                                          "properties": {
+                                            "fields": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "actions": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "type": "object",
+                                                      "properties": {
+                                                        "href": {
+                                                          "type": "string",
+                                                          "format": "uri"
+                                                        },
+                                                        "label": {
+                                                          "type": "string",
+                                                          "minLength": 1
+                                                        },
+                                                        "opensInNewWindow": {
+                                                          "type": "boolean"
+                                                        }
+                                                      },
+                                                      "required": ["href", "label"],
+                                                      "additionalProperties": false
+                                                    },
+                                                    "minItems": 1
+                                                  },
+                                                  "description": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "inputType": {
+                                                    "type": "string",
+                                                    "enum": ["password", "text", "textarea"]
+                                                  },
+                                                  "label": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "name": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "placeholder": {
+                                                    "type": "string",
+                                                    "minLength": 1
+                                                  },
+                                                  "required": {
+                                                    "type": "boolean"
+                                                  }
+                                                },
+                                                "required": ["inputType", "label", "name"],
+                                                "additionalProperties": false
+                                              },
+                                              "minItems": 1
+                                            },
+                                            "submitLabel": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": ["fields", "submitLabel"],
+                                          "additionalProperties": false
                                         }
                                       },
                                       "required": ["routeSegment"],

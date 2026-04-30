@@ -81,6 +81,27 @@ describe("IntegrationTargetSchema", () => {
               ],
             },
             routeSegment: "slack-app",
+            startForm: {
+              submitLabel: "Create and connect Slack app",
+              fields: [
+                {
+                  name: "appConfigToken",
+                  label: "App configuration token",
+                  inputType: "password",
+                  required: true,
+                  placeholder: "xoxe.xoxp-...",
+                  description:
+                    "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+                  actions: [
+                    {
+                      label: "Generate token in Slack",
+                      href: "https://api.slack.com/apps",
+                      opensInNewWindow: true,
+                    },
+                  ],
+                },
+              ],
+            },
           },
           secretFields: [
             {
@@ -124,6 +145,27 @@ describe("IntegrationTargetSchema", () => {
           ],
         },
         routeSegment: "slack-app",
+        startForm: {
+          submitLabel: "Create and connect Slack app",
+          fields: [
+            {
+              name: "appConfigToken",
+              label: "App configuration token",
+              inputType: "password",
+              required: true,
+              placeholder: "xoxe.xoxp-...",
+              description:
+                "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+              actions: [
+                {
+                  label: "Generate token in Slack",
+                  href: "https://api.slack.com/apps",
+                  opensInNewWindow: true,
+                },
+              ],
+            },
+          ],
+        },
       },
     });
   });

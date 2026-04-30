@@ -3361,6 +3361,24 @@ export interface paths {
                               kind: "all-of";
                             };
                         routeSegment: string;
+                        startForm?: {
+                          fields: {
+                            actions?: {
+                              /** Format: uri */
+                              href: string;
+                              label: string;
+                              opensInNewWindow?: boolean;
+                            }[];
+                            description?: string;
+                            /** @enum {string} */
+                            inputType: "password" | "text" | "textarea";
+                            label: string;
+                            name: string;
+                            placeholder?: string;
+                            required?: boolean;
+                          }[];
+                          submitLabel: string;
+                        };
                       };
                     }
                   | {

@@ -129,10 +129,38 @@ export const IntegrationSetupCompletionRequirementSchema: z.ZodType<IntegrationF
       .strict(),
   ]);
 
+const IntegrationFormConnectionMethodSetupStartFormActionSchema = z
+  .object({
+    href: z.url(),
+    label: z.string().min(1),
+    opensInNewWindow: z.boolean().optional(),
+  })
+  .strict();
+
+const IntegrationFormConnectionMethodSetupStartFormFieldSchema = z
+  .object({
+    actions: z.array(IntegrationFormConnectionMethodSetupStartFormActionSchema).min(1).optional(),
+    description: z.string().min(1).optional(),
+    inputType: z.enum(["password", "text", "textarea"]),
+    label: z.string().min(1),
+    name: z.string().min(1),
+    placeholder: z.string().min(1).optional(),
+    required: z.boolean().optional(),
+  })
+  .strict();
+
+const IntegrationFormConnectionMethodSetupStartFormSchema = z
+  .object({
+    fields: z.array(IntegrationFormConnectionMethodSetupStartFormFieldSchema).min(1),
+    submitLabel: z.string().min(1),
+  })
+  .strict();
+
 export const IntegrationFormConnectionMethodSetupFlowMetadataSchema: z.ZodType<IntegrationFormConnectionMethodSetupFlowMetadata> =
   z
     .object({
       completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
       routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+      startForm: IntegrationFormConnectionMethodSetupStartFormSchema.optional(),
     })
     .strict();

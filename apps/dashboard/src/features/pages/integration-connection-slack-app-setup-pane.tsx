@@ -7,6 +7,7 @@ import {
   FieldHeader,
   FieldLabel,
   Input,
+  Textarea,
   TextLink,
 } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -43,7 +44,10 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
-import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
+import type {
+  IntegrationSetupAppManifestDraftBuilder,
+  IntegrationSetupStartForm,
+} from "./integration-connection-setup-manifest-draft.js";
 import {
   hasConfiguredSetupSecretField,
   resolveConfiguredSetupSecretFieldKeys,
@@ -244,40 +248,147 @@ function resolveSlackExistingAppSetupSavedFieldKeys(
   return SlackExistingAppConfigFieldKeys;
 }
 
+function createInitialSetupStartFormValues(
+  form: IntegrationSetupStartForm,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  for (const field of form.fields) {
+    values[field.name] = "";
+  }
+
+  return values;
+}
+
+function normalizeSetupStartFormValue(value: string | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function areRequiredSetupStartFormFieldsComplete(input: {
+  form: IntegrationSetupStartForm;
+  values: Record<string, string>;
+}): boolean {
+  return input.form.fields.every(
+    (field) =>
+      field.required !== true || normalizeSetupStartFormValue(input.values[field.name]).length > 0,
+  );
+}
+
+function resolveRequiredSetupStartFormValue(input: {
+  fieldName: string;
+  form: IntegrationSetupStartForm;
+  values: Record<string, string>;
+}): string {
+  const field = input.form.fields.find((candidate) => candidate.name === input.fieldName) ?? null;
+
+  if (field === null) {
+    throw new Error(`Setup start form does not define required field '${input.fieldName}'.`);
+  }
+
+  const value = normalizeSetupStartFormValue(input.values[field.name]);
+  if (value.length === 0) {
+    throw new Error(`Setup start form field '${input.fieldName}' is required.`);
+  }
+
+  return value;
+}
+
+function SetupStartFormField(input: {
+  field: IntegrationSetupStartForm["fields"][number];
+  value: string;
+  onValueChange: (fieldName: string, value: string) => void;
+}): React.JSX.Element {
+  const inputId = `integration-setup-start-form-${input.field.name}`;
+  const fieldDescriptionId = `${inputId}-description`;
+  const hasDescription = input.field.description !== undefined || input.field.actions !== undefined;
+
+  return (
+    <Field>
+      <FieldHeader>
+        <FieldLabel htmlFor={inputId} required={input.field.required === true}>
+          {input.field.label}
+        </FieldLabel>
+        {hasDescription ? (
+          <FieldDescription id={fieldDescriptionId}>
+            {input.field.description === undefined ? null : <span>{input.field.description}</span>}
+            {input.field.actions === undefined
+              ? null
+              : input.field.actions.map((action) => (
+                  <span className="block" key={action.href}>
+                    <TextLink
+                      href={action.href}
+                      {...(action.opensInNewWindow === undefined
+                        ? {}
+                        : { opensInNewWindow: action.opensInNewWindow })}
+                    >
+                      {action.label}
+                    </TextLink>
+                  </span>
+                ))}
+          </FieldDescription>
+        ) : null}
+      </FieldHeader>
+      <FieldContent>
+        {input.field.inputType === "textarea" ? (
+          <Textarea
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoComplete="off"
+            id={inputId}
+            onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
+            placeholder={input.field.placeholder}
+            value={input.value}
+          />
+        ) : (
+          <Input
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoComplete="off"
+            id={inputId}
+            onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
+            placeholder={input.field.placeholder}
+            type={input.field.inputType}
+            value={input.value}
+          />
+        )}
+      </FieldContent>
+    </Field>
+  );
+}
+
+function ProviderSetupStartForm(input: {
+  form: IntegrationSetupStartForm;
+  values: Record<string, string>;
+  onValueChange: (fieldName: string, value: string) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      {input.form.fields.map((field) => (
+        <SetupStartFormField
+          field={field}
+          key={field.name}
+          onValueChange={input.onValueChange}
+          value={input.values[field.name] ?? ""}
+        />
+      ))}
+    </>
+  );
+}
+
 function SlackManifestSetupPanel(input: {
-  appConfigToken: string;
   manifestCallbackState: ManifestWebhookCallbackState;
   manifestValue: string;
   manifestValidation: ManifestJsonValidation;
-  onAppConfigTokenChange: (value: string) => void;
   onManifestChange: (value: string) => void;
+  onSetupStartFormValueChange: (fieldName: string, value: string) => void;
+  setupStartForm: IntegrationSetupStartForm;
+  setupStartFormValues: Record<string, string>;
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-6">
-      <Field>
-        <FieldHeader>
-          <FieldLabel htmlFor="slack-app-config-token" required>
-            App configuration token
-          </FieldLabel>
-          <FieldDescription>
-            Generate one from{" "}
-            <TextLink href="https://api.slack.com/apps" opensInNewWindow>
-              Slack app settings
-            </TextLink>
-            , then paste it here.
-          </FieldDescription>
-        </FieldHeader>
-        <FieldContent>
-          <Input
-            autoComplete="off"
-            id="slack-app-config-token"
-            onChange={(event) => input.onAppConfigTokenChange(event.target.value)}
-            placeholder="xoxe.xoxp-..."
-            type="password"
-            value={input.appConfigToken}
-          />
-        </FieldContent>
-      </Field>
+      <ProviderSetupStartForm
+        form={input.setupStartForm}
+        onValueChange={input.onSetupStartFormValueChange}
+        values={input.setupStartFormValues}
+      />
 
       <IntegrationConnectionSetupManifestEditorSection
         description="Create a Slack app from a basic manifest. You can still change the settings later in Slack."
@@ -318,13 +429,16 @@ function SlackSetupUrls(input: {
 export function SlackAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
+  setupStartForm: IntegrationSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [setupMode, setSetupMode] = useState<SlackSetupMode>(() =>
     isSlackAppInstalled(input.connection) ? "existing-app" : "manifest",
   );
-  const [appConfigToken, setAppConfigToken] = useState("");
+  const [setupStartFormValues, setSetupStartFormValues] = useState(() =>
+    createInitialSetupStartFormValues(input.setupStartForm),
+  );
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSlackSecretFieldKeys(input.connection),
   );
@@ -386,9 +500,20 @@ export function SlackAppSetupPane(input: {
       startSlackAppManifestCreation({
         connectionId: input.connection.id,
         manifest: parseManifestJsonObject(manifestDraft.manifestValue),
-        appConfigToken,
+        appConfigToken: resolveRequiredSetupStartFormValue({
+          fieldName: "appConfigToken",
+          form: input.setupStartForm,
+          values: setupStartFormValues,
+        }),
       }),
   });
+
+  function updateSetupStartFormValue(fieldName: string, value: string): void {
+    setSetupStartFormValues((currentValues) => ({
+      ...currentValues,
+      [fieldName]: value,
+    }));
+  }
 
   async function createSlackApp(): Promise<void> {
     setActionErrorMessage(null);
@@ -409,7 +534,10 @@ export function SlackAppSetupPane(input: {
   const canCreateManifest =
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
-    appConfigToken.trim().length > 0;
+    areRequiredSetupStartFormFieldsComplete({
+      form: input.setupStartForm,
+      values: setupStartFormValues,
+    });
   const requiredSecretsReady = SlackRequiredExistingAppSecretFieldKeys.every((fieldKey) =>
     isSlackExistingAppRequiredSecretReady({
       fieldKey,
@@ -518,7 +646,7 @@ export function SlackAppSetupPane(input: {
                   }}
                   type="button"
                 >
-                  Create and connect Slack app
+                  {input.setupStartForm.submitLabel}
                 </Button>
               </FormPageActionBar>
             ) : null}
@@ -526,12 +654,13 @@ export function SlackAppSetupPane(input: {
         }
         manifestContent={
           <SlackManifestSetupPanel
-            appConfigToken={appConfigToken}
             manifestCallbackState={webhookCallbackState}
             manifestValidation={manifestValidation}
             manifestValue={manifestDraft.manifestValue}
-            onAppConfigTokenChange={setAppConfigToken}
             onManifestChange={manifestDraft.onManifestChange}
+            onSetupStartFormValueChange={updateSetupStartFormValue}
+            setupStartForm={input.setupStartForm}
+            setupStartFormValues={setupStartFormValues}
           />
         }
         onModeChange={setSetupMode}

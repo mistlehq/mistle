@@ -501,9 +501,31 @@ export type IntegrationFormConnectionMethodSetupManifestDraft = {
   ): Record<string, unknown>;
 };
 
+export type IntegrationFormConnectionMethodSetupStartFormAction = {
+  href: string;
+  label: string;
+  opensInNewWindow?: boolean | undefined;
+};
+
+export type IntegrationFormConnectionMethodSetupStartFormField = {
+  actions?: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormAction> | undefined;
+  description?: string | undefined;
+  inputType: "password" | "text" | "textarea";
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  required?: boolean | undefined;
+};
+
+export type IntegrationFormConnectionMethodSetupStartForm = {
+  fields: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormField>;
+  submitLabel: string;
+};
+
 export type IntegrationFormConnectionMethodSetupFlowMetadata = {
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
   routeSegment: string;
+  startForm?: IntegrationFormConnectionMethodSetupStartForm | undefined;
 };
 
 export type IntegrationFormConnectionMethodSetupFlow =

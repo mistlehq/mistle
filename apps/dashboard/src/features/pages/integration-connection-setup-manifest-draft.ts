@@ -1,6 +1,8 @@
 import type {
   AnyIntegrationDefinition,
+  IntegrationBrowserSafeFormConnectionMethodDefinition,
   IntegrationFormConnectionMethodSetupManifestDraft,
+  IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 
@@ -9,6 +11,12 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 
 export type IntegrationSetupAppManifestDraftBuilder =
   IntegrationFormConnectionMethodSetupManifestDraft["build"];
+
+export type IntegrationSetupStartForm = IntegrationFormConnectionMethodSetupStartForm;
+
+type IntegrationSetupFormMethod = IntegrationBrowserSafeFormConnectionMethodDefinition & {
+  setupFlow: NonNullable<IntegrationBrowserSafeFormConnectionMethodDefinition["setupFlow"]>;
+};
 
 const ManifestWebhookCallbackPathPrefix = "/p/integration/webhooks/";
 
@@ -32,6 +40,36 @@ export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
 }): IntegrationSetupAppManifestDraftBuilder {
+  const method = resolveIntegrationSetupFormMethodOrThrow(input);
+
+  if (method.setupFlow.appManifestDraft === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define an app manifest draft builder for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return method.setupFlow.appManifestDraft.build;
+}
+
+export function resolveIntegrationSetupStartFormOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationSetupStartForm {
+  const method = resolveIntegrationSetupFormMethodOrThrow(input);
+
+  if (method.setupFlow.startForm === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define a setup start form for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return method.setupFlow.startForm;
+}
+
+function resolveIntegrationSetupFormMethodOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationSetupFormMethod {
   const definition = resolveIntegrationDefinitionByTargetKey(input.connection.targetKey);
   const method =
     definition.connectionMethods.find((candidate) => candidate.id === input.setupRoute.methodId) ??
@@ -49,19 +87,15 @@ export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
     );
   }
 
-  if (method.setupFlow.routeSegment !== input.setupRoute.routeSegment) {
+  const setupFlow = method.setupFlow;
+
+  if (setupFlow.routeSegment !== input.setupRoute.routeSegment) {
     throw new Error(
-      `Integration setup route '${input.setupRoute.routeSegment}' does not match browser definition route '${method.setupFlow.routeSegment}' for target '${input.connection.targetKey}'.`,
+      `Integration setup route '${input.setupRoute.routeSegment}' does not match browser definition route '${setupFlow.routeSegment}' for target '${input.connection.targetKey}'.`,
     );
   }
 
-  if (method.setupFlow.appManifestDraft === undefined) {
-    throw new Error(
-      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define an app manifest draft builder for target '${input.connection.targetKey}'.`,
-    );
-  }
-
-  return method.setupFlow.appManifestDraft.build;
+  return { ...method, setupFlow };
 }
 
 function resolveIntegrationDefinitionByTargetKey(targetKey: string): AnyIntegrationDefinition {

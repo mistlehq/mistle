@@ -3,7 +3,10 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browse
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
-import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
+import {
+  resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupStartFormOrThrow,
+} from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
@@ -39,6 +42,10 @@ function renderSlackAppSetupPane(input: {
     <SlackAppSetupPane
       connection={input.connection}
       manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
+        connection: input.connection,
+        setupRoute: input.setupRoute,
+      })}
+      setupStartForm={resolveIntegrationSetupStartFormOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}

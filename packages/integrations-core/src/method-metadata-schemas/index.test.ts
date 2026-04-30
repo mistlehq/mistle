@@ -57,6 +57,26 @@ describe("integration method metadata schemas", () => {
     expect(
       IntegrationFormConnectionMethodSetupFlowMetadataSchema.parse({
         routeSegment: "provider-app",
+        startForm: {
+          submitLabel: "Create app",
+          fields: [
+            {
+              name: "appConfigToken",
+              label: "App configuration token",
+              inputType: "password",
+              required: true,
+              placeholder: "xoxe.xoxp-...",
+              description: "Generate a provider app configuration token.",
+              actions: [
+                {
+                  label: "Generate token",
+                  href: "https://api.slack.com/apps",
+                  opensInNewWindow: true,
+                },
+              ],
+            },
+          ],
+        },
         completionRequirements: {
           kind: "all-of",
           allOf: [
@@ -72,6 +92,26 @@ describe("integration method metadata schemas", () => {
       }),
     ).toEqual({
       routeSegment: "provider-app",
+      startForm: {
+        submitLabel: "Create app",
+        fields: [
+          {
+            name: "appConfigToken",
+            label: "App configuration token",
+            inputType: "password",
+            required: true,
+            placeholder: "xoxe.xoxp-...",
+            description: "Generate a provider app configuration token.",
+            actions: [
+              {
+                label: "Generate token",
+                href: "https://api.slack.com/apps",
+                opensInNewWindow: true,
+              },
+            ],
+          },
+        ],
+      },
       completionRequirements: {
         kind: "all-of",
         allOf: [

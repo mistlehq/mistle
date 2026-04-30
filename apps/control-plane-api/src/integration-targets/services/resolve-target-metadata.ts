@@ -104,6 +104,22 @@ export type ResolvedIntegrationTargetMetadata = {
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
           routeSegment: string;
+          startForm?: {
+            fields: {
+              actions?: {
+                href: string;
+                label: string;
+                opensInNewWindow?: boolean;
+              }[];
+              description?: string;
+              inputType: "password" | "text" | "textarea";
+              label: string;
+              name: string;
+              placeholder?: string;
+              required?: boolean;
+            }[];
+            submitLabel: string;
+          };
         };
         secretFields: {
           name: string;
@@ -188,6 +204,36 @@ function resolveConnectionMethod(
                     ),
                   }),
               routeSegment: method.setupFlow.routeSegment,
+              ...(method.setupFlow.startForm === undefined
+                ? {}
+                : {
+                    startForm: {
+                      submitLabel: method.setupFlow.startForm.submitLabel,
+                      fields: method.setupFlow.startForm.fields.map((field) => ({
+                        ...(field.actions === undefined
+                          ? {}
+                          : {
+                              actions: field.actions.map((action) => ({
+                                href: action.href,
+                                label: action.label,
+                                ...(action.opensInNewWindow === undefined
+                                  ? {}
+                                  : { opensInNewWindow: action.opensInNewWindow }),
+                              })),
+                            }),
+                        ...(field.description === undefined
+                          ? {}
+                          : { description: field.description }),
+                        inputType: field.inputType,
+                        label: field.label,
+                        name: field.name,
+                        ...(field.placeholder === undefined
+                          ? {}
+                          : { placeholder: field.placeholder }),
+                        ...(field.required === undefined ? {} : { required: field.required }),
+                      })),
+                    },
+                  }),
             },
           }),
       secretFields: method.secretFields.map((field) => ({

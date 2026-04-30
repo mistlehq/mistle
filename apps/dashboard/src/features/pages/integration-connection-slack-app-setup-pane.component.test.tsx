@@ -11,7 +11,10 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
-import { resolveIntegrationSetupAppManifestDraftBuilderOrThrow } from "./integration-connection-setup-manifest-draft.js";
+import {
+  resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupStartFormOrThrow,
+} from "./integration-connection-setup-manifest-draft.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 function createSlackConnection(input?: {
@@ -94,6 +97,13 @@ function renderSlackAppSetupPane(input?: {
               routeSegment: "slack-app",
             },
           })}
+          setupStartForm={resolveIntegrationSetupStartFormOrThrow({
+            connection,
+            setupRoute: {
+              methodId: "slack-bot-token",
+              routeSegment: "slack-app",
+            },
+          })}
         />
         <CurrentPath />
       </QueryClientProvider>
@@ -114,6 +124,14 @@ describe("SlackAppSetupPane", () => {
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(screen.getByText("App configuration token")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+      ),
+    ).toBeTruthy();
+    const generateTokenLink = screen.getByRole("link", { name: "Generate token in Slack" });
+    expect(generateTokenLink.getAttribute("href")).toBe("https://api.slack.com/apps");
+    expect(screen.getByPlaceholderText("xoxe.xoxp-...")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Slack app manifest" })).toBeTruthy();
     expect(
       screen.getByText(
