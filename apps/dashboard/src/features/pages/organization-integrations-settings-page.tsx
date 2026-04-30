@@ -18,7 +18,7 @@ export function OrganizationIntegrationsSettingsPage(): React.JSX.Element {
       breadcrumbs={breadcrumbs}
       description={shouldRenderPageHeader ? description : undefined}
       headerIcon={shouldRenderPageHeader ? (pageMeta.headerIcon ?? undefined) : undefined}
-      maxWidthClassName="max-w-5xl"
+      width="normal"
       title={shouldRenderPageHeader ? title : ""}
     >
       <IntegrationsPage />

@@ -157,6 +157,7 @@ function resolveSandboxProfileHeaderLeading(
 
 export const ROUTE_HANDLES = {
   dashboard: {
+    appShellInsetOwner: "child",
     breadcrumb: "Home",
     title: "Home",
     description: "",
@@ -228,6 +229,7 @@ export const ROUTE_HANDLES = {
     description: "",
   },
   sandboxProfiles: {
+    appShellInsetOwner: "child",
     breadcrumb: "Sandbox Profiles",
     title: "Sandbox Profiles",
     description: "Manage sandbox profile configuration.",
@@ -275,6 +277,7 @@ export const ROUTE_HANDLES = {
     description: "Manage sandbox profile snapshots.",
   },
   automations: {
+    appShellInsetOwner: "child",
     breadcrumb: "Automations",
     title: "Automations",
     description: "Manage webhook automations.",

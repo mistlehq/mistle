@@ -74,7 +74,7 @@ import type {
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
-import { FormPageFrame, PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createSandboxBaseSetupScriptContextFromGeneratedInventory,
   resolveSandboxBaseRepositoryHandles,
@@ -333,7 +333,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame breadcrumbs={breadcrumbs} description={description} title={title}>
+    <PageFrame breadcrumbs={breadcrumbs} description={description} title={title} width="form">
       <div className="gap-4 flex flex-col">
         {metaState.saveError ? (
           <Notice title="Create failed" variant="alert">
@@ -380,7 +380,7 @@ function CreateSandboxProfileEditorPage(): React.JSX.Element {
           </CardContent>
         </Card>
       </div>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 
@@ -436,7 +436,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
   if (profileQuery.isPending || profileVersionsQuery.isPending) {
     return (
-      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} width="normal" title="">
         {null}
       </PageFrame>
     );
@@ -447,7 +447,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
-      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} width="normal" title="">
         <div className="gap-4 flex flex-col">
           <h1 className="text-xl font-semibold">Edit profile</h1>
           <Card>
@@ -483,7 +483,7 @@ export function SandboxProfileEditorShell(): React.JSX.Element {
 
   if (profileVersionsQuery.isError || profileVersionsQuery.data === undefined) {
     return (
-      <PageFrame breadcrumbs={breadcrumbs} maxWidthClassName="max-w-5xl" title="">
+      <PageFrame breadcrumbs={breadcrumbs} width="normal" title="">
         <Notice title="Could not load profile versions" variant="alert">
           {resolveApiErrorMessage({
             error: profileVersionsQuery.error,

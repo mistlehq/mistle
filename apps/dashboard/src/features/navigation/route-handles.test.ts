@@ -10,6 +10,7 @@ describe("route handles", () => {
   it("defines titles and descriptions for settings leaf pages", () => {
     expect(ROUTE_HANDLES.dashboard.title).toBe("Home");
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
+    expect(ROUTE_HANDLES.dashboard.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.integrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.integrations.description).toBe("");
     expect(typeof ROUTE_HANDLES.integrationCreate.title).toBe("function");
@@ -35,6 +36,7 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.sandboxProfiles.title).toBe("Sandbox Profiles");
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
+    expect(ROUTE_HANDLES.sandboxProfiles.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.sandboxProfilesNew.title).toBe("Create");
     expect(ROUTE_HANDLES.sandboxProfilesNew.description).toBe("Create a sandbox profile.");
     expect(ROUTE_HANDLES.sandboxProfilesNew.appShellInsetOwner).toBe("child");
@@ -58,6 +60,7 @@ describe("route handles", () => {
 
     expect(ROUTE_HANDLES.automations.title).toBe("Automations");
     expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
+    expect(ROUTE_HANDLES.automations.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
     expect(ROUTE_HANDLES.automationsNew.description).toBe("");
     expect(ROUTE_HANDLES.automationsNew.appShellInsetOwner).toBe("child");

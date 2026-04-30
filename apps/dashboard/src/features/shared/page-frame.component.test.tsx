@@ -3,14 +3,14 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { FormPageFrame, PageFrame } from "./page-frame.js";
+import { PageFrame } from "./page-frame.js";
 
 describe("PageFrame", () => {
   it("renders a centered constrained layout for the form page frame", () => {
     const { container } = render(
-      <FormPageFrame title="Editor Shell">
+      <PageFrame title="Editor Shell" width="form">
         <div>Contained content</div>
-      </FormPageFrame>,
+      </PageFrame>,
     );
 
     const content = screen.getByText("Contained content");
@@ -26,9 +26,9 @@ describe("PageFrame", () => {
 
   it("omits the shared page header when all header content is empty", () => {
     const { container } = render(
-      <FormPageFrame description={undefined} title="">
+      <PageFrame description={undefined} title="" width="form">
         <div>Contained content</div>
-      </FormPageFrame>,
+      </PageFrame>,
     );
 
     expect(container.querySelector('[data-slot="page-header"]')).toBeNull();
@@ -37,12 +37,13 @@ describe("PageFrame", () => {
 
   it("renders breadcrumbs above the form page header", () => {
     render(
-      <FormPageFrame
+      <PageFrame
         breadcrumbs={<nav aria-label="Page breadcrumbs">Parent / Child</nav>}
         title="Editor Shell"
+        width="form"
       >
         <div>Contained content</div>
-      </FormPageFrame>,
+      </PageFrame>,
     );
 
     const breadcrumbs = screen.getByLabelText("Page breadcrumbs");
@@ -76,7 +77,7 @@ describe("PageFrame", () => {
 
   it("supports constraining the generic page frame header and content", () => {
     const { container } = render(
-      <PageFrame maxWidthClassName="max-w-5xl" title="Generic page">
+      <PageFrame width="normal" title="Generic page">
         <div>Contained content</div>
       </PageFrame>,
     );

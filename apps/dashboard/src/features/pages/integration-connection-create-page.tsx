@@ -9,7 +9,7 @@ import { listIntegrationDirectory } from "../integrations/integrations-service.j
 import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import { resolveDraftThenSetupConnectionPath } from "./integration-connection-post-create-navigation.js";
 import {
@@ -45,7 +45,8 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
 
   if (integrationsQuery.isError) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
         breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
@@ -72,20 +73,21 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
             </div>
           </div>
         </FormPageSection>
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   if (integrationsQuery.isPending || integrationsQuery.data === undefined) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
         breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
       >
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -97,7 +99,8 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
       breadcrumbs={breadcrumbs}
       description={description}
       headerIcon={pageMeta.headerIcon ?? undefined}
@@ -108,7 +111,7 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
         initialEditorInput={buildOpenCreateIntegrationConnectionInput(card)}
         {...(returnPath === null ? {} : { returnPath })}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

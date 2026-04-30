@@ -1,5 +1,9 @@
+import { cn } from "@mistle/ui";
+
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import { FormPageHeader } from "./form-page.js";
+
+export type PageFrameWidth = "form" | "full" | "normal";
 
 export type PageFrameProps = {
   breadcrumbs?: React.ReactNode;
@@ -7,9 +11,9 @@ export type PageFrameProps = {
   description?: React.ReactNode;
   headerActions?: React.ReactNode;
   headerIcon?: React.ReactNode;
-  maxWidthClassName?: string;
   paddingClassName?: string;
   title: React.ReactNode;
+  width?: PageFrameWidth;
 };
 
 export function resolvePageFrameText(
@@ -43,12 +47,16 @@ function shouldRenderPageFrameHeader(input: Omit<PageFrameProps, "children">): b
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
   const hasBreadcrumbs = input.breadcrumbs !== undefined && input.breadcrumbs !== null;
-  const contentClassName =
-    input.maxWidthClassName === undefined ? undefined : `mx-auto w-full ${input.maxWidthClassName}`;
+  const contentClassName = resolvePageFrameContentClassName(input.width ?? "full");
   const paddingClassName = input.paddingClassName ?? "px-4 py-6";
+  const rootClassName = cn(
+    "flex min-h-full flex-col",
+    input.width === "form" ? "gap-6 bg-muted/30" : "gap-4",
+    paddingClassName,
+  );
 
   return (
-    <div className={`flex min-h-full flex-col gap-4 ${paddingClassName}`}>
+    <div className={rootClassName}>
       {hasBreadcrumbs || shouldRenderHeader ? (
         <div className={contentClassName}>
           <div className="flex flex-col gap-2">
@@ -69,28 +77,13 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
   );
 }
 
-export function FormPageFrame(input: PageFrameProps): React.JSX.Element {
-  const shouldRenderHeader = shouldRenderPageFrameHeader(input);
-  const hasBreadcrumbs = input.breadcrumbs !== undefined && input.breadcrumbs !== null;
-
-  return (
-    <div className="flex min-h-full flex-col gap-6 bg-muted/30 px-4 py-6">
-      {hasBreadcrumbs || shouldRenderHeader ? (
-        <div className="mx-auto w-full max-w-2xl">
-          <div className="flex flex-col gap-2">
-            {input.breadcrumbs}
-            {shouldRenderHeader ? (
-              <FormPageHeader
-                actions={input.headerActions}
-                description={input.description}
-                icon={input.headerIcon}
-                title={input.title}
-              />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
-      <div className="mx-auto w-full max-w-2xl">{input.children}</div>
-    </div>
-  );
+function resolvePageFrameContentClassName(width: PageFrameWidth): string | undefined {
+  switch (width) {
+    case "form":
+      return "mx-auto w-full max-w-2xl";
+    case "full":
+      return undefined;
+    case "normal":
+      return "mx-auto w-full max-w-5xl";
+  }
 }

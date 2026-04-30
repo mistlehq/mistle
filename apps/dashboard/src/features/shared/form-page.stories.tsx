@@ -11,11 +11,12 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "./form-page.js";
-import { FormPageFrame } from "./page-frame.js";
+import { PageFrame } from "./page-frame.js";
 
 function FormPageStoryPreview(): React.JSX.Element {
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
       description="Shared form-page surface for dashboard editors."
       title="Editor Shell"
     >
@@ -41,7 +42,7 @@ function FormPageStoryPreview(): React.JSX.Element {
           </Button>
         </FormPageActionBar>
       </FormPageStack>
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 
