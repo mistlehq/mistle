@@ -799,24 +799,15 @@ export class PortAccessTransportService {
     stream: ActivePortAccessTcpStream;
     streamId: number;
   }): Promise<void> {
-    if (input.message.direction !== "response") {
-      await this.failTcpStream({
-        error: new PortAccessTransportStreamError({
-          code: "upstream_io_error",
-          message: "Gateway received a non-response TCP close from sandboxd.",
-        }),
-        notifyBootstrap: false,
-        outcome: "stream_error",
-        sandboxInstanceId: input.sandboxInstanceId,
-        streamId: input.streamId,
-      });
-      return;
+    if (input.message.direction === "request") {
+      input.stream.requestClosed = true;
+    } else {
+      if (!input.stream.responseClosed) {
+        input.stream.responseClosed = true;
+        input.stream.client.end();
+      }
     }
 
-    if (!input.stream.responseClosed) {
-      input.stream.responseClosed = true;
-      input.stream.client.end();
-    }
     this.releaseTcpStreamIfComplete({
       sandboxInstanceId: input.sandboxInstanceId,
       stream: input.stream,

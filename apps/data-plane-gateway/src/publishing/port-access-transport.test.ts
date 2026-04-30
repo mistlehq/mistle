@@ -308,8 +308,10 @@ async function createWebSocketPair(): Promise<WebSocketPair> {
   };
 }
 
-async function createTcpSocketPair(): Promise<TcpSocketPair> {
-  const server = createTcpServer();
+async function createTcpSocketPair(input?: { allowHalfOpen?: boolean }): Promise<TcpSocketPair> {
+  const server = createTcpServer({
+    allowHalfOpen: input?.allowHalfOpen ?? false,
+  });
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(0, "127.0.0.1", () => {
@@ -328,6 +330,7 @@ async function createTcpSocketPair(): Promise<TcpSocketPair> {
     });
   });
   const clientSocket = connect({
+    allowHalfOpen: input?.allowHalfOpen ?? false,
     host: "127.0.0.1",
     port: address.port,
   });
@@ -651,7 +654,7 @@ describe("port access transport session fencing", () => {
     expect(nextHandle.streamId).toBe(2);
   });
 
-  it("converts TCP client and target half-closes into directional close messages", async () => {
+  it("keeps TCP streams alive after sandboxd acknowledges request half-close", async () => {
     const relayCoordinator = createInMemoryTunnelRelayCoordinator(LocalNodeId);
     const bootstrapTarget = createBootstrapTarget({
       sessionId: "sess_bootstrap_tcp_half_close",
@@ -661,7 +664,9 @@ describe("port access transport session fencing", () => {
     });
     const service = new PortAccessTransportService(relayCoordinator, tunnelSessionRegistry);
     const bootstrap = await createWebSocketPair();
-    const tcpPair = await createTcpSocketPair();
+    const tcpPair = await createTcpSocketPair({
+      allowHalfOpen: true,
+    });
     openWebSocketPairs.push(bootstrap);
     openTcpSocketPairs.push(tcpPair);
 
@@ -699,6 +704,32 @@ describe("port access transport session fencing", () => {
       streamId: handle.streamId,
       direction: "request",
     });
+
+    await service.handleBootstrapTransportMessage({
+      sandboxInstanceId: SandboxInstanceId,
+      sourceBootstrapSessionId: bootstrapTarget.sessionId,
+      message: {
+        type: "ports.tcp.close",
+        streamId: handle.streamId,
+        direction: "request",
+      },
+    });
+    await expect(
+      service.handleBootstrapDataFrame({
+        payload: toArrayBuffer(
+          encodeDataFrame({
+            streamId: handle.streamId,
+            payloadKind: PayloadKindRawBytes,
+            payload: Buffer.from("HTTP/1.1 200 OK\r\n\r\n"),
+          }),
+        ),
+        sandboxInstanceId: SandboxInstanceId,
+        sourceBootstrapSessionId: bootstrapTarget.sessionId,
+      }),
+    ).resolves.toBe(true);
+    expect((await waitForTcpData(tcpPair.clientSocket)).toString("utf8")).toBe(
+      "HTTP/1.1 200 OK\r\n\r\n",
+    );
 
     await service.handleBootstrapTransportMessage({
       sandboxInstanceId: SandboxInstanceId,
