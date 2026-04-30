@@ -54,7 +54,7 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Triggers" })).toBeDefined();
-    expect(screen.getByRole("textbox", { name: "Agent Message" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 
   it("shows the scheduled automation fields from the type query", () => {
@@ -64,6 +64,6 @@ describe("AutomationCreatePage", () => {
     expect(screen.getByText("Automation type")).toBeDefined();
     expect(screen.getByRole("heading", { name: "Schedule" })).toBeDefined();
     expect(screen.getByLabelText("Cron breakdown")).toBeDefined();
-    expect(screen.getByRole("textbox", { name: "Agent Message" })).toBeDefined();
+    expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 });

@@ -858,7 +858,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.fieldErrors).toMatchObject({
       name: "Automation name is required.",
       sandboxProfileId: "Select a sandbox profile.",
-      inputTemplate: "Input template is required.",
+      inputTemplate: "User message is required.",
       triggerIds: "Please add a trigger",
     });
   });

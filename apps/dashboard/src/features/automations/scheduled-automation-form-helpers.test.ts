@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   DefaultScheduledAutomationCronExpression,
-  DefaultScheduledAutomationMessageTemplate,
   readBrowserTimezone,
   toCreateScheduledAutomationPayload,
   toScheduledAutomationFormValues,
@@ -59,7 +58,7 @@ describe("toScheduledAutomationFormValues", () => {
       enabled: true,
       cronExpression: DefaultScheduledAutomationCronExpression,
       timezone: readBrowserTimezone(),
-      inputTemplate: DefaultScheduledAutomationMessageTemplate,
+      inputTemplate: "",
     });
   });
 
@@ -101,7 +100,7 @@ describe("validateScheduledAutomationFormValues", () => {
       sandboxProfileId: "Select a sandbox profile.",
       cronExpression: "Cron expression is required.",
       timezone: "Timezone is required.",
-      inputTemplate: "Message template is required.",
+      inputTemplate: "User message is required.",
     });
   });
 });

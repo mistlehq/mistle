@@ -51,7 +51,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
             <Field>
               <FieldHeader>
                 <div className="space-y-1">
-                  <FieldLabel id="story-agent-instructions-label">Agent Message</FieldLabel>
+                  <FieldLabel id="story-agent-instructions-label">User message</FieldLabel>
                   <FieldDescription>
                     <span className="block">
                       These are the instructions the agent will receive.
@@ -79,7 +79,7 @@ function StoryHarness(input: StoryHarnessProps): React.JSX.Element {
                   </p>
                 ) : null}
                 {input.invalid ? (
-                  <p className="text-destructive text-sm">Input template is required.</p>
+                  <p className="text-destructive text-sm">User message is required.</p>
                 ) : null}
               </FieldContent>
             </Field>
@@ -162,7 +162,7 @@ function PlaygroundHarness(): React.JSX.Element {
             <Field>
               <FieldHeader>
                 <div className="space-y-1">
-                  <FieldLabel id="playground-agent-instructions-label">Agent Message</FieldLabel>
+                  <FieldLabel id="playground-agent-instructions-label">User message</FieldLabel>
                   <FieldDescription>
                     <span className="block">
                       Type inside the editor as if this were the real form.
@@ -189,7 +189,7 @@ function PlaygroundHarness(): React.JSX.Element {
                   </p>
                 ) : null}
                 {invalid ? (
-                  <p className="text-destructive text-sm">Input template is required.</p>
+                  <p className="text-destructive text-sm">User message is required.</p>
                 ) : null}
               </FieldContent>
             </Field>

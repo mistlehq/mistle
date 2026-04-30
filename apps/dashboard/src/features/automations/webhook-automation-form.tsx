@@ -17,6 +17,7 @@ import {
   cn,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
@@ -62,6 +63,7 @@ type WebhookAutomationFormProps = {
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  automationTypeField?: ReactNode;
   onValueChange: (
     key: WebhookAutomationFormValueKey,
     value: string | boolean | string[] | WebhookAutomationTriggerParameterValueMap,
@@ -251,6 +253,9 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             </Field>
           </div>
         ) : null}
+        {input.automationTypeField === undefined ? null : (
+          <div className="border-t p-4">{input.automationTypeField}</div>
+        )}
         <div className="p-4">
           <SelectField
             error={input.fieldErrors.sandboxProfileId}
@@ -449,7 +454,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <Field>
             <FieldHeader>
               <div className="space-y-1">
-                <FieldLabel id={inputTemplateLabelId}>Agent Message</FieldLabel>
+                <FieldLabel id={inputTemplateLabelId}>User message</FieldLabel>
                 {formState.hasSelectedTrigger ? (
                   <FieldDescription>
                     <span className="block">Sent to the agent each time the automation runs.</span>

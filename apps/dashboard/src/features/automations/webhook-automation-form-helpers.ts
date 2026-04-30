@@ -171,7 +171,7 @@ export function validateWebhookAutomationFormValues(
   }
 
   if (trimmedInputTemplate.length === 0) {
-    errors.inputTemplate = "Input template is required.";
+    errors.inputTemplate = "User message is required.";
   }
 
   if (values.conversationKeyTemplate.trim().length === 0) {

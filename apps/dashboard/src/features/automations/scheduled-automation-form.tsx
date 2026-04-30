@@ -16,7 +16,7 @@ import {
   cn,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
 import {
@@ -28,7 +28,6 @@ import {
 } from "../pages/sandbox-profile-editor-page-model.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
-import { DefaultScheduledAutomationMessageTemplate } from "./scheduled-automation-form-helpers.js";
 import { resolveScheduledAutomationFormPresentation } from "./scheduled-automation-form-state.js";
 import type {
   ScheduledAutomationFormOption,
@@ -47,6 +46,7 @@ type ScheduledAutomationFormProps = {
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
+  automationTypeField?: ReactNode;
   onValueChange: (key: ScheduledAutomationFormValueKey, value: string | boolean) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
@@ -257,6 +257,9 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
             </Field>
           </div>
         ) : null}
+        {input.automationTypeField === undefined ? null : (
+          <div className="border-t p-4">{input.automationTypeField}</div>
+        )}
 
         <div className="p-4">
           <SelectField
@@ -415,7 +418,7 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
           <Field>
             <FieldHeader>
               <div className="space-y-1">
-                <FieldLabel id={inputTemplateLabelId}>Agent Message</FieldLabel>
+                <FieldLabel id={inputTemplateLabelId}>User message</FieldLabel>
                 <FieldDescription>
                   Sent to the agent each time the automation runs.
                 </FieldDescription>
@@ -429,7 +432,6 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
                 onChange={(nextValue) => {
                   input.onValueChange("inputTemplate", nextValue);
                 }}
-                placeholderText={DefaultScheduledAutomationMessageTemplate}
                 tokens={[]}
                 value={input.values.inputTemplate}
               />

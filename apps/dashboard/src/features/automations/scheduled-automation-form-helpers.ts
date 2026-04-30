@@ -10,7 +10,6 @@ import type {
 import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 
 export const DefaultScheduledAutomationCronExpression = "0 9 * * *";
-export const DefaultScheduledAutomationMessageTemplate = "Run the scheduled automation.";
 
 export function readBrowserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
@@ -40,7 +39,7 @@ export function toScheduledAutomationFormValues(
       enabled: true,
       cronExpression: DefaultScheduledAutomationCronExpression,
       timezone: readBrowserTimezone(),
-      inputTemplate: DefaultScheduledAutomationMessageTemplate,
+      inputTemplate: "",
     };
   }
 
@@ -77,7 +76,7 @@ export function validateScheduledAutomationFormValues(
   }
 
   if (values.inputTemplate.trim().length === 0) {
-    errors.inputTemplate = "Message template is required.";
+    errors.inputTemplate = "User message is required.";
   }
 
   return errors;

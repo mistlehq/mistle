@@ -336,7 +336,7 @@ describe("validateWebhookAutomationFormValues", () => {
       name: "Automation name is required.",
       triggerIds: "Please add a trigger",
       sandboxProfileId: "Select a sandbox profile.",
-      inputTemplate: "Input template is required.",
+      inputTemplate: "User message is required.",
       conversationKeyTemplate: "Conversation key template is required.",
     });
   });
