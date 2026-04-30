@@ -63,6 +63,21 @@ function createDispatchTestContextWithWorkflow(input: {
   };
 }
 
+async function createTestWorkflowBackend(input: { namespaceId: string; url: string }) {
+  const backend = await createControlPlaneBackend({
+    url: input.url,
+    namespaceId: input.namespaceId,
+    runMigrations: false,
+  });
+
+  return {
+    backend,
+    openWorkflow: createControlPlaneOpenWorkflow({
+      backend,
+    }),
+  };
+}
+
 async function createTestDatabase(input: { databaseUrl: string }) {
   await runControlPlaneMigrations({
     connectionString: input.databaseUrl,
@@ -414,13 +429,9 @@ describe("schedule dispatch child batches", () => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
-    const backend = await createControlPlaneBackend({
+    const { backend, openWorkflow } = await createTestWorkflowBackend({
       url: fixture.databaseStack.directUrl,
       namespaceId: fixture.config.workflow.namespaceId,
-      runMigrations: false,
-    });
-    const openWorkflow = createControlPlaneOpenWorkflow({
-      backend,
     });
 
     try {
@@ -521,13 +532,9 @@ describe("schedule dispatch child batches", () => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
-    const backend = await createControlPlaneBackend({
+    const { backend, openWorkflow } = await createTestWorkflowBackend({
       url: fixture.databaseStack.directUrl,
       namespaceId: fixture.config.workflow.namespaceId,
-      runMigrations: false,
-    });
-    const openWorkflow = createControlPlaneOpenWorkflow({
-      backend,
     });
 
     try {
@@ -705,13 +712,9 @@ describe("schedule dispatch child batches", () => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
-    const backend = await createControlPlaneBackend({
+    const { backend, openWorkflow } = await createTestWorkflowBackend({
       url: fixture.databaseStack.directUrl,
       namespaceId: fixture.config.workflow.namespaceId,
-      runMigrations: false,
-    });
-    const openWorkflow = createControlPlaneOpenWorkflow({
-      backend,
     });
 
     try {
@@ -801,13 +804,9 @@ describe("schedule dispatch child batches", () => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
-    const backend = await createControlPlaneBackend({
+    const { backend, openWorkflow } = await createTestWorkflowBackend({
       url: fixture.databaseStack.directUrl,
       namespaceId: fixture.config.workflow.namespaceId,
-      runMigrations: false,
-    });
-    const openWorkflow = createControlPlaneOpenWorkflow({
-      backend,
     });
 
     try {
@@ -877,13 +876,9 @@ describe("schedule dispatch child batches", () => {
     const database = await createTestDatabase({
       databaseUrl: fixture.config.workflow.databaseUrl,
     });
-    const backend = await createControlPlaneBackend({
+    const { backend, openWorkflow } = await createTestWorkflowBackend({
       url: fixture.databaseStack.directUrl,
       namespaceId: fixture.config.workflow.namespaceId,
-      runMigrations: false,
-    });
-    const openWorkflow = createControlPlaneOpenWorkflow({
-      backend,
     });
 
     try {

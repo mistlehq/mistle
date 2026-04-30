@@ -82,13 +82,6 @@ const ScheduleDispatchTargetHandoffFailures = ScheduleDispatchMeter.createCounte
   },
 );
 
-const ScheduleDispatchTargetHandlerMissing = ScheduleDispatchMeter.createCounter(
-  "mistle.schedule.dispatch.target_handler.missing.count",
-  {
-    description: "Count of scheduled action dispatch attempts with no registered target handler.",
-  },
-);
-
 export function recordScheduleDispatchWorkflowStarted(): void {
   ScheduleDispatchWorkflowStarted.add(1);
 }
@@ -179,23 +172,6 @@ export function recordScheduleTargetHandoffFailure(input: {
       targetType: input.targetType,
     },
     "Schedule target handoff failed.",
-  );
-}
-
-export function recordMissingScheduleTargetHandler(input: {
-  scheduledActionId: string;
-  targetType: string;
-}): void {
-  ScheduleDispatchTargetHandlerMissing.add(1, {
-    target_type: input.targetType,
-  });
-  logger.error(
-    {
-      eventName: "schedule.dispatch.target_handler_missing",
-      scheduledActionId: input.scheduledActionId,
-      targetType: input.targetType,
-    },
-    "Schedule dispatch target handler is not registered.",
   );
 }
 
