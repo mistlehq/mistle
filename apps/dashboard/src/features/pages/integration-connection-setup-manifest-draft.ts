@@ -1,7 +1,7 @@
 import type {
   AnyIntegrationDefinition,
-  IntegrationBrowserSafeFormConnectionMethodDefinition,
   IntegrationFormConnectionMethodSetupManifestDraft,
+  IntegrationFormConnectionMethodSetupFlow,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
@@ -11,12 +11,6 @@ import type { IntegrationConnectionSetupRoute } from "./integration-connection-s
 
 export type IntegrationSetupAppManifestDraftBuilder =
   IntegrationFormConnectionMethodSetupManifestDraft["build"];
-
-export type IntegrationSetupStartForm = IntegrationFormConnectionMethodSetupStartForm;
-
-type IntegrationSetupFormMethod = IntegrationBrowserSafeFormConnectionMethodDefinition & {
-  setupFlow: NonNullable<IntegrationBrowserSafeFormConnectionMethodDefinition["setupFlow"]>;
-};
 
 const ManifestWebhookCallbackPathPrefix = "/p/integration/webhooks/";
 
@@ -40,36 +34,36 @@ export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
 }): IntegrationSetupAppManifestDraftBuilder {
-  const method = resolveIntegrationSetupFormMethodOrThrow(input);
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
 
-  if (method.setupFlow.appManifestDraft === undefined) {
+  if (setupFlow.appManifestDraft === undefined) {
     throw new Error(
       `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define an app manifest draft builder for target '${input.connection.targetKey}'.`,
     );
   }
 
-  return method.setupFlow.appManifestDraft.build;
+  return setupFlow.appManifestDraft.build;
 }
 
 export function resolveIntegrationSetupStartFormOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
-}): IntegrationSetupStartForm {
-  const method = resolveIntegrationSetupFormMethodOrThrow(input);
+}): IntegrationFormConnectionMethodSetupStartForm {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
 
-  if (method.setupFlow.startForm === undefined) {
+  if (setupFlow.startForm === undefined) {
     throw new Error(
       `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define a setup start form for target '${input.connection.targetKey}'.`,
     );
   }
 
-  return method.setupFlow.startForm;
+  return setupFlow.startForm;
 }
 
-function resolveIntegrationSetupFormMethodOrThrow(input: {
+function resolveIntegrationSetupFlowOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
-}): IntegrationSetupFormMethod {
+}): IntegrationFormConnectionMethodSetupFlow {
   const definition = resolveIntegrationDefinitionByTargetKey(input.connection.targetKey);
   const method =
     definition.connectionMethods.find((candidate) => candidate.id === input.setupRoute.methodId) ??
@@ -95,7 +89,7 @@ function resolveIntegrationSetupFormMethodOrThrow(input: {
     );
   }
 
-  return { ...method, setupFlow };
+  return setupFlow;
 }
 
 function resolveIntegrationDefinitionByTargetKey(targetKey: string): AnyIntegrationDefinition {

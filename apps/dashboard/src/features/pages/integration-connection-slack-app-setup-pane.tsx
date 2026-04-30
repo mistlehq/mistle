@@ -1,3 +1,4 @@
+import type { IntegrationFormConnectionMethodSetupStartForm } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import {
   Button,
@@ -44,10 +45,7 @@ import {
   IntegrationConnectionSetupWebhookCallbackValue,
   type IntegrationConnectionSetupMode,
 } from "./integration-connection-setup-flow.js";
-import type {
-  IntegrationSetupAppManifestDraftBuilder,
-  IntegrationSetupStartForm,
-} from "./integration-connection-setup-manifest-draft.js";
+import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
 import {
   hasConfiguredSetupSecretField,
   resolveConfiguredSetupSecretFieldKeys,
@@ -249,7 +247,7 @@ function resolveSlackExistingAppSetupSavedFieldKeys(
 }
 
 function createInitialSetupStartFormValues(
-  form: IntegrationSetupStartForm,
+  form: IntegrationFormConnectionMethodSetupStartForm,
 ): Record<string, string> {
   const values: Record<string, string> = {};
 
@@ -265,7 +263,7 @@ function normalizeSetupStartFormValue(value: string | undefined): string {
 }
 
 function areRequiredSetupStartFormFieldsComplete(input: {
-  form: IntegrationSetupStartForm;
+  form: IntegrationFormConnectionMethodSetupStartForm;
   values: Record<string, string>;
 }): boolean {
   return input.form.fields.every(
@@ -276,7 +274,7 @@ function areRequiredSetupStartFormFieldsComplete(input: {
 
 function resolveRequiredSetupStartFormValue(input: {
   fieldName: string;
-  form: IntegrationSetupStartForm;
+  form: IntegrationFormConnectionMethodSetupStartForm;
   values: Record<string, string>;
 }): string {
   const field = input.form.fields.find((candidate) => candidate.name === input.fieldName) ?? null;
@@ -294,7 +292,7 @@ function resolveRequiredSetupStartFormValue(input: {
 }
 
 function SetupStartFormField(input: {
-  field: IntegrationSetupStartForm["fields"][number];
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number];
   value: string;
   onValueChange: (fieldName: string, value: string) => void;
 }): React.JSX.Element {
@@ -355,7 +353,7 @@ function SetupStartFormField(input: {
 }
 
 function ProviderSetupStartForm(input: {
-  form: IntegrationSetupStartForm;
+  form: IntegrationFormConnectionMethodSetupStartForm;
   values: Record<string, string>;
   onValueChange: (fieldName: string, value: string) => void;
 }): React.JSX.Element {
@@ -379,7 +377,7 @@ function SlackManifestSetupPanel(input: {
   manifestValidation: ManifestJsonValidation;
   onManifestChange: (value: string) => void;
   onSetupStartFormValueChange: (fieldName: string, value: string) => void;
-  setupStartForm: IntegrationSetupStartForm;
+  setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
   setupStartFormValues: Record<string, string>;
 }): React.JSX.Element {
   return (
@@ -429,7 +427,7 @@ function SlackSetupUrls(input: {
 export function SlackAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
-  setupStartForm: IntegrationSetupStartForm;
+  setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();

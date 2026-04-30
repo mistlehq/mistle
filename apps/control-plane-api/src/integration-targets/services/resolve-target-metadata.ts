@@ -7,6 +7,7 @@ import type {
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
+  IntegrationFormConnectionMethodSetupStartForm,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -104,22 +105,7 @@ export type ResolvedIntegrationTargetMetadata = {
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
           routeSegment: string;
-          startForm?: {
-            fields: {
-              actions?: {
-                href: string;
-                label: string;
-                opensInNewWindow?: boolean;
-              }[];
-              description?: string;
-              inputType: "password" | "text" | "textarea";
-              label: string;
-              name: string;
-              placeholder?: string;
-              required?: boolean;
-            }[];
-            submitLabel: string;
-          };
+          startForm?: IntegrationFormConnectionMethodSetupStartForm;
         };
         secretFields: {
           name: string;
