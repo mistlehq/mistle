@@ -11,12 +11,12 @@ import type {
   IntegrationConnection,
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
+import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
   resolveIntegrationSetupInstructionsOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 function createSlackConnection(input?: {
   configuredSecretNames?: readonly string[];
@@ -46,7 +46,7 @@ function CurrentPath(): React.JSX.Element {
   return <div data-testid="current-path">{location.pathname}</div>;
 }
 
-function renderSlackAppSetupPane(input?: {
+function renderProviderAppSetupPane(input?: {
   connection?: IntegrationConnection;
   controlPlaneApiOrigin?: string;
   webhookCallbackUrl?: string;
@@ -89,7 +89,7 @@ function renderSlackAppSetupPane(input?: {
       initialEntries={[`/integrations/${connection.targetKey}/${connection.id}/slack-app/setup`]}
     >
       <QueryClientProvider client={queryClient}>
-        <SlackAppSetupPane
+        <ProviderAppSetupPane
           connection={connection}
           manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
             connection,
@@ -98,6 +98,8 @@ function renderSlackAppSetupPane(input?: {
               routeSegment: "slack-app",
             },
           })}
+          methodId="slack-bot-token"
+          routeSegment="slack-app"
           setupStartForm={resolveIntegrationSetupStartFormOrThrow({
             connection,
             setupRoute: {
@@ -119,7 +121,7 @@ function renderSlackAppSetupPane(input?: {
   );
 }
 
-describe("SlackAppSetupPane", () => {
+describe("ProviderAppSetupPane", () => {
   afterEach(() => {
     Object.assign(import.meta.env, {
       VITE_CONTROL_PLANE_API_ORIGIN: "http://localhost:3000",
@@ -128,7 +130,7 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("defaults an incomplete Slack connection to manifest setup", async () => {
-    const rendered = renderSlackAppSetupPane();
+    const rendered = renderProviderAppSetupPane();
 
     expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(screen.getByText("App configuration token")).toBeTruthy();
@@ -164,7 +166,7 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("uses the provider-facing webhook callback base for generated redirect URLs", async () => {
-    const rendered = renderSlackAppSetupPane({
+    const rendered = renderProviderAppSetupPane({
       controlPlaneApiOrigin: "http://localhost:3000",
       webhookCallbackUrl:
         "https://public-control-plane.example.com/base/p/integration/webhooks/slack-default/eps_public",
@@ -187,7 +189,7 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("defaults a configured Slack connection to the existing app setup", () => {
-    renderSlackAppSetupPane({
+    renderProviderAppSetupPane({
       connection: createSlackConnection({
         clientId: "123.456",
         configuredSecretNames: ["botToken", "signingSecret", "clientSecret"],
@@ -217,7 +219,7 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("keeps the existing Slack app completion action disabled until required local setup is ready", () => {
-    renderSlackAppSetupPane({
+    renderProviderAppSetupPane({
       connection: createSlackConnection({
         clientId: "123.456",
         configuredSecretNames: ["botToken"],
@@ -233,7 +235,7 @@ describe("SlackAppSetupPane", () => {
   });
 
   it("keeps the existing Slack app completion action disabled when the Events API URL is unavailable", () => {
-    renderSlackAppSetupPane({
+    renderProviderAppSetupPane({
       connection: createSlackConnection({
         clientId: "123.456",
         configuredSecretNames: ["botToken", "signingSecret"],

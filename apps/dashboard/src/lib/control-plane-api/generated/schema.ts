@@ -3364,16 +3364,25 @@ export interface paths {
                           description: string;
                           existingApp: {
                             configFields: {
+                              configKey: string;
                               label: string;
                               name: string;
+                              required: boolean;
                             }[];
                             connectLabel: string;
                             description: string;
+                            installedDetection: {
+                              configFields: string[];
+                              secretFields: string[];
+                            };
                             saveErrorMessage: string;
                             secretFields: {
+                              /** @enum {string} */
+                              inputType: "password";
                               label: string;
                               name: string;
                               placeholder?: string;
+                              required: boolean;
                               secretLabel: string;
                             }[];
                             title: string;
@@ -3381,6 +3390,12 @@ export interface paths {
                           manifest: {
                             createErrorMessage: string;
                             description: string;
+                            startAction: {
+                              /** @enum {string} */
+                              expectedResultKind: "redirect";
+                              manifestBodyField: string;
+                              unexpectedResultMessage: string;
+                            };
                             title: string;
                           };
                           title: string;

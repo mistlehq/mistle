@@ -199,21 +199,35 @@ function resolveConnectionMethod(
                       existingApp: {
                         configFields: method.setupFlow.instructions.existingApp.configFields.map(
                           (field) => ({
+                            configKey: field.configKey,
                             label: field.label,
                             name: field.name,
+                            required: field.required,
                           }),
                         ),
                         connectLabel: method.setupFlow.instructions.existingApp.connectLabel,
                         description: method.setupFlow.instructions.existingApp.description,
+                        installedDetection: {
+                          configFields: [
+                            ...method.setupFlow.instructions.existingApp.installedDetection
+                              .configFields,
+                          ],
+                          secretFields: [
+                            ...method.setupFlow.instructions.existingApp.installedDetection
+                              .secretFields,
+                          ],
+                        },
                         saveErrorMessage:
                           method.setupFlow.instructions.existingApp.saveErrorMessage,
                         secretFields: method.setupFlow.instructions.existingApp.secretFields.map(
                           (field) => ({
+                            inputType: field.inputType,
                             label: field.label,
                             name: field.name,
                             ...(field.placeholder === undefined
                               ? {}
                               : { placeholder: field.placeholder }),
+                            required: field.required,
                             secretLabel: field.secretLabel,
                           }),
                         ),
@@ -223,6 +237,15 @@ function resolveConnectionMethod(
                         createErrorMessage:
                           method.setupFlow.instructions.manifest.createErrorMessage,
                         description: method.setupFlow.instructions.manifest.description,
+                        startAction: {
+                          expectedResultKind:
+                            method.setupFlow.instructions.manifest.startAction.expectedResultKind,
+                          manifestBodyField:
+                            method.setupFlow.instructions.manifest.startAction.manifestBodyField,
+                          unexpectedResultMessage:
+                            method.setupFlow.instructions.manifest.startAction
+                              .unexpectedResultMessage,
+                        },
                         title: method.setupFlow.instructions.manifest.title,
                       },
                       title: method.setupFlow.instructions.title,

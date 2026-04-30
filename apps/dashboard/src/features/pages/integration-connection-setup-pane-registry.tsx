@@ -3,13 +3,13 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browse
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
+import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
   resolveIntegrationSetupInstructionsOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
-import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
 
 type IntegrationConnectionSetupPaneComponent = (input: {
   connection: IntegrationConnection;
@@ -34,18 +34,20 @@ function renderGitHubAppSetupPane(input: {
   );
 }
 
-function renderSlackAppSetupPane(input: {
+function renderProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   searchParams: URLSearchParams;
   setupRoute: IntegrationConnectionSetupRoute;
 }): React.JSX.Element {
   return (
-    <SlackAppSetupPane
+    <ProviderAppSetupPane
       connection={input.connection}
       manifestDraftBuilder={resolveIntegrationSetupAppManifestDraftBuilderOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}
+      methodId={input.setupRoute.methodId}
+      routeSegment={input.setupRoute.routeSegment}
       setupStartForm={resolveIntegrationSetupStartFormOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
@@ -67,7 +69,7 @@ const IntegrationConnectionSetupPaneByKey: Record<
   IntegrationConnectionSetupPaneComponent
 > = {
   "github-app-installation:github-app": renderGitHubAppSetupPane,
-  "slack-bot-token:slack-app": renderSlackAppSetupPane,
+  "slack-bot-token:slack-app": renderProviderAppSetupPane,
 };
 
 function resolveSetupPaneKey(

@@ -165,22 +165,32 @@ const IntegrationFormConnectionMethodSetupInstructionsSchema = z
           .array(
             z
               .object({
+                configKey: z.string().min(1),
                 label: z.string().min(1),
                 name: z.string().min(1),
+                required: z.boolean(),
               })
               .strict(),
           )
           .min(1),
         connectLabel: z.string().min(1),
         description: z.string().min(1),
+        installedDetection: z
+          .object({
+            configFields: z.array(z.string().min(1)),
+            secretFields: z.array(z.string().min(1)),
+          })
+          .strict(),
         saveErrorMessage: z.string().min(1),
         secretFields: z
           .array(
             z
               .object({
+                inputType: z.literal("password"),
                 label: z.string().min(1),
                 name: z.string().min(1),
                 placeholder: z.string().min(1).optional(),
+                required: z.boolean(),
                 secretLabel: z.string().min(1),
               })
               .strict(),
@@ -193,6 +203,13 @@ const IntegrationFormConnectionMethodSetupInstructionsSchema = z
       .object({
         createErrorMessage: z.string().min(1),
         description: z.string().min(1),
+        startAction: z
+          .object({
+            expectedResultKind: z.literal("redirect"),
+            manifestBodyField: z.string().min(1),
+            unexpectedResultMessage: z.string().min(1),
+          })
+          .strict(),
         title: z.string().min(1),
       })
       .strict(),

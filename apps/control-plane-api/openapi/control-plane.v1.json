@@ -6218,6 +6218,10 @@
                                                   "items": {
                                                     "type": "object",
                                                     "properties": {
+                                                      "configKey": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
                                                       "label": {
                                                         "type": "string",
                                                         "minLength": 1
@@ -6225,9 +6229,17 @@
                                                       "name": {
                                                         "type": "string",
                                                         "minLength": 1
+                                                      },
+                                                      "required": {
+                                                        "type": "boolean"
                                                       }
                                                     },
-                                                    "required": ["label", "name"],
+                                                    "required": [
+                                                      "configKey",
+                                                      "label",
+                                                      "name",
+                                                      "required"
+                                                    ],
                                                     "additionalProperties": false
                                                   },
                                                   "minItems": 1
@@ -6240,6 +6252,27 @@
                                                   "type": "string",
                                                   "minLength": 1
                                                 },
+                                                "installedDetection": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "configFields": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    },
+                                                    "secretFields": {
+                                                      "type": "array",
+                                                      "items": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    }
+                                                  },
+                                                  "required": ["configFields", "secretFields"],
+                                                  "additionalProperties": false
+                                                },
                                                 "saveErrorMessage": {
                                                   "type": "string",
                                                   "minLength": 1
@@ -6249,6 +6282,10 @@
                                                   "items": {
                                                     "type": "object",
                                                     "properties": {
+                                                      "inputType": {
+                                                        "type": "string",
+                                                        "enum": ["password"]
+                                                      },
                                                       "label": {
                                                         "type": "string",
                                                         "minLength": 1
@@ -6261,12 +6298,21 @@
                                                         "type": "string",
                                                         "minLength": 1
                                                       },
+                                                      "required": {
+                                                        "type": "boolean"
+                                                      },
                                                       "secretLabel": {
                                                         "type": "string",
                                                         "minLength": 1
                                                       }
                                                     },
-                                                    "required": ["label", "name", "secretLabel"],
+                                                    "required": [
+                                                      "inputType",
+                                                      "label",
+                                                      "name",
+                                                      "required",
+                                                      "secretLabel"
+                                                    ],
                                                     "additionalProperties": false
                                                   },
                                                   "minItems": 1
@@ -6280,6 +6326,7 @@
                                                 "configFields",
                                                 "connectLabel",
                                                 "description",
+                                                "installedDetection",
                                                 "saveErrorMessage",
                                                 "secretFields",
                                                 "title"
@@ -6297,6 +6344,29 @@
                                                   "type": "string",
                                                   "minLength": 1
                                                 },
+                                                "startAction": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "expectedResultKind": {
+                                                      "type": "string",
+                                                      "enum": ["redirect"]
+                                                    },
+                                                    "manifestBodyField": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "unexpectedResultMessage": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "expectedResultKind",
+                                                    "manifestBodyField",
+                                                    "unexpectedResultMessage"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
                                                 "title": {
                                                   "type": "string",
                                                   "minLength": 1
@@ -6305,6 +6375,7 @@
                                               "required": [
                                                 "createErrorMessage",
                                                 "description",
+                                                "startAction",
                                                 "title"
                                               ],
                                               "additionalProperties": false

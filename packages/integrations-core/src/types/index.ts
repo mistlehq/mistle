@@ -523,14 +523,18 @@ export type IntegrationFormConnectionMethodSetupStartForm = {
 };
 
 export type IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions = {
+  configKey: string;
   label: string;
   name: string;
+  required: boolean;
 };
 
 export type IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions = {
+  inputType: "password";
   label: string;
   name: string;
   placeholder?: string | undefined;
+  required: boolean;
   secretLabel: string;
 };
 
@@ -540,6 +544,10 @@ export type IntegrationFormConnectionMethodSetupInstructions = {
     configFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions>;
     connectLabel: string;
     description: string;
+    installedDetection: {
+      configFields: ReadonlyArray<string>;
+      secretFields: ReadonlyArray<string>;
+    };
     saveErrorMessage: string;
     secretFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions>;
     title: string;
@@ -547,6 +555,11 @@ export type IntegrationFormConnectionMethodSetupInstructions = {
   manifest: {
     createErrorMessage: string;
     description: string;
+    startAction: {
+      expectedResultKind: "redirect";
+      manifestBodyField: string;
+      unexpectedResultMessage: string;
+    };
     title: string;
   };
   title: string;

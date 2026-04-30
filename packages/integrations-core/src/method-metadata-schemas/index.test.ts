@@ -64,23 +64,36 @@ describe("integration method metadata schemas", () => {
             title: "Provider app manifest",
             description: "Create a provider app from a manifest.",
             createErrorMessage: "Could not create provider app manifest.",
+            startAction: {
+              expectedResultKind: "redirect",
+              manifestBodyField: "manifest",
+              unexpectedResultMessage: "Provider app manifest setup did not return a redirect URL.",
+            },
           },
           existingApp: {
             title: "Existing Provider App",
             description: "Paste values from an existing provider app.",
             connectLabel: "Connect provider app",
+            installedDetection: {
+              configFields: ["clientId"],
+              secretFields: ["apiSecret"],
+            },
             saveErrorMessage: "Could not save provider app setup.",
             configFields: [
               {
+                configKey: "client_id",
                 name: "clientId",
                 label: "Client ID",
+                required: false,
               },
             ],
             secretFields: [
               {
+                inputType: "password",
                 name: "apiSecret",
                 label: "API secret",
                 placeholder: "secret-...",
+                required: true,
                 secretLabel: "API secret",
               },
             ],
@@ -138,23 +151,36 @@ describe("integration method metadata schemas", () => {
           title: "Provider app manifest",
           description: "Create a provider app from a manifest.",
           createErrorMessage: "Could not create provider app manifest.",
+          startAction: {
+            expectedResultKind: "redirect",
+            manifestBodyField: "manifest",
+            unexpectedResultMessage: "Provider app manifest setup did not return a redirect URL.",
+          },
         },
         existingApp: {
           title: "Existing Provider App",
           description: "Paste values from an existing provider app.",
           connectLabel: "Connect provider app",
+          installedDetection: {
+            configFields: ["clientId"],
+            secretFields: ["apiSecret"],
+          },
           saveErrorMessage: "Could not save provider app setup.",
           configFields: [
             {
+              configKey: "client_id",
               name: "clientId",
               label: "Client ID",
+              required: false,
             },
           ],
           secretFields: [
             {
+              inputType: "password",
               name: "apiSecret",
               label: "API secret",
               placeholder: "secret-...",
+              required: true,
               secretLabel: "API secret",
             },
           ],

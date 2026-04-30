@@ -74,34 +74,51 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
             description:
               "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",
             createErrorMessage: "Could not create Slack app manifest.",
+            startAction: {
+              expectedResultKind: "redirect",
+              manifestBodyField: "manifest",
+              unexpectedResultMessage: "Slack app manifest setup did not return a redirect URL.",
+            },
           },
           existingApp: {
             title: "Existing Slack App",
             description:
               "Paste values from a Slack app you already created or configured in Slack.",
             connectLabel: "Connect Slack to Mistle",
+            installedDetection: {
+              configFields: ["clientId"],
+              secretFields: ["botToken", "signingSecret"],
+            },
             saveErrorMessage: "Could not save Slack app setup.",
             configFields: [
               {
+                configKey: "client_id",
                 name: "clientId",
                 label: "Client ID",
+                required: false,
               },
             ],
             secretFields: [
               {
+                inputType: "password",
                 name: "botToken",
                 label: "Bot token",
                 placeholder: "xoxb-...",
+                required: true,
                 secretLabel: "bot token",
               },
               {
+                inputType: "password",
                 name: "signingSecret",
                 label: "Signing secret",
+                required: true,
                 secretLabel: "signing secret",
               },
               {
+                inputType: "password",
                 name: "clientSecret",
                 label: "Client secret",
+                required: false,
                 secretLabel: "client secret",
               },
             ],
