@@ -54,23 +54,27 @@
 
 **Integration tests** (`*.integration.test.ts`):
 
-- Test a **single app/service** in isolation with its real dependencies (database, etc.)
-- Integration tests may include other services, but those dependencies must run out-of-process (containers/services), never in-process imports that blur boundaries
-- Import and call the app's code directly (e.g., `import { createApp } from "@mistle/control-plane-api/app.js"`)
-- Located in `apps/*/integration/` folders
-- Use real infrastructure (Postgres, etc.) but test the app as a unit
-- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, or Postgres plus any other required service for tests that need both).
-- When an integration test starts a local TCP service/runtime, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness/network`) so suites can run in parallel without `EADDRINUSE`.
-- Example: Testing auth routes by importing `createApp()` and making requests to it, verifying database state
+- Test one app/service as the primary subject, but compose any real Mistle services that are required for the behavior under test.
+- Integration tests may run multiple Mistle services. The boundary is the service process/API, not "exactly one app in memory". If the subject service normally talks to another service, prefer starting that service through `@mistle/test-harness` instead of replacing it with a test double.
+- Do not import another app's runtime directly from an app integration test. Cross-service dependencies must be started through the test environment registry so the dependency runs as a real service.
+- New integration tests must use the registry-backed environment harness: `startTestEnvironment({ registry: createTestRegistry(), services: [...] })` from `@mistle/test-harness`. Do not add new legacy per-file fixtures, bespoke Testcontainers orchestration, or direct app-runtime imports for dependency-bearing integration tests.
+- Request every live service the test intentionally exercises. Service references in the registry are wiring/order hints only; they must not surprise-start extra services.
+- The default test environment policy is pooled physical infrastructure and pooled stateless services so full suites can run in parallel without excessive container or port churn. Use `__dangerouslyIsolatedServices` only when the test truly needs to restart or mutate a service instance in a way that would affect other tests, and include a clear reason.
+- Infrastructure such as Postgres, PgBouncer, Valkey, and Mailpit is resolved from service dependencies under the hood. Tests should not hand-roll containers when a registry-backed service declaration already describes the required infrastructure.
+- Located in `apps/*/integration/` folders.
+- Existing integration tests that use legacy per-file fixtures, bespoke Testcontainers setup, or direct in-process app runtimes are legacy. Do not copy their patterns into new tests. When changing those tests, prefer migrating the touched coverage to `startTestEnvironment(...)`; keep legacy-only edits small and only when a migration would make the task materially larger.
+- When porting a legacy integration test, preserve the observable behavior being asserted, but move setup into the test registry where possible: service selection in the test, infra requirements in the registry, and no test-local knowledge of which physical containers are needed.
+- When an integration test starts any local TCP service/runtime outside the registry, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness`) so suites can run in parallel without `EADDRINUSE`.
+- Example: Testing data-plane API internal routes by starting `data-plane-api` plus its real Postgres dependency through `startTestEnvironment(...)`, then making HTTP requests to the returned service handle.
 
 **System tests** (`*.system.test.ts`):
 
-- Test **multiple services** working together via HTTP
-- Make HTTP requests to running services (do not import service code directly)
-- Located in `tests/system/` folder
-- Require services to be running and accessible via URLs (e.g., `CONTROL_PLANE_BASE_URL`, `DATA_PLANE_BASE_URL`)
-- **Infrastructure:** Services are typically started via Testcontainers by composing `@mistle/test-harness` primitives (for example app launchers in `src/apps/*` plus backing services). Tests receive service URLs via environment variables.
-- Example: Testing that control-plane and data-plane services both respond to health checks
+- Test cross-service behavior where the system, rather than one app, is the subject.
+- Make HTTP requests to running services (do not import service code directly).
+- Located in `tests/system/` folders.
+- Use system tests for full-stack smoke, packaging, deployment-shape, and end-to-end service interaction checks that cannot be expressed as an app integration test.
+- Do not put ordinary multi-service app behavior in system tests just because more than one service is involved. If one service is the subject and the other services are dependencies, prefer an integration test composed with `startTestEnvironment(...)`.
+- Example: Testing that a fully packaged control-plane/data-plane stack starts with the production-like entrypoints and exposes all expected health checks.
 
 **E2E tests** (`*.e2e.test.ts`):
 
@@ -85,17 +89,18 @@
 
 - Use **unit tests** for pure logic only: functions/classes/modules with no React rendering, browser DOM, provider runtime, network service, database, subprocess, or container dependency
 - Use **component tests** for React components, hooks, jsdom/browser behavior, Router/QueryClient provider behavior, and rendered/static component markup that does not require external services
-- Use **integration tests** when testing a single app's functionality with its dependencies
-- Use **system tests** when testing service-to-service interactions or multi-service health
+- Use **integration tests** when one app/service is the subject, even if the test composes additional real services as dependencies through `@mistle/test-harness`
+- Use **system tests** when the deployed multi-service system itself is the subject, especially packaging/deployment-shape behavior and broad smoke coverage
 - Use **E2E tests** when testing user-facing flows that require browser interaction
 - Use **property-based tests** for pure, input-rich logic where invariants across generated inputs provide stronger coverage than a small fixed set of examples
 - If a test requires external dependencies (database, network service, subprocess/container), it is not a unit or component test and should be moved to integration or above
 
-**Infrastructure with Testcontainers:**
+**Infrastructure and service composition:**
 
-- **Prefer Testcontainers for infrastructure in tests.** It provides isolated, reproducible infrastructure that matches production without requiring pre-configured services or shared state.
-- **Benefits:** Isolation (fresh infrastructure per test run), reproducibility (works the same locally and in CI), production-like (real infrastructure, not mocks), parallelization (multiple suites can run in parallel without conflicts).
-- **When Testcontainers might not be needed:** Unit tests that are pure (no infrastructure), or CI environments where equivalent real infrastructure is already provisioned and isolated for the run.
+- The registry-backed environment harness from `@mistle/test-harness` is the default for dependency-bearing integration tests. It dedupes physical infrastructure, gives each environment isolated logical state, pools stateless services by default, and exposes service handles with reusable clients.
+- Prefer Testcontainers for infrastructure under the harness. App integration tests should not directly manage Testcontainers resources unless the registry does not yet model the dependency they need; if the registry is missing a dependency, add it to the registry instead of hand-rolling it in the test.
+- Keep tests parallel-safe by default. Avoid fixed ports, shared mutable databases, and per-test physical containers unless the test explicitly needs them.
+- When adding a new service dependency, declare it once in the test registry with its exact infra requirements. Do not make individual tests remember that, for example, a service needs Postgres, PgBouncer, Valkey, or Mailpit.
 
 ### Testing Exceptions
 
