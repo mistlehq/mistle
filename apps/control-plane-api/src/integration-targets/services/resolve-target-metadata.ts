@@ -8,6 +8,7 @@ import type {
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
   IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
@@ -107,9 +108,7 @@ export type ResolvedIntegrationTargetMetadata = {
           completionRequirements?: ResolvedSetupCompletionRequirement;
           providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup;
           routeSegment: string;
-          setupPane?: {
-            kind: "provider-app";
-          };
+          setupPane?: IntegrationFormConnectionMethodSetupPaneMetadata;
           startForm?: IntegrationFormConnectionMethodSetupStartForm;
         };
         secretFields: {
@@ -197,117 +196,18 @@ function resolveConnectionMethod(
               ...(method.setupFlow.providerAppSetup === undefined
                 ? {}
                 : {
-                    providerAppSetup: {
-                      description: method.setupFlow.providerAppSetup.description,
-                      existingApp: {
-                        configFields:
-                          method.setupFlow.providerAppSetup.existingApp.configFields.map(
-                            (field) => ({
-                              configKey: field.configKey,
-                              label: field.label,
-                              name: field.name,
-                              required: field.required,
-                            }),
-                          ),
-                        connectLabel: method.setupFlow.providerAppSetup.existingApp.connectLabel,
-                        description: method.setupFlow.providerAppSetup.existingApp.description,
-                        installedDetection: {
-                          configFields: [
-                            ...method.setupFlow.providerAppSetup.existingApp.installedDetection
-                              .configFields,
-                          ],
-                          secretFields: [
-                            ...method.setupFlow.providerAppSetup.existingApp.installedDetection
-                              .secretFields,
-                          ],
-                        },
-                        saveErrorMessage:
-                          method.setupFlow.providerAppSetup.existingApp.saveErrorMessage,
-                        secretFields:
-                          method.setupFlow.providerAppSetup.existingApp.secretFields.map(
-                            (field) => ({
-                              inputType: field.inputType,
-                              label: field.label,
-                              name: field.name,
-                              ...(field.placeholder === undefined
-                                ? {}
-                                : { placeholder: field.placeholder }),
-                              required: field.required,
-                              secretLabel: field.secretLabel,
-                            }),
-                          ),
-                        title: method.setupFlow.providerAppSetup.existingApp.title,
-                      },
-                      manifest: {
-                        createErrorMessage:
-                          method.setupFlow.providerAppSetup.manifest.createErrorMessage,
-                        description: method.setupFlow.providerAppSetup.manifest.description,
-                        startAction: {
-                          expectedResultKind:
-                            method.setupFlow.providerAppSetup.manifest.startAction
-                              .expectedResultKind,
-                          manifestBodyField:
-                            method.setupFlow.providerAppSetup.manifest.startAction
-                              .manifestBodyField,
-                          unexpectedResultMessage:
-                            method.setupFlow.providerAppSetup.manifest.startAction
-                              .unexpectedResultMessage,
-                        },
-                        title: method.setupFlow.providerAppSetup.manifest.title,
-                      },
-                      title: method.setupFlow.providerAppSetup.title,
-                      urls: {
-                        description: method.setupFlow.providerAppSetup.urls.description,
-                        title: method.setupFlow.providerAppSetup.urls.title,
-                        webhookCallback: {
-                          errorTitle:
-                            method.setupFlow.providerAppSetup.urls.webhookCallback.errorTitle,
-                          label: method.setupFlow.providerAppSetup.urls.webhookCallback.label,
-                          missingMessage:
-                            method.setupFlow.providerAppSetup.urls.webhookCallback.missingMessage,
-                          missingTitle:
-                            method.setupFlow.providerAppSetup.urls.webhookCallback.missingTitle,
-                        },
-                      },
-                    },
+                    providerAppSetup: cloneProviderAppSetup(method.setupFlow.providerAppSetup),
                   }),
               routeSegment: method.setupFlow.routeSegment,
               ...(method.setupFlow.setupPane === undefined
                 ? {}
                 : {
-                    setupPane: {
-                      kind: method.setupFlow.setupPane.kind,
-                    },
+                    setupPane: cloneSetupPaneMetadata(method.setupFlow.setupPane),
                   }),
               ...(method.setupFlow.startForm === undefined
                 ? {}
                 : {
-                    startForm: {
-                      submitLabel: method.setupFlow.startForm.submitLabel,
-                      fields: method.setupFlow.startForm.fields.map((field) => ({
-                        ...(field.actions === undefined
-                          ? {}
-                          : {
-                              actions: field.actions.map((action) => ({
-                                href: action.href,
-                                label: action.label,
-                                ...(action.opensInNewWindow === undefined
-                                  ? {}
-                                  : { opensInNewWindow: action.opensInNewWindow }),
-                              })),
-                            }),
-                        ...(field.description === undefined
-                          ? {}
-                          : { description: field.description }),
-                        inputType: field.inputType,
-                        label: field.label,
-                        name: field.name,
-                        ...(field.placeholder === undefined
-                          ? {}
-                          : { placeholder: field.placeholder }),
-                        ...(field.required === undefined ? {} : { required: field.required }),
-                      })),
-                    },
+                    startForm: cloneSetupStartForm(method.setupFlow.startForm),
                   }),
             },
           }),
@@ -343,6 +243,94 @@ function resolveConnectionMethod(
       ? {}
       : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
     ui: method.ui,
+  };
+}
+
+function cloneProviderAppSetup(
+  setup: IntegrationFormConnectionMethodProviderAppSetup,
+): IntegrationFormConnectionMethodProviderAppSetup {
+  return {
+    description: setup.description,
+    existingApp: {
+      configFields: setup.existingApp.configFields.map((field) => ({
+        configKey: field.configKey,
+        label: field.label,
+        name: field.name,
+        required: field.required,
+      })),
+      connectLabel: setup.existingApp.connectLabel,
+      description: setup.existingApp.description,
+      installedDetection: {
+        configFields: [...setup.existingApp.installedDetection.configFields],
+        secretFields: [...setup.existingApp.installedDetection.secretFields],
+      },
+      saveErrorMessage: setup.existingApp.saveErrorMessage,
+      secretFields: setup.existingApp.secretFields.map((field) => ({
+        inputType: field.inputType,
+        label: field.label,
+        name: field.name,
+        ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        required: field.required,
+        secretLabel: field.secretLabel,
+      })),
+      title: setup.existingApp.title,
+    },
+    manifest: {
+      createErrorMessage: setup.manifest.createErrorMessage,
+      description: setup.manifest.description,
+      startAction: {
+        expectedResultKind: setup.manifest.startAction.expectedResultKind,
+        manifestBodyField: setup.manifest.startAction.manifestBodyField,
+        unexpectedResultMessage: setup.manifest.startAction.unexpectedResultMessage,
+      },
+      title: setup.manifest.title,
+    },
+    title: setup.title,
+    urls: {
+      description: setup.urls.description,
+      title: setup.urls.title,
+      webhookCallback: {
+        errorTitle: setup.urls.webhookCallback.errorTitle,
+        label: setup.urls.webhookCallback.label,
+        missingMessage: setup.urls.webhookCallback.missingMessage,
+        missingTitle: setup.urls.webhookCallback.missingTitle,
+      },
+    },
+  };
+}
+
+function cloneSetupPaneMetadata(
+  metadata: IntegrationFormConnectionMethodSetupPaneMetadata,
+): IntegrationFormConnectionMethodSetupPaneMetadata {
+  return {
+    kind: metadata.kind,
+  };
+}
+
+function cloneSetupStartForm(
+  startForm: IntegrationFormConnectionMethodSetupStartForm,
+): IntegrationFormConnectionMethodSetupStartForm {
+  return {
+    submitLabel: startForm.submitLabel,
+    fields: startForm.fields.map((field) => ({
+      ...(field.actions === undefined
+        ? {}
+        : {
+            actions: field.actions.map((action) => ({
+              href: action.href,
+              label: action.label,
+              ...(action.opensInNewWindow === undefined
+                ? {}
+                : { opensInNewWindow: action.opensInNewWindow }),
+            })),
+          }),
+      ...(field.description === undefined ? {} : { description: field.description }),
+      inputType: field.inputType,
+      label: field.label,
+      name: field.name,
+      ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+      ...(field.required === undefined ? {} : { required: field.required }),
+    })),
   };
 }
 

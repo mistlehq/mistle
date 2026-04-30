@@ -43,6 +43,19 @@ export function resolveProviderAppSetupSecretFieldKeys(
   return providerAppSetup.existingApp.secretFields.map((field) => field.name);
 }
 
+export function resolveProviderAppSetupRequiredFieldKeys(
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup,
+): readonly ProviderAppSetupFieldKey[] {
+  return [
+    ...providerAppSetup.existingApp.configFields
+      .filter((field) => field.required)
+      .map((field) => field.name),
+    ...providerAppSetup.existingApp.secretFields
+      .filter((field) => field.required)
+      .map((field) => field.name),
+  ];
+}
+
 export function isProviderAppSetupSecretFieldKey(input: {
   fieldKey: ProviderAppSetupFieldKey;
   providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;

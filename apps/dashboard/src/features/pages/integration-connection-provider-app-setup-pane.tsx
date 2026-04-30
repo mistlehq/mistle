@@ -43,6 +43,7 @@ import {
   isProviderAppSetupSecretFieldKey,
   normalizeProviderAppSetupValue,
   resolveProviderAppSetupFieldKeys,
+  resolveProviderAppSetupRequiredFieldKeys,
   resolveProviderAppSetupSavedFieldKeys,
   resolveProviderAppSetupSecretFieldKeys,
   shouldPersistProviderAppSetupField,
@@ -58,8 +59,6 @@ import {
 import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
 import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
-
-type ProviderAppSetupMode = IntegrationConnectionSetupMode;
 
 function resolveConfiguredSecretFieldKeys(input: {
   connection: IntegrationConnection;
@@ -106,7 +105,7 @@ export function ProviderAppSetupPane(input: {
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [setupMode, setSetupMode] = useState<ProviderAppSetupMode>(() =>
+  const [setupMode, setSetupMode] = useState<IntegrationConnectionSetupMode>(() =>
     isProviderAppInstalled({
       connection: input.connection,
       providerAppSetup: input.providerAppSetup,
@@ -250,14 +249,7 @@ export function ProviderAppSetupPane(input: {
     manifestValidation.status === "valid" &&
     webhookCallbackState.kind === "ready" &&
     setupStartFormState.requiredFieldsComplete;
-  const requiredFieldKeys = [
-    ...input.providerAppSetup.existingApp.configFields
-      .filter((field) => field.required)
-      .map((field) => field.name),
-    ...input.providerAppSetup.existingApp.secretFields
-      .filter((field) => field.required)
-      .map((field) => field.name),
-  ];
+  const requiredFieldKeys = resolveProviderAppSetupRequiredFieldKeys(input.providerAppSetup);
   const requiredFieldsReady = requiredFieldKeys.every((fieldKey) =>
     isProviderAppRequiredFieldReady({
       fieldKey,

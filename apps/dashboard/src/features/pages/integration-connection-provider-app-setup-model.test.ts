@@ -12,6 +12,7 @@ import {
   getProviderAppSetupFieldValidationMessage,
   isProviderAppInstalled,
   isProviderAppRequiredFieldReady,
+  resolveProviderAppSetupRequiredFieldKeys,
   resolveProviderAppSetupSavedFieldKeys,
   shouldPersistProviderAppSetupField,
 } from "./integration-connection-provider-app-setup-model.js";
@@ -104,6 +105,7 @@ describe("provider app setup model", () => {
       botToken: "",
       clientSecret: "",
     });
+    expect(resolveProviderAppSetupRequiredFieldKeys(ProviderAppSetup)).toEqual(["botToken"]);
     expect(
       isProviderAppInstalled({
         connection: ProviderConnection,
