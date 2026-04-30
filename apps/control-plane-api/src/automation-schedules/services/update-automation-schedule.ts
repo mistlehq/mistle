@@ -159,15 +159,15 @@ async function updateScheduleRow(
     input.schedule?.cronExpression !== undefined || input.schedule?.timezone !== undefined;
   const enabledChanged =
     input.enabled !== undefined && input.enabled !== existingAutomation.enabled;
+  const recomputedNextScheduledAt =
+    scheduleTimingChanged || (nextEnabled && enabledChanged)
+      ? resolveNextScheduledAtOrThrow({
+          cronExpression: nextCronExpression,
+          timezone: nextTimezone,
+          now: input.now,
+        })
+      : undefined;
   const nextValues: Partial<typeof schedules.$inferInsert> = {};
-
-  if (scheduleTimingChanged) {
-    resolveNextScheduledAtOrThrow({
-      cronExpression: nextCronExpression,
-      timezone: nextTimezone,
-      now: input.now,
-    });
-  }
 
   if (input.schedule?.name !== undefined) {
     nextValues.name = input.schedule.name;
@@ -187,12 +187,8 @@ async function updateScheduleRow(
 
   if (!nextEnabled) {
     nextValues.nextScheduledAt = null;
-  } else if (scheduleTimingChanged || enabledChanged) {
-    nextValues.nextScheduledAt = resolveNextScheduledAtOrThrow({
-      cronExpression: nextCronExpression,
-      timezone: nextTimezone,
-      now: input.now,
-    });
+  } else if (recomputedNextScheduledAt !== undefined) {
+    nextValues.nextScheduledAt = recomputedNextScheduledAt;
   }
 
   if (Object.keys(nextValues).length === 0) {

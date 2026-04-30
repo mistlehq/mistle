@@ -1,11 +1,6 @@
-import {
-  type ControlPlaneDatabase,
-  type ControlPlaneTransaction,
-  sandboxProfileVersions,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, type ControlPlaneTransaction } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { findNextScheduleOccurrence } from "@mistle/time";
-import { and, eq } from "drizzle-orm";
 
 import { listProfileVersionRepositoryOptions } from "../../sandbox-profiles/services/repository-options.js";
 import { AutomationSchedulesBadRequestCodes } from "../constants.js";
@@ -62,20 +57,15 @@ export async function resolveSandboxProfileVersionOrThrow(
     );
   }
 
-  const version = await ctx.db
-    .select({
-      version: sandboxProfileVersions.version,
-    })
-    .from(sandboxProfileVersions)
-    .where(
-      and(
-        eq(sandboxProfileVersions.sandboxProfileId, input.sandboxProfileId),
-        eq(sandboxProfileVersions.version, resolvedVersion),
-      ),
-    )
-    .limit(1);
+  const version = await ctx.db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      version: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.sandboxProfileId, input.sandboxProfileId), eq(table.version, resolvedVersion)),
+  });
 
-  if (version[0] === undefined) {
+  if (version === undefined) {
     throw new BadRequestError(
       AutomationSchedulesBadRequestCodes.INVALID_SANDBOX_PROFILE_VERSION_REFERENCE,
       `Sandbox profile version '${String(resolvedVersion)}' was not found.`,

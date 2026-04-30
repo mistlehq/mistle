@@ -39,7 +39,12 @@ export type CreateScheduleAutomationInput = {
   now: Date;
 };
 
-type CreateScheduleAutomationPersistenceInput = Omit<CreateScheduleAutomationInput, "target"> & {
+type CreateScheduleAutomationPersistenceInput = Omit<
+  CreateScheduleAutomationInput,
+  "enabled" | "now" | "target"
+> & {
+  enabled: boolean;
+  nextScheduledAt: string | null;
   target: {
     sandboxProfileId: string;
     sandboxProfileVersion: number;
@@ -70,7 +75,7 @@ export async function createAutomationSchedule(
   );
 
   const enabled = input.enabled ?? true;
-  resolveNextScheduledAtOrThrow({
+  const resolvedNextScheduledAt = resolveNextScheduledAtOrThrow({
     cronExpression: input.schedule.cronExpression,
     timezone: input.schedule.timezone,
     now: input.now,
@@ -80,6 +85,7 @@ export async function createAutomationSchedule(
     const automation = await createAutomationAggregate(tx, {
       ...input,
       enabled,
+      nextScheduledAt: enabled ? resolvedNextScheduledAt : null,
       target: {
         sandboxProfileId: input.target.sandboxProfileId,
         sandboxProfileVersion,
@@ -101,14 +107,6 @@ async function createAutomationAggregate(
   tx: ControlPlaneTransaction,
   input: CreateScheduleAutomationPersistenceInput,
 ) {
-  const nextScheduledAt = input.enabled
-    ? resolveNextScheduledAtOrThrow({
-        cronExpression: input.schedule.cronExpression,
-        timezone: input.schedule.timezone,
-        now: input.now,
-      })
-    : null;
-
   const insertedAutomationRows = await tx
     .insert(automations)
     .values({
@@ -136,7 +134,7 @@ async function createAutomationAggregate(
       cronExpression: input.schedule.cronExpression,
       timezone: input.schedule.timezone,
       enabled: input.enabled,
-      nextScheduledAt,
+      nextScheduledAt: input.nextScheduledAt,
     })
     .returning({
       id: schedules.id,

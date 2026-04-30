@@ -4,6 +4,7 @@ import { systemClock } from "@mistle/time";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
+import { AutomationScheduleKinds } from "../constants.js";
 import { createAutomationSchedule } from "../services/create-automation-schedule.js";
 import { route } from "./route.js";
 
@@ -28,7 +29,7 @@ const routeHandler = async (
   return ctx.json(
     {
       ...automationSchedule,
-      kind: getAutomationScheduleKind(),
+      kind: AutomationScheduleKinds.SCHEDULE,
     },
     201,
   );
@@ -37,7 +38,3 @@ const routeHandler = async (
 export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
   withRequiredSession(routeHandler),
 );
-
-function getAutomationScheduleKind(): "schedule" {
-  return "schedule";
-}
