@@ -18,15 +18,14 @@ describe("PageFrame", () => {
     const contentContainer = content.parentElement;
 
     expect(root?.className).toContain("bg-muted/30");
-    expect(root?.className).toContain("px-4");
-    expect(root?.className).toContain("py-6");
+    expect(root?.className).toContain("p-4");
     expect(contentContainer?.className).toContain("mx-auto");
     expect(contentContainer?.className).toContain("max-w-2xl");
   });
 
   it("omits the shared page header when all header content is empty", () => {
     const { container } = render(
-      <PageFrame description={undefined} title="" width="form">
+      <PageFrame description={undefined} width="form">
         <div>Contained content</div>
       </PageFrame>,
     );
@@ -52,6 +51,17 @@ describe("PageFrame", () => {
     expect(breadcrumbs.compareDocumentPosition(header)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  it("renders custom title slots without wrapping them in the default heading", () => {
+    render(
+      <PageFrame titleSlot={<div data-slot="custom-title">Editable title</div>}>
+        <div>Contained content</div>
+      </PageFrame>,
+    );
+
+    expect(screen.getByText("Editable title").getAttribute("data-slot")).toBe("custom-title");
+    expect(screen.queryByRole("heading", { name: "Editable title" })).toBeNull();
+  });
+
   it("keeps the generic page frame unconstrained", () => {
     const { container } = render(
       <PageFrame title="Generic page">
@@ -61,18 +71,29 @@ describe("PageFrame", () => {
 
     expect(container.firstElementChild?.className).toContain("gap-4");
     expect(container.firstElementChild?.className).not.toContain("bg-muted/30");
+    expect(container.firstElementChild?.className).toContain("p-4");
     expect(container.querySelector('[data-slot="page-header"]')).toBeDefined();
   });
 
-  it("supports replacing the generic page frame padding", () => {
+  it("separates tabbed pages into above-tabs and below-tabs regions", () => {
     const { container } = render(
-      <PageFrame paddingClassName="py-0" title="Generic page">
+      <PageFrame
+        breadcrumbs={<nav aria-label="Page breadcrumbs">Parent / Child</nav>}
+        title="Generic page"
+        variant="tabbed"
+      >
         <div>Contained content</div>
       </PageFrame>,
     );
 
-    expect(container.firstElementChild?.className).toContain("py-0");
+    const aboveTabs = container.querySelector('[data-slot="page-frame-above-tabs"]');
+    const belowTabs = container.querySelector('[data-slot="page-frame-below-tabs"]');
+
+    expect(aboveTabs?.className).toContain("p-4");
+    expect(belowTabs?.className).toContain("min-h-0");
+    expect(belowTabs?.className).toContain("flex-1");
     expect(container.firstElementChild?.className).not.toContain("px-4");
+    expect(screen.getByLabelText("Page breadcrumbs")).toBeDefined();
   });
 
   it("supports constraining the generic page frame header and content", () => {

@@ -773,6 +773,8 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByRole("tab", { name: "Sandbox Profile" })).toBeDefined();
     expect(screen.getByRole("tab", { name: "Snapshots" })).toBeDefined();
+    expect(screen.getByLabelText("Profile sections").className).toContain("max-w-5xl");
+    expect(screen.getByLabelText("Profile sections").parentElement?.className).toContain("px-4");
     expect(screen.getByRole("tabpanel", { name: "Sandbox Profile" }).className).toContain(
       "bg-muted/30",
     );

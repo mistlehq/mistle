@@ -10,7 +10,6 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { sandboxProfileDetailQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { useAppPageBreadcrumbs } from "./app-breadcrumbs.js";
 import { ROUTE_HANDLES } from "./route-handles.js";
@@ -278,7 +277,7 @@ describe("app routing breadcrumb integration", () => {
     }
   });
 
-  it("renders sandbox profile breadcrumbs for list, create, and detail routes", async () => {
+  it("renders sandbox profile breadcrumbs for create routes only", async () => {
     const router = createMemoryRouter(sandboxProfileRoutes, {
       initialEntries: ["/sandbox-profiles/new"],
     });
@@ -289,49 +288,26 @@ describe("app routing breadcrumb integration", () => {
     expectMarkupToContainMetaTitle(markup, "Create");
     expectMarkupToContainMetaDescription(markup, "Create a sandbox profile.");
 
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData(sandboxProfileDetailQueryKey("sbp_abc"), {
-      id: "sbp_abc",
-      displayName: "Customer Support Sandbox",
-      activeVersion: 2,
-      status: "active",
-      latestVersion: 3,
-      createdAt: "2026-04-23T00:00:00.000Z",
-      updatedAt: "2026-04-23T00:00:00.000Z",
-    });
-
     await router.navigate("/sandbox-profiles/sbp_abc/sandbox-profile/published");
-    markup = renderRoutingMarkup(router, queryClient);
+    markup = renderRoutingMarkup(router);
 
-    expectMarkupToContainHref(markup, "/sandbox-profiles");
-    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/sandbox-profile");
-    expect(markup).toContain("Customer Support Sandbox");
-    expectMarkupToContainCurrentPageLabel(markup, "Published");
+    expectMarkupNotToContainBreadcrumbs(markup);
     expectMarkupToContainMetaTitle(markup, "Edit profile");
     expectMarkupToContainMetaDescription(markup, "Edit sandbox profile configuration.");
 
-    queryClient.setQueryData(sandboxProfileDetailQueryKey("sbp_draft"), {
-      id: "sbp_draft",
-      displayName: "Draft Only Sandbox",
-      activeVersion: null,
-      status: "active",
-      latestVersion: 1,
-      createdAt: "2026-04-23T00:00:00.000Z",
-      updatedAt: "2026-04-23T00:00:00.000Z",
-    });
-
     await router.navigate("/sandbox-profiles/sbp_draft/sandbox-profile/draft");
-    markup = renderRoutingMarkup(router, queryClient);
+    markup = renderRoutingMarkup(router);
 
-    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_draft/sandbox-profile");
-    expect(markup).toContain("Draft Only Sandbox");
-    expectMarkupToContainCurrentPageLabel(markup, "Draft");
+    expectMarkupNotToContainBreadcrumbs(markup);
+    expectMarkupToContainMetaTitle(markup, "Edit profile");
+    expectMarkupToContainMetaDescription(markup, "Edit sandbox profile configuration.");
 
     await router.navigate("/sandbox-profiles/sbp_abc/snapshots");
-    markup = renderRoutingMarkup(router, queryClient);
+    markup = renderRoutingMarkup(router);
 
-    expectMarkupToContainHref(markup, "/sandbox-profiles/sbp_abc/sandbox-profile");
-    expectMarkupToContainCurrentPageLabel(markup, "Snapshots");
+    expectMarkupNotToContainBreadcrumbs(markup);
+    expectMarkupToContainMetaTitle(markup, "Edit profile");
+    expectMarkupToContainMetaDescription(markup, "Manage sandbox profile snapshots.");
   });
 
   it("does not render page breadcrumbs for home and sessions routes", async () => {

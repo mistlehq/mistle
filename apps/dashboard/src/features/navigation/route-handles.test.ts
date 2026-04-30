@@ -46,7 +46,7 @@ describe("route handles", () => {
       "Edit sandbox profile configuration.",
     );
     expect(ROUTE_HANDLES.sandboxProfilesDetail.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.sandboxProfilesDetail.pageBreadcrumbVisible).toBe(true);
+    expect(ROUTE_HANDLES.sandboxProfilesDetail).not.toHaveProperty("pageBreadcrumbVisible");
     expect(ROUTE_HANDLES.sandboxProfilePublished.title).toBe("Edit profile");
     expect(ROUTE_HANDLES.sandboxProfilePublished.description).toBe(
       "Edit sandbox profile configuration.",
@@ -176,8 +176,9 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfileEditor.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
     expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
-    expect(typeof ROUTE_HANDLES.sandboxProfilePublished.pageBreadcrumb).toBe("function");
-    expect(typeof ROUTE_HANDLES.sandboxProfileDraft.pageBreadcrumb).toBe("function");
+    expect(ROUTE_HANDLES.sandboxProfilePublished).not.toHaveProperty("pageBreadcrumb");
+    expect(ROUTE_HANDLES.sandboxProfileDraft).not.toHaveProperty("pageBreadcrumb");
+    expect(ROUTE_HANDLES.sandboxProfileSnapshots).not.toHaveProperty("pageBreadcrumb");
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {

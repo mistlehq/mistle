@@ -4,10 +4,6 @@ import { createElement } from "react";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
-import {
-  SandboxProfileBreadcrumbs,
-  type SandboxProfileBreadcrumbView,
-} from "./sandbox-profile-breadcrumbs.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
   breadcrumb: RouteTextValue;
@@ -140,21 +136,6 @@ function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): stri
   return "Edit";
 }
 
-function resolveSandboxProfileHeaderLeading(
-  input: RouteTextResolverInput,
-  view: SandboxProfileBreadcrumbView,
-): React.ReactNode | null {
-  const profileId = input.params["profileId"];
-  if (profileId === undefined || profileId.trim().length === 0) {
-    return null;
-  }
-
-  return createElement(SandboxProfileBreadcrumbs, {
-    profileId,
-    view,
-  });
-}
-
 export const ROUTE_HANDLES = {
   dashboard: {
     appShellInsetOwner: "child",
@@ -244,7 +225,6 @@ export const ROUTE_HANDLES = {
   sandboxProfilesDetail: {
     appShellInsetOwner: "child",
     breadcrumb: "Profile",
-    pageBreadcrumbVisible: true,
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
@@ -258,21 +238,18 @@ export const ROUTE_HANDLES = {
   sandboxProfilePublished: {
     appShellInsetOwner: "child",
     breadcrumb: "Published",
-    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "published"),
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileDraft: {
     appShellInsetOwner: "child",
     breadcrumb: "Draft",
-    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "draft"),
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
     breadcrumb: "Snapshots",
-    pageBreadcrumb: (input) => resolveSandboxProfileHeaderLeading(input, "snapshots"),
     title: "Edit profile",
     description: "Manage sandbox profile snapshots.",
   },
