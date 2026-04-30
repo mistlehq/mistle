@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
-import { ensureIntegrationRunId } from "./integration-run-id.ts";
+import { stopRunnerServicePools } from "../../packages/test-harness/src/environment/runner-service-pool.ts";
+import { ensureIntegrationRunnerPoolSession } from "./integration-run-id.ts";
 
 const IntegrationVitestProjects = [
   {
@@ -166,7 +167,8 @@ async function runCommand(command: string, args: ReadonlyArray<string>): Promise
 }
 
 async function main(): Promise<void> {
-  const integrationRunId = ensureIntegrationRunId(process.env);
+  const runnerPoolSession = ensureIntegrationRunnerPoolSession(process.env);
+  const integrationRunId = runnerPoolSession.runId;
   const cliArgs = normalizeCliArgs(process.argv.slice(2));
   const projectFilters = parseProjectFilters(cliArgs);
   const selectedProjects = resolveSelectedProjects(projectFilters);
@@ -199,14 +201,21 @@ async function main(): Promise<void> {
     await runCommand("pnpm", ["run", "test-harness:prepare-runtime"]);
   }
 
-  await runCommand("pnpm", [
-    "exec",
-    "vitest",
-    "run",
-    "-c",
-    "vitest.integration.root.ts",
-    ...cliArgs,
-  ]);
+  try {
+    await runCommand("pnpm", [
+      "exec",
+      "vitest",
+      "run",
+      "-c",
+      "vitest.integration.root.ts",
+      ...cliArgs,
+    ]);
+  } finally {
+    await stopRunnerServicePools({
+      runId: runnerPoolSession.runId,
+      coordinatorDir: runnerPoolSession.coordinatorDir,
+    });
+  }
 }
 
 main().catch((error: unknown) => {

@@ -16,6 +16,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:stress": "tsx ../../scripts/test/run-test-harness-stress.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
@@ -26,6 +27,7 @@
     "@testcontainers/postgresql": "^11.13.0",
     "mailpit-api": "^1.9.0",
     "testcontainers": "^11.14.0",
+    "undici": "^7.24.6",
     "zod": "^4.3.6"
   }
 }
