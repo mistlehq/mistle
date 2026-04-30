@@ -258,7 +258,7 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
           </div>
         ) : null}
         {input.automationTypeField === undefined ? null : (
-          <div className="border-t p-4">{input.automationTypeField}</div>
+          <div className="p-4">{input.automationTypeField}</div>
         )}
 
         <div className="p-4">
