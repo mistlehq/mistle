@@ -7,21 +7,34 @@ import {
 
 describe("createSetupScriptTestShellPayload", () => {
   it("enables fail-fast execution before the user setup script when requested", () => {
-    expect(
-      createSetupScriptTestShellPayload({
-        failOnFirstError: true,
-        setupScript: "pnpm install\npnpm dev:bootstrap",
-      }),
-    ).toBe("set -e\npnpm install\npnpm dev:bootstrap");
+    const payload = createSetupScriptTestShellPayload({
+      failOnFirstError: true,
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+    });
+
+    expect(payload).toContain("base64 -d");
+    expect(payload).toContain("exec /bin/bash -l -e");
   });
 
-  it("runs the user setup script unchanged when fail-fast execution is disabled", () => {
-    expect(
-      createSetupScriptTestShellPayload({
-        failOnFirstError: false,
-        setupScript: "#!/usr/bin/env bash\npnpm install || npm install",
-      }),
-    ).toBe("#!/usr/bin/env bash\npnpm install || npm install");
+  it("runs non-shebang scripts without fail-fast shell options when disabled", () => {
+    const payload = createSetupScriptTestShellPayload({
+      failOnFirstError: false,
+      setupScript: "pnpm install || npm install",
+    });
+
+    expect(payload).toContain("base64 -d");
+    expect(payload).toContain("exec /bin/bash -l");
+    expect(payload).not.toContain("exec /bin/bash -l -e");
+  });
+
+  it("executes shebang scripts directly from the generated script file", () => {
+    const payload = createSetupScriptTestShellPayload({
+      failOnFirstError: true,
+      setupScript: "#!/usr/bin/env python3\nprint('hello')",
+    });
+
+    expect(payload).toContain('if head -c 2 "$setup_script_path" | grep -q "^#!"; then');
+    expect(payload).toContain('  exec "$setup_script_path"');
   });
 });
 
