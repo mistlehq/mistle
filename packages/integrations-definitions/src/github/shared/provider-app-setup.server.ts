@@ -112,6 +112,48 @@ function completeGitHubAppInstallation(input: {
   };
 }
 
+export function buildCompletedGitHubAppManifestResult(input: {
+  conversion: ReturnType<typeof parseGitHubAppManifestConversionResponse>;
+  query: URLSearchParams;
+  supportsClientSecret: boolean;
+}): IntegrationProviderAppSetupCompleteResult {
+  const convertedConnectionConfig = parseGitHubAppInstallationConnectionConfig(
+    buildConvertedGitHubAppConnectionConfig({
+      conversion: input.conversion,
+    }),
+  );
+  const convertedConnectionSecrets = buildConvertedGitHubAppConnectionSecrets({
+    conversion: input.conversion,
+    supportsClientSecret: input.supportsClientSecret,
+  });
+
+  const installationId = input.query.get("installation_id");
+  if (installationId !== null && installationId.length > 0) {
+    const installationResult = completeGitHubAppInstallation({
+      connectionConfig: convertedConnectionConfig,
+      query: input.query,
+    });
+
+    return {
+      ...installationResult,
+      secrets: convertedConnectionSecrets,
+    };
+  }
+
+  return {
+    completionRedirect: {
+      kind: "setup-route",
+      query: {
+        githubAppManifest: "created",
+      },
+    },
+    connection: {
+      config: convertedConnectionConfig,
+    },
+    secrets: convertedConnectionSecrets,
+  };
+}
+
 export function createGitHubProviderAppSetupCapability(
   options: GitHubProviderAppSetupCapabilityOptions,
 ): IntegrationProviderAppSetupCapability<
@@ -177,21 +219,11 @@ export function createGitHubProviderAppSetupCapability(
             code,
           });
 
-          return {
-            completionRedirect: {
-              kind: "setup-route",
-              query: {
-                githubAppManifest: "created",
-              },
-            },
-            connection: {
-              config: buildConvertedGitHubAppConnectionConfig({ conversion }),
-            },
-            secrets: buildConvertedGitHubAppConnectionSecrets({
-              conversion,
-              supportsClientSecret: options.supportsClientSecret,
-            }),
-          };
+          return buildCompletedGitHubAppManifestResult({
+            conversion,
+            query: input.query,
+            supportsClientSecret: options.supportsClientSecret,
+          });
         },
       },
       {

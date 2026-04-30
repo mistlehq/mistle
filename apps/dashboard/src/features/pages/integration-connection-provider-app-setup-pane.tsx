@@ -2,7 +2,7 @@ import type {
   IntegrationFormConnectionMethodProviderAppSetup,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
-import { Button, CopyableValue } from "@mistle/ui";
+import { Button, CopyableValue, Notice } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -24,7 +24,7 @@ import {
   useManifestWebhookCallbackState,
 } from "../integrations/manifest-webhook-callback-state.js";
 import { openDeferredExternalWindow } from "../shared/external-window.js";
-import { FormPageActionBar, FormPageStack } from "../shared/form-page.js";
+import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 import {
   ExistingAppSetupFieldsPanel,
@@ -113,7 +113,7 @@ function ManifestCreatedState(): React.JSX.Element {
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader
-        description="The GitHub App was created successfully. Install it in GitHub to finish connecting it to Mistle."
+        description="Your GitHub App is ready. Continue the installation in GitHub to connect it to Mistle."
         title="GitHub App created"
       />
     </div>
@@ -160,6 +160,37 @@ function completeProviderAppSetupStart(input: {
     submissionUrl: input.result.submissionUrl,
     fields: input.result.fields,
   });
+}
+
+function PostManifestInstallationScreen(input: {
+  actionErrorMessage: string | null;
+  isPending: boolean;
+  onInstall: () => void;
+}): React.JSX.Element {
+  return (
+    <FormPageStack>
+      <FormPageSection>
+        <div className="flex flex-col gap-6 p-6">
+          <ManifestCreatedState />
+          {input.actionErrorMessage === null ? null : (
+            <Notice title="Could not continue setup" variant="alert">
+              {input.actionErrorMessage}
+            </Notice>
+          )}
+          <FormPageActionBar>
+            <Button
+              aria-busy={input.isPending}
+              disabled={input.isPending}
+              onClick={input.onInstall}
+              type="button"
+            >
+              {input.isPending ? "Starting install..." : "Install GitHub App"}
+            </Button>
+          </FormPageActionBar>
+        </div>
+      </FormPageSection>
+    </FormPageStack>
+  );
 }
 
 export function ProviderAppSetupPane(input: {
@@ -440,6 +471,18 @@ export function ProviderAppSetupPane(input: {
   const isExistingAppStartActionPending =
     startExistingAppActionMutation.isPending || isRedirectingToExistingAppStartAction;
 
+  if (showManifestCreatedState) {
+    return (
+      <PostManifestInstallationScreen
+        actionErrorMessage={actionErrorMessage}
+        isPending={isExistingAppStartActionPending}
+        onInstall={() => {
+          void startExistingAppAction();
+        }}
+      />
+    );
+  }
+
   return (
     <FormPageStack>
       <IntegrationConnectionSetupModeTabs
@@ -471,14 +514,14 @@ export function ProviderAppSetupPane(input: {
         }
         footer={
           <>
-            {setupMode === "existing-app" || showManifestCreatedState ? (
+            {setupMode === "existing-app" ? (
               <SetupUrls
                 providerAppSetup={input.providerAppSetup}
                 webhookCallbackState={webhookCallbackState}
               />
             ) : null}
 
-            {setupMode === "existing-app" || showManifestCreatedState ? (
+            {setupMode === "existing-app" ? (
               <FormPageActionBar>
                 <Button
                   aria-busy={isExistingAppStartActionPending}
@@ -519,22 +562,18 @@ export function ProviderAppSetupPane(input: {
           </>
         }
         manifestContent={
-          showManifestCreatedState ? (
-            <ManifestCreatedState />
-          ) : (
-            <IntegrationConnectionSetupManifestPanel
-              editorId={`${input.routeSegment}-manifest-editor`}
-              manifestCallbackState={webhookCallbackState}
-              manifestDescription={input.providerAppSetup.manifest.description}
-              manifestTitle={input.providerAppSetup.manifest.title}
-              manifestValidation={manifestValidation}
-              manifestValue={manifestDraft.manifestValue}
-              onManifestChange={manifestDraft.onManifestChange}
-              onSetupStartFormValueChange={setupStartFormState.updateValue}
-              setupStartForm={input.setupStartForm}
-              setupStartFormValues={setupStartFormState.values}
-            />
-          )
+          <IntegrationConnectionSetupManifestPanel
+            editorId={`${input.routeSegment}-manifest-editor`}
+            manifestCallbackState={webhookCallbackState}
+            manifestDescription={input.providerAppSetup.manifest.description}
+            manifestTitle={input.providerAppSetup.manifest.title}
+            manifestValidation={manifestValidation}
+            manifestValue={manifestDraft.manifestValue}
+            onManifestChange={manifestDraft.onManifestChange}
+            onSetupStartFormValueChange={setupStartFormState.updateValue}
+            setupStartForm={input.setupStartForm}
+            setupStartFormValues={setupStartFormState.values}
+          />
         }
         onModeChange={setSetupMode}
         title={input.providerAppSetup.title}

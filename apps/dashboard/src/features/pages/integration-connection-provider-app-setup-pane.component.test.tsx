@@ -321,15 +321,16 @@ describe("ProviderAppSetupPane", () => {
       routeSegment: "github-app",
     });
 
-    expect(screen.getByRole("tab", { name: "Create from manifest", selected: true })).toBeTruthy();
     expect(screen.getByText("GitHub App created")).toBeTruthy();
     expect(
       screen.getByText(
-        "The GitHub App was created successfully. Install it in GitHub to finish connecting it to Mistle.",
+        "Your GitHub App is ready. Continue the installation in GitHub to connect it to Mistle.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText("Existing GitHub App")).toBeNull();
-    expect(screen.getByText("Hook URLs")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Create from manifest" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Use existing app" })).toBeNull();
+    expect(screen.queryByText("Hook URLs")).toBeNull();
     expect(
       screen.getByRole("button", { name: "Install GitHub App" }).hasAttribute("disabled"),
     ).toBe(false);
