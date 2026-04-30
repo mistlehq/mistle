@@ -188,6 +188,7 @@ export function SandboxProfileSnapshotPanel(input: {
               <ActivityStatus
                 className="shrink-0 justify-start text-muted-foreground sm:min-w-48 sm:justify-end"
                 label={activityLabel}
+                labelClassName="min-w-0 text-right"
                 labelKey={input.state.kind}
               />
             )}

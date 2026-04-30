@@ -792,6 +792,9 @@ describe("SandboxProfileEditorPage", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Snapshots" }));
 
     expect(screen.getByText("Creating snapshot")).toBeDefined();
+    const status = screen.getByRole("status", { name: "Creating snapshot" });
+    expect(status.className).toContain("sm:justify-end");
+    expect(status.querySelector(".text-right")?.textContent).toContain("Creating snapshot");
   });
 
   it("shows creating while the first snapshot is materializing from a manual job", () => {

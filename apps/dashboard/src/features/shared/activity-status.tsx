@@ -3,6 +3,7 @@ import { BrailleSpinner } from "@mistle/ui";
 export function ActivityStatus(input: {
   className?: string;
   label: string;
+  labelClassName?: string;
   labelKey?: React.Key;
 }): React.JSX.Element {
   return (
@@ -13,7 +14,9 @@ export function ActivityStatus(input: {
       role="status"
     >
       <BrailleSpinner className="text-stone-400" />
-      <span className="relative block min-w-[14rem] overflow-hidden text-left">
+      <span
+        className={`relative block overflow-hidden${input.labelClassName === undefined ? " min-w-[14rem] text-left" : ` ${input.labelClassName}`}`}
+      >
         <span
           className="block whitespace-nowrap [animation:activity-status-enter_180ms_ease-out]"
           key={input.labelKey ?? input.label}
