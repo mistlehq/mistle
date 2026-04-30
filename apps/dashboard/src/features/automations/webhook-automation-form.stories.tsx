@@ -466,7 +466,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/WebhookAutomation/Form",
+  title: "Dashboard/Automations/Trigger/Form",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {

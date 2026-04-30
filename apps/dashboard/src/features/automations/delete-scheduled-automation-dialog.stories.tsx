@@ -4,14 +4,14 @@ import { withDashboardCenteredStory } from "../../storybook/decorators.js";
 import { DeleteWebhookAutomationDialog } from "./delete-webhook-automation-dialog.js";
 
 const meta = {
-  title: "Dashboard/Automations/Trigger/DeleteDialog",
+  title: "Dashboard/Automations/Schedule/DeleteDialog",
   component: DeleteWebhookAutomationDialog,
   decorators: [withDashboardCenteredStory],
   parameters: {
     layout: "fullscreen",
   },
   args: {
-    automationName: "GitHub pushes to repo triage",
+    automationName: "Daily repository triage",
     errorMessage: null,
     isOpen: true,
     isPending: false,
@@ -34,6 +34,6 @@ export const Pending: Story = {
 
 export const ErrorState: Story = {
   args: {
-    errorMessage: "The webhook automation no longer exists.",
+    errorMessage: "The scheduled automation no longer exists.",
   },
 };

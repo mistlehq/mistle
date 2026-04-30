@@ -136,7 +136,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/ScheduledAutomation/Form",
+  title: "Dashboard/Automations/Schedule/Form",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {
