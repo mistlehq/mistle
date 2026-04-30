@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import {
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
+  SandboxInstancePurposes,
+  type SandboxInstancePurpose,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
@@ -57,10 +59,15 @@ function createSandboxInstanceId(): string {
 
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
+  purpose: SandboxInstancePurpose;
   persistentSandboxesEnabled: boolean;
   sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
+  if (input.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+    return SandboxInstancePersistenceModes.EPHEMERAL;
+  }
+
   if (!input.persistentSandboxesEnabled) {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
@@ -126,6 +133,7 @@ export async function startSandboxInstance(
   );
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
+    purpose: input.purpose,
     persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
     sandboxProvider: ctx.sandboxProvider,
     configuredStorageBackend: ctx.sandboxStorageBackend,

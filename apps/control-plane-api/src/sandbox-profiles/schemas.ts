@@ -307,7 +307,12 @@ export const startSandboxProfileInstanceBodySchema = z
 
 export const startSandboxProfileSetupScriptTestRunBodySchema = z
   .object({
-    setupScript: z.string().min(1),
+    setupScript: z
+      .string()
+      .min(1)
+      .refine((value) => value.trim().length > 0, {
+        message: "Setup script must not be blank.",
+      }),
     idempotencyKey: z.string().min(1).max(255).optional(),
   })
   .strict();
