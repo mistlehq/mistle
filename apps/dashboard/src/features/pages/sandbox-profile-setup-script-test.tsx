@@ -1,5 +1,5 @@
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
-import { Button, InlineCode, Notice } from "@mistle/ui";
+import { Button, InlineCode, Label, Notice, Switch } from "@mistle/ui";
 import {
   CheckCircleIcon,
   PlayIcon,
@@ -24,9 +24,11 @@ type SetupScriptTestViewProps = {
   disabled?: boolean;
   isDraft: boolean;
   onClose?: () => void;
+  onFailOnFirstErrorChange?: (checked: boolean) => void;
   onResize?: (dimensions: { cols: number; rows: number }) => Promise<void>;
   onRun?: () => void;
   onWriteInput?: (input: string) => Promise<void>;
+  failOnFirstError?: boolean;
   outputChunks?: readonly Uint8Array[];
   outputText?: string;
   status: SetupScriptTestStatus;
@@ -73,6 +75,17 @@ Setup failed with exit code 1`;
 
 function createSetupScriptTestPtySessionId(): string {
   return `${SetupScriptTestPtySessionPrefix}-${crypto.randomUUID()}`;
+}
+
+export function createSetupScriptTestShellPayload(input: {
+  failOnFirstError: boolean;
+  setupScript: string;
+}): string {
+  if (!input.failOnFirstError) {
+    return input.setupScript;
+  }
+
+  return ["set -e", input.setupScript].join("\n");
 }
 
 function resolveSetupScriptTestButtonLabel(status: SetupScriptTestStatus): string {
@@ -159,7 +172,7 @@ function resolveSetupScriptTestStatus(input: {
   return "idle";
 }
 
-function resolveSetupScriptTestStatusMessage(input: {
+export function resolveSetupScriptTestStatusMessage(input: {
   ptyErrorMessage: string | null;
   ptyExitCode: number | null;
   runErrorMessage: string | null;
@@ -175,10 +188,6 @@ function resolveSetupScriptTestStatusMessage(input: {
 
   if (input.ptyErrorMessage !== null) {
     return input.ptyErrorMessage;
-  }
-
-  if (input.ptyExitCode !== null && input.ptyExitCode !== 0) {
-    return `The setup script exited with code ${String(input.ptyExitCode)}.`;
   }
 
   return null;
@@ -202,22 +211,38 @@ export function SandboxProfileSetupScriptTestButton(
   const isButtonDisabled =
     input.disabled === true || !input.isDraft || input.status === "blank" || isBusy;
 
+  const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
+
   return (
-    <Button
-      disabled={isButtonDisabled}
-      onClick={input.onRun}
-      size="sm"
-      title={resolveSetupScriptTestButtonTitle({
-        disabled: input.disabled === true,
-        isDraft: input.isDraft,
-        status: input.status,
-      })}
-      type="button"
-      variant="outline"
-    >
-      {resolveSetupScriptTestButtonIcon(input.status)}
-      {resolveSetupScriptTestButtonLabel(input.status)}
-    </Button>
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={input.failOnFirstError ?? true}
+          disabled={isBusy || input.disabled === true || !input.isDraft}
+          id={failOnFirstErrorSwitchId}
+          onCheckedChange={input.onFailOnFirstErrorChange}
+          size="sm"
+        />
+        <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
+          Fail on first command error
+        </Label>
+      </div>
+      <Button
+        disabled={isButtonDisabled}
+        onClick={input.onRun}
+        size="sm"
+        title={resolveSetupScriptTestButtonTitle({
+          disabled: input.disabled === true,
+          isDraft: input.isDraft,
+          status: input.status,
+        })}
+        type="button"
+        variant="outline"
+      >
+        {resolveSetupScriptTestButtonIcon(input.status)}
+        {resolveSetupScriptTestButtonLabel(input.status)}
+      </Button>
+    </div>
   );
 }
 
@@ -309,6 +334,7 @@ export function useSandboxProfileSetupScriptTestRun(
   const [startedRun, setStartedRun] = useState<StartedSetupScriptTestRun | null>(null);
   const [runErrorMessage, setRunErrorMessage] = useState<string | null>(null);
   const [isOpenRequested, setIsOpenRequested] = useState(false);
+  const [failOnFirstError, setFailOnFirstError] = useState(true);
   const openedPtySessionIdRef = useRef<string | null>(null);
   const transportManager = useSessionWorkbenchTransport({
     sandboxInstanceId: startedRun?.sandboxInstanceId ?? null,
@@ -372,11 +398,18 @@ export function useSandboxProfileSetupScriptTestRun(
     failureMessage: sandboxStatusQuery.data?.failureMessage,
     status: sandboxStatusQuery.data?.status,
   });
+  const sandboxStatusErrorMessage = sandboxStatusQuery.isError
+    ? resolveApiErrorMessage({
+        error: sandboxStatusQuery.error,
+        fallbackMessage: "Could not check setup script test sandbox status.",
+      })
+    : null;
+  const testRunErrorMessage = sandboxFailureMessage ?? sandboxStatusErrorMessage ?? runErrorMessage;
   const status = resolveSetupScriptTestStatus({
     isOpenRequested,
     ptyErrorMessage: ptyState.lifecycle.errorMessage,
     ptyExitCode: ptyState.lifecycle.exitInfo?.exitCode ?? null,
-    runErrorMessage: sandboxFailureMessage ?? runErrorMessage,
+    runErrorMessage: testRunErrorMessage,
     scriptIsBlank,
     startIsPending: startMutation.isPending,
     startedRun,
@@ -384,7 +417,7 @@ export function useSandboxProfileSetupScriptTestRun(
   const statusMessage = resolveSetupScriptTestStatusMessage({
     ptyErrorMessage: ptyState.lifecycle.errorMessage,
     ptyExitCode: ptyState.lifecycle.exitInfo?.exitCode ?? null,
-    runErrorMessage,
+    runErrorMessage: sandboxStatusErrorMessage ?? runErrorMessage,
     sandboxFailureMessage,
   });
 
@@ -403,7 +436,13 @@ export function useSandboxProfileSetupScriptTestRun(
     void ptyState.actions
       .openPty({
         ...INITIAL_PTY_DIMENSIONS,
-        args: ["-lc", startedRun.setupScript],
+        args: [
+          "-lc",
+          createSetupScriptTestShellPayload({
+            failOnFirstError,
+            setupScript: startedRun.setupScript,
+          }),
+        ],
         command: "/bin/bash",
         ptySessionId: startedRun.ptySessionId,
         sandboxInstanceId: startedRun.sandboxInstanceId,
@@ -413,7 +452,7 @@ export function useSandboxProfileSetupScriptTestRun(
           error instanceof Error ? error.message : "Could not open setup script test terminal.",
         );
       });
-  }, [ptyState.actions, sandboxStatusQuery.data?.connectable, startedRun]);
+  }, [failOnFirstError, ptyState.actions, sandboxStatusQuery.data?.connectable, startedRun]);
 
   const handleRun = useCallback((): void => {
     if (!input.isDraft || input.disabled === true || scriptIsBlank || status === "running") {
@@ -438,7 +477,9 @@ export function useSandboxProfileSetupScriptTestRun(
 
   return {
     buttonProps: {
+      failOnFirstError,
       isDraft: input.isDraft,
+      onFailOnFirstErrorChange: setFailOnFirstError,
       onRun: handleRun,
       status,
       ...(input.disabled === undefined ? {} : { disabled: input.disabled }),

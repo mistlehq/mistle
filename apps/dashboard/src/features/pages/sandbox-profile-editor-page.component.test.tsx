@@ -1579,9 +1579,16 @@ describe("SandboxProfileEditorPage", () => {
     const testButton = screen.getByRole("button", {
       name: "Test",
     });
+    const failOnFirstErrorSwitch = screen.getByRole("switch", {
+      name: "Fail on first command error",
+    });
 
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
+    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
+
+    fireEvent.click(failOnFirstErrorSwitch);
+    expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("false");
   });
 
   it("disables setup script testing for empty and published scripts", () => {
