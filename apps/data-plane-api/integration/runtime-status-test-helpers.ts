@@ -38,6 +38,7 @@ function createGatewayEnvironment(input: {
   const host = "127.0.0.1";
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
+    MISTLE_ENV: "development",
     NODE_ENV: "development",
     MISTLE_TELEMETRY_ENABLED: "false",
     MISTLE_TELEMETRY_DEBUG: "false",
