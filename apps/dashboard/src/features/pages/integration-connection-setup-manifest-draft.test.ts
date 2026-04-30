@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupStartFormOrThrow,
   resolveManifestDraftControlPlaneBaseUrl,
 } from "./integration-connection-setup-manifest-draft.js";
 
@@ -115,6 +116,54 @@ describe("resolveIntegrationSetupAppManifestDraftBuilderOrThrow", () => {
       }),
     ).toThrow(
       "Integration setup flow 'api-key/github-app' is not a browser form setup flow for target 'github-cloud'.",
+    );
+  });
+});
+
+describe("resolveIntegrationSetupStartFormOrThrow", () => {
+  it("resolves the Slack setup start form from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupStartFormOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toEqual({
+      submitLabel: "Create and connect Slack app",
+      fields: [
+        {
+          name: "appConfigToken",
+          label: "App configuration token",
+          inputType: "password",
+          required: true,
+          placeholder: "xoxe.xoxp-...",
+          description:
+            "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+          actions: [
+            {
+              label: "Generate token in Slack",
+              href: "https://api.slack.com/apps",
+              opensInNewWindow: true,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("fails fast when the setup flow has no start form", () => {
+    expect(() =>
+      resolveIntegrationSetupStartFormOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toThrow(
+      "Integration setup flow 'github-app-installation/github-app' does not define a setup start form for target 'github-cloud'.",
     );
   });
 });
