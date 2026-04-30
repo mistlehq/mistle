@@ -28,7 +28,7 @@ install_file() {
 }
 
 confirm_install() {
-  echo "Mistle local Compose installer"
+  echo "Mistle local installer"
   echo
   echo "This will:"
   echo "- write compose.yaml, .env.example, up.sh, and down.sh to ${install_directory_path}"
@@ -37,8 +37,16 @@ confirm_install() {
   echo "- fetch files from ${local_compose_raw_base_url}"
   echo "- start Mistle by running ${install_directory_path}/up.sh"
 
-  printf "Continue? [y/N] "
-  read answer
+  if [ ! -r /dev/tty ]; then
+    echo "Installer confirmation requires an interactive terminal." >&2
+    exit 1
+  fi
+
+  printf "Continue? [y/N] " >/dev/tty
+  if ! IFS= read -r answer </dev/tty; then
+    echo "Installer confirmation could not be read." >&2
+    exit 1
+  fi
 
   case "$answer" in
     y | Y | yes | YES)

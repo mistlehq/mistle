@@ -16,15 +16,16 @@ Mistle is an open-source platform for running and automating sandboxed coding ag
 You can spin up Mistle easily, assuming you have Docker installed:
 
 ```bash
-git clone https://github.com/mistlehq/mistle.git
-
-# Start the single-node Docker Compose stack
-cd mistle/deploy/compose/local
-./up.sh
-
-# Stop the stack when you're done
-./down.sh
+curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/deploy/compose/local/install.sh | sh
 ```
+
+The script:
+
+- Runs [deploy/compose/local/install.sh](deploy/compose/local/install.sh).
+- Installs the local Docker Compose files into `~/.mistle/local`.
+- Creates `~/.mistle/local/.env` from `.env.example` if it does not exist.
+- Preserves an existing `~/.mistle/local/.env`.
+- Starts Mistle by running `~/.mistle/local/up.sh`.
 
 ## Other notes
 
