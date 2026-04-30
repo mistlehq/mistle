@@ -27,7 +27,7 @@ import { SectionHeader } from "../shared/section-header.js";
 
 export type IntegrationConnectionSetupMode = "manifest" | "existing-app";
 
-export type IntegrationConnectionSetupStartFormState = {
+type IntegrationConnectionSetupStartFormState = {
   requiredFieldsComplete: boolean;
   resolveRequiredValue: (fieldName: string) => string;
   updateValue: (fieldName: string, value: string) => void;
