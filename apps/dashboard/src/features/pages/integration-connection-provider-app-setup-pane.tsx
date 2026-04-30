@@ -1,7 +1,5 @@
 import type {
-  IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions,
-  IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions,
-  IntegrationFormConnectionMethodSetupInstructions,
+  IntegrationFormConnectionMethodProviderAppSetup,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { Button } from "@mistle/ui";
@@ -10,7 +8,6 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import type { SavingFieldState } from "../forms/configured-secret-field.js";
 import {
   startProviderAppSetup,
   updateFormIntegrationConnection,
@@ -33,6 +30,25 @@ import {
   useSetupManifestDraft,
 } from "./integration-connection-app-setup-shared.js";
 import {
+  buildProviderAppSetupConfig,
+  buildProviderAppSetupConfigFieldInputs,
+  buildProviderAppSetupSecretFieldInputs,
+  buildProviderAppSetupSecrets,
+  buildProviderAppSetupStartBody,
+  createInitialProviderAppSetupDraft,
+  getProviderAppSetupFieldValidationMessage,
+  isProviderAppInstalled,
+  isProviderAppRequiredFieldReady,
+  isProviderAppSetupFieldStable,
+  isProviderAppSetupSecretFieldKey,
+  normalizeProviderAppSetupValue,
+  resolveProviderAppSetupFieldKeys,
+  resolveProviderAppSetupSavedFieldKeys,
+  resolveProviderAppSetupSecretFieldKeys,
+  shouldPersistProviderAppSetupField,
+  type ProviderAppSetupFieldKey,
+} from "./integration-connection-provider-app-setup-model.js";
+import {
   IntegrationConnectionSetupManifestPanel,
   IntegrationConnectionSetupModeTabs,
   IntegrationConnectionSetupWebhookCallbackValue,
@@ -40,293 +56,32 @@ import {
   useIntegrationConnectionSetupStartForm,
 } from "./integration-connection-setup-flow.js";
 import type { IntegrationSetupAppManifestDraftBuilder } from "./integration-connection-setup-manifest-draft.js";
-import {
-  hasConfiguredSetupSecretField,
-  resolveConfiguredSetupSecretFieldKeys,
-} from "./integration-connection-setup-secret-fields.js";
+import { resolveConfiguredSetupSecretFieldKeys } from "./integration-connection-setup-secret-fields.js";
 import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-state.js";
 
 type ProviderAppSetupMode = IntegrationConnectionSetupMode;
-type ProviderAppSetupFieldKey = string;
-
-function normalizeInputValue(value: unknown): string {
-  return typeof value === "string" ? value : "";
-}
-
-function createInitialExistingAppDraft(input: {
-  connection: IntegrationConnection;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): Record<ProviderAppSetupFieldKey, string> {
-  const draft: Record<ProviderAppSetupFieldKey, string> = {};
-
-  for (const field of input.setupInstructions.existingApp.configFields) {
-    draft[field.name] = normalizeInputValue(input.connection.config?.[field.configKey]);
-  }
-
-  for (const field of input.setupInstructions.existingApp.secretFields) {
-    draft[field.name] = "";
-  }
-
-  return draft;
-}
-
-function resolveExistingAppFieldKeys(
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions,
-): readonly ProviderAppSetupFieldKey[] {
-  return [
-    ...setupInstructions.existingApp.configFields.map((field) => field.name),
-    ...setupInstructions.existingApp.secretFields.map((field) => field.name),
-  ];
-}
-
-function resolveExistingAppConfigFieldKeys(
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions,
-): readonly ProviderAppSetupFieldKey[] {
-  return setupInstructions.existingApp.configFields.map((field) => field.name);
-}
-
-function resolveExistingAppSecretFieldKeys(
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions,
-): readonly ProviderAppSetupFieldKey[] {
-  return setupInstructions.existingApp.secretFields.map((field) => field.name);
-}
-
-function isExistingAppSecretFieldKey(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): boolean {
-  return input.setupInstructions.existingApp.secretFields.some(
-    (field) => field.name === input.fieldKey,
-  );
-}
 
 function resolveConfiguredSecretFieldKeys(input: {
   connection: IntegrationConnection;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
 }): ReadonlySet<ProviderAppSetupFieldKey> {
   return resolveConfiguredSetupSecretFieldKeys({
     configuredSecretNames: input.connection.configuredSecretNames,
-    fieldKeys: resolveExistingAppSecretFieldKeys(input.setupInstructions),
+    fieldKeys: resolveProviderAppSetupSecretFieldKeys(input.providerAppSetup),
   });
-}
-
-function isProviderAppInstalled(input: {
-  connection: IntegrationConnection;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): boolean {
-  const { installedDetection } = input.setupInstructions.existingApp;
-  const configFieldsByName = new Map(
-    input.setupInstructions.existingApp.configFields.map((field) => [field.name, field.configKey]),
-  );
-
-  return (
-    installedDetection.configFields.every((fieldName) => {
-      const configKey = configFieldsByName.get(fieldName);
-      if (configKey === undefined) {
-        throw new Error(
-          `Provider app setup instructions do not define config field '${fieldName}'.`,
-        );
-      }
-
-      return typeof input.connection.config?.[configKey] === "string";
-    }) &&
-    installedDetection.secretFields.every((fieldName) =>
-      hasConfiguredSetupSecretField({
-        configuredSecretNames: input.connection.configuredSecretNames,
-        fieldName,
-      }),
-    )
-  );
-}
-
-function normalizeExistingAppSetupValue(value: string): string {
-  return value.trim();
-}
-
-function buildExistingAppSetupConfig(input: {
-  methodId: string;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): Record<string, string> {
-  const config: Record<string, string> = {
-    connection_method: input.methodId,
-  };
-
-  for (const field of input.setupInstructions.existingApp.configFields) {
-    const value = normalizeExistingAppSetupValue(input.draft[field.name] ?? "");
-    if (value.length > 0) {
-      config[field.configKey] = value;
-    }
-  }
-
-  return config;
-}
-
-function buildExistingAppSetupSecrets(input: {
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  fieldKey: ProviderAppSetupFieldKey;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): Record<string, string> | undefined {
-  if (
-    !isExistingAppSecretFieldKey({
-      fieldKey: input.fieldKey,
-      setupInstructions: input.setupInstructions,
-    })
-  ) {
-    return undefined;
-  }
-
-  const value = normalizeExistingAppSetupValue(input.draft[input.fieldKey] ?? "");
-  return value.length === 0 ? undefined : { [input.fieldKey]: value };
-}
-
-function isExistingAppSetupFieldDirty(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  savedDraft: Record<ProviderAppSetupFieldKey, string>;
-}): boolean {
-  return (
-    normalizeExistingAppSetupValue(input.draft[input.fieldKey] ?? "") !==
-    normalizeExistingAppSetupValue(input.savedDraft[input.fieldKey] ?? "")
-  );
-}
-
-function isExistingAppFieldStable(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  savedDraft: Record<ProviderAppSetupFieldKey, string>;
-  fieldState: SavingFieldState;
-}): boolean {
-  return (
-    input.fieldState.status !== "saving" &&
-    input.fieldState.errorMessage === null &&
-    !isExistingAppSetupFieldDirty({
-      fieldKey: input.fieldKey,
-      draft: input.draft,
-      savedDraft: input.savedDraft,
-    })
-  );
-}
-
-function getExistingAppSetupFieldValidationMessage(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): string | null {
-  const normalizedValue = normalizeExistingAppSetupValue(input.draft[input.fieldKey] ?? "");
-  if (normalizedValue.length > 0) {
-    return null;
-  }
-
-  const configField = resolveOptionalConfigFieldInstructions({
-    fieldKey: input.fieldKey,
-    setupInstructions: input.setupInstructions,
-  });
-  if (configField !== null && configField.required) {
-    return `${configField.label} is required.`;
-  }
-
-  const secretField = resolveOptionalSecretFieldInstructions({
-    fieldKey: input.fieldKey,
-    setupInstructions: input.setupInstructions,
-  });
-  if (secretField !== null && secretField.required) {
-    return `${secretField.label} is required.`;
-  }
-
-  return null;
-}
-
-function shouldPersistExistingAppSetupField(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): boolean {
-  if (
-    !isExistingAppSecretFieldKey({
-      fieldKey: input.fieldKey,
-      setupInstructions: input.setupInstructions,
-    })
-  ) {
-    return true;
-  }
-
-  return normalizeExistingAppSetupValue(input.draft[input.fieldKey] ?? "").length > 0;
-}
-
-function isExistingAppRequiredFieldReady(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  draft: Record<ProviderAppSetupFieldKey, string>;
-  savedDraft: Record<ProviderAppSetupFieldKey, string>;
-  fieldState: SavingFieldState;
-  isConfiguredOnServer: boolean;
-}): boolean {
-  const draftValue = normalizeExistingAppSetupValue(input.draft[input.fieldKey] ?? "");
-  const savedValue = normalizeExistingAppSetupValue(input.savedDraft[input.fieldKey] ?? "");
-
-  if (
-    input.isConfiguredOnServer &&
-    draftValue.length === 0 &&
-    savedValue.length === 0 &&
-    isExistingAppFieldStable(input)
-  ) {
-    return true;
-  }
-
-  return savedValue.length > 0 && isExistingAppFieldStable(input);
-}
-
-function resolveExistingAppSetupSavedFieldKeys(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): readonly ProviderAppSetupFieldKey[] {
-  const configFieldKeys = resolveExistingAppConfigFieldKeys(input.setupInstructions);
-
-  if (
-    isExistingAppSecretFieldKey({
-      fieldKey: input.fieldKey,
-      setupInstructions: input.setupInstructions,
-    })
-  ) {
-    return [...configFieldKeys, input.fieldKey];
-  }
-
-  return configFieldKeys;
-}
-
-function resolveOptionalConfigFieldInstructions(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions | null {
-  return (
-    input.setupInstructions.existingApp.configFields.find(
-      (candidate) => candidate.name === input.fieldKey,
-    ) ?? null
-  );
-}
-
-function resolveOptionalSecretFieldInstructions(input: {
-  fieldKey: ProviderAppSetupFieldKey;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-}): IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions | null {
-  return (
-    input.setupInstructions.existingApp.secretFields.find(
-      (candidate) => candidate.name === input.fieldKey,
-    ) ?? null
-  );
 }
 
 function SetupUrls(input: {
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   webhookCallbackState: ManifestWebhookCallbackState;
 }): React.JSX.Element {
-  const webhookCallbackInstructions = input.setupInstructions.urls.webhookCallback;
+  const webhookCallbackInstructions = input.providerAppSetup.urls.webhookCallback;
 
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader
-        description={input.setupInstructions.urls.description}
-        title={input.setupInstructions.urls.title}
+        description={input.providerAppSetup.urls.description}
+        title={input.providerAppSetup.urls.title}
       />
       <div className="flex flex-col gap-4">
         <IntegrationConnectionSetupWebhookCallbackValue
@@ -341,32 +96,12 @@ function SetupUrls(input: {
   );
 }
 
-function buildSetupStartBody(input: {
-  manifest: Record<string, unknown>;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
-  setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
-  setupStartFormState: ReturnType<typeof useIntegrationConnectionSetupStartForm>;
-}): Record<string, unknown> {
-  const body: Record<string, unknown> = {
-    [input.setupInstructions.manifest.startAction.manifestBodyField]: input.manifest,
-  };
-
-  for (const field of input.setupStartForm.fields) {
-    body[field.name] =
-      field.required === true
-        ? input.setupStartFormState.resolveRequiredValue(field.name)
-        : (input.setupStartFormState.values[field.name] ?? "");
-  }
-
-  return body;
-}
-
 export function ProviderAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
   methodId: string;
   routeSegment: string;
-  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
+  providerAppSetup: IntegrationFormConnectionMethodProviderAppSetup;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -374,7 +109,7 @@ export function ProviderAppSetupPane(input: {
   const [setupMode, setSetupMode] = useState<ProviderAppSetupMode>(() =>
     isProviderAppInstalled({
       connection: input.connection,
-      setupInstructions: input.setupInstructions,
+      providerAppSetup: input.providerAppSetup,
     })
       ? "existing-app"
       : "manifest",
@@ -383,14 +118,14 @@ export function ProviderAppSetupPane(input: {
   const [configuredSecretFieldKeys, setConfiguredSecretFieldKeys] = useState(() =>
     resolveConfiguredSecretFieldKeys({
       connection: input.connection,
-      setupInstructions: input.setupInstructions,
+      providerAppSetup: input.providerAppSetup,
     }),
   );
   const [isSecretReplacementDialogOpen, setIsSecretReplacementDialogOpen] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const existingAppFieldKeys = useMemo(
-    () => resolveExistingAppFieldKeys(input.setupInstructions),
-    [input.setupInstructions],
+    () => resolveProviderAppSetupFieldKeys(input.providerAppSetup),
+    [input.providerAppSetup],
   );
   const existingAppAutoSave = useExistingAppSetupAutoSave<
     ProviderAppSetupFieldKey,
@@ -400,50 +135,50 @@ export function ProviderAppSetupPane(input: {
       setActionErrorMessage(null);
     },
     createInitialDraft: () =>
-      createInitialExistingAppDraft({
+      createInitialProviderAppSetupDraft({
         connection: input.connection,
-        setupInstructions: input.setupInstructions,
+        providerAppSetup: input.providerAppSetup,
       }),
     fieldKeys: existingAppFieldKeys,
-    normalizeValue: normalizeExistingAppSetupValue,
+    normalizeValue: normalizeProviderAppSetupValue,
     onFieldSaved: (updatedConnection, fieldKey) => {
       if (
-        isExistingAppSecretFieldKey({
+        isProviderAppSetupSecretFieldKey({
           fieldKey,
-          setupInstructions: input.setupInstructions,
+          providerAppSetup: input.providerAppSetup,
         })
       ) {
         setConfiguredSecretFieldKeys(
           resolveConfiguredSecretFieldKeys({
             connection: updatedConnection,
-            setupInstructions: input.setupInstructions,
+            providerAppSetup: input.providerAppSetup,
           }),
         );
       }
     },
     resolveSavedFieldKeys: (fieldKey) =>
-      resolveExistingAppSetupSavedFieldKeys({
+      resolveProviderAppSetupSavedFieldKeys({
         fieldKey,
-        setupInstructions: input.setupInstructions,
+        providerAppSetup: input.providerAppSetup,
       }),
     resolveSaveErrorMessage: (error) =>
       resolveApiErrorMessage({
         error,
-        fallbackMessage: input.setupInstructions.existingApp.saveErrorMessage,
+        fallbackMessage: input.providerAppSetup.existingApp.saveErrorMessage,
       }),
     saveField: async ({ draft, fieldKey }) => {
-      const secrets = buildExistingAppSetupSecrets({
+      const secrets = buildProviderAppSetupSecrets({
         draft,
         fieldKey,
-        setupInstructions: input.setupInstructions,
+        providerAppSetup: input.providerAppSetup,
       });
       const updatedConnection = await updateFormIntegrationConnection({
         connectionId: input.connection.id,
         displayName: input.connection.displayName,
-        config: buildExistingAppSetupConfig({
+        config: buildProviderAppSetupConfig({
           methodId: input.methodId,
           draft,
-          setupInstructions: input.setupInstructions,
+          providerAppSetup: input.providerAppSetup,
         }),
         ...(secrets === undefined ? {} : { secrets }),
       });
@@ -455,16 +190,16 @@ export function ProviderAppSetupPane(input: {
       return updatedConnection;
     },
     shouldPersistField: ({ draft, fieldKey }) =>
-      shouldPersistExistingAppSetupField({
+      shouldPersistProviderAppSetupField({
         draft,
         fieldKey,
-        setupInstructions: input.setupInstructions,
+        providerAppSetup: input.providerAppSetup,
       }),
     validateField: ({ draft, fieldKey }) =>
-      getExistingAppSetupFieldValidationMessage({
+      getProviderAppSetupFieldValidationMessage({
         draft,
         fieldKey,
-        setupInstructions: input.setupInstructions,
+        providerAppSetup: input.providerAppSetup,
       }),
   });
   const webhookCallbackState = useManifestWebhookCallbackState({
@@ -481,13 +216,13 @@ export function ProviderAppSetupPane(input: {
       startProviderAppSetup({
         connectionId: input.connection.id,
         routeSegment: input.routeSegment,
-        body: buildSetupStartBody({
+        body: buildProviderAppSetupStartBody({
           manifest: parseManifestJsonObject(manifestDraft.manifestValue),
-          setupInstructions: input.setupInstructions,
-          setupStartForm: input.setupStartForm,
+          providerAppSetup: input.providerAppSetup,
+          setupStartFormFields: input.setupStartForm.fields,
           setupStartFormState,
         }),
-        fallbackMessage: input.setupInstructions.manifest.createErrorMessage,
+        fallbackMessage: input.providerAppSetup.manifest.createErrorMessage,
       }),
   });
 
@@ -495,8 +230,8 @@ export function ProviderAppSetupPane(input: {
     setActionErrorMessage(null);
     try {
       const started = await startManifestMutation.mutateAsync();
-      if (started.kind !== input.setupInstructions.manifest.startAction.expectedResultKind) {
-        throw new Error(input.setupInstructions.manifest.startAction.unexpectedResultMessage);
+      if (started.kind !== input.providerAppSetup.manifest.startAction.expectedResultKind) {
+        throw new Error(input.providerAppSetup.manifest.startAction.unexpectedResultMessage);
       }
 
       globalThis.location.assign(started.authorizationUrl);
@@ -504,7 +239,7 @@ export function ProviderAppSetupPane(input: {
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
-          fallbackMessage: input.setupInstructions.manifest.createErrorMessage,
+          fallbackMessage: input.providerAppSetup.manifest.createErrorMessage,
         }),
       );
     }
@@ -516,15 +251,15 @@ export function ProviderAppSetupPane(input: {
     webhookCallbackState.kind === "ready" &&
     setupStartFormState.requiredFieldsComplete;
   const requiredFieldKeys = [
-    ...input.setupInstructions.existingApp.configFields
+    ...input.providerAppSetup.existingApp.configFields
       .filter((field) => field.required)
       .map((field) => field.name),
-    ...input.setupInstructions.existingApp.secretFields
+    ...input.providerAppSetup.existingApp.secretFields
       .filter((field) => field.required)
       .map((field) => field.name),
   ];
   const requiredFieldsReady = requiredFieldKeys.every((fieldKey) =>
-    isExistingAppRequiredFieldReady({
+    isProviderAppRequiredFieldReady({
       fieldKey,
       draft: existingAppAutoSave.draft,
       savedDraft: existingAppAutoSave.savedDraft,
@@ -533,7 +268,7 @@ export function ProviderAppSetupPane(input: {
     }),
   );
   const allFieldsStable = existingAppFieldKeys.every((fieldKey) =>
-    isExistingAppFieldStable({
+    isProviderAppSetupFieldStable({
       fieldKey,
       draft: existingAppAutoSave.draft,
       savedDraft: existingAppAutoSave.savedDraft,
@@ -550,17 +285,15 @@ export function ProviderAppSetupPane(input: {
     <FormPageStack>
       <IntegrationConnectionSetupModeTabs
         actionErrorMessage={actionErrorMessage}
-        description={input.setupInstructions.description}
+        description={input.providerAppSetup.description}
         existingAppContent={
           <ExistingAppSetupFieldsPanel
-            configFields={input.setupInstructions.existingApp.configFields.map((field) => ({
-              fieldKey: field.name,
-              id: `${input.routeSegment}-${field.name}`,
-              label: field.label,
-              required: field.required,
-              value: existingAppAutoSave.draft[field.name] ?? "",
-            }))}
-            description={input.setupInstructions.existingApp.description}
+            configFields={buildProviderAppSetupConfigFieldInputs({
+              draft: existingAppAutoSave.draft,
+              providerAppSetup: input.providerAppSetup,
+              routeSegment: input.routeSegment,
+            })}
+            description={input.providerAppSetup.existingApp.description}
             fieldStates={existingAppAutoSave.fieldStates}
             onCommitField={(fieldKey) => {
               void existingAppAutoSave.persistField(fieldKey);
@@ -568,25 +301,20 @@ export function ProviderAppSetupPane(input: {
             onReplacementDialogOpenChange={setIsSecretReplacementDialogOpen}
             onRevertSecretReplacement={existingAppAutoSave.revertField}
             onUpdateFieldDraft={existingAppAutoSave.updateFieldDraft}
-            secretFields={input.setupInstructions.existingApp.secretFields.map((field) => ({
-              configured: configuredSecretFieldKeys.has(field.name),
-              fieldKey: field.name,
-              id: `${input.routeSegment}-${field.name}`,
-              label: field.label,
-              ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
-              required: field.required && !configuredSecretFieldKeys.has(field.name),
-              secretLabel: field.secretLabel,
-              type: field.inputType,
-              value: existingAppAutoSave.draft[field.name] ?? "",
-            }))}
-            title={input.setupInstructions.existingApp.title}
+            secretFields={buildProviderAppSetupSecretFieldInputs({
+              configuredSecretFieldKeys,
+              draft: existingAppAutoSave.draft,
+              providerAppSetup: input.providerAppSetup,
+              routeSegment: input.routeSegment,
+            })}
+            title={input.providerAppSetup.existingApp.title}
           />
         }
         footer={
           <>
             {setupMode === "existing-app" ? (
               <SetupUrls
-                setupInstructions={input.setupInstructions}
+                providerAppSetup={input.providerAppSetup}
                 webhookCallbackState={webhookCallbackState}
               />
             ) : null}
@@ -600,7 +328,7 @@ export function ProviderAppSetupPane(input: {
                   }}
                   type="button"
                 >
-                  {input.setupInstructions.existingApp.connectLabel}
+                  {input.providerAppSetup.existingApp.connectLabel}
                 </Button>
               </FormPageActionBar>
             ) : setupMode === "manifest" ? (
@@ -622,8 +350,8 @@ export function ProviderAppSetupPane(input: {
           <IntegrationConnectionSetupManifestPanel
             editorId={`${input.routeSegment}-manifest-editor`}
             manifestCallbackState={webhookCallbackState}
-            manifestDescription={input.setupInstructions.manifest.description}
-            manifestTitle={input.setupInstructions.manifest.title}
+            manifestDescription={input.providerAppSetup.manifest.description}
+            manifestTitle={input.providerAppSetup.manifest.title}
             manifestValidation={manifestValidation}
             manifestValue={manifestDraft.manifestValue}
             onManifestChange={manifestDraft.onManifestChange}
@@ -633,7 +361,7 @@ export function ProviderAppSetupPane(input: {
           />
         }
         onModeChange={setSetupMode}
-        title={input.setupInstructions.title}
+        title={input.providerAppSetup.title}
         value={setupMode}
       />
     </FormPageStack>

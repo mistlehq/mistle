@@ -6203,7 +6203,7 @@
                                             }
                                           ]
                                         },
-                                        "instructions": {
+                                        "providerAppSetup": {
                                           "type": "object",
                                           "properties": {
                                             "description": {
@@ -6444,6 +6444,17 @@
                                         "routeSegment": {
                                           "type": "string",
                                           "pattern": "^[a-z0-9][a-z0-9-]*$"
+                                        },
+                                        "setupPane": {
+                                          "type": "object",
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "enum": ["provider-app"]
+                                            }
+                                          },
+                                          "required": ["kind"],
+                                          "additionalProperties": false
                                         },
                                         "startForm": {
                                           "type": "object",

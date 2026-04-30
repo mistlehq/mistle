@@ -156,7 +156,13 @@ const IntegrationFormConnectionMethodSetupStartFormSchema = z
   })
   .strict();
 
-const IntegrationFormConnectionMethodSetupInstructionsSchema = z
+const IntegrationFormConnectionMethodSetupPaneMetadataSchema = z
+  .object({
+    kind: z.literal("provider-app"),
+  })
+  .strict();
+
+const IntegrationFormConnectionMethodProviderAppSetupSchema = z
   .object({
     description: z.string().min(1),
     existingApp: z
@@ -229,14 +235,43 @@ const IntegrationFormConnectionMethodSetupInstructionsSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((providerAppSetup, context) => {
+    const configFieldNames = new Set(
+      providerAppSetup.existingApp.configFields.map((field) => field.name),
+    );
+    const secretFieldNames = new Set(
+      providerAppSetup.existingApp.secretFields.map((field) => field.name),
+    );
+
+    for (const fieldName of providerAppSetup.existingApp.installedDetection.configFields) {
+      if (!configFieldNames.has(fieldName)) {
+        context.addIssue({
+          code: "custom",
+          message: `Installed detection config field '${fieldName}' is not declared in existing app config fields.`,
+          path: ["existingApp", "installedDetection", "configFields"],
+        });
+      }
+    }
+
+    for (const fieldName of providerAppSetup.existingApp.installedDetection.secretFields) {
+      if (!secretFieldNames.has(fieldName)) {
+        context.addIssue({
+          code: "custom",
+          message: `Installed detection secret field '${fieldName}' is not declared in existing app secret fields.`,
+          path: ["existingApp", "installedDetection", "secretFields"],
+        });
+      }
+    }
+  });
 
 export const IntegrationFormConnectionMethodSetupFlowMetadataSchema: z.ZodType<IntegrationFormConnectionMethodSetupFlowMetadata> =
   z
     .object({
       completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
-      instructions: IntegrationFormConnectionMethodSetupInstructionsSchema.optional(),
+      providerAppSetup: IntegrationFormConnectionMethodProviderAppSetupSchema.optional(),
       routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
+      setupPane: IntegrationFormConnectionMethodSetupPaneMetadataSchema.optional(),
       startForm: IntegrationFormConnectionMethodSetupStartFormSchema.optional(),
     })
     .strict();

@@ -65,7 +65,10 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
           ],
         },
         routeSegment: "slack-app",
-        instructions: {
+        setupPane: {
+          kind: "provider-app",
+        },
+        providerAppSetup: {
           title: "Choose a setup method",
           description:
             "Create a new Slack app with a manifest or connect an app you've already configured in Slack.",

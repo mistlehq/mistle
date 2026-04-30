@@ -2,7 +2,8 @@ import type {
   AnyIntegrationDefinition,
   IntegrationFormConnectionMethodSetupManifestDraft,
   IntegrationFormConnectionMethodSetupFlow,
-  IntegrationFormConnectionMethodSetupInstructions,
+  IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodSetupPaneMetadata,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
@@ -61,19 +62,34 @@ export function resolveIntegrationSetupStartFormOrThrow(input: {
   return setupFlow.startForm;
 }
 
-export function resolveIntegrationSetupInstructionsOrThrow(input: {
+export function resolveIntegrationProviderAppSetupOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
-}): IntegrationFormConnectionMethodSetupInstructions {
+}): IntegrationFormConnectionMethodProviderAppSetup {
   const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
 
-  if (setupFlow.instructions === undefined) {
+  if (setupFlow.providerAppSetup === undefined) {
     throw new Error(
-      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define setup instructions for target '${input.connection.targetKey}'.`,
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define provider app setup for target '${input.connection.targetKey}'.`,
     );
   }
 
-  return setupFlow.instructions;
+  return setupFlow.providerAppSetup;
+}
+
+export function resolveIntegrationSetupPaneOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodSetupPaneMetadata {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.setupPane === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define a setup pane for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.setupPane;
 }
 
 function resolveIntegrationSetupFlowOrThrow(input: {

@@ -522,14 +522,18 @@ export type IntegrationFormConnectionMethodSetupStartForm = {
   submitLabel: string;
 };
 
-export type IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions = {
+export type IntegrationFormConnectionMethodSetupPaneMetadata = {
+  kind: "provider-app";
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField = {
   configKey: string;
   label: string;
   name: string;
   required: boolean;
 };
 
-export type IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions = {
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField = {
   inputType: "password";
   label: string;
   name: string;
@@ -538,10 +542,10 @@ export type IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructio
   secretLabel: string;
 };
 
-export type IntegrationFormConnectionMethodSetupInstructions = {
+export type IntegrationFormConnectionMethodProviderAppSetup = {
   description: string;
   existingApp: {
-    configFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions>;
+    configFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField>;
     connectLabel: string;
     description: string;
     installedDetection: {
@@ -549,7 +553,7 @@ export type IntegrationFormConnectionMethodSetupInstructions = {
       secretFields: ReadonlyArray<string>;
     };
     saveErrorMessage: string;
-    secretFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions>;
+    secretFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField>;
     title: string;
   };
   manifest: {
@@ -577,8 +581,9 @@ export type IntegrationFormConnectionMethodSetupInstructions = {
 
 export type IntegrationFormConnectionMethodSetupFlowMetadata = {
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
-  instructions?: IntegrationFormConnectionMethodSetupInstructions | undefined;
+  providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup | undefined;
   routeSegment: string;
+  setupPane?: IntegrationFormConnectionMethodSetupPaneMetadata | undefined;
   startForm?: IntegrationFormConnectionMethodSetupStartForm | undefined;
 };
 

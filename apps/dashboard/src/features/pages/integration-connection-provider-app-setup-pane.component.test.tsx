@@ -14,7 +14,7 @@ import type {
 import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
-  resolveIntegrationSetupInstructionsOrThrow,
+  resolveIntegrationProviderAppSetupOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
 
@@ -107,7 +107,7 @@ function renderProviderAppSetupPane(input?: {
               routeSegment: "slack-app",
             },
           })}
-          setupInstructions={resolveIntegrationSetupInstructionsOrThrow({
+          providerAppSetup={resolveIntegrationProviderAppSetupOrThrow({
             connection,
             setupRoute: {
               methodId: "slack-bot-token",

@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
-  resolveIntegrationSetupInstructionsOrThrow,
+  resolveIntegrationProviderAppSetupOrThrow,
+  resolveIntegrationSetupPaneOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
   resolveManifestDraftControlPlaneBaseUrl,
 } from "./integration-connection-setup-manifest-draft.js";
@@ -169,10 +170,10 @@ describe("resolveIntegrationSetupStartFormOrThrow", () => {
   });
 });
 
-describe("resolveIntegrationSetupInstructionsOrThrow", () => {
-  it("resolves Slack setup instructions from the browser definition", () => {
+describe("resolveIntegrationProviderAppSetupOrThrow", () => {
+  it("resolves Slack provider app setup from the browser definition", () => {
     expect(
-      resolveIntegrationSetupInstructionsOrThrow({
+      resolveIntegrationProviderAppSetupOrThrow({
         connection: SlackConnection,
         setupRoute: {
           methodId: "slack-bot-token",
@@ -202,9 +203,9 @@ describe("resolveIntegrationSetupInstructionsOrThrow", () => {
     });
   });
 
-  it("fails fast when the setup flow has no setup instructions", () => {
+  it("fails fast when the setup flow has no provider app setup", () => {
     expect(() =>
-      resolveIntegrationSetupInstructionsOrThrow({
+      resolveIntegrationProviderAppSetupOrThrow({
         connection: GitHubConnection,
         setupRoute: {
           methodId: "github-app-installation",
@@ -212,7 +213,37 @@ describe("resolveIntegrationSetupInstructionsOrThrow", () => {
         },
       }),
     ).toThrow(
-      "Integration setup flow 'github-app-installation/github-app' does not define setup instructions for target 'github-cloud'.",
+      "Integration setup flow 'github-app-installation/github-app' does not define provider app setup for target 'github-cloud'.",
+    );
+  });
+});
+
+describe("resolveIntegrationSetupPaneOrThrow", () => {
+  it("resolves Slack setup pane metadata from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupPaneOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toEqual({
+      kind: "provider-app",
+    });
+  });
+
+  it("fails fast when the setup flow has no setup pane metadata", () => {
+    expect(() =>
+      resolveIntegrationSetupPaneOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toThrow(
+      "Integration setup flow 'github-app-installation/github-app' does not define a setup pane for target 'github-cloud'.",
     );
   });
 });

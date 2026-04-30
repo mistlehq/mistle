@@ -3360,7 +3360,7 @@ export interface paths {
                               /** @enum {string} */
                               kind: "all-of";
                             };
-                        instructions?: {
+                        providerAppSetup?: {
                           description: string;
                           existingApp: {
                             configFields: {
@@ -3411,6 +3411,10 @@ export interface paths {
                           };
                         };
                         routeSegment: string;
+                        setupPane?: {
+                          /** @enum {string} */
+                          kind: "provider-app";
+                        };
                         startForm?: {
                           fields: {
                             actions?: {

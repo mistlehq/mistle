@@ -40,6 +40,8 @@ describe("renderIntegrationConnectionSetupPane", () => {
         },
         searchParams: new URLSearchParams(),
       }),
-    ).toThrow("Unsupported integration setup flow 'unsupported-method/unsupported'.");
+    ).toThrow(
+      "Integration setup flow 'unsupported-method/unsupported' has no browser definition method for target 'github-cloud'.",
+    );
   });
 });

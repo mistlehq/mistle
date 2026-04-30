@@ -7,7 +7,7 @@ import type {
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
-  IntegrationFormConnectionMethodSetupInstructions,
+  IntegrationFormConnectionMethodProviderAppSetup,
   IntegrationFormConnectionMethodSetupStartForm,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
@@ -105,8 +105,11 @@ export type ResolvedIntegrationTargetMetadata = {
         postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
-          instructions?: IntegrationFormConnectionMethodSetupInstructions;
+          providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup;
           routeSegment: string;
+          setupPane?: {
+            kind: "provider-app";
+          };
           startForm?: IntegrationFormConnectionMethodSetupStartForm;
         };
         secretFields: {
@@ -191,79 +194,91 @@ function resolveConnectionMethod(
                       method.setupFlow.completionRequirements,
                     ),
                   }),
-              ...(method.setupFlow.instructions === undefined
+              ...(method.setupFlow.providerAppSetup === undefined
                 ? {}
                 : {
-                    instructions: {
-                      description: method.setupFlow.instructions.description,
+                    providerAppSetup: {
+                      description: method.setupFlow.providerAppSetup.description,
                       existingApp: {
-                        configFields: method.setupFlow.instructions.existingApp.configFields.map(
-                          (field) => ({
-                            configKey: field.configKey,
-                            label: field.label,
-                            name: field.name,
-                            required: field.required,
-                          }),
-                        ),
-                        connectLabel: method.setupFlow.instructions.existingApp.connectLabel,
-                        description: method.setupFlow.instructions.existingApp.description,
+                        configFields:
+                          method.setupFlow.providerAppSetup.existingApp.configFields.map(
+                            (field) => ({
+                              configKey: field.configKey,
+                              label: field.label,
+                              name: field.name,
+                              required: field.required,
+                            }),
+                          ),
+                        connectLabel: method.setupFlow.providerAppSetup.existingApp.connectLabel,
+                        description: method.setupFlow.providerAppSetup.existingApp.description,
                         installedDetection: {
                           configFields: [
-                            ...method.setupFlow.instructions.existingApp.installedDetection
+                            ...method.setupFlow.providerAppSetup.existingApp.installedDetection
                               .configFields,
                           ],
                           secretFields: [
-                            ...method.setupFlow.instructions.existingApp.installedDetection
+                            ...method.setupFlow.providerAppSetup.existingApp.installedDetection
                               .secretFields,
                           ],
                         },
                         saveErrorMessage:
-                          method.setupFlow.instructions.existingApp.saveErrorMessage,
-                        secretFields: method.setupFlow.instructions.existingApp.secretFields.map(
-                          (field) => ({
-                            inputType: field.inputType,
-                            label: field.label,
-                            name: field.name,
-                            ...(field.placeholder === undefined
-                              ? {}
-                              : { placeholder: field.placeholder }),
-                            required: field.required,
-                            secretLabel: field.secretLabel,
-                          }),
-                        ),
-                        title: method.setupFlow.instructions.existingApp.title,
+                          method.setupFlow.providerAppSetup.existingApp.saveErrorMessage,
+                        secretFields:
+                          method.setupFlow.providerAppSetup.existingApp.secretFields.map(
+                            (field) => ({
+                              inputType: field.inputType,
+                              label: field.label,
+                              name: field.name,
+                              ...(field.placeholder === undefined
+                                ? {}
+                                : { placeholder: field.placeholder }),
+                              required: field.required,
+                              secretLabel: field.secretLabel,
+                            }),
+                          ),
+                        title: method.setupFlow.providerAppSetup.existingApp.title,
                       },
                       manifest: {
                         createErrorMessage:
-                          method.setupFlow.instructions.manifest.createErrorMessage,
-                        description: method.setupFlow.instructions.manifest.description,
+                          method.setupFlow.providerAppSetup.manifest.createErrorMessage,
+                        description: method.setupFlow.providerAppSetup.manifest.description,
                         startAction: {
                           expectedResultKind:
-                            method.setupFlow.instructions.manifest.startAction.expectedResultKind,
+                            method.setupFlow.providerAppSetup.manifest.startAction
+                              .expectedResultKind,
                           manifestBodyField:
-                            method.setupFlow.instructions.manifest.startAction.manifestBodyField,
+                            method.setupFlow.providerAppSetup.manifest.startAction
+                              .manifestBodyField,
                           unexpectedResultMessage:
-                            method.setupFlow.instructions.manifest.startAction
+                            method.setupFlow.providerAppSetup.manifest.startAction
                               .unexpectedResultMessage,
                         },
-                        title: method.setupFlow.instructions.manifest.title,
+                        title: method.setupFlow.providerAppSetup.manifest.title,
                       },
-                      title: method.setupFlow.instructions.title,
+                      title: method.setupFlow.providerAppSetup.title,
                       urls: {
-                        description: method.setupFlow.instructions.urls.description,
-                        title: method.setupFlow.instructions.urls.title,
+                        description: method.setupFlow.providerAppSetup.urls.description,
+                        title: method.setupFlow.providerAppSetup.urls.title,
                         webhookCallback: {
-                          errorTitle: method.setupFlow.instructions.urls.webhookCallback.errorTitle,
-                          label: method.setupFlow.instructions.urls.webhookCallback.label,
+                          errorTitle:
+                            method.setupFlow.providerAppSetup.urls.webhookCallback.errorTitle,
+                          label: method.setupFlow.providerAppSetup.urls.webhookCallback.label,
                           missingMessage:
-                            method.setupFlow.instructions.urls.webhookCallback.missingMessage,
+                            method.setupFlow.providerAppSetup.urls.webhookCallback.missingMessage,
                           missingTitle:
-                            method.setupFlow.instructions.urls.webhookCallback.missingTitle,
+                            method.setupFlow.providerAppSetup.urls.webhookCallback.missingTitle,
                         },
                       },
                     },
                   }),
               routeSegment: method.setupFlow.routeSegment,
+              ...(method.setupFlow.setupPane === undefined
+                ? {}
+                : {
+                    setupPane: {
+                      kind: method.setupFlow.setupPane.kind,
+                    },
+                  }),
               ...(method.setupFlow.startForm === undefined
                 ? {}
                 : {

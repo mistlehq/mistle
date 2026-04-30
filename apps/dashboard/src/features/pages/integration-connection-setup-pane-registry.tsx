@@ -1,12 +1,12 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
 import { ProviderAppSetupPane } from "./integration-connection-provider-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
-  resolveIntegrationSetupInstructionsOrThrow,
+  resolveIntegrationProviderAppSetupOrThrow,
+  resolveIntegrationSetupPaneOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
@@ -52,7 +52,7 @@ function renderProviderAppSetupPane(input: {
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}
-      setupInstructions={resolveIntegrationSetupInstructionsOrThrow({
+      providerAppSetup={resolveIntegrationProviderAppSetupOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}
@@ -60,33 +60,27 @@ function renderProviderAppSetupPane(input: {
   );
 }
 
-type IntegrationConnectionSetupPaneKey =
-  | "github-app-installation:github-app"
-  | "slack-bot-token:slack-app";
-
-const IntegrationConnectionSetupPaneByKey: Record<
-  IntegrationConnectionSetupPaneKey,
-  IntegrationConnectionSetupPaneComponent
-> = {
-  "github-app-installation:github-app": renderGitHubAppSetupPane,
-  "slack-bot-token:slack-app": renderProviderAppSetupPane,
-};
-
-function resolveSetupPaneKey(
-  input: IntegrationConnectionSetupRoute,
-): IntegrationConnectionSetupPaneKey {
+function resolveSetupPane(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationConnectionSetupPaneComponent {
   if (
-    input.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
-    input.routeSegment === "github-app"
+    input.setupRoute.methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION &&
+    input.setupRoute.routeSegment === "github-app"
   ) {
-    return "github-app-installation:github-app";
+    return renderGitHubAppSetupPane;
   }
 
-  if (input.methodId === SlackConnectionMethodId && input.routeSegment === "slack-app") {
-    return "slack-bot-token:slack-app";
+  const setupPane = resolveIntegrationSetupPaneOrThrow(input);
+  if (setupPane.kind === "provider-app") {
+    return renderProviderAppSetupPane;
   }
 
-  throw new Error(`Unsupported integration setup flow '${input.methodId}/${input.routeSegment}'.`);
+  return handleUnsupportedIntegrationSetupPaneKind(setupPane.kind);
+}
+
+function handleUnsupportedIntegrationSetupPaneKind(_kind: never): never {
+  throw new Error("Unsupported integration setup pane kind.");
 }
 
 export function renderIntegrationConnectionSetupPane(input: {
@@ -94,7 +88,10 @@ export function renderIntegrationConnectionSetupPane(input: {
   setupRoute: IntegrationConnectionSetupRoute;
   searchParams: URLSearchParams;
 }): React.JSX.Element {
-  const SetupPane = IntegrationConnectionSetupPaneByKey[resolveSetupPaneKey(input.setupRoute)];
+  const SetupPane = resolveSetupPane({
+    connection: input.connection,
+    setupRoute: input.setupRoute,
+  });
 
   return (
     <SetupPane
