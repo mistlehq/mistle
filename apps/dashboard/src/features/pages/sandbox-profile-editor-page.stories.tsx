@@ -40,9 +40,11 @@ import type { SandboxProfileEditorSection } from "./sandbox-profile-editor-secti
 import { SandboxProfileIntegrationsSetupSection } from "./sandbox-profile-integrations-setup-section.js";
 import { mapBindingsToEditorRows } from "./sandbox-profile-integrations-state.js";
 import {
-  SandboxProfileSnapshotPanel,
+  SandboxProfileSnapshotPanelView,
+  SandboxProfileSnapshotRefreshScheduleForm,
   shouldShowMissingSnapshotAlert,
   type SnapshotPanelState,
+  type SnapshotRefreshSchedule,
 } from "./sandbox-profile-snapshot-panel.js";
 
 type SandboxProfileEditorPageStoryArgs = {
@@ -113,10 +115,6 @@ function createStorySections(input: {
       : section,
   );
 }
-
-type SnapshotRefreshSchedule = React.ComponentProps<
-  typeof SandboxProfileSnapshotPanel
->["refreshSchedule"];
 
 const StoryBindings = [
   {
@@ -497,24 +495,30 @@ function SandboxProfileEditorPageStoryView(
 
           if (sectionId === "snapshot") {
             return (
-              <SandboxProfileSnapshotPanel
+              <SandboxProfileSnapshotPanelView
                 isActionPending={false}
-                invalidateProfileVersions={async () => {}}
-                {...(snapshotRefreshScheduleInitialDraft === null
-                  ? {}
-                  : { initialScheduleDraft: snapshotRefreshScheduleInitialDraft })}
                 onPublishSuccessMessageDismiss={() => {}}
-                onDeleteRefreshSchedule={async () => {}}
                 onRefreshSnapshot={() => {}}
-                onSaveRefreshSchedule={async () => {}}
                 publishSuccessMessage={input.publishSuccessMessage === true}
                 publishSuccessMessageKey={input.publishSuccessMessage === true ? "visible" : "idle"}
-                profileId="sandbox_profile_story"
-                refreshSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
-                scheduleMutationError={
-                  snapshotRefreshScheduleState === "save-failure"
-                    ? "Could not save snapshot refresh schedule."
-                    : null
+                refreshScheduleSection={
+                  snapshotStatus === "draft-unavailable" ? null : (
+                    <SandboxProfileSnapshotRefreshScheduleForm
+                      disabled={false}
+                      existingSchedule={createSnapshotRefreshSchedule(snapshotRefreshScheduleState)}
+                      {...(snapshotRefreshScheduleInitialDraft === null
+                        ? {}
+                        : { initialDraft: snapshotRefreshScheduleInitialDraft })}
+                      mutationError={
+                        snapshotRefreshScheduleState === "save-failure"
+                          ? "Could not save snapshot refresh schedule."
+                          : null
+                      }
+                      onDeleteSchedule={() => {}}
+                      onSaveSchedule={() => {}}
+                      previewAfter={new Date("2026-04-29T00:00:00.000Z")}
+                    />
+                  )
                 }
                 state={snapshotPanelState}
                 version={snapshotStatus === "draft-unavailable" ? null : 1}

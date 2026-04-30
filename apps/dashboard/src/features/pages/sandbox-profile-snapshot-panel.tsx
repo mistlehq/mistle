@@ -12,7 +12,15 @@ import {
   Switch,
 } from "@mistle/ui";
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, type Key, type SyntheticEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Key,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
@@ -56,8 +64,8 @@ export type SnapshotPanelState =
       message: string;
     };
 
-type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
-type SnapshotRefreshScheduleInput = {
+export type SnapshotRefreshSchedule = SandboxProfileVersion["refreshSchedule"];
+export type SnapshotRefreshScheduleInput = {
   cronExpression: string;
   timezone: string;
 };
@@ -112,19 +120,46 @@ export function shouldShowMissingSnapshotAlert(snapshotState: SnapshotPanelState
 export function SandboxProfileSnapshotPanel(input: {
   isActionPending: boolean;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
-  initialScheduleDraft?: {
-    cronExpression: string;
-    timezone: string;
-  };
   onPublishSuccessMessageDismiss: () => void;
   onRefreshSnapshot: () => void;
-  onDeleteRefreshSchedule?: () => Promise<void>;
-  onSaveRefreshSchedule?: (schedule: SnapshotRefreshScheduleInput) => Promise<void>;
   publishSuccessMessageKey: Key;
   publishSuccessMessage: boolean;
   profileId: string;
   refreshSchedule: SnapshotRefreshSchedule;
-  scheduleMutationError?: string | null;
+  state: SnapshotPanelState;
+  version: number | null;
+}): React.JSX.Element {
+  return (
+    <SandboxProfileSnapshotPanelView
+      isActionPending={input.isActionPending}
+      onPublishSuccessMessageDismiss={input.onPublishSuccessMessageDismiss}
+      onRefreshSnapshot={input.onRefreshSnapshot}
+      publishSuccessMessage={input.publishSuccessMessage}
+      publishSuccessMessageKey={input.publishSuccessMessageKey}
+      refreshScheduleSection={
+        input.version === null ? null : (
+          <SandboxProfileSnapshotRefreshScheduleSection
+            disabled={input.isActionPending}
+            invalidateProfileVersions={input.invalidateProfileVersions}
+            profileId={input.profileId}
+            refreshSchedule={input.refreshSchedule}
+            version={input.version}
+          />
+        )
+      }
+      state={input.state}
+      version={input.version}
+    />
+  );
+}
+
+export function SandboxProfileSnapshotPanelView(input: {
+  isActionPending: boolean;
+  onPublishSuccessMessageDismiss: () => void;
+  onRefreshSnapshot: () => void;
+  publishSuccessMessageKey: Key;
+  publishSuccessMessage: boolean;
+  refreshScheduleSection: ReactNode;
   state: SnapshotPanelState;
   version: number | null;
 }): React.JSX.Element {
@@ -207,25 +242,7 @@ export function SandboxProfileSnapshotPanel(input: {
         </div>
       </FormPageSection>
 
-      <SandboxProfileSnapshotRefreshScheduleSection
-        disabled={input.isActionPending}
-        invalidateProfileVersions={input.invalidateProfileVersions}
-        {...(input.initialScheduleDraft === undefined
-          ? {}
-          : { initialScheduleDraft: input.initialScheduleDraft })}
-        profileId={input.profileId}
-        refreshSchedule={input.refreshSchedule}
-        {...(input.onDeleteRefreshSchedule === undefined
-          ? {}
-          : { onDeleteSchedule: input.onDeleteRefreshSchedule })}
-        {...(input.onSaveRefreshSchedule === undefined
-          ? {}
-          : { onSaveSchedule: input.onSaveRefreshSchedule })}
-        {...(input.scheduleMutationError === undefined
-          ? {}
-          : { initialMutationError: input.scheduleMutationError })}
-        version={input.version}
-      />
+      {input.refreshScheduleSection}
     </SandboxProfileEditorHorizontalTabContent>
   );
 }
@@ -242,30 +259,16 @@ function SnapshotPanelDescription(): React.JSX.Element {
 function SandboxProfileSnapshotRefreshScheduleSection(input: {
   disabled: boolean;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
-  initialScheduleDraft?: {
-    cronExpression: string;
-    timezone: string;
-  };
-  initialMutationError?: string | null;
-  onDeleteSchedule?: () => Promise<void>;
-  onSaveSchedule?: (schedule: SnapshotRefreshScheduleInput) => Promise<void>;
   profileId: string;
   refreshSchedule: SnapshotRefreshSchedule;
   version: number;
 }): React.JSX.Element {
-  const [mutationError, setMutationError] = useState<string | null>(
-    input.initialMutationError ?? null,
-  );
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const previousRefreshScheduleRef = useRef(input.refreshSchedule);
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: SnapshotRefreshScheduleInput) => {
       if (schedule.cronExpression.length === 0 || schedule.timezone.length === 0) {
         throw new Error("Enter a cron expression and timezone.");
-      }
-
-      if (input.onSaveSchedule !== undefined) {
-        await input.onSaveSchedule(schedule);
-        return;
       }
 
       return putSandboxProfileVersionRefreshSchedule({
@@ -289,17 +292,11 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     },
   });
   const removeScheduleMutation = useMutation({
-    mutationFn: async () => {
-      if (input.onDeleteSchedule !== undefined) {
-        await input.onDeleteSchedule();
-        return;
-      }
-
-      return deleteSandboxProfileVersionRefreshSchedule({
+    mutationFn: async () =>
+      deleteSandboxProfileVersionRefreshSchedule({
         profileId: input.profileId,
         version: input.version,
-      });
-    },
+      }),
     onSuccess: async () => {
       setMutationError(null);
       await input.invalidateProfileVersions(input.profileId);
@@ -316,12 +313,6 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   const isMutating = saveScheduleMutation.isPending || removeScheduleMutation.isPending;
 
   useEffect(() => {
-    if (input.initialMutationError !== undefined) {
-      setMutationError(input.initialMutationError);
-    }
-  }, [input.initialMutationError]);
-
-  useEffect(() => {
     if (previousRefreshScheduleRef.current !== input.refreshSchedule) {
       previousRefreshScheduleRef.current = input.refreshSchedule;
       setMutationError(null);
@@ -332,9 +323,6 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
     <SandboxProfileSnapshotRefreshScheduleForm
       disabled={input.disabled || isMutating}
       existingSchedule={input.refreshSchedule}
-      {...(input.initialScheduleDraft === undefined
-        ? {}
-        : { initialDraft: input.initialScheduleDraft })}
       mutationError={mutationError}
       onDeleteSchedule={() => {
         removeScheduleMutation.mutate();
@@ -347,7 +335,7 @@ function SandboxProfileSnapshotRefreshScheduleSection(input: {
   );
 }
 
-function SandboxProfileSnapshotRefreshScheduleForm(input: {
+export function SandboxProfileSnapshotRefreshScheduleForm(input: {
   disabled: boolean;
   existingSchedule: SnapshotRefreshSchedule;
   initialDraft?: {
@@ -360,14 +348,17 @@ function SandboxProfileSnapshotRefreshScheduleForm(input: {
   previewAfter: Date;
 }): React.JSX.Element {
   const existingSchedule = input.existingSchedule;
+  const hasInitialDraft = input.initialDraft !== undefined;
+  const initialDraftCronExpression = input.initialDraft?.cronExpression;
+  const initialDraftTimezone = input.initialDraft?.timezone;
   const [scheduleEnabled, setScheduleEnabled] = useState(
-    existingSchedule !== null || input.initialDraft !== undefined,
+    existingSchedule !== null || hasInitialDraft,
   );
   const [cronExpression, setCronExpression] = useState(
-    input.initialDraft?.cronExpression ?? existingSchedule?.cronExpression ?? "",
+    initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "",
   );
   const [timezone, setTimezone] = useState(
-    input.initialDraft?.timezone ?? existingSchedule?.timezone ?? readBrowserTimeZone(),
+    initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone(),
   );
   const timezoneOptions = useMemo(
     () => createTimezoneOptions(existingSchedule?.timezone ?? null),
@@ -387,12 +378,10 @@ function SandboxProfileSnapshotRefreshScheduleForm(input: {
     : "Snapshots will not refresh automatically.";
 
   useEffect(() => {
-    setScheduleEnabled(existingSchedule !== null || input.initialDraft !== undefined);
-    setCronExpression(input.initialDraft?.cronExpression ?? existingSchedule?.cronExpression ?? "");
-    setTimezone(
-      input.initialDraft?.timezone ?? existingSchedule?.timezone ?? readBrowserTimeZone(),
-    );
-  }, [existingSchedule, input.initialDraft]);
+    setScheduleEnabled(existingSchedule !== null || hasInitialDraft);
+    setCronExpression(initialDraftCronExpression ?? existingSchedule?.cronExpression ?? "");
+    setTimezone(initialDraftTimezone ?? existingSchedule?.timezone ?? readBrowserTimeZone());
+  }, [existingSchedule, hasInitialDraft, initialDraftCronExpression, initialDraftTimezone]);
 
   function handleSubmit(event: SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();

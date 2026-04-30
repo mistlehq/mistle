@@ -1,4 +1,4 @@
-import { BrailleSpinner } from "@mistle/ui";
+import { BrailleSpinner, cn } from "@mistle/ui";
 
 export function ActivityStatus(input: {
   className?: string;
@@ -10,12 +10,18 @@ export function ActivityStatus(input: {
     <div
       aria-label={input.label}
       aria-live="polite"
-      className={`flex min-h-7 items-center justify-center gap-3 text-sm text-stone-500${input.className === undefined ? "" : ` ${input.className}`}`}
+      className={cn(
+        "flex min-h-7 items-center justify-center gap-3 text-sm text-stone-500",
+        input.className,
+      )}
       role="status"
     >
       <BrailleSpinner className="text-stone-400" />
       <span
-        className={`relative block overflow-hidden${input.labelClassName === undefined ? " min-w-[14rem] text-left" : ` ${input.labelClassName}`}`}
+        className={cn(
+          "relative block min-w-[14rem] overflow-hidden text-left",
+          input.labelClassName,
+        )}
       >
         <span
           className="block whitespace-nowrap [animation:activity-status-enter_180ms_ease-out]"
