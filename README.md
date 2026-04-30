@@ -85,24 +85,13 @@ cd mistle/deploy/compose/local
 
 ## Deploy Mistle
 
-Mistle is deployed as a multi-service system. The repository includes Kubernetes packaging, but deployment still requires environment-specific decisions about infrastructure, networking, secrets, and exposure.
+Mistle is deployed as a multi-service system. For this release, the supported
+packaged path is the single-node Docker Compose stack under
+[deploy/compose/local/](deploy/compose/local/).
 
-At a minimum, operators should expect to reason about:
-
-- dashboard access
-- control-plane APIs and workers
-- data-plane APIs and workers
-- gateway connectivity for runtime and session traffic
-- supporting infrastructure such as databases, secrets, and environment configuration
-
-Mistle should be treated as an integrated platform deployment rather than a single application process.
-
-### Deployment Options
-
-| Option              | Use this when...                                                    | Start here                                                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Kubernetes          | You want the main cluster-based deployment path in this repository. | [deploy/helm/mistle/](deploy/helm/mistle/). For repo-local Helm smoke testing, start with [deploy/helm/mistle/values-local.yaml](deploy/helm/mistle/values-local.yaml). |
-| Self-hosted Compose | You want a separate self-hosted Compose deployment artifact.        | Not implemented yet in this repository.                                                                                                                                 |
+Kubernetes deployment requires environment-specific decisions about
+infrastructure, networking, secrets, ingress, dashboard hosting, and rollout
+operations. A supported Kubernetes deployment guide is not published yet.
 
 ## Releases
 
