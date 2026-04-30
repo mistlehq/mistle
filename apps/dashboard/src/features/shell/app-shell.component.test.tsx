@@ -31,6 +31,8 @@ describe("resolveAppShellFrame", () => {
       activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
+        appShellHeaderLeadingVisible: true,
+        appShellHeaderVisible: true,
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         title: "Sessions",
@@ -85,6 +87,8 @@ describe("resolveAppShellFrame", () => {
       activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
+        appShellHeaderLeadingVisible: true,
+        appShellHeaderVisible: true,
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         title: "Sessions",
@@ -102,5 +106,47 @@ describe("resolveAppShellFrame", () => {
     }
     expect(frame.sidebarContent.type).not.toBe(SessionsShellSidebar);
     expect(frame.sidebarHeaderContent).not.toBeNull();
+  });
+
+  it("keeps the app shell header hidden when route metadata does not opt in", () => {
+    const locationPathname = "/integrations";
+    const routeState = resolveAppShellRouteState(locationPathname);
+    const frame = resolveAppShellFrame({
+      handleBackToApp: () => {},
+      handleNavigateToSettings: () => {},
+      handleSignOut: () => {},
+      handleSwitchOrganization: () => {},
+      inAutomations: routeState.inAutomations,
+      inDashboardRoot: routeState.inDashboardRoot,
+      inIntegrations: routeState.inIntegrations,
+      inSandboxProfiles: routeState.inSandboxProfiles,
+      inSessionDetail: routeState.inSessionDetail,
+      inSessions: routeState.inSessions,
+      inSettings: routeState.inSettings,
+      isSigningOut: false,
+      isSwitchingOrganization: false,
+      locationPathname,
+      organizationOptions: [],
+      organizationSummaryErrorMessage: null,
+      organizationSwitcherErrorMessage: null,
+      organizationImageUrl: null,
+      activeOrganizationId: "org_123",
+      organizationName: "Acme",
+      pageMeta: {
+        appShellHeaderLeadingVisible: false,
+        appShellHeaderVisible: false,
+        appShellInsetOwner: "child",
+        appShellViewportMode: "document",
+        title: "Integrations",
+        headerIcon: null,
+        supportingText: "",
+      },
+      signOutError: null,
+      showSessionsSidebar: false,
+      onShowSessionsSidebarChange: () => {},
+    });
+
+    expect(frame.showHeader).toBe(false);
+    expect(frame.showHeaderLeadingContent).toBe(false);
   });
 });

@@ -165,6 +165,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
       title: "Integrations",
@@ -189,6 +191,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
       title: "Integration connection",
@@ -212,11 +216,78 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "child",
       appShellViewportMode: "workspace",
       title: "Create automation",
       headerIcon: null,
       supportingText: "",
+    });
+  });
+
+  it("defaults app shell header visibility to hidden unless a route opts in", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            breadcrumb: "Integrations",
+            title: "Integrations",
+          },
+          params: {},
+          pathname: "/integrations",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
+    });
+  });
+
+  it("resolves app shell header visibility from the deepest route opt-in", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            appShellHeaderVisible: false,
+            title: "Sessions",
+          },
+          params: {},
+          pathname: "/sessions",
+        },
+        {
+          handle: {
+            appShellHeaderLeadingVisible: true,
+            appShellHeaderVisible: true,
+            title: "Session",
+          },
+          params: {
+            sandboxInstanceId: "sbi_123",
+          },
+          pathname: "/sessions/sbi_123",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: true,
+      appShellHeaderVisible: true,
+    });
+  });
+
+  it("allows routes to opt into the app shell header without leading content", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            appShellHeaderVisible: true,
+            title: "Edit profile",
+          },
+          params: {},
+          pathname: "/sandbox-profiles/sbp_123/sandbox-profile",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: true,
     });
   });
 

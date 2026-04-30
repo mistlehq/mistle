@@ -165,6 +165,7 @@ describe("route handles", () => {
 
   it("defines sandbox profile published and draft breadcrumbs", () => {
     expect(ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb).toBe("Profile");
+    expect(ROUTE_HANDLES.sandboxProfileEditor.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
     expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
     expect(typeof ROUTE_HANDLES.sandboxProfilePublished.header?.leading).toBe("function");
@@ -172,6 +173,8 @@ describe("route handles", () => {
   });
 
   it("defines session detail header-leading content and hides breadcrumbs", () => {
+    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderLeadingVisible).toBe(true);
+    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
     expect(typeof ROUTE_HANDLES.sessionsDetail.header?.leading).toBe("function");
   });

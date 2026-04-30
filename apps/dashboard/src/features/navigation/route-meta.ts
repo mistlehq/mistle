@@ -14,6 +14,8 @@ export type AppRouteHeaderHandle = {
 };
 
 export type AppRouteHandle = {
+  appShellHeaderLeadingVisible?: boolean;
+  appShellHeaderVisible?: boolean;
   appShellInsetOwner?: "app-shell" | "child";
   appShellViewportMode?: "document" | "workspace";
   breadcrumbIcon?: RouteNodeValue;
@@ -34,6 +36,8 @@ export type AppBreadcrumb = {
 };
 
 export type AppPageMeta = {
+  appShellHeaderLeadingVisible: boolean;
+  appShellHeaderVisible: boolean;
   appShellInsetOwner: "app-shell" | "child";
   appShellViewportMode: "document" | "workspace";
   title: string | null;
@@ -139,6 +143,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   }
 
   const parsedHandle: AppRouteHandle = {};
+  const appShellHeaderLeadingVisible = handle["appShellHeaderLeadingVisible"];
+  const appShellHeaderVisible = handle["appShellHeaderVisible"];
   const appShellInsetOwner = handle["appShellInsetOwner"];
   const appShellViewportMode = handle["appShellViewportMode"];
   const breadcrumb = handle["breadcrumb"];
@@ -149,6 +155,14 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const description = handle["description"];
   const header = handle["header"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
+
+  if (typeof appShellHeaderLeadingVisible === "boolean") {
+    parsedHandle.appShellHeaderLeadingVisible = appShellHeaderLeadingVisible;
+  }
+
+  if (typeof appShellHeaderVisible === "boolean") {
+    parsedHandle.appShellHeaderVisible = appShellHeaderVisible;
+  }
 
   if (appShellInsetOwner === "app-shell" || appShellInsetOwner === "child") {
     parsedHandle.appShellInsetOwner = appShellInsetOwner;
@@ -192,6 +206,8 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   }
 
   if (
+    parsedHandle.appShellHeaderLeadingVisible === undefined &&
+    parsedHandle.appShellHeaderVisible === undefined &&
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
     parsedHandle.breadcrumbIcon === undefined &&
@@ -344,10 +360,15 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
       title: null,
       headerIcon: null,
       supportingText: null,
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
     };
   }
+
+  const appShellHeaderLeadingVisible = resolveAppShellHeaderLeadingVisibilityFromMatches(matches);
+  const appShellHeaderVisible = resolveAppShellHeaderVisibilityFromMatches(matches);
 
   for (let index = matches.length - 1; index >= 0; index -= 1) {
     const match = matches.at(index);
@@ -370,6 +391,8 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
         title,
         headerIcon,
         supportingText,
+        appShellHeaderLeadingVisible,
+        appShellHeaderVisible,
         appShellInsetOwner: handle.appShellInsetOwner ?? "app-shell",
         appShellViewportMode: handle.appShellViewportMode ?? "document",
       };
@@ -380,7 +403,41 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
     title: null,
     headerIcon: null,
     supportingText: null,
+    appShellHeaderLeadingVisible,
+    appShellHeaderVisible,
     appShellInsetOwner: "app-shell",
     appShellViewportMode: "document",
   };
+}
+
+function resolveAppShellHeaderLeadingVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.appShellHeaderLeadingVisible !== undefined) {
+      return handle.appShellHeaderLeadingVisible;
+    }
+  }
+
+  return false;
+}
+
+function resolveAppShellHeaderVisibilityFromMatches(matches: unknown[]): boolean {
+  for (let index = matches.length - 1; index >= 0; index -= 1) {
+    const match = matches.at(index);
+    if (match === undefined || !isMatchLike(match)) {
+      continue;
+    }
+
+    const handle = parseAppRouteHandle(match.handle);
+    if (handle?.appShellHeaderVisible !== undefined) {
+      return handle.appShellHeaderVisible;
+    }
+  }
+
+  return false;
 }

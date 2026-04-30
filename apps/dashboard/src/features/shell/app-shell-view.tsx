@@ -25,6 +25,7 @@ export interface AppShellViewProps {
   autosaveIndicator: React.ReactNode | null;
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
+  showHeader: boolean;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
   showHeaderLeadingContent: boolean;
@@ -35,6 +36,11 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
+  const shouldRenderHeader =
+    input.showHeader &&
+    (input.showHeaderLeadingContent ||
+      input.headerActions !== null ||
+      input.autosaveIndicator !== null);
 
   return (
     <SidebarProvider style={SidebarWidthStyle}>
@@ -57,7 +63,7 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
         }
       >
         {input.topLoadingBar}
-        <AppShellStickyHeader {...input} />
+        {shouldRenderHeader ? <AppShellStickyHeader {...input} /> : null}
         <div className={contentContainerClassName}>
           <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
         </div>

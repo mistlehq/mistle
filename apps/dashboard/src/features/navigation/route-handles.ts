@@ -212,6 +212,8 @@ export const ROUTE_HANDLES = {
     description: "Start a sandbox-backed session from a sandbox profile.",
   },
   sessionsDetail: {
+    appShellHeaderLeadingVisible: true,
+    appShellHeaderVisible: true,
     hideBreadcrumb: true,
     header: {
       leading: resolveSessionDetailHeaderLeading,
@@ -242,6 +244,7 @@ export const ROUTE_HANDLES = {
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileEditor: {
+    appShellHeaderVisible: true,
     appShellInsetOwner: "child",
     breadcrumb: "Sandbox Profile",
     title: "Edit profile",

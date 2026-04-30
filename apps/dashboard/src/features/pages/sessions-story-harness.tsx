@@ -160,6 +160,8 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     activeOrganizationId: "org_123",
     organizationName: "Mistle Labs",
     pageMeta: {
+      appShellHeaderLeadingVisible: isExistingSandboxSessionPath(location.pathname),
+      appShellHeaderVisible: isExistingSandboxSessionPath(location.pathname),
       appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
       appShellViewportMode: "document",
       title: null,
