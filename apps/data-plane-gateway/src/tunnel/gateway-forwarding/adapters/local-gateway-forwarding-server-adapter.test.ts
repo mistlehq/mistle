@@ -16,6 +16,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -42,6 +43,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         sourceNodeId: "dpg_test",
         targetNodeId: "dpg_test",
         targetBootstrapSessionId: "sess_bootstrap",
+        ownerLeaseId: "lease_test",
       },
       {
         sandboxInstanceId: "sbi_test",
@@ -55,6 +57,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         sourceNodeId: "dpg_test",
         targetNodeId: "dpg_test",
         targetBootstrapSessionId: "sess_bootstrap",
+        ownerLeaseId: "lease_test",
       },
       {
         sandboxInstanceId: "sbi_test",
@@ -84,6 +87,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -98,6 +102,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -111,6 +116,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -118,13 +124,18 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           clientStreamId: 7,
         },
       ),
-    ).toEqual(openedStream);
+    ).toEqual({
+      ...openedStream,
+      activePtyBindingCount: 0,
+      ownerLeaseId: "lease_test",
+    });
     expect(
       await adapter.releaseClientSessionStreams(
         {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -132,12 +143,14 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         },
       ),
     ).toEqual({
+      activePtyBindingCount: 0,
       bootstrapTarget: {
         sandboxInstanceId: "sbi_test",
         side: "bootstrap",
         nodeId: "dpg_test",
         sessionId: "sess_bootstrap",
       },
+      ownerLeaseId: "lease_test",
       releasedBindings: [secondOpenedStream.binding],
     });
   });
@@ -157,6 +170,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         sourceNodeId: "dpg_test",
         targetNodeId: "dpg_test",
         targetBootstrapSessionId: "sess_bootstrap",
+        ownerLeaseId: "lease_test",
       },
       {
         sandboxInstanceId: "sbi_test",
@@ -172,6 +186,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",

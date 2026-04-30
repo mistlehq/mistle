@@ -220,7 +220,9 @@ describe("InteractiveStreamRouter", () => {
         clientSessionId: "conn_1",
       }),
     ).resolves.toEqual({
+      activePtyBindingCount: 0,
       bootstrapTarget: undefined,
+      ownerLeaseId: undefined,
       releasedBindings: [],
     });
   });
@@ -270,7 +272,9 @@ describe("InteractiveStreamRouter", () => {
         clientSessionId: "conn_1",
       }),
     ).resolves.toEqual({
+      activePtyBindingCount: 0,
       bootstrapTarget: undefined,
+      ownerLeaseId: undefined,
       releasedBindings: [],
     });
     expect(

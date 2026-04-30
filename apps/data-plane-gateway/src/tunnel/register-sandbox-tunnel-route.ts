@@ -25,6 +25,7 @@ import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
+import type { SetupCheckPtyDrainService } from "./setup-check-pty-drain-service.js";
 import { SandboxSigningRequestService } from "./signing/sandbox-signing-request-service.js";
 import type { SandboxTelemetryIngressService } from "./telemetry-ingress/index.js";
 import {
@@ -61,6 +62,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   activeBootstrapSessionStore: ActiveBootstrapSessionStore;
   sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
+  setupCheckPtyDrainService: SetupCheckPtyDrainService;
   sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator;
   telemetryIngressService: SandboxTelemetryIngressService;
   sandboxTunnelTaskTracker: AsyncTaskTracker;
@@ -114,6 +116,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxInstanceDeadlineService,
+    input.setupCheckPtyDrainService,
     input.sandboxDeadlineLifecycleCoordinator,
     input.clock,
     input.scheduler,
@@ -328,6 +331,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     ws.send(JSON.stringify(result));
                   },
                   sandboxKeepaliveRepository,
+                  sandboxInstanceDeadlineService: input.sandboxInstanceDeadlineService,
+                  setupCheckPtyDrainService: input.setupCheckPtyDrainService,
                   sandboxRuntimeReadinessRepository,
                   handleTelemetryDelivery: async (delivery) => {
                     await input.telemetryIngressService.handleDelivery({

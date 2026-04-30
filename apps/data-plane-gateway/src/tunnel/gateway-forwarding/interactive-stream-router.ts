@@ -3,6 +3,7 @@ import type { SandboxOwnerResolver } from "../ownership/sandbox-owner-resolver.j
 import type { GatewayForwardingClientAdapter } from "./gateway-forwarding-client-adapter.js";
 import type {
   CloseInteractiveStreamInput,
+  ClosedInteractiveStreamRoute,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
   InteractiveStreamRoute,
@@ -44,7 +45,7 @@ export class InteractiveStreamRouter {
 
   public async closeInteractiveStream(
     input: CloseInteractiveStreamInput,
-  ): Promise<InteractiveStreamRoute | undefined> {
+  ): Promise<ClosedInteractiveStreamRoute | undefined> {
     const target = await this.resolveForwardingTarget(input.sandboxInstanceId);
     return this.gatewayForwardingClient.closeInteractiveStream(target, input);
   }
@@ -57,7 +58,9 @@ export class InteractiveStreamRouter {
     });
     if (ownerResolution.kind === "missing") {
       return {
+        activePtyBindingCount: 0,
         bootstrapTarget: undefined,
+        ownerLeaseId: undefined,
         releasedBindings: [],
       };
     }
@@ -67,6 +70,7 @@ export class InteractiveStreamRouter {
         sourceNodeId: this.sourceNodeId,
         targetNodeId: ownerResolution.owner.nodeId,
         targetBootstrapSessionId: ownerResolution.owner.sessionId,
+        ownerLeaseId: ownerResolution.owner.leaseId,
       },
       input,
     );
@@ -84,6 +88,7 @@ export class InteractiveStreamRouter {
       sourceNodeId: this.sourceNodeId,
       targetNodeId: ownerResolution.owner.nodeId,
       targetBootstrapSessionId: ownerResolution.owner.sessionId,
+      ownerLeaseId: ownerResolution.owner.leaseId,
     };
   }
 }

@@ -17,6 +17,7 @@ import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import type { TunnelRelayCoordinator } from "../relay-coordinator.js";
+import type { SetupCheckPtyDrainService } from "../setup-check-pty-drain-service.js";
 import {
   notifyBootstrapPeerOfReleasedInteractiveStreams,
   notifyConnectionPeerOfBootstrapDisconnect,
@@ -84,6 +85,7 @@ export class TunnelSessionService {
     private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxInstanceDeadlineService: SandboxInstanceDeadlineService,
+    private readonly setupCheckPtyDrainService: SetupCheckPtyDrainService,
     private readonly sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
@@ -441,16 +443,27 @@ export class TunnelSessionService {
         sandboxInstanceId: input.sandboxInstanceId,
         clientSessionId: input.attachedPeer.relayTarget.sessionId,
       })
-      .then((result) =>
-        notifyBootstrapPeerOfReleasedInteractiveStreams({
+      .then(async (result) => {
+        await notifyBootstrapPeerOfReleasedInteractiveStreams({
           relayCoordinator: this.relayCoordinator,
           releasedBindings: result.releasedBindings,
           sandboxInstanceId: input.sandboxInstanceId,
           ...(result.bootstrapTarget === undefined
             ? {}
             : { targetBootstrapSessionId: result.bootstrapTarget.sessionId }),
-        }),
-      )
+        });
+
+        if (
+          result.ownerLeaseId !== undefined &&
+          result.activePtyBindingCount === 0 &&
+          result.releasedBindings.some((binding) => binding.channelKind === "pty")
+        ) {
+          await this.setupCheckPtyDrainService.notifyPtyDrained({
+            ownerLeaseId: result.ownerLeaseId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          });
+        }
+      })
       .catch((error: unknown) => {
         logger.error(
           {

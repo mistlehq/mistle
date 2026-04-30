@@ -1381,6 +1381,95 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox/instances/:id/setup-check-pty-drained": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            ownerLeaseId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Handle a drained setup-check PTY event for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  sandboxInstanceId: string;
+                  /** @enum {string} */
+                  status: "ignored";
+                }
+              | {
+                  sandboxInstanceId: string;
+                  /** @enum {string} */
+                  status: "accepted";
+                  workflowRunId: string;
+                };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox/instances/:id/stop": {
     parameters: {
       query?: never;

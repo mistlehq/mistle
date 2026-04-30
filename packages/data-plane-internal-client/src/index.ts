@@ -97,6 +97,26 @@ export type ReconcileSandboxInstanceInput = {
 };
 export type ReconcileSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/reconcile"]["post"]["responses"]["200"]["content"]["application/json"];
+export type SetupCheckPtyDrainedInput = {
+  sandboxInstanceId: string;
+  ownerLeaseId: string;
+};
+const SetupCheckPtyDrainedResponseSchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("ignored"),
+      sandboxInstanceId: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("accepted"),
+      sandboxInstanceId: z.string().min(1),
+      workflowRunId: z.string().min(1),
+    })
+    .strict(),
+]);
+export type SetupCheckPtyDrainedResponse = z.infer<typeof SetupCheckPtyDrainedResponseSchema>;
 export type PutSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: "idle" | "disconnect";
@@ -199,6 +219,7 @@ export type DataPlaneSandboxInstancesClient = {
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
+  setupCheckPtyDrained: (input: SetupCheckPtyDrainedInput) => Promise<SetupCheckPtyDrainedResponse>;
   putSandboxInstanceDeadline: (
     input: PutSandboxInstanceDeadlineInput,
   ) => Promise<PutSandboxInstanceDeadlineAcceptedResponse>;
@@ -245,6 +266,7 @@ function createClientError(input: {
     | "start"
     | "materialize"
     | "resume"
+    | "setupCheckPtyDrained"
     | "stop"
     | "reconcile"
     | "putDeadline"
@@ -257,6 +279,7 @@ function createClientError(input: {
     start: "start",
     materialize: "materialize",
     resume: "resume",
+    setupCheckPtyDrained: "setup-check PTY drained",
     stop: "stop",
     reconcile: "reconcile",
     putDeadline: "put deadline",
@@ -472,6 +495,39 @@ export function createDataPlaneSandboxInstancesClient(
         status: response.status,
         error: errorBody,
         operation: "reconcile",
+      });
+    },
+
+    async setupCheckPtyDrained(setupCheckPtyDrainedInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: setupCheckPtyDrainedInput.sandboxInstanceId,
+          suffix: "/setup-check-pty-drained",
+        }),
+        {
+          method: "POST",
+          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          body: JSON.stringify({
+            ownerLeaseId: setupCheckPtyDrainedInput.ownerLeaseId,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        const responseBody = await response.json();
+        const parsedResponse = SetupCheckPtyDrainedResponseSchema.parse(responseBody);
+
+        return parsedResponse;
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "setupCheckPtyDrained",
       });
     },
 

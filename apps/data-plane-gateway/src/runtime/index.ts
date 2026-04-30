@@ -41,6 +41,7 @@ import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
 import { AttachmentBackedSandboxOwnerResolver } from "../tunnel/ownership/attachment-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
+import { SetupCheckPtyDrainService } from "../tunnel/setup-check-pty-drain-service.js";
 import { SandboxSigningRequestService } from "../tunnel/signing/sandbox-signing-request-service.js";
 import {
   createSandboxTelemetryIngressSink,
@@ -218,6 +219,7 @@ export function createDataPlaneGatewayRuntime(
     systemClock,
     DefaultDataPlaneGatewayLifecycleDurations,
   );
+  const setupCheckPtyDrainService = new SetupCheckPtyDrainService(dataPlaneClient);
   const sandboxDeadlineLifecycleCoordinator = new SandboxDeadlineLifecycleCoordinator();
 
   registerSandboxRuntimeStateRoute({
@@ -257,6 +259,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxRuntimeAttachmentStore,
     activeBootstrapSessionStore,
     sandboxInstanceDeadlineService,
+    setupCheckPtyDrainService,
     sandboxDeadlineLifecycleCoordinator,
     telemetryIngressService,
     sandboxTunnelTaskTracker,

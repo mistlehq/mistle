@@ -90,6 +90,13 @@ export class TunnelSessionRegistry {
     return this.adapter.getBindingByTunnelStreamId(input);
   }
 
+  public getBindingCountByChannelKind(input: {
+    sandboxInstanceId: string;
+    channelKind: StreamChannel["kind"];
+  }): number {
+    return this.adapter.getBindingCountByChannelKind(input);
+  }
+
   /**
    * Removes a client-to-tunnel stream binding if it is still registered.
    */

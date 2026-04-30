@@ -36,6 +36,7 @@ export type GatewayForwardingTarget = {
   sourceNodeId: string;
   targetNodeId: string;
   targetBootstrapSessionId: string;
+  ownerLeaseId: string;
 };
 
 export type InteractiveStreamRoute = {
@@ -43,7 +44,14 @@ export type InteractiveStreamRoute = {
   binding: ClientStreamBinding;
 };
 
+export type ClosedInteractiveStreamRoute = InteractiveStreamRoute & {
+  activePtyBindingCount: number;
+  ownerLeaseId: string;
+};
+
 export type ReleaseClientSessionStreamsResult = {
   bootstrapTarget: RelayTarget | undefined;
+  activePtyBindingCount: number;
+  ownerLeaseId: string | undefined;
   releasedBindings: ClientStreamBinding[];
 };

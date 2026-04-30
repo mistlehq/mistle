@@ -2,6 +2,7 @@ import type { GatewayForwardingClientAdapter } from "../gateway-forwarding-clien
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
   CloseInteractiveStreamInput,
+  ClosedInteractiveStreamRoute,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
   GatewayForwardingTarget,
@@ -47,7 +48,7 @@ export class LocalGatewayForwardingClientAdapter implements GatewayForwardingCli
   public async closeInteractiveStream(
     target: GatewayForwardingTarget,
     input: CloseInteractiveStreamInput,
-  ): Promise<InteractiveStreamRoute | undefined> {
+  ): Promise<ClosedInteractiveStreamRoute | undefined> {
     this.assertLocalTarget(target);
     return this.gatewayForwardingServer.closeInteractiveStream(target, input);
   }

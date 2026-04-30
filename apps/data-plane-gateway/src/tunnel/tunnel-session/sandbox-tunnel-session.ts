@@ -28,7 +28,6 @@ export class TunnelSessionBindingLimitExceededError extends Error {
 export class SandboxTunnelSession {
   readonly #bindingsByClientKey = new Map<string, ClientStreamBinding>();
   readonly #bindingsByTunnelStreamId = new Map<number, ClientStreamBinding>();
-  readonly #bindingCountsByClientSessionId = new Map<string, number>();
   readonly #reservedTunnelStreamIds = new Set<number>();
   #nextTunnelStreamId = 1;
 
@@ -77,10 +76,6 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.set(clientBindingKey, binding);
     this.#bindingsByTunnelStreamId.set(binding.tunnelStreamId, binding);
-    this.#bindingCountsByClientSessionId.set(
-      input.clientSessionId,
-      (this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) + 1,
-    );
 
     return binding;
   }
@@ -121,13 +116,6 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.delete(clientBindingKey);
     this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
-    const nextBindingCount =
-      (this.#bindingCountsByClientSessionId.get(binding.clientSessionId) ?? 1) - 1;
-    if (nextBindingCount <= 0) {
-      this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
-    } else {
-      this.#bindingCountsByClientSessionId.set(binding.clientSessionId, nextBindingCount);
-    }
     return binding;
   }
 
@@ -135,7 +123,6 @@ export class SandboxTunnelSession {
     const bindings = Array.from(this.#bindingsByTunnelStreamId.values());
     this.#bindingsByClientKey.clear();
     this.#bindingsByTunnelStreamId.clear();
-    this.#bindingCountsByClientSessionId.clear();
     this.#reservedTunnelStreamIds.clear();
     return bindings;
   }
@@ -163,15 +150,22 @@ export class SandboxTunnelSession {
       this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
     }
 
-    if (releasedBindings.length > 0) {
-      this.#bindingCountsByClientSessionId.delete(input.clientSessionId);
-    }
-
     return releasedBindings;
   }
 
   public get bindingCount(): number {
     return this.#bindingsByTunnelStreamId.size;
+  }
+
+  public getBindingCountByChannelKind(channelKind: StreamChannel["kind"]): number {
+    let bindingCount = 0;
+    for (const binding of this.#bindingsByTunnelStreamId.values()) {
+      if (binding.channelKind === channelKind) {
+        bindingCount += 1;
+      }
+    }
+
+    return bindingCount;
   }
 
   private allocateTunnelStreamId(): number {

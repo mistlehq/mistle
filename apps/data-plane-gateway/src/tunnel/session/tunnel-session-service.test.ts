@@ -22,6 +22,7 @@ import { InMemoryLocalPeerRegistryAdapter } from "../local-peer-registry/adapter
 import { AttachmentBackedSandboxOwnerResolver } from "../ownership/attachment-backed-sandbox-owner-resolver.js";
 import { TunnelRelayCoordinator } from "../relay-coordinator.js";
 import { InMemoryRelayTransportAdapter } from "../relay-transport/adapters/in-memory-relay-transport-adapter.js";
+import { SetupCheckPtyDrainService } from "../setup-check-pty-drain-service.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket } from "../types.js";
@@ -229,7 +230,22 @@ afterEach(async () => {
   openPairs.clear();
 });
 
-async function createDisconnectTestHarness() {
+async function createDisconnectTestHarness(input?: {
+  setupCheckPtyDrained?: (drainedInput: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+  }) => Promise<
+    | {
+        status: "accepted";
+        sandboxInstanceId: string;
+        workflowRunId: string;
+      }
+    | {
+        status: "ignored";
+        sandboxInstanceId: string;
+      }
+  >;
+}) {
   const clock = createMutableClock(1_000);
   const scheduler = createManualScheduler(clock);
   const attachmentStore = new InMemorySandboxRuntimeAttachmentStore(clock);
@@ -293,6 +309,18 @@ async function createDisconnectTestHarness() {
       clock,
       DefaultDataPlaneGatewayLifecycleDurations,
     ),
+    new SetupCheckPtyDrainService({
+      async setupCheckPtyDrained(drainedInput) {
+        if (input?.setupCheckPtyDrained !== undefined) {
+          return input.setupCheckPtyDrained(drainedInput);
+        }
+
+        return {
+          status: "ignored",
+          sandboxInstanceId: drainedInput.sandboxInstanceId,
+        };
+      },
+    }),
     new SandboxDeadlineLifecycleCoordinator(),
     clock,
     scheduler,
@@ -382,6 +410,14 @@ describe("TunnelSessionService", () => {
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
+      new SetupCheckPtyDrainService({
+        async setupCheckPtyDrained() {
+          return {
+            status: "ignored",
+            sandboxInstanceId: SandboxInstanceId,
+          };
+        },
+      }),
       new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
@@ -503,6 +539,14 @@ describe("TunnelSessionService", () => {
         clock,
         DefaultDataPlaneGatewayLifecycleDurations,
       ),
+      new SetupCheckPtyDrainService({
+        async setupCheckPtyDrained() {
+          return {
+            status: "ignored",
+            sandboxInstanceId: SandboxInstanceId,
+          };
+        },
+      }),
       new SandboxDeadlineLifecycleCoordinator(),
       clock,
       scheduler,
@@ -615,6 +659,55 @@ describe("TunnelSessionService", () => {
           "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
       }),
       isBinary: false,
+    });
+  });
+
+  it("notifies data-plane when connection detach releases the last PTY stream", async () => {
+    const drainedInputs: Array<{
+      sandboxInstanceId: string;
+      ownerLeaseId: string;
+    }> = [];
+    const { attachedBootstrapPeer, service, tunnelSessionRegistry } =
+      await createDisconnectTestHarness({
+        async setupCheckPtyDrained(drainedInput) {
+          drainedInputs.push(drainedInput);
+          return {
+            status: "accepted",
+            sandboxInstanceId: drainedInput.sandboxInstanceId,
+            workflowRunId: "owfr_stop_setup_check",
+          };
+        },
+      });
+
+    tunnelSessionRegistry.bindClientStream({
+      sandboxInstanceId: SandboxInstanceId,
+      channelKind: "pty",
+      clientSessionId: ConnectionSessionId,
+      clientStreamId: 42,
+    });
+
+    await service.detachConnectionPeer({
+      attachedPeer: {
+        relayTarget: {
+          sandboxInstanceId: SandboxInstanceId,
+          side: "connection",
+          nodeId: GatewayNodeId,
+          sessionId: ConnectionSessionId,
+        },
+      },
+      sandboxInstanceId: SandboxInstanceId,
+    });
+
+    expect(drainedInputs).toEqual([
+      {
+        sandboxInstanceId: SandboxInstanceId,
+        ownerLeaseId: OwnerLeaseId,
+      },
+    ]);
+    await service.detachBootstrapPeer({
+      attachedPeer: attachedBootstrapPeer,
+      leaseId: OwnerLeaseId,
+      sandboxInstanceId: SandboxInstanceId,
     });
   });
 });

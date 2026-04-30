@@ -23,6 +23,7 @@ describe("LocalGatewayForwardingClientAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_remote",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",
@@ -39,6 +40,7 @@ describe("LocalGatewayForwardingClientAdapter", () => {
           sourceNodeId: "dpg_test",
           targetNodeId: "dpg_test",
           targetBootstrapSessionId: "sess_bootstrap",
+          ownerLeaseId: "lease_test",
         },
         {
           sandboxInstanceId: "sbi_test",

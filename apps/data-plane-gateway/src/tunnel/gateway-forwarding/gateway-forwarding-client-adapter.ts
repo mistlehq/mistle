@@ -1,5 +1,6 @@
 import type {
   CloseInteractiveStreamInput,
+  ClosedInteractiveStreamRoute,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
   GatewayForwardingTarget,
@@ -28,7 +29,7 @@ export interface GatewayForwardingClientAdapter {
   closeInteractiveStream(
     target: GatewayForwardingTarget,
     input: CloseInteractiveStreamInput,
-  ): Promise<InteractiveStreamRoute | undefined>;
+  ): Promise<ClosedInteractiveStreamRoute | undefined>;
   releaseClientSessionStreams(
     target: GatewayForwardingTarget,
     input: ReleaseClientSessionStreamsInput,

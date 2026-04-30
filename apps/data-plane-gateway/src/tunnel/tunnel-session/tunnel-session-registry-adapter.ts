@@ -53,6 +53,10 @@ export interface TunnelSessionRegistryAdapter {
     sandboxInstanceId: string;
     tunnelStreamId: number;
   }): ClientStreamBinding | undefined;
+  getBindingCountByChannelKind(input: {
+    sandboxInstanceId: string;
+    channelKind: StreamChannel["kind"];
+  }): number;
   unbindClientStream(input: {
     sandboxInstanceId: string;
     clientSessionId: string;

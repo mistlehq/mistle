@@ -130,6 +130,17 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
       ?.getBindingByTunnelStreamId(input.tunnelStreamId);
   }
 
+  public getBindingCountByChannelKind(input: {
+    sandboxInstanceId: string;
+    channelKind: StreamChannel["kind"];
+  }): number {
+    return (
+      this.#sessionsBySandboxInstanceId
+        .get(input.sandboxInstanceId)
+        ?.getBindingCountByChannelKind(input.channelKind) ?? 0
+    );
+  }
+
   public unbindClientStream(input: {
     sandboxInstanceId: string;
     clientSessionId: string;

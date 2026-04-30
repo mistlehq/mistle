@@ -1,5 +1,6 @@
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
+import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -9,6 +10,7 @@ import {
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { SandboxKeepaliveRepository } from "./sandbox-keepalive-repository.js";
 import { SandboxRuntimeReadinessRepository } from "./sandbox-runtime-readiness-repository.js";
+import type { SetupCheckPtyDrainService } from "./setup-check-pty-drain-service.js";
 import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
 import type { RelayPeerSide } from "./types.js";
 
@@ -56,6 +58,8 @@ export async function handleTunnelWebSocketMessage(input: {
   currentSocket: Pick<WSContext, "send">;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
+  sandboxInstanceDeadlineService: SandboxInstanceDeadlineService;
+  setupCheckPtyDrainService: SetupCheckPtyDrainService;
   sandboxRuntimeReadinessRepository: SandboxRuntimeReadinessRepository;
   handleTelemetryDelivery?: ((delivery: TelemetryDelivery) => Promise<void>) | undefined;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -136,11 +140,17 @@ export async function handleTunnelWebSocketMessage(input: {
   }
 
   if (translation.releaseInteractiveStream !== undefined) {
-    await input.interactiveStreamRouter.closeInteractiveStream({
+    const closedStream = await input.interactiveStreamRouter.closeInteractiveStream({
       sandboxInstanceId: input.sandboxInstanceId,
       clientSessionId: translation.releaseInteractiveStream.clientSessionId,
       clientStreamId: translation.releaseInteractiveStream.clientStreamId,
     });
+    if (closedStream?.binding.channelKind === "pty" && closedStream.activePtyBindingCount === 0) {
+      await input.setupCheckPtyDrainService.notifyPtyDrained({
+        ownerLeaseId: closedStream.ownerLeaseId,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    }
   }
   if (translation.notifyBootstrapPeerOfReleasedStream !== undefined) {
     await notifyBootstrapPeerOfReleasedInteractiveStreams({

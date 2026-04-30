@@ -3,6 +3,7 @@ import { TunnelSessionRegistry } from "../../tunnel-session/index.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
   CloseInteractiveStreamInput,
+  ClosedInteractiveStreamRoute,
   FindInteractiveStreamByClientInput,
   FindInteractiveStreamByTunnelInput,
   GatewayForwardingTarget,
@@ -79,7 +80,7 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
   public async closeInteractiveStream(
     target: GatewayForwardingTarget,
     input: CloseInteractiveStreamInput,
-  ): Promise<InteractiveStreamRoute | undefined> {
+  ): Promise<ClosedInteractiveStreamRoute | undefined> {
     const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
     if (bootstrapTarget === undefined) {
       return undefined;
@@ -92,7 +93,12 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
 
     return {
       bootstrapTarget,
+      activePtyBindingCount: this.tunnelSessionRegistry.getBindingCountByChannelKind({
+        sandboxInstanceId: input.sandboxInstanceId,
+        channelKind: "pty",
+      }),
       binding,
+      ownerLeaseId: target.ownerLeaseId,
     };
   }
 
@@ -103,14 +109,23 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
     const bootstrapTarget = this.getMatchingBootstrapTarget(target, input.sandboxInstanceId);
     if (bootstrapTarget === undefined) {
       return {
+        activePtyBindingCount: 0,
         bootstrapTarget: undefined,
+        ownerLeaseId: undefined,
         releasedBindings: [],
       };
     }
 
+    const releasedBindings = this.tunnelSessionRegistry.releaseClientSessionBindings(input);
+
     return {
+      activePtyBindingCount: this.tunnelSessionRegistry.getBindingCountByChannelKind({
+        sandboxInstanceId: input.sandboxInstanceId,
+        channelKind: "pty",
+      }),
       bootstrapTarget,
-      releasedBindings: this.tunnelSessionRegistry.releaseClientSessionBindings(input),
+      ownerLeaseId: target.ownerLeaseId,
+      releasedBindings,
     };
   }
 
