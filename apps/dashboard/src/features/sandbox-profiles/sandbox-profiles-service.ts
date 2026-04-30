@@ -18,6 +18,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProfileSetupScriptTestRun,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
   UpdateSandboxProfileInput,
@@ -434,6 +435,14 @@ const SandboxProfileVersionSetupScriptResponseSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().nullable(),
+  })
+  .strict();
+
+const SandboxProfileSetupScriptTestRunResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    workflowRunId: z.string().min(1),
+    sandboxInstanceId: z.string().min(1),
   })
   .strict();
 
@@ -940,6 +949,51 @@ export async function putSandboxProfileVersionSetupScript(input: {
         operation: "putSandboxProfileVersionSetupScript",
         error,
         fallbackMessage: "Could not save sandbox profile setup script.",
+      }),
+    );
+  }
+}
+
+export async function startSandboxProfileSetupScriptTestRun(input: {
+  profileId: string;
+  version: number;
+  setupScript: string;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileSetupScriptTestRun> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startSandboxProfileSetupScriptTestRun",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/setup-script/test-runs`,
+      body: {
+        setupScript: input.setupScript,
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not start setup script test run.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileSetupScriptTestRunResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "startSandboxProfileSetupScriptTestRun",
+        status: 500,
+        body: responseBody,
+        message: "Setup script test run response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "startSandboxProfileSetupScriptTestRun",
+        error,
+        fallbackMessage: "Could not start setup script test run.",
       }),
     );
   }
