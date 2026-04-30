@@ -12,6 +12,17 @@ integration testing by default. It is not the production deployment artifact.
 
 ## First Run
 
+To install and start Mistle without cloning the repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/deploy/compose/local/install.sh | sh
+```
+
+The installer writes the local Compose files to `~/.mistle/local`, creates `.env` from
+`.env.example` if needed, preserves an existing `.env`, and runs `./up.sh`.
+
+For repo-local development:
+
 1. Change into the local Compose directory:
 
    ```bash
