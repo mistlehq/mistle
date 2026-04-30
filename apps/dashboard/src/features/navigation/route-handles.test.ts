@@ -61,9 +61,6 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.automationsDetail.title).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.automationsDetail.appShellInsetOwner).toBe("child");
-    expect(ROUTE_HANDLES.scheduledAutomationsNew.title).toBe("Create scheduled automation");
-    expect(ROUTE_HANDLES.scheduledAutomationsNew.description).toBe("");
-    expect(ROUTE_HANDLES.scheduledAutomationsNew.appShellInsetOwner).toBe("child");
     expect(ROUTE_HANDLES.scheduledAutomationsDetail.title).toBe("");
     expect(ROUTE_HANDLES.scheduledAutomationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.scheduledAutomationsDetail.appShellInsetOwner).toBe("child");

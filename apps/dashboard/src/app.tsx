@@ -14,6 +14,7 @@ import {
   AuthSwitchOrganizationPage,
 } from "./features/auth/auth-switch-organization-page.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
+import { AutomationCreatePage } from "./features/pages/automation-create-page.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationConnectionCreatePage } from "./features/pages/integration-connection-create-page.js";
@@ -109,13 +110,12 @@ export const APP_ROUTES = createRoutesFromElements(
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
           <Route element={<AutomationsPage />} index />
           <Route
-            element={<WebhookAutomationEditorPage mode="create" />}
+            element={<AutomationCreatePage />}
             handle={ROUTE_HANDLES.automationsNew}
             path="new"
           />
           <Route
-            element={<ScheduledAutomationEditorPage mode="create" />}
-            handle={ROUTE_HANDLES.scheduledAutomationsNew}
+            element={<Navigate replace to="/automations/new?type=scheduled" />}
             path="schedules/new"
           />
           <Route

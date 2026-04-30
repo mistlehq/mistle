@@ -449,13 +449,10 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           <Field>
             <FieldHeader>
               <div className="space-y-1">
-                <FieldLabel id={inputTemplateLabelId}>Message Template</FieldLabel>
+                <FieldLabel id={inputTemplateLabelId}>Agent Message</FieldLabel>
                 {formState.hasSelectedTrigger ? (
                   <FieldDescription>
-                    <span className="block">
-                      Template for the message sent to the agent each time this automation is
-                      triggered.
-                    </span>
+                    <span className="block">Sent to the agent each time the automation runs.</span>
                     <span className="block">
                       Use <InlineCode variant="muted">{"{{ ... }}"}</InlineCode> to insert event
                       fields.
@@ -463,9 +460,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
                   </FieldDescription>
                 ) : (
                   <FieldDescription>
-                    <span className="block">
-                      Template for the message sent when this automation is triggered.
-                    </span>
+                    <span className="block">Sent to the agent each time the automation runs.</span>
                     <span className="block">Select a trigger to insert event fields.</span>
                   </FieldDescription>
                 )}

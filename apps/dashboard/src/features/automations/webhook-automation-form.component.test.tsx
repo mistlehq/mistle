@@ -222,7 +222,7 @@ describe("WebhookAutomationForm", () => {
     const { container } = renderForm("create");
     const currentForm = within(container);
 
-    expect(currentForm.getByRole("textbox", { name: "Message Template" })).toBeDefined();
+    expect(currentForm.getByRole("textbox", { name: "Agent Message" })).toBeDefined();
     expect(
       currentForm.getByRole("textbox", { name: "Agent Instructions for Automation" }),
     ).toBeDefined();
@@ -234,7 +234,7 @@ describe("WebhookAutomationForm", () => {
     }
 
     expect(messageTemplateEditor.getAttribute("data-editor-state")).toBe("empty");
-    expect(currentForm.queryByRole("heading", { name: "Message Template" })).toBeNull();
+    expect(currentForm.queryByRole("heading", { name: "Agent Message" })).toBeNull();
   });
 
   it("renders triggers before the automation instructions editor and message template editor", () => {
@@ -247,7 +247,7 @@ describe("WebhookAutomationForm", () => {
     const automationInstructionsField = currentForm.getByRole("textbox", {
       name: "Agent Instructions for Automation",
     });
-    const inputTemplateField = currentForm.getByRole("textbox", { name: "Message Template" });
+    const inputTemplateField = currentForm.getByRole("textbox", { name: "Agent Message" });
 
     if (triggersHeading === undefined) {
       throw new Error("Expected triggers heading to be rendered.");
@@ -270,7 +270,7 @@ describe("WebhookAutomationForm", () => {
         Number.POSITIVE_INFINITY,
     );
     expect(container.textContent?.indexOf("Agent Instructions for Automation")).toBeLessThan(
-      container.textContent?.indexOf("Message Template") ?? Number.POSITIVE_INFINITY,
+      container.textContent?.indexOf("Agent Message") ?? Number.POSITIVE_INFINITY,
     );
   });
 
@@ -341,7 +341,7 @@ describe("WebhookAutomationForm", () => {
 
     const currentForm = within(container);
     const automationNameInput = currentForm.getByDisplayValue("Repo triage");
-    const inputTemplateEditor = currentForm.getByRole("textbox", { name: "Message Template" });
+    const inputTemplateEditor = currentForm.getByRole("textbox", { name: "Agent Message" });
 
     expect(automationNameInput.getAttribute("aria-invalid")).toBe("true");
     expect(inputTemplateEditor.getAttribute("aria-invalid")).toBe("true");

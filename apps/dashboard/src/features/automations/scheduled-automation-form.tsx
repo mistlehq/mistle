@@ -16,8 +16,16 @@ import {
   cn,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
+import { useMemo } from "react";
 
 import { SingleSelectStringComboboxField } from "../forms/single-select-string-combobox-field.js";
+import {
+  createTimezoneOptions,
+  formatCronExpressionBreakdownDiagram,
+  resolveCronExpressionBreakdown,
+  resolveSnapshotRefreshScheduleBehaviorDescription,
+  type CronExpressionBreakdown,
+} from "../pages/sandbox-profile-editor-page-model.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
 import { DefaultScheduledAutomationMessageTemplate } from "./scheduled-automation-form-helpers.js";
@@ -120,8 +128,36 @@ function SelectField(input: {
   );
 }
 
+function CronExpressionBreakdownList(input: {
+  breakdown: CronExpressionBreakdown | null;
+  message: string;
+}): React.JSX.Element {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 text-sm" aria-label="Cron breakdown">
+      {input.breakdown === null ? (
+        <p className="text-muted-foreground">{input.message}</p>
+      ) : (
+        <pre className="overflow-x-auto rounded-sm bg-background p-2 font-mono text-xs leading-5 text-muted-foreground">
+          {formatCronExpressionBreakdownDiagram(input.breakdown)}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): React.JSX.Element {
   const inputTemplateLabelId = "scheduled-automation-input-template-label";
+  const previewAfter = useMemo(() => new Date(), []);
+  const timezoneOptions = useMemo(
+    () => createTimezoneOptions(input.values.timezone),
+    [input.values.timezone],
+  );
+  const scheduleBehaviorDescription = resolveSnapshotRefreshScheduleBehaviorDescription({
+    after: previewAfter,
+    cronExpression: input.values.cronExpression,
+    timezone: input.values.timezone,
+  });
+  const cronExpressionBreakdown = resolveCronExpressionBreakdown(input.values.cronExpression);
   const presentation = resolveScheduledAutomationFormPresentation({
     mode: input.mode,
     values: input.values,
@@ -302,63 +338,75 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
         }
       >
         <div className="p-4">
-          <Field orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel htmlFor="scheduled-automation-cron-expression">
-                Cron expression
-              </FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <Input
-                aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
-                disabled={input.isDeleting || input.isSaving}
-                id="scheduled-automation-cron-expression"
-                onChange={(event) => {
-                  input.onValueChange("cronExpression", event.currentTarget.value);
-                }}
-                value={input.values.cronExpression}
-              />
-              <FieldError
-                message={
-                  shouldRenderInlineFieldError({
-                    key: "cronExpression",
-                    message: input.fieldErrors.cronExpression,
-                  })
-                    ? input.fieldErrors.cronExpression
-                    : undefined
-                }
-              />
-            </FieldContent>
-          </Field>
-        </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="scheduled-automation-cron-expression">
+                  Cron expression
+                </FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <Input
+                  aria-invalid={input.fieldErrors.cronExpression !== undefined ? true : undefined}
+                  disabled={input.isDeleting || input.isSaving}
+                  id="scheduled-automation-cron-expression"
+                  onChange={(event) => {
+                    input.onValueChange("cronExpression", event.currentTarget.value);
+                  }}
+                  placeholder="0 9 * * 1"
+                  value={input.values.cronExpression}
+                />
+                <FieldError
+                  message={
+                    shouldRenderInlineFieldError({
+                      key: "cronExpression",
+                      message: input.fieldErrors.cronExpression,
+                    })
+                      ? input.fieldErrors.cronExpression
+                      : undefined
+                  }
+                />
+              </FieldContent>
+            </Field>
+            <Field>
+              <FieldHeader>
+                <FieldLabel htmlFor="scheduled-automation-timezone">Timezone</FieldLabel>
+              </FieldHeader>
+              <FieldContent>
+                <SingleSelectStringComboboxField
+                  contentClassName="max-h-80"
+                  disabled={input.isDeleting || input.isSaving}
+                  emptyMessage="No matching timezones."
+                  inputId="scheduled-automation-timezone"
+                  inputLabel="Timezone"
+                  invalid={input.fieldErrors.timezone !== undefined}
+                  onChange={(value) => {
+                    input.onValueChange("timezone", value ?? "");
+                  }}
+                  options={timezoneOptions}
+                  placeholder="Asia/Singapore"
+                  value={input.values.timezone}
+                />
+                <FieldError
+                  message={
+                    shouldRenderInlineFieldError({
+                      key: "timezone",
+                      message: input.fieldErrors.timezone,
+                    })
+                      ? input.fieldErrors.timezone
+                      : undefined
+                  }
+                />
+              </FieldContent>
+            </Field>
+          </div>
 
-        <div className="border-t p-4">
-          <Field orientation="horizontal">
-            <FieldHeader>
-              <FieldLabel htmlFor="scheduled-automation-timezone">Timezone</FieldLabel>
-            </FieldHeader>
-            <FieldContent>
-              <Input
-                aria-invalid={input.fieldErrors.timezone !== undefined ? true : undefined}
-                disabled={input.isDeleting || input.isSaving}
-                id="scheduled-automation-timezone"
-                onChange={(event) => {
-                  input.onValueChange("timezone", event.currentTarget.value);
-                }}
-                value={input.values.timezone}
-              />
-              <FieldError
-                message={
-                  shouldRenderInlineFieldError({
-                    key: "timezone",
-                    message: input.fieldErrors.timezone,
-                  })
-                    ? input.fieldErrors.timezone
-                    : undefined
-                }
-              />
-            </FieldContent>
-          </Field>
+          <div className="mt-4">
+            <CronExpressionBreakdownList
+              breakdown={cronExpressionBreakdown}
+              message={scheduleBehaviorDescription}
+            />
+          </div>
         </div>
       </FormPageSection>
 
@@ -367,8 +415,10 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
           <Field>
             <FieldHeader>
               <div className="space-y-1">
-                <FieldLabel id={inputTemplateLabelId}>Message Template</FieldLabel>
-                <FieldDescription>Message sent each time the schedule runs.</FieldDescription>
+                <FieldLabel id={inputTemplateLabelId}>Agent Message</FieldLabel>
+                <FieldDescription>
+                  Sent to the agent each time the automation runs.
+                </FieldDescription>
               </div>
             </FieldHeader>
             <FieldContent>

@@ -69,7 +69,7 @@ function renderScheduledAutomationEditorError(input: {
   );
 }
 
-function CreateScheduledAutomationEditor(input: {
+export function CreateScheduledAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
 }): React.JSX.Element | null {
   const prerequisites = useScheduledAutomationPrerequisites();

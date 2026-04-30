@@ -72,7 +72,7 @@ function renderWebhookAutomationEditorError(input: {
   );
 }
 
-function CreateWebhookAutomationEditor(input: {
+export function CreateWebhookAutomationEditor(input: {
   navigate: (to: string) => void | Promise<void>;
 }): React.JSX.Element | null {
   const prerequisites = useWebhookAutomationPrerequisites();

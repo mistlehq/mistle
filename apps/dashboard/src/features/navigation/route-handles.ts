@@ -291,12 +291,6 @@ export const ROUTE_HANDLES = {
     title: "",
     description: "",
   },
-  scheduledAutomationsNew: {
-    appShellInsetOwner: "child",
-    breadcrumb: "Create scheduled",
-    title: "Create scheduled automation",
-    description: "",
-  },
   scheduledAutomationsDetail: {
     appShellInsetOwner: "child",
     breadcrumb: resolveAutomationDetailBreadcrumb,

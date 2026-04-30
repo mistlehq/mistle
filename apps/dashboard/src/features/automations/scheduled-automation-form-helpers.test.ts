@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   DefaultScheduledAutomationCronExpression,
   DefaultScheduledAutomationMessageTemplate,
-  DefaultScheduledAutomationTimezone,
+  readBrowserTimezone,
   toCreateScheduledAutomationPayload,
   toScheduledAutomationFormValues,
   toUpdateScheduledAutomationPayload,
@@ -58,7 +58,7 @@ describe("toScheduledAutomationFormValues", () => {
       primaryRepositoryId: "",
       enabled: true,
       cronExpression: DefaultScheduledAutomationCronExpression,
-      timezone: DefaultScheduledAutomationTimezone,
+      timezone: readBrowserTimezone(),
       inputTemplate: DefaultScheduledAutomationMessageTemplate,
     });
   });
