@@ -66,6 +66,7 @@ describe("resolveSetupScriptTestStatus", () => {
         scriptIsBlank: true,
         startIsPending: false,
         startedRun: {
+          failOnFirstError: true,
           ptySessionId: "setup-script-test-1",
           sandboxInstanceId: "sbi_setup_test_1",
           setupScript: "pnpm install",
@@ -84,6 +85,7 @@ describe("resolveSetupScriptTestStatus", () => {
         scriptIsBlank: true,
         startIsPending: false,
         startedRun: {
+          failOnFirstError: true,
           ptySessionId: "setup-script-test-1",
           sandboxInstanceId: "sbi_setup_test_1",
           setupScript: "pnpm install",

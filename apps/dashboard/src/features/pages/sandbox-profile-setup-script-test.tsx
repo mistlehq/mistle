@@ -54,8 +54,14 @@ type SetupScriptTestRunState = {
 };
 
 type StartedSetupScriptTestRun = {
+  failOnFirstError: boolean;
   ptySessionId: string;
   sandboxInstanceId: string;
+  setupScript: string;
+};
+
+type SetupScriptTestRunRequest = {
+  failOnFirstError: boolean;
   setupScript: string;
 };
 
@@ -387,21 +393,22 @@ export function useSandboxProfileSetupScriptTestRun(
     });
   }, [closePty, disconnectPty]);
   const startMutation = useMutation({
-    mutationFn: async () =>
+    mutationFn: async (request: SetupScriptTestRunRequest) =>
       startSandboxProfileSetupScriptTestRun({
         idempotencyKey: crypto.randomUUID(),
         profileId: input.profileId,
-        setupScript: input.setupScript,
+        setupScript: request.setupScript,
         version: input.version,
       }),
-    onSuccess: (result) => {
+    onSuccess: (result, request) => {
       setRunErrorMessage(null);
       setIsOpenRequested(false);
       openedPtySessionIdRef.current = null;
       const nextStartedRun = {
+        failOnFirstError: request.failOnFirstError,
         ptySessionId: createSetupScriptTestPtySessionId(),
         sandboxInstanceId: result.sandboxInstanceId,
-        setupScript: input.setupScript,
+        setupScript: request.setupScript,
       };
       startedRunRef.current = nextStartedRun;
       setStartedRun(nextStartedRun);
@@ -482,7 +489,7 @@ export function useSandboxProfileSetupScriptTestRun(
       args: [
         "-lc",
         createSetupScriptTestShellPayload({
-          failOnFirstError,
+          failOnFirstError: startedRun.failOnFirstError,
           setupScript: startedRun.setupScript,
         }),
       ],
@@ -495,7 +502,7 @@ export function useSandboxProfileSetupScriptTestRun(
         error instanceof Error ? error.message : "Could not open setup script test terminal.",
       );
     });
-  }, [failOnFirstError, openPty, sandboxStatusQuery.data?.connectable, startedRun]);
+  }, [openPty, sandboxStatusQuery.data?.connectable, startedRun]);
 
   const handleRun = useCallback((): void => {
     if (
@@ -514,8 +521,20 @@ export function useSandboxProfileSetupScriptTestRun(
     startedRunRef.current = null;
     openedPtySessionIdRef.current = null;
     setIsOpenRequested(false);
-    startMutation.mutate();
-  }, [closeActivePtySession, input.disabled, input.isDraft, scriptIsBlank, startMutation, status]);
+    startMutation.mutate({
+      failOnFirstError,
+      setupScript: input.setupScript,
+    });
+  }, [
+    closeActivePtySession,
+    failOnFirstError,
+    input.disabled,
+    input.isDraft,
+    input.setupScript,
+    scriptIsBlank,
+    startMutation,
+    status,
+  ]);
 
   const handleClose = useCallback((): void => {
     setRunErrorMessage(null);
