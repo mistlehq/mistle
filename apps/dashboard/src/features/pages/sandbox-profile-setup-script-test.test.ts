@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createSetupScriptTestShellPayload,
+  resolveSetupScriptTestStatus,
   resolveSetupScriptTestStatusMessage,
 } from "./sandbox-profile-setup-script-test.js";
 
@@ -35,6 +36,58 @@ describe("createSetupScriptTestShellPayload", () => {
 
     expect(payload).toContain('if head -c 2 "$setup_script_path" | grep -q "^#!"; then');
     expect(payload).toContain('  exec "$setup_script_path"');
+  });
+});
+
+describe("resolveSetupScriptTestStatus", () => {
+  it("reports blank only when there is no active setup script test run", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        isOpenRequested: false,
+        ptyErrorMessage: null,
+        ptyExitCode: null,
+        runErrorMessage: null,
+        scriptIsBlank: true,
+        startIsPending: false,
+        startedRun: null,
+      }),
+    ).toBe("blank");
+  });
+
+  it("keeps an active setup script test visible when the editor is cleared", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        isOpenRequested: false,
+        ptyErrorMessage: null,
+        ptyExitCode: null,
+        runErrorMessage: null,
+        scriptIsBlank: true,
+        startIsPending: false,
+        startedRun: {
+          ptySessionId: "setup-script-test-1",
+          sandboxInstanceId: "sbi_setup_test_1",
+          setupScript: "pnpm install",
+        },
+      }),
+    ).toBe("starting");
+  });
+
+  it("keeps a running setup script test visible when the editor is cleared", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        isOpenRequested: true,
+        ptyErrorMessage: null,
+        ptyExitCode: null,
+        runErrorMessage: null,
+        scriptIsBlank: true,
+        startIsPending: false,
+        startedRun: {
+          ptySessionId: "setup-script-test-1",
+          sandboxInstanceId: "sbi_setup_test_1",
+          setupScript: "pnpm install",
+        },
+      }),
+    ).toBe("running");
   });
 });
 
