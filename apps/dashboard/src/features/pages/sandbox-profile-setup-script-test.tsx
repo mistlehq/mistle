@@ -1,4 +1,4 @@
-import { SandboxPtyStates } from "@mistle/sandbox-session-client";
+import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-client";
 import { Button, InlineCode, Label, Notice, Switch } from "@mistle/ui";
 import {
   CheckCircleIcon,
@@ -31,6 +31,7 @@ type SetupScriptTestViewProps = {
   failOnFirstError?: boolean;
   outputChunks?: readonly Uint8Array[];
   outputText?: string;
+  ptyLifecycleState?: SandboxPtyState;
   status: SetupScriptTestStatus;
   statusMessage?: string | null;
 };
@@ -56,6 +57,7 @@ type StartedSetupScriptTestRun = {
 
 const SetupScriptTestPtySessionPrefix = "setup-script-test";
 const SetupScriptTestSandboxStatusRefetchIntervalMs = 1_000;
+const SetupScriptTestWorkingDirectory = "/root";
 
 const DefaultSetupScriptTestOutput = `$ pnpm install
 Lockfile is up to date, resolution step is skipped
@@ -77,15 +79,37 @@ function createSetupScriptTestPtySessionId(): string {
   return `${SetupScriptTestPtySessionPrefix}-${crypto.randomUUID()}`;
 }
 
+function encodeSetupScriptBase64(setupScript: string): string {
+  const bytes = new TextEncoder().encode(setupScript);
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
 export function createSetupScriptTestShellPayload(input: {
   failOnFirstError: boolean;
   setupScript: string;
 }): string {
-  if (!input.failOnFirstError) {
-    return input.setupScript;
-  }
+  const encodedSetupScript = encodeSetupScriptBase64(input.setupScript);
+  const shellArgs = input.failOnFirstError ? "-l -e" : "-l";
 
-  return ["set -e", input.setupScript].join("\n");
+  return [
+    'setup_script_path="$(mktemp /tmp/mistle-setup-script-test.XXXXXX)"',
+    'cleanup_setup_script() { rm -f "$setup_script_path"; }',
+    "trap cleanup_setup_script EXIT",
+    `base64 -d > "$setup_script_path" <<'MISTLE_SETUP_SCRIPT'`,
+    encodedSetupScript,
+    "MISTLE_SETUP_SCRIPT",
+    'chmod 700 "$setup_script_path"',
+    'if head -c 2 "$setup_script_path" | grep -q "^#!"; then',
+    '  exec "$setup_script_path"',
+    "fi",
+    `exec /bin/bash ${shellArgs} "$setup_script_path"`,
+  ].join("\n");
 }
 
 function resolveSetupScriptTestButtonLabel(status: SetupScriptTestStatus): string {
@@ -313,7 +337,7 @@ export function SandboxProfileSetupScriptTestPanel(
         {renderTerminalSurface ? (
           <SessionTerminalSurface
             isVisible={true}
-            lifecycleState={SandboxPtyStates.OPEN}
+            lifecycleState={input.ptyLifecycleState ?? SandboxPtyStates.CLOSED}
             onResize={terminalResize}
             onWriteInput={terminalWriteInput}
             outputChunks={terminalOutputChunks}
@@ -444,6 +468,7 @@ export function useSandboxProfileSetupScriptTestRun(
           }),
         ],
         command: "/bin/bash",
+        cwd: SetupScriptTestWorkingDirectory,
         ptySessionId: startedRun.ptySessionId,
         sandboxInstanceId: startedRun.sandboxInstanceId,
       })
@@ -490,6 +515,7 @@ export function useSandboxProfileSetupScriptTestRun(
       onResize: ptyState.actions.resizePty,
       onWriteInput: ptyState.actions.writeInput,
       outputChunks: ptyState.output.chunks,
+      ptyLifecycleState: ptyState.lifecycle.state,
       status,
       statusMessage,
     },
