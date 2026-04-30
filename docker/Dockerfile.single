@@ -24,34 +24,11 @@ RUN pnpm --filter @mistle/control-plane-api... build && \
 
 FROM build AS runtime-workspace
 
-RUN CI=true pnpm prune --prod && \
-  set -eu; \
-  mkdir -p /runtime/apps /runtime/packages /runtime/config; \
-  cp package.json pnpm-lock.yaml pnpm-workspace.yaml VERSION /runtime/; \
-  cp config/sandbox-base-images.json /runtime/config/sandbox-base-images.json; \
-  cp integration-targets.json /runtime/integration-targets.json; \
-  cp -a node_modules /runtime/node_modules; \
-  for app in \
-    control-plane-api \
-    control-plane-worker \
-    data-plane-api \
-    data-plane-worker \
-    data-plane-gateway \
-    tokenizer-proxy; do \
-    mkdir -p "/runtime/apps/${app}"; \
-    cp "apps/${app}/package.json" "/runtime/apps/${app}/package.json"; \
-    cp -a "apps/${app}/dist" "/runtime/apps/${app}/dist"; \
-    cp -a "apps/${app}/node_modules" "/runtime/apps/${app}/node_modules"; \
-  done; \
-  for package_json in packages/*/package.json; do \
-    package_name="$(basename "$(dirname "${package_json}")")"; \
-    if [ -d "packages/${package_name}/dist" ]; then \
-      mkdir -p "/runtime/packages/${package_name}"; \
-      cp "${package_json}" "/runtime/packages/${package_name}/package.json"; \
-      cp -a "packages/${package_name}/dist" "/runtime/packages/${package_name}/dist"; \
-    fi; \
-  done; \
-  cp -a packages/db/migrations /runtime/packages/db/migrations
+RUN CI=true pnpm --filter @mistle/container --prod deploy --legacy /runtime && \
+  mkdir -p /runtime/config && \
+  cp VERSION /runtime/VERSION && \
+  cp config/sandbox-base-images.json /runtime/config/sandbox-base-images.json && \
+  cp integration-targets.json /runtime/integration-targets.json
 
 FROM alpine:3.22 AS commit-sign-build
 

@@ -1,6 +1,9 @@
 {
   "name": "@mistle/data-plane-gateway",
   "private": true,
+  "files": [
+    "dist/**"
+  ],
   "type": "module",
   "scripts": {
     "dev": "tsx watch --import ./src/instrument.ts src/index.ts",

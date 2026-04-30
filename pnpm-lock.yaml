@@ -158,6 +158,9 @@ importers:
       sharp:
         specifier: 0.34.5
         version: 0.34.5
+      smol-toml:
+        specifier: ^1.6.1
+        version: 1.6.1
       sshpk:
         specifier: ^1.18.0
         version: 1.18.0
@@ -705,6 +708,30 @@ importers:
         specifier: ^4.1.12
         version: 4.3.6
 
+  packages/container:
+    dependencies:
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../config
+      '@mistle/control-plane-api':
+        specifier: workspace:*
+        version: link:../../apps/control-plane-api
+      '@mistle/control-plane-worker':
+        specifier: workspace:*
+        version: link:../../apps/control-plane-worker
+      '@mistle/data-plane-api':
+        specifier: workspace:*
+        version: link:../../apps/data-plane-api
+      '@mistle/data-plane-gateway':
+        specifier: workspace:*
+        version: link:../../apps/data-plane-gateway
+      '@mistle/data-plane-worker':
+        specifier: workspace:*
+        version: link:../../apps/data-plane-worker
+      '@mistle/tokenizer-proxy':
+        specifier: workspace:*
+        version: link:../../apps/tokenizer-proxy
+
   packages/control-plane-internal-client:
     dependencies:
       openapi-fetch:
@@ -776,6 +803,15 @@ importers:
 
   packages/emails:
     dependencies:
+      '@jsx-email/plugin-inline':
+        specifier: ^1.0.1
+        version: 1.0.1(jsx-email@2.8.4)
+      '@jsx-email/plugin-minify':
+        specifier: ^1.0.2
+        version: 1.0.2(jsx-email@2.8.4)
+      '@jsx-email/plugin-pretty':
+        specifier: ^1.0.0
+        version: 1.0.0(jsx-email@2.8.4)
       jsx-email:
         specifier: ^2.8.4
         version: 2.8.4(@jsx-email/plugin-inline@1.0.1)(@jsx-email/plugin-minify@1.0.2)(@jsx-email/plugin-pretty@1.0.0)(@types/node@25.6.0)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(jiti@2.6.1)(lightningcss@1.32.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)

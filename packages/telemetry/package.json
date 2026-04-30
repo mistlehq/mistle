@@ -1,6 +1,10 @@
 {
   "name": "@mistle/telemetry",
   "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
   "type": "module",
   "exports": {
     ".": {

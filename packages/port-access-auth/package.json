@@ -1,6 +1,10 @@
 {
   "name": "@mistle/port-access-auth",
   "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
   "type": "module",
   "exports": {
     ".": {

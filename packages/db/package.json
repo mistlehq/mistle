@@ -1,6 +1,11 @@
 {
   "name": "@mistle/db",
   "private": true,
+  "files": [
+    "dist/**",
+    "*.js",
+    "migrations/**"
+  ],
   "type": "module",
   "exports": {
     ".": {

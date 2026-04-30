@@ -1,13 +1,16 @@
 #!/bin/sh
 set -eu
 
-if [ ! -f "apps/control-plane-worker/dist/openworkflow.config.js" ]; then
-  echo "Expected prebuilt apps/control-plane-worker OpenWorkflow dist artifacts in image." >&2
+app_root="/app/node_modules/@mistle/control-plane-worker"
+
+if [ ! -f "${app_root}/dist/openworkflow.config.js" ]; then
+  echo "Expected prebuilt @mistle/control-plane-worker OpenWorkflow dist artifacts in image." >&2
   exit 1
 fi
 
-exec node \
-  --import ./apps/control-plane-worker/dist/instrument.js \
-  ./apps/control-plane-worker/node_modules/@openworkflow/cli/dist/cli.js \
+cd "${app_root}"
+export NODE_OPTIONS="--import=./dist/instrument.js${NODE_OPTIONS:+ ${NODE_OPTIONS}}"
+
+exec ./node_modules/.bin/openworkflow \
   worker start \
-  --config ./apps/control-plane-worker/dist/openworkflow.config.js
+  --config ./dist/openworkflow.config.js
