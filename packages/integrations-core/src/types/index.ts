@@ -522,8 +522,49 @@ export type IntegrationFormConnectionMethodSetupStartForm = {
   submitLabel: string;
 };
 
+export type IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions = {
+  label: string;
+  name: string;
+};
+
+export type IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions = {
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  secretLabel: string;
+};
+
+export type IntegrationFormConnectionMethodSetupInstructions = {
+  description: string;
+  existingApp: {
+    configFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppConfigFieldInstructions>;
+    connectLabel: string;
+    description: string;
+    saveErrorMessage: string;
+    secretFields: ReadonlyArray<IntegrationFormConnectionMethodSetupExistingAppSecretFieldInstructions>;
+    title: string;
+  };
+  manifest: {
+    createErrorMessage: string;
+    description: string;
+    title: string;
+  };
+  title: string;
+  urls: {
+    description: string;
+    title: string;
+    webhookCallback: {
+      errorTitle: string;
+      label: string;
+      missingMessage: string;
+      missingTitle: string;
+    };
+  };
+};
+
 export type IntegrationFormConnectionMethodSetupFlowMetadata = {
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
+  instructions?: IntegrationFormConnectionMethodSetupInstructions | undefined;
   routeSegment: string;
   startForm?: IntegrationFormConnectionMethodSetupStartForm | undefined;
 };

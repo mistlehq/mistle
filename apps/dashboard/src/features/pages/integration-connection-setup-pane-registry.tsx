@@ -5,6 +5,7 @@ import type { IntegrationConnection } from "../integrations/integrations-service
 import { GitHubAppSetupPane } from "./integration-connection-github-app-setup-pane.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupInstructionsOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
 import type { IntegrationConnectionSetupRoute } from "./integration-connection-setup-state.js";
@@ -46,6 +47,10 @@ function renderSlackAppSetupPane(input: {
         setupRoute: input.setupRoute,
       })}
       setupStartForm={resolveIntegrationSetupStartFormOrThrow({
+        connection: input.connection,
+        setupRoute: input.setupRoute,
+      })}
+      setupInstructions={resolveIntegrationSetupInstructionsOrThrow({
         connection: input.connection,
         setupRoute: input.setupRoute,
       })}

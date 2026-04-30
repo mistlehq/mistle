@@ -6203,6 +6203,173 @@
                                             }
                                           ]
                                         },
+                                        "instructions": {
+                                          "type": "object",
+                                          "properties": {
+                                            "description": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "existingApp": {
+                                              "type": "object",
+                                              "properties": {
+                                                "configFields": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "label": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "name": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    },
+                                                    "required": ["label", "name"],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "minItems": 1
+                                                },
+                                                "connectLabel": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "description": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "saveErrorMessage": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "secretFields": {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                      "label": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "name": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "placeholder": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      },
+                                                      "secretLabel": {
+                                                        "type": "string",
+                                                        "minLength": 1
+                                                      }
+                                                    },
+                                                    "required": ["label", "name", "secretLabel"],
+                                                    "additionalProperties": false
+                                                  },
+                                                  "minItems": 1
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "configFields",
+                                                "connectLabel",
+                                                "description",
+                                                "saveErrorMessage",
+                                                "secretFields",
+                                                "title"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "manifest": {
+                                              "type": "object",
+                                              "properties": {
+                                                "createErrorMessage": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "description": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": [
+                                                "createErrorMessage",
+                                                "description",
+                                                "title"
+                                              ],
+                                              "additionalProperties": false
+                                            },
+                                            "title": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "urls": {
+                                              "type": "object",
+                                              "properties": {
+                                                "description": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "title": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "webhookCallback": {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "errorTitle": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "label": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "missingMessage": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    },
+                                                    "missingTitle": {
+                                                      "type": "string",
+                                                      "minLength": 1
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "errorTitle",
+                                                    "label",
+                                                    "missingMessage",
+                                                    "missingTitle"
+                                                  ],
+                                                  "additionalProperties": false
+                                                }
+                                              },
+                                              "required": [
+                                                "description",
+                                                "title",
+                                                "webhookCallback"
+                                              ],
+                                              "additionalProperties": false
+                                            }
+                                          },
+                                          "required": [
+                                            "description",
+                                            "existingApp",
+                                            "manifest",
+                                            "title",
+                                            "urls"
+                                          ],
+                                          "additionalProperties": false
+                                        },
                                         "routeSegment": {
                                           "type": "string",
                                           "pattern": "^[a-z0-9][a-z0-9-]*$"

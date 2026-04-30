@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupInstructionsOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
   resolveManifestDraftControlPlaneBaseUrl,
 } from "./integration-connection-setup-manifest-draft.js";
@@ -164,6 +165,54 @@ describe("resolveIntegrationSetupStartFormOrThrow", () => {
       }),
     ).toThrow(
       "Integration setup flow 'github-app-installation/github-app' does not define a setup start form for target 'github-cloud'.",
+    );
+  });
+});
+
+describe("resolveIntegrationSetupInstructionsOrThrow", () => {
+  it("resolves Slack setup instructions from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupInstructionsOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toMatchObject({
+      title: "Choose a setup method",
+      description:
+        "Create a new Slack app with a manifest or connect an app you've already configured in Slack.",
+      manifest: {
+        title: "Slack app manifest",
+        description:
+          "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",
+      },
+      existingApp: {
+        title: "Existing Slack App",
+        connectLabel: "Connect Slack to Mistle",
+      },
+      urls: {
+        title: "Slack app URLs",
+        webhookCallback: {
+          label: "Events API Request URL",
+          errorTitle: "Could not load Events API Request URL",
+        },
+      },
+    });
+  });
+
+  it("fails fast when the setup flow has no setup instructions", () => {
+    expect(() =>
+      resolveIntegrationSetupInstructionsOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toThrow(
+      "Integration setup flow 'github-app-installation/github-app' does not define setup instructions for target 'github-cloud'.",
     );
   });
 });

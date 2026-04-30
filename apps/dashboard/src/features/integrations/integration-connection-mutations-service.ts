@@ -411,6 +411,7 @@ export async function startGitHubAppManifestCreation(input: {
 
 export async function startSlackAppManifestCreation(input: {
   connectionId: string;
+  fallbackMessage: string;
   manifest: Record<string, unknown>;
   appConfigToken: string;
 }): Promise<StartedRedirectConnection> {
@@ -421,7 +422,7 @@ export async function startSlackAppManifestCreation(input: {
       manifest: input.manifest,
       appConfigToken: input.appConfigToken,
     },
-    fallbackMessage: "Could not create Slack app manifest.",
+    fallbackMessage: input.fallbackMessage,
   });
   if (startedSetup.kind !== "redirect") {
     throw new Error("Slack app manifest setup did not return a redirect URL.");

@@ -13,6 +13,7 @@ import type {
 } from "../integrations/integrations-service.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationSetupInstructionsOrThrow,
   resolveIntegrationSetupStartFormOrThrow,
 } from "./integration-connection-setup-manifest-draft.js";
 import { SlackAppSetupPane } from "./integration-connection-slack-app-setup-pane.js";
@@ -98,6 +99,13 @@ function renderSlackAppSetupPane(input?: {
             },
           })}
           setupStartForm={resolveIntegrationSetupStartFormOrThrow({
+            connection,
+            setupRoute: {
+              methodId: "slack-bot-token",
+              routeSegment: "slack-app",
+            },
+          })}
+          setupInstructions={resolveIntegrationSetupInstructionsOrThrow({
             connection,
             setupRoute: {
               methodId: "slack-bot-token",

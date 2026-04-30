@@ -3360,6 +3360,41 @@ export interface paths {
                               /** @enum {string} */
                               kind: "all-of";
                             };
+                        instructions?: {
+                          description: string;
+                          existingApp: {
+                            configFields: {
+                              label: string;
+                              name: string;
+                            }[];
+                            connectLabel: string;
+                            description: string;
+                            saveErrorMessage: string;
+                            secretFields: {
+                              label: string;
+                              name: string;
+                              placeholder?: string;
+                              secretLabel: string;
+                            }[];
+                            title: string;
+                          };
+                          manifest: {
+                            createErrorMessage: string;
+                            description: string;
+                            title: string;
+                          };
+                          title: string;
+                          urls: {
+                            description: string;
+                            title: string;
+                            webhookCallback: {
+                              errorTitle: string;
+                              label: string;
+                              missingMessage: string;
+                              missingTitle: string;
+                            };
+                          };
+                        };
                         routeSegment: string;
                         startForm?: {
                           fields: {

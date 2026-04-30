@@ -156,10 +156,69 @@ const IntegrationFormConnectionMethodSetupStartFormSchema = z
   })
   .strict();
 
+const IntegrationFormConnectionMethodSetupInstructionsSchema = z
+  .object({
+    description: z.string().min(1),
+    existingApp: z
+      .object({
+        configFields: z
+          .array(
+            z
+              .object({
+                label: z.string().min(1),
+                name: z.string().min(1),
+              })
+              .strict(),
+          )
+          .min(1),
+        connectLabel: z.string().min(1),
+        description: z.string().min(1),
+        saveErrorMessage: z.string().min(1),
+        secretFields: z
+          .array(
+            z
+              .object({
+                label: z.string().min(1),
+                name: z.string().min(1),
+                placeholder: z.string().min(1).optional(),
+                secretLabel: z.string().min(1),
+              })
+              .strict(),
+          )
+          .min(1),
+        title: z.string().min(1),
+      })
+      .strict(),
+    manifest: z
+      .object({
+        createErrorMessage: z.string().min(1),
+        description: z.string().min(1),
+        title: z.string().min(1),
+      })
+      .strict(),
+    title: z.string().min(1),
+    urls: z
+      .object({
+        description: z.string().min(1),
+        title: z.string().min(1),
+        webhookCallback: z
+          .object({
+            errorTitle: z.string().min(1),
+            label: z.string().min(1),
+            missingMessage: z.string().min(1),
+            missingTitle: z.string().min(1),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
 export const IntegrationFormConnectionMethodSetupFlowMetadataSchema: z.ZodType<IntegrationFormConnectionMethodSetupFlowMetadata> =
   z
     .object({
       completionRequirements: IntegrationSetupCompletionRequirementSchema.optional(),
+      instructions: IntegrationFormConnectionMethodSetupInstructionsSchema.optional(),
       routeSegment: z.string().regex(/^[a-z0-9][a-z0-9-]*$/),
       startForm: IntegrationFormConnectionMethodSetupStartFormSchema.optional(),
     })

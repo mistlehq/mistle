@@ -7,6 +7,7 @@ import type {
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
+  IntegrationFormConnectionMethodSetupInstructions,
   IntegrationFormConnectionMethodSetupStartForm,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
@@ -104,6 +105,7 @@ export type ResolvedIntegrationTargetMetadata = {
         postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
+          instructions?: IntegrationFormConnectionMethodSetupInstructions;
           routeSegment: string;
           startForm?: IntegrationFormConnectionMethodSetupStartForm;
         };
@@ -188,6 +190,55 @@ function resolveConnectionMethod(
                     completionRequirements: cloneSetupCompletionRequirement(
                       method.setupFlow.completionRequirements,
                     ),
+                  }),
+              ...(method.setupFlow.instructions === undefined
+                ? {}
+                : {
+                    instructions: {
+                      description: method.setupFlow.instructions.description,
+                      existingApp: {
+                        configFields: method.setupFlow.instructions.existingApp.configFields.map(
+                          (field) => ({
+                            label: field.label,
+                            name: field.name,
+                          }),
+                        ),
+                        connectLabel: method.setupFlow.instructions.existingApp.connectLabel,
+                        description: method.setupFlow.instructions.existingApp.description,
+                        saveErrorMessage:
+                          method.setupFlow.instructions.existingApp.saveErrorMessage,
+                        secretFields: method.setupFlow.instructions.existingApp.secretFields.map(
+                          (field) => ({
+                            label: field.label,
+                            name: field.name,
+                            ...(field.placeholder === undefined
+                              ? {}
+                              : { placeholder: field.placeholder }),
+                            secretLabel: field.secretLabel,
+                          }),
+                        ),
+                        title: method.setupFlow.instructions.existingApp.title,
+                      },
+                      manifest: {
+                        createErrorMessage:
+                          method.setupFlow.instructions.manifest.createErrorMessage,
+                        description: method.setupFlow.instructions.manifest.description,
+                        title: method.setupFlow.instructions.manifest.title,
+                      },
+                      title: method.setupFlow.instructions.title,
+                      urls: {
+                        description: method.setupFlow.instructions.urls.description,
+                        title: method.setupFlow.instructions.urls.title,
+                        webhookCallback: {
+                          errorTitle: method.setupFlow.instructions.urls.webhookCallback.errorTitle,
+                          label: method.setupFlow.instructions.urls.webhookCallback.label,
+                          missingMessage:
+                            method.setupFlow.instructions.urls.webhookCallback.missingMessage,
+                          missingTitle:
+                            method.setupFlow.instructions.urls.webhookCallback.missingTitle,
+                        },
+                      },
+                    },
                   }),
               routeSegment: method.setupFlow.routeSegment,
               ...(method.setupFlow.startForm === undefined

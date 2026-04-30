@@ -2,6 +2,7 @@ import type {
   AnyIntegrationDefinition,
   IntegrationFormConnectionMethodSetupManifestDraft,
   IntegrationFormConnectionMethodSetupFlow,
+  IntegrationFormConnectionMethodSetupInstructions,
   IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
@@ -58,6 +59,21 @@ export function resolveIntegrationSetupStartFormOrThrow(input: {
   }
 
   return setupFlow.startForm;
+}
+
+export function resolveIntegrationSetupInstructionsOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodSetupInstructions {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.instructions === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define setup instructions for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.instructions;
 }
 
 function resolveIntegrationSetupFlowOrThrow(input: {

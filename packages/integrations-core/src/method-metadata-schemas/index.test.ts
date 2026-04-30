@@ -57,6 +57,45 @@ describe("integration method metadata schemas", () => {
     expect(
       IntegrationFormConnectionMethodSetupFlowMetadataSchema.parse({
         routeSegment: "provider-app",
+        instructions: {
+          title: "Choose a setup method",
+          description: "Create or connect a provider app.",
+          manifest: {
+            title: "Provider app manifest",
+            description: "Create a provider app from a manifest.",
+            createErrorMessage: "Could not create provider app manifest.",
+          },
+          existingApp: {
+            title: "Existing Provider App",
+            description: "Paste values from an existing provider app.",
+            connectLabel: "Connect provider app",
+            saveErrorMessage: "Could not save provider app setup.",
+            configFields: [
+              {
+                name: "clientId",
+                label: "Client ID",
+              },
+            ],
+            secretFields: [
+              {
+                name: "apiSecret",
+                label: "API secret",
+                placeholder: "secret-...",
+                secretLabel: "API secret",
+              },
+            ],
+          },
+          urls: {
+            title: "Provider app URLs",
+            description: "Copy these URLs into the provider app.",
+            webhookCallback: {
+              label: "Webhook URL",
+              errorTitle: "Could not load webhook URL",
+              missingTitle: "Webhook URL is not available yet",
+              missingMessage: "Setup requires a webhook URL.",
+            },
+          },
+        },
         startForm: {
           submitLabel: "Create app",
           fields: [
@@ -92,6 +131,45 @@ describe("integration method metadata schemas", () => {
       }),
     ).toEqual({
       routeSegment: "provider-app",
+      instructions: {
+        title: "Choose a setup method",
+        description: "Create or connect a provider app.",
+        manifest: {
+          title: "Provider app manifest",
+          description: "Create a provider app from a manifest.",
+          createErrorMessage: "Could not create provider app manifest.",
+        },
+        existingApp: {
+          title: "Existing Provider App",
+          description: "Paste values from an existing provider app.",
+          connectLabel: "Connect provider app",
+          saveErrorMessage: "Could not save provider app setup.",
+          configFields: [
+            {
+              name: "clientId",
+              label: "Client ID",
+            },
+          ],
+          secretFields: [
+            {
+              name: "apiSecret",
+              label: "API secret",
+              placeholder: "secret-...",
+              secretLabel: "API secret",
+            },
+          ],
+        },
+        urls: {
+          title: "Provider app URLs",
+          description: "Copy these URLs into the provider app.",
+          webhookCallback: {
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage: "Setup requires a webhook URL.",
+          },
+        },
+      },
       startForm: {
         submitLabel: "Create app",
         fields: [

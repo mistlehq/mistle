@@ -1,4 +1,7 @@
-import type { IntegrationFormConnectionMethodSetupStartForm } from "@mistle/integrations-core";
+import type {
+  IntegrationFormConnectionMethodSetupInstructions,
+  IntegrationFormConnectionMethodSetupStartForm,
+} from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
 import { Button } from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -52,13 +55,6 @@ type SlackExistingAppDraft = {
 };
 
 type SlackExistingAppFieldKey = keyof SlackExistingAppDraft;
-
-const SlackExistingAppSetupFieldLabels = {
-  clientId: "Client ID",
-  botToken: "Bot token",
-  signingSecret: "Signing secret",
-  clientSecret: "Client secret",
-} satisfies Record<SlackExistingAppFieldKey, string>;
 
 const SlackExistingAppFieldKeys = [
   "clientId",
@@ -180,6 +176,7 @@ function isSlackExistingAppFieldStable(input: {
 function getSlackExistingAppSetupFieldValidationMessage(input: {
   fieldKey: SlackExistingAppFieldKey;
   draft: SlackExistingAppDraft;
+  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
 }): string | null {
   const normalizedValue = normalizeSlackExistingAppSetupValue(input.draft[input.fieldKey]);
 
@@ -188,7 +185,12 @@ function getSlackExistingAppSetupFieldValidationMessage(input: {
       return null;
     }
 
-    return `${SlackExistingAppSetupFieldLabels[input.fieldKey]} is required.`;
+    return `${
+      resolveExistingAppSecretFieldInstructions({
+        fieldKey: input.fieldKey,
+        setupInstructions: input.setupInstructions,
+      }).label
+    } is required.`;
   }
 
   return null;
@@ -236,21 +238,56 @@ function resolveSlackExistingAppSetupSavedFieldKeys(
   return SlackExistingAppConfigFieldKeys;
 }
 
+function resolveExistingAppConfigFieldInstructions(input: {
+  fieldKey: SlackExistingAppFieldKey;
+  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
+}): IntegrationFormConnectionMethodSetupInstructions["existingApp"]["configFields"][number] {
+  const field =
+    input.setupInstructions.existingApp.configFields.find(
+      (candidate) => candidate.name === input.fieldKey,
+    ) ?? null;
+
+  if (field === null) {
+    throw new Error(`Slack setup instructions do not define config field '${input.fieldKey}'.`);
+  }
+
+  return field;
+}
+
+function resolveExistingAppSecretFieldInstructions(input: {
+  fieldKey: SlackExistingAppSecretFieldKey;
+  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
+}): IntegrationFormConnectionMethodSetupInstructions["existingApp"]["secretFields"][number] {
+  const field =
+    input.setupInstructions.existingApp.secretFields.find(
+      (candidate) => candidate.name === input.fieldKey,
+    ) ?? null;
+
+  if (field === null) {
+    throw new Error(`Slack setup instructions do not define secret field '${input.fieldKey}'.`);
+  }
+
+  return field;
+}
+
 function SlackSetupUrls(input: {
+  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
   webhookCallbackState: ManifestWebhookCallbackState;
 }): React.JSX.Element {
+  const webhookCallbackInstructions = input.setupInstructions.urls.webhookCallback;
+
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader
-        description="Copy this URL into Slack Event Subscriptions, then return here to connect Slack to Mistle."
-        title="Slack app URLs"
+        description={input.setupInstructions.urls.description}
+        title={input.setupInstructions.urls.title}
       />
       <div className="flex flex-col gap-4">
         <IntegrationConnectionSetupWebhookCallbackValue
-          errorTitle="Could not load Events API Request URL"
-          label="Events API Request URL"
-          missingMessage="Slack setup requires an Events API Request URL, but this connection does not have one yet."
-          missingTitle="Events API Request URL is not available yet"
+          errorTitle={webhookCallbackInstructions.errorTitle}
+          label={webhookCallbackInstructions.label}
+          missingMessage={webhookCallbackInstructions.missingMessage}
+          missingTitle={webhookCallbackInstructions.missingTitle}
           webhookCallbackState={input.webhookCallbackState}
         />
       </div>
@@ -261,6 +298,7 @@ function SlackSetupUrls(input: {
 export function SlackAppSetupPane(input: {
   connection: IntegrationConnection;
   manifestDraftBuilder: IntegrationSetupAppManifestDraftBuilder;
+  setupInstructions: IntegrationFormConnectionMethodSetupInstructions;
   setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -293,7 +331,7 @@ export function SlackAppSetupPane(input: {
     resolveSaveErrorMessage: (error) =>
       resolveApiErrorMessage({
         error,
-        fallbackMessage: "Could not save Slack app setup.",
+        fallbackMessage: input.setupInstructions.existingApp.saveErrorMessage,
       }),
     saveField: async ({ draft, fieldKey }) => {
       const secrets = buildSlackExistingAppSetupSecrets({
@@ -314,7 +352,12 @@ export function SlackAppSetupPane(input: {
       return updatedConnection;
     },
     shouldPersistField: shouldPersistSlackExistingAppSetupField,
-    validateField: getSlackExistingAppSetupFieldValidationMessage,
+    validateField: ({ draft, fieldKey }) =>
+      getSlackExistingAppSetupFieldValidationMessage({
+        draft,
+        fieldKey,
+        setupInstructions: input.setupInstructions,
+      }),
   });
   const webhookCallbackState = useManifestWebhookCallbackState({
     enabled: true,
@@ -329,6 +372,7 @@ export function SlackAppSetupPane(input: {
     mutationFn: async () =>
       startSlackAppManifestCreation({
         connectionId: input.connection.id,
+        fallbackMessage: input.setupInstructions.manifest.createErrorMessage,
         manifest: parseManifestJsonObject(manifestDraft.manifestValue),
         appConfigToken: setupStartFormState.resolveRequiredValue("appConfigToken"),
       }),
@@ -343,7 +387,7 @@ export function SlackAppSetupPane(input: {
       setActionErrorMessage(
         resolveApiErrorMessage({
           error,
-          fallbackMessage: "Could not create Slack app manifest.",
+          fallbackMessage: input.setupInstructions.manifest.createErrorMessage,
         }),
       );
     }
@@ -376,23 +420,39 @@ export function SlackAppSetupPane(input: {
     allFieldsStable &&
     !isSecretReplacementDialogOpen &&
     webhookCallbackState.kind === "ready";
+  const clientIdInstructions = resolveExistingAppConfigFieldInstructions({
+    fieldKey: "clientId",
+    setupInstructions: input.setupInstructions,
+  });
+  const botTokenInstructions = resolveExistingAppSecretFieldInstructions({
+    fieldKey: "botToken",
+    setupInstructions: input.setupInstructions,
+  });
+  const signingSecretInstructions = resolveExistingAppSecretFieldInstructions({
+    fieldKey: "signingSecret",
+    setupInstructions: input.setupInstructions,
+  });
+  const clientSecretInstructions = resolveExistingAppSecretFieldInstructions({
+    fieldKey: "clientSecret",
+    setupInstructions: input.setupInstructions,
+  });
 
   return (
     <FormPageStack>
       <IntegrationConnectionSetupModeTabs
         actionErrorMessage={actionErrorMessage}
-        description="Create a new Slack app with a manifest or connect an app you've already configured in Slack."
+        description={input.setupInstructions.description}
         existingAppContent={
           <ExistingAppSetupFieldsPanel
             configFields={[
               {
                 fieldKey: "clientId",
                 id: "slack-client-id",
-                label: SlackExistingAppSetupFieldLabels.clientId,
+                label: clientIdInstructions.label,
                 value: existingAppAutoSave.draft.clientId,
               },
             ]}
-            description="Paste values from a Slack app you already created or configured in Slack."
+            description={input.setupInstructions.existingApp.description}
             fieldStates={existingAppAutoSave.fieldStates}
             onCommitField={(fieldKey) => {
               void existingAppAutoSave.persistField(fieldKey);
@@ -405,10 +465,12 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("botToken"),
                 fieldKey: "botToken",
                 id: "slack-bot-token",
-                label: SlackExistingAppSetupFieldLabels.botToken,
-                placeholder: "xoxb-...",
+                label: botTokenInstructions.label,
+                ...(botTokenInstructions.placeholder === undefined
+                  ? {}
+                  : { placeholder: botTokenInstructions.placeholder }),
                 required: !configuredSecretFieldKeys.has("botToken"),
-                secretLabel: "bot token",
+                secretLabel: botTokenInstructions.secretLabel,
                 type: "password",
                 value: existingAppAutoSave.draft.botToken,
               },
@@ -416,9 +478,12 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("signingSecret"),
                 fieldKey: "signingSecret",
                 id: "slack-signing-secret",
-                label: SlackExistingAppSetupFieldLabels.signingSecret,
+                label: signingSecretInstructions.label,
+                ...(signingSecretInstructions.placeholder === undefined
+                  ? {}
+                  : { placeholder: signingSecretInstructions.placeholder }),
                 required: !configuredSecretFieldKeys.has("signingSecret"),
-                secretLabel: "signing secret",
+                secretLabel: signingSecretInstructions.secretLabel,
                 type: "password",
                 value: existingAppAutoSave.draft.signingSecret,
               },
@@ -426,19 +491,25 @@ export function SlackAppSetupPane(input: {
                 configured: configuredSecretFieldKeys.has("clientSecret"),
                 fieldKey: "clientSecret",
                 id: "slack-client-secret",
-                label: SlackExistingAppSetupFieldLabels.clientSecret,
-                secretLabel: "client secret",
+                label: clientSecretInstructions.label,
+                ...(clientSecretInstructions.placeholder === undefined
+                  ? {}
+                  : { placeholder: clientSecretInstructions.placeholder }),
+                secretLabel: clientSecretInstructions.secretLabel,
                 type: "password",
                 value: existingAppAutoSave.draft.clientSecret,
               },
             ]}
-            title="Existing Slack App"
+            title={input.setupInstructions.existingApp.title}
           />
         }
         footer={
           <>
             {setupMode === "existing-app" ? (
-              <SlackSetupUrls webhookCallbackState={webhookCallbackState} />
+              <SlackSetupUrls
+                setupInstructions={input.setupInstructions}
+                webhookCallbackState={webhookCallbackState}
+              />
             ) : null}
 
             {setupMode === "existing-app" ? (
@@ -450,7 +521,7 @@ export function SlackAppSetupPane(input: {
                   }}
                   type="button"
                 >
-                  Connect Slack to Mistle
+                  {input.setupInstructions.existingApp.connectLabel}
                 </Button>
               </FormPageActionBar>
             ) : setupMode === "manifest" ? (
@@ -472,8 +543,8 @@ export function SlackAppSetupPane(input: {
           <IntegrationConnectionSetupManifestPanel
             editorId="slack-app-manifest-editor"
             manifestCallbackState={webhookCallbackState}
-            manifestDescription="Create a Slack app from a basic manifest. You can still change the settings later in Slack."
-            manifestTitle="Slack app manifest"
+            manifestDescription={input.setupInstructions.manifest.description}
+            manifestTitle={input.setupInstructions.manifest.title}
             manifestValidation={manifestValidation}
             manifestValue={manifestDraft.manifestValue}
             onManifestChange={manifestDraft.onManifestChange}
@@ -483,7 +554,7 @@ export function SlackAppSetupPane(input: {
           />
         }
         onModeChange={setSetupMode}
-        title="Choose a setup method"
+        title={input.setupInstructions.title}
         value={setupMode}
       />
     </FormPageStack>
