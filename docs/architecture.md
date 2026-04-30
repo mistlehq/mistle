@@ -21,7 +21,7 @@ Mistle is split into control-plane and data-plane services.
                               | provisions / connects runtime
                               v
 +--------------------------------------------------------------+
-|                      Sandbox (Docker/E2B)                    |
+|                  Sandbox (Docker / remote)                   |
 |               agent runtime | filesystem | tools             |
 +--------------------------------------------------------------+
                 |                                |

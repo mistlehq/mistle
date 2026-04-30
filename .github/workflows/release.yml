@@ -79,7 +79,6 @@ jobs:
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/${{ matrix.component }}
       IMAGE_SHA_TAG: ${{ github.sha }}
-      IMAGE_RELEASE_TAG: v${{ needs.validate.outputs.release_version }}
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
     steps:
@@ -93,39 +92,27 @@ jobs:
 
       - name: Build service image
         run: |
-          tags=(
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
-          )
-
-          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
-            tags+=(--tag "${IMAGE_REPOSITORY}:latest")
-          fi
-
           docker build \
             --platform linux/amd64 \
             --target "${{ matrix.target }}" \
             --file docker/Dockerfile \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
             --label "org.opencontainers.image.title=${{ matrix.component }}" \
-            "${tags[@]}" \
+            --label "org.opencontainers.image.description=Mistle ${{ matrix.component }} service image" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle" \
             .
 
       - name: Push service image
-        run: |
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
-
-          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
-            docker push "${IMAGE_REPOSITORY}:latest"
-          fi
+        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
 
       - name: Resolve pushed digest
         id: publish
         run: |
-          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}")"
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}")"
           echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
 
       - name: Write release manifest fragment
@@ -149,7 +136,6 @@ jobs:
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
       IMAGE_SHA_TAG: ${{ github.sha }}
-      IMAGE_RELEASE_TAG: v${{ needs.validate.outputs.release_version }}
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
     steps:
@@ -163,19 +149,11 @@ jobs:
 
       - name: Build sandbox base image
         run: |
-          tags=(
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
-            --tag "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
-          )
-
-          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
-            tags+=(--tag "${IMAGE_REPOSITORY}:latest")
-          fi
-
           docker build \
             --platform linux/amd64 \
             --target sandbox-base \
             --file packages/sandboxd/Dockerfile \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
@@ -183,22 +161,15 @@ jobs:
             --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes" \
             --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.vendor=Mistle" \
-            "${tags[@]}" \
             .
 
       - name: Push sandbox base image
-        run: |
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
-          docker push "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}"
-
-          if [ "${{ needs.validate.outputs.stable_release }}" = "true" ]; then
-            docker push "${IMAGE_REPOSITORY}:latest"
-          fi
+        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
 
       - name: Resolve pushed digest
         id: publish
         run: |
-          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_RELEASE_TAG}")"
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}")"
           echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
 
       - name: Write release manifest fragment
@@ -214,12 +185,157 @@ jobs:
           name: release-image-sandbox-base
           path: dist/release-manifest/sandbox-base.json
 
-  publish-github-release:
-    name: Publish GitHub release
+  publish-single-container:
+    name: Publish single-container (${{ matrix.profile }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: docker
+            target: docker-sandbox
+          - profile: remote
+            target: remote-sandbox
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/mistle
+      IMAGE_SHA_TAG: ${{ matrix.profile }}-${{ github.sha }}
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+      IMAGE_TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build single-container image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --target "${IMAGE_TARGET}" \
+            --file docker/Dockerfile.single \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}" \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${{ needs.validate.outputs.release_version }}" \
+            --label "org.opencontainers.image.title=Mistle" \
+            --label "org.opencontainers.image.description=Open-source platform for running sandboxed coding agents" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle" \
+            .
+
+      - name: Push single-container image
+        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}"
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_SHA_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write release manifest fragment
+        run: |
+          mkdir -p dist/release-manifest
+          cat <<EOF > "dist/release-manifest/mistle-${{ matrix.profile }}.json"
+          {"component":"mistle-${{ matrix.profile }}","image_ref":"${{ steps.publish.outputs.image_ref }}"}
+          EOF
+
+      - name: Upload release manifest fragment
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-image-mistle-${{ matrix.profile }}
+          path: dist/release-manifest/mistle-${{ matrix.profile }}.json
+
+  promote-release-images:
+    name: Promote release image tags
     needs:
       - validate
       - publish-services
       - publish-sandbox-base
+      - publish-single-container
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download release manifest fragments
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/release-artifacts
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Promote release tags
+        run: |
+          python3 <<'PY' > /tmp/release-image-promotions.tsv
+          import json
+          import os
+          from pathlib import Path
+
+          service_components = {
+              "control-plane-api",
+              "control-plane-worker",
+              "data-plane-api",
+              "data-plane-worker",
+              "data-plane-gateway",
+              "tokenizer-proxy",
+          }
+          version = os.environ["RELEASE_VERSION"]
+          stable_release = os.environ["STABLE_RELEASE"] == "true"
+
+          for manifest_path in sorted(Path("dist/release-artifacts").rglob("*.json")):
+              payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+              component = payload["component"]
+              image_ref = payload["image_ref"]
+
+              if component in service_components:
+                  repository = f"ghcr.io/mistlehq/{component}"
+                  release_tag = f"v{version}"
+                  latest_tag = "latest"
+              elif component == "sandbox-base":
+                  repository = "ghcr.io/mistlehq/sandbox-base"
+                  release_tag = f"v{version}"
+                  latest_tag = "latest"
+              elif component.startswith("mistle-"):
+                  profile = component.removeprefix("mistle-")
+                  repository = "ghcr.io/mistlehq/mistle"
+                  release_tag = f"{profile}-v{version}"
+                  latest_tag = f"{profile}-latest"
+              else:
+                  raise ValueError(f"Unknown release image component: {component}")
+
+              if not stable_release:
+                  latest_tag = ""
+
+              print("\t".join([image_ref, repository, release_tag, latest_tag]))
+          PY
+
+          while IFS=$'\t' read -r image_ref repository release_tag latest_tag; do
+            docker buildx imagetools create \
+              --tag "${repository}:${release_tag}" \
+              "${image_ref}"
+
+            if [ -n "${latest_tag}" ]; then
+              docker buildx imagetools create \
+                --tag "${repository}:${latest_tag}" \
+                "${image_ref}"
+            fi
+          done < /tmp/release-image-promotions.tsv
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          STABLE_RELEASE: ${{ needs.validate.outputs.stable_release }}
+
+  publish-github-release:
+    name: Publish GitHub release
+    needs:
+      - validate
+      - promote-release-images
     runs-on: ubuntu-latest
 
     steps:

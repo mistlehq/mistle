@@ -32,7 +32,7 @@ on:
         options:
           - all
           - docker
-          - e2b
+          - remote
       publish_latest:
         description: Also publish profile-qualified latest tags
         required: true
@@ -79,7 +79,7 @@ jobs:
 
           all_profiles = [
               {"profile": "docker", "target": "docker-sandbox"},
-              {"profile": "e2b", "target": "remote-sandbox"},
+              {"profile": "remote", "target": "remote-sandbox"},
           ]
           selected_profile = os.environ["SELECTED_PROFILE"]
 
