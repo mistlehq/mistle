@@ -1,12 +1,13 @@
 import {
-  getDataPlaneDatabaseSchema,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 type DeleteSandboxInstanceDeadlineContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines">;
 };
 
 export type DeleteSandboxInstanceDeadlineInput = {
@@ -25,7 +26,7 @@ export async function deleteSandboxInstanceDeadline(
   ctx: DeleteSandboxInstanceDeadlineContext,
   input: DeleteSandboxInstanceDeadlineInput,
 ): Promise<DeleteSandboxInstanceDeadlineOkResponse> {
-  const { sandboxInstanceDeadlines } = getDataPlaneDatabaseSchema(ctx.db);
+  const { sandboxInstanceDeadlines } = ctx.tables;
 
   await ctx.db
     .update(sandboxInstanceDeadlines)

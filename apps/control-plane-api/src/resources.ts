@@ -1,13 +1,26 @@
-import { createHash } from "node:crypto";
-
-import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  createControlPlaneDatabase,
+  createControlPlaneDbSchema,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import {
+  createControlPlaneTestSchemaName,
+  createControlPlaneWorkflowNamespaceId,
+} from "@mistle/db/test-environment";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { S3CompatibleObjectStore } from "@mistle/object-store";
 import { Pool } from "pg";
 
+import { createControlPlaneAuth, type ControlPlaneAuthConfig } from "./auth/index.js";
 import { createControlPlaneBackend, createControlPlaneOpenWorkflow } from "./openworkflow.js";
 import type { ControlPlaneApiConfig } from "./types.js";
+
+export type AppRequestContext = {
+  db: ControlPlaneDatabase;
+  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
+  auth: ReturnType<typeof createControlPlaneAuth>;
+};
 
 export type AppRuntimeResources = {
   db: ControlPlaneDatabase;
@@ -27,6 +40,10 @@ export type AppRuntimeResources = {
   getOpenWorkflow: (input?: {
     testEnvironmentId?: string;
   }) => Promise<ReturnType<typeof createControlPlaneOpenWorkflow>>;
+  getAppContext: (input: {
+    authConfig: ControlPlaneAuthConfig;
+    testEnvironmentId?: string;
+  }) => Promise<AppRequestContext>;
 };
 
 export async function createAppResources(
@@ -37,6 +54,8 @@ export async function createAppResources(
   });
   const db = createControlPlaneDatabase(dbPool);
   const testDbsByEnvironmentId = new Map<string, ControlPlaneDatabase>();
+  let auth: ReturnType<typeof createControlPlaneAuth> | undefined;
+  const testAuthByEnvironmentId = new Map<string, ReturnType<typeof createControlPlaneAuth>>();
   const testWorkflowsByEnvironmentId = new Map<
     string,
     Promise<{
@@ -98,16 +117,11 @@ export async function createAppResources(
         throw new Error("Expected test environment id for isolated control-plane API request.");
       }
 
-      const existingDb = testDbsByEnvironmentId.get(testEnvironmentId);
-      if (existingDb !== undefined) {
-        return existingDb;
-      }
-
-      const testDb = createControlPlaneDatabase(dbPool, {
-        schemaName: createControlPlaneTestSchemaName(testEnvironmentId),
+      return createControlPlaneTestDatabase({
+        dbPool,
+        testDbsByEnvironmentId,
+        testEnvironmentId,
       });
-      testDbsByEnvironmentId.set(testEnvironmentId, testDb);
-      return testDb;
     },
     getOpenWorkflow: async (request = {}) => {
       const testIsolation = config.__dangerouslyEnableTestIsolation;
@@ -122,17 +136,58 @@ export async function createAppResources(
         );
       }
 
-      const existingWorkflow = testWorkflowsByEnvironmentId.get(testEnvironmentId);
-      if (existingWorkflow !== undefined) {
-        return (await existingWorkflow).openWorkflow;
-      }
-
-      const workflowPromise = createTestControlPlaneWorkflow({
+      return createControlPlaneTestOpenWorkflow({
         config,
+        testWorkflowsByEnvironmentId,
         testEnvironmentId,
       });
-      testWorkflowsByEnvironmentId.set(testEnvironmentId, workflowPromise);
-      return (await workflowPromise).openWorkflow;
+    },
+    getAppContext: async (request) => {
+      const testEnvironmentId = request.testEnvironmentId;
+      if (
+        config.__dangerouslyEnableTestIsolation === undefined ||
+        testEnvironmentId === undefined ||
+        testEnvironmentId.length === 0
+      ) {
+        auth ??= createControlPlaneAuth({
+          config: request.authConfig,
+          db,
+          openWorkflow,
+        });
+
+        return {
+          auth,
+          db,
+          openWorkflow,
+        };
+      }
+
+      const testDb = createControlPlaneTestDatabase({
+        dbPool,
+        testDbsByEnvironmentId,
+        testEnvironmentId,
+      });
+      const testOpenWorkflow = await createControlPlaneTestOpenWorkflow({
+        config,
+        testWorkflowsByEnvironmentId,
+        testEnvironmentId,
+      });
+      let testAuth = testAuthByEnvironmentId.get(testEnvironmentId);
+      if (testAuth === undefined) {
+        testAuth = createControlPlaneAuth({
+          config: request.authConfig,
+          db: testDb,
+          tables: createControlPlaneDbSchema(createControlPlaneTestSchemaName(testEnvironmentId)),
+          openWorkflow: testOpenWorkflow,
+        });
+        testAuthByEnvironmentId.set(testEnvironmentId, testAuth);
+      }
+
+      return {
+        auth: testAuth,
+        db: testDb,
+        openWorkflow: testOpenWorkflow,
+      };
     },
   };
 }
@@ -156,10 +211,7 @@ async function createTestControlPlaneWorkflow(input: {
 }> {
   const backend = await createControlPlaneBackend({
     url: input.config.workflow.databaseUrl,
-    namespaceId: createWorkflowNamespaceId({
-      prefix: "cp",
-      environmentId: input.testEnvironmentId,
-    }),
+    namespaceId: createControlPlaneWorkflowNamespaceId(input.testEnvironmentId),
     runMigrations: false,
   });
 
@@ -169,27 +221,43 @@ async function createTestControlPlaneWorkflow(input: {
   };
 }
 
-function createWorkflowNamespaceId(input: { prefix: string; environmentId: string }): string {
-  return `${input.prefix}_${createSafeIdentifier(input.environmentId)}`;
-}
-
-function createControlPlaneTestSchemaName(testEnvironmentId: string): string {
-  const normalized = testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
-  const prefix = /^[a-z]/u.test(normalized) ? normalized : `env_${normalized}`;
-  const digest = createHash("sha256").update(testEnvironmentId).digest("hex").slice(0, 10);
-  const schemaName = `${prefix.slice(0, 40)}_${digest}_control_plane`;
-  if (schemaName.length > 63) {
-    throw new Error(
-      `Test control-plane schema name '${schemaName}' exceeds Postgres length limits.`,
-    );
+function createControlPlaneTestDatabase(input: {
+  dbPool: Pool;
+  testDbsByEnvironmentId: Map<string, ControlPlaneDatabase>;
+  testEnvironmentId: string;
+}): ControlPlaneDatabase {
+  const existingDb = input.testDbsByEnvironmentId.get(input.testEnvironmentId);
+  if (existingDb !== undefined) {
+    return existingDb;
   }
 
-  return schemaName;
+  const testDb = createControlPlaneDatabase(input.dbPool, {
+    schemaName: createControlPlaneTestSchemaName(input.testEnvironmentId),
+  });
+  input.testDbsByEnvironmentId.set(input.testEnvironmentId, testDb);
+  return testDb;
 }
 
-function createSafeIdentifier(value: string): string {
-  const normalized = value.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
-  const digest = createHash("sha256").update(value).digest("hex").slice(0, 10);
-  const compact = normalized.length === 0 ? "env" : normalized.slice(0, 28);
-  return `${compact}_${digest}`;
+async function createControlPlaneTestOpenWorkflow(input: {
+  config: ControlPlaneApiConfig;
+  testWorkflowsByEnvironmentId: Map<
+    string,
+    Promise<{
+      backend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
+      openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
+    }>
+  >;
+  testEnvironmentId: string;
+}): Promise<ReturnType<typeof createControlPlaneOpenWorkflow>> {
+  const existingWorkflow = input.testWorkflowsByEnvironmentId.get(input.testEnvironmentId);
+  if (existingWorkflow !== undefined) {
+    return (await existingWorkflow).openWorkflow;
+  }
+
+  const workflowPromise = createTestControlPlaneWorkflow({
+    config: input.config,
+    testEnvironmentId: input.testEnvironmentId,
+  });
+  input.testWorkflowsByEnvironmentId.set(input.testEnvironmentId, workflowPromise);
+  return (await workflowPromise).openWorkflow;
 }

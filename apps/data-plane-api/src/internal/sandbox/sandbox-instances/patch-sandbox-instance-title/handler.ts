@@ -7,12 +7,14 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
+  const tables = ctx.get("resources").tables;
   const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   const response = await patchSandboxInstanceTitle(
     {
       db,
+      tables,
     },
     {
       organizationId: body.organizationId,

@@ -7,12 +7,13 @@ import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 export const RequestDeleteSandboxProfileWorkflow = defineTracedControlPlaneWorkflow(
   RequestDeleteSandboxProfileWorkflowSpec,
   async ({ input: { organizationId, profileId }, step }) => {
-    const { db } = await getWorkflowContext();
+    const { db, tables } = await getWorkflowContext();
 
     await step.run({ name: "delete-sandbox-profile" }, async () => {
       await deleteSandboxProfile(
         {
           db,
+          tables,
         },
         {
           organizationId,

@@ -12,67 +12,79 @@ import {
 } from "@mistle/workflow-registry/control-plane";
 import { describe, expect, it } from "vitest";
 
-import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
-import { HandleAutomationRunWorkflow } from "./handle-automation-run/workflow.js";
-import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event/workflow.js";
-import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
-import { ScheduleDispatchBatchWorkflow } from "./schedule-dispatch/batch-workflow.js";
-import { ScheduleDispatchWorkflow } from "./schedule-dispatch/workflow.js";
-import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
-import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
-import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance/workflow.js";
-import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-connection-resources/workflow.js";
+import { ControlPlaneWorkerWorkflows } from "./workflows.js";
+
+const workflows = new Map(
+  ControlPlaneWorkerWorkflows.map((workflow) => [workflow.spec.name, workflow]),
+);
 
 describe("control-plane worker openworkflow entrypoints", () => {
   it("preserves the handle automation conversation delivery workflow identity", () => {
-    expect(HandleAutomationConversationDeliveryWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(HandleAutomationConversationDeliveryWorkflowSpec.name)).toMatchObject(
       HandleAutomationConversationDeliveryWorkflowSpec,
     );
   });
 
   it("preserves the handle automation run workflow identity", () => {
-    expect(HandleAutomationRunWorkflow.spec).toMatchObject(HandleAutomationRunWorkflowSpec);
+    expect(readWorkflowSpec(HandleAutomationRunWorkflowSpec.name)).toMatchObject(
+      HandleAutomationRunWorkflowSpec,
+    );
   });
 
   it("preserves the handle integration webhook event workflow identity", () => {
-    expect(HandleIntegrationWebhookEventWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(HandleIntegrationWebhookEventWorkflowSpec.name)).toMatchObject(
       HandleIntegrationWebhookEventWorkflowSpec,
     );
   });
 
   it("preserves the request delete sandbox profile workflow identity", () => {
-    expect(RequestDeleteSandboxProfileWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(RequestDeleteSandboxProfileWorkflowSpec.name)).toMatchObject(
       RequestDeleteSandboxProfileWorkflowSpec,
     );
   });
 
   it("preserves the send organization invitation workflow identity", () => {
-    expect(SendOrganizationInvitationWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(SendOrganizationInvitationWorkflowSpec.name)).toMatchObject(
       SendOrganizationInvitationWorkflowSpec,
     );
   });
 
   it("preserves the send verification OTP workflow identity", () => {
-    expect(SendVerificationOTPWorkflow.spec).toMatchObject(SendVerificationOTPWorkflowSpec);
+    expect(readWorkflowSpec(SendVerificationOTPWorkflowSpec.name)).toMatchObject(
+      SendVerificationOTPWorkflowSpec,
+    );
   });
 
   it("preserves the start sandbox profile instance workflow identity", () => {
-    expect(StartSandboxProfileInstanceWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(StartSandboxProfileInstanceWorkflowSpec.name)).toMatchObject(
       StartSandboxProfileInstanceWorkflowSpec,
     );
   });
 
   it("preserves the sync integration connection resources workflow identity", () => {
-    expect(SyncIntegrationConnectionResourcesWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(SyncIntegrationConnectionResourcesWorkflowSpec.name)).toMatchObject(
       SyncIntegrationConnectionResourcesWorkflowSpec,
     );
   });
 
   it("preserves the schedule dispatch workflow identity", () => {
-    expect(ScheduleDispatchWorkflow.spec).toMatchObject(ScheduleDispatchWorkflowSpec);
+    expect(readWorkflowSpec(ScheduleDispatchWorkflowSpec.name)).toMatchObject(
+      ScheduleDispatchWorkflowSpec,
+    );
   });
 
   it("preserves the schedule dispatch batch workflow identity", () => {
-    expect(ScheduleDispatchBatchWorkflow.spec).toMatchObject(ScheduleDispatchBatchWorkflowSpec);
+    expect(readWorkflowSpec(ScheduleDispatchBatchWorkflowSpec.name)).toMatchObject(
+      ScheduleDispatchBatchWorkflowSpec,
+    );
   });
 });
+
+function readWorkflowSpec(name: string): unknown {
+  const workflow = workflows.get(name);
+  if (workflow === undefined) {
+    throw new Error(`Expected control-plane worker workflow ${name} to be registered.`);
+  }
+
+  return workflow.spec;
+}

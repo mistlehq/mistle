@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  getDataPlaneDatabaseSchema,
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { SandboxProvider } from "@mistle/sandbox";
@@ -29,6 +29,7 @@ const WorkflowRunInputSchema = z
 
 type StartSandboxInstanceContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
@@ -119,7 +120,7 @@ export async function startSandboxInstance(
   ctx: StartSandboxInstanceContext,
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
-  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+  const { sandboxInstances } = ctx.tables;
   const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
     {
       organizationId: input.organizationId,

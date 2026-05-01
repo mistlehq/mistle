@@ -1,6 +1,5 @@
-import { createHash } from "node:crypto";
-
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import { Pool } from "pg";
 
 import type { DataPlaneGatewayApp, DataPlaneGatewayConfig } from "../types.js";
@@ -65,16 +64,4 @@ export async function stopAppResources(app: DataPlaneGatewayApp): Promise<void> 
 
   AppResourcesByInstance.delete(app);
   await appResources.dbPool.end();
-}
-
-function createDataPlaneTestSchemaName(testEnvironmentId: string): string {
-  const normalized = testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
-  const prefix = /^[a-z]/u.test(normalized) ? normalized : `env_${normalized}`;
-  const digest = createHash("sha256").update(testEnvironmentId).digest("hex").slice(0, 10);
-  const schemaName = `${prefix.slice(0, 40)}_${digest}_data_plane`;
-  if (schemaName.length > 63) {
-    throw new Error(`Test data-plane schema name '${schemaName}' exceeds Postgres length limits.`);
-  }
-
-  return schemaName;
 }

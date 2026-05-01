@@ -38,6 +38,12 @@
       "import": "./src/testing/index.ts",
       "default": "./src/testing/index.ts"
     },
+    "./test-environment": {
+      "types": "./src/test-environment.ts",
+      "node": "./dist/test-environment.js",
+      "import": "./src/test-environment.ts",
+      "default": "./src/test-environment.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",

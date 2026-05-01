@@ -125,6 +125,9 @@ async function createRequestContext(input: {
       db: input.resources.getDb({
         testEnvironmentId: input.testEnvironmentId,
       }),
+      tables: input.resources.getTables({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
       openWorkflow: await input.resources.getOpenWorkflow({
         testEnvironmentId: input.testEnvironmentId,
       }),

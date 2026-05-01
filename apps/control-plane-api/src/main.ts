@@ -1,7 +1,7 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
 import { createApp } from "./app.js";
-import { createControlPlaneAuth, type ControlPlaneAuthConfig } from "./auth/index.js";
+import type { ControlPlaneAuthConfig } from "./auth/index.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
 import type {
@@ -21,47 +21,30 @@ export async function createControlPlaneApiRuntime(
   });
   const { app: config } = runtimeConfig;
   const authConfig = createAuthConfig(config);
-  const testAuthByEnvironmentId = new Map<string, ReturnType<typeof createControlPlaneAuth>>();
   let app: ControlPlaneApp;
 
   try {
-    const auth = createControlPlaneAuth({
-      config: authConfig,
-      db: resources.db,
-      openWorkflow: resources.openWorkflow,
+    const appContext = await resources.getAppContext({
+      authConfig,
     });
 
     app = createApp({
       config,
       sandboxConfig: config.sandbox,
       internalAuthServiceToken: config.internalAuth.serviceToken,
-      db: resources.db,
+      db: appContext.db,
       objectStore: resources.objectStore,
       integrationRegistry: resources.integrationRegistry,
       dataPlaneClient,
       connectionTokenConfig: config.connectionToken,
       portAccessConfig: config.portAccess,
-      openWorkflow: resources.openWorkflow,
-      auth,
-      resolveTestContext: async ({ testEnvironmentId }) => {
-        const db = resources.getDb({ testEnvironmentId });
-        const openWorkflow = await resources.getOpenWorkflow({ testEnvironmentId });
-        let testAuth = testAuthByEnvironmentId.get(testEnvironmentId);
-        if (testAuth === undefined) {
-          testAuth = createControlPlaneAuth({
-            config: authConfig,
-            db,
-            openWorkflow,
-          });
-          testAuthByEnvironmentId.set(testEnvironmentId, testAuth);
-        }
-
-        return {
-          db,
-          openWorkflow,
-          auth: testAuth,
-        };
-      },
+      openWorkflow: appContext.openWorkflow,
+      auth: appContext.auth,
+      resolveTestContext: async ({ testEnvironmentId }) =>
+        resources.getAppContext({
+          authConfig,
+          testEnvironmentId,
+        }),
     });
   } catch (error) {
     await stopAppResources(resources);

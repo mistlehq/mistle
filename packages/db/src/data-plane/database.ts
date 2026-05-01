@@ -5,6 +5,7 @@ import { createDataPlaneDbSchema, type DataPlaneDbSchema } from "./schema/factor
 import { DATA_PLANE_SCHEMA_NAME } from "./schema/index.js";
 
 export type DataPlaneDatabase = NodePgDatabase<DataPlaneDbSchema>;
+export type DataPlaneTables = DataPlaneDbSchema;
 
 const DataPlaneDatabaseSchemas = new WeakMap<DataPlaneDatabase, DataPlaneDbSchema>();
 

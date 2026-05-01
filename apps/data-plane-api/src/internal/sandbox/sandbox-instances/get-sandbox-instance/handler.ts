@@ -6,6 +6,7 @@ import { route } from "./route.js";
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
+  const tables = ctx.get("resources").tables;
   const sandboxAdapter = ctx.get("resources").sandboxAdapter;
   const runtimeStateReader = ctx.get("resources").runtimeStateReader;
   const sandboxProvider = ctx.get("sandboxProvider");
@@ -15,6 +16,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
   const response = await getSandboxInstanceByInspection(
     {
       db,
+      tables,
       sandboxAdapter,
       runtimeStateReader,
       sandboxProvider,
