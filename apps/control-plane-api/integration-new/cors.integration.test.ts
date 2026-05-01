@@ -1,17 +1,18 @@
 /* eslint-disable jest/no-standalone-expect --
- * The test cases use an extended Vitest fixture imported from ./fixture.js.
+ * The test cases use an extended Vitest fixture created by the test harness.
  */
 
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import { it } from "./fixture.js";
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
 describe("cors integration", () => {
-  it("adds CORS headers for trusted origins on standard requests", async ({
-    controlPlaneApi,
-    trustedOrigin,
-  }) => {
-    const response = await controlPlaneApi.http.fetch("/__healthz", {
+  it("adds CORS headers for trusted origins on standard requests", async ({ env }) => {
+    const trustedOrigin = env.controlPlaneApi.hostBaseUrl;
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: trustedOrigin,
@@ -22,8 +23,8 @@ describe("cors integration", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("does not allow untrusted origins on standard requests", async ({ controlPlaneApi }) => {
-    const response = await controlPlaneApi.http.fetch("/__healthz", {
+  it("does not allow untrusted origins on standard requests", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: "http://malicious.example",
@@ -35,11 +36,9 @@ describe("cors integration", () => {
     expect(allowOrigin === null || allowOrigin === "").toBe(true);
   });
 
-  it("handles preflight requests for trusted origins", async ({
-    controlPlaneApi,
-    trustedOrigin,
-  }) => {
-    const response = await controlPlaneApi.http.fetch("/__healthz", {
+  it("handles preflight requests for trusted origins", async ({ env }) => {
+    const trustedOrigin = env.controlPlaneApi.hostBaseUrl;
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "OPTIONS",
       headers: {
         origin: trustedOrigin,
