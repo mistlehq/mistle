@@ -5,6 +5,20 @@
     "dist/**"
   ],
   "type": "module",
+  "exports": {
+    "./runtime": {
+      "types": "./src/main.ts",
+      "node": "./dist/main.js",
+      "import": "./src/main.ts",
+      "default": "./src/main.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "node": "./dist/types.js",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
     "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",

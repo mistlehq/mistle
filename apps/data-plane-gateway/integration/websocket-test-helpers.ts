@@ -13,6 +13,7 @@ export type FailedWebSocketConnectResult = {
 
 export type WebSocketConnectOptions = {
   autoPong?: boolean;
+  headers?: Record<string, string>;
   handshakeTimeoutMs?: number;
 };
 
@@ -20,14 +21,17 @@ export type SandboxTunnelWebSocketTokenKind = "bootstrap" | "connect";
 
 function createWebSocketClientOptions(input: WebSocketConnectOptions | undefined): {
   autoPong?: boolean;
+  headers?: Record<string, string>;
   handshakeTimeout: number;
 } {
   return input?.autoPong === undefined
     ? {
+        ...(input?.headers === undefined ? {} : { headers: input.headers }),
         handshakeTimeout: input?.handshakeTimeoutMs ?? ConnectTimeoutMs,
       }
     : {
         autoPong: input.autoPong,
+        ...(input.headers === undefined ? {} : { headers: input.headers }),
         handshakeTimeout: input.handshakeTimeoutMs ?? ConnectTimeoutMs,
       };
 }
@@ -73,15 +77,21 @@ export function connectSandboxTunnelWebSocket(input: {
   tokenKind: SandboxTunnelWebSocketTokenKind;
   token: string;
   autoPong?: boolean;
+  headers?: Record<string, string>;
 }): Promise<WebSocket> {
   const tokenQueryParam = input.tokenKind === "bootstrap" ? "bootstrap_token" : "connect_token";
 
   return connectWebSocket(
     `${input.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?${tokenQueryParam}=${encodeURIComponent(input.token)}`,
     input.autoPong === undefined
-      ? undefined
+      ? input.headers === undefined
+        ? undefined
+        : {
+            headers: input.headers,
+          }
       : {
           autoPong: input.autoPong,
+          ...(input.headers === undefined ? {} : { headers: input.headers }),
         },
   );
 }

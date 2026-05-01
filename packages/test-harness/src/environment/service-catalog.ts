@@ -1,8 +1,23 @@
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { dirname } from "node:path";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+
+import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
+import { DATA_PLANE_SCHEMA_NAME } from "@mistle/db/data-plane";
+import {
+  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+  MigrationTracking,
+  runControlPlaneMigrations,
+  runDataPlaneMigrations,
+} from "@mistle/db/migrator";
+import { systemSleeper } from "@mistle/time";
+import { BackendPostgres } from "openworkflow/postgres";
+import { createClient } from "redis";
 
 import { startControlPlaneApi } from "../apps/control-plane-api.js";
 import { startControlPlaneWorker } from "../apps/control-plane-worker.js";
@@ -10,20 +25,19 @@ import { startDataPlaneApi } from "../apps/data-plane-api.js";
 import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
 import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
-import { runCleanupTasks } from "../cleanup/index.js";
+import { registerProcessCleanupTask } from "../cleanup/index.js";
 import { acquireSharedMailpitInfra } from "../services/shared-mailpit.js";
-import { acquireSharedPostgresInfra } from "../services/shared-postgres.js";
-import { startValkey, type ValkeyService } from "../services/valkey/index.js";
+import {
+  acquireSharedPostgresInfra,
+  type SharedPostgresLease,
+} from "../services/shared-postgres.js";
+import { acquireSharedValkeyInfra, type SharedValkeyLease } from "../services/shared-valkey.js";
 import { DockerIntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
 import { readPreparedTestHarnessRuntime } from "../system/prepared-runtime.js";
-import {
-  createControlPlaneDatabaseMigrationCommandInput,
-  createControlPlaneWorkflowMigrationCommandInput,
-  createDataPlaneDatabaseMigrationCommandInput,
-  createDataPlaneWorkflowMigrationCommandInput,
-  resolveHostPathFromContainerPath,
-} from "../system/provision-system-integration-targets.js";
+import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
 import { createServiceRegistry } from "./registry.js";
+import { MISTLE_TEST_RUN_ID_ENV } from "./runner-pool-session.js";
+import { createDataPlaneTestSchemaName } from "./test-isolation.js";
 import type {
   ResolvedTestInfra,
   TestService,
@@ -46,22 +60,30 @@ const DefaultSharedInfraKey = "mistle-test-environment";
 const HostGatewayName = "host.testcontainers.internal";
 const DockerSocketPath = "/var/run/docker.sock";
 const DeadServiceBaseUrl = "http://host.testcontainers.internal:9";
+const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
+const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
+const MigrationLockPollIntervalMs = 50;
+const MigrationLockTimeoutMs = 120_000;
+const PostgresMigrationCoordinatorRootDirectoryPath = join(
+  tmpdir(),
+  "mistle-test-harness",
+  "postgres-migrations",
+);
 
-export const MistleTestInfraIds = {
+const InfraIds = {
   POSTGRES: "postgres",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
 };
 
-const InfraIds = MistleTestInfraIds;
-
-export const MistlePostgresInfraValues = {
+const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
   HOST_POOLED_URL: "host.pooledUrl",
   CONTAINER_DIRECT_URL: "container.directUrl",
   CONTAINER_POOLED_URL: "container.pooledUrl",
   CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
   DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
+  DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
 };
 
 const InfraKinds = {
@@ -69,8 +91,6 @@ const InfraKinds = {
   VALKEY: "valkey",
   MAILPIT: "mailpit",
 };
-
-const PostgresValues = MistlePostgresInfraValues;
 
 const ValkeyValues = {
   HOST_URL: "host.url",
@@ -83,6 +103,54 @@ const MailpitValues = {
   SMTP_PORT: "smtp.port",
   HTTP_BASE_URL: "http.baseUrl",
 };
+
+function formatDuration(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
+function writeTimingLine(message: string): void {
+  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
+    return;
+  }
+
+  process.stderr.write(`${message}\n`);
+}
+
+async function measure<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function measureSync<T>(timings: Map<string, number>, label: string, callback: () => T): T {
+  const startedAt = Date.now();
+  try {
+    return callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function writeProvisionerTimingSummary(input: {
+  environmentId: string;
+  provisioner: string;
+  timings: ReadonlyMap<string, number>;
+}): void {
+  const parts = Array.from(input.timings.entries()).map(
+    ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
+  );
+
+  writeTimingLine(
+    `[integration-new] env ${input.environmentId} ${input.provisioner} phases: ${parts.join(", ")}.`,
+  );
+}
 
 export type MistleTestServiceId =
   | "control-plane-api"
@@ -118,26 +186,16 @@ type MistleRegistryContext = {
   startupTimeoutMs: number;
 };
 
-type LocalValkeyLease = {
-  service: ValkeyService;
-  leaseCount: number;
-};
-
-export type CreateMistlePostgresInfraRequirementInput = {
-  buildContextHostPath?: string;
-  configPathInContainer?: string;
-  sharedInfraKey?: string;
-  startupTimeoutMs?: number;
-};
-
 export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleTestRegistry {
-  const context = createMistleRegistryContext(input);
-  const sharedInfraKey = input.sharedInfraKey ?? DefaultSharedInfraKey;
+  const context = createRegistryContext(input);
+  const sharedInfraKey = input.sharedInfraKey ?? createDefaultSharedInfraKey(process.env);
   const postgres = createPostgresRequirement({
     sharedInfraKey,
     context,
   });
-  const valkey = createValkeyRequirement();
+  const valkey = createValkeyRequirement({
+    sharedInfraKey,
+  });
   const mailpit = createMailpitRequirement({
     sharedInfraKey,
   });
@@ -178,16 +236,16 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
   });
 }
 
-export function createMistlePostgresInfraRequirement(
-  input: CreateMistlePostgresInfraRequirementInput = {},
-): TestInfraRequirement {
-  return createPostgresRequirement({
-    sharedInfraKey: input.sharedInfraKey ?? DefaultSharedInfraKey,
-    context: createMistleRegistryContext(input),
-  });
+function createDefaultSharedInfraKey(environment: NodeJS.ProcessEnv): string {
+  const testRunId = environment[MISTLE_TEST_RUN_ID_ENV];
+  if (testRunId === undefined || testRunId.length === 0) {
+    return DefaultSharedInfraKey;
+  }
+
+  return `${DefaultSharedInfraKey}:${testRunId}`;
 }
 
-function createMistleRegistryContext(input: {
+function createRegistryContext(input: {
   buildContextHostPath?: string;
   configPathInContainer?: string;
   startupTimeoutMs?: number;
@@ -214,31 +272,97 @@ function createPostgresProvisioner(input: {
   sharedInfraKey: string;
   context: MistleRegistryContext;
 }): TestInfraProvisioner {
+  let sharedLease: Promise<SharedPostgresLease> | undefined;
+  let bootstrapMigrations: Promise<void> | undefined;
+  let logicalMigrations: Promise<void> = Promise.resolve();
+
+  const acquireLease = (): Promise<SharedPostgresLease> => {
+    if (sharedLease !== undefined) {
+      return sharedLease;
+    }
+
+    let leasePromise: Promise<SharedPostgresLease>;
+    leasePromise = acquireSharedPostgresInfra({
+      key: input.sharedInfraKey,
+      postgres: {},
+    }).then(
+      (lease) => {
+        registerProcessCleanupTask(async () => {
+          await lease.release();
+          if (sharedLease === leasePromise) {
+            sharedLease = undefined;
+          }
+        });
+        return lease;
+      },
+      (error: unknown) => {
+        if (sharedLease === leasePromise) {
+          sharedLease = undefined;
+        }
+        throw error;
+      },
+    );
+    sharedLease = leasePromise;
+
+    return leasePromise;
+  };
+  const runBootstrapMigrationsOnce = (migrationInput: {
+    hostDirectUrl: string;
+    migrationCoordinatorKey: string;
+    timings: Map<string, number>;
+  }): Promise<void> => {
+    if (bootstrapMigrations !== undefined) {
+      return bootstrapMigrations;
+    }
+
+    let migrationsPromise: Promise<void>;
+    migrationsPromise = runPostgresBootstrapMigrationsOnceAcrossProcesses({
+      context: input.context,
+      hostDirectUrl: migrationInput.hostDirectUrl,
+      migrationCoordinatorKey: migrationInput.migrationCoordinatorKey,
+      timings: migrationInput.timings,
+    }).catch((error: unknown) => {
+      if (bootstrapMigrations === migrationsPromise) {
+        bootstrapMigrations = undefined;
+      }
+      throw error;
+    });
+    bootstrapMigrations = migrationsPromise;
+    return migrationsPromise;
+  };
+  const enqueueLogicalMigrations = (migrationInput: {
+    hostDirectUrl: string;
+    dataPlaneSchemaName: string;
+    workflowControlPlaneNamespaceId: string;
+    workflowDataPlaneNamespaceId: string;
+    timings: Map<string, number>;
+  }): Promise<void> => {
+    const migrationTask = logicalMigrations.then(() =>
+      runPostgresLogicalMigrations({
+        context: input.context,
+        ...migrationInput,
+      }),
+    );
+    logicalMigrations = migrationTask.catch(() => {});
+    return migrationTask;
+  };
+
   return {
     kind: InfraKinds.POSTGRES,
     provision: async (provisionInput) => {
-      const lease = await acquireSharedPostgresInfra({
-        key: input.sharedInfraKey,
-        postgres: {},
-      });
-      const databaseName = createPostgresDatabaseName(provisionInput.environmentId);
-      const workflowControlPlaneNamespaceId = createWorkflowNamespaceId({
-        prefix: "cp",
-        environmentId: provisionInput.environmentId,
-      });
-      const workflowDataPlaneNamespaceId = createWorkflowNamespaceId({
-        prefix: "dp",
-        environmentId: provisionInput.environmentId,
-      });
-      let databaseCreated = false;
-
-      try {
-        await runPostgresAdminCommand({
-          containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
-          username: lease.infra.postgres.postgres.username,
-          sql: `create database "${databaseName}"`,
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-shared-lease", acquireLease);
+      const resolved = measureSync(timings, "resolve-values", () => {
+        const databaseName = lease.infra.postgres.postgres.databaseName;
+        const workflowControlPlaneNamespaceId = createWorkflowNamespaceId({
+          prefix: "cp",
+          environmentId: provisionInput.environmentId,
         });
-        databaseCreated = true;
+        const workflowDataPlaneNamespaceId = createWorkflowNamespaceId({
+          prefix: "dp",
+          environmentId: provisionInput.environmentId,
+        });
+        const dataPlaneSchemaName = createDataPlaneTestSchemaName(provisionInput.environmentId);
 
         const hostDirectUrl = createDatabaseUrl({
           username: lease.infra.postgres.postgres.username,
@@ -268,109 +392,190 @@ function createPostgresProvisioner(input: {
           port: lease.infra.postgres.pgbouncer.port,
           databaseName,
         });
-
-        await runPostgresMigrations({
-          context: input.context,
-          hostDirectUrl,
-          workflowControlPlaneNamespaceId,
-          workflowDataPlaneNamespaceId,
+        const migrationCoordinatorKey = createPostgresMigrationCoordinatorKey({
+          sharedInfraKey: input.sharedInfraKey,
+          postgresContainerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
         });
 
-        return provisionInput.requirements.map((requirement) => ({
-          id: requirement.id,
-          kind: requirement.kind,
-          values: new Map([
-            [PostgresValues.HOST_DIRECT_URL, hostDirectUrl],
-            [PostgresValues.HOST_POOLED_URL, hostPooledUrl],
-            [PostgresValues.CONTAINER_DIRECT_URL, containerDirectUrl],
-            [PostgresValues.CONTAINER_POOLED_URL, containerPooledUrl],
-            [PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID, workflowControlPlaneNamespaceId],
-            [PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID, workflowDataPlaneNamespaceId],
-          ]),
-          stop: async () => {
-            await runCleanupTasks({
-              tasks: [
-                async () => {
-                  await dropPostgresDatabase({
-                    containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
-                    username: lease.infra.postgres.postgres.username,
-                    databaseName,
-                  });
-                },
-                lease.release,
-              ],
-              context: `Mistle test Postgres cleanup for ${databaseName}`,
-            });
-          },
-        }));
-      } catch (error) {
-        if (databaseCreated) {
-          await dropPostgresDatabase({
-            containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
-            username: lease.infra.postgres.postgres.username,
-            databaseName,
-          });
-        }
-
-        await lease.release();
-        throw error;
-      }
-    },
-  };
-}
-
-function createValkeyRequirement(): TestInfraRequirement {
-  return {
-    id: InfraIds.VALKEY,
-    kind: InfraKinds.VALKEY,
-    provisioner: createValkeyProvisioner(),
-  };
-}
-
-function createValkeyProvisioner(): TestInfraProvisioner {
-  let lease: LocalValkeyLease | undefined;
-
-  return {
-    kind: InfraKinds.VALKEY,
-    provision: async (provisionInput) => {
-      if (lease === undefined) {
-        lease = {
-          service: await startValkey({
-            manageProcessCleanup: false,
-          }),
-          leaseCount: 0,
+        return {
+          hostDirectUrl,
+          hostPooledUrl,
+          containerDirectUrl,
+          containerPooledUrl,
+          workflowControlPlaneNamespaceId,
+          workflowDataPlaneNamespaceId,
+          dataPlaneSchemaName,
+          migrationCoordinatorKey,
         };
-      }
+      });
 
-      lease.leaseCount += 1;
-      const activeLease = lease;
-      const keyPrefix = `${createSafeIdentifier(provisionInput.environmentId)}:`;
+      await measure(timings, "bootstrap-migrations", async () =>
+        runBootstrapMigrationsOnce({
+          hostDirectUrl: resolved.hostDirectUrl,
+          migrationCoordinatorKey: resolved.migrationCoordinatorKey,
+          timings,
+        }),
+      );
+      await measure(timings, "logical-migrations", async () => {
+        await withPostgresMigrationCoordinatorLock(resolved.migrationCoordinatorKey, async () => {
+          await enqueueLogicalMigrations({
+            hostDirectUrl: resolved.hostDirectUrl,
+            dataPlaneSchemaName: resolved.dataPlaneSchemaName,
+            workflowControlPlaneNamespaceId: resolved.workflowControlPlaneNamespaceId,
+            workflowDataPlaneNamespaceId: resolved.workflowDataPlaneNamespaceId,
+            timings,
+          });
+        });
+      });
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "postgres",
+        timings,
+      });
 
       return provisionInput.requirements.map((requirement) => ({
         id: requirement.id,
         kind: requirement.kind,
         values: new Map([
-          [ValkeyValues.HOST_URL, activeLease.service.url],
+          [PostgresValues.HOST_DIRECT_URL, resolved.hostDirectUrl],
+          [PostgresValues.HOST_POOLED_URL, resolved.hostPooledUrl],
+          [PostgresValues.CONTAINER_DIRECT_URL, resolved.containerDirectUrl],
+          [PostgresValues.CONTAINER_POOLED_URL, resolved.containerPooledUrl],
           [
-            ValkeyValues.CONTAINER_URL,
-            `redis://${HostGatewayName}:${String(activeLease.service.port)}`,
+            PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
+            resolved.workflowControlPlaneNamespaceId,
           ],
-          [ValkeyValues.KEY_PREFIX, keyPrefix],
+          [PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID, resolved.workflowDataPlaneNamespaceId],
+          [PostgresValues.DATA_PLANE_SCHEMA_NAME, resolved.dataPlaneSchemaName],
         ]),
         stop: async () => {
-          activeLease.leaseCount -= 1;
-          if (activeLease.leaseCount > 0) {
-            return;
-          }
-
-          await activeLease.service.stop();
-          if (lease === activeLease) {
-            lease = undefined;
-          }
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "drop-data-plane-schema", async () =>
+            dropPostgresSchema({
+              containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
+              username: lease.infra.postgres.postgres.username,
+              databaseName: lease.infra.postgres.postgres.databaseName,
+              schemaName: resolved.dataPlaneSchemaName,
+            }),
+          );
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "postgres cleanup",
+            timings: cleanupTimings,
+          });
         },
       }));
     },
   };
+}
+
+function createValkeyRequirement(input: { sharedInfraKey: string }): TestInfraRequirement {
+  return {
+    id: InfraIds.VALKEY,
+    kind: InfraKinds.VALKEY,
+    provisioner: createValkeyProvisioner(input),
+  };
+}
+
+function createValkeyProvisioner(input: { sharedInfraKey: string }): TestInfraProvisioner {
+  let sharedLease: Promise<SharedValkeyLease> | undefined;
+
+  const acquireLease = (): Promise<SharedValkeyLease> => {
+    if (sharedLease !== undefined) {
+      return sharedLease;
+    }
+
+    let leasePromise: Promise<SharedValkeyLease>;
+    leasePromise = acquireSharedValkeyInfra({
+      key: input.sharedInfraKey,
+    }).then(
+      (lease) => {
+        registerProcessCleanupTask(async () => {
+          await lease.release();
+          if (sharedLease === leasePromise) {
+            sharedLease = undefined;
+          }
+        });
+        return lease;
+      },
+      (error: unknown) => {
+        if (sharedLease === leasePromise) {
+          sharedLease = undefined;
+        }
+        throw error;
+      },
+    );
+    sharedLease = leasePromise;
+
+    return leasePromise;
+  };
+
+  return {
+    kind: InfraKinds.VALKEY,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-shared-lease", acquireLease);
+      const keyPrefix = measureSync(
+        timings,
+        "resolve-values",
+        () => `${createSafeIdentifier(provisionInput.environmentId)}:`,
+      );
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "valkey",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([
+          [ValkeyValues.HOST_URL, lease.infra.valkey.url],
+          [
+            ValkeyValues.CONTAINER_URL,
+            `redis://${HostGatewayName}:${String(lease.infra.valkey.port)}`,
+          ],
+          [ValkeyValues.KEY_PREFIX, keyPrefix],
+        ]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "delete-key-prefix", async () =>
+            deleteValkeyKeysByPrefix({
+              url: lease.infra.valkey.url,
+              keyPrefix,
+            }),
+          );
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "valkey cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+async function deleteValkeyKeysByPrefix(input: { url: string; keyPrefix: string }): Promise<void> {
+  const client = createClient({
+    url: input.url,
+  });
+
+  await client.connect();
+  try {
+    for await (const keys of client.scanIterator({
+      MATCH: `${input.keyPrefix}*`,
+      COUNT: 100,
+    })) {
+      if (keys.length === 0) {
+        continue;
+      }
+
+      await client.del(keys);
+    }
+  } finally {
+    await client.close();
+  }
 }
 
 function createMailpitRequirement(input: { sharedInfraKey: string }): TestInfraRequirement {
@@ -385,8 +590,16 @@ function createMailpitProvisioner(input: { sharedInfraKey: string }): TestInfraP
   return {
     kind: InfraKinds.MAILPIT,
     provision: async (provisionInput) => {
-      const lease = await acquireSharedMailpitInfra({
-        key: input.sharedInfraKey,
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-physical", async () =>
+        acquireSharedMailpitInfra({
+          key: input.sharedInfraKey,
+        }),
+      );
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "mailpit",
+        timings,
       });
 
       return provisionInput.requirements.map((requirement) => ({
@@ -397,7 +610,15 @@ function createMailpitProvisioner(input: { sharedInfraKey: string }): TestInfraP
           [MailpitValues.SMTP_PORT, String(lease.infra.mailpit.smtpPort)],
           [MailpitValues.HTTP_BASE_URL, lease.infra.mailpit.httpBaseUrl],
         ]),
-        stop: lease.release,
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "release-lease", lease.release);
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "mailpit cleanup",
+            timings: cleanupTimings,
+          });
+        },
       }));
     },
   };
@@ -788,93 +1009,260 @@ async function startDataPlaneWorkerDockerService(input: {
   };
 }
 
-async function runPostgresMigrations(input: {
+function createPostgresMigrationCoordinatorKey(input: {
+  sharedInfraKey: string;
+  postgresContainerId: string;
+}): string {
+  return createHash("sha256")
+    .update(input.sharedInfraKey)
+    .update("\0")
+    .update(input.postgresContainerId)
+    .digest("hex");
+}
+
+async function runPostgresBootstrapMigrations(input: {
   context: MistleRegistryContext;
   hostDirectUrl: string;
+  timings: Map<string, number>;
+}): Promise<void> {
+  await measure(input.timings, "bootstrap-data-plane-db-migrations", async () =>
+    runDataPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: DATA_PLANE_SCHEMA_NAME,
+      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
+      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
+    }),
+  );
+  await measure(input.timings, "bootstrap-control-plane-db-migrations", async () =>
+    runControlPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: CONTROL_PLANE_SCHEMA_NAME,
+      migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
+      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    }),
+  );
+}
+
+async function runPostgresBootstrapMigrationsOnceAcrossProcesses(input: {
+  context: MistleRegistryContext;
+  hostDirectUrl: string;
+  migrationCoordinatorKey: string;
+  timings: Map<string, number>;
+}): Promise<void> {
+  await withPostgresMigrationCoordinatorLock(input.migrationCoordinatorKey, async () => {
+    if (await hasPostgresBootstrapMigrationMarker(input.migrationCoordinatorKey)) {
+      return;
+    }
+
+    await runPostgresBootstrapMigrations({
+      context: input.context,
+      hostDirectUrl: input.hostDirectUrl,
+      timings: input.timings,
+    });
+    await writePostgresBootstrapMigrationMarker(input.migrationCoordinatorKey);
+  });
+}
+
+async function runPostgresLogicalMigrations(input: {
+  context: MistleRegistryContext;
+  hostDirectUrl: string;
+  dataPlaneSchemaName: string;
   workflowControlPlaneNamespaceId: string;
   workflowDataPlaneNamespaceId: string;
+  timings: Map<string, number>;
 }): Promise<void> {
-  await runSystemCommand(
-    createDataPlaneDatabaseMigrationCommandInput({
-      buildContextHostPath: input.context.buildContextHostPath,
-      configPathInContainer: input.context.configPathInContainer,
-      hostDatabaseUrl: input.hostDirectUrl,
+  await measure(input.timings, "logical-data-plane-db-migrations", async () =>
+    runDataPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: input.dataPlaneSchemaName,
+      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: `${input.dataPlaneSchemaName}_meta`,
+      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
     }),
   );
-  await runSystemCommand({
-    ...createDataPlaneWorkflowMigrationCommandInput({
-      buildContextHostPath: input.context.buildContextHostPath,
-      configPathInContainer: input.context.configPathInContainer,
-      hostDatabaseUrl: input.hostDirectUrl,
-    }),
-    env: {
-      ...createDataPlaneWorkflowMigrationCommandInput({
-        buildContextHostPath: input.context.buildContextHostPath,
-        configPathInContainer: input.context.configPathInContainer,
-        hostDatabaseUrl: input.hostDirectUrl,
-      }).env,
-      MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: input.workflowDataPlaneNamespaceId,
-    },
-  });
-  await runSystemCommand(
-    createControlPlaneDatabaseMigrationCommandInput({
-      buildContextHostPath: input.context.buildContextHostPath,
-      configPathInContainer: input.context.configPathInContainer,
-      hostDatabaseUrl: input.hostDirectUrl,
+  await measure(input.timings, "logical-data-plane-workflow-migrations", async () =>
+    runOpenWorkflowPostgresMigrations({
+      url: input.hostDirectUrl,
+      namespaceId: input.workflowDataPlaneNamespaceId,
+      schema: DataPlaneOpenWorkflowSchema,
     }),
   );
-  await runSystemCommand({
-    ...createControlPlaneWorkflowMigrationCommandInput({
-      buildContextHostPath: input.context.buildContextHostPath,
-      configPathInContainer: input.context.configPathInContainer,
-      hostDatabaseUrl: input.hostDirectUrl,
+  await measure(input.timings, "logical-control-plane-workflow-migrations", async () =>
+    runOpenWorkflowPostgresMigrations({
+      url: input.hostDirectUrl,
+      namespaceId: input.workflowControlPlaneNamespaceId,
+      schema: ControlPlaneOpenWorkflowSchema,
     }),
-    env: {
-      ...createControlPlaneWorkflowMigrationCommandInput({
-        buildContextHostPath: input.context.buildContextHostPath,
-        configPathInContainer: input.context.configPathInContainer,
-        hostDatabaseUrl: input.hostDirectUrl,
-      }).env,
-      MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: input.workflowControlPlaneNamespaceId,
-    },
-  });
+  );
 }
 
-async function runSystemCommand(input: {
-  command: string;
-  args: readonly string[];
-  cwd: string;
-  env: Record<string, string>;
+async function runOpenWorkflowPostgresMigrations(input: {
+  url: string;
+  namespaceId: string;
+  schema: string;
 }): Promise<void> {
-  await execFileAsync(input.command, [...input.args], {
-    cwd: input.cwd,
-    env: {
-      ...process.env,
-      ...input.env,
-    },
+  const backend = await BackendPostgres.connect(input.url, {
+    namespaceId: input.namespaceId,
+    runMigrations: true,
+    schema: input.schema,
   });
+
+  await backend.stop();
 }
 
-async function dropPostgresDatabase(input: {
+async function withPostgresMigrationCoordinatorLock<T>(
+  migrationCoordinatorKey: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const lockDirectoryPath = join(
+    PostgresMigrationCoordinatorRootDirectoryPath,
+    `${migrationCoordinatorKey}.lock`,
+  );
+  const ownerFilePath = join(lockDirectoryPath, "owner.json");
+  const deadline = Date.now() + MigrationLockTimeoutMs;
+
+  await mkdir(PostgresMigrationCoordinatorRootDirectoryPath, {
+    recursive: true,
+  });
+
+  while (Date.now() < deadline) {
+    try {
+      await mkdir(lockDirectoryPath);
+      await writeFile(
+        ownerFilePath,
+        `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`,
+        "utf8",
+      );
+
+      try {
+        return await callback();
+      } finally {
+        await rm(lockDirectoryPath, {
+          recursive: true,
+          force: true,
+        });
+      }
+    } catch (error) {
+      if (!isNodeErrorCode(error, "EEXIST")) {
+        throw error;
+      }
+
+      const ownerPid = await readPostgresMigrationLockOwnerPid(ownerFilePath);
+      if (ownerPid !== undefined && !isProcessAlive(ownerPid)) {
+        await rm(lockDirectoryPath, {
+          recursive: true,
+          force: true,
+        });
+        continue;
+      }
+
+      await systemSleeper.sleep(MigrationLockPollIntervalMs);
+    }
+  }
+
+  throw new Error(
+    `Timed out acquiring Postgres migration lock after ${String(MigrationLockTimeoutMs)}ms.`,
+  );
+}
+
+async function hasPostgresBootstrapMigrationMarker(
+  migrationCoordinatorKey: string,
+): Promise<boolean> {
+  try {
+    await readFile(createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey), "utf8");
+    return true;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function writePostgresBootstrapMigrationMarker(
+  migrationCoordinatorKey: string,
+): Promise<void> {
+  await writeFile(
+    createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey),
+    `${JSON.stringify({ completedAt: Date.now(), pid: process.pid })}\n`,
+    "utf8",
+  );
+}
+
+function createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey: string): string {
+  return join(PostgresMigrationCoordinatorRootDirectoryPath, `${migrationCoordinatorKey}.ready`);
+}
+
+async function readPostgresMigrationLockOwnerPid(
+  ownerFilePath: string,
+): Promise<number | undefined> {
+  try {
+    const raw = await readFile(ownerFilePath, "utf8");
+    const parsed = parseJsonRecord(raw);
+    const pid = parsed["pid"];
+    if (typeof pid !== "number") {
+      return undefined;
+    }
+    return pid;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed)) {
+    throw new Error("Expected JSON object.");
+  }
+  return parsed;
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return isRecord(error) && error["code"] === code;
+}
+
+function isProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ESRCH")) {
+      return false;
+    }
+    if (isNodeErrorCode(error, "EPERM")) {
+      return true;
+    }
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function dropPostgresSchema(input: {
   containerId: string;
   username: string;
   databaseName: string;
+  schemaName: string;
 }): Promise<void> {
   await runPostgresAdminCommand({
     containerId: input.containerId,
     username: input.username,
-    sql: `select pg_terminate_backend(pid) from pg_stat_activity where datname = '${input.databaseName.replaceAll("'", "''")}'`,
-  });
-  await runPostgresAdminCommand({
-    containerId: input.containerId,
-    username: input.username,
-    sql: `drop database if exists "${input.databaseName}"`,
+    databaseName: input.databaseName,
+    sql: `drop schema if exists "${input.schemaName.replaceAll('"', '""')}" cascade`,
   });
 }
 
 async function runPostgresAdminCommand(input: {
   containerId: string;
   username: string;
+  databaseName?: string;
   sql: string;
 }): Promise<void> {
   await execFileAsync("docker", [
@@ -884,7 +1272,7 @@ async function runPostgresAdminCommand(input: {
     "-U",
     input.username,
     "-d",
-    "postgres",
+    input.databaseName ?? "postgres",
     "-v",
     "ON_ERROR_STOP=1",
     "-c",
@@ -902,10 +1290,6 @@ function createDatabaseUrl(input: {
   return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
 }
 
-function createPostgresDatabaseName(environmentId: string): string {
-  return `mistle_test_${createSafeIdentifier(environmentId)}`;
-}
-
 function createWorkflowNamespaceId(input: { prefix: string; environmentId: string }): string {
   return `${input.prefix}_${createSafeIdentifier(input.environmentId)}`;
 }
@@ -913,7 +1297,7 @@ function createWorkflowNamespaceId(input: { prefix: string; environmentId: strin
 function createSafeIdentifier(value: string): string {
   const normalized = value.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
   const digest = createHash("sha256").update(value).digest("hex").slice(0, 10);
-  const compact = normalized.length === 0 ? "env" : normalized.slice(0, 40);
+  const compact = normalized.length === 0 ? "env" : normalized.slice(0, 28);
   return `${compact}_${digest}_${randomUUID().replaceAll("-", "").slice(0, 8)}`;
 }
 

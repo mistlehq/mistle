@@ -1,4 +1,4 @@
-import { fetch as undiciFetch, Pool } from "undici";
+import { fetch as undiciFetch, Headers, Pool } from "undici";
 
 import type { TestHttpClient } from "./types.js";
 
@@ -12,7 +12,10 @@ type SharedHttpPool = {
 const SharedHttpPoolsByOrigin = new Map<string, SharedHttpPool>();
 const DefaultMaxConnectionsPerOrigin = 4;
 
-export function createTestHttpClient(input: { baseUrl: string }): TestHttpClient {
+export function createTestHttpClient(input: {
+  baseUrl: string;
+  defaultHeaders?: ReadonlyMap<string, string>;
+}): TestHttpClient {
   const baseUrl = new URL(input.baseUrl);
   const sharedPool = leaseSharedHttpPool(baseUrl.origin);
   let closed = false;
@@ -24,8 +27,16 @@ export function createTestHttpClient(input: { baseUrl: string }): TestHttpClient
       }
 
       const url = new URL(path, baseUrl);
+      const headers = new Headers(init?.headers);
+      for (const [name, value] of input.defaultHeaders ?? []) {
+        if (!headers.has(name)) {
+          headers.set(name, value);
+        }
+      }
+
       return undiciFetch(url, {
         ...init,
+        headers,
         dispatcher: sharedPool.pool,
       });
     },

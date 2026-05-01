@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { drainProcessCleanupTasks } from "../cleanup/index.js";
-import { defineTestServiceRegistry } from "./registry.js";
+import { createServiceRegistry, defineTestServiceRegistry } from "./registry.js";
 import { startTestEnvironment } from "./runtime.js";
 import type {
   ResolvedTestInfra,
@@ -21,6 +21,45 @@ function createResolvedInfra(input: {
     values: new Map([["url", `postgresql://${input.id}`]]),
     stop: async () => {
       input.cleanupEvents.push(`infra:${input.id}`);
+    },
+  };
+}
+
+function createRestartableHttpService(input: {
+  id: string;
+  requirement: TestInfraRequirement;
+  startEvents: string[];
+  cleanupEvents: string[];
+}): TestServiceDefinition {
+  return {
+    id: input.id,
+    infra: [input.requirement],
+    serviceReferences: [],
+    endpoints: {
+      http: {
+        host: "127.0.0.1",
+      },
+    },
+    supportedModes: ["runtime"],
+    healthCheck: async () => {},
+    start: async (startInput) => {
+      const httpEndpoint = startInput.plannedEndpoints.get(input.id)?.http;
+      if (httpEndpoint === undefined) {
+        throw new Error("Expected HTTP endpoint to be planned.");
+      }
+
+      input.startEvents.push(httpEndpoint.hostBaseUrl);
+
+      return {
+        id: input.id,
+        mode: startInput.mode,
+        endpoints: {
+          http: httpEndpoint,
+        },
+        stop: async () => {
+          input.cleanupEvents.push(`service:${input.id}`);
+        },
+      };
     },
   };
 }
@@ -288,5 +327,71 @@ describe("startTestEnvironment", () => {
     ).rejects.toThrow("broken-service failed to start");
 
     expect(cleanupEvents).toEqual(["infra:postgres.control-plane"]);
+  });
+
+  it("restarts an isolated service with the same planned endpoint", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const registry = defineTestServiceRegistry({
+      "control-plane-api": createRestartableHttpService({
+        id: "control-plane-api",
+        requirement: postgresRequirement,
+        startEvents,
+        cleanupEvents,
+      }),
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_restart",
+      registry,
+      services: [{ service: "control-plane-api", mode: "runtime" }],
+    });
+    const service = environment.services.get("control-plane-api");
+    const firstUrl = service.endpoints.http?.hostBaseUrl;
+
+    await service.restart();
+
+    expect(service.endpoints.http?.hostBaseUrl).toBe(firstUrl);
+    expect(startEvents).toEqual([firstUrl, firstUrl]);
+
+    await environment.stop();
+
+    expect(cleanupEvents).toEqual([
+      "service:control-plane-api",
+      "service:control-plane-api",
+      "infra:postgres.control-plane",
+    ]);
+  });
+
+  it("requires dangerous service isolation before mutating service lifecycle", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const registry = createServiceRegistry({
+      services: {
+        "control-plane-api": createRestartableHttpService({
+          id: "control-plane-api",
+          requirement: postgresRequirement,
+          startEvents,
+          cleanupEvents,
+        }),
+      },
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_pooled_lifecycle",
+      registry,
+      services: [{ service: "control-plane-api", mode: "runtime" }],
+    });
+    const service = environment.services.get("control-plane-api");
+
+    await expect(service.restart()).rejects.toThrow(
+      "Use __dangerouslyIsolatedServices when a test needs to mutate service lifecycle.",
+    );
+
+    await environment.stop();
   });
 });

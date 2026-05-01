@@ -40,6 +40,7 @@ export async function acquireSharedPostgresMailpitInfra(
     key: input.key,
     postgres: input.postgres,
     mailpit: true,
+    valkey: false,
   });
 
   const postgres = coordinatorLease.infra.postgres;

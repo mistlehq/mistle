@@ -23,6 +23,9 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^20.5.0
         version: 20.5.0
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:packages/test-harness
       '@playwright/test':
         specifier: ^1.58.1
         version: 1.58.2
@@ -525,6 +528,9 @@ importers:
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract
+      '@mistle/sandbox-session-client':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-client
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol
@@ -779,9 +785,6 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
-      '@mistle/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
@@ -1130,6 +1133,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../config
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
@@ -1139,6 +1145,15 @@ importers:
       mailpit-api:
         specifier: ^1.9.0
         version: 1.9.0(react@19.2.5)
+      openworkflow:
+        specifier: 0.9.0
+        version: 0.9.0(postgres@3.4.9)
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
+      redis:
+        specifier: ^5.12.1
+        version: 5.12.1(@opentelemetry/api@1.9.1)
       testcontainers:
         specifier: ^11.14.0
         version: 11.14.0
@@ -1148,6 +1163,10 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
 
   packages/time:
     dependencies:

@@ -7,6 +7,7 @@ const TestRunIdLength = 12;
 export const MISTLE_TEST_RUN_ID_ENV = "MISTLE_TEST_RUN_ID";
 export const MISTLE_TEST_COORDINATOR_DIR_ENV = "MISTLE_TEST_COORDINATOR_DIR";
 export const MISTLE_TEST_POOLING_ENV = "MISTLE_TEST_POOLING";
+export const MISTLE_TEST_RUN_OWNER_PID_ENV = "MISTLE_TEST_RUN_OWNER_PID";
 
 export type RunnerPoolSession = {
   runId: string;
@@ -25,6 +26,7 @@ export function ensureRunnerPoolSession(environment: NodeJS.ProcessEnv): RunnerP
     create: () => join(tmpdir(), "mistle-test-harness", "runner-pools", runId),
   });
   environment[MISTLE_TEST_POOLING_ENV] = "1";
+  environment[MISTLE_TEST_RUN_OWNER_PID_ENV] = String(process.pid);
 
   return {
     runId,

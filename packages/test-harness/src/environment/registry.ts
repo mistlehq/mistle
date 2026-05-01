@@ -113,6 +113,7 @@ function createPooledServiceDefinition(input: {
       return {
         id: input.service.id,
         mode: startInput.mode,
+        isPooled: true,
         endpoints: lease.endpoints,
         ...(lease.pid === undefined ? {} : { pid: lease.pid }),
         ...(lease.containerId === undefined ? {} : { containerId: lease.containerId }),

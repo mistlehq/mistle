@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { createTestRegistry } from "./mistle.js";
+import { createTestRegistry } from "./service-catalog.js";
+import { createDataPlaneTestSchemaName } from "./test-isolation.js";
 
 describe("createTestRegistry", () => {
   it("declares the default Mistle service catalog", () => {
@@ -63,5 +64,13 @@ describe("createTestRegistry", () => {
       "control-plane-api",
     ]);
     expect(registry["tokenizer-proxy"].serviceReferences).toEqual(["control-plane-api"]);
+  });
+
+  it("keeps generated data-plane schema names below the Postgres identifier limit", () => {
+    const schemaName = createDataPlaneTestSchemaName(
+      "test_env_596504dee50c4663b35c_b2c6f6b2c3_eede8a34",
+    );
+
+    expect(schemaName.length).toBeLessThanOrEqual(63);
   });
 });

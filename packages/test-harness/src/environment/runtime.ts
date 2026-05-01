@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { registerProcessCleanupTask, runCleanupTasks, type CleanupTask } from "../cleanup/index.js";
+import { releaseReservedPort, reserveAvailablePort } from "../network/reserve-available-port.js";
 import { createTestHttpClient } from "./http-client.js";
 import { createTestEnvironmentPlan } from "./plan.js";
 import { resolveTestServiceRequests } from "./registry.js";
+import { TestEnvironmentIdHeader } from "./test-isolation.js";
 import type {
   ResolvedTestInfra,
   SelectedTestServiceId,
@@ -13,14 +15,64 @@ import type {
   TestInfraProvisioner,
   TestInfraRequirement,
   TestServiceCollection,
+  TestServiceEndpoints,
   TestServiceHandle,
   TestServiceSelection,
   TestServiceRegistry,
   TestServiceRequest,
+  TestServiceStartInput,
 } from "./types.js";
 
 function createTestEnvironmentId(): string {
   return `test_env_${randomUUID().replaceAll("-", "").slice(0, 20)}`;
+}
+
+function formatDuration(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
+function writeTimingLine(message: string): void {
+  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
+    return;
+  }
+
+  process.stderr.write(`${message}\n`);
+}
+
+async function measure<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function measureSync<T>(timings: Map<string, number>, label: string, callback: () => T): T {
+  const startedAt = Date.now();
+  try {
+    return callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function writeEnvironmentTimingSummary(input: {
+  environmentId: string;
+  phase: "setup" | "cleanup";
+  timings: ReadonlyMap<string, number>;
+}): void {
+  const parts = Array.from(input.timings.entries()).map(
+    ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
+  );
+
+  writeTimingLine(
+    `[integration-new] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
+  );
 }
 
 function groupInfraRequirementsByKind(
@@ -151,13 +203,19 @@ async function stopInfra(infra: ReadonlyMap<string, ResolvedTestInfra>): Promise
   });
 }
 
-async function stopServices(services: ReadonlyMap<string, TestServiceHandle>): Promise<void> {
+type ManagedTestServiceHandle = TestServiceHandle & {
+  cleanup: () => Promise<void>;
+};
+
+async function stopServices(
+  services: ReadonlyMap<string, ManagedTestServiceHandle>,
+): Promise<void> {
   // Services stop before infra. Reverse startup order gives dependents a chance
   // to drain before the services they call are torn down.
   const tasks: CleanupTask[] = [];
 
   for (const service of Array.from(services.values()).reverse()) {
-    tasks.push(service.stop);
+    tasks.push(service.cleanup);
   }
 
   await runCleanupTasks({
@@ -169,52 +227,116 @@ async function stopServices(services: ReadonlyMap<string, TestServiceHandle>): P
 async function startServiceLayer(input: {
   environmentId: string;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
-  servicesById: Map<string, TestServiceHandle>;
+  servicesById: Map<string, ManagedTestServiceHandle>;
+  plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
   layer: readonly TestServiceRequest[];
 }): Promise<void> {
   // The planner only groups services whose dependencies are already started, so
   // a layer can start concurrently without callers hand-tuning parallelism.
   const startedServices = await Promise.all(
-    input.layer.map(async (request) =>
-      request.service.start({
+    input.layer.map(async (request) => {
+      const startInput: TestServiceStartInput = {
         environmentId: input.environmentId,
         mode: request.mode,
         infra: input.infra,
         services: input.servicesById,
-      }),
-    ),
+        plannedEndpoints: input.plannedEndpoints,
+      };
+
+      return {
+        request,
+        service: await request.service.start(startInput),
+        startInput,
+      };
+    }),
   );
 
-  for (const service of startedServices) {
+  for (const { request, service, startInput } of startedServices) {
     if (input.servicesById.has(service.id)) {
       throw new Error(`Test service '${service.id}' started more than once.`);
     }
 
-    input.servicesById.set(service.id, createTestServiceHandle(service));
+    input.servicesById.set(
+      service.id,
+      createTestServiceHandle({
+        request,
+        service,
+        startInput,
+      }),
+    );
   }
 }
 
-function createTestServiceHandle(service: TestService): TestServiceHandle {
+function createTestServiceHandle(input: {
+  request: TestServiceRequest;
+  service: TestService;
+  startInput: TestServiceStartInput;
+}): ManagedTestServiceHandle {
+  let service = input.service;
   const httpEndpoint = service.endpoints.http;
   const http =
     httpEndpoint === undefined
       ? undefined
       : createTestHttpClient({
           baseUrl: httpEndpoint.hostBaseUrl,
+          defaultHeaders: new Map([[TestEnvironmentIdHeader, input.startInput.environmentId]]),
         });
   let stopped = false;
-  const stopHttp = http === undefined ? async () => {} : http.close;
+  let cleanedUp = false;
+  const closeHttp = http === undefined ? async () => {} : http.close;
+
+  const assertIsolated = (operation: string): void => {
+    if (service.isPooled === true) {
+      throw new Error(
+        `Cannot ${operation} pooled test service '${service.id}'. Use __dangerouslyIsolatedServices when a test needs to mutate service lifecycle.`,
+      );
+    }
+  };
 
   const handle = {
     ...service,
+    start: async () => {
+      assertIsolated("start");
+      if (!stopped) {
+        return;
+      }
+
+      service = await input.request.service.start(input.startInput);
+      syncHandleRuntime(handle, service);
+      stopped = false;
+    },
     stop: async () => {
+      assertIsolated("stop");
       if (stopped) {
         return;
       }
 
+      await service.stop();
       stopped = true;
+    },
+    restart: async () => {
+      assertIsolated("restart");
+      await handle.stop();
+      await handle.start();
+    },
+    cleanup: async () => {
+      if (cleanedUp) {
+        return;
+      }
+
+      cleanedUp = true;
       await runCleanupTasks({
-        tasks: [stopHttp, service.stop],
+        tasks: [
+          closeHttp,
+          async () => {
+            if (stopped) {
+              return;
+            }
+
+            await service.stop();
+            stopped = true;
+          },
+        ],
         context: `test service '${service.id}' cleanup`,
       });
     },
@@ -230,23 +352,93 @@ function createTestServiceHandle(service: TestService): TestServiceHandle {
   };
 }
 
+function syncHandleRuntime(handle: TestServiceHandle, service: TestService): void {
+  handle.endpoints = service.endpoints;
+
+  if (service.pid === undefined) {
+    delete handle.pid;
+  } else {
+    handle.pid = service.pid;
+  }
+
+  if (service.containerId === undefined) {
+    delete handle.containerId;
+  } else {
+    handle.containerId = service.containerId;
+  }
+}
+
 async function startServices(input: {
   environmentId: string;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
+  plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
   serviceLayers: readonly (readonly TestServiceRequest[])[];
-}): Promise<ReadonlyMap<string, TestServiceHandle>> {
-  const servicesById = new Map<string, TestServiceHandle>();
+}): Promise<ReadonlyMap<string, ManagedTestServiceHandle>> {
+  const servicesById = new Map<string, ManagedTestServiceHandle>();
 
   for (const layer of input.serviceLayers) {
     await startServiceLayer({
       environmentId: input.environmentId,
       infra: input.infra,
+      plannedEndpoints: input.plannedEndpoints,
       servicesById,
       layer,
     });
   }
 
   return servicesById;
+}
+
+async function planServiceEndpoints(
+  requests: readonly TestServiceRequest[],
+): Promise<ReadonlyMap<string, TestServiceEndpoints>> {
+  const plannedEndpoints = new Map<string, TestServiceEndpoints>();
+
+  for (const request of requests) {
+    const http = request.service.endpoints?.http;
+    if (http === undefined) {
+      plannedEndpoints.set(request.service.id, {});
+      continue;
+    }
+
+    const port = await reserveAvailablePort({
+      host: http.host,
+    });
+    const hostBaseUrl = `http://${http.host}:${String(port)}`;
+
+    plannedEndpoints.set(request.service.id, {
+      http: {
+        hostBaseUrl,
+        internalBaseUrl: hostBaseUrl,
+      },
+    });
+  }
+
+  return plannedEndpoints;
+}
+
+async function releasePlannedEndpoints(
+  plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>,
+): Promise<void> {
+  await Promise.all(
+    Array.from(plannedEndpoints.values()).map(async (endpoints) => {
+      const httpEndpoint = endpoints.http;
+      if (httpEndpoint === undefined) {
+        return;
+      }
+
+      const url = new URL(httpEndpoint.hostBaseUrl);
+      const port = Number(url.port);
+      if (!Number.isInteger(port)) {
+        throw new Error(`Cannot release planned HTTP endpoint '${httpEndpoint.hostBaseUrl}'.`);
+      }
+
+      await releaseReservedPort({
+        host: url.hostname,
+        port,
+      });
+    }),
+  );
 }
 
 function createTestServiceCollection<
@@ -288,37 +480,63 @@ export async function startTestEnvironment<
   },
 ): Promise<TestEnvironment<SelectedTestServiceId<TServices>>> {
   const environmentId = input.id ?? createTestEnvironmentId();
+  const setupTimings = new Map<string, number>();
 
   if (environmentId.length === 0) {
     throw new Error("Test environment id must be non-empty.");
   }
 
-  const requestedServices = resolveTestServiceRequests(input);
-  const plan = createTestEnvironmentPlan({
-    services: requestedServices,
-  });
+  const requestedServices = measureSync(setupTimings, "resolve-services", () =>
+    resolveTestServiceRequests(input),
+  );
+  const plan = measureSync(setupTimings, "plan", () =>
+    createTestEnvironmentPlan({
+      services: requestedServices,
+    }),
+  );
   // Provision infrastructure by kind before any service starts. Provisioners get
   // batched requirements so they can share physical containers and isolate
   // logical resources such as databases, buckets, or key prefixes.
-  const infra = await provisionInfra({
-    environmentId,
-    requirements: plan.infraRequirements,
-  });
+  const infra = await measure(setupTimings, "infra", async () =>
+    provisionInfra({
+      environmentId,
+      requirements: plan.infraRequirements,
+    }),
+  );
 
-  let services: ReadonlyMap<string, TestServiceHandle> | undefined;
+  let plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints> | undefined;
+  let services: ReadonlyMap<string, ManagedTestServiceHandle> | undefined;
 
   try {
-    services = await startServices({
-      environmentId,
-      infra,
-      serviceLayers: plan.serviceLayers,
-    });
+    const endpoints = await measure(setupTimings, "endpoints", async () =>
+      planServiceEndpoints(requestedServices),
+    );
+    plannedEndpoints = endpoints;
+    services = await measure(setupTimings, "services", async () =>
+      startServices({
+        environmentId,
+        infra,
+        plannedEndpoints: endpoints,
+        serviceLayers: plan.serviceLayers,
+      }),
+    );
   } catch (error) {
     // If service startup fails, no environment handle is returned. Clean up infra
     // here so callers do not need a partially-started-environment protocol.
+    if (services !== undefined) {
+      await stopServices(services);
+    }
     await stopInfra(infra);
+    if (plannedEndpoints !== undefined) {
+      await releasePlannedEndpoints(plannedEndpoints);
+    }
     throw error;
   }
+  writeEnvironmentTimingSummary({
+    environmentId,
+    phase: "setup",
+    timings: setupTimings,
+  });
 
   let cleanupPromise: Promise<void> | undefined;
 
@@ -328,21 +546,32 @@ export async function startTestEnvironment<
       return;
     }
 
+    const cleanupTimings = new Map<string, number>();
     cleanupPromise = runCleanupTasks({
       tasks: [
         async () => {
           if (services !== undefined) {
-            await stopServices(services);
+            await measure(cleanupTimings, "services", async () => stopServices(services));
           }
         },
         async () => {
-          await stopInfra(infra);
+          await measure(cleanupTimings, "infra", async () => stopInfra(infra));
+        },
+        async () => {
+          await measure(cleanupTimings, "endpoints", async () =>
+            releasePlannedEndpoints(plannedEndpoints),
+          );
         },
       ],
       context: `test environment '${environmentId}' cleanup`,
     });
 
     await cleanupPromise;
+    writeEnvironmentTimingSummary({
+      environmentId,
+      phase: "cleanup",
+      timings: cleanupTimings,
+    });
   };
   const unregisterProcessCleanupTask = registerProcessCleanupTask(stopInternal);
 

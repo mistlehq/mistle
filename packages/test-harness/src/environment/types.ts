@@ -56,6 +56,12 @@ export type TestServiceEndpoints = {
   http?: TestServiceHttpEndpoint;
 };
 
+export type TestServiceEndpointPlan = {
+  http?: {
+    host: string;
+  };
+};
+
 export type TestServiceRuntime = {
   endpoints: TestServiceEndpoints;
   pid?: number;
@@ -69,6 +75,7 @@ export type TestServiceRuntime = {
 export type TestService = TestServiceRuntime & {
   id: string;
   mode: TestServiceLaunchMode;
+  isPooled?: true;
   stop: () => Promise<void>;
 };
 
@@ -81,6 +88,8 @@ export type TestHttpClient = {
 /** Test-facing service handle with harness-managed clients attached when present. */
 export type TestServiceHandle = TestService & {
   http?: TestHttpClient;
+  start: () => Promise<void>;
+  restart: () => Promise<void>;
 };
 
 /**
@@ -92,6 +101,7 @@ export type TestServiceStartInput = {
   mode: TestServiceLaunchMode;
   infra: ReadonlyMap<string, ResolvedTestInfra>;
   services: ReadonlyMap<string, TestServiceHandle>;
+  plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
 };
 
 /**
@@ -104,6 +114,7 @@ export type TestServiceDefinition = {
   id: string;
   infra: readonly TestInfraRequirement[];
   serviceReferences: readonly string[];
+  endpoints?: TestServiceEndpointPlan;
   supportedModes: readonly TestServiceLaunchMode[];
   healthCheck: (service: TestServiceRuntime) => Promise<void>;
   start: (input: TestServiceStartInput) => Promise<TestService>;
