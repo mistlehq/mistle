@@ -1,5 +1,5 @@
 import {
-  sandboxInstanceDeadlines,
+  getDataPlaneDatabaseSchema,
   type DataPlaneDatabase,
   type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
@@ -15,6 +15,10 @@ type PutSandboxInstanceDeadlineContext = {
 
 type DataPlaneTransaction = Parameters<Parameters<DataPlaneDatabase["transaction"]>[0]>[0];
 type DeadlineDatabase = DataPlaneDatabase | DataPlaneTransaction;
+type DeadlineTables = Pick<
+  ReturnType<typeof getDataPlaneDatabaseSchema>,
+  "sandboxInstanceDeadlines"
+>;
 
 export type PutSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
@@ -103,12 +107,15 @@ async function readCurrentSandboxInstanceDeadline(ctx: {
 
 async function persistSandboxInstanceDeadline(ctx: {
   db: DeadlineDatabase;
+  tables: DeadlineTables;
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
   ownerLeaseId: string;
   dueAt: string;
   generation: number;
 }): Promise<void> {
+  const { sandboxInstanceDeadlines } = ctx.tables;
+
   await ctx.db
     .insert(sandboxInstanceDeadlines)
     .values({
@@ -150,6 +157,8 @@ export async function putSandboxInstanceDeadline(
   ctx: PutSandboxInstanceDeadlineContext,
   input: PutSandboxInstanceDeadlineInput,
 ): Promise<PutSandboxInstanceDeadlineAcceptedResponse> {
+  const tables = getDataPlaneDatabaseSchema(ctx.db);
+
   const generation = await ctx.db.transaction(async (tx) => {
     await acquireSandboxInstanceDeadlineWriteLock({
       db: tx,
@@ -170,6 +179,7 @@ export async function putSandboxInstanceDeadline(
 
     await persistSandboxInstanceDeadline({
       db: tx,
+      tables,
       sandboxInstanceId: input.sandboxInstanceId,
       kind: input.kind,
       ownerLeaseId: input.ownerLeaseId,

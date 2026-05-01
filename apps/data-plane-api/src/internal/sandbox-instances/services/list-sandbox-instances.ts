@@ -1,6 +1,6 @@
 import {
+  getDataPlaneDatabaseSchema,
   SandboxInstancePurposes,
-  sandboxInstances,
   type DataPlaneDatabase,
   type SandboxInstance,
 } from "@mistle/db/data-plane";
@@ -72,6 +72,8 @@ export async function listSandboxInstances(
   input: ListSandboxInstancesInput,
 ): Promise<ListSandboxInstancesResponse> {
   try {
+    const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
     const response = await paginateKeyset<ListSandboxInstanceRow, SandboxInstancesCursor>({
       query: {
         after: input.after,

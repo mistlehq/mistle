@@ -1,9 +1,9 @@
 import {
+  getDataPlaneDatabaseSchema,
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
-  sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
@@ -62,6 +62,8 @@ async function markRunningSandboxInstanceStopped(
     clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -94,6 +96,8 @@ async function clearStoppedSandboxInstanceProviderSandboxId(
     sandboxInstanceId: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -129,6 +133,8 @@ async function markStartingSandboxInstanceFailed(
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -163,6 +169,8 @@ async function markStartingSandboxInstanceStopped(
     clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -200,6 +208,8 @@ async function markRunningSandboxInstanceFailed(
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -235,6 +245,8 @@ async function markStoppedSandboxInstanceFailed(
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({

@@ -1,8 +1,7 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
+  getDataPlaneDatabaseSchema,
   SandboxInstancePurposes,
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
+  type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
@@ -23,6 +22,8 @@ export async function getSandboxInstance(
   ctx: GetSandboxInstanceContext,
   input: GetSandboxInstanceInput,
 ): Promise<GetSandboxInstanceResponse> {
+  const { sandboxInstanceRuntimePlans, sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
+
   const [sandboxInstance] = await ctx.db
     .select({
       id: sandboxInstances.id,

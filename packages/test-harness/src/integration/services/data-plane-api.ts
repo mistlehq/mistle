@@ -8,6 +8,7 @@ import type {
   TestServiceDefinition,
   TestServiceStartInput,
 } from "../../environment/index.js";
+import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import {
@@ -122,6 +123,9 @@ function config(input: {
     },
     internalAuth: {
       serviceToken: "integration-new-internal-service-token",
+    },
+    __dangerouslyEnableTestIsolation: {
+      testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
 }

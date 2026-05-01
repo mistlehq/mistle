@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  getDataPlaneDatabaseSchema,
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -119,6 +119,7 @@ export async function startSandboxInstance(
   ctx: StartSandboxInstanceContext,
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
   const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
     {
       organizationId: input.organizationId,

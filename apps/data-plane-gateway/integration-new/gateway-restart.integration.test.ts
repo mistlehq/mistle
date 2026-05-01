@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses, getDataPlaneDatabaseSchema } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
@@ -44,8 +44,9 @@ it(
   "keeps sandbox tunnel routing usable across a gateway restart",
   async ({ env }) => {
     const sandboxInstanceId = typeid("sbi").toString();
+    const dataPlaneSchema = getDataPlaneDatabaseSchema(env.dataPlaneDb);
 
-    await env.dataPlaneDb.insert(sandboxInstances).values({
+    await env.dataPlaneDb.insert(dataPlaneSchema.sandboxInstances).values({
       id: sandboxInstanceId,
       organizationId: "org_integration_new_gateway_restart",
       sandboxProfileId: "sbp_integration_new_gateway_restart",

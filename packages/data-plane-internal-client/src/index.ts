@@ -25,6 +25,7 @@ const InternalErrorSchema = z
 export type CreateDataPlaneSandboxInstancesClientInput = {
   baseUrl: string;
   serviceToken: string;
+  testEnvironmentIdHeader?: string;
   requestTimeoutMs?: number;
 };
 
@@ -102,6 +103,7 @@ export type PutSandboxInstanceDeadlineInput = {
   kind: "idle" | "disconnect";
   ownerLeaseId: string;
   dueAt: string;
+  testEnvironmentId?: string;
 };
 const PutSandboxInstanceDeadlineAcceptedResponseSchema = z
   .object({
@@ -119,6 +121,7 @@ export type DeleteSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: "idle" | "disconnect";
   ownerLeaseId: string;
+  testEnvironmentId?: string;
 };
 const DeleteSandboxInstanceDeadlineOkResponseSchema = z
   .object({
@@ -277,6 +280,7 @@ function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput)
   baseUrl: string;
   client: Client<paths>;
   serviceToken: string;
+  testEnvironmentIdHeader: string | undefined;
   requestTimeoutMs: number;
 } {
   return {
@@ -288,15 +292,26 @@ function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput)
       },
     }),
     serviceToken: input.serviceToken,
+    testEnvironmentIdHeader: input.testEnvironmentIdHeader,
     requestTimeoutMs: input.requestTimeoutMs ?? DefaultRequestTimeoutMs,
   };
 }
 
-function createAuthedJsonHeaders(serviceToken: string): Record<string, string> {
-  return {
+function createAuthedJsonHeaders(input: {
+  serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
     "content-type": "application/json",
-    [DATA_PLANE_INTERNAL_AUTH_HEADER]: serviceToken,
+    [DATA_PLANE_INTERNAL_AUTH_HEADER]: input.serviceToken,
   };
+
+  if (input.testEnvironmentId !== undefined && input.testEnvironmentIdHeader !== undefined) {
+    headers[input.testEnvironmentIdHeader] = input.testEnvironmentId;
+  }
+
+  return headers;
 }
 
 function createSandboxInstanceMemberUrl(input: {
@@ -341,7 +356,9 @@ export function createDataPlaneSandboxInstancesClient(
     async startSandboxInstance(startInput) {
       const response = await fetch(new URL("/internal/sandbox/instances", internalClient.baseUrl), {
         method: "POST",
-        headers: createAuthedJsonHeaders(internalClient.serviceToken),
+        headers: createAuthedJsonHeaders({
+          serviceToken: internalClient.serviceToken,
+        }),
         body: JSON.stringify({
           ...startInput,
           ...(startInput.actingUserId === undefined
@@ -375,7 +392,9 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+          }),
           body: JSON.stringify({
             organizationId: resumeInput.organizationId,
             ...(resumeInput.actingUserId === undefined
@@ -416,7 +435,9 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+          }),
           body: JSON.stringify({
             stopReason: stopInput.stopReason,
             expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
@@ -450,7 +471,9 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+          }),
           body: JSON.stringify({
             reason: reconcileInput.reason,
             expectedOwnerLeaseId: reconcileInput.expectedOwnerLeaseId,
@@ -484,7 +507,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "PUT",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(putDeadlineInput.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: putDeadlineInput.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             ownerLeaseId: putDeadlineInput.ownerLeaseId,
             dueAt: putDeadlineInput.dueAt,
@@ -519,7 +550,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "DELETE",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(deleteDeadlineInput.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: deleteDeadlineInput.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             ownerLeaseId: deleteDeadlineInput.ownerLeaseId,
           }),
@@ -552,7 +591,9 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "PATCH",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+          }),
           body: JSON.stringify({
             ...(patchInput.onlyIfUnset === undefined
               ? {}
@@ -588,7 +629,9 @@ export function createDataPlaneSandboxInstancesClient(
         ),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createAuthedJsonHeaders({
+            serviceToken: internalClient.serviceToken,
+          }),
           body: JSON.stringify(materializeInput),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },

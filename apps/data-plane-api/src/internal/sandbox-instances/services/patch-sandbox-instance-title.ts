@@ -1,5 +1,5 @@
 import {
-  sandboxInstances,
+  getDataPlaneDatabaseSchema,
   SandboxInstancePurposes,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
@@ -22,6 +22,7 @@ export async function patchSandboxInstanceTitle(
   ctx: PatchSandboxInstanceTitleContext,
   input: PatchSandboxInstanceTitleInput,
 ): Promise<PatchSandboxInstanceTitleResponse> {
+  const { sandboxInstances } = getDataPlaneDatabaseSchema(ctx.db);
   const titlePredicate = input.onlyIfUnset === true ? isNull(sandboxInstances.title) : undefined;
   const [sandboxInstance] = await ctx.db
     .update(sandboxInstances)

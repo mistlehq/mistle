@@ -1,5 +1,5 @@
 import {
-  sandboxInstanceDeadlines,
+  getDataPlaneDatabaseSchema,
   type DataPlaneDatabase,
   type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
@@ -25,6 +25,8 @@ export async function deleteSandboxInstanceDeadline(
   ctx: DeleteSandboxInstanceDeadlineContext,
   input: DeleteSandboxInstanceDeadlineInput,
 ): Promise<DeleteSandboxInstanceDeadlineOkResponse> {
+  const { sandboxInstanceDeadlines } = getDataPlaneDatabaseSchema(ctx.db);
+
   await ctx.db
     .update(sandboxInstanceDeadlines)
     .set({

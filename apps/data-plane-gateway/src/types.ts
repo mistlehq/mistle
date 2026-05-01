@@ -36,6 +36,7 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: DataPlaneGatewayConfig;
   db: DataPlaneDatabase;
+  testEnvironmentId?: string;
   sandboxTunnelAdmission?: AdmittedSandboxTunnelWebSocketRequest;
 };
 

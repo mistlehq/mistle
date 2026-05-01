@@ -10,6 +10,10 @@ const IntegrationNewVitestProjects = [
     packageName: "@mistle/control-plane-api",
   },
   {
+    projectName: "@mistle/data-plane-api",
+    packageName: "@mistle/data-plane-api",
+  },
+  {
     projectName: "@mistle/data-plane-gateway",
     packageName: "@mistle/data-plane-gateway",
   },

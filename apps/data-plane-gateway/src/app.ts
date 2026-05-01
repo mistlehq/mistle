@@ -14,6 +14,9 @@ export function createApp(config: DataPlaneGatewayConfig): DataPlaneGatewayApp {
   app.use("*", async (ctx, next) => {
     const testEnvironmentId = readTestEnvironmentId(config, (name) => ctx.req.header(name));
     ctx.set("config", config);
+    if (testEnvironmentId !== undefined) {
+      ctx.set("testEnvironmentId", testEnvironmentId);
+    }
     ctx.set(
       "db",
       resources.getDb(
