@@ -1,7 +1,13 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { drainProcessCleanupTasks } from "../cleanup/index.js";
 import { createServiceRegistry, defineTestServiceRegistry } from "./registry.js";
+import { MISTLE_TEST_COORDINATOR_DIR_ENV, MISTLE_TEST_RUN_ID_ENV } from "./runner-pool-session.js";
+import { stopRunnerServicePools } from "./runner-service-pool.js";
 import { startTestEnvironment } from "./runtime.js";
 import type {
   ResolvedTestInfra,
@@ -89,6 +95,7 @@ function createPostgresProvisioner(cleanupEvents: string[]): TestInfraProvisione
 function createService(input: {
   id: string;
   requirement: TestInfraRequirement;
+  poolScope?: "runner" | "environment";
   serviceReferences?: readonly string[];
   startEvents: string[];
   cleanupEvents: string[];
@@ -97,6 +104,7 @@ function createService(input: {
     id: input.id,
     infra: [input.requirement],
     serviceReferences: input.serviceReferences ?? [],
+    ...(input.poolScope === undefined ? {} : { poolScope: input.poolScope }),
     supportedModes: ["runtime"],
     healthCheck: async () => {},
     start: async (startInput) => {
@@ -137,6 +145,37 @@ function createSingleServiceRegistry(input: {
       cleanupEvents: input.cleanupEvents,
     }),
   });
+}
+
+async function withRunnerPoolEnvironment<T>(callback: () => Promise<T>): Promise<T> {
+  const previousRunId = process.env[MISTLE_TEST_RUN_ID_ENV];
+  const previousCoordinatorDir = process.env[MISTLE_TEST_COORDINATOR_DIR_ENV];
+  const runId = `runtime_test_${Date.now().toString(36)}`;
+  const coordinatorDir = await mkdtemp(join(tmpdir(), "mistle-runtime-test-"));
+
+  process.env[MISTLE_TEST_RUN_ID_ENV] = runId;
+  process.env[MISTLE_TEST_COORDINATOR_DIR_ENV] = coordinatorDir;
+
+  try {
+    return await callback();
+  } finally {
+    await stopRunnerServicePools({
+      runId,
+      coordinatorDir,
+    });
+
+    if (previousRunId === undefined) {
+      delete process.env[MISTLE_TEST_RUN_ID_ENV];
+    } else {
+      process.env[MISTLE_TEST_RUN_ID_ENV] = previousRunId;
+    }
+
+    if (previousCoordinatorDir === undefined) {
+      delete process.env[MISTLE_TEST_COORDINATOR_DIR_ENV];
+    } else {
+      process.env[MISTLE_TEST_COORDINATOR_DIR_ENV] = previousCoordinatorDir;
+    }
+  }
 }
 
 describe("startTestEnvironment", () => {
@@ -393,5 +432,50 @@ describe("startTestEnvironment", () => {
     );
 
     await environment.stop();
+  });
+
+  it("pools environment-scoped services by environment id", async () => {
+    await withRunnerPoolEnvironment(async () => {
+      const startEvents: string[] = [];
+      const cleanupEvents: string[] = [];
+      const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+      const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+      const registry = createServiceRegistry({
+        services: {
+          "control-plane-worker": createService({
+            id: "control-plane-worker",
+            requirement: postgresRequirement,
+            poolScope: "environment",
+            startEvents,
+            cleanupEvents,
+          }),
+        },
+      });
+
+      const firstEnvironment = await startTestEnvironment({
+        id: "env_worker_a",
+        registry,
+        services: [{ service: "control-plane-worker", mode: "runtime" }],
+      });
+      const secondEnvironment = await startTestEnvironment({
+        id: "env_worker_a",
+        registry,
+        services: [{ service: "control-plane-worker", mode: "runtime" }],
+      });
+      const thirdEnvironment = await startTestEnvironment({
+        id: "env_worker_b",
+        registry,
+        services: [{ service: "control-plane-worker", mode: "runtime" }],
+      });
+
+      expect(startEvents).toEqual([
+        "control-plane-worker:env_worker_a:postgres.control-plane",
+        "control-plane-worker:env_worker_b:postgres.control-plane",
+      ]);
+
+      await thirdEnvironment.stop();
+      await secondEnvironment.stop();
+      await firstEnvironment.stop();
+    });
   });
 });

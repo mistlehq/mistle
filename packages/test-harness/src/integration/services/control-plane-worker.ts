@@ -8,6 +8,10 @@ import type {
   TestServiceDefinition,
   TestServiceStartInput,
 } from "../../environment/index.js";
+import {
+  TestEnvironmentIdHeader,
+  createControlPlaneWorkflowNamespaceId,
+} from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import {
@@ -28,7 +32,6 @@ const InfraIds = {
 
 const PostgresValues = {
   HOST_POOLED_URL: "host.pooledUrl",
-  CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
 };
 
 const MailpitValues = {
@@ -41,6 +44,7 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     id: ServiceIds.CONTROL_PLANE_WORKER,
     infra,
     serviceReferences: [ServiceIds.CONTROL_PLANE_API, ServiceIds.DATA_PLANE_API],
+    poolScope: "environment",
     supportedModes: ["process"],
     healthCheck: async (runtime) => processHealth(runtime, ServiceIds.CONTROL_PLANE_WORKER),
     start: start({
@@ -82,10 +86,11 @@ function start(input: {
           postgres,
           PostgresValues.HOST_POOLED_URL,
         ),
-        MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: infraValue(
-          postgres,
-          PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
+        MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: createControlPlaneWorkflowNamespaceId(
+          startInput.environmentId,
         ),
+        MISTLE_TEST_ENVIRONMENT_ID: startInput.environmentId,
+        MISTLE_TEST_ENVIRONMENT_ID_HEADER: TestEnvironmentIdHeader,
         MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
         MISTLE_EMAIL_SMTP_FROM_ADDRESS: "integration-new@mistle.test",
         MISTLE_EMAIL_SMTP_FROM_NAME: "Mistle Integration",

@@ -8,6 +8,10 @@ import type {
   TestServiceDefinition,
   TestServiceStartInput,
 } from "../../environment/index.js";
+import {
+  TestEnvironmentIdHeader,
+  createDataPlaneWorkflowNamespaceId,
+} from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import {
@@ -24,7 +28,6 @@ const DockerSocketPath = "/var/run/docker.sock";
 
 const PostgresValues = {
   HOST_POOLED_URL: "host.pooledUrl",
-  DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -36,6 +39,7 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
       ServiceIds.TOKENIZER_PROXY,
       ServiceIds.CONTROL_PLANE_API,
     ],
+    poolScope: "environment",
     supportedModes: ["process"],
     healthCheck: async (runtime) => processHealth(runtime, ServiceIds.DATA_PLANE_WORKER),
     start: start({
@@ -71,10 +75,11 @@ function start(input: {
         MISTLE_ENV: "development",
         NODE_ENV: "development",
         MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: infraValue(postgres, PostgresValues.HOST_POOLED_URL),
-        MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: infraValue(
-          postgres,
-          PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID,
+        MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: createDataPlaneWorkflowNamespaceId(
+          startInput.environmentId,
         ),
+        MISTLE_TEST_ENVIRONMENT_ID: startInput.environmentId,
+        MISTLE_TEST_ENVIRONMENT_ID_HEADER: TestEnvironmentIdHeader,
         MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: peer.url(ServiceIds.DATA_PLANE_GATEWAY),
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL: peer.ws(

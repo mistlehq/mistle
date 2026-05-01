@@ -16,6 +16,14 @@ export function createDataPlaneTestSchemaName(testEnvironmentId: string): string
   });
 }
 
+export function createControlPlaneWorkflowNamespaceId(testEnvironmentId: string): string {
+  return `cp_${createSafeIdentifier(testEnvironmentId)}`;
+}
+
+export function createDataPlaneWorkflowNamespaceId(testEnvironmentId: string): string {
+  return `dp_${createSafeIdentifier(testEnvironmentId)}`;
+}
+
 function createTestSchemaName(input: { testEnvironmentId: string; suffix: string }): string {
   const normalized = input.testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
   const prefix = /^[a-z]/u.test(normalized) ? normalized : `env_${normalized}`;
@@ -26,4 +34,11 @@ function createTestSchemaName(input: { testEnvironmentId: string; suffix: string
   }
 
   return schemaName;
+}
+
+function createSafeIdentifier(value: string): string {
+  const normalized = value.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 10);
+  const compact = normalized.length === 0 ? "env" : normalized.slice(0, 28);
+  return `${compact}_${digest}`;
 }

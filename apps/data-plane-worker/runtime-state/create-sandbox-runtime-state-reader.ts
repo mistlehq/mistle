@@ -11,9 +11,17 @@ import type { SandboxRuntimeStateReader } from "./sandbox-runtime-state-reader.j
 export function createSandboxRuntimeStateReader(input: {
   gatewayBaseUrl: string;
   serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
 }): SandboxRuntimeStateReader {
   return new GatewayHttpSandboxRuntimeStateReader({
     baseUrl: input.gatewayBaseUrl,
     serviceToken: input.serviceToken,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
+    ...(input.testEnvironmentIdHeader === undefined
+      ? {}
+      : { testEnvironmentIdHeader: input.testEnvironmentIdHeader }),
   });
 }

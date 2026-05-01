@@ -115,6 +115,11 @@ export type TestServiceDefinition = {
   infra: readonly TestInfraRequirement[];
   serviceReferences: readonly string[];
   endpoints?: TestServiceEndpointPlan;
+  /**
+   * Services are runner-pooled by default. Worker services should use
+   * `environment` because OpenWorkflow workers are bound to one namespace.
+   */
+  poolScope?: "runner" | "environment";
   supportedModes: readonly TestServiceLaunchMode[];
   healthCheck: (service: TestServiceRuntime) => Promise<void>;
   start: (input: TestServiceStartInput) => Promise<TestService>;

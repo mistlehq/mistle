@@ -95,7 +95,11 @@ function createPooledServiceDefinition(input: {
       const lease = await acquireRunnerServicePoolLease({
         runId: input.runId,
         coordinatorDir: input.coordinatorDir,
-        key: `${input.service.id}/${startInput.mode}`,
+        key: createPooledServiceKey({
+          service: input.service,
+          mode: startInput.mode,
+          environmentId: startInput.environmentId,
+        }),
         healthCheck: input.service.healthCheck,
         start: async () => {
           const startedService = await input.service.start(startInput);
@@ -121,6 +125,19 @@ function createPooledServiceDefinition(input: {
       };
     },
   };
+}
+
+function createPooledServiceKey(input: {
+  service: TestServiceDefinition;
+  mode: string;
+  environmentId: string;
+}): string {
+  const scope = input.service.poolScope ?? "runner";
+  if (scope === "environment") {
+    return `${input.service.id}/${input.mode}/${input.environmentId}`;
+  }
+
+  return `${input.service.id}/${input.mode}`;
 }
 
 function shouldIsolateService(input: {

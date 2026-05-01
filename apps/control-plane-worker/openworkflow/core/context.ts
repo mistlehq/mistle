@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
@@ -11,6 +13,7 @@ import { createEmailSender, type ControlPlaneWorkerEmailDelivery } from "./email
 import { getOpenWorkflowRuntime } from "./runtime.js";
 
 const ControlPlaneInternalRequestTimeoutMs = 60_000;
+const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
@@ -29,24 +32,47 @@ let shutdownHandlersRegistered = false;
 
 async function createWorkflowContext(): Promise<WorkflowContext> {
   const { backend, workerConfig } = await getOpenWorkflowRuntime();
+  const testIsolation = readTestIsolationEnv();
   const dbPool = new Pool({
     connectionString: workerConfig.workflow.databaseUrl,
   });
 
   try {
-    const db = createControlPlaneDatabase(dbPool);
+    const db =
+      testIsolation === undefined
+        ? createControlPlaneDatabase(dbPool)
+        : createControlPlaneDatabase(dbPool, {
+            schemaName: createControlPlaneTestSchemaName(testIsolation.testEnvironmentId),
+          });
     const openWorkflow = createControlPlaneOpenWorkflow({
       backend,
     });
-    const dataPlaneClient = createDataPlaneSandboxInstancesClient({
-      baseUrl: workerConfig.dataPlaneApi.baseUrl,
-      serviceToken: workerConfig.internalAuth.serviceToken,
-    });
-    const controlPlaneInternalClient = new ControlPlaneInternalClient({
-      baseUrl: workerConfig.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
-      requestTimeoutMs: ControlPlaneInternalRequestTimeoutMs,
-    });
+    const dataPlaneClient =
+      testIsolation === undefined
+        ? createDataPlaneSandboxInstancesClient({
+            baseUrl: workerConfig.dataPlaneApi.baseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+          })
+        : createDataPlaneSandboxInstancesClient({
+            baseUrl: workerConfig.dataPlaneApi.baseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+            testEnvironmentId: testIsolation.testEnvironmentId,
+            testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+          });
+    const controlPlaneInternalClient =
+      testIsolation === undefined
+        ? new ControlPlaneInternalClient({
+            baseUrl: workerConfig.controlPlaneApi.baseUrl,
+            internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
+            requestTimeoutMs: ControlPlaneInternalRequestTimeoutMs,
+          })
+        : new ControlPlaneInternalClient({
+            baseUrl: workerConfig.controlPlaneApi.baseUrl,
+            internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
+            requestTimeoutMs: ControlPlaneInternalRequestTimeoutMs,
+            testEnvironmentId: testIsolation.testEnvironmentId,
+            testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+          });
     const emailDelivery = {
       emailSender: createEmailSender(workerConfig),
       from: {
@@ -70,6 +96,36 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
     await dbPool.end();
     throw error;
   }
+}
+
+function readTestIsolationEnv():
+  | {
+      testEnvironmentId: string;
+      testEnvironmentIdHeader: string;
+    }
+  | undefined {
+  const testEnvironmentId = process.env.MISTLE_TEST_ENVIRONMENT_ID;
+  if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+    return undefined;
+  }
+
+  return {
+    testEnvironmentId,
+    testEnvironmentIdHeader:
+      process.env.MISTLE_TEST_ENVIRONMENT_ID_HEADER ?? DefaultTestEnvironmentIdHeader,
+  };
+}
+
+function createControlPlaneTestSchemaName(testEnvironmentId: string): string {
+  const normalized = testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
+  const prefix = /^[a-z]/u.test(normalized) ? normalized : `env_${normalized}`;
+  const digest = createHash("sha256").update(testEnvironmentId).digest("hex").slice(0, 10);
+  const schemaName = `${prefix.slice(0, 40)}_${digest}_control_plane`;
+  if (schemaName.length > 63) {
+    throw new Error(`Test control-plane schema name '${schemaName}' exceeds Postgres limits.`);
+  }
+
+  return schemaName;
 }
 
 export function getWorkflowContext(): Promise<WorkflowContext> {
