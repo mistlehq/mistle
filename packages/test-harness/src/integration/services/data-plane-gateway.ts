@@ -24,7 +24,7 @@ import {
 const Host = "127.0.0.1";
 
 const InfraIds = {
-  POSTGRES: "postgres",
+  POSTGRES: "postgres.data-plane",
   VALKEY: "valkey",
 };
 

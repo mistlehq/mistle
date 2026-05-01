@@ -26,10 +26,13 @@ describe("integration services", () => {
     };
 
     expect(services[ServiceIds.CONTROL_PLANE_API].supportedModes).toEqual(["runtime"]);
-    expect(services[ServiceIds.CONTROL_PLANE_WORKER].supportedModes).toEqual(["process"]);
+    expect(services[ServiceIds.CONTROL_PLANE_WORKER].supportedModes).toEqual([
+      "runtime",
+      "process",
+    ]);
     expect(services[ServiceIds.DATA_PLANE_API].supportedModes).toEqual(["runtime"]);
     expect(services[ServiceIds.DATA_PLANE_GATEWAY].supportedModes).toEqual(["runtime"]);
-    expect(services[ServiceIds.DATA_PLANE_WORKER].supportedModes).toEqual(["process"]);
+    expect(services[ServiceIds.DATA_PLANE_WORKER].supportedModes).toEqual(["runtime", "process"]);
     expect(services[ServiceIds.TOKENIZER_PROXY].supportedModes).toEqual(["runtime"]);
   });
 

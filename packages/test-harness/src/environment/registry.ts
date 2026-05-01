@@ -137,6 +137,13 @@ function createPooledServiceKey(input: {
     return `${input.service.id}/${input.mode}/${input.environmentId}`;
   }
 
+  if (input.mode === "runtime") {
+    // Runtime services run in-process inside the current Vitest worker. They
+    // cannot be safely shared by other workers because the owning worker can
+    // exit while another worker still has a persisted lease for its port.
+    return `${input.service.id}/${input.mode}/${String(process.pid)}`;
+  }
+
   return `${input.service.id}/${input.mode}`;
 }
 

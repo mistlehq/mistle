@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
     "noEmit": true,
     "paths": {
       "@mistle/control-plane-api/runtime": ["../../apps/control-plane-api/src/main.ts"],

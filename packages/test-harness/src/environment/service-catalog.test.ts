@@ -20,18 +20,34 @@ describe("createTestRegistry", () => {
   it("maps each service to its exact external infra references", () => {
     const registry = createTestRegistry();
 
-    expect(registry["control-plane-api"].infra.map((infra) => infra.id)).toEqual(["postgres"]);
+    expect(registry["control-plane-api"].infra.map((infra) => infra.id)).toEqual([
+      "postgres.control-plane",
+    ]);
     expect(registry["control-plane-worker"].infra.map((infra) => infra.id)).toEqual([
-      "postgres",
+      "postgres.control-plane",
       "mailpit",
     ]);
-    expect(registry["data-plane-api"].infra.map((infra) => infra.id)).toEqual(["postgres"]);
+    expect(registry["data-plane-api"].infra.map((infra) => infra.id)).toEqual([
+      "postgres.data-plane",
+    ]);
     expect(registry["data-plane-gateway"].infra.map((infra) => infra.id)).toEqual([
-      "postgres",
+      "postgres.data-plane",
       "valkey",
     ]);
-    expect(registry["data-plane-worker"].infra.map((infra) => infra.id)).toEqual(["postgres"]);
+    expect(registry["data-plane-worker"].infra.map((infra) => infra.id)).toEqual([
+      "postgres.data-plane",
+    ]);
     expect(registry["tokenizer-proxy"].infra.map((infra) => infra.id)).toEqual([]);
+  });
+
+  it("uses one Postgres provisioner for control-plane and data-plane logical resources", () => {
+    const registry = createTestRegistry();
+    const controlPlanePostgres = registry["control-plane-api"].infra[0];
+    const dataPlanePostgres = registry["data-plane-api"].infra[0];
+
+    expect(controlPlanePostgres?.id).toBe("postgres.control-plane");
+    expect(dataPlanePostgres?.id).toBe("postgres.data-plane");
+    expect(controlPlanePostgres?.provisioner).toBe(dataPlanePostgres?.provisioner);
   });
 
   it("enables docker mode for the concrete Mistle catalog", () => {

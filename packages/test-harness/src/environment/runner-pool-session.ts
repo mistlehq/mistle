@@ -25,8 +25,12 @@ export function ensureRunnerPoolSession(environment: NodeJS.ProcessEnv): RunnerP
     key: MISTLE_TEST_COORDINATOR_DIR_ENV,
     create: () => join(tmpdir(), "mistle-test-harness", "runner-pools", runId),
   });
+  ensureEnvValue({
+    environment,
+    key: MISTLE_TEST_RUN_OWNER_PID_ENV,
+    create: () => String(process.pid),
+  });
   environment[MISTLE_TEST_POOLING_ENV] = "1";
-  environment[MISTLE_TEST_RUN_OWNER_PID_ENV] = String(process.pid);
 
   return {
     runId,

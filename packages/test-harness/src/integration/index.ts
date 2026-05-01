@@ -12,20 +12,23 @@ import {
 } from "../environment/index.js";
 import type {
   DangerouslyIsolatedTestRegistry,
+  TestInfraRequirement,
   TestServiceLaunchMode,
+  TestServiceDefinition,
   TestServiceRegistry,
   TestServiceSelection,
 } from "../environment/index.js";
-import { createIntegrationEnvironment, type IntegrationTestEnvironment } from "./environment.js";
-import { service as controlPlaneApi } from "./services/control-plane-api.js";
-import { service as controlPlaneWorker } from "./services/control-plane-worker.js";
-import { service as dataPlaneApi } from "./services/data-plane-api.js";
-import { service as dataPlaneGateway } from "./services/data-plane-gateway.js";
-import { service as dataPlaneWorker } from "./services/data-plane-worker.js";
+import type { IntegrationTestEnvironment } from "./environment.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
-import { service as tokenizerProxy } from "./services/tokenizer-proxy.js";
+import {
+  formatIntegrationDuration,
+  writeIntegrationTimingEvent,
+  writeIntegrationTimingLine,
+} from "./timing.js";
 
 export { TestEnvironmentIdHeader } from "../environment/index.js";
+export type { IntegrationAuthenticatedSession, IntegrationAuth } from "./auth.js";
+export type { IntegrationTestEnvironment } from "./environment.js";
 
 type IntegrationServiceSelection =
   | ServiceId
@@ -43,10 +46,6 @@ type IntegrationTestFixture = {
   env: IntegrationTestEnvironment;
 };
 
-function formatDuration(milliseconds: number): string {
-  return `${(milliseconds / 1000).toFixed(2)}s`;
-}
-
 function formatSelectedServices(selectionsInput: readonly IntegrationServiceSelection[]): string {
   return selectionsInput
     .map((selection) => {
@@ -59,53 +58,52 @@ function formatSelectedServices(selectionsInput: readonly IntegrationServiceSele
     .join(", ");
 }
 
-function writeTimingLine(message: string): void {
-  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
-    return;
-  }
-
-  process.stderr.write(`${message}\n`);
-}
-
 // The integration API is intentionally small: app tests choose services and get
 // a single env fixture. Registry, infra, ports, service pooling, and cleanup all
 // stay inside the harness.
 export function createIntegrationTest(input: CreateIntegrationTestInput) {
-  const registry = registryFor(input);
-  const services = selections({
-    registry,
-    selections: input.services,
-  });
+  const selectedServices = formatSelectedServices(input.services);
+  writeIntegrationTimingEvent(
+    "createIntegrationTest evaluated",
+    `caller=${readCallerFromStack()} services=${selectedServices}`,
+  );
 
   return base.extend<IntegrationTestFixture>({
     env: [
       async ({}, use) => {
+        writeIntegrationTimingEvent("env fixture start", `services=${selectedServices}`);
         const setupStartedAt = Date.now();
+        const registry = await registryFor(input);
+        const services = selections({
+          registry,
+          selections: input.services,
+        });
         const environment = await startTestEnvironment({
           registry,
           services,
         });
+        const { createIntegrationEnvironment } = await import("./environment.js");
         const integrationEnvironment = createIntegrationEnvironment({
           environment,
         });
         const setupDurationMs = Date.now() - setupStartedAt;
 
-        writeTimingLine(
-          `[integration-new] env ${environment.id} setup completed in ${formatDuration(setupDurationMs)} for ${formatSelectedServices(input.services)}.`,
+        writeIntegrationTimingLine(
+          `[integration-new] env ${environment.id} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
         );
 
         try {
           const testStartedAt = Date.now();
           await use(integrationEnvironment);
-          writeTimingLine(
-            `[integration-new] env ${environment.id} test body completed in ${formatDuration(Date.now() - testStartedAt)}.`,
+          writeIntegrationTimingLine(
+            `[integration-new] env ${environment.id} test body completed in ${formatIntegrationDuration(Date.now() - testStartedAt)}.`,
           );
         } finally {
           const teardownStartedAt = Date.now();
           await integrationEnvironment.stop();
           await environment.stop();
-          writeTimingLine(
-            `[integration-new] env ${environment.id} teardown completed in ${formatDuration(Date.now() - teardownStartedAt)}.`,
+          writeIntegrationTimingLine(
+            `[integration-new] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
           );
         }
       },
@@ -116,34 +114,130 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
   });
 }
 
-function registryFor(input: CreateIntegrationTestInput): TestServiceRegistry {
+function readCallerFromStack(): string {
+  const stack = new Error().stack;
+  if (stack === undefined) {
+    return "unknown";
+  }
+
+  for (const line of stack.split("\n")) {
+    const trimmed = line.trim();
+    if (
+      trimmed.length === 0 ||
+      trimmed.startsWith("Error") ||
+      trimmed.includes("createIntegrationTest") ||
+      trimmed.includes("readCallerFromStack") ||
+      trimmed.includes("packages/test-harness/src/integration/index.ts")
+    ) {
+      continue;
+    }
+
+    return trimmed;
+  }
+
+  return "unknown";
+}
+
+async function registryFor(input: CreateIntegrationTestInput): Promise<TestServiceRegistry> {
+  const serviceEntries = await loadSelectedServices(input.services);
   const serviceCatalog = createTestRegistry();
+  const services: Record<string, TestServiceDefinition> = {};
+
+  for (const entry of serviceEntries) {
+    const catalogService = serviceCatalog[entry.serviceId];
+    if (catalogService === undefined) {
+      throw new Error(`Unknown integration test service '${entry.serviceId}'.`);
+    }
+    services[entry.serviceId] = entry.service(catalogService.infra);
+  }
 
   return createServiceRegistry({
-    services: {
-      [ServiceIds.CONTROL_PLANE_API]: controlPlaneApi(
-        serviceCatalog[ServiceIds.CONTROL_PLANE_API].infra,
-      ),
-      [ServiceIds.CONTROL_PLANE_WORKER]: controlPlaneWorker(
-        serviceCatalog[ServiceIds.CONTROL_PLANE_WORKER].infra,
-      ),
-      [ServiceIds.DATA_PLANE_API]: dataPlaneApi(serviceCatalog[ServiceIds.DATA_PLANE_API].infra),
-      [ServiceIds.DATA_PLANE_GATEWAY]: dataPlaneGateway(
-        serviceCatalog[ServiceIds.DATA_PLANE_GATEWAY].infra,
-      ),
-      [ServiceIds.DATA_PLANE_WORKER]: dataPlaneWorker(
-        serviceCatalog[ServiceIds.DATA_PLANE_WORKER].infra,
-      ),
-      [ServiceIds.TOKENIZER_PROXY]: tokenizerProxy(
-        serviceCatalog[ServiceIds.TOKENIZER_PROXY].infra,
-      ),
-    },
+    services,
     ...(input.__dangerouslyIsolatedServices === undefined
       ? {}
       : {
           __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
         }),
   });
+}
+
+type IntegrationServiceEntry = {
+  serviceId: ServiceId;
+  service: (infra: readonly TestInfraRequirement[]) => TestServiceDefinition;
+};
+
+async function loadSelectedServices(
+  selectionsInput: readonly IntegrationServiceSelection[],
+): Promise<readonly IntegrationServiceEntry[]> {
+  const selectedServiceIds = uniqueSelectedServiceIds(selectionsInput);
+
+  return Promise.all(selectedServiceIds.map(loadService));
+}
+
+function uniqueSelectedServiceIds(
+  selectionsInput: readonly IntegrationServiceSelection[],
+): readonly ServiceId[] {
+  const serviceIds: ServiceId[] = [];
+
+  for (const selection of selectionsInput) {
+    const serviceId = typeof selection === "string" ? selection : selection.service;
+    if (!serviceIds.includes(serviceId)) {
+      serviceIds.push(serviceId);
+    }
+  }
+
+  return serviceIds;
+}
+
+async function loadService(serviceId: ServiceId): Promise<IntegrationServiceEntry> {
+  // Dynamic imports are intentionally isolated to the integration harness. The
+  // public API asks tests to declare selected services, so loading every app and
+  // worker runtime up front makes small integration tests pay for unrelated
+  // service graphs before fixtures even start.
+  switch (serviceId) {
+    case ServiceIds.CONTROL_PLANE_API: {
+      const module = await import("./services/control-plane-api.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+    case ServiceIds.CONTROL_PLANE_WORKER: {
+      const module = await import("./services/control-plane-worker.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+    case ServiceIds.DATA_PLANE_API: {
+      const module = await import("./services/data-plane-api.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+    case ServiceIds.DATA_PLANE_GATEWAY: {
+      const module = await import("./services/data-plane-gateway.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+    case ServiceIds.DATA_PLANE_WORKER: {
+      const module = await import("./services/data-plane-worker.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+    case ServiceIds.TOKENIZER_PROXY: {
+      const module = await import("./services/tokenizer-proxy.js");
+      return {
+        serviceId,
+        service: module.service,
+      };
+    }
+  }
 }
 
 function selections(input: {

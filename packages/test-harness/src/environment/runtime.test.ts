@@ -46,7 +46,7 @@ function createRestartableHttpService(input: {
         host: "127.0.0.1",
       },
     },
-    supportedModes: ["runtime"],
+    supportedModes: ["runtime", "process"],
     healthCheck: async () => {},
     start: async (startInput) => {
       const httpEndpoint = startInput.plannedEndpoints.get(input.id)?.http;
@@ -105,7 +105,7 @@ function createService(input: {
     infra: [input.requirement],
     serviceReferences: input.serviceReferences ?? [],
     ...(input.poolScope === undefined ? {} : { poolScope: input.poolScope }),
-    supportedModes: ["runtime"],
+    supportedModes: ["runtime", "process"],
     healthCheck: async () => {},
     start: async (startInput) => {
       const database = startInput.infra.get(input.requirement.id);
@@ -455,17 +455,17 @@ describe("startTestEnvironment", () => {
       const firstEnvironment = await startTestEnvironment({
         id: "env_worker_a",
         registry,
-        services: [{ service: "control-plane-worker", mode: "runtime" }],
+        services: [{ service: "control-plane-worker", mode: "process" }],
       });
       const secondEnvironment = await startTestEnvironment({
         id: "env_worker_a",
         registry,
-        services: [{ service: "control-plane-worker", mode: "runtime" }],
+        services: [{ service: "control-plane-worker", mode: "process" }],
       });
       const thirdEnvironment = await startTestEnvironment({
         id: "env_worker_b",
         registry,
-        services: [{ service: "control-plane-worker", mode: "runtime" }],
+        services: [{ service: "control-plane-worker", mode: "process" }],
       });
 
       expect(startEvents).toEqual([

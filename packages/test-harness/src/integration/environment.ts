@@ -1,9 +1,18 @@
-import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import {
+  createControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import {
+  createDataPlaneDatabase,
+  getDataPlaneDatabaseSchema,
+  type DataPlaneDatabase,
+} from "@mistle/db/data-plane";
 import { Pool, type PoolConfig } from "pg";
 
-import type { TestEnvironment } from "../environment/index.js";
+import type { TestEnvironment, TestServiceHandle } from "../environment/index.js";
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
+import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import { httpService, type IntegrationHttpService } from "./services/shared.js";
 
@@ -14,20 +23,35 @@ const PostgresValues = {
   DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
 };
 
+const PostgresInfraIds = {
+  CONTROL_PLANE: "postgres.control-plane",
+  DATA_PLANE: "postgres.data-plane",
+};
+
 type IntegrationDatabasePoolFactory = (config: PoolConfig) => Pool;
 
 export type IntegrationTestEnvironment = {
   id: string;
+  auth: IntegrationAuth;
   controlPlaneDb: ControlPlaneDatabase;
+  controlPlaneTables: ReturnType<typeof getControlPlaneDatabaseSchema>;
   controlPlaneApi: IntegrationHttpService;
+  controlPlaneWorker: IntegrationProcessService;
   dataPlaneDb: DataPlaneDatabase;
+  dataPlaneTables: ReturnType<typeof getDataPlaneDatabaseSchema>;
   dataPlaneApi: IntegrationHttpService;
   dataPlaneGateway: IntegrationHttpService;
+  dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
+  tokenizerProxy: IntegrationHttpService;
 };
 
 export type ManagedIntegrationTestEnvironment = IntegrationTestEnvironment & {
   stop: () => Promise<void>;
+};
+
+export type IntegrationProcessService = TestServiceHandle & {
+  pid: number;
 };
 
 export function createIntegrationEnvironment(input: {
@@ -37,15 +61,24 @@ export function createIntegrationEnvironment(input: {
   const poolFactory = input.poolFactory ?? ((config) => new Pool(config));
   const pools: Pool[] = [];
   let stopped = false;
+  let auth: IntegrationAuth | undefined;
   let controlPlaneDb: ControlPlaneDatabase | undefined;
   let dataPlaneDb: DataPlaneDatabase | undefined;
 
-  return {
+  const integrationEnvironment: ManagedIntegrationTestEnvironment = {
     id: input.environment.id,
+    get auth() {
+      auth ??= createIntegrationAuth(integrationEnvironment);
+
+      return auth;
+    },
     get controlPlaneDb() {
       controlPlaneDb ??= createControlPlaneDatabase(
         createPool({
-          connectionString: readPostgresDirectUrl(input.environment),
+          connectionString: readPostgresDirectUrl({
+            environment: input.environment,
+            infraId: PostgresInfraIds.CONTROL_PLANE,
+          }),
           poolFactory,
           pools,
         }),
@@ -56,13 +89,22 @@ export function createIntegrationEnvironment(input: {
 
       return controlPlaneDb;
     },
+    get controlPlaneTables() {
+      return getControlPlaneDatabaseSchema(this.controlPlaneDb);
+    },
     get controlPlaneApi() {
       return httpService(input.environment.services.get(ServiceIds.CONTROL_PLANE_API));
+    },
+    get controlPlaneWorker() {
+      return processService(input.environment.services.get(ServiceIds.CONTROL_PLANE_WORKER));
     },
     get dataPlaneDb() {
       dataPlaneDb ??= createDataPlaneDatabase(
         createPool({
-          connectionString: readPostgresDirectUrl(input.environment),
+          connectionString: readPostgresDirectUrl({
+            environment: input.environment,
+            infraId: PostgresInfraIds.DATA_PLANE,
+          }),
           poolFactory,
           pools,
         }),
@@ -73,11 +115,17 @@ export function createIntegrationEnvironment(input: {
 
       return dataPlaneDb;
     },
+    get dataPlaneTables() {
+      return getDataPlaneDatabaseSchema(this.dataPlaneDb);
+    },
     get dataPlaneApi() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_API));
     },
     get dataPlaneGateway() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_GATEWAY));
+    },
+    get dataPlaneWorker() {
+      return processService(input.environment.services.get(ServiceIds.DATA_PLANE_WORKER));
     },
     get mailpit() {
       const mailpit = input.environment.infra.get("mailpit");
@@ -90,6 +138,9 @@ export function createIntegrationEnvironment(input: {
         httpBaseUrl,
       });
     },
+    get tokenizerProxy() {
+      return httpService(input.environment.services.get(ServiceIds.TOKENIZER_PROXY));
+    },
     stop: async () => {
       if (stopped) {
         return;
@@ -98,6 +149,20 @@ export function createIntegrationEnvironment(input: {
       stopped = true;
       await Promise.all(pools.map((pool) => pool.end()));
     },
+  };
+
+  return integrationEnvironment;
+}
+
+function processService(service: TestServiceHandle): IntegrationProcessService {
+  const pid = service.pid;
+  if (pid === undefined) {
+    throw new Error(`Expected test service '${service.id}' to expose a process id.`);
+  }
+
+  return {
+    ...service,
+    pid,
   };
 }
 
@@ -111,24 +176,28 @@ function createPool(input: {
     max: DefaultDatabasePoolMax,
   });
 
-  pool.on("error", () => {});
   input.pools.push(pool);
 
   return pool;
 }
 
-function readPostgresDirectUrl(environment: TestEnvironment<ServiceId>): string {
-  const postgres = environment.infra.get("postgres");
+function readPostgresDirectUrl(input: {
+  environment: TestEnvironment<ServiceId>;
+  infraId: string;
+}): string {
+  const postgres = input.environment.infra.get(input.infraId);
   const directUrl = postgres?.values.get(PostgresValues.HOST_DIRECT_URL);
   if (directUrl === undefined) {
-    throw new Error("Expected integration environment to include Postgres infra.");
+    throw new Error(
+      `Expected integration environment to include Postgres infra '${input.infraId}'.`,
+    );
   }
 
   return directUrl;
 }
 
 function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {
-  const postgres = environment.infra.get("postgres");
+  const postgres = environment.infra.get(PostgresInfraIds.DATA_PLANE);
   const schemaName = postgres?.values.get(PostgresValues.DATA_PLANE_SCHEMA_NAME);
   if (schemaName === undefined) {
     throw new Error("Expected integration environment to include data-plane schema name.");
@@ -138,7 +207,7 @@ function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): strin
 }
 
 function readControlPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {
-  const postgres = environment.infra.get("postgres");
+  const postgres = environment.infra.get(PostgresInfraIds.CONTROL_PLANE);
   const schemaName = postgres?.values.get(PostgresValues.CONTROL_PLANE_SCHEMA_NAME);
   if (schemaName === undefined) {
     throw new Error("Expected integration environment to include control-plane schema name.");

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -37,6 +37,7 @@ const SharedInfraLockDirectoryPath = join(
 const SharedInfraLockInfoFilePath = join(SharedInfraLockDirectoryPath, "owner.json");
 
 export const DEFAULT_SHARED_INTEGRATION_INFRA_KEY = "mistle-integration-shared-v1";
+const DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY = "mistle-test-environment";
 const SharedInfraDebugEnabled = process.env["MISTLE_SHARED_INFRA_DEBUG"] === "1";
 
 function sharedInfraDebug(message: string): void {
@@ -82,6 +83,17 @@ function writeSharedInfraTimingSummary(input: {
   process.stderr.write(
     `[integration-new] shared infra ${input.operation} ${input.key}: ${phases}.\n`,
   );
+}
+
+export function createTestEnvironmentSharedInfraKey(
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const testRunId = environment[MISTLE_TEST_RUN_ID_ENV];
+  if (testRunId === undefined || testRunId.length === 0) {
+    return DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY;
+  }
+
+  return `${DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY}:${testRunId}`;
 }
 
 type PostgresRequestConfig = Omit<
@@ -580,7 +592,13 @@ async function readPersistedState(): Promise<PersistedSharedInfraState> {
 
 async function writePersistedState(state: PersistedSharedInfraState): Promise<void> {
   await mkdir(SharedInfraRootDirectoryPath, { recursive: true });
-  await writeFile(SharedInfraStateFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  await writeJsonFileAtomic(SharedInfraStateFilePath, state);
+}
+
+async function writeJsonFileAtomic(filePath: string, value: unknown): Promise<void> {
+  const temporaryFilePath = `${filePath}.${process.pid}.${systemClock.nowMs()}.${randomUUID()}.tmp`;
+  await writeFile(temporaryFilePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await rename(temporaryFilePath, filePath);
 }
 
 async function readLockOwnerPid(): Promise<number | undefined> {
@@ -615,11 +633,10 @@ async function acquireStateFileLock(): Promise<() => Promise<void>> {
       sharedInfraDebug("lock: creating lock directory");
       await mkdir(SharedInfraLockDirectoryPath);
       sharedInfraDebug("lock: writing lock owner info");
-      await writeFile(
-        SharedInfraLockInfoFilePath,
-        `${JSON.stringify({ pid: process.pid, createdAt: systemClock.nowMs() })}\n`,
-        "utf8",
-      );
+      await writeJsonFileAtomic(SharedInfraLockInfoFilePath, {
+        pid: process.pid,
+        createdAt: systemClock.nowMs(),
+      });
       const cleanupOnProcessExit = (): void => {
         try {
           rmSync(SharedInfraLockDirectoryPath, { recursive: true, force: true });

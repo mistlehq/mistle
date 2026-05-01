@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { registerProcessCleanupTask, runCleanupTasks, type CleanupTask } from "../cleanup/index.js";
+import {
+  formatIntegrationDuration,
+  writeIntegrationTimingEvent,
+  writeIntegrationTimingLine,
+} from "../integration/timing.js";
 import { releaseReservedPort, reserveAvailablePort } from "../network/reserve-available-port.js";
 import { createTestHttpClient } from "./http-client.js";
 import { createTestEnvironmentPlan } from "./plan.js";
@@ -28,15 +33,7 @@ function createTestEnvironmentId(): string {
 }
 
 function formatDuration(milliseconds: number): string {
-  return `${(milliseconds / 1000).toFixed(2)}s`;
-}
-
-function writeTimingLine(message: string): void {
-  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
-    return;
-  }
-
-  process.stderr.write(`${message}\n`);
+  return formatIntegrationDuration(milliseconds);
 }
 
 async function measure<T>(
@@ -70,9 +67,23 @@ function writeEnvironmentTimingSummary(input: {
     ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
   );
 
-  writeTimingLine(
+  writeIntegrationTimingLine(
     `[integration-new] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
   );
+}
+
+function formatServiceRequests(requests: readonly TestServiceRequest[]): string {
+  return requests
+    .map((request) => `${request.service.id}:${request.mode}`)
+    .sort()
+    .join(", ");
+}
+
+function formatIds(items: readonly { id: string }[]): string {
+  return items
+    .map((item) => item.id)
+    .sort()
+    .join(", ");
 }
 
 function groupInfraRequirementsByKind(
@@ -161,11 +172,19 @@ async function provisionInfra(input: {
         throw new Error(`Missing test infra provisioner for kind '${kind}'.`);
       }
 
+      writeIntegrationTimingEvent(
+        "infra provision begin",
+        `env=${input.environmentId} kind=${kind} requirements=${formatIds(requirements)}`,
+      );
       const expectedRequirementIds = new Set(requirements.map((requirement) => requirement.id));
       const resolvedInfra = await provisioner.provision({
         environmentId: input.environmentId,
         requirements,
       });
+      writeIntegrationTimingEvent(
+        "infra provision end",
+        `env=${input.environmentId} kind=${kind} resolved=${formatIds(resolvedInfra)}`,
+      );
 
       for (const infra of resolvedInfra) {
         addResolvedInfra({
@@ -243,9 +262,20 @@ async function startServiceLayer(input: {
         plannedEndpoints: input.plannedEndpoints,
       };
 
+      writeIntegrationTimingEvent(
+        "service start begin",
+        `env=${input.environmentId} service=${request.service.id} mode=${request.mode}`,
+      );
+      const startedAt = Date.now();
+      const service = await request.service.start(startInput);
+      writeIntegrationTimingEvent(
+        "service start end",
+        `env=${input.environmentId} service=${request.service.id} mode=${request.mode} duration=${formatDuration(Date.now() - startedAt)}`,
+      );
+
       return {
         request,
-        service: await request.service.start(startInput),
+        service,
         startInput,
       };
     }),
@@ -316,8 +346,17 @@ function createTestServiceHandle(input: {
     },
     restart: async () => {
       assertIsolated("restart");
+      writeIntegrationTimingEvent(
+        "service restart begin",
+        `env=${input.startInput.environmentId} service=${service.id}`,
+      );
+      const startedAt = Date.now();
       await handle.stop();
       await handle.start();
+      writeIntegrationTimingEvent(
+        "service restart end",
+        `env=${input.startInput.environmentId} service=${service.id} duration=${formatDuration(Date.now() - startedAt)}`,
+      );
     },
     cleanup: async () => {
       if (cleanedUp) {
@@ -486,13 +525,22 @@ export async function startTestEnvironment<
     throw new Error("Test environment id must be non-empty.");
   }
 
+  writeIntegrationTimingEvent("startTestEnvironment begin", `env=${environmentId}`);
   const requestedServices = measureSync(setupTimings, "resolve-services", () =>
     resolveTestServiceRequests(input),
+  );
+  writeIntegrationTimingEvent(
+    "startTestEnvironment resolved services",
+    `env=${environmentId} services=${formatServiceRequests(requestedServices)}`,
   );
   const plan = measureSync(setupTimings, "plan", () =>
     createTestEnvironmentPlan({
       services: requestedServices,
     }),
+  );
+  writeIntegrationTimingEvent(
+    "startTestEnvironment planned",
+    `env=${environmentId} infra=${formatIds(plan.infraRequirements)} layers=${String(plan.serviceLayers.length)}`,
   );
   // Provision infrastructure by kind before any service starts. Provisioners get
   // batched requirements so they can share physical containers and isolate
@@ -537,6 +585,7 @@ export async function startTestEnvironment<
     phase: "setup",
     timings: setupTimings,
   });
+  writeIntegrationTimingEvent("startTestEnvironment ready", `env=${environmentId}`);
 
   let cleanupPromise: Promise<void> | undefined;
 
@@ -572,6 +621,7 @@ export async function startTestEnvironment<
       phase: "cleanup",
       timings: cleanupTimings,
     });
+    writeIntegrationTimingEvent("startTestEnvironment stopped", `env=${environmentId}`);
   };
   const unregisterProcessCleanupTask = registerProcessCleanupTask(stopInternal);
 

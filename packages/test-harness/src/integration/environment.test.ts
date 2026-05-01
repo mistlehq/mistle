@@ -14,13 +14,24 @@ function createEnvironment(): TestEnvironment<ServiceId> {
     id: "env_database_pool",
     infra: new Map<string, ResolvedTestInfra>([
       [
-        "postgres",
+        "postgres.control-plane",
         {
-          id: "postgres",
+          id: "postgres.control-plane",
           kind: "postgres",
           values: new Map([
             ["host.directUrl", "postgresql://mistle:mistle@127.0.0.1:1/mistle"],
             ["schema.controlPlane", "env_database_pool_control_plane"],
+          ]),
+          stop: async () => {},
+        },
+      ],
+      [
+        "postgres.data-plane",
+        {
+          id: "postgres.data-plane",
+          kind: "postgres",
+          values: new Map([
+            ["host.directUrl", "postgresql://mistle:mistle@127.0.0.1:1/mistle"],
             ["schema.dataPlane", "env_database_pool_data_plane"],
           ]),
           stop: async () => {},
