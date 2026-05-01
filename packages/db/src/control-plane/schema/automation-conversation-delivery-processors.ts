@@ -1,4 +1,4 @@
-import { bigint, text, timestamp } from "drizzle-orm/pg-core";
+import { bigint, text, timestamp, type PgSchema } from "drizzle-orm/pg-core";
 
 import { automationConversations } from "./automation-conversations.js";
 import { controlPlaneSchema } from "./namespace.js";
@@ -11,9 +11,8 @@ export const AutomationConversationDeliveryProcessorStatuses = {
 export type AutomationConversationDeliveryProcessorStatus =
   (typeof AutomationConversationDeliveryProcessorStatuses)[keyof typeof AutomationConversationDeliveryProcessorStatuses];
 
-export const automationConversationDeliveryProcessors = controlPlaneSchema.table(
-  "automation_conversation_delivery_processors",
-  {
+export function defineAutomationConversationDeliveryProcessors(schema: PgSchema) {
+  return schema.table("automation_conversation_delivery_processors", {
     conversationId: text("conversation_id")
       .primaryKey()
       .references(() => automationConversations.id, { onDelete: "cascade" }),
@@ -29,8 +28,11 @@ export const automationConversationDeliveryProcessors = controlPlaneSchema.table
     updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),
-  },
-);
+  });
+}
+
+export const automationConversationDeliveryProcessors =
+  defineAutomationConversationDeliveryProcessors(controlPlaneSchema);
 
 export type AutomationConversationDeliveryProcessor =
   typeof automationConversationDeliveryProcessors.$inferSelect;
