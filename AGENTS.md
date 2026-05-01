@@ -59,6 +59,7 @@
 - Do not import another app's runtime directly from an app integration test. Cross-service dependencies must be started through the test environment registry so the dependency runs as a real service.
 - Before adding, changing, or migrating integration tests, read `packages/test-harness/src/environment/README.md`. It is the source of truth for the new integration harness API, fixture shape, service selection, runtime default, pooling behavior, and migration expectations.
 - New integration tests must use `@mistle/test-harness` through the temporary `integration-new/` lane. Use `createIntegrationTest(...)` from the harness; do not create app-local bespoke setup unless you are implementing harness support itself.
+- Do not spin up ad hoc HTTP servers, local handlers, or app-local doubles to emulate Mistle services. If a test needs a Mistle service, add/select that service through `createIntegrationTest(...)` so the real service runs with the harness-managed environment. Ad hoc HTTP servers are acceptable only when the behavior under test is explicitly about calling an external/non-Mistle upstream, such as an echo server or provider callback endpoint.
 - `@mistle/test-harness` may dynamically import selected integration service implementations behind `createIntegrationTest(...)` so small tests do not transform every Mistle app and worker runtime before fixtures start. Keep this exception inside the harness service loader; app/test code should still use ordinary static imports.
 - New integration tests must receive a single `{ env }` fixture. Do not expose many one-off fixture fields when they can be modeled under `env`.
 - Runtime mode is the default for Mistle services in the new integration lane. Do not use Docker mode for ordinary application behavior tests unless the test explicitly covers packaging/deployment-shape behavior.
@@ -140,6 +141,8 @@
 
 - Prefer Drizzle's relational query API (`database.query.<table>.findFirst/findMany`) over raw `database.select(...)` unless you need SQL-level control.
 - In relational queries, prefer clause operator helpers from callback context (for example `where: (table, { eq, and }) => ...`) instead of importing operators directly from `drizzle-orm`.
+- Runtime app and worker code must not use static Drizzle table objects from `@mistle/db/control-plane` or `@mistle/db/data-plane` in query builders. Static tables bind to the default schema and bypass request/test-environment schema isolation. Use the relational query API when possible, or resolve the bound schema with `getControlPlaneDatabaseSchema(db)` / `getDataPlaneDatabaseSchema(db)` and use `tables.<tableName>` for inserts, updates, deletes, joins, and predicates.
+- Existing static-table usages are legacy debt guarded by the `mistle-db/no-static-db-tables-in-runtime` oxlint baseline. When touching nearby runtime DB code, actively migrate the touched path to bound schema tables and remove the corresponding baseline entry. Do not add new baseline entries unless the user explicitly approves a temporary exception.
 - Prefer `typeid` identifiers over UUIDs for application-generated IDs.
 - Prefer database-native timestamps for persisted rows: use schema defaults like `.defaultNow()` or SQL primitives like `` sql`now()` `` instead of `new Date()` values in insert/update payloads.
 
