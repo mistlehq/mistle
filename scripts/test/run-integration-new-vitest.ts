@@ -1,16 +1,5 @@
 import { spawn } from "node:child_process";
 
-import { stopRunnerServicePools } from "../../packages/test-harness/src/environment/runner-service-pool.ts";
-import {
-  formatIntegrationDuration,
-  markIntegrationTimingStart,
-  writeIntegrationTimingEvent,
-} from "../../packages/test-harness/src/integration/timing.ts";
-import {
-  acquireSharedInfraCoordinatorLease,
-  createTestEnvironmentSharedInfraKey,
-  stopSharedInfraForTestRun,
-} from "../../packages/test-harness/src/services/shared-infra-coordinator.ts";
 import { ensureIntegrationRunnerPoolSession } from "./integration-run-id.ts";
 
 const IntegrationNewVitestProjects = [
@@ -52,6 +41,31 @@ type SharedInfraPrewarmPlan = {
   valkey: boolean;
 };
 
+type PostgresPrewarmConfig = {
+  databaseName?: string;
+  username?: string;
+  password?: string;
+  startupTimeoutMs?: number;
+  poolMode?: "session" | "transaction" | "statement";
+  defaultPoolSize?: number;
+  maxClientConnections?: number;
+};
+
+type SharedInfraCoordinator = {
+  acquireSharedInfraCoordinatorLease: (input: {
+    key: string;
+    postgres: PostgresPrewarmConfig | undefined;
+    mailpit: boolean;
+    valkey: boolean;
+  }) => Promise<unknown>;
+  createTestEnvironmentSharedInfraKey: (environment: NodeJS.ProcessEnv) => string;
+  stopSharedInfraForTestRun: (runId: string) => Promise<void>;
+};
+
+type RunnerServicePools = {
+  stopRunnerServicePools: (input: { runId: string; coordinatorDir?: string }) => Promise<void>;
+};
+
 const RequiredBuildPackages = [
   "@mistle/control-plane-api",
   "@mistle/control-plane-worker",
@@ -62,6 +76,9 @@ const RequiredBuildPackages = [
   "@mistle/test-harness",
   "@mistle/tokenizer-proxy",
 ] as const;
+
+const TimingEnabledValue = "1";
+const TimingStartedAtEnv = "MISTLE_TEST_TIMING_STARTED_AT_MS";
 
 function normalizeCliArgs(rawArgs: ReadonlyArray<string>): string[] {
   if (rawArgs[0] === "--") {
@@ -129,7 +146,7 @@ function resolveSelectedProjects(
 }
 
 function formatDuration(milliseconds: number): string {
-  return formatIntegrationDuration(milliseconds);
+  return `${(milliseconds / 1000).toFixed(2)}s`;
 }
 
 function resolveSharedInfraPrewarmPlan(
@@ -190,6 +207,7 @@ function describeSharedInfraPrewarmPlan(plan: SharedInfraPrewarmPlan): string {
 
 async function prewarmSharedInfra(
   selectedProjects: ReadonlyArray<IntegrationNewVitestProject>,
+  coordinator: SharedInfraCoordinator,
 ): Promise<void> {
   const plan = resolveSharedInfraPrewarmPlan(selectedProjects);
   if (!plan.postgres && !plan.mailpit && !plan.valkey) {
@@ -201,8 +219,8 @@ async function prewarmSharedInfra(
   console.info(
     `[integration-new] prewarming shared infra: ${describeSharedInfraPrewarmPlan(plan)}.`,
   );
-  await acquireSharedInfraCoordinatorLease({
-    key: createTestEnvironmentSharedInfraKey(process.env),
+  await coordinator.acquireSharedInfraCoordinatorLease({
+    key: coordinator.createTestEnvironmentSharedInfraKey(process.env),
     postgres: plan.postgres ? {} : undefined,
     mailpit: plan.mailpit,
     valkey: plan.valkey,
@@ -210,6 +228,40 @@ async function prewarmSharedInfra(
   console.info(
     `[integration-new] shared infra prewarm completed in ${formatDuration(Date.now() - startedAt)}.`,
   );
+}
+
+function markIntegrationTimingStart(environment: NodeJS.ProcessEnv): void {
+  if (environment["MISTLE_TEST_TIMING"] !== TimingEnabledValue) {
+    return;
+  }
+
+  if (environment[TimingStartedAtEnv] === undefined) {
+    environment[TimingStartedAtEnv] = String(Date.now());
+  }
+}
+
+function writeIntegrationTimingEvent(event: string, details: string): void {
+  if (process.env["MISTLE_TEST_TIMING"] !== TimingEnabledValue) {
+    return;
+  }
+
+  process.stderr.write(
+    `[integration-new] ${formatTimingOffset()} pid=${String(process.pid)} worker=unknown ${event}: ${details}.\n`,
+  );
+}
+
+function formatTimingOffset(): string {
+  const startedAtValue = process.env[TimingStartedAtEnv];
+  if (startedAtValue === undefined || startedAtValue.length === 0) {
+    return "t=unknown";
+  }
+
+  const startedAt = Number(startedAtValue);
+  if (!Number.isFinite(startedAt)) {
+    return "t=unknown";
+  }
+
+  return `t=+${formatDuration(Date.now() - startedAt)}`;
 }
 
 async function runCommand(command: string, args: ReadonlyArray<string>): Promise<void> {
@@ -258,6 +310,16 @@ async function runTimedCommand(input: {
   return durationMs;
 }
 
+async function loadSharedInfraCoordinator(): Promise<SharedInfraCoordinator> {
+  // The runner must build workspace packages before loading harness internals.
+  return await import("../../packages/test-harness/src/services/shared-infra-coordinator.ts");
+}
+
+async function loadRunnerServicePools(): Promise<RunnerServicePools> {
+  // The runner must build workspace packages before loading harness internals.
+  return await import("../../packages/test-harness/src/environment/runner-service-pool.ts");
+}
+
 async function main(): Promise<void> {
   const startedAt = Date.now();
   markIntegrationTimingStart(process.env);
@@ -291,8 +353,11 @@ async function main(): Promise<void> {
     ],
   });
 
+  const sharedInfraCoordinator = await loadSharedInfraCoordinator();
+  const runnerServicePools = await loadRunnerServicePools();
+
   try {
-    await prewarmSharedInfra(selectedProjects);
+    await prewarmSharedInfra(selectedProjects, sharedInfraCoordinator);
     await runTimedCommand({
       label: "vitest",
       command: "pnpm",
@@ -300,11 +365,11 @@ async function main(): Promise<void> {
     });
   } finally {
     const cleanupStartedAt = Date.now();
-    await stopRunnerServicePools({
+    await runnerServicePools.stopRunnerServicePools({
       runId: runnerPoolSession.runId,
       coordinatorDir: runnerPoolSession.coordinatorDir,
     });
-    await stopSharedInfraForTestRun(runnerPoolSession.runId);
+    await sharedInfraCoordinator.stopSharedInfraForTestRun(runnerPoolSession.runId);
     console.info(
       `[integration-new] pooled service/infra cleanup completed in ${formatDuration(Date.now() - cleanupStartedAt)}.`,
     );
