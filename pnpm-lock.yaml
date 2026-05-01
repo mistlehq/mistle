@@ -699,6 +699,12 @@ importers:
         specifier: ^4.12.14
         version: 4.12.14
     devDependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../../packages/integrations-core
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
