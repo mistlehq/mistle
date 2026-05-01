@@ -9,7 +9,6 @@ import {
   type IntegrationBindingKind,
   type IntegrationTarget,
   type IntegrationCredentialSecretKind,
-  sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
@@ -1324,16 +1323,16 @@ export async function resolveIntegrationCredential(
 
         let bindingResolverContext: ResolverContextBinding | undefined;
         if (input.bindingId !== undefined) {
-          const [binding] = await db
-            .select({
-              id: sandboxProfileVersionIntegrationBindings.id,
-              kind: sandboxProfileVersionIntegrationBindings.kind,
-              connectionId: sandboxProfileVersionIntegrationBindings.connectionId,
-              config: sandboxProfileVersionIntegrationBindings.config,
-            })
-            .from(sandboxProfileVersionIntegrationBindings)
-            .where(eq(sandboxProfileVersionIntegrationBindings.id, input.bindingId))
-            .limit(1);
+          const bindingId = input.bindingId;
+          const binding = await db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+            columns: {
+              id: true,
+              kind: true,
+              connectionId: true,
+              config: true,
+            },
+            where: (table, { eq }) => eq(table.id, bindingId),
+          });
 
           if (binding === undefined) {
             throw new InternalIntegrationCredentialsError(
