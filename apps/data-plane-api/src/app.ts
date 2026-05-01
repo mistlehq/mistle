@@ -131,6 +131,9 @@ async function createRequestContext(input: {
       runtimeStateReader: input.resources.getRuntimeStateReader({
         testEnvironmentId: input.testEnvironmentId,
       }),
+      controlPlaneInternalClient: input.resources.getControlPlaneInternalClient({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
     },
   };
 }

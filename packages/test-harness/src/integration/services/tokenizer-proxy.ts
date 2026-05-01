@@ -7,6 +7,7 @@ import type {
   TestServiceDefinition,
   TestServiceStartInput,
 } from "../../environment/index.js";
+import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import { assertMode, httpEndpoint, httpHealth } from "./shared.js";
@@ -78,6 +79,9 @@ function config(input: { port: number; controlPlaneBaseUrl: string }): Tokenizer
       tokenSecret: "integration-new-egress-token-secret",
       tokenIssuer: "integration-new-data-plane-worker",
       tokenAudience: "integration-new-tokenizer-proxy",
+    },
+    __dangerouslyEnableTestIsolation: {
+      testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
 }

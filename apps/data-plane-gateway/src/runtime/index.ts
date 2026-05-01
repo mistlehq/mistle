@@ -201,6 +201,12 @@ export function createDataPlaneGatewayRuntime(
     controlPlaneClient: new ControlPlaneInternalClient({
       baseUrl: config.app.controlPlaneApi.baseUrl,
       internalAuthServiceToken: config.app.internalAuth.serviceToken,
+      ...(config.app.__dangerouslyEnableTestIsolation === undefined
+        ? {}
+        : {
+            testEnvironmentIdHeader:
+              config.app.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+          }),
     }),
   });
   const telemetryIngressSink = createSandboxTelemetryIngressSink({

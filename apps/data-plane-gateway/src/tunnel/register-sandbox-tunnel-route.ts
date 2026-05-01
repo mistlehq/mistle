@@ -327,6 +327,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
                         liveSandboxInstanceId: sandboxInstanceId,
                         request: delivery.message,
+                        ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                       });
                     ws.send(JSON.stringify(result));
                   },

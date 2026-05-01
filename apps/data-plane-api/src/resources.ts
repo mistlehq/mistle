@@ -33,6 +33,9 @@ export type AppRuntimeResources = {
   }) => Promise<ReturnType<typeof createDataPlaneOpenWorkflow>>;
   getWorkflowNamespaceId: (input?: { testEnvironmentId?: string }) => string;
   getRuntimeStateReader: (input?: { testEnvironmentId?: string }) => SandboxRuntimeStateReader;
+  getControlPlaneInternalClient: (input?: {
+    testEnvironmentId?: string;
+  }) => ControlPlaneInternalClient;
 };
 
 export async function createAppResources(
@@ -54,6 +57,7 @@ export async function createAppResources(
     }>
   >();
   const testRuntimeStateReadersByEnvironmentId = new Map<string, SandboxRuntimeStateReader>();
+  const testControlPlaneClientsByEnvironmentId = new Map<string, ControlPlaneInternalClient>();
   const runtimeStateReader = new GatewayHttpSandboxRuntimeStateReader({
     baseUrl: runtimeConfig.app.runtimeState.gatewayBaseUrl,
     serviceToken: runtimeConfig.app.internalAuth.serviceToken,
@@ -177,6 +181,33 @@ export async function createAppResources(
       });
       testRuntimeStateReadersByEnvironmentId.set(testEnvironmentId, reader);
       return reader;
+    },
+    getControlPlaneInternalClient: (request = {}) => {
+      const testIsolation = runtimeConfig.app.__dangerouslyEnableTestIsolation;
+      if (testIsolation === undefined) {
+        return controlPlaneInternalClient;
+      }
+
+      const testEnvironmentId = request.testEnvironmentId;
+      if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+        throw new Error(
+          "Expected test environment id for isolated data-plane control-plane client request.",
+        );
+      }
+
+      const existingClient = testControlPlaneClientsByEnvironmentId.get(testEnvironmentId);
+      if (existingClient !== undefined) {
+        return existingClient;
+      }
+
+      const client = new ControlPlaneInternalClient({
+        baseUrl: runtimeConfig.app.controlPlaneApi.baseUrl,
+        internalAuthServiceToken: runtimeConfig.app.internalAuth.serviceToken,
+        testEnvironmentId,
+        testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+      });
+      testControlPlaneClientsByEnvironmentId.set(testEnvironmentId, client);
+      return client;
     },
   };
 }

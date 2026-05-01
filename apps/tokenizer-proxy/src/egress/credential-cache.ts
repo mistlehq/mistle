@@ -1,5 +1,6 @@
 export type CredentialCacheKeyInput =
   | {
+      testEnvironmentId?: string;
       bindingId: string;
       credentialResolverKind: "integration_connection";
       connectionId: string;
@@ -8,6 +9,7 @@ export type CredentialCacheKeyInput =
       resolverKey?: string;
     }
   | {
+      testEnvironmentId?: string;
       bindingId: string;
       credentialResolverKind: "linked_principal";
       organizationId: string;
@@ -51,6 +53,7 @@ type CredentialCacheInput = {
 function toCacheKey(input: CredentialCacheKeyInput): string {
   if (input.credentialResolverKind === "integration_connection") {
     return [
+      input.testEnvironmentId ?? "",
       input.bindingId,
       input.credentialResolverKind,
       input.connectionId,
@@ -61,6 +64,7 @@ function toCacheKey(input: CredentialCacheKeyInput): string {
   }
 
   return [
+    input.testEnvironmentId ?? "",
     input.bindingId,
     input.credentialResolverKind,
     input.organizationId,

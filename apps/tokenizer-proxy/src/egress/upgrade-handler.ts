@@ -19,6 +19,7 @@ type CreateEgressProxyUpgradeHandlerInput = {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
   egressGrantConfig: EgressGrantConfig;
+  testEnvironmentIdHeader?: string;
 };
 
 type CredentialCacheKey = Parameters<CredentialCache["get"]>[0];
@@ -53,6 +54,24 @@ function readOptionalHeader(headers: IncomingHttpHeaders, headerName: string): s
 
   const trimmedValue = firstValue.trim();
   return trimmedValue.length === 0 ? undefined : trimmedValue;
+}
+
+function readTestEnvironmentId(input: {
+  headers: IncomingHttpHeaders;
+  testEnvironmentIdHeader: string | undefined;
+}): string | undefined {
+  if (input.testEnvironmentIdHeader === undefined) {
+    return undefined;
+  }
+
+  const testEnvironmentId = readOptionalHeader(input.headers, input.testEnvironmentIdHeader);
+  if (testEnvironmentId === undefined) {
+    throw new Error(
+      `Expected '${input.testEnvironmentIdHeader}' header for isolated tokenizer-proxy websocket upgrade.`,
+    );
+  }
+
+  return testEnvironmentId;
 }
 
 function joinPath(basePath: string, suffixPath: string): string {
@@ -214,11 +233,15 @@ function applyAdditionalHeaders(input: {
 }
 
 function createCredentialCacheKey(input: {
+  testEnvironmentId?: string;
   bindingId: string;
   resolver: CredentialResolverInput;
 }): CredentialCacheKey {
   if (input.resolver.credentialResolverKind === "integration_connection") {
     return {
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
       bindingId: input.bindingId,
       credentialResolverKind: "integration_connection",
       connectionId: input.resolver.connectionId,
@@ -231,6 +254,9 @@ function createCredentialCacheKey(input: {
   }
 
   return {
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
     bindingId: input.bindingId,
     credentialResolverKind: "linked_principal",
     organizationId: input.resolver.organizationId,
@@ -448,11 +474,15 @@ function connectTunnel(left: Socket, right: Socket, head: Buffer): void {
 async function resolveCredentialValue(input: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
+  testEnvironmentId?: string;
   bindingId: string;
   resolver: CredentialResolverInput;
   context: string;
 }): Promise<string> {
   const cacheKey = createCredentialCacheKey({
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
     bindingId: input.bindingId,
     resolver: input.resolver,
   });
@@ -467,27 +497,41 @@ async function resolveCredentialValue(input: {
 
   const resolvedCredential =
     input.resolver.credentialResolverKind === "integration_connection"
-      ? await input.controlPlaneInternalClient.resolveIntegrationCredential({
-          connectionId: input.resolver.connectionId,
-          bindingId: input.bindingId,
-          secretType: input.resolver.secretType,
-          ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
-          ...(input.resolver.resolverKey === undefined
-            ? {}
-            : { resolverKey: input.resolver.resolverKey }),
-        })
-      : await input.controlPlaneInternalClient.resolveIdentityLinkPrincipalCredential({
-          organizationId: input.resolver.organizationId,
-          actingUserId:
-            input.resolver.actingUserId ??
-            (() => {
-              throw new Error("Linked-principal credential resolver is missing actingUserId.");
-            })(),
-          providerFamily: input.resolver.providerFamily,
-          ...(input.resolver.credentialKind === undefined
-            ? {}
-            : { credentialKind: input.resolver.credentialKind }),
-        });
+      ? await input.controlPlaneInternalClient.resolveIntegrationCredential(
+          {
+            connectionId: input.resolver.connectionId,
+            bindingId: input.bindingId,
+            secretType: input.resolver.secretType,
+            ...(input.resolver.slotKey === undefined ? {} : { slotKey: input.resolver.slotKey }),
+            ...(input.resolver.resolverKey === undefined
+              ? {}
+              : { resolverKey: input.resolver.resolverKey }),
+          },
+          {
+            ...(input.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: input.testEnvironmentId }),
+          },
+        )
+      : await input.controlPlaneInternalClient.resolveIdentityLinkPrincipalCredential(
+          {
+            organizationId: input.resolver.organizationId,
+            actingUserId:
+              input.resolver.actingUserId ??
+              (() => {
+                throw new Error("Linked-principal credential resolver is missing actingUserId.");
+              })(),
+            providerFamily: input.resolver.providerFamily,
+            ...(input.resolver.credentialKind === undefined
+              ? {}
+              : { credentialKind: input.resolver.credentialKind }),
+          },
+          {
+            ...(input.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: input.testEnvironmentId }),
+          },
+        );
 
   input.credentialCache.set(cacheKey, resolvedCredential);
   return resolveStaticCredentialValueOrThrow({
@@ -551,11 +595,28 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
         return;
       }
 
+      let testEnvironmentId: string | undefined;
+      try {
+        testEnvironmentId = readTestEnvironmentId({
+          headers: request.headers,
+          testEnvironmentIdHeader: input.testEnvironmentIdHeader,
+        });
+      } catch (error) {
+        writeFailure(
+          socket,
+          400,
+          "Bad Request",
+          error instanceof Error ? error.message : "Missing test environment id.",
+        );
+        return;
+      }
+
       let credentialValue: string;
       try {
         credentialValue = await resolveCredentialValue({
           controlPlaneInternalClient: input.controlPlaneInternalClient,
           credentialCache: input.credentialCache,
+          ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
           bindingId: egressGrant.bindingId,
           resolver: toCredentialResolverInputFromGrant({
             grant: egressGrant,
@@ -597,6 +658,7 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
             const resolvedHeaderValue = await resolveCredentialValue({
               controlPlaneInternalClient: input.controlPlaneInternalClient,
               credentialCache: input.credentialCache,
+              ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
               bindingId: egressGrant.bindingId,
               resolver: toCredentialResolverInputFromHeader({
                 organizationId: egressGrant.organizationId,

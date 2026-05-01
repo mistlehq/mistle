@@ -7,7 +7,13 @@ import type { Context, Hono } from "hono";
 
 type LoadTokenizerProxyConfigResult = ReturnType<typeof loadConfig<typeof AppIds.TOKENIZER_PROXY>>;
 
-export type TokenizerProxyConfig = LoadTokenizerProxyConfigResult["app"];
+export type TokenizerProxyTestIsolationConfig = {
+  testEnvironmentIdHeader: string;
+};
+
+export type TokenizerProxyConfig = LoadTokenizerProxyConfigResult["app"] & {
+  __dangerouslyEnableTestIsolation?: TokenizerProxyTestIsolationConfig;
+};
 
 export type TokenizerProxyRuntimeConfig = {
   app: TokenizerProxyConfig;
@@ -20,6 +26,7 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: TokenizerProxyConfig;
   internalAuthServiceToken: string;
+  testEnvironmentId?: string;
 };
 
 export type AppContext = Context<AppContextBindings>;
