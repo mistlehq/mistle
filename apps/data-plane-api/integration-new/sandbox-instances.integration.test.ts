@@ -2,11 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import {
-  SandboxInstancePurposes,
-  SandboxInstanceStatuses,
-  getDataPlaneDatabaseSchema,
-} from "@mistle/db/data-plane";
+import { SandboxInstancePurposes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { typeid } from "typeid-js";
 import { expect } from "vitest";
@@ -22,9 +18,8 @@ const it = createIntegrationTest({
 it("lists sandbox instances from the requesting test environment", async ({ env }) => {
   const organizationId = "org_integration_new_data_plane_api";
   const sandboxInstanceId = typeid("sbi").toString();
-  const dataPlaneSchema = getDataPlaneDatabaseSchema(env.dataPlaneDb);
 
-  await env.dataPlaneDb.insert(dataPlaneSchema.sandboxInstances).values({
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
     id: sandboxInstanceId,
     organizationId,
     sandboxProfileId: "sbp_integration_new_data_plane_api",

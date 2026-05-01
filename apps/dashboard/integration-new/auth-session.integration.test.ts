@@ -2,10 +2,7 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { createHmac } from "node:crypto";
-
-import { MemberRoles, members, organizations, sessions, users } from "@mistle/db/control-plane";
-import { TestEnvironmentIdHeader, createIntegrationTest } from "@mistle/test-harness/integration";
+import { createIntegrationTest, TestEnvironmentIdHeader } from "@mistle/test-harness/integration";
 import { expect } from "vitest";
 
 import { resetDashboardConfigForTest } from "../src/config.js";
@@ -17,59 +14,25 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-const BetterAuthSessionCookieName = "better-auth.session_token";
-const ControlPlaneAuthSecret = "integration-new-auth-secret";
-
 it("resolves the dashboard session from the real control-plane API", async ({ env }) => {
-  const sessionToken = `dashboard-integration-${env.id}`;
-  const userId = `usr_${env.id}`;
-  const organizationId = `org_${env.id}`;
-  const sessionId = `ses_${env.id}`;
-  const memberId = `mbr_${env.id}`;
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 60 * 60 * 1000);
-
-  await env.controlPlaneDb.insert(users).values({
-    id: userId,
-    name: "Dashboard Integration User",
-    email: `${userId}@mistle.test`,
-    emailVerified: true,
-  });
-  await env.controlPlaneDb.insert(organizations).values({
-    id: organizationId,
-    name: "Dashboard Integration",
-    slug: organizationId,
-  });
-  await env.controlPlaneDb.insert(members).values({
-    id: memberId,
-    organizationId,
-    userId,
-    role: MemberRoles.OWNER,
-  });
-  await env.controlPlaneDb.insert(sessions).values({
-    id: sessionId,
-    token: sessionToken,
-    userId,
-    activeOrganizationId: organizationId,
-    expiresAt,
+  const session = await env.auth.createSession({
+    organizationName: "Dashboard Integration",
   });
 
-  const cookie = createBetterAuthSessionCookie(sessionToken);
   const backendSessionResponse = await env.controlPlaneApi.http.fetch("/v1/auth/get-session", {
     headers: {
-      cookie,
+      cookie: session.cookie,
     },
   });
-
   expect(backendSessionResponse.status).toBe(200);
-  await expect(backendSessionResponse.json()).resolves.toMatchObject({
+
+  const backendSessionPayload = await backendSessionResponse.json();
+  expect(backendSessionPayload).toMatchObject({
     session: {
-      id: sessionId,
-      userId,
-      activeOrganizationId: organizationId,
+      activeOrganizationId: session.organizationId,
     },
     user: {
-      id: userId,
+      email: session.email,
     },
   });
 
@@ -83,7 +46,7 @@ it("resolves the dashboard session from the real control-plane API", async ({ en
   const dashboardAuthResponse = await authClient.getSession({
     fetchOptions: {
       headers: {
-        cookie,
+        cookie: session.cookie,
         [TestEnvironmentIdHeader]: env.id,
       },
     },
@@ -95,20 +58,10 @@ it("resolves the dashboard session from the real control-plane API", async ({ en
 
   expect(dashboardSession).toMatchObject({
     session: {
-      id: sessionId,
-      userId,
-      activeOrganizationId: organizationId,
+      activeOrganizationId: session.organizationId,
     },
     user: {
-      id: userId,
+      email: session.email,
     },
   });
 });
-
-function createBetterAuthSessionCookie(sessionToken: string): string {
-  const signature = createHmac("sha256", ControlPlaneAuthSecret)
-    .update(sessionToken)
-    .digest("base64");
-  const signedValue = encodeURIComponent(`${sessionToken}.${signature}`);
-  return `${BetterAuthSessionCookieName}=${signedValue}`;
-}

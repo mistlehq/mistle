@@ -59,6 +59,7 @@
 - Do not import another app's runtime directly from an app integration test. Cross-service dependencies must be started through the test environment registry so the dependency runs as a real service.
 - Before adding, changing, or migrating integration tests, read `packages/test-harness/src/environment/README.md`. It is the source of truth for the new integration harness API, fixture shape, service selection, runtime default, pooling behavior, and migration expectations.
 - New integration tests must use `@mistle/test-harness` through the temporary `integration-new/` lane. Use `createIntegrationTest(...)` from the harness; do not create app-local bespoke setup unless you are implementing harness support itself.
+- `@mistle/test-harness` may dynamically import selected integration service implementations behind `createIntegrationTest(...)` so small tests do not transform every Mistle app and worker runtime before fixtures start. Keep this exception inside the harness service loader; app/test code should still use ordinary static imports.
 - New integration tests must receive a single `{ env }` fixture. Do not expose many one-off fixture fields when they can be modeled under `env`.
 - Runtime mode is the default for Mistle services in the new integration lane. Do not use Docker mode for ordinary application behavior tests unless the test explicitly covers packaging/deployment-shape behavior.
 - Request every live service the test intentionally exercises. Service references in the registry are wiring/order hints only; they must not surprise-start extra services.
@@ -156,7 +157,7 @@
 - `any` and `as` are forbidden.
 - For identifier registries and constants maps, use PascalCase object names with UPPER_SNAKE_CASE keys (for example `AppIds.CONTROL_PLANE_API`), not camelCase key access patterns.
 - Check `node_modules` for external API type definitions instead of guessing.
-- **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports.
+- **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports. The only current exception is the `@mistle/test-harness` integration service loader documented above.
 - NEVER remove or downgrade code to fix type errors from outdated dependencies; upgrade the dependency instead.
 - Always ask before removing functionality or code that appears to be intentional.
 - If the app is for a browser, assume we use all modern browsers unless otherwise specified, we don't need most polyfills.
