@@ -15,10 +15,10 @@ describe("sandbox base inventory spec Dockerfile check", () => {
   });
 
   it("reports drift when a declared apt-backed command is removed", () => {
-    const dockerfileText = readFileSync(DockerfileUrl, "utf8").replace(/^\s+fd-find \\\n/mu, "");
+    const dockerfileText = readFileSync(DockerfileUrl, "utf8").replace(/^\s+ripgrep \\\n/mu, "");
 
     expect(findSandboxBaseInventorySpecDrift(dockerfileText)).toContain(
-      "fd: expected apt package 'fd-find' in stage 'sandbox-base'",
+      "rg: expected apt package 'ripgrep' in stage 'sandbox-base-common'",
     );
   });
 });
