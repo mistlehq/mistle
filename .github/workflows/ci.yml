@@ -716,7 +716,7 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run new TS integration tests in Nix shell
-        run: nix develop --command pnpm --filter @mistle/control-plane-api test:integration:new
+        run: nix develop --command pnpm test:integration:new
 
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.test-ts-integration-new-turbo-cache.outputs.cache-hit != 'true' }}
