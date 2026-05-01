@@ -20,6 +20,7 @@ function createEnvironment(): TestEnvironment<ServiceId> {
           kind: "postgres",
           values: new Map([
             ["host.directUrl", "postgresql://mistle:mistle@127.0.0.1:1/mistle"],
+            ["schema.controlPlane", "env_database_pool_control_plane"],
             ["schema.dataPlane", "env_database_pool_data_plane"],
           ]),
           stop: async () => {},

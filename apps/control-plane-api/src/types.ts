@@ -14,7 +14,11 @@ type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
 >;
 
-export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
+export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"] & {
+  __dangerouslyEnableTestIsolation?: {
+    testEnvironmentIdHeader: string;
+  };
+};
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
 export type ControlPlaneApiConnectionTokenConfig = ControlPlaneApiConfig["connectionToken"];
 export type ControlPlaneApiPortAccessConfig = ControlPlaneApiConfig["portAccess"];

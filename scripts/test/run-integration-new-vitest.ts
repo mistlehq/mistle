@@ -13,6 +13,10 @@ const IntegrationNewVitestProjects = [
     projectName: "@mistle/data-plane-gateway",
     packageName: "@mistle/data-plane-gateway",
   },
+  {
+    projectName: "@mistle/dashboard",
+    packageName: "@mistle/dashboard",
+  },
 ] as const;
 
 type IntegrationNewVitestProject = (typeof IntegrationNewVitestProjects)[number];

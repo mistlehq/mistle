@@ -9,6 +9,7 @@ import type {
   TestServiceDefinition,
   TestServiceStartInput,
 } from "../../environment/index.js";
+import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import { httpEndpoint, httpHealth, infraValue, resolvedInfra, singleInfra } from "./shared.js";
@@ -160,6 +161,9 @@ function config(input: {
       otpLength: 6,
       otpExpiresInSeconds: 300,
       otpAllowedAttempts: 3,
+    },
+    __dangerouslyEnableTestIsolation: {
+      testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
 }

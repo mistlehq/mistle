@@ -1,7 +1,7 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
 import { createApp } from "./app.js";
-import { createControlPlaneAuth } from "./auth/index.js";
+import { createControlPlaneAuth, type ControlPlaneAuthConfig } from "./auth/index.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
 import type {
@@ -20,23 +20,13 @@ export async function createControlPlaneApiRuntime(
     serviceToken: runtimeConfig.app.internalAuth.serviceToken,
   });
   const { app: config } = runtimeConfig;
+  const authConfig = createAuthConfig(config);
+  const testAuthByEnvironmentId = new Map<string, ReturnType<typeof createControlPlaneAuth>>();
   let app: ControlPlaneApp;
 
   try {
     const auth = createControlPlaneAuth({
-      config: {
-        authBaseUrl: config.auth.baseUrl,
-        dashboardBaseUrl: config.dashboard.baseUrl,
-        authSecret: config.auth.secret,
-        authTrustedOrigins: config.auth.trustedOrigins,
-        authOTPLength: config.auth.otpLength,
-        authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
-        authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
-        authGoogleClientId: config.auth.google?.clientId ?? null,
-        authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
-        activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
-        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
-      },
+      config: authConfig,
       db: resources.db,
       openWorkflow: resources.openWorkflow,
     });
@@ -53,6 +43,25 @@ export async function createControlPlaneApiRuntime(
       portAccessConfig: config.portAccess,
       openWorkflow: resources.openWorkflow,
       auth,
+      resolveTestContext: async ({ testEnvironmentId }) => {
+        const db = resources.getDb({ testEnvironmentId });
+        const openWorkflow = await resources.getOpenWorkflow({ testEnvironmentId });
+        let testAuth = testAuthByEnvironmentId.get(testEnvironmentId);
+        if (testAuth === undefined) {
+          testAuth = createControlPlaneAuth({
+            config: authConfig,
+            db,
+            openWorkflow,
+          });
+          testAuthByEnvironmentId.set(testEnvironmentId, testAuth);
+        }
+
+        return {
+          db,
+          openWorkflow,
+          auth: testAuth,
+        };
+      },
     });
   } catch (error) {
     await stopAppResources(resources);
@@ -104,5 +113,21 @@ export async function createControlPlaneApiRuntime(
 
       await stopPromise;
     },
+  };
+}
+
+function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlPlaneAuthConfig {
+  return {
+    authBaseUrl: config.auth.baseUrl,
+    dashboardBaseUrl: config.dashboard.baseUrl,
+    authSecret: config.auth.secret,
+    authTrustedOrigins: config.auth.trustedOrigins,
+    authOTPLength: config.auth.otpLength,
+    authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
+    authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
+    authGoogleClientId: config.auth.google?.clientId ?? null,
+    authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
+    activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
+    masterEncryptionKeys: config.integrations.masterEncryptionKeys,
   };
 }

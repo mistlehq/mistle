@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -37,7 +37,10 @@ import { readPreparedTestHarnessRuntime } from "../system/prepared-runtime.js";
 import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
 import { createServiceRegistry } from "./registry.js";
 import { MISTLE_TEST_RUN_ID_ENV } from "./runner-pool-session.js";
-import { createDataPlaneTestSchemaName } from "./test-isolation.js";
+import {
+  createControlPlaneTestSchemaName,
+  createDataPlaneTestSchemaName,
+} from "./test-isolation.js";
 import type {
   ResolvedTestInfra,
   TestService,
@@ -83,6 +86,7 @@ const PostgresValues = {
   CONTAINER_POOLED_URL: "container.pooledUrl",
   CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
   DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
+  CONTROL_PLANE_SCHEMA_NAME: "schema.controlPlane",
   DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
 };
 
@@ -332,6 +336,7 @@ function createPostgresProvisioner(input: {
   };
   const enqueueLogicalMigrations = (migrationInput: {
     hostDirectUrl: string;
+    controlPlaneSchemaName: string;
     dataPlaneSchemaName: string;
     workflowControlPlaneNamespaceId: string;
     workflowDataPlaneNamespaceId: string;
@@ -362,6 +367,9 @@ function createPostgresProvisioner(input: {
           prefix: "dp",
           environmentId: provisionInput.environmentId,
         });
+        const controlPlaneSchemaName = createControlPlaneTestSchemaName(
+          provisionInput.environmentId,
+        );
         const dataPlaneSchemaName = createDataPlaneTestSchemaName(provisionInput.environmentId);
 
         const hostDirectUrl = createDatabaseUrl({
@@ -404,6 +412,7 @@ function createPostgresProvisioner(input: {
           containerPooledUrl,
           workflowControlPlaneNamespaceId,
           workflowDataPlaneNamespaceId,
+          controlPlaneSchemaName,
           dataPlaneSchemaName,
           migrationCoordinatorKey,
         };
@@ -420,6 +429,7 @@ function createPostgresProvisioner(input: {
         await withPostgresMigrationCoordinatorLock(resolved.migrationCoordinatorKey, async () => {
           await enqueueLogicalMigrations({
             hostDirectUrl: resolved.hostDirectUrl,
+            controlPlaneSchemaName: resolved.controlPlaneSchemaName,
             dataPlaneSchemaName: resolved.dataPlaneSchemaName,
             workflowControlPlaneNamespaceId: resolved.workflowControlPlaneNamespaceId,
             workflowDataPlaneNamespaceId: resolved.workflowDataPlaneNamespaceId,
@@ -446,10 +456,19 @@ function createPostgresProvisioner(input: {
             resolved.workflowControlPlaneNamespaceId,
           ],
           [PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID, resolved.workflowDataPlaneNamespaceId],
+          [PostgresValues.CONTROL_PLANE_SCHEMA_NAME, resolved.controlPlaneSchemaName],
           [PostgresValues.DATA_PLANE_SCHEMA_NAME, resolved.dataPlaneSchemaName],
         ]),
         stop: async () => {
           const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "drop-control-plane-schema", async () =>
+            dropPostgresSchema({
+              containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
+              username: lease.infra.postgres.postgres.username,
+              databaseName: lease.infra.postgres.postgres.databaseName,
+              schemaName: resolved.controlPlaneSchemaName,
+            }),
+          );
           await measure(cleanupTimings, "drop-data-plane-schema", async () =>
             dropPostgresSchema({
               containerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
@@ -1068,11 +1087,21 @@ async function runPostgresBootstrapMigrationsOnceAcrossProcesses(input: {
 async function runPostgresLogicalMigrations(input: {
   context: MistleRegistryContext;
   hostDirectUrl: string;
+  controlPlaneSchemaName: string;
   dataPlaneSchemaName: string;
   workflowControlPlaneNamespaceId: string;
   workflowDataPlaneNamespaceId: string;
   timings: Map<string, number>;
 }): Promise<void> {
+  await measure(input.timings, "logical-control-plane-db-migrations", async () =>
+    runControlPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: input.controlPlaneSchemaName,
+      migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: `${input.controlPlaneSchemaName}_meta`,
+      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    }),
+  );
   await measure(input.timings, "logical-data-plane-db-migrations", async () =>
     runDataPlaneMigrations({
       connectionString: input.hostDirectUrl,
@@ -1298,7 +1327,7 @@ function createSafeIdentifier(value: string): string {
   const normalized = value.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
   const digest = createHash("sha256").update(value).digest("hex").slice(0, 10);
   const compact = normalized.length === 0 ? "env" : normalized.slice(0, 28);
-  return `${compact}_${digest}_${randomUUID().replaceAll("-", "").slice(0, 8)}`;
+  return `${compact}_${digest}`;
 }
 
 function getInfra(infra: ReadonlyMap<string, ResolvedTestInfra>, id: string): ResolvedTestInfra {

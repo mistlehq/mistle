@@ -6,6 +6,7 @@ import {
 } from "vitest/config";
 
 import controlPlaneApiConfig from "./apps/control-plane-api/vitest.integration-new.config.ts";
+import dashboardConfig from "./apps/dashboard/vitest.integration-new.config.ts";
 import dataPlaneGatewayConfig from "./apps/data-plane-gateway/vitest.integration-new.config.ts";
 
 function createNamedProject(input: {
@@ -36,6 +37,11 @@ export default defineConfig({
         name: "@mistle/data-plane-gateway",
         root: "./apps/data-plane-gateway",
         config: dataPlaneGatewayConfig,
+      }),
+      createNamedProject({
+        name: "@mistle/dashboard",
+        root: "./apps/dashboard",
+        config: dashboardConfig,
       }),
     ],
   },

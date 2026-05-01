@@ -10,6 +10,7 @@ import { httpService, type IntegrationHttpService } from "./services/shared.js";
 const DefaultDatabasePoolMax = 4;
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
+  CONTROL_PLANE_SCHEMA_NAME: "schema.controlPlane",
   DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
 };
 
@@ -48,6 +49,9 @@ export function createIntegrationEnvironment(input: {
           poolFactory,
           pools,
         }),
+        {
+          schemaName: readControlPlaneSchemaName(input.environment),
+        },
       );
 
       return controlPlaneDb;
@@ -128,6 +132,16 @@ function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): strin
   const schemaName = postgres?.values.get(PostgresValues.DATA_PLANE_SCHEMA_NAME);
   if (schemaName === undefined) {
     throw new Error("Expected integration environment to include data-plane schema name.");
+  }
+
+  return schemaName;
+}
+
+function readControlPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {
+  const postgres = environment.infra.get("postgres");
+  const schemaName = postgres?.values.get(PostgresValues.CONTROL_PLANE_SCHEMA_NAME);
+  if (schemaName === undefined) {
+    throw new Error("Expected integration environment to include control-plane schema name.");
   }
 
   return schemaName;

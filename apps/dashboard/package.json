@@ -13,6 +13,7 @@
     "test:component": "vitest run -c vitest.component.config.ts --passWithNoTests",
     "test:bench": "vitest bench src/features/automations/agent-instructions-performance.bench.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:integration:new": "vitest run -c vitest.integration-new.config.ts --passWithNoTests",
     "openapi:generate": "tsx scripts/generate-control-plane-client.ts",
     "openapi:check": "tsx lint/check-control-plane-client-drift.ts",
     "format": "oxfmt .",

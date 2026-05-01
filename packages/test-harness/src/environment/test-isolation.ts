@@ -2,13 +2,27 @@ import { createHash } from "node:crypto";
 
 export const TestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
+export function createControlPlaneTestSchemaName(testEnvironmentId: string): string {
+  return createTestSchemaName({
+    testEnvironmentId,
+    suffix: "control_plane",
+  });
+}
+
 export function createDataPlaneTestSchemaName(testEnvironmentId: string): string {
-  const normalized = testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
+  return createTestSchemaName({
+    testEnvironmentId,
+    suffix: "data_plane",
+  });
+}
+
+function createTestSchemaName(input: { testEnvironmentId: string; suffix: string }): string {
+  const normalized = input.testEnvironmentId.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
   const prefix = /^[a-z]/u.test(normalized) ? normalized : `env_${normalized}`;
-  const digest = createHash("sha256").update(testEnvironmentId).digest("hex").slice(0, 10);
-  const schemaName = `${prefix.slice(0, 40)}_${digest}_data_plane`;
+  const digest = createHash("sha256").update(input.testEnvironmentId).digest("hex").slice(0, 10);
+  const schemaName = `${prefix.slice(0, 40)}_${digest}_${input.suffix}`;
   if (schemaName.length > 63) {
-    throw new Error(`Test data-plane schema name '${schemaName}' exceeds Postgres length limits.`);
+    throw new Error(`Test schema name '${schemaName}' exceeds Postgres length limits.`);
   }
 
   return schemaName;

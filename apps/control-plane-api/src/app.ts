@@ -5,6 +5,7 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { OpenWorkflow } from "openworkflow";
 
+import type { ControlPlaneAuth } from "./auth/index.js";
 import { createAuthRoutes } from "./auth/routes.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
 import { createHomeRoutes } from "./home/index.js";
@@ -57,6 +58,11 @@ export type CreateAppInput = {
   portAccessConfig: AppContextBindings["Variables"]["portAccessConfig"];
   openWorkflow: OpenWorkflow;
   auth: AppContextVariables["auth"];
+  resolveTestContext?: (input: { testEnvironmentId: string }) => Promise<{
+    db: ControlPlaneDatabase;
+    openWorkflow: OpenWorkflow;
+    auth: ControlPlaneAuth;
+  }>;
 };
 
 export function createApp(input: CreateAppInput): ControlPlaneApp {
@@ -75,6 +81,11 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     portAccessConfig: input.portAccessConfig,
     openWorkflow: input.openWorkflow,
     auth: input.auth,
+    ...(input.resolveTestContext === undefined
+      ? {}
+      : {
+          resolveTestContext: input.resolveTestContext,
+        }),
   });
 
   return app;
@@ -84,6 +95,9 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
   const { app, config, db, auth } = input;
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
+  app.get("/__healthz", (ctx) => {
+    return ctx.json({ ok: true });
+  });
   app.use(
     "*",
     createAppContextMiddleware({
@@ -98,6 +112,11 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       portAccessConfig: input.portAccessConfig,
       openWorkflow: input.openWorkflow,
       auth,
+      ...(input.resolveTestContext === undefined
+        ? {}
+        : {
+            resolveTestContext: input.resolveTestContext,
+          }),
     }),
   );
   app.doc(ControlPlaneOpenApiPath, {
@@ -105,9 +124,6 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
     info: ControlPlaneOpenApiInfo,
   });
   registerApiRouteModules(app);
-  app.get("/__healthz", (ctx) => {
-    return ctx.json({ ok: true });
-  });
 }
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
