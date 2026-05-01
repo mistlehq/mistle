@@ -8,15 +8,19 @@ import {
   getDataPlaneDatabaseSchema,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
+import { OpenWorkflow } from "openworkflow";
+import { BackendPostgres } from "openworkflow/postgres";
 import { Pool, type PoolConfig } from "pg";
 
 import type { TestEnvironment, TestServiceHandle } from "../environment/index.js";
+import { createDataPlaneWorkflowNamespaceId } from "../environment/test-isolation.js";
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
 import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import { httpService, type IntegrationHttpService } from "./services/shared.js";
 
 const DefaultDatabasePoolMax = 4;
+const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
   CONTROL_PLANE_SCHEMA_NAME: "schema.controlPlane",
@@ -39,6 +43,7 @@ export type IntegrationTestEnvironment = {
   controlPlaneWorker: IntegrationProcessService;
   dataPlaneDb: DataPlaneDatabase;
   dataPlaneTables: ReturnType<typeof getDataPlaneDatabaseSchema>;
+  dataPlaneWorkflow: IntegrationWorkflowClient;
   dataPlaneApi: IntegrationHttpService;
   dataPlaneGateway: IntegrationHttpService;
   dataPlaneWorker: IntegrationProcessService;
@@ -64,6 +69,7 @@ export function createIntegrationEnvironment(input: {
   let auth: IntegrationAuth | undefined;
   let controlPlaneDb: ControlPlaneDatabase | undefined;
   let dataPlaneDb: DataPlaneDatabase | undefined;
+  let dataPlaneWorkflowResources: IntegrationWorkflowResources | undefined;
 
   const integrationEnvironment: ManagedIntegrationTestEnvironment = {
     id: input.environment.id,
@@ -118,6 +124,11 @@ export function createIntegrationEnvironment(input: {
     get dataPlaneTables() {
       return getDataPlaneDatabaseSchema(this.dataPlaneDb);
     },
+    get dataPlaneWorkflow() {
+      dataPlaneWorkflowResources ??= createDataPlaneWorkflowResources(input.environment);
+
+      return dataPlaneWorkflowResources.client;
+    },
     get dataPlaneApi() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_API));
     },
@@ -147,11 +158,60 @@ export function createIntegrationEnvironment(input: {
       }
 
       stopped = true;
-      await Promise.all(pools.map((pool) => pool.end()));
+      const workflowBackend = await dataPlaneWorkflowResources?.backend;
+      await Promise.all([
+        ...pools.map((pool) => pool.end()),
+        workflowBackend?.stop() ?? Promise.resolve(),
+      ]);
     },
   };
 
   return integrationEnvironment;
+}
+
+type IntegrationWorkflowResources = {
+  backend: Promise<BackendPostgres>;
+  client: IntegrationWorkflowClient;
+};
+
+export type IntegrationWorkflowClient = Pick<OpenWorkflow, "runWorkflow" | "sendSignal">;
+
+function createDataPlaneWorkflowResources(
+  environment: TestEnvironment<ServiceId>,
+): IntegrationWorkflowResources {
+  const backend = BackendPostgres.connect(
+    readPostgresDirectUrl({
+      environment,
+      infraId: PostgresInfraIds.DATA_PLANE,
+    }),
+    {
+      namespaceId: createDataPlaneWorkflowNamespaceId(environment.id),
+      runMigrations: false,
+      schema: DataPlaneOpenWorkflowSchema,
+    },
+  );
+
+  return {
+    backend,
+    client: {
+      runWorkflow: async (spec, workflowInput, options) => {
+        const resolvedBackend = await backend;
+        const openWorkflow = new OpenWorkflow({
+          backend: resolvedBackend,
+        });
+
+        return openWorkflow.runWorkflow(spec, workflowInput, options);
+      },
+      sendSignal: async (options) => {
+        const resolvedBackend = await backend;
+        const openWorkflow = new OpenWorkflow({
+          backend: resolvedBackend,
+        });
+
+        return openWorkflow.sendSignal(options);
+      },
+    },
+  };
 }
 
 function processService(service: TestServiceHandle): IntegrationProcessService {
