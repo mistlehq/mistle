@@ -889,7 +889,7 @@ jobs:
         run: |
           docker run --rm --platform linux/amd64 --entrypoint bash mistle-sandbox-base-tooling-check:local -lc '
             set -euo pipefail
-            for tool in cmddir docker dockerd mise nix node python3; do
+            for tool in cmddir mise cat sed awk grep find rg; do
               command -v "$tool"
             done
           '
