@@ -2,7 +2,10 @@ import type { MiddlewareHandler } from "hono";
 
 import type { AppContextBindings, AppContextVariables } from "../types.js";
 
-type DynamicAppContextValues = Pick<AppContextVariables, "auth" | "db" | "openWorkflow">;
+type DynamicAppContextValues = Pick<
+  AppContextVariables,
+  "auth" | "dataPlaneClient" | "db" | "openWorkflow"
+>;
 
 type CreateAppContextInput = Omit<AppContextVariables, "session"> & {
   resolveTestContext?: (input: { testEnvironmentId: string }) => Promise<DynamicAppContextValues>;
@@ -23,7 +26,7 @@ export function createAppContextMiddleware(
     ctx.set("db", dynamicContext.db);
     ctx.set("objectStore", appContext.objectStore);
     ctx.set("integrationRegistry", appContext.integrationRegistry);
-    ctx.set("dataPlaneClient", appContext.dataPlaneClient);
+    ctx.set("dataPlaneClient", dynamicContext.dataPlaneClient);
     ctx.set("connectionTokenConfig", appContext.connectionTokenConfig);
     ctx.set("portAccessConfig", appContext.portAccessConfig);
     ctx.set("openWorkflow", dynamicContext.openWorkflow);

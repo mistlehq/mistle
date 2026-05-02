@@ -60,6 +60,7 @@ export type CreateAppInput = {
   auth: AppContextVariables["auth"];
   resolveTestContext?: (input: { testEnvironmentId: string }) => Promise<{
     db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
     openWorkflow: OpenWorkflow;
     auth: ControlPlaneAuth;
   }>;

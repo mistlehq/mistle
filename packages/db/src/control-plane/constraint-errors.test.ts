@@ -33,6 +33,22 @@ describe("control-plane constraint errors", () => {
     ).toBe(true);
   });
 
+  it("matches the generated snapshot job active unique index from copied test schemas", () => {
+    const error = {
+      cause: {
+        code: "23505",
+        constraint: "sandbox_profile_version_snaps_sandbox_profile_id_sandbox_pr_idx",
+      },
+    };
+
+    expect(
+      isControlPlaneUniqueViolation(
+        error,
+        ControlPlaneConstraintIds.SNAPSHOT_JOB_ACTIVE_PER_VERSION,
+      ),
+    ).toBe(true);
+  });
+
   it("returns false for unrelated control-plane constraints", () => {
     const error = {
       code: "23505",

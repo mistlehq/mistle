@@ -3,6 +3,7 @@ import type {
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import {
+  getControlPlaneDatabaseSchema,
   sandboxProfileVersionIntegrationBindings,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -181,6 +182,7 @@ export async function putProfileVersionIntegrationBindings(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: PutProfileVersionIntegrationBindingsInput,
 ): Promise<PutProfileVersionIntegrationBindingsResult> {
+  const tables = getControlPlaneDatabaseSchema(db);
   const duplicateBindingId = findDuplicateBindingId(input.bindings);
   if (duplicateBindingId !== undefined) {
     throw new SandboxProfilesIntegrationBindingsBadRequestError(
@@ -418,6 +420,7 @@ export async function putProfileVersionIntegrationBindings(
   return db.transaction(async (tx) => {
     const lockedVersion = await lockProfileVersionForUpdateOrThrow({
       db: tx,
+      tables,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
     });

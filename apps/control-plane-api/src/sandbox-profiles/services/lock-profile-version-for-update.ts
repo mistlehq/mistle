@@ -1,14 +1,15 @@
-import type { ControlPlaneTransaction } from "@mistle/db/control-plane";
-import { sandboxProfileVersions } from "@mistle/db/control-plane";
+import type { ControlPlaneTables, ControlPlaneTransaction } from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
 
 export async function lockProfileVersionForUpdateOrThrow(input: {
   db: ControlPlaneTransaction;
+  tables: ControlPlaneTables;
   profileId: string;
   profileVersion: number;
 }) {
+  const sandboxProfileVersions = input.tables.sandboxProfileVersions;
   const [lockedVersion] = await input.db
     .select({
       sandboxProfileId: sandboxProfileVersions.sandboxProfileId,

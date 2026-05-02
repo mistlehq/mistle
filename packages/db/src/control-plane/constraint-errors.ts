@@ -19,6 +19,7 @@ const ControlPlaneUniqueConstraintNamesById: Record<
   ],
   [ControlPlaneConstraintIds.SNAPSHOT_JOB_ACTIVE_PER_VERSION]: [
     "spv_snapshot_jobs_active_job_per_version_uidx",
+    "sandbox_profile_version_snaps_sandbox_profile_id_sandbox_pr_idx",
   ],
   [ControlPlaneConstraintIds.SNAPSHOT_JOB_SOURCE_SCHEDULED_ACTION]: [
     "spv_snapshot_jobs_source_scheduled_action_id_uidx",

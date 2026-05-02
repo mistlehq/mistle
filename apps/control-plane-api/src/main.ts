@@ -15,11 +15,10 @@ export async function createControlPlaneApiRuntime(
   runtimeConfig: ControlPlaneApiRuntimeConfig,
 ): Promise<ControlPlaneApiRuntime> {
   const resources = await createAppResources(runtimeConfig.app);
-  const dataPlaneClient = createDataPlaneSandboxInstancesClient({
-    baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
-    serviceToken: runtimeConfig.app.internalAuth.serviceToken,
-  });
   const { app: config } = runtimeConfig;
+  const dataPlaneClient = createDataPlaneClient({
+    config,
+  });
   const authConfig = createAuthConfig(config);
   let app: ControlPlaneApp;
 
@@ -40,11 +39,16 @@ export async function createControlPlaneApiRuntime(
       portAccessConfig: config.portAccess,
       openWorkflow: appContext.openWorkflow,
       auth: appContext.auth,
-      resolveTestContext: async ({ testEnvironmentId }) =>
-        resources.getAppContext({
+      resolveTestContext: async ({ testEnvironmentId }) => ({
+        ...(await resources.getAppContext({
           authConfig,
           testEnvironmentId,
+        })),
+        dataPlaneClient: createDataPlaneClient({
+          config,
+          testEnvironmentId,
         }),
+      }),
     });
   } catch (error) {
     await stopAppResources(resources);
@@ -97,6 +101,28 @@ export async function createControlPlaneApiRuntime(
       await stopPromise;
     },
   };
+}
+
+function createDataPlaneClient(input: {
+  config: ControlPlaneApiRuntimeConfig["app"];
+  testEnvironmentId?: string;
+}) {
+  const testIsolation = input.config.__dangerouslyEnableTestIsolation;
+
+  return createDataPlaneSandboxInstancesClient({
+    baseUrl: input.config.dataPlaneApi.baseUrl,
+    serviceToken: input.config.internalAuth.serviceToken,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : {
+          testEnvironmentId: input.testEnvironmentId,
+        }),
+    ...(testIsolation === undefined
+      ? {}
+      : {
+          testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+        }),
+  });
 }
 
 function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlPlaneAuthConfig {

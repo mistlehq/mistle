@@ -1,8 +1,7 @@
 import {
   type ControlPlaneTables,
   type ControlPlaneTransaction,
-  sandboxProfileSnapshotRefreshScheduleTargets,
-  schedules,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -26,8 +25,9 @@ export async function deleteProfileVersionRefreshSchedule(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: DeleteProfileVersionRefreshScheduleInput,
 ): Promise<DeleteProfileVersionRefreshScheduleOutput> {
+  const tables = getControlPlaneDatabaseSchema(db);
   return db.transaction(async (tx) => {
-    await lockProfileAndVersion(tx, input);
+    await lockProfileAndVersion(tx, tables, input);
 
     const target = await tx.query.sandboxProfileSnapshotRefreshScheduleTargets.findFirst({
       columns: {
@@ -49,14 +49,14 @@ export async function deleteProfileVersionRefreshSchedule(
     }
 
     await tx
-      .update(schedules)
+      .update(tables.schedules)
       .set({
         enabled: false,
         nextScheduledAt: null,
         deletedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
-      .where(eq(schedules.id, target.scheduleId));
+      .where(eq(tables.schedules.id, target.scheduleId));
 
     return {
       sandboxProfileId: input.profileId,
@@ -68,6 +68,7 @@ export async function deleteProfileVersionRefreshSchedule(
 
 async function lockProfileAndVersion(
   tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
   input: DeleteProfileVersionRefreshScheduleInput,
 ): Promise<void> {
   const profile = await tx.query.sandboxProfiles.findFirst({
@@ -90,6 +91,7 @@ async function lockProfileAndVersion(
 
   await lockProfileVersionForUpdateOrThrow({
     db: tx,
+    tables,
     profileId: input.profileId,
     profileVersion: input.profileVersion,
   });
@@ -98,16 +100,13 @@ async function lockProfileAndVersion(
 export async function softDeleteSnapshotRefreshSchedulesForProfileVersion(
   tx: ControlPlaneTransaction,
   input: {
-    tables?: ControlPlaneTables;
+    tables: ControlPlaneTables;
     profileId: string;
     profileVersion: number;
   },
 ): Promise<void> {
-  const tables = input.tables;
-  const scheduleTargets =
-    tables?.sandboxProfileSnapshotRefreshScheduleTargets ??
-    sandboxProfileSnapshotRefreshScheduleTargets;
-  const scheduleTable = tables?.schedules ?? schedules;
+  const scheduleTargets = input.tables.sandboxProfileSnapshotRefreshScheduleTargets;
+  const scheduleTable = input.tables.schedules;
 
   const targets = await tx
     .select({

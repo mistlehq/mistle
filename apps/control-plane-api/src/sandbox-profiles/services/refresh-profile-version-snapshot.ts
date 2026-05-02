@@ -1,11 +1,9 @@
 import {
   ControlPlaneConstraintIds,
+  getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
-  sandboxProfiles,
-  sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
@@ -73,6 +71,10 @@ export async function refreshProfileVersionSnapshot(
   input: RefreshProfileVersionSnapshotInput,
 ): Promise<RefreshProfileVersionSnapshotOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
+  const tables = getControlPlaneDatabaseSchema(db);
+  const sandboxProfiles = tables.sandboxProfiles;
+  const sandboxProfileVersions = tables.sandboxProfileVersions;
+  const sandboxProfileVersionSnapshotJobs = tables.sandboxProfileVersionSnapshotJobs;
 
   try {
     const refreshResult = await db.transaction(async (tx) => {

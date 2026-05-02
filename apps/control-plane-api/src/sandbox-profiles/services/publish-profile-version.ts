@@ -1,6 +1,5 @@
 import {
-  sandboxProfileVersionSnapshotJobs,
-  sandboxProfileVersions,
+  getControlPlaneDatabaseSchema,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -71,6 +70,9 @@ export async function publishProfileVersion(
   input: PublishProfileVersionInput,
 ): Promise<PublishProfileVersionOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
+  const tables = getControlPlaneDatabaseSchema(db);
+  const sandboxProfileVersions = tables.sandboxProfileVersions;
+  const sandboxProfileVersionSnapshotJobs = tables.sandboxProfileVersionSnapshotJobs;
 
   const publishedResult = await db.transaction(async (tx) => {
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
