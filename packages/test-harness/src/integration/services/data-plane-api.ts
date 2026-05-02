@@ -105,7 +105,7 @@ function config(input: {
       migrationUrl: directUrl,
     },
     workflow: {
-      databaseUrl: pooledUrl,
+      databaseUrl: directUrl,
       migrationUrl: directUrl,
       namespaceId: infraValue(input.postgres, PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID),
     },

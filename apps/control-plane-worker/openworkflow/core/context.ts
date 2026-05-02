@@ -58,7 +58,7 @@ async function createWorkflowContext(input?: {
   const dbPool =
     input?.dbPool ??
     new Pool({
-      connectionString: workerConfig.workflow.databaseUrl,
+      connectionString: workerConfig.database.url,
     });
   const ownsDbPool = input?.dbPool === undefined;
 

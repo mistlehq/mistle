@@ -233,7 +233,7 @@ describe("loadConfig", () => {
       migrationUrl: "postgresql://direct.example/mistle",
     });
     expect(loadedConfig.app.workflow).toEqual({
-      databaseUrl: "postgresql://pooled.example/mistle",
+      databaseUrl: "postgresql://direct.example/mistle",
       migrationUrl: "postgresql://direct.example/mistle",
       namespaceId: "staging",
     });

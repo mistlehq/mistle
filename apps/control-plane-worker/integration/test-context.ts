@@ -174,6 +174,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
       });
 
       const config: ControlPlaneWorkerConfig = {
+        database: {
+          url: runtimeDatabaseUrl,
+        },
         workflow: {
           databaseUrl: runtimeDatabaseUrl,
           namespaceId: sharedInfraConfig.workflowNamespaceId,

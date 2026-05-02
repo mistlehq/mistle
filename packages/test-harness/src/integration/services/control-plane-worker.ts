@@ -198,6 +198,10 @@ function createControlPlaneWorkerEnv(input: {
       input.postgres,
       PostgresValues.HOST_POOLED_URL,
     ),
+    MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: infraValue(
+      input.postgres,
+      PostgresValues.HOST_DIRECT_URL,
+    ),
     MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: createControlPlaneWorkflowNamespaceId(
       input.environmentId,
     ),

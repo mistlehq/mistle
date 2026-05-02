@@ -112,7 +112,7 @@ function config(input: {
       secretAccessKey: "integration-new-secret-key",
     },
     workflow: {
-      databaseUrl: hostPooledUrl,
+      databaseUrl: hostDirectUrl,
       migrationUrl: hostDirectUrl,
       namespaceId: infraValue(input.postgres, PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID),
     },

@@ -169,7 +169,8 @@ const ControlPlaneApiResourceRuntimeEnvExports: readonly RuntimeEnvExportDescrip
 ];
 
 const ControlPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
-  { path: ["workflow", "databaseUrl"], envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL" },
+  { path: ["database", "url"], envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL" },
+  { path: ["workflow", "databaseUrl"], envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID" },
   {
     path: ["workflow", "concurrency"],
@@ -240,6 +241,7 @@ function readArchilMountObjectStore(root: unknown): "sandbox_storage" | undefine
 
 const DataPlaneWorkerResourceRuntimeEnvExports: readonly RuntimeEnvExportDescriptor[] = [
   { path: ["database", "url"], envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL" },
+  { path: ["workflow", "databaseUrl"], envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL" },
   { path: ["workflow", "namespaceId"], envVar: "MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID" },
   {
     path: ["workflow", "concurrency"],
