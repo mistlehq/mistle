@@ -288,7 +288,7 @@ export async function deleteIntegrationConnection(
           inArray(tables.integrationCredentials.id, credentialIds),
           sql`not exists (
               select 1
-              from "control_plane"."integration_connection_credentials" as linked_credentials
+              from ${tables.integrationConnectionCredentials} as linked_credentials
               where linked_credentials.credential_id = ${tables.integrationCredentials.id}
             )`,
         ),
