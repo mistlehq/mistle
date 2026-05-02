@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { Socket } from "node:net";
 
 import { describe, expect, it } from "vitest";
 
@@ -11,6 +12,14 @@ async function startTestServer(input: {
   stop: () => Promise<void>;
 }> {
   const server = createServer(input.handler);
+  const sockets = new Set<Socket>();
+
+  server.on("connection", (socket) => {
+    sockets.add(socket);
+    socket.once("close", () => {
+      sockets.delete(socket);
+    });
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -37,6 +46,12 @@ async function startTestServer(input: {
 
           reject(error);
         });
+
+        server.closeIdleConnections?.();
+        server.closeAllConnections?.();
+        for (const socket of sockets) {
+          socket.destroy();
+        }
       });
     },
   };
