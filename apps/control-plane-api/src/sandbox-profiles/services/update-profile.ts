@@ -1,5 +1,4 @@
-import type { SandboxProfile } from "@mistle/db/control-plane";
-import { sandboxProfiles } from "@mistle/db/control-plane";
+import { type SandboxProfile, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "../errors.js";
@@ -15,6 +14,7 @@ export async function updateProfile(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   serviceInput: UpdateProfileInput,
 ): Promise<SandboxProfile> {
+  const tables = getControlPlaneDatabaseSchema(db);
   const updateValues: {
     displayName?: string;
     updatedAt: SQL;
@@ -26,12 +26,12 @@ export async function updateProfile(
   }
 
   const [updatedProfile] = await db
-    .update(sandboxProfiles)
+    .update(tables.sandboxProfiles)
     .set(updateValues)
     .where(
       and(
-        eq(sandboxProfiles.id, serviceInput.profileId),
-        eq(sandboxProfiles.organizationId, serviceInput.organizationId),
+        eq(tables.sandboxProfiles.id, serviceInput.profileId),
+        eq(tables.sandboxProfiles.organizationId, serviceInput.organizationId),
       ),
     )
     .returning();
