@@ -1,10 +1,8 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   AutomationKinds,
-  automations,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  sandboxProfiles,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -71,17 +69,17 @@ export async function getHomeSummary(
     }>`select
         exists(
           select 1
-          from ${sandboxProfiles} as sp
+          from ${tables.sandboxProfiles} as sp
           where sp."organization_id" = ${params.organizationId}
         ) as "hasProfiles",
         exists(
           select 1
-          from ${sandboxProfiles} as sp
+          from ${tables.sandboxProfiles} as sp
           where sp."organization_id" = ${params.organizationId}
             and sp."active_version" is not null
             and exists (
               select 1
-              from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
+              from ${tables.sandboxProfileVersionIntegrationBindings} as spvib
               inner join ${tables.integrationConnections} as icn
                 on icn."id" = spvib."connection_id"
               inner join ${tables.integrationTargets} as itg
@@ -95,7 +93,7 @@ export async function getHomeSummary(
             )
             and not exists (
               select 1
-              from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
+              from ${tables.sandboxProfileVersionIntegrationBindings} as spvib
               left join ${tables.integrationConnections} as icn
                 on icn."id" = spvib."connection_id"
                and icn."organization_id" = ${params.organizationId}
@@ -114,7 +112,7 @@ export async function getHomeSummary(
         ) as "hasUsableProfiles",
         exists(
           select 1
-          from ${automations} as a
+          from ${tables.automations} as a
           where a."organization_id" = ${params.organizationId}
             and a."kind" = ${AutomationKinds.WEBHOOK}
         ) as "hasAutomations"`),
