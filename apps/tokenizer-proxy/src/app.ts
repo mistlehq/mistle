@@ -31,6 +31,11 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
     baseUrl: config.controlPlaneApi.baseUrl,
     internalAuthServiceToken: config.internalAuth.serviceToken,
     requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+    ...(config.__dangerouslyEnableTestIsolation === undefined
+      ? {}
+      : {
+          testEnvironmentIdHeader: config.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+        }),
   });
   const credentialCache = new CredentialCache({
     maxEntries: CREDENTIAL_CACHE_MAX_ENTRIES,
@@ -48,16 +53,25 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
     controlPlaneInternalClient,
     credentialCache,
     egressGrantConfig: config.egressGrant,
-  });
-
-  app.use("*", async (ctx, next) => {
-    ctx.set("config", config);
-    ctx.set("internalAuthServiceToken", config.internalAuth.serviceToken);
-    await next();
+    ...(config.__dangerouslyEnableTestIsolation === undefined
+      ? {}
+      : {
+          testEnvironmentIdHeader: config.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+        }),
   });
 
   app.get("/__healthz", (ctx) => {
     return ctx.json({ ok: true });
+  });
+
+  app.use("*", async (ctx, next) => {
+    const testEnvironmentId = readTestEnvironmentId(config, (name) => ctx.req.header(name));
+    ctx.set("config", config);
+    ctx.set("internalAuthServiceToken", config.internalAuth.serviceToken);
+    if (testEnvironmentId !== undefined) {
+      ctx.set("testEnvironmentId", testEnvironmentId);
+    }
+    await next();
   });
 
   app.all(EGRESS_BASE_PATH, egressProxyHandler);
@@ -71,4 +85,23 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
 
 export function createApp(config: TokenizerProxyConfig): TokenizerProxyApp {
   return createAppComponents(config).app;
+}
+
+function readTestEnvironmentId(
+  config: TokenizerProxyConfig,
+  readHeader: (name: string) => string | undefined,
+): string | undefined {
+  const testIsolation = config.__dangerouslyEnableTestIsolation;
+  if (testIsolation === undefined) {
+    return undefined;
+  }
+
+  const testEnvironmentId = readHeader(testIsolation.testEnvironmentIdHeader);
+  if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+    throw new Error(
+      `Expected '${testIsolation.testEnvironmentIdHeader}' header for isolated tokenizer-proxy request.`,
+    );
+  }
+
+  return testEnvironmentId;
 }

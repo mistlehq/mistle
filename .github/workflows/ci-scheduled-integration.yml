@@ -90,6 +90,12 @@ jobs:
           MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.integration.docker.toml
         run: nix develop --command pnpm test:integration:all
 
+      - name: Run test harness stress suite in Nix shell
+        env:
+          MISTLE_TEST_HARNESS_STRESS_ENVIRONMENTS_PER_FILE: "125"
+          MISTLE_TEST_HARNESS_STRESS_REQUESTS_PER_ENVIRONMENT: "1"
+        run: nix develop --command pnpm --filter @mistle/test-harness test:stress -- --maxWorkers=4
+
       - name: Save Turbo local cache
         if: ${{ always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
@@ -119,7 +125,7 @@ jobs:
         run: |
           docker run --rm --platform linux/amd64 --entrypoint bash mistle-sandbox-base-check:local -lc '
             set -euo pipefail
-            for tool in cmddir mise sandboxd nix; do
+            for tool in cmddir mise sandboxd cat sed awk grep find rg; do
               command -v "$tool"
             done
           '

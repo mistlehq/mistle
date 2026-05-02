@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 
-import { runPostgresMigrations, type RunPostgresMigrationsInput } from "./runner.js";
+import { CONTROL_PLANE_SCHEMA_NAME } from "../control-plane/schema/namespace.js";
+import { type RunPostgresMigrationsInput } from "./runner.js";
+import { runSchemaScopedPostgresMigrations } from "./schema-scoped-migrations.js";
 
 export type RunControlPlaneMigrationsInput = RunPostgresMigrationsInput;
 
@@ -11,5 +13,8 @@ export const CONTROL_PLANE_MIGRATIONS_FOLDER_PATH = fileURLToPath(
 export async function runControlPlaneMigrations(
   input: RunControlPlaneMigrationsInput,
 ): Promise<void> {
-  await runPostgresMigrations(input);
+  await runSchemaScopedPostgresMigrations({
+    defaultSchemaName: CONTROL_PLANE_SCHEMA_NAME,
+    migrations: input,
+  });
 }

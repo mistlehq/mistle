@@ -8,6 +8,12 @@
       "node": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./integration": {
+      "types": "./src/integration/index.ts",
+      "node": "./src/integration/index.ts",
+      "import": "./src/integration/index.ts",
+      "default": "./src/integration/index.ts"
     }
   },
   "scripts": {
@@ -16,16 +22,26 @@
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:stress": "tsx ../../scripts/test/run-test-harness-stress.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1033.0",
     "@mistle/config": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@mistle/time": "workspace:*",
     "@testcontainers/postgresql": "^11.13.0",
     "mailpit-api": "^1.9.0",
+    "openworkflow": "0.9.0",
+    "pg": "^8.20.0",
+    "postgres": "3.4.9",
+    "redis": "^5.12.1",
     "testcontainers": "^11.14.0",
+    "undici": "^7.24.6",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.20.0"
   }
 }

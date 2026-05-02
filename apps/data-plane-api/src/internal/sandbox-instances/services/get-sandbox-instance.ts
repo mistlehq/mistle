@@ -1,8 +1,7 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   SandboxInstancePurposes,
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
@@ -16,6 +15,7 @@ import { readEffectiveSandboxStatus } from "./read-effective-sandbox-status.js";
 
 type GetSandboxInstanceContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceRuntimePlans" | "sandboxInstances">;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
 };
 
@@ -23,6 +23,8 @@ export async function getSandboxInstance(
   ctx: GetSandboxInstanceContext,
   input: GetSandboxInstanceInput,
 ): Promise<GetSandboxInstanceResponse> {
+  const { sandboxInstanceRuntimePlans, sandboxInstances } = ctx.tables;
+
   const [sandboxInstance] = await ctx.db
     .select({
       id: sandboxInstances.id,

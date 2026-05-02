@@ -1,4 +1,4 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/control-plane";
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -30,6 +30,7 @@ export type ControlPlaneAuthConfig = {
 type CreateControlPlaneAuthOptions = {
   config: ControlPlaneAuthConfig;
   db: ControlPlaneDatabase;
+  tables?: ControlPlaneTables;
   openWorkflow: OpenWorkflow;
 };
 
@@ -44,6 +45,7 @@ export function createAccountOptions(): NonNullable<Parameters<typeof betterAuth
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   const { config, db, openWorkflow } = options;
+  const tables = options.tables ?? ControlPlaneDbSchema;
   const sendVerificationOTP = createSendVerificationOTPService({
     openWorkflow,
     expiresInSeconds: config.authOTPExpiresInSeconds,
@@ -83,7 +85,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     trustedOrigins: config.authTrustedOrigins,
     database: drizzleAdapter(db, {
       provider: "pg",
-      schema: ControlPlaneDbSchema,
+      schema: tables,
     }),
     user: {
       modelName: "users",
@@ -134,11 +136,12 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
                 organizationId: organization.id,
                 activeMasterEncryptionKeyVersion: config.activeMasterEncryptionKeyVersion,
                 masterEncryptionKeys: config.masterEncryptionKeys,
+                table: tables.organizationCredentialKeys,
               });
             } catch (error) {
               await db
-                .delete(ControlPlaneDbSchema.organizations)
-                .where(eq(ControlPlaneDbSchema.organizations.id, organization.id));
+                .delete(tables.organizations)
+                .where(eq(tables.organizations.id, organization.id));
               throw new Error(
                 `Failed to initialize credential key for organization '${organization.id}'.`,
                 { cause: error },

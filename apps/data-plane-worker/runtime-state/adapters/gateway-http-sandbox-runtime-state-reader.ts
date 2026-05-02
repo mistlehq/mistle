@@ -21,6 +21,8 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
     private readonly input: {
       baseUrl: string;
       serviceToken: string;
+      testEnvironmentId?: string;
+      testEnvironmentIdHeader?: string;
       requestTimeoutMs?: number;
     },
   ) {}
@@ -39,9 +41,7 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
       this.input.baseUrl,
     );
     const response = await fetch(url, {
-      headers: {
-        [DataPlaneInternalAuthHeader]: this.input.serviceToken,
-      },
+      headers: this.#headers(),
       signal: AbortSignal.timeout(this.input.requestTimeoutMs ?? DefaultRequestTimeoutMs),
     });
 
@@ -53,5 +53,20 @@ export class GatewayHttpSandboxRuntimeStateReader implements SandboxRuntimeState
 
     const json = await response.json();
     return SandboxRuntimeStateSnapshotSchema.parse(json);
+  }
+
+  #headers(): Record<string, string> {
+    const headers: Record<string, string> = {
+      [DataPlaneInternalAuthHeader]: this.input.serviceToken,
+    };
+
+    if (
+      this.input.testEnvironmentId !== undefined &&
+      this.input.testEnvironmentIdHeader !== undefined
+    ) {
+      headers[this.input.testEnvironmentIdHeader] = this.input.testEnvironmentId;
+    }
+
+    return headers;
   }
 }

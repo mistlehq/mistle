@@ -23,6 +23,9 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^20.5.0
         version: 20.5.0
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:packages/test-harness
       '@playwright/test':
         specifier: ^1.58.1
         version: 1.58.2
@@ -693,6 +696,12 @@ importers:
         specifier: ^4.12.14
         version: 4.12.14
     devDependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../../packages/integrations-core
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
@@ -779,9 +788,6 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
-      '@mistle/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
@@ -1130,6 +1136,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../config
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
@@ -1139,12 +1148,31 @@ importers:
       mailpit-api:
         specifier: ^1.9.0
         version: 1.9.0(react@19.2.5)
+      openworkflow:
+        specifier: 0.9.0
+        version: 0.9.0(postgres@3.4.9)
+      pg:
+        specifier: ^8.20.0
+        version: 8.20.0
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
+      redis:
+        specifier: ^5.12.1
+        version: 5.12.1(@opentelemetry/api@1.9.1)
       testcontainers:
         specifier: ^11.14.0
         version: 11.14.0
+      undici:
+        specifier: ^7.24.6
+        version: 7.24.6
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.20.0
+        version: 8.20.0
 
   packages/time:
     dependencies:
@@ -11996,10 +12024,6 @@ packages:
   undici-types@7.19.2:
     resolution: {integrity: sha512-qYVnV5OEm2AW8cJMCpdV20CDyaN3g0AjDlOGf1OW4iaDEx8MwdtChUp4zu4H0VP3nDRF/8RKWH+IPp9uW0YGZg==}
 
-  undici@7.24.5:
-    resolution: {integrity: sha512-3IWdCpjgxp15CbJnsi/Y9TCDE7HWVN19j1hmzVhoAkY/+CJx449tVxT5wZc1Gwg8J+P0LWvzlBzxYRnHJ+1i7Q==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.24.6:
     resolution: {integrity: sha512-Xi4agocCbRzt0yYMZGMA6ApD7gvtUFaxm4ZmeacWI4cZxaF6C+8I8QfofC20NAePiB/IcvZmzkJ7XPa471AEtA==}
     engines: {node: '>=20.18.1'}
@@ -21785,7 +21809,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.1
-      undici: 7.24.5
+      undici: 7.24.6
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -25440,8 +25464,6 @@ snapshots:
   undici-types@7.18.2: {}
 
   undici-types@7.19.2: {}
-
-  undici@7.24.5: {}
 
   undici@7.24.6: {}
 

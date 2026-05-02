@@ -1,0 +1,1656 @@
+import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
+import { DATA_PLANE_SCHEMA_NAME } from "@mistle/db/data-plane";
+import {
+  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+  MigrationTracking,
+  runControlPlaneMigrations,
+  runDataPlaneMigrations,
+} from "@mistle/db/migrator";
+import { systemSleeper } from "@mistle/time";
+import { BackendPostgres } from "openworkflow/postgres";
+import { Client } from "pg";
+import { createClient } from "redis";
+
+import { startControlPlaneApi } from "../apps/control-plane-api.js";
+import { startControlPlaneWorker } from "../apps/control-plane-worker.js";
+import { startDataPlaneApi } from "../apps/data-plane-api.js";
+import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
+import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
+import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
+import { registerProcessCleanupTask } from "../cleanup/index.js";
+import { createTestEnvironmentSharedInfraKey } from "../services/shared-infra-coordinator.js";
+import { acquireSharedMailpitInfra } from "../services/shared-mailpit.js";
+import {
+  acquireSharedPostgresInfra,
+  type SharedPostgresLease,
+} from "../services/shared-postgres.js";
+import { acquireSharedValkeyInfra, type SharedValkeyLease } from "../services/shared-valkey.js";
+import { DockerIntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
+import { readPreparedTestHarnessRuntime } from "../system/prepared-runtime.js";
+import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
+import { createServiceRegistry } from "./registry.js";
+import { ensureRunnerPoolSession } from "./runner-pool-session.js";
+import {
+  createControlPlaneTestSchemaName,
+  createControlPlaneWorkflowNamespaceId,
+  createDataPlaneTestSchemaName,
+  createDataPlaneWorkflowNamespaceId,
+} from "./test-isolation.js";
+import type {
+  ResolvedTestInfra,
+  TestService,
+  TestInfraProvisioner,
+  TestInfraRequirement,
+  TestServiceDefinition,
+  TestServiceEndpoints,
+  TestServiceHandle,
+  TestServiceLaunchMode,
+  TestServiceRuntime,
+  TestServiceRegistry,
+  TestServiceStartInput,
+} from "./types.js";
+
+const execFileAsync = promisify(execFile);
+
+const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.meta.url));
+const DefaultStartupTimeoutMs = 120_000;
+const HostGatewayName = "host.testcontainers.internal";
+const DockerSocketPath = "/var/run/docker.sock";
+const DeadServiceBaseUrl = "http://host.testcontainers.internal:9";
+const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
+const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
+const MigrationLockPollIntervalMs = 50;
+const MigrationLockTimeoutMs = 120_000;
+const PostgresMigrationCoordinatorRootDirectoryPath = join(
+  tmpdir(),
+  "mistle-test-harness",
+  "postgres-migrations",
+);
+
+const InfraIds = {
+  CONTROL_PLANE_POSTGRES: "postgres.control-plane",
+  DATA_PLANE_POSTGRES: "postgres.data-plane",
+  VALKEY: "valkey",
+  MAILPIT: "mailpit",
+};
+
+const PostgresValues = {
+  HOST_DIRECT_URL: "host.directUrl",
+  HOST_POOLED_URL: "host.pooledUrl",
+  CONTAINER_DIRECT_URL: "container.directUrl",
+  CONTAINER_POOLED_URL: "container.pooledUrl",
+  CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
+  DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
+  CONTROL_PLANE_SCHEMA_NAME: "schema.controlPlane",
+  DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
+};
+
+const InfraKinds = {
+  POSTGRES: "postgres",
+  VALKEY: "valkey",
+  MAILPIT: "mailpit",
+};
+
+const ValkeyValues = {
+  HOST_URL: "host.url",
+  CONTAINER_URL: "container.url",
+  KEY_PREFIX: "keyPrefix",
+};
+
+const MailpitValues = {
+  SMTP_HOST: "smtp.host",
+  SMTP_PORT: "smtp.port",
+  HTTP_BASE_URL: "http.baseUrl",
+};
+
+function formatDuration(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
+function writeTimingLine(message: string): void {
+  if (process.env["MISTLE_TEST_TIMING"] !== "1") {
+    return;
+  }
+
+  process.stderr.write(`${message}\n`);
+}
+
+async function measure<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = Date.now();
+  try {
+    return await callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function measureSync<T>(timings: Map<string, number>, label: string, callback: () => T): T {
+  const startedAt = Date.now();
+  try {
+    return callback();
+  } finally {
+    timings.set(label, Date.now() - startedAt);
+  }
+}
+
+function writeProvisionerTimingSummary(input: {
+  environmentId: string;
+  provisioner: string;
+  timings: ReadonlyMap<string, number>;
+}): void {
+  const parts = Array.from(input.timings.entries()).map(
+    ([label, durationMs]) => `${label}=${formatDuration(durationMs)}`,
+  );
+
+  writeTimingLine(
+    `[integration-new] env ${input.environmentId} ${input.provisioner} phases: ${parts.join(", ")}.`,
+  );
+}
+
+export type MistleTestServiceId =
+  | "control-plane-api"
+  | "control-plane-worker"
+  | "data-plane-api"
+  | "data-plane-gateway"
+  | "data-plane-worker"
+  | "tokenizer-proxy";
+
+export type MistleTestRegistry = TestServiceRegistry & {
+  "control-plane-api": TestServiceDefinition;
+  "control-plane-worker": TestServiceDefinition;
+  "data-plane-api": TestServiceDefinition;
+  "data-plane-gateway": TestServiceDefinition;
+  "data-plane-worker": TestServiceDefinition;
+  "tokenizer-proxy": TestServiceDefinition;
+};
+
+export type CreateTestRegistryInput = {
+  buildContextHostPath?: string;
+  configPathInContainer?: string;
+  startupTimeoutMs?: number;
+  sharedInfraKey?: string;
+  __dangerouslyIsolatedServices?: {
+    reason: string;
+    services?: readonly MistleTestServiceId[];
+  };
+};
+
+type MistleRegistryContext = {
+  buildContextHostPath: string;
+  configPathInContainer: string;
+  startupTimeoutMs: number;
+};
+
+export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleTestRegistry {
+  ensureRunnerPoolSession(process.env);
+
+  const context = createRegistryContext(input);
+  const sharedInfraKey = input.sharedInfraKey ?? createTestEnvironmentSharedInfraKey(process.env);
+  const postgresProvisioner = createPostgresProvisioner({
+    sharedInfraKey,
+    context,
+  });
+  const controlPlanePostgres = createPostgresRequirement({
+    id: InfraIds.CONTROL_PLANE_POSTGRES,
+    provisioner: postgresProvisioner,
+  });
+  const dataPlanePostgres = createPostgresRequirement({
+    id: InfraIds.DATA_PLANE_POSTGRES,
+    provisioner: postgresProvisioner,
+  });
+  const valkey = createValkeyRequirement({
+    sharedInfraKey,
+  });
+  const mailpit = createMailpitRequirement({
+    sharedInfraKey,
+  });
+
+  return createServiceRegistry({
+    services: {
+      "control-plane-api": createControlPlaneApiService({
+        context,
+        postgres: controlPlanePostgres,
+      }),
+      "control-plane-worker": createControlPlaneWorkerService({
+        context,
+        postgres: controlPlanePostgres,
+        mailpit,
+      }),
+      "data-plane-api": createDataPlaneApiService({
+        context,
+        postgres: dataPlanePostgres,
+      }),
+      "data-plane-gateway": createDataPlaneGatewayService({
+        context,
+        postgres: dataPlanePostgres,
+        valkey,
+      }),
+      "data-plane-worker": createDataPlaneWorkerService({
+        context,
+        postgres: dataPlanePostgres,
+      }),
+      "tokenizer-proxy": createTokenizerProxyService({
+        context,
+      }),
+    },
+    ...(input.__dangerouslyIsolatedServices === undefined
+      ? {}
+      : {
+          __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
+        }),
+  });
+}
+
+function createRegistryContext(input: {
+  buildContextHostPath?: string;
+  configPathInContainer?: string;
+  startupTimeoutMs?: number;
+}): MistleRegistryContext {
+  return {
+    buildContextHostPath: input.buildContextHostPath ?? DefaultBuildContextHostPath,
+    configPathInContainer: input.configPathInContainer ?? DockerIntegrationConfigPathInContainer,
+    startupTimeoutMs: input.startupTimeoutMs ?? DefaultStartupTimeoutMs,
+  };
+}
+
+function createPostgresRequirement(input: {
+  id: string;
+  provisioner: TestInfraProvisioner;
+}): TestInfraRequirement {
+  return {
+    id: input.id,
+    kind: InfraKinds.POSTGRES,
+    provisioner: input.provisioner,
+  };
+}
+
+function createPostgresProvisioner(input: {
+  sharedInfraKey: string;
+  context: MistleRegistryContext;
+}): TestInfraProvisioner {
+  let sharedLease: Promise<SharedPostgresLease> | undefined;
+  let bootstrapMigrations: Promise<void> | undefined;
+
+  const acquireLease = (): Promise<SharedPostgresLease> => {
+    if (sharedLease !== undefined) {
+      return sharedLease;
+    }
+
+    let leasePromise: Promise<SharedPostgresLease>;
+    leasePromise = acquireSharedPostgresInfra({
+      key: input.sharedInfraKey,
+      postgres: {},
+    }).then(
+      (lease) => {
+        registerProcessCleanupTask(async () => {
+          await lease.release();
+          if (sharedLease === leasePromise) {
+            sharedLease = undefined;
+          }
+        });
+        return lease;
+      },
+      (error: unknown) => {
+        if (sharedLease === leasePromise) {
+          sharedLease = undefined;
+        }
+        throw error;
+      },
+    );
+    sharedLease = leasePromise;
+
+    return leasePromise;
+  };
+  const runBootstrapMigrationsOnce = (migrationInput: {
+    hostDirectUrl: string;
+    migrationCoordinatorKey: string;
+    timings: Map<string, number>;
+  }): Promise<void> => {
+    if (bootstrapMigrations !== undefined) {
+      return bootstrapMigrations;
+    }
+
+    let migrationsPromise: Promise<void>;
+    migrationsPromise = runPostgresBootstrapMigrationsOnceAcrossProcesses({
+      context: input.context,
+      hostDirectUrl: migrationInput.hostDirectUrl,
+      migrationCoordinatorKey: migrationInput.migrationCoordinatorKey,
+      timings: migrationInput.timings,
+    }).catch((error: unknown) => {
+      if (bootstrapMigrations === migrationsPromise) {
+        bootstrapMigrations = undefined;
+      }
+      throw error;
+    });
+    bootstrapMigrations = migrationsPromise;
+    return migrationsPromise;
+  };
+  return {
+    kind: InfraKinds.POSTGRES,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-shared-lease", acquireLease);
+      const resolved = measureSync(timings, "resolve-values", () => {
+        const databaseName = lease.infra.postgres.postgres.databaseName;
+        const workflowControlPlaneNamespaceId = createControlPlaneWorkflowNamespaceId(
+          provisionInput.environmentId,
+        );
+        const workflowDataPlaneNamespaceId = createDataPlaneWorkflowNamespaceId(
+          provisionInput.environmentId,
+        );
+        const controlPlaneSchemaName = createControlPlaneTestSchemaName(
+          provisionInput.environmentId,
+        );
+        const dataPlaneSchemaName = createDataPlaneTestSchemaName(provisionInput.environmentId);
+
+        const hostDirectUrl = createDatabaseUrl({
+          username: lease.infra.postgres.postgres.username,
+          password: lease.infra.postgres.postgres.password,
+          host: lease.infra.postgres.postgres.host,
+          port: lease.infra.postgres.postgres.port,
+          databaseName,
+        });
+        const hostPooledUrl = createDatabaseUrl({
+          username: lease.infra.postgres.postgres.username,
+          password: lease.infra.postgres.postgres.password,
+          host: lease.infra.postgres.pgbouncer.host,
+          port: lease.infra.postgres.pgbouncer.port,
+          databaseName,
+        });
+        const containerDirectUrl = createDatabaseUrl({
+          username: lease.infra.postgres.postgres.username,
+          password: lease.infra.postgres.postgres.password,
+          host: lease.infra.containerHostGateway,
+          port: lease.infra.postgres.postgres.port,
+          databaseName,
+        });
+        const containerPooledUrl = createDatabaseUrl({
+          username: lease.infra.postgres.postgres.username,
+          password: lease.infra.postgres.postgres.password,
+          host: lease.infra.containerHostGateway,
+          port: lease.infra.postgres.pgbouncer.port,
+          databaseName,
+        });
+        const migrationCoordinatorKey = createPostgresMigrationCoordinatorKey({
+          sharedInfraKey: input.sharedInfraKey,
+          postgresContainerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
+        });
+
+        return {
+          hostDirectUrl,
+          hostPooledUrl,
+          containerDirectUrl,
+          containerPooledUrl,
+          workflowControlPlaneNamespaceId,
+          workflowDataPlaneNamespaceId,
+          controlPlaneSchemaName,
+          dataPlaneSchemaName,
+          migrationCoordinatorKey,
+        };
+      });
+
+      await measure(timings, "bootstrap-migrations", async () =>
+        runBootstrapMigrationsOnce({
+          hostDirectUrl: resolved.hostDirectUrl,
+          migrationCoordinatorKey: resolved.migrationCoordinatorKey,
+          timings,
+        }),
+      );
+      await measure(timings, "logical-migrations", async () => {
+        await runPostgresLogicalMigrations({
+          context: input.context,
+          hostDirectUrl: resolved.hostDirectUrl,
+          controlPlaneSchemaName: resolved.controlPlaneSchemaName,
+          dataPlaneSchemaName: resolved.dataPlaneSchemaName,
+          requirements: provisionInput.requirements,
+          timings,
+        });
+      });
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "postgres",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) =>
+        createResolvedPostgresInfra({
+          requirement,
+          resolved,
+          lease,
+          environmentId: provisionInput.environmentId,
+        }),
+      );
+    },
+  };
+}
+
+function createResolvedPostgresInfra(input: {
+  requirement: TestInfraRequirement;
+  resolved: {
+    hostDirectUrl: string;
+    hostPooledUrl: string;
+    containerDirectUrl: string;
+    containerPooledUrl: string;
+    workflowControlPlaneNamespaceId: string;
+    workflowDataPlaneNamespaceId: string;
+    controlPlaneSchemaName: string;
+    dataPlaneSchemaName: string;
+  };
+  lease: SharedPostgresLease;
+  environmentId: string;
+}): ResolvedTestInfra {
+  return {
+    id: input.requirement.id,
+    kind: input.requirement.kind,
+    values: new Map([
+      [PostgresValues.HOST_DIRECT_URL, input.resolved.hostDirectUrl],
+      [PostgresValues.HOST_POOLED_URL, input.resolved.hostPooledUrl],
+      [PostgresValues.CONTAINER_DIRECT_URL, input.resolved.containerDirectUrl],
+      [PostgresValues.CONTAINER_POOLED_URL, input.resolved.containerPooledUrl],
+      [
+        PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
+        input.resolved.workflowControlPlaneNamespaceId,
+      ],
+      [
+        PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID,
+        input.resolved.workflowDataPlaneNamespaceId,
+      ],
+      [PostgresValues.CONTROL_PLANE_SCHEMA_NAME, input.resolved.controlPlaneSchemaName],
+      [PostgresValues.DATA_PLANE_SCHEMA_NAME, input.resolved.dataPlaneSchemaName],
+    ]),
+    stop: async () => {
+      const cleanupTimings = new Map<string, number>();
+      await dropPostgresLogicalSchemas({
+        requirement: input.requirement,
+        lease: input.lease,
+        controlPlaneSchemaName: input.resolved.controlPlaneSchemaName,
+        dataPlaneSchemaName: input.resolved.dataPlaneSchemaName,
+        timings: cleanupTimings,
+      });
+      writeProvisionerTimingSummary({
+        environmentId: input.environmentId,
+        provisioner: `postgres cleanup ${input.requirement.id}`,
+        timings: cleanupTimings,
+      });
+    },
+  };
+}
+
+function createValkeyRequirement(input: { sharedInfraKey: string }): TestInfraRequirement {
+  return {
+    id: InfraIds.VALKEY,
+    kind: InfraKinds.VALKEY,
+    provisioner: createValkeyProvisioner(input),
+  };
+}
+
+function createValkeyProvisioner(input: { sharedInfraKey: string }): TestInfraProvisioner {
+  let sharedLease: Promise<SharedValkeyLease> | undefined;
+
+  const acquireLease = (): Promise<SharedValkeyLease> => {
+    if (sharedLease !== undefined) {
+      return sharedLease;
+    }
+
+    let leasePromise: Promise<SharedValkeyLease>;
+    leasePromise = acquireSharedValkeyInfra({
+      key: input.sharedInfraKey,
+    }).then(
+      (lease) => {
+        registerProcessCleanupTask(async () => {
+          await lease.release();
+          if (sharedLease === leasePromise) {
+            sharedLease = undefined;
+          }
+        });
+        return lease;
+      },
+      (error: unknown) => {
+        if (sharedLease === leasePromise) {
+          sharedLease = undefined;
+        }
+        throw error;
+      },
+    );
+    sharedLease = leasePromise;
+
+    return leasePromise;
+  };
+
+  return {
+    kind: InfraKinds.VALKEY,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-shared-lease", acquireLease);
+      const keyPrefix = measureSync(
+        timings,
+        "resolve-values",
+        () => `${createSafeIdentifier(provisionInput.environmentId)}:`,
+      );
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "valkey",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([
+          [ValkeyValues.HOST_URL, lease.infra.valkey.url],
+          [
+            ValkeyValues.CONTAINER_URL,
+            `redis://${HostGatewayName}:${String(lease.infra.valkey.port)}`,
+          ],
+          [ValkeyValues.KEY_PREFIX, keyPrefix],
+        ]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "delete-key-prefix", async () =>
+            deleteValkeyKeysByPrefix({
+              url: lease.infra.valkey.url,
+              keyPrefix,
+            }),
+          );
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "valkey cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+async function deleteValkeyKeysByPrefix(input: { url: string; keyPrefix: string }): Promise<void> {
+  const client = createClient({
+    url: input.url,
+  });
+
+  await client.connect();
+  try {
+    for await (const keys of client.scanIterator({
+      MATCH: `${input.keyPrefix}*`,
+      COUNT: 100,
+    })) {
+      if (keys.length === 0) {
+        continue;
+      }
+
+      await client.del(keys);
+    }
+  } finally {
+    await client.close();
+  }
+}
+
+function createMailpitRequirement(input: { sharedInfraKey: string }): TestInfraRequirement {
+  return {
+    id: InfraIds.MAILPIT,
+    kind: InfraKinds.MAILPIT,
+    provisioner: createMailpitProvisioner(input),
+  };
+}
+
+function createMailpitProvisioner(input: { sharedInfraKey: string }): TestInfraProvisioner {
+  return {
+    kind: InfraKinds.MAILPIT,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-physical", async () =>
+        acquireSharedMailpitInfra({
+          key: input.sharedInfraKey,
+        }),
+      );
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "mailpit",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([
+          [MailpitValues.SMTP_HOST, lease.infra.mailpit.smtpHost],
+          [MailpitValues.SMTP_PORT, String(lease.infra.mailpit.smtpPort)],
+          [MailpitValues.HTTP_BASE_URL, lease.infra.mailpit.httpBaseUrl],
+        ]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "release-lease", lease.release);
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "mailpit cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+function createControlPlaneApiService(input: {
+  context: MistleRegistryContext;
+  postgres: TestInfraRequirement;
+}): TestServiceDefinition {
+  return {
+    id: "control-plane-api",
+    infra: [input.postgres],
+    serviceReferences: [],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkHttpServiceHealth(service, "control-plane-api"),
+    start: async (startInput) =>
+      startControlPlaneApiDockerService({
+        context: input.context,
+        startInput,
+      }),
+  };
+}
+
+async function startControlPlaneApiDockerService(input: {
+  context: MistleRegistryContext;
+  startInput: TestServiceStartInput;
+}): Promise<TestService> {
+  assertDockerMode(input.startInput.mode, "control-plane-api");
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
+  const postgres = getInfra(input.startInput.infra, InfraIds.CONTROL_PLANE_POSTGRES);
+  const service = await startControlPlaneApi({
+    buildContextHostPath: input.context.buildContextHostPath,
+    configPathInContainer: input.context.configPathInContainer,
+    startupTimeoutMs: input.context.startupTimeoutMs,
+    prebuiltImageName: preparedRuntime.appImages.controlPlaneApi,
+    environment: {
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_POOLED_URL,
+      ),
+      MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_DIRECT_URL,
+      ),
+      MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: readInfraValue(
+        postgres,
+        PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
+      ),
+      MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "http://localhost:5100",
+      MISTLE_SERVICES_DASHBOARD_PUBLIC_URL: "http://localhost:5173",
+      MISTLE_SERVICES_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS:
+        "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
+      MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "data-plane-api",
+      }),
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL:
+        "ws://localhost:5202/tunnel/sandbox",
+    },
+    bindMounts: [createConfigBindMount(input.context)],
+  });
+
+  return {
+    id: "control-plane-api",
+    mode: input.startInput.mode,
+    endpoints: createHttpEndpoints({
+      hostBaseUrl: service.hostBaseUrl,
+      internalBaseUrl: service.containerBaseUrl,
+    }),
+    containerId: service.containerId,
+    stop: service.stop,
+  };
+}
+
+function createDataPlaneApiService(input: {
+  context: MistleRegistryContext;
+  postgres: TestInfraRequirement;
+}): TestServiceDefinition {
+  return {
+    id: "data-plane-api",
+    infra: [input.postgres],
+    serviceReferences: ["control-plane-api"],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkHttpServiceHealth(service, "data-plane-api"),
+    start: async (startInput) =>
+      startDataPlaneApiDockerService({
+        context: input.context,
+        startInput,
+      }),
+  };
+}
+
+async function startDataPlaneApiDockerService(input: {
+  context: MistleRegistryContext;
+  startInput: TestServiceStartInput;
+}): Promise<TestService> {
+  assertDockerMode(input.startInput.mode, "data-plane-api");
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
+  const postgres = getInfra(input.startInput.infra, InfraIds.DATA_PLANE_POSTGRES);
+  const service = await startDataPlaneApi({
+    buildContextHostPath: input.context.buildContextHostPath,
+    configPathInContainer: input.context.configPathInContainer,
+    startupTimeoutMs: input.context.startupTimeoutMs,
+    prebuiltImageName: preparedRuntime.appImages.dataPlaneApi,
+    bindMounts: [
+      createConfigBindMount(input.context),
+      {
+        source: DockerSocketPath,
+        target: DockerSocketPath,
+        mode: "rw",
+      },
+    ],
+    environment: {
+      MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_POOLED_URL,
+      ),
+      MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_DIRECT_URL,
+      ),
+      MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: readInfraValue(
+        postgres,
+        PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID,
+      ),
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "data-plane-gateway",
+      }),
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "control-plane-api",
+      }),
+      MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+    },
+  });
+
+  return {
+    id: "data-plane-api",
+    mode: input.startInput.mode,
+    endpoints: createHttpEndpoints({
+      hostBaseUrl: service.hostBaseUrl,
+      internalBaseUrl: service.containerBaseUrl,
+    }),
+    containerId: service.containerId,
+    stop: service.stop,
+  };
+}
+
+function createDataPlaneGatewayService(input: {
+  context: MistleRegistryContext;
+  postgres: TestInfraRequirement;
+  valkey: TestInfraRequirement;
+}): TestServiceDefinition {
+  return {
+    id: "data-plane-gateway",
+    infra: [input.postgres, input.valkey],
+    serviceReferences: ["control-plane-api", "data-plane-api"],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkHttpServiceHealth(service, "data-plane-gateway"),
+    start: async (startInput) =>
+      startDataPlaneGatewayDockerService({
+        context: input.context,
+        startInput,
+      }),
+  };
+}
+
+async function startDataPlaneGatewayDockerService(input: {
+  context: MistleRegistryContext;
+  startInput: TestServiceStartInput;
+}): Promise<TestService> {
+  assertDockerMode(input.startInput.mode, "data-plane-gateway");
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
+  const postgres = getInfra(input.startInput.infra, InfraIds.DATA_PLANE_POSTGRES);
+  const valkey = getInfra(input.startInput.infra, InfraIds.VALKEY);
+  const service = await startDataPlaneGateway({
+    buildContextHostPath: input.context.buildContextHostPath,
+    configPathInContainer: input.context.configPathInContainer,
+    startupTimeoutMs: input.context.startupTimeoutMs,
+    prebuiltImageName: preparedRuntime.appImages.dataPlaneGateway,
+    environment: {
+      MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_POOLED_URL,
+      ),
+      MISTLE_KV_DATA_PLANE_BACKEND: "valkey",
+      MISTLE_KV_DATA_PLANE_URL: readInfraValue(valkey, ValkeyValues.CONTAINER_URL),
+      MISTLE_KV_DATA_PLANE_KEY_PREFIX: readInfraValue(valkey, ValkeyValues.KEY_PREFIX),
+      MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "data-plane-api",
+      }),
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "control-plane-api",
+      }),
+    },
+    bindMounts: [createConfigBindMount(input.context)],
+  });
+
+  return {
+    id: "data-plane-gateway",
+    mode: input.startInput.mode,
+    endpoints: createHttpEndpoints({
+      hostBaseUrl: service.hostBaseUrl,
+      internalBaseUrl: service.containerBaseUrl,
+    }),
+    containerId: service.containerId,
+    stop: service.stop,
+  };
+}
+
+function createTokenizerProxyService(input: {
+  context: MistleRegistryContext;
+}): TestServiceDefinition {
+  return {
+    id: "tokenizer-proxy",
+    infra: [],
+    serviceReferences: ["control-plane-api"],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkHttpServiceHealth(service, "tokenizer-proxy"),
+    start: async (startInput) => {
+      assertDockerMode(startInput.mode, "tokenizer-proxy");
+      const preparedRuntime = await readPreparedTestHarnessRuntime(
+        input.context.buildContextHostPath,
+      );
+      const service = await startTokenizerProxy({
+        buildContextHostPath: input.context.buildContextHostPath,
+        configPathInContainer: input.context.configPathInContainer,
+        startupTimeoutMs: input.context.startupTimeoutMs,
+        prebuiltImageName: preparedRuntime.appImages.tokenizerProxy,
+        environment: {
+          MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+            services: startInput.services,
+            serviceId: "control-plane-api",
+          }),
+          MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: "http://localhost:5100",
+        },
+        bindMounts: [createConfigBindMount(input.context)],
+      });
+
+      return {
+        id: "tokenizer-proxy",
+        mode: startInput.mode,
+        endpoints: createHttpEndpoints({
+          hostBaseUrl: service.hostBaseUrl,
+          internalBaseUrl: service.containerBaseUrl,
+        }),
+        containerId: service.containerId,
+        stop: service.stop,
+      };
+    },
+  };
+}
+
+function createControlPlaneWorkerService(input: {
+  context: MistleRegistryContext;
+  postgres: TestInfraRequirement;
+  mailpit: TestInfraRequirement;
+}): TestServiceDefinition {
+  return {
+    id: "control-plane-worker",
+    infra: [input.postgres, input.mailpit],
+    serviceReferences: ["control-plane-api", "data-plane-api"],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkContainerServiceHealth(service, "control-plane-worker"),
+    start: async (startInput) =>
+      startControlPlaneWorkerDockerService({
+        context: input.context,
+        startInput,
+      }),
+  };
+}
+
+async function startControlPlaneWorkerDockerService(input: {
+  context: MistleRegistryContext;
+  startInput: TestServiceStartInput;
+}): Promise<TestService> {
+  assertDockerMode(input.startInput.mode, "control-plane-worker");
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
+  const postgres = getInfra(input.startInput.infra, InfraIds.CONTROL_PLANE_POSTGRES);
+  const mailpit = getInfra(input.startInput.infra, InfraIds.MAILPIT);
+  const service = await startControlPlaneWorker({
+    buildContextHostPath: input.context.buildContextHostPath,
+    configPathInContainer: input.context.configPathInContainer,
+    startupTimeoutMs: input.context.startupTimeoutMs,
+    prebuiltImageName: preparedRuntime.appImages.controlPlaneWorker,
+    environment: {
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_POOLED_URL,
+      ),
+      MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID: readInfraValue(
+        postgres,
+        PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
+      ),
+      MISTLE_EMAIL_SMTP_HOST: readInfraValue(mailpit, MailpitValues.SMTP_HOST),
+      MISTLE_EMAIL_SMTP_PORT: readInfraValue(mailpit, MailpitValues.SMTP_PORT),
+      MISTLE_EMAIL_SMTP_SECURE: "false",
+      MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "data-plane-api",
+      }),
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "control-plane-api",
+      }),
+    },
+    bindMounts: [createConfigBindMount(input.context)],
+  });
+
+  return {
+    id: "control-plane-worker",
+    mode: input.startInput.mode,
+    endpoints: {},
+    containerId: service.containerId,
+    stop: service.stop,
+  };
+}
+
+function createDataPlaneWorkerService(input: {
+  context: MistleRegistryContext;
+  postgres: TestInfraRequirement;
+}): TestServiceDefinition {
+  return {
+    id: "data-plane-worker",
+    infra: [input.postgres],
+    serviceReferences: ["data-plane-gateway", "tokenizer-proxy", "control-plane-api"],
+    supportedModes: ["docker"],
+    healthCheck: async (service) => checkContainerServiceHealth(service, "data-plane-worker"),
+    start: async (startInput) =>
+      startDataPlaneWorkerDockerService({
+        context: input.context,
+        startInput,
+      }),
+  };
+}
+
+async function startDataPlaneWorkerDockerService(input: {
+  context: MistleRegistryContext;
+  startInput: TestServiceStartInput;
+}): Promise<TestService> {
+  assertDockerMode(input.startInput.mode, "data-plane-worker");
+  const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
+  const postgres = getInfra(input.startInput.infra, InfraIds.DATA_PLANE_POSTGRES);
+  const gatewayBaseUrl = readOptionalServiceContainerBaseUrl({
+    services: input.startInput.services,
+    serviceId: "data-plane-gateway",
+  });
+  const service = await startDataPlaneWorker({
+    buildContextHostPath: input.context.buildContextHostPath,
+    configPathInContainer: input.context.configPathInContainer,
+    startupTimeoutMs: input.context.startupTimeoutMs,
+    prebuiltImageName: preparedRuntime.appImages.dataPlaneWorker,
+    environment: {
+      MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: readInfraValue(
+        postgres,
+        PostgresValues.CONTAINER_POOLED_URL,
+      ),
+      MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID: readInfraValue(
+        postgres,
+        PostgresValues.DATA_PLANE_WORKFLOW_NAMESPACE_ID,
+      ),
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_INTERNAL_URL: gatewayBaseUrl,
+      MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_INTERNAL_URL:
+        createWebSocketBaseUrl(gatewayBaseUrl),
+      MISTLE_SANDBOX_PROVIDER: "docker",
+      MISTLE_SANDBOX_DOCKER_SOCKET_PATH: DockerSocketPath,
+      MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "tokenizer-proxy",
+      }),
+      MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
+        services: input.startInput.services,
+        serviceId: "control-plane-api",
+      }),
+    },
+    bindMounts: [createConfigBindMount(input.context)],
+  });
+
+  return {
+    id: "data-plane-worker",
+    mode: input.startInput.mode,
+    endpoints: {},
+    containerId: service.containerId,
+    stop: service.stop,
+  };
+}
+
+function createPostgresMigrationCoordinatorKey(input: {
+  sharedInfraKey: string;
+  postgresContainerId: string;
+}): string {
+  return createHash("sha256")
+    .update(input.sharedInfraKey)
+    .update("\0")
+    .update(input.postgresContainerId)
+    .digest("hex");
+}
+
+async function runPostgresBootstrapMigrations(input: {
+  context: MistleRegistryContext;
+  hostDirectUrl: string;
+  timings: Map<string, number>;
+}): Promise<void> {
+  await measure(input.timings, "bootstrap-data-plane-db-migrations", async () =>
+    runDataPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: DATA_PLANE_SCHEMA_NAME,
+      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
+      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
+    }),
+  );
+  await measure(input.timings, "bootstrap-control-plane-db-migrations", async () =>
+    runControlPlaneMigrations({
+      connectionString: input.hostDirectUrl,
+      schemaName: CONTROL_PLANE_SCHEMA_NAME,
+      migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+      migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
+      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    }),
+  );
+  await measure(input.timings, "bootstrap-data-plane-workflow-migrations", async () =>
+    runOpenWorkflowPostgresMigrations({
+      url: input.hostDirectUrl,
+      namespaceId: "template",
+      schema: DataPlaneOpenWorkflowSchema,
+    }),
+  );
+  await measure(input.timings, "bootstrap-control-plane-workflow-migrations", async () =>
+    runOpenWorkflowPostgresMigrations({
+      url: input.hostDirectUrl,
+      namespaceId: "template",
+      schema: ControlPlaneOpenWorkflowSchema,
+    }),
+  );
+}
+
+async function runPostgresBootstrapMigrationsOnceAcrossProcesses(input: {
+  context: MistleRegistryContext;
+  hostDirectUrl: string;
+  migrationCoordinatorKey: string;
+  timings: Map<string, number>;
+}): Promise<void> {
+  await withPostgresMigrationCoordinatorLock(input.migrationCoordinatorKey, async () => {
+    if (await hasPostgresBootstrapMigrationMarker(input.migrationCoordinatorKey)) {
+      return;
+    }
+
+    await runPostgresBootstrapMigrations({
+      context: input.context,
+      hostDirectUrl: input.hostDirectUrl,
+      timings: input.timings,
+    });
+    await writePostgresBootstrapMigrationMarker(input.migrationCoordinatorKey);
+  });
+}
+
+async function runPostgresLogicalMigrations(input: {
+  context: MistleRegistryContext;
+  hostDirectUrl: string;
+  controlPlaneSchemaName: string;
+  dataPlaneSchemaName: string;
+  requirements: readonly TestInfraRequirement[];
+  timings: Map<string, number>;
+}): Promise<void> {
+  const materializations: Promise<void>[] = [];
+
+  if (requiresControlPlanePostgres(input.requirements)) {
+    materializations.push(
+      measure(input.timings, "logical-control-plane-schema-materialization", async () =>
+        materializePostgresSchemaFromTemplate({
+          connectionString: input.hostDirectUrl,
+          sourceSchemaName: CONTROL_PLANE_SCHEMA_NAME,
+          targetSchemaName: input.controlPlaneSchemaName,
+        }),
+      ),
+    );
+  }
+
+  if (requiresDataPlanePostgres(input.requirements)) {
+    materializations.push(
+      measure(input.timings, "logical-data-plane-schema-materialization", async () =>
+        materializePostgresSchemaFromTemplate({
+          connectionString: input.hostDirectUrl,
+          sourceSchemaName: DATA_PLANE_SCHEMA_NAME,
+          targetSchemaName: input.dataPlaneSchemaName,
+        }),
+      ),
+    );
+  }
+
+  await Promise.all(materializations);
+}
+
+async function materializePostgresSchemaFromTemplate(input: {
+  connectionString: string;
+  sourceSchemaName: string;
+  targetSchemaName: string;
+}): Promise<void> {
+  const client = new Client({
+    connectionString: input.connectionString,
+  });
+
+  await client.connect();
+
+  try {
+    await client.query("begin");
+    await client.query(`create schema ${quoteSqlIdentifier(input.targetSchemaName)}`);
+
+    const tables = await readPostgresSchemaTables({
+      client,
+      schemaName: input.sourceSchemaName,
+    });
+
+    for (const table of tables) {
+      await client.query(
+        `create table ${quoteSqlIdentifier(input.targetSchemaName)}.${quoteSqlIdentifier(table.tableName)} (like ${quoteSqlIdentifier(input.sourceSchemaName)}.${quoteSqlIdentifier(table.tableName)} including all)`,
+      );
+    }
+
+    const foreignKeys = await readPostgresSchemaForeignKeys({
+      client,
+      schemaName: input.sourceSchemaName,
+    });
+
+    for (const foreignKey of foreignKeys) {
+      await client.query(
+        `alter table ${quoteSqlIdentifier(input.targetSchemaName)}.${quoteSqlIdentifier(foreignKey.tableName)} add constraint ${quoteSqlIdentifier(foreignKey.constraintName)} ${rewritePostgresConstraintDefinition(
+          {
+            definition: foreignKey.definition,
+            sourceSchemaName: input.sourceSchemaName,
+            targetSchemaName: input.targetSchemaName,
+          },
+        )}`,
+      );
+    }
+
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+type PostgresSchemaTable = {
+  tableName: string;
+};
+
+type PostgresSchemaForeignKey = {
+  tableName: string;
+  constraintName: string;
+  definition: string;
+};
+
+async function readPostgresSchemaTables(input: {
+  client: Client;
+  schemaName: string;
+}): Promise<readonly PostgresSchemaTable[]> {
+  const result = await input.client.query<{
+    table_name: string;
+  }>(
+    `
+      select c.relname as table_name
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = $1
+        and c.relkind in ('r', 'p')
+      order by c.relname
+    `,
+    [input.schemaName],
+  );
+
+  return result.rows.map((row) => ({
+    tableName: row.table_name,
+  }));
+}
+
+async function readPostgresSchemaForeignKeys(input: {
+  client: Client;
+  schemaName: string;
+}): Promise<readonly PostgresSchemaForeignKey[]> {
+  const result = await input.client.query<{
+    table_name: string;
+    constraint_name: string;
+    definition: string;
+  }>(
+    `
+      select
+        c.relname as table_name,
+        con.conname as constraint_name,
+        pg_catalog.pg_get_constraintdef(con.oid, true) as definition
+      from pg_catalog.pg_constraint con
+      join pg_catalog.pg_class c on c.oid = con.conrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = $1
+        and con.contype = 'f'
+      order by c.relname, con.conname
+    `,
+    [input.schemaName],
+  );
+
+  return result.rows.map((row) => ({
+    tableName: row.table_name,
+    constraintName: row.constraint_name,
+    definition: row.definition,
+  }));
+}
+
+function rewritePostgresConstraintDefinition(input: {
+  definition: string;
+  sourceSchemaName: string;
+  targetSchemaName: string;
+}): string {
+  return input.definition
+    .replaceAll(
+      `${quoteSqlIdentifier(input.sourceSchemaName)}.`,
+      `${quoteSqlIdentifier(input.targetSchemaName)}.`,
+    )
+    .replaceAll(`${input.sourceSchemaName}.`, `${quoteSqlIdentifier(input.targetSchemaName)}.`);
+}
+
+async function dropPostgresLogicalSchemas(input: {
+  requirement: TestInfraRequirement;
+  lease: SharedPostgresLease;
+  controlPlaneSchemaName: string;
+  dataPlaneSchemaName: string;
+  timings: Map<string, number>;
+}): Promise<void> {
+  if (input.requirement.id === InfraIds.CONTROL_PLANE_POSTGRES) {
+    await measure(input.timings, "drop-control-plane-schema", async () =>
+      dropPostgresSchema({
+        containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
+        username: input.lease.infra.postgres.postgres.username,
+        databaseName: input.lease.infra.postgres.postgres.databaseName,
+        schemaName: input.controlPlaneSchemaName,
+      }),
+    );
+    return;
+  }
+
+  if (input.requirement.id === InfraIds.DATA_PLANE_POSTGRES) {
+    await measure(input.timings, "drop-data-plane-schema", async () =>
+      dropPostgresSchema({
+        containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
+        username: input.lease.infra.postgres.postgres.username,
+        databaseName: input.lease.infra.postgres.postgres.databaseName,
+        schemaName: input.dataPlaneSchemaName,
+      }),
+    );
+    return;
+  }
+
+  throw new Error(`Unknown Postgres infra requirement '${input.requirement.id}'.`);
+}
+
+function requiresControlPlanePostgres(requirements: readonly TestInfraRequirement[]): boolean {
+  return requirements.some((requirement) => requirement.id === InfraIds.CONTROL_PLANE_POSTGRES);
+}
+
+function requiresDataPlanePostgres(requirements: readonly TestInfraRequirement[]): boolean {
+  return requirements.some((requirement) => requirement.id === InfraIds.DATA_PLANE_POSTGRES);
+}
+
+async function runOpenWorkflowPostgresMigrations(input: {
+  url: string;
+  namespaceId: string;
+  schema: string;
+}): Promise<void> {
+  const backend = await BackendPostgres.connect(input.url, {
+    namespaceId: input.namespaceId,
+    runMigrations: true,
+    schema: input.schema,
+  });
+
+  await backend.stop();
+}
+
+async function withPostgresMigrationCoordinatorLock<T>(
+  migrationCoordinatorKey: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const lockDirectoryPath = join(
+    PostgresMigrationCoordinatorRootDirectoryPath,
+    `${migrationCoordinatorKey}.lock`,
+  );
+  const ownerFilePath = join(lockDirectoryPath, "owner.json");
+  const deadline = Date.now() + MigrationLockTimeoutMs;
+
+  await mkdir(PostgresMigrationCoordinatorRootDirectoryPath, {
+    recursive: true,
+  });
+
+  while (Date.now() < deadline) {
+    try {
+      await mkdir(lockDirectoryPath);
+      await writeJsonFileAtomic(ownerFilePath, { pid: process.pid, createdAt: Date.now() });
+
+      try {
+        return await callback();
+      } finally {
+        await rm(lockDirectoryPath, {
+          recursive: true,
+          force: true,
+        });
+      }
+    } catch (error) {
+      if (!isNodeErrorCode(error, "EEXIST")) {
+        throw error;
+      }
+
+      const ownerPid = await readPostgresMigrationLockOwnerPid(ownerFilePath);
+      if (ownerPid !== undefined && !isProcessAlive(ownerPid)) {
+        await rm(lockDirectoryPath, {
+          recursive: true,
+          force: true,
+        });
+        continue;
+      }
+
+      await systemSleeper.sleep(MigrationLockPollIntervalMs);
+    }
+  }
+
+  throw new Error(
+    `Timed out acquiring Postgres migration lock after ${String(MigrationLockTimeoutMs)}ms.`,
+  );
+}
+
+async function hasPostgresBootstrapMigrationMarker(
+  migrationCoordinatorKey: string,
+): Promise<boolean> {
+  try {
+    await readFile(createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey), "utf8");
+    return true;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function writePostgresBootstrapMigrationMarker(
+  migrationCoordinatorKey: string,
+): Promise<void> {
+  await writeJsonFileAtomic(createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey), {
+    completedAt: Date.now(),
+    pid: process.pid,
+  });
+}
+
+function createPostgresBootstrapMigrationMarkerPath(migrationCoordinatorKey: string): string {
+  return join(PostgresMigrationCoordinatorRootDirectoryPath, `${migrationCoordinatorKey}.ready`);
+}
+
+async function readPostgresMigrationLockOwnerPid(
+  ownerFilePath: string,
+): Promise<number | undefined> {
+  try {
+    const raw = await readFile(ownerFilePath, "utf8");
+    const parsed = parseJsonRecordIfComplete(raw);
+    if (parsed === undefined) {
+      return undefined;
+    }
+    const pid = parsed["pid"];
+    if (typeof pid !== "number") {
+      return undefined;
+    }
+    return pid;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function writeJsonFileAtomic(
+  filePath: string,
+  value: Record<string, unknown>,
+): Promise<void> {
+  const temporaryFilePath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(temporaryFilePath, `${JSON.stringify(value)}\n`, "utf8");
+  await rename(temporaryFilePath, filePath);
+}
+
+function parseJsonRecordIfComplete(raw: string): Record<string, unknown> | undefined {
+  try {
+    return parseJsonRecord(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function parseJsonRecord(raw: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isRecord(parsed)) {
+    throw new Error("Expected JSON object.");
+  }
+  return parsed;
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return isRecord(error) && error["code"] === code;
+}
+
+function isProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    if (isNodeErrorCode(error, "ESRCH")) {
+      return false;
+    }
+    if (isNodeErrorCode(error, "EPERM")) {
+      return true;
+    }
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function dropPostgresSchema(input: {
+  containerId: string;
+  username: string;
+  databaseName: string;
+  schemaName: string;
+}): Promise<void> {
+  await runPostgresAdminCommand({
+    containerId: input.containerId,
+    username: input.username,
+    databaseName: input.databaseName,
+    sql: `drop schema if exists "${input.schemaName.replaceAll('"', '""')}" cascade`,
+  });
+}
+
+async function runPostgresAdminCommand(input: {
+  containerId: string;
+  username: string;
+  databaseName?: string;
+  sql: string;
+}): Promise<void> {
+  await execFileAsync("docker", [
+    "exec",
+    input.containerId,
+    "psql",
+    "-U",
+    input.username,
+    "-d",
+    input.databaseName ?? "postgres",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-c",
+    input.sql,
+  ]);
+}
+
+function createDatabaseUrl(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  databaseName: string;
+}): string {
+  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
+}
+
+function quoteSqlIdentifier(identifier: string): string {
+  return `"${identifier.replaceAll('"', '""')}"`;
+}
+
+function createSafeIdentifier(value: string): string {
+  const normalized = value.toLowerCase().replaceAll(/[^a-z0-9_]/gu, "_");
+  const digest = createHash("sha256").update(value).digest("hex").slice(0, 10);
+  const compact = normalized.length === 0 ? "env" : normalized.slice(0, 28);
+  return `${compact}_${digest}`;
+}
+
+function getInfra(infra: ReadonlyMap<string, ResolvedTestInfra>, id: string): ResolvedTestInfra {
+  const resolved = infra.get(id);
+  if (resolved === undefined) {
+    throw new Error(`Expected Mistle test infra '${id}' to be resolved.`);
+  }
+
+  return resolved;
+}
+
+function readInfraValue(infra: ResolvedTestInfra, key: string): string {
+  const value = infra.values.get(key);
+  if (value === undefined) {
+    throw new Error(`Expected Mistle test infra '${infra.id}' to expose '${key}'.`);
+  }
+
+  return value;
+}
+
+function readOptionalServiceContainerBaseUrl(input: {
+  services: ReadonlyMap<string, TestServiceHandle>;
+  serviceId: string;
+}): string {
+  const service = input.services.get(input.serviceId);
+  if (service === undefined) {
+    return DeadServiceBaseUrl;
+  }
+
+  return createContainerReachableBaseUrl(service);
+}
+
+function createContainerReachableBaseUrl(service: TestServiceHandle): string {
+  const httpEndpoint = service.endpoints.http;
+  if (httpEndpoint === undefined) {
+    throw new Error(`Expected Mistle test service '${service.id}' to expose an HTTP endpoint.`);
+  }
+
+  if (httpEndpoint.internalBaseUrl !== undefined) {
+    return httpEndpoint.internalBaseUrl;
+  }
+
+  const url = new URL(httpEndpoint.hostBaseUrl);
+  url.hostname = HostGatewayName;
+  return url.toString().replace(/\/$/u, "");
+}
+
+function createHttpEndpoints(input: {
+  hostBaseUrl: string;
+  internalBaseUrl: string;
+}): TestServiceEndpoints {
+  return {
+    http: {
+      hostBaseUrl: input.hostBaseUrl,
+      internalBaseUrl: input.internalBaseUrl,
+    },
+  };
+}
+
+async function checkHttpServiceHealth(
+  service: TestServiceRuntime,
+  serviceId: MistleTestServiceId,
+): Promise<void> {
+  const httpEndpoint = service.endpoints.http;
+  if (httpEndpoint === undefined) {
+    throw new Error(`Expected Mistle test service '${serviceId}' to expose an HTTP endpoint.`);
+  }
+
+  const response = await fetch(new URL("/__healthz", httpEndpoint.hostBaseUrl));
+  if (!response.ok) {
+    throw new Error(
+      `Mistle test service '${serviceId}' health check returned ${String(response.status)}.`,
+    );
+  }
+}
+
+async function checkContainerServiceHealth(
+  service: TestServiceRuntime,
+  serviceId: MistleTestServiceId,
+): Promise<void> {
+  if (service.containerId === undefined) {
+    throw new Error(`Expected Mistle test service '${serviceId}' to expose a container id.`);
+  }
+
+  const { stdout } = await execFileAsync("docker", [
+    "inspect",
+    "-f",
+    "{{.State.Running}}",
+    service.containerId,
+  ]);
+  if (stdout.trim() !== "true") {
+    throw new Error(`Mistle test service '${serviceId}' container is not running.`);
+  }
+}
+
+function createWebSocketBaseUrl(httpBaseUrl: string): string {
+  const url = new URL(httpBaseUrl);
+  if (url.protocol === "http:") {
+    url.protocol = "ws:";
+    return url.toString().replace(/\/$/u, "");
+  }
+  if (url.protocol === "https:") {
+    url.protocol = "wss:";
+    return url.toString().replace(/\/$/u, "");
+  }
+
+  throw new Error(`Expected HTTP base URL to create WebSocket URL, received '${httpBaseUrl}'.`);
+}
+
+function createConfigBindMount(input: MistleRegistryContext): {
+  source: string;
+  target: string;
+  mode: "ro";
+} {
+  return {
+    source: dirname(
+      resolveHostPathFromContainerPath({
+        buildContextHostPath: input.buildContextHostPath,
+        containerPath: input.configPathInContainer,
+      }),
+    ),
+    target: dirname(input.configPathInContainer),
+    mode: "ro",
+  };
+}
+
+function assertDockerMode(mode: TestServiceLaunchMode, serviceId: string): void {
+  if (mode !== "docker") {
+    throw new Error(`Mistle test service '${serviceId}' currently supports docker mode only.`);
+  }
+}

@@ -103,6 +103,7 @@ export class TunnelSessionService {
     relaySessionId: string;
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
+    testEnvironmentId?: string;
   }): AttachedTunnelPeer {
     const relayTarget = this.relayCoordinator.attachPeer({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -190,6 +191,9 @@ export class TunnelSessionService {
       relayTarget,
       sandboxInstanceId: input.sandboxInstanceId,
       socket: input.socket,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
@@ -228,6 +232,7 @@ export class TunnelSessionService {
     relaySessionId: string;
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
+    testEnvironmentId?: string;
   }): AttachedTunnelPeer {
     const relayTarget = this.relayCoordinator.attachPeer({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -307,6 +312,9 @@ export class TunnelSessionService {
             await this.sandboxInstanceDeadlineService.touchIdleDeadline({
               sandboxInstanceId: input.sandboxInstanceId,
               ownerLeaseId: activeSession.ownerLeaseId,
+              ...(input.testEnvironmentId === undefined
+                ? {}
+                : { testEnvironmentId: input.testEnvironmentId }),
             });
           },
         });
@@ -354,6 +362,7 @@ export class TunnelSessionService {
     attachedPeer: AttachedTunnelPeer;
     leaseId: string;
     sandboxInstanceId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     input.attachedPeer.leaseHeartbeatHandle?.stop();
     input.attachedPeer.websocketHealthHandle?.stop();
@@ -380,6 +389,9 @@ export class TunnelSessionService {
         await this.sandboxInstanceDeadlineService.handleBootstrapDisconnect({
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: input.leaseId,
+          ...(input.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: input.testEnvironmentId }),
         });
       },
     });
@@ -493,6 +505,7 @@ export class TunnelSessionService {
     relayTarget: RelayTarget;
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
+    testEnvironmentId?: string;
   }): Promise<void> {
     try {
       if (
@@ -519,6 +532,9 @@ export class TunnelSessionService {
           await this.sandboxInstanceDeadlineService.handleBootstrapAttach({
             sandboxInstanceId: input.sandboxInstanceId,
             ownerLeaseId: input.leaseId,
+            ...(input.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: input.testEnvironmentId }),
           });
         },
       });

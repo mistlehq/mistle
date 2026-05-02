@@ -5,6 +5,20 @@
     "dist/**"
   ],
   "type": "module",
+  "exports": {
+    "./runtime": {
+      "types": "./src/main.ts",
+      "node": "./dist/main.js",
+      "import": "./src/main.ts",
+      "default": "./src/main.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "node": "./dist/types.js",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
     "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",
@@ -15,6 +29,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:integration:new": "vitest run -c vitest.integration-new.config.ts",
     "test:property": "vitest run --passWithNoTests",
     "openapi:generate": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/generate-spec.ts",
     "openapi:check": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/check-spec-drift.ts",

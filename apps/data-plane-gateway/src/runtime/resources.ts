@@ -1,11 +1,12 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import { Pool } from "pg";
 
 import type { DataPlaneGatewayApp, DataPlaneGatewayConfig } from "../types.js";
 
 export type AppRuntimeResources = {
-  db: DataPlaneDatabase;
   dbPool: Pool;
+  getDb: (input?: { testEnvironmentId?: string }) => DataPlaneDatabase;
 };
 
 const AppResourcesByInstance = new WeakMap<DataPlaneGatewayApp, AppRuntimeResources>();
@@ -24,10 +25,33 @@ export function createAppResources(config: DataPlaneGatewayConfig): AppRuntimeRe
   const dbPool = new Pool({
     connectionString: config.database.url,
   });
+  const defaultDb = createDataPlaneDatabase(dbPool);
+  const testDbsByEnvironmentId = new Map<string, DataPlaneDatabase>();
 
   return {
-    db: createDataPlaneDatabase(dbPool),
     dbPool,
+    getDb: (input = {}) => {
+      const testIsolation = config.__dangerouslyEnableTestIsolation;
+      if (testIsolation === undefined) {
+        return defaultDb;
+      }
+
+      const testEnvironmentId = input.testEnvironmentId;
+      if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+        throw new Error("Expected test environment id for isolated data-plane gateway request.");
+      }
+
+      const existingDb = testDbsByEnvironmentId.get(testEnvironmentId);
+      if (existingDb !== undefined) {
+        return existingDb;
+      }
+
+      const db = createDataPlaneDatabase(dbPool, {
+        schemaName: createDataPlaneTestSchemaName(testEnvironmentId),
+      });
+      testDbsByEnvironmentId.set(testEnvironmentId, db);
+      return db;
+    },
   };
 }
 

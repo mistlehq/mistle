@@ -69,6 +69,7 @@ export const SandboxBaseToolCategories = {
 } satisfies Record<string, SandboxBaseInventoryToolCategory>;
 
 const SandboxBaseCommonStage = "sandbox-base-common";
+const SandboxBaseToolingStage = "sandbox-base-tooling";
 const SandboxBaseStage = "sandbox-base";
 
 export const SandboxBaseInventorySpec = {
@@ -77,112 +78,6 @@ export const SandboxBaseInventorySpec = {
   inventoryPath: "packages/sandboxd/sandbox-base-inventory.generated.json",
   packageManagerCommands: ["apt-get", "apt", "apk", "dnf", "yum", "pacman", "brew"],
   tools: [
-    {
-      category: SandboxBaseToolCategories.RUNTIMES,
-      command: "node",
-      displayName: "Node.js",
-      dockerfileAssertions: [copyFromStage("node", "/usr/local/bin/node", "/usr/local/bin/node")],
-      versionCommand: ["node", "--version"],
-      versionParser: parseLeadingVVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "npm",
-      displayName: "npm",
-      dockerfileAssertions: [
-        copyFromStage("node", "/usr/local/lib/node_modules", "/usr/local/lib/node_modules"),
-        symlink("/usr/local/lib/node_modules/npm/bin/npm-cli.js", "/usr/local/bin/npm"),
-      ],
-      versionCommand: ["npm", "--version"],
-      versionParser: parseFirstLine,
-    },
-    {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "npx",
-      displayName: "npx",
-      dockerfileAssertions: [
-        copyFromStage("node", "/usr/local/lib/node_modules", "/usr/local/lib/node_modules"),
-        symlink("/usr/local/lib/node_modules/npm/bin/npx-cli.js", "/usr/local/bin/npx"),
-      ],
-      versionCommand: ["npx", "--version"],
-      versionParser: parseFirstLine,
-    },
-    {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "corepack",
-      displayName: "Corepack",
-      dockerfileAssertions: [
-        copyFromStage("node", "/usr/local/lib/node_modules", "/usr/local/lib/node_modules"),
-        symlink("/usr/local/lib/node_modules/corepack/dist/corepack.js", "/usr/local/bin/corepack"),
-      ],
-      versionCommand: ["corepack", "--version"],
-      versionParser: parseFirstLine,
-    },
-    {
-      category: SandboxBaseToolCategories.RUNTIMES,
-      command: "python3",
-      displayName: "Python",
-      dockerfileAssertions: [copyFromStage("python", "/usr/local", "/usr/local")],
-      versionCommand: ["python3", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "pip",
-      displayName: "pip",
-      dockerfileAssertions: [copyFromStage("python", "/usr/local", "/usr/local")],
-      versionCommand: ["pip", "--version"],
-      versionParser: parseSecondToken,
-    },
-    {
-      category: SandboxBaseToolCategories.CONTAINERS,
-      command: "docker",
-      displayName: "Docker",
-      dockerfileAssertions: [
-        copyFromStage("docker", "/usr/local/bin/docker", "/usr/local/bin/docker"),
-      ],
-      versionCommand: ["docker", "--version"],
-      versionParser: parseDockerVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CONTAINERS,
-      command: "docker-compose",
-      displayName: "Docker Compose",
-      dockerfileAssertions: [
-        copyFromStage("docker", "/usr/local/bin/docker-compose", "/usr/local/bin/docker-compose"),
-      ],
-      versionCommand: ["docker-compose", "version", "--short"],
-      versionParser: parseFirstLine,
-    },
-    {
-      category: SandboxBaseToolCategories.CONTAINERS,
-      command: "containerd",
-      displayName: "containerd",
-      dockerfileAssertions: [
-        copyFromStage("docker", "/usr/local/bin/containerd", "/usr/local/bin/containerd"),
-      ],
-      versionCommand: ["containerd", "--version"],
-      versionParser: parseContainerdVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CONTAINERS,
-      command: "runc",
-      displayName: "runc",
-      dockerfileAssertions: [copyFromStage("docker", "/usr/local/bin/runc", "/usr/local/bin/runc")],
-      versionCommand: ["runc", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
-      command: "nix",
-      displayName: "Nix",
-      dockerfileAssertions: [
-        copyFromStage("nix", "/nix", "/nix"),
-        copyFromStage("nix", "/root/.nix-profile", "/root/.nix-profile"),
-      ],
-      versionCommand: ["nix", "--version"],
-      versionParser: parseLastToken,
-    },
     {
       category: SandboxBaseToolCategories.PACKAGE_AND_ENVIRONMENT,
       command: "mise",
@@ -199,11 +94,51 @@ export const SandboxBaseInventorySpec = {
       command: "archil",
       displayName: "Archil",
       dockerfileAssertions: [
-        runContains(SandboxBaseStage, "https://archil.com/install"),
-        symlink("/usr/bin/archil", "/opt/mistle/bin/archil"),
+        runContains(SandboxBaseToolingStage, "https://archil.com/install"),
+        symlink("/usr/bin/archil", "/opt/mistle/bin/archil", SandboxBaseToolingStage),
       ],
       versionCommand: ["archil", "--version"],
       versionParser: parseArchilVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "cat",
+      displayName: "cat",
+      dockerfileAssertions: [aptPackage("coreutils", SandboxBaseCommonStage)],
+      versionCommand: ["cat", "--version"],
+      versionParser: parseGnuToolVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "sed",
+      displayName: "sed",
+      dockerfileAssertions: [aptPackage("sed", SandboxBaseCommonStage)],
+      versionCommand: ["sed", "--version"],
+      versionParser: parseGnuToolVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "awk",
+      displayName: "awk",
+      dockerfileAssertions: [aptPackage("gawk", SandboxBaseCommonStage)],
+      versionCommand: ["awk", "--version"],
+      versionParser: parseGawkVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "grep",
+      displayName: "grep",
+      dockerfileAssertions: [aptPackage("grep", SandboxBaseCommonStage)],
+      versionCommand: ["grep", "--version"],
+      versionParser: parseGnuToolVersion,
+    },
+    {
+      category: SandboxBaseToolCategories.CLI_UTILITIES,
+      command: "find",
+      displayName: "find",
+      dockerfileAssertions: [aptPackage("findutils", SandboxBaseCommonStage)],
+      versionCommand: ["find", "--version"],
+      versionParser: parseGnuToolVersion,
     },
     {
       category: SandboxBaseToolCategories.CLI_UTILITIES,
@@ -238,89 +173,6 @@ export const SandboxBaseInventorySpec = {
       versionParser: parseTrailingVersion,
     },
     {
-      category: SandboxBaseToolCategories.CLI_UTILITIES,
-      command: "fd",
-      displayName: "fd",
-      dockerfileAssertions: [
-        aptPackage("fd-find"),
-        symlink("/usr/bin/fdfind", "/opt/mistle/bin/fd"),
-      ],
-      versionCommand: ["fd", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CLI_UTILITIES,
-      command: "bat",
-      displayName: "bat",
-      dockerfileAssertions: [aptPackage("bat"), symlink("/usr/bin/batcat", "/opt/mistle/bin/bat")],
-      versionCommand: ["bat", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CLI_UTILITIES,
-      command: "tmux",
-      displayName: "tmux",
-      dockerfileAssertions: [aptPackage("tmux")],
-      versionCommand: ["tmux", "-V"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CLI_UTILITIES,
-      command: "vim",
-      displayName: "Vim",
-      dockerfileAssertions: [aptPackage("vim")],
-      versionCommand: ["vim", "--version"],
-      versionParser: parseVimVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.CLI_UTILITIES,
-      command: "sqlite3",
-      displayName: "SQLite",
-      dockerfileAssertions: [aptPackage("sqlite3")],
-      versionCommand: ["sqlite3", "--version"],
-      versionParser: parseFirstToken,
-    },
-    {
-      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "make",
-      displayName: "Make",
-      dockerfileAssertions: [aptPackage("make")],
-      versionCommand: ["make", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "gdb",
-      displayName: "gdb",
-      dockerfileAssertions: [aptPackage("gdb")],
-      versionCommand: ["gdb", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "strace",
-      displayName: "strace",
-      dockerfileAssertions: [aptPackage("strace")],
-      versionCommand: ["strace", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "tcpdump",
-      displayName: "tcpdump",
-      dockerfileAssertions: [aptPackage("tcpdump")],
-      versionCommand: ["tcpdump", "--version"],
-      versionParser: parseTrailingVersion,
-    },
-    {
-      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "tree",
-      displayName: "tree",
-      dockerfileAssertions: [aptPackage("tree")],
-      versionCommand: ["tree", "--version"],
-      versionParser: parseSecondTokenWithoutLeadingV,
-    },
-    {
       category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
       command: "tini",
       displayName: "tini",
@@ -339,21 +191,6 @@ function aptPackage(
     kind: "apt-package",
     packageName,
     stageName,
-  };
-}
-
-function copyFromStage(
-  fromStageName: string,
-  sourcePath: string,
-  targetPath: string,
-  stageName = SandboxBaseStage,
-): SandboxBaseDockerfileAssertion {
-  return {
-    fromStageName,
-    kind: "copy-from-stage",
-    sourcePath,
-    stageName,
-    targetPath,
   };
 }
 
@@ -396,10 +233,6 @@ function parseSecondToken(output: string): string {
   return parseRequiredToken(output, 1);
 }
 
-function parseSecondTokenWithoutLeadingV(output: string): string {
-  return parseSecondToken(output).replace(/^v/u, "");
-}
-
 function parseLastToken(output: string): string {
   const tokens = parseFirstLine(output).split(/\s+/u);
   const token = tokens[tokens.length - 1];
@@ -421,34 +254,32 @@ function parseRequiredToken(output: string, index: number): string {
   return token;
 }
 
-function parseLeadingVVersion(output: string): string {
-  return parseFirstLine(output).replace(/^v/u, "");
-}
-
 function parseTrailingVersion(output: string): string {
   return parseLastToken(output).replace(/^v/u, "");
-}
-
-function parseDockerVersion(output: string): string {
-  return parseRequiredToken(output.replaceAll(",", ""), 2);
-}
-
-function parseContainerdVersion(output: string): string {
-  return parseRequiredToken(output, 2).replace(/^v/u, "");
 }
 
 function parseJqVersion(output: string): string {
   return parseFirstLine(output).replace(/^jq-/u, "");
 }
 
-function parseVimVersion(output: string): string {
-  const versionMatch = /\b\d+\.\d+\b/u.exec(parseFirstLine(output));
+function parseGnuToolVersion(output: string): string {
+  const versionMatch = /\b\d+(?:\.\d+)+\b/u.exec(parseFirstLine(output));
 
   if (versionMatch === null) {
-    throw new Error(`Could not parse Vim version from output: ${output}`);
+    throw new Error(`Could not parse GNU tool version from output: ${output}`);
   }
 
   return versionMatch[0];
+}
+
+function parseGawkVersion(output: string): string {
+  const versionMatch = /^GNU Awk\s+(\S+)/u.exec(parseFirstLine(output));
+
+  if (versionMatch === null || versionMatch[1] === undefined) {
+    throw new Error(`Could not parse GNU Awk version from output: ${output}`);
+  }
+
+  return versionMatch[1].replace(/,$/u, "");
 }
 
 function parseArchilVersion(output: string): string {

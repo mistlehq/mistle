@@ -1,4 +1,4 @@
-import { index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, jsonb, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { integrationConnections } from "./integration-connections.js";
@@ -21,64 +21,71 @@ export const IntegrationWebhookEventStatuses = {
 export type IntegrationWebhookEventStatus =
   (typeof IntegrationWebhookEventStatuses)[keyof typeof IntegrationWebhookEventStatuses];
 
-export const integrationWebhookEvents = controlPlaneSchema.table(
-  "integration_webhook_events",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => typeid("iwe").toString()),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    integrationConnectionId: text("integration_connection_id")
-      .notNull()
-      .references(() => integrationConnections.id, { onDelete: "cascade" }),
-    integrationWebhookSourceId: text("integration_webhook_source_id")
-      .notNull()
-      .references(() => integrationWebhookSources.id, { onDelete: "cascade" }),
-    targetKey: text("target_key")
-      .notNull()
-      .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
-    externalEventId: text("external_event_id").notNull(),
-    externalDeliveryId: text("external_delivery_id"),
-    eventType: text("event_type").notNull(),
-    providerEventType: text("provider_event_type").notNull(),
-    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-    sourceOccurredAt: timestamp("source_occurred_at", { withTimezone: true, mode: "string" }),
-    sourceOrderKey: text("source_order_key"),
-    status: text("status")
-      .notNull()
-      .$type<IntegrationWebhookEventStatus>()
-      .default(IntegrationWebhookEventStatuses.RECEIVED),
-    resolvedUserId: text("resolved_user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
-    resolvedPrincipalId: text("resolved_principal_id").references(() => userExternalPrincipals.id, {
-      onDelete: "set null",
-    }),
-    finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" }),
-  },
-  (table) => [
-    uniqueIndex("integration_webhook_events_source_id_external_event_id_uidx").on(
-      table.integrationWebhookSourceId,
-      table.externalEventId,
-    ),
-    index("integration_webhook_events_organization_id_idx").on(table.organizationId),
-    index("integration_webhook_events_integration_connection_id_idx").on(
-      table.integrationConnectionId,
-    ),
-    index("integration_webhook_events_integration_webhook_source_id_idx").on(
-      table.integrationWebhookSourceId,
-    ),
-    index("integration_webhook_events_target_key_idx").on(table.targetKey),
-    index("integration_webhook_events_status_idx").on(table.status),
-    index("integration_webhook_events_event_type_idx").on(table.eventType),
-    index("integration_webhook_events_external_delivery_id_idx").on(table.externalDeliveryId),
-    index("integration_webhook_events_source_order_key_idx").on(table.sourceOrderKey),
-    index("integration_webhook_events_resolved_user_id_idx").on(table.resolvedUserId),
-    index("integration_webhook_events_resolved_principal_id_idx").on(table.resolvedPrincipalId),
-  ],
-);
+export function defineIntegrationWebhookEvents(schema: PgSchema) {
+  return schema.table(
+    "integration_webhook_events",
+    {
+      id: text("id")
+        .primaryKey()
+        .$defaultFn(() => typeid("iwe").toString()),
+      organizationId: text("organization_id")
+        .notNull()
+        .references(() => organizations.id, { onDelete: "cascade" }),
+      integrationConnectionId: text("integration_connection_id")
+        .notNull()
+        .references(() => integrationConnections.id, { onDelete: "cascade" }),
+      integrationWebhookSourceId: text("integration_webhook_source_id")
+        .notNull()
+        .references(() => integrationWebhookSources.id, { onDelete: "cascade" }),
+      targetKey: text("target_key")
+        .notNull()
+        .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
+      externalEventId: text("external_event_id").notNull(),
+      externalDeliveryId: text("external_delivery_id"),
+      eventType: text("event_type").notNull(),
+      providerEventType: text("provider_event_type").notNull(),
+      payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+      sourceOccurredAt: timestamp("source_occurred_at", { withTimezone: true, mode: "string" }),
+      sourceOrderKey: text("source_order_key"),
+      status: text("status")
+        .notNull()
+        .$type<IntegrationWebhookEventStatus>()
+        .default(IntegrationWebhookEventStatuses.RECEIVED),
+      resolvedUserId: text("resolved_user_id").references(() => users.id, {
+        onDelete: "set null",
+      }),
+      resolvedPrincipalId: text("resolved_principal_id").references(
+        () => userExternalPrincipals.id,
+        {
+          onDelete: "set null",
+        },
+      ),
+      finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" }),
+    },
+    (table) => [
+      uniqueIndex("integration_webhook_events_source_id_external_event_id_uidx").on(
+        table.integrationWebhookSourceId,
+        table.externalEventId,
+      ),
+      index("integration_webhook_events_organization_id_idx").on(table.organizationId),
+      index("integration_webhook_events_integration_connection_id_idx").on(
+        table.integrationConnectionId,
+      ),
+      index("integration_webhook_events_integration_webhook_source_id_idx").on(
+        table.integrationWebhookSourceId,
+      ),
+      index("integration_webhook_events_target_key_idx").on(table.targetKey),
+      index("integration_webhook_events_status_idx").on(table.status),
+      index("integration_webhook_events_event_type_idx").on(table.eventType),
+      index("integration_webhook_events_external_delivery_id_idx").on(table.externalDeliveryId),
+      index("integration_webhook_events_source_order_key_idx").on(table.sourceOrderKey),
+      index("integration_webhook_events_resolved_user_id_idx").on(table.resolvedUserId),
+      index("integration_webhook_events_resolved_principal_id_idx").on(table.resolvedPrincipalId),
+    ],
+  );
+}
+
+export const integrationWebhookEvents = defineIntegrationWebhookEvents(controlPlaneSchema);
 
 export type IntegrationWebhookEvent = typeof integrationWebhookEvents.$inferSelect;
 export type InsertIntegrationWebhookEvent = typeof integrationWebhookEvents.$inferInsert;

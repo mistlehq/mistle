@@ -1,8 +1,6 @@
 name: CI - System (Scheduled)
 
 on:
-  schedule:
-    - cron: "0 2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -162,7 +160,7 @@ jobs:
         run: |
           docker run --rm --platform linux/amd64 --entrypoint bash mistle-sandbox-base-check:local -lc '
             set -euo pipefail
-            for tool in cmddir mise sandboxd nix; do
+            for tool in cmddir mise sandboxd cat sed awk grep find rg; do
               command -v "$tool"
             done
           '

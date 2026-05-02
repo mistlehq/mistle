@@ -63,6 +63,14 @@
     "packages/storybook": {
       "ignoreDependencies": ["@mistle/ui", "streamdown"],
     },
+    "packages/test-harness": {
+      "ignoreDependencies": [
+        "@mistle/control-plane-api",
+        "@mistle/data-plane-api",
+        "@mistle/data-plane-gateway",
+        "@mistle/tokenizer-proxy",
+      ],
+    },
     "tests": {},
   },
   "ignoreFiles": [

@@ -12,7 +12,19 @@ type LoadDataPlaneGatewayConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.DATA_PLANE_GATEWAY>
 >;
 
-export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"];
+export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"] & {
+  /**
+   * Programmatic test-only isolation switch.
+   *
+   * This is intentionally not part of the public config schema or env loader,
+   * so deployment config cannot enable it accidentally. The integration harness
+   * sets it directly when a pooled gateway must select a per-test database
+   * schema from the test environment id on each request.
+   */
+  __dangerouslyEnableTestIsolation?: {
+    testEnvironmentIdHeader: string;
+  };
+};
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
 };
@@ -24,6 +36,7 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: DataPlaneGatewayConfig;
   db: DataPlaneDatabase;
+  testEnvironmentId?: string;
   sandboxTunnelAdmission?: AdmittedSandboxTunnelWebSocketRequest;
 };
 

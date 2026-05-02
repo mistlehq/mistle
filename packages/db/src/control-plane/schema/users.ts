@@ -1,21 +1,25 @@
-import { boolean, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { controlPlaneSchema } from "./namespace.js";
 
-export const users = controlPlaneSchema.table(
-  "users",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => typeid("usr").toString()),
-    name: text("name").notNull(),
-    email: text("email").notNull(),
-    emailVerified: boolean("email_verified").notNull().default(false),
-    image: text("image"),
-    imageObjectKey: text("image_object_key"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [uniqueIndex("users_email_uidx").on(table.email)],
-);
+export function defineUsers(schema: PgSchema) {
+  return schema.table(
+    "users",
+    {
+      id: text("id")
+        .primaryKey()
+        .$defaultFn(() => typeid("usr").toString()),
+      name: text("name").notNull(),
+      email: text("email").notNull(),
+      emailVerified: boolean("email_verified").notNull().default(false),
+      image: text("image"),
+      imageObjectKey: text("image_object_key"),
+      createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [uniqueIndex("users_email_uidx").on(table.email)],
+  );
+}
+
+export const users = defineUsers(controlPlaneSchema);

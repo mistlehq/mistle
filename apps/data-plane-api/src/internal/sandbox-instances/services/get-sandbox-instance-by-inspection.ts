@@ -3,8 +3,8 @@ import {
   SandboxInstancePurposes,
   SandboxInstanceStatuses,
   SandboxStopReasons,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import {
@@ -29,6 +29,7 @@ import {
 
 type GetSandboxInstanceByInspectionContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
   sandboxAdapter: SandboxAdapter;
   runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
   sandboxProvider: SandboxProvider;
@@ -56,12 +57,14 @@ async function readPersistedRuntimePlan(input: {
 type PersistedRuntimePlan = Awaited<ReturnType<typeof readPersistedRuntimePlan>>;
 
 async function markRunningSandboxInstanceStopped(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
     clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -89,11 +92,13 @@ async function markRunningSandboxInstanceStopped(
 }
 
 async function clearStoppedSandboxInstanceProviderSandboxId(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -122,13 +127,15 @@ const InspectionFailureCodes = {
 } as const;
 
 async function markStartingSandboxInstanceFailed(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -157,12 +164,14 @@ async function markStartingSandboxInstanceFailed(
 }
 
 async function markStartingSandboxInstanceStopped(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
     clearProviderSandboxId?: boolean;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -193,13 +202,15 @@ async function markStartingSandboxInstanceStopped(
 }
 
 async function markRunningSandboxInstanceFailed(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
@@ -228,13 +239,15 @@ async function markRunningSandboxInstanceFailed(
 }
 
 async function markStoppedSandboxInstanceFailed(
-  ctx: Pick<GetSandboxInstanceByInspectionContext, "db">,
+  ctx: Pick<GetSandboxInstanceByInspectionContext, "db" | "tables">,
   input: {
     sandboxInstanceId: string;
     failureCode: string;
     failureMessage: string;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
+
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({

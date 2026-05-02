@@ -1,7 +1,7 @@
 import {
-  sandboxInstances,
   SandboxInstancePurposes,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { and, eq, isNull } from "drizzle-orm";
@@ -16,12 +16,14 @@ const SandboxInstanceNotFoundErrorCode = "NOT_FOUND";
 
 type PatchSandboxInstanceTitleContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
 export async function patchSandboxInstanceTitle(
   ctx: PatchSandboxInstanceTitleContext,
   input: PatchSandboxInstanceTitleInput,
 ): Promise<PatchSandboxInstanceTitleResponse> {
+  const { sandboxInstances } = ctx.tables;
   const titlePredicate = input.onlyIfUnset === true ? isNull(sandboxInstances.title) : undefined;
   const [sandboxInstance] = await ctx.db
     .update(sandboxInstances)

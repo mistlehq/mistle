@@ -8,41 +8,55 @@ import {
 } from "@mistle/workflow-registry/data-plane";
 import { describe, expect, it } from "vitest";
 
-import { MaterializeSandboxProfileVersionSnapshotWorkflow } from "./materialize-sandbox-profile-version-snapshot/workflow.js";
-import { ReconcileSandboxInstanceWorkflow } from "./reconcile-sandbox-instance/workflow.js";
-import { ResumeSandboxInstanceWorkflow } from "./resume-sandbox-instance/workflow.js";
-import { HandleSandboxInstanceDeadlineWorkflow } from "./sandbox-instance-deadlines/workflow.js";
-import { StartSandboxInstanceWorkflow } from "./start-sandbox-instance/workflow.js";
-import { StopSandboxInstanceWorkflow } from "./stop-sandbox-instance/workflow.js";
+import { DataPlaneWorkerWorkflows } from "./workflows.js";
+
+const workflows = new Map(
+  DataPlaneWorkerWorkflows.map((workflow) => [workflow.spec.name, workflow]),
+);
 
 describe("data-plane worker openworkflow entrypoints", () => {
   it("preserves the start sandbox instance workflow identity", () => {
-    expect(StartSandboxInstanceWorkflow.spec).toMatchObject(StartSandboxInstanceWorkflowSpec);
-  });
-
-  it("preserves the snapshot materialization workflow identity", () => {
-    expect(MaterializeSandboxProfileVersionSnapshotWorkflow.spec).toMatchObject(
-      MaterializeSandboxProfileVersionSnapshotWorkflowSpec,
+    expect(readWorkflowSpec(StartSandboxInstanceWorkflowSpec.name)).toMatchObject(
+      StartSandboxInstanceWorkflowSpec,
     );
   });
 
+  it("preserves the snapshot materialization workflow identity", () => {
+    expect(
+      readWorkflowSpec(MaterializeSandboxProfileVersionSnapshotWorkflowSpec.name),
+    ).toMatchObject(MaterializeSandboxProfileVersionSnapshotWorkflowSpec);
+  });
+
   it("preserves the resume sandbox instance workflow identity", () => {
-    expect(ResumeSandboxInstanceWorkflow.spec).toMatchObject(ResumeSandboxInstanceWorkflowSpec);
+    expect(readWorkflowSpec(ResumeSandboxInstanceWorkflowSpec.name)).toMatchObject(
+      ResumeSandboxInstanceWorkflowSpec,
+    );
   });
 
   it("preserves the stop sandbox instance workflow identity", () => {
-    expect(StopSandboxInstanceWorkflow.spec).toMatchObject(StopSandboxInstanceWorkflowSpec);
+    expect(readWorkflowSpec(StopSandboxInstanceWorkflowSpec.name)).toMatchObject(
+      StopSandboxInstanceWorkflowSpec,
+    );
   });
 
   it("preserves the reconcile sandbox instance workflow identity", () => {
-    expect(ReconcileSandboxInstanceWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(ReconcileSandboxInstanceWorkflowSpec.name)).toMatchObject(
       ReconcileSandboxInstanceWorkflowSpec,
     );
   });
 
   it("preserves the handle sandbox instance deadline workflow identity", () => {
-    expect(HandleSandboxInstanceDeadlineWorkflow.spec).toMatchObject(
+    expect(readWorkflowSpec(HandleSandboxInstanceDeadlineWorkflowSpec.name)).toMatchObject(
       HandleSandboxInstanceDeadlineWorkflowSpec,
     );
   });
 });
+
+function readWorkflowSpec(name: string): unknown {
+  const workflow = workflows.get(name);
+  if (workflow === undefined) {
+    throw new Error(`Expected data-plane worker workflow ${name} to be registered.`);
+  }
+
+  return workflow.spec;
+}

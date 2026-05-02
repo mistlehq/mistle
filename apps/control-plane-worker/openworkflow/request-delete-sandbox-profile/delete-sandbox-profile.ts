@@ -1,12 +1,15 @@
-import { type ControlPlaneDatabase, sandboxProfiles, schedules } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/control-plane";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 export async function deleteSandboxProfile(
   ctx: {
     db: ControlPlaneDatabase;
+    tables: ControlPlaneTables;
   },
   input: { organizationId: string; profileId: string },
 ): Promise<void> {
+  const { sandboxProfiles, schedules } = ctx.tables;
+
   await ctx.db.transaction(async (tx) => {
     const refreshScheduleTargets =
       await tx.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({

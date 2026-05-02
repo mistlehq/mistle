@@ -38,6 +38,12 @@
       "import": "./src/testing/index.ts",
       "default": "./src/testing/index.ts"
     },
+    "./test-environment": {
+      "types": "./src/test-environment.ts",
+      "node": "./dist/test-environment.js",
+      "import": "./src/test-environment.ts",
+      "default": "./src/test-environment.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
@@ -61,7 +67,6 @@
     "typeid-js": "^1.2.0"
   },
   "devDependencies": {
-    "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "squawk-cli": "^2.46.0",

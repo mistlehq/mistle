@@ -6,12 +6,14 @@ import { route } from "./route.js";
 
 export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
+  const tables = ctx.get("resources").tables;
   const params = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
   const response = await deleteSandboxInstanceDeadline(
     {
       db,
+      tables,
     },
     {
       sandboxInstanceId: params.id,

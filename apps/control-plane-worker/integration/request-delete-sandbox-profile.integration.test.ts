@@ -3,6 +3,7 @@ import {
   automations,
   AutomationKinds,
   createControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
   organizations,
   sandboxProfileSnapshotRefreshScheduleTargets,
   sandboxProfiles,
@@ -100,6 +101,7 @@ describe("request delete sandbox profile", () => {
       await deleteSandboxProfile(
         {
           db: database.db,
+          tables: getControlPlaneDatabaseSchema(database.db),
         },
         {
           organizationId: "org_delete_profile_worker",

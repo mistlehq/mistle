@@ -22,11 +22,11 @@
 - Read `docs/development/no-mocking.md` before adding or changing tests.
 - Test **everything**. Tests must be rigorous. Our intent is ensuring a new person contributing to the same code base cannot break our stuff and that nothing slips by.
 - Unless the user asks otherwise, run only the tests you added or modified instead of the entire suite to avoid wasting time.
-- For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, `pnpm --filter <pkg> exec vitest run -c vitest.component.config.ts <file>` for package-local component runs, and `pnpm test:integration -- --project <project> <file>` for the root integration runner.
+- For targeted Vitest runs, prefer direct exec forms that pass file paths directly to Vitest. Use `pnpm --filter <pkg> exec vitest run -c <config> <file>` for package-local runs, `pnpm --filter <pkg> exec vitest run -c vitest.component.config.ts <file>` for package-local component runs, `pnpm --filter <pkg> exec vitest run -c vitest.integration-new.config.ts <file>` for new harness-backed integration tests, and `pnpm test:integration -- --project <project> <file>` for the legacy root integration runner.
 - In this repo, `pnpm --filter <pkg> test:integration -- <file>` does **not** reliably scope to that file. It forwards as `vitest run -c <config> -- <file>`, and Vitest treats that differently from a positional file filter. Use the direct `exec vitest ... <file>` form when you need a single-file package-level run.
 - Unit tests should be colocated / close to the source code and scoped to pure function/class/module behavior (no external dependencies)
 - Component tests should be colocated / close to the component or hook under test, named `*.component.test.ts` or `*.component.test.tsx`, and run through the package component Vitest config / `test:component` lane.
-- Integration tests should be in a dedicated integration/ folder for a given app or package.
+- Legacy integration tests live in a dedicated integration/ folder for a given app or package. New and migrated harness-backed integration tests live in the temporary integration-new/ lane until the legacy lane is fully retired.
 - System tests should be in a tests/system/ folder.
 - E2E tests should be in a tests/e2e/ folder.
 
@@ -54,23 +54,37 @@
 
 **Integration tests** (`*.integration.test.ts`):
 
-- Test a **single app/service** in isolation with its real dependencies (database, etc.)
-- Integration tests may include other services, but those dependencies must run out-of-process (containers/services), never in-process imports that blur boundaries
-- Import and call the app's code directly (e.g., `import { createApp } from "@mistle/control-plane-api/app.js"`)
-- Located in `apps/*/integration/` folders
-- Use real infrastructure (Postgres, etc.) but test the app as a unit
-- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, or Postgres plus any other required service for tests that need both).
-- When an integration test starts a local TCP service/runtime, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness/network`) so suites can run in parallel without `EADDRINUSE`.
-- Example: Testing auth routes by importing `createApp()` and making requests to it, verifying database state
+- Test one app/service as the primary subject, but compose any real Mistle services that are required for the behavior under test.
+- Integration tests may run multiple Mistle services. The boundary is the service process/API, not "exactly one app in memory". If the subject service normally talks to another service, prefer starting that service through `@mistle/test-harness` instead of replacing it with a test double.
+- Do not import another app's runtime directly from an app integration test. Cross-service dependencies must be started through the test environment registry so the dependency runs as a real service.
+- Before adding, changing, or migrating integration tests, read `packages/test-harness/src/environment/README.md`. It is the source of truth for the new integration harness API, fixture shape, service selection, runtime default, pooling behavior, and migration expectations.
+- New integration tests must use `@mistle/test-harness` through the temporary `integration-new/` lane. Use `createIntegrationTest(...)` from the harness; do not create app-local bespoke setup unless you are implementing harness support itself.
+- Do not spin up ad hoc HTTP servers, local handlers, or app-local doubles to emulate Mistle services. If a test needs a Mistle service, add/select that service through `createIntegrationTest(...)` so the real service runs with the harness-managed environment. Ad hoc HTTP servers are acceptable only when the behavior under test is explicitly about calling an external/non-Mistle upstream, such as an echo server or provider callback endpoint.
+- `@mistle/test-harness` may dynamically import selected integration service implementations behind `createIntegrationTest(...)` so small tests do not transform every Mistle app and worker runtime before fixtures start. Keep this exception inside the harness service loader; app/test code should still use ordinary static imports.
+- New integration tests must receive a single `{ env }` fixture. Do not expose many one-off fixture fields when they can be modeled under `env`.
+- Runtime mode is the default for Mistle services in the new integration lane. Do not use Docker mode for ordinary application behavior tests unless the test explicitly covers packaging/deployment-shape behavior.
+- Request every live service the test intentionally exercises. Service references in the registry are wiring/order hints only; they must not surprise-start extra services.
+- Keep test bodies at the scenario level: arrange the domain state, perform the user/service action, and assert the observable outcome. Move repetitive protocol mechanics, token minting, websocket choreography, polling, and cleanup into well-named file-local helpers so the test reads as behavior. Do not promote those helpers to public harness APIs until multiple real tests prove the abstraction is stable.
+- The default test environment policy is pooled physical infrastructure and pooled stateless services so full suites can run in parallel without excessive container or port churn. Use dangerous isolation only when the test truly needs to restart or mutate a service instance in a way that would affect other tests, and include a clear reason.
+- Infrastructure such as Postgres, PgBouncer, Valkey, and Mailpit is resolved from service dependencies under the hood. Tests should not hand-roll containers when a harness service declaration already describes the required infrastructure.
+- New or migrated harness-backed tests live in `apps/*/integration-new/` and run through the package's `vitest.integration-new.config.ts` / `test:integration:new` lane. This lane is temporary and exists so we can migrate progressively without destabilizing the old integration scaffolding.
+- Run all currently migrated harness-backed integration tests with `pnpm test:integration:new`. This root command owns one integration runner session so pooled infrastructure and pooled services can be shared across projects.
+- For `integration-new` subsets where pooling/timing behavior matters, still use the root runner: one package with `pnpm test:integration:new -- --project <pkg>`, or one file with `pnpm test:integration:new -- --project <pkg> <file>`.
+- Detailed harness phase timing is opt-in. Use `MISTLE_TEST_TIMING=1 pnpm test:integration:new ...` when diagnosing setup cost; normal runs should stay concise.
+- Direct package Vitest execution, such as `pnpm --filter <pkg> exec vitest run -c vitest.integration-new.config.ts <file>`, is only for focused local debugging. Do not use package-local direct execution as the canonical suite command or as evidence of full-suite pooling/timing behavior.
+- Existing tests in `apps/*/integration/` that use legacy per-file fixtures, bespoke Testcontainers setup, or direct in-process app runtimes are legacy. Do not copy their patterns into new tests. When changing those tests, prefer moving the touched coverage to `integration-new/`; keep legacy-only edits small and only when a migration would make the task materially larger.
+- When porting a legacy integration test, preserve the observable behavior being asserted, but move setup to the new harness path. App developers should select services and assert through `env`; harness internals should own service definitions, infra requirements, pooling, ports, and cleanup.
+- When an integration test starts any local TCP service/runtime outside the registry, do not hard-code shared ports like `3000` or `4000`. Reserve an ephemeral port instead (for example with `reserveAvailablePort({ host: "127.0.0.1" })` from `@mistle/test-harness`) so suites can run in parallel without `EADDRINUSE`.
+- Example: Testing data-plane API internal routes by selecting `services: ["data-plane-api"]` through the new harness fixture, then making HTTP requests through `env.dataPlaneApi`.
 
 **System tests** (`*.system.test.ts`):
 
-- Test **multiple services** working together via HTTP
-- Make HTTP requests to running services (do not import service code directly)
-- Located in `tests/system/` folder
-- Require services to be running and accessible via URLs (e.g., `CONTROL_PLANE_BASE_URL`, `DATA_PLANE_BASE_URL`)
-- **Infrastructure:** Services are typically started via Testcontainers by composing `@mistle/test-harness` primitives (for example app launchers in `src/apps/*` plus backing services). Tests receive service URLs via environment variables.
-- Example: Testing that control-plane and data-plane services both respond to health checks
+- Test cross-service behavior where the system, rather than one app, is the subject.
+- Make HTTP requests to running services (do not import service code directly).
+- Located in `tests/system/` folders.
+- Use system tests for full-stack smoke, packaging, deployment-shape, and end-to-end service interaction checks that cannot be expressed as an app integration test.
+- Do not put ordinary multi-service app behavior in system tests just because more than one service is involved. If one service is the subject and the other services are dependencies, prefer an integration test composed with `startTestEnvironment(...)`.
+- Example: Testing that a fully packaged control-plane/data-plane stack starts with the production-like entrypoints and exposes all expected health checks.
 
 **E2E tests** (`*.e2e.test.ts`):
 
@@ -85,17 +99,18 @@
 
 - Use **unit tests** for pure logic only: functions/classes/modules with no React rendering, browser DOM, provider runtime, network service, database, subprocess, or container dependency
 - Use **component tests** for React components, hooks, jsdom/browser behavior, Router/QueryClient provider behavior, and rendered/static component markup that does not require external services
-- Use **integration tests** when testing a single app's functionality with its dependencies
-- Use **system tests** when testing service-to-service interactions or multi-service health
+- Use **integration tests** when one app/service is the subject, even if the test composes additional real services as dependencies through `@mistle/test-harness`
+- Use **system tests** when the deployed multi-service system itself is the subject, especially packaging/deployment-shape behavior and broad smoke coverage
 - Use **E2E tests** when testing user-facing flows that require browser interaction
 - Use **property-based tests** for pure, input-rich logic where invariants across generated inputs provide stronger coverage than a small fixed set of examples
 - If a test requires external dependencies (database, network service, subprocess/container), it is not a unit or component test and should be moved to integration or above
 
-**Infrastructure with Testcontainers:**
+**Infrastructure and service composition:**
 
-- **Prefer Testcontainers for infrastructure in tests.** It provides isolated, reproducible infrastructure that matches production without requiring pre-configured services or shared state.
-- **Benefits:** Isolation (fresh infrastructure per test run), reproducibility (works the same locally and in CI), production-like (real infrastructure, not mocks), parallelization (multiple suites can run in parallel without conflicts).
-- **When Testcontainers might not be needed:** Unit tests that are pure (no infrastructure), or CI environments where equivalent real infrastructure is already provisioned and isolated for the run.
+- The environment harness from `@mistle/test-harness` is mandatory for new dependency-bearing integration tests. It dedupes physical infrastructure, gives each environment isolated logical state, pools stateless services by default, and exposes service handles with reusable clients. See `packages/test-harness/src/environment/README.md` for the public API and examples.
+- Prefer Testcontainers for infrastructure under the harness. App integration tests should not directly manage Testcontainers resources unless the registry does not yet model the dependency they need; if the registry is missing a dependency, add it to the registry instead of hand-rolling it in the test.
+- Keep tests parallel-safe by default. Avoid fixed ports, shared mutable databases, and per-test physical containers unless the test explicitly needs them.
+- When adding a new service dependency, declare it once in the test registry with its exact infra requirements. Do not make individual tests remember that, for example, a service needs Postgres, PgBouncer, Valkey, or Mailpit.
 
 ### Testing Exceptions
 
@@ -126,6 +141,8 @@
 
 - Prefer Drizzle's relational query API (`database.query.<table>.findFirst/findMany`) over raw `database.select(...)` unless you need SQL-level control.
 - In relational queries, prefer clause operator helpers from callback context (for example `where: (table, { eq, and }) => ...`) instead of importing operators directly from `drizzle-orm`.
+- Runtime app and worker code must not use static Drizzle table objects from `@mistle/db/control-plane` or `@mistle/db/data-plane` in query builders. Static tables bind to the default schema and bypass request/test-environment schema isolation. Use the relational query API when possible, or resolve the bound schema with `getControlPlaneDatabaseSchema(db)` / `getDataPlaneDatabaseSchema(db)` and use `tables.<tableName>` for inserts, updates, deletes, joins, and predicates.
+- Existing static-table usages are legacy debt guarded by the `mistle-db/no-static-db-tables-in-runtime` oxlint baseline. When touching nearby runtime DB code, actively migrate the touched path to bound schema tables and remove the corresponding baseline entry. Do not add new baseline entries unless the user explicitly approves a temporary exception.
 - Prefer `typeid` identifiers over UUIDs for application-generated IDs.
 - Prefer database-native timestamps for persisted rows: use schema defaults like `.defaultNow()` or SQL primitives like `` sql`now()` `` instead of `new Date()` values in insert/update payloads.
 
@@ -143,7 +160,7 @@
 - `any` and `as` are forbidden.
 - For identifier registries and constants maps, use PascalCase object names with UPPER_SNAKE_CASE keys (for example `AppIds.CONTROL_PLANE_API`), not camelCase key access patterns.
 - Check `node_modules` for external API type definitions instead of guessing.
-- **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports.
+- **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports. The only current exception is the `@mistle/test-harness` integration service loader documented above.
 - NEVER remove or downgrade code to fix type errors from outdated dependencies; upgrade the dependency instead.
 - Always ask before removing functionality or code that appears to be intentional.
 - If the app is for a browser, assume we use all modern browsers unless otherwise specified, we don't need most polyfills.

@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { createDataPlaneBackend } from "./client.js";
 import { loadDataPlaneWorkerConfig, type DataPlaneWorkerConfig } from "./config.js";
 
@@ -8,8 +10,14 @@ export type OpenWorkflowRuntime = {
 
 let openWorkflowRuntimePromise: Promise<OpenWorkflowRuntime> | undefined;
 let closeOpenWorkflowRuntimePromise: Promise<void> | undefined;
+const hostedOpenWorkflowRuntimeStorage = new AsyncLocalStorage<OpenWorkflowRuntime>();
 
 export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
+  const hostedRuntime = hostedOpenWorkflowRuntimeStorage.getStore();
+  if (hostedRuntime !== undefined) {
+    return Promise.resolve(hostedRuntime);
+  }
+
   if (openWorkflowRuntimePromise !== undefined) {
     return openWorkflowRuntimePromise;
   }
@@ -57,4 +65,11 @@ export async function closeOpenWorkflowRuntime(): Promise<void> {
   });
 
   await closeOpenWorkflowRuntimePromise;
+}
+
+export function withHostedOpenWorkflowRuntime<T>(
+  runtime: OpenWorkflowRuntime,
+  callback: () => Promise<T> | T,
+): Promise<T> | T {
+  return hostedOpenWorkflowRuntimeStorage.run(runtime, callback);
 }

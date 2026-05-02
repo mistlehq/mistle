@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,12 +9,18 @@ import { getContainerRuntimeClient } from "testcontainers";
 
 import { runCleanupTasks } from "../cleanup/index.js";
 import { isIgnorableContainerStopError } from "../docker/cleanup.js";
+import {
+  MISTLE_TEST_POOLING_ENV,
+  MISTLE_TEST_RUN_ID_ENV,
+  MISTLE_TEST_RUN_OWNER_PID_ENV,
+} from "../environment/runner-pool-session.js";
 import { createMailpitInbox, startMailpit, type MailpitService } from "./mailpit/index.js";
 import {
   startPostgresWithPgBouncer,
   type PostgresWithPgBouncerService,
   type StartPostgresWithPgBouncerInput,
 } from "./postgres/index.js";
+import { startValkey, type ValkeyService } from "./valkey/index.js";
 
 const STATE_FILE_VERSION = 1;
 const LOCK_POLL_INTERVAL_MS = 100;
@@ -31,6 +37,7 @@ const SharedInfraLockDirectoryPath = join(
 const SharedInfraLockInfoFilePath = join(SharedInfraLockDirectoryPath, "owner.json");
 
 export const DEFAULT_SHARED_INTEGRATION_INFRA_KEY = "mistle-integration-shared-v1";
+const DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY = "mistle-test-environment";
 const SharedInfraDebugEnabled = process.env["MISTLE_SHARED_INFRA_DEBUG"] === "1";
 
 function sharedInfraDebug(message: string): void {
@@ -38,6 +45,55 @@ function sharedInfraDebug(message: string): void {
     return;
   }
   console.error(`[shared-infra] ${message}`);
+}
+
+function formatDuration(milliseconds: number): string {
+  return `${(milliseconds / 1000).toFixed(2)}s`;
+}
+
+function addTiming(timings: Map<string, number>, label: string, milliseconds: number): void {
+  timings.set(label, (timings.get(label) ?? 0) + milliseconds);
+}
+
+async function measure<T>(
+  timings: Map<string, number>,
+  label: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const startedAt = systemClock.nowMs();
+  try {
+    return await callback();
+  } finally {
+    addTiming(timings, label, systemClock.nowMs() - startedAt);
+  }
+}
+
+function writeSharedInfraTimingSummary(input: {
+  operation: string;
+  key: string;
+  timings: Map<string, number>;
+}): void {
+  if (process.env["MISTLE_TEST_TIMING"] !== "1" || input.timings.size === 0) {
+    return;
+  }
+
+  const phases = [...input.timings.entries()]
+    .map(([label, milliseconds]) => `${label}=${formatDuration(milliseconds)}`)
+    .join(", ");
+  process.stderr.write(
+    `[integration-new] shared infra ${input.operation} ${input.key}: ${phases}.\n`,
+  );
+}
+
+export function createTestEnvironmentSharedInfraKey(
+  environment: NodeJS.ProcessEnv = process.env,
+): string {
+  const testRunId = environment[MISTLE_TEST_RUN_ID_ENV];
+  if (testRunId === undefined || testRunId.length === 0) {
+    return DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY;
+  }
+
+  return `${DEFAULT_TEST_ENVIRONMENT_SHARED_INFRA_KEY}:${testRunId}`;
 }
 
 type PostgresRequestConfig = Omit<
@@ -65,14 +121,23 @@ type PersistedMailpitInfra = {
   runtimeMetadata: MailpitService["runtimeMetadata"];
 };
 
+type PersistedValkeyInfra = {
+  host: string;
+  port: number;
+  url: string;
+  runtimeMetadata: ValkeyService["runtimeMetadata"];
+};
+
 type PersistedLease = {
   ownerPid: number;
+  ownerId: string | undefined;
   createdAt: number;
 };
 
 type PersistedSharedInfraEntry = {
   postgres: PersistedPostgresInfra | undefined;
   mailpit: PersistedMailpitInfra | undefined;
+  valkey: PersistedValkeyInfra | undefined;
   leases: Record<string, PersistedLease>;
 };
 
@@ -85,15 +150,24 @@ type SharedInfraRequest = {
   key: string;
   postgres: PostgresRequestConfig | undefined;
   mailpit: boolean;
+  valkey: boolean;
 };
 
 export type SharedInfraCoordinatorLease = {
   infra: {
     postgres: PostgresWithPgBouncerService | undefined;
     mailpit: MailpitService | undefined;
+    valkey: ValkeyService | undefined;
     containerHostGateway: string;
   };
   release: () => Promise<void>;
+};
+
+type LeaseOwner = {
+  leaseId: string;
+  ownerPid: number;
+  ownerId: string | undefined;
+  runnerOwned: boolean;
 };
 
 const TESTCONTAINERS_HOST_GATEWAY = "host.docker.internal";
@@ -215,12 +289,18 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
       }
       leases[leaseId] = {
         ownerPid,
+        ownerId: readRecordString(
+          leaseRecordValue,
+          "ownerId",
+          `shared infra lease ${leaseId} ownerId`,
+        ),
         createdAt,
       };
     }
 
     const postgresValue = value["postgres"];
     const mailpitValue = value["mailpit"];
+    const valkeyValue = value["valkey"];
 
     const postgres =
       postgresValue === undefined
@@ -433,9 +513,61 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
             } satisfies PersistedMailpitInfra;
           })();
 
+    const valkey =
+      valkeyValue === undefined
+        ? undefined
+        : (() => {
+            if (!isRecord(valkeyValue)) {
+              throw new Error(`Shared infra valkey entry for key ${key} must be an object.`);
+            }
+
+            const host = readRecordString(
+              valkeyValue,
+              "host",
+              `shared infra valkey host for key ${key}`,
+            );
+            const port = readRecordNumber(
+              valkeyValue,
+              "port",
+              `shared infra valkey port for key ${key}`,
+            );
+            const url = readRecordString(
+              valkeyValue,
+              "url",
+              `shared infra valkey url for key ${key}`,
+            );
+            const runtimeMetadata = valkeyValue["runtimeMetadata"];
+            if (
+              host === undefined ||
+              port === undefined ||
+              url === undefined ||
+              !isRecord(runtimeMetadata)
+            ) {
+              throw new Error(`Shared infra valkey entry for key ${key} is missing fields.`);
+            }
+            const containerId = readRecordString(
+              runtimeMetadata,
+              "containerId",
+              `shared infra valkey runtime containerId for key ${key}`,
+            );
+            if (containerId === undefined) {
+              throw new Error(`Shared infra valkey runtime containerId for key ${key} is missing.`);
+            }
+
+            return {
+              host,
+              port,
+              url,
+              runtimeMetadata: {
+                containerId,
+              },
+            } satisfies PersistedValkeyInfra;
+          })();
+
     entries[key] = {
       postgres,
       mailpit,
+      valkey,
       leases,
     };
   }
@@ -460,7 +592,13 @@ async function readPersistedState(): Promise<PersistedSharedInfraState> {
 
 async function writePersistedState(state: PersistedSharedInfraState): Promise<void> {
   await mkdir(SharedInfraRootDirectoryPath, { recursive: true });
-  await writeFile(SharedInfraStateFilePath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  await writeJsonFileAtomic(SharedInfraStateFilePath, state);
+}
+
+async function writeJsonFileAtomic(filePath: string, value: unknown): Promise<void> {
+  const temporaryFilePath = `${filePath}.${process.pid}.${systemClock.nowMs()}.${randomUUID()}.tmp`;
+  await writeFile(temporaryFilePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await rename(temporaryFilePath, filePath);
 }
 
 async function readLockOwnerPid(): Promise<number | undefined> {
@@ -495,11 +633,10 @@ async function acquireStateFileLock(): Promise<() => Promise<void>> {
       sharedInfraDebug("lock: creating lock directory");
       await mkdir(SharedInfraLockDirectoryPath);
       sharedInfraDebug("lock: writing lock owner info");
-      await writeFile(
-        SharedInfraLockInfoFilePath,
-        `${JSON.stringify({ pid: process.pid, createdAt: systemClock.nowMs() })}\n`,
-        "utf8",
-      );
+      await writeJsonFileAtomic(SharedInfraLockInfoFilePath, {
+        pid: process.pid,
+        createdAt: systemClock.nowMs(),
+      });
       const cleanupOnProcessExit = (): void => {
         try {
           rmSync(SharedInfraLockDirectoryPath, { recursive: true, force: true });
@@ -533,13 +670,25 @@ async function acquireStateFileLock(): Promise<() => Promise<void>> {
   );
 }
 
-async function withStateFileLock<T>(callback: () => Promise<T>): Promise<T> {
-  const releaseLock = await acquireStateFileLock();
+async function withStateFileLock<T>(
+  callback: () => Promise<T>,
+  timings?: Map<string, number>,
+): Promise<T> {
+  const releaseLock =
+    timings === undefined
+      ? await acquireStateFileLock()
+      : await measure(timings, "state-lock", acquireStateFileLock);
   try {
     sharedInfraDebug("lock: running callback");
-    return await callback();
+    return timings === undefined
+      ? await callback()
+      : await measure(timings, "state-mutation", callback);
   } finally {
-    await releaseLock();
+    if (timings === undefined) {
+      await releaseLock();
+    } else {
+      await measure(timings, "state-unlock", releaseLock);
+    }
     sharedInfraDebug("lock: released");
   }
 }
@@ -575,6 +724,18 @@ function createMailpitServiceView(input: PersistedMailpitInfra): MailpitService 
     runtimeMetadata: input.runtimeMetadata,
     stop: async () => {
       throw new Error("Shared mailpit infra is coordinator-managed. Use lease.release().");
+    },
+  };
+}
+
+function createValkeyServiceView(input: PersistedValkeyInfra): ValkeyService {
+  return {
+    host: input.host,
+    port: input.port,
+    url: input.url,
+    runtimeMetadata: input.runtimeMetadata,
+    stop: async () => {
+      throw new Error("Shared valkey infra is coordinator-managed. Use lease.release().");
     },
   };
 }
@@ -636,6 +797,11 @@ async function stopPersistedInfraEntry(
     tasks.push(async () => stopContainerById(mailpit.runtimeMetadata.containerId));
   }
 
+  if (input.valkey !== undefined) {
+    const valkey = input.valkey;
+    tasks.push(async () => stopContainerById(valkey.runtimeMetadata.containerId));
+  }
+
   if (input.postgres !== undefined) {
     const postgres = input.postgres;
     tasks.push(async () => stopContainerById(postgres.runtimeMetadata.pgbouncerContainerId));
@@ -694,6 +860,7 @@ function getOrCreateEntry(
   const created: PersistedSharedInfraEntry = {
     postgres: undefined,
     mailpit: undefined,
+    valkey: undefined,
     leases: {},
   };
   state.entries[key] = created;
@@ -704,6 +871,7 @@ async function ensureEntryInfraForRequest(
   entry: PersistedSharedInfraEntry,
   request: SharedInfraRequest,
   key: string,
+  timings: Map<string, number>,
 ): Promise<void> {
   const startupCleanupTasks: Array<() => Promise<void>> = [];
   const sharedLabels = {
@@ -722,14 +890,16 @@ async function ensureEntryInfraForRequest(
         }
       } else {
         sharedInfraDebug(`startup: starting postgres for key=${key}`);
-        const postgres = await startPostgresWithPgBouncer({
-          ...request.postgres,
-          manageProcessCleanup: false,
-          containerLabels: {
-            ...sharedLabels,
-            [SHARED_INFRA_SERVICE_LABEL]: "postgres",
-          },
-        });
+        const postgres = await measure(timings, "start-postgres", async () =>
+          startPostgresWithPgBouncer({
+            ...request.postgres,
+            manageProcessCleanup: false,
+            containerLabels: {
+              ...sharedLabels,
+              [SHARED_INFRA_SERVICE_LABEL]: "postgres",
+            },
+          }),
+        );
         startupCleanupTasks.unshift(async () => postgres.stop());
         sharedInfraDebug(`startup: started postgres for key=${key}`);
 
@@ -747,13 +917,15 @@ async function ensureEntryInfraForRequest(
     if (request.mailpit) {
       if (entry.mailpit === undefined) {
         sharedInfraDebug(`startup: starting mailpit for key=${key}`);
-        const mailpit = await startMailpit({
-          manageProcessCleanup: false,
-          containerLabels: {
-            ...sharedLabels,
-            [SHARED_INFRA_SERVICE_LABEL]: "mailpit",
-          },
-        });
+        const mailpit = await measure(timings, "start-mailpit", async () =>
+          startMailpit({
+            manageProcessCleanup: false,
+            containerLabels: {
+              ...sharedLabels,
+              [SHARED_INFRA_SERVICE_LABEL]: "mailpit",
+            },
+          }),
+        );
         startupCleanupTasks.unshift(async () => mailpit.stop());
         sharedInfraDebug(`startup: started mailpit for key=${key}`);
 
@@ -762,6 +934,30 @@ async function ensureEntryInfraForRequest(
           smtpPort: mailpit.smtpPort,
           httpBaseUrl: mailpit.httpBaseUrl,
           runtimeMetadata: mailpit.runtimeMetadata,
+        };
+      }
+    }
+
+    if (request.valkey) {
+      if (entry.valkey === undefined) {
+        sharedInfraDebug(`startup: starting valkey for key=${key}`);
+        const valkey = await measure(timings, "start-valkey", async () =>
+          startValkey({
+            manageProcessCleanup: false,
+            containerLabels: {
+              ...sharedLabels,
+              [SHARED_INFRA_SERVICE_LABEL]: "valkey",
+            },
+          }),
+        );
+        startupCleanupTasks.unshift(async () => valkey.stop());
+        sharedInfraDebug(`startup: started valkey for key=${key}`);
+
+        entry.valkey = {
+          host: valkey.host,
+          port: valkey.port,
+          url: valkey.url,
+          runtimeMetadata: valkey.runtimeMetadata,
         };
       }
     }
@@ -780,57 +976,115 @@ function validateKey(key: string): void {
   }
 }
 
+function resolveLeaseOwner(environment: NodeJS.ProcessEnv): LeaseOwner {
+  const testPooling = environment[MISTLE_TEST_POOLING_ENV];
+  const testRunId = environment[MISTLE_TEST_RUN_ID_ENV];
+  const ownerPidValue = environment[MISTLE_TEST_RUN_OWNER_PID_ENV];
+
+  if (
+    testPooling === "1" &&
+    testRunId !== undefined &&
+    testRunId.length > 0 &&
+    ownerPidValue !== undefined &&
+    ownerPidValue.length > 0
+  ) {
+    const ownerPid = Number(ownerPidValue);
+    if (!Number.isInteger(ownerPid) || ownerPid <= 0) {
+      throw new Error(
+        `Expected ${MISTLE_TEST_RUN_OWNER_PID_ENV} to contain a positive integer process id.`,
+      );
+    }
+
+    const ownerId = createRunnerSharedInfraOwnerId(testRunId);
+    return {
+      leaseId: ownerId,
+      ownerPid,
+      ownerId,
+      runnerOwned: true,
+    };
+  }
+
+  return {
+    leaseId: randomUUID(),
+    ownerPid: process.pid,
+    ownerId: undefined,
+    runnerOwned: false,
+  };
+}
+
+function createRunnerSharedInfraOwnerId(testRunId: string): string {
+  return `runner:${testRunId}`;
+}
+
 export async function acquireSharedInfraCoordinatorLease(
   request: SharedInfraRequest,
 ): Promise<SharedInfraCoordinatorLease> {
   validateKey(request.key);
-  if (request.postgres === undefined && !request.mailpit) {
-    throw new Error("Shared infra request must require postgres and/or mailpit.");
+  if (request.postgres === undefined && !request.mailpit && !request.valkey) {
+    throw new Error("Shared infra request must require postgres, mailpit, and/or valkey.");
   }
 
-  const leaseId = randomUUID();
-  sharedInfraDebug(`lease: acquiring key=${request.key} leaseId=${leaseId}`);
+  const leaseOwner = resolveLeaseOwner(process.env);
+  sharedInfraDebug(`lease: acquiring key=${request.key} leaseId=${leaseOwner.leaseId}`);
 
+  const acquireTimings = new Map<string, number>();
   const infraView = await withStateFileLock(async () => {
     sharedInfraDebug(`lease: reading state key=${request.key}`);
-    const state = await readPersistedState();
+    const state = await measure(acquireTimings, "read-state", readPersistedState);
     const entry = getOrCreateEntry(state, request.key);
 
-    pruneDeadLeases(entry);
+    await measure(acquireTimings, "prune-dead-leases", async () => {
+      pruneDeadLeases(entry);
+    });
 
     if (
       Object.keys(entry.leases).length === 0 &&
-      (entry.postgres !== undefined || entry.mailpit !== undefined)
+      (entry.postgres !== undefined || entry.mailpit !== undefined || entry.valkey !== undefined)
     ) {
-      await stopPersistedInfraEntry(entry, request.key);
+      await measure(acquireTimings, "stop-unleased-entry", async () =>
+        stopPersistedInfraEntry(entry, request.key),
+      );
       entry.postgres = undefined;
       entry.mailpit = undefined;
+      entry.valkey = undefined;
     }
     if (
       Object.keys(entry.leases).length === 0 &&
       entry.postgres === undefined &&
-      entry.mailpit === undefined
+      entry.mailpit === undefined &&
+      entry.valkey === undefined
     ) {
-      await cleanupOrphanedLabeledContainers(request.key);
+      await measure(acquireTimings, "cleanup-orphans", async () =>
+        cleanupOrphanedLabeledContainers(request.key),
+      );
     }
 
-    await ensureEntryInfraForRequest(entry, request, request.key);
+    await measure(acquireTimings, "ensure-infra", async () =>
+      ensureEntryInfraForRequest(entry, request, request.key, acquireTimings),
+    );
     sharedInfraDebug(`lease: infra ready key=${request.key}`);
 
-    entry.leases[leaseId] = {
-      ownerPid: process.pid,
+    entry.leases[leaseOwner.leaseId] = {
+      ownerPid: leaseOwner.ownerPid,
+      ownerId: leaseOwner.ownerId,
       createdAt: systemClock.nowMs(),
     };
 
-    await writePersistedState(state);
+    await measure(acquireTimings, "write-state", async () => writePersistedState(state));
     sharedInfraDebug(`lease: state persisted key=${request.key}`);
 
     return {
       postgres:
         entry.postgres === undefined ? undefined : createPostgresServiceView(entry.postgres),
       mailpit: entry.mailpit === undefined ? undefined : createMailpitServiceView(entry.mailpit),
+      valkey: entry.valkey === undefined ? undefined : createValkeyServiceView(entry.valkey),
       containerHostGateway: TESTCONTAINERS_HOST_GATEWAY,
     };
+  }, acquireTimings);
+  writeSharedInfraTimingSummary({
+    operation: "acquire",
+    key: request.key,
+    timings: acquireTimings,
   });
 
   let released = false;
@@ -838,46 +1092,112 @@ export async function acquireSharedInfraCoordinatorLease(
   return {
     infra: infraView,
     release: async () => {
+      if (leaseOwner.runnerOwned) {
+        return;
+      }
       if (released) {
         throw new Error(`Shared infra key ${request.key} lease was already released.`);
       }
       released = true;
 
+      const releaseTimings = new Map<string, number>();
       await withStateFileLock(async () => {
-        sharedInfraDebug(`lease: releasing key=${request.key} leaseId=${leaseId}`);
-        const state = await readPersistedState();
+        sharedInfraDebug(`lease: releasing key=${request.key} leaseId=${leaseOwner.leaseId}`);
+        const state = await measure(releaseTimings, "read-state", readPersistedState);
         const entry = state.entries[request.key];
         if (entry === undefined) {
           throw new Error(`Shared infra key ${request.key} has no persisted entry during release.`);
         }
 
-        pruneDeadLeases(entry);
+        await measure(releaseTimings, "prune-dead-leases", async () => {
+          pruneDeadLeases(entry);
+        });
 
-        if (entry.leases[leaseId] === undefined) {
+        if (entry.leases[leaseOwner.leaseId] === undefined) {
           throw new Error(
-            `Shared infra key ${request.key} lease ${leaseId} was not found during release.`,
+            `Shared infra key ${request.key} lease ${leaseOwner.leaseId} was not found during release.`,
           );
         }
 
-        delete entry.leases[leaseId];
+        delete entry.leases[leaseOwner.leaseId];
 
         let stopError: Error | undefined;
         if (Object.keys(entry.leases).length === 0) {
           try {
-            await stopPersistedInfraEntry(entry, request.key);
+            await measure(releaseTimings, "stop-entry", async () =>
+              stopPersistedInfraEntry(entry, request.key),
+            );
           } catch (error) {
             stopError = error instanceof Error ? error : new Error(String(error));
           }
           delete state.entries[request.key];
         }
 
-        await writePersistedState(state);
+        await measure(releaseTimings, "write-state", async () => writePersistedState(state));
         sharedInfraDebug(`lease: release persisted key=${request.key}`);
 
         if (stopError !== undefined) {
           throw stopError;
         }
+      }, releaseTimings);
+      writeSharedInfraTimingSummary({
+        operation: "release",
+        key: request.key,
+        timings: releaseTimings,
       });
     },
   };
+}
+
+export async function stopSharedInfraForTestRun(testRunId: string): Promise<void> {
+  if (testRunId.length === 0) {
+    throw new Error("Test run id must be non-empty.");
+  }
+
+  const ownerId = createRunnerSharedInfraOwnerId(testRunId);
+  const cleanupTimings = new Map<string, number>();
+
+  await withStateFileLock(async () => {
+    const state = await measure(cleanupTimings, "read-state", readPersistedState);
+    const stopErrors: Error[] = [];
+
+    for (const [key, entry] of Object.entries(state.entries)) {
+      for (const [leaseId, lease] of Object.entries(entry.leases)) {
+        if (lease.ownerId === ownerId) {
+          delete entry.leases[leaseId];
+        }
+      }
+
+      await measure(cleanupTimings, "prune-dead-leases", async () => {
+        pruneDeadLeases(entry);
+      });
+
+      if (Object.keys(entry.leases).length > 0) {
+        continue;
+      }
+
+      try {
+        await measure(cleanupTimings, `stop-entry:${key}`, async () =>
+          stopPersistedInfraEntry(entry, key),
+        );
+      } catch (error) {
+        stopErrors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+      delete state.entries[key];
+    }
+
+    await measure(cleanupTimings, "write-state", async () => writePersistedState(state));
+
+    if (stopErrors.length > 0) {
+      throw new AggregateError(
+        stopErrors,
+        `Failed to stop shared infra for test run ${testRunId}.`,
+      );
+    }
+  }, cleanupTimings);
+  writeSharedInfraTimingSummary({
+    operation: "cleanup",
+    key: testRunId,
+    timings: cleanupTimings,
+  });
 }

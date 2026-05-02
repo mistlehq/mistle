@@ -9,80 +9,124 @@ import { integrationWebhookSources } from "./integration-webhook-sources.js";
 import { userExternalPrincipals } from "./user-external-principals.js";
 import { users } from "./users.js";
 
-export const integrationConnectionsRelations = relations(
-  integrationConnections,
-  ({ many, one }) => ({
-    target: one(integrationTargets, {
-      fields: [integrationConnections.targetKey],
-      references: [integrationTargets.targetKey],
+export function defineIntegrationConnectionRelations(input: {
+  integrationConnectionResourceStates: typeof integrationConnectionResourceStates;
+  integrationConnectionResources: typeof integrationConnectionResources;
+  integrationConnections: typeof integrationConnections;
+  integrationTargets: typeof integrationTargets;
+  integrationWebhookEvents: typeof integrationWebhookEvents;
+  integrationWebhookSources: typeof integrationWebhookSources;
+  userExternalPrincipals: typeof userExternalPrincipals;
+  users: typeof users;
+}) {
+  const integrationConnectionsRelations = relations(
+    input.integrationConnections,
+    ({ many, one }) => ({
+      target: one(input.integrationTargets, {
+        fields: [input.integrationConnections.targetKey],
+        references: [input.integrationTargets.targetKey],
+      }),
+      resources: many(input.integrationConnectionResources),
+      resourceStates: many(input.integrationConnectionResourceStates),
+      webhookEvents: many(input.integrationWebhookEvents),
+      webhookSources: many(input.integrationWebhookSources),
     }),
-    resources: many(integrationConnectionResources),
-    resourceStates: many(integrationConnectionResourceStates),
-    webhookEvents: many(integrationWebhookEvents),
-    webhookSources: many(integrationWebhookSources),
-  }),
-);
+  );
 
-export const integrationConnectionResourcesRelations = relations(
-  integrationConnectionResources,
-  ({ one }) => ({
-    connection: one(integrationConnections, {
-      fields: [integrationConnectionResources.connectionId],
-      references: [integrationConnections.id],
+  const integrationConnectionResourcesRelations = relations(
+    input.integrationConnectionResources,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationConnectionResources.connectionId],
+        references: [input.integrationConnections.id],
+      }),
     }),
-  }),
-);
+  );
 
-export const integrationConnectionResourceStatesRelations = relations(
+  const integrationConnectionResourceStatesRelations = relations(
+    input.integrationConnectionResourceStates,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationConnectionResourceStates.connectionId],
+        references: [input.integrationConnections.id],
+      }),
+    }),
+  );
+
+  const integrationTargetsRelations = relations(input.integrationTargets, ({ many }) => ({
+    connections: many(input.integrationConnections),
+    webhookEvents: many(input.integrationWebhookEvents),
+    webhookSources: many(input.integrationWebhookSources),
+  }));
+
+  const integrationWebhookEventsRelations = relations(
+    input.integrationWebhookEvents,
+    ({ one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationWebhookEvents.integrationConnectionId],
+        references: [input.integrationConnections.id],
+      }),
+      resolvedPrincipal: one(input.userExternalPrincipals, {
+        fields: [input.integrationWebhookEvents.resolvedPrincipalId],
+        references: [input.userExternalPrincipals.id],
+      }),
+      resolvedUser: one(input.users, {
+        fields: [input.integrationWebhookEvents.resolvedUserId],
+        references: [input.users.id],
+      }),
+      source: one(input.integrationWebhookSources, {
+        fields: [input.integrationWebhookEvents.integrationWebhookSourceId],
+        references: [input.integrationWebhookSources.id],
+      }),
+      target: one(input.integrationTargets, {
+        fields: [input.integrationWebhookEvents.targetKey],
+        references: [input.integrationTargets.targetKey],
+      }),
+    }),
+  );
+
+  const integrationWebhookSourcesRelations = relations(
+    input.integrationWebhookSources,
+    ({ many, one }) => ({
+      connection: one(input.integrationConnections, {
+        fields: [input.integrationWebhookSources.integrationConnectionId],
+        references: [input.integrationConnections.id],
+      }),
+      events: many(input.integrationWebhookEvents),
+      target: one(input.integrationTargets, {
+        fields: [input.integrationWebhookSources.targetKey],
+        references: [input.integrationTargets.targetKey],
+      }),
+    }),
+  );
+
+  return {
+    integrationConnectionResourcesRelations,
+    integrationConnectionResourceStatesRelations,
+    integrationConnectionsRelations,
+    integrationTargetsRelations,
+    integrationWebhookEventsRelations,
+    integrationWebhookSourcesRelations,
+  };
+}
+
+const defaultRelations = defineIntegrationConnectionRelations({
   integrationConnectionResourceStates,
-  ({ one }) => ({
-    connection: one(integrationConnections, {
-      fields: [integrationConnectionResourceStates.connectionId],
-      references: [integrationConnections.id],
-    }),
-  }),
-);
-
-export const integrationTargetsRelations = relations(integrationTargets, ({ many }) => ({
-  connections: many(integrationConnections),
-  webhookEvents: many(integrationWebhookEvents),
-  webhookSources: many(integrationWebhookSources),
-}));
-
-export const integrationWebhookEventsRelations = relations(integrationWebhookEvents, ({ one }) => ({
-  connection: one(integrationConnections, {
-    fields: [integrationWebhookEvents.integrationConnectionId],
-    references: [integrationConnections.id],
-  }),
-  resolvedPrincipal: one(userExternalPrincipals, {
-    fields: [integrationWebhookEvents.resolvedPrincipalId],
-    references: [userExternalPrincipals.id],
-  }),
-  resolvedUser: one(users, {
-    fields: [integrationWebhookEvents.resolvedUserId],
-    references: [users.id],
-  }),
-  source: one(integrationWebhookSources, {
-    fields: [integrationWebhookEvents.integrationWebhookSourceId],
-    references: [integrationWebhookSources.id],
-  }),
-  target: one(integrationTargets, {
-    fields: [integrationWebhookEvents.targetKey],
-    references: [integrationTargets.targetKey],
-  }),
-}));
-
-export const integrationWebhookSourcesRelations = relations(
+  integrationConnectionResources,
+  integrationConnections,
+  integrationTargets,
+  integrationWebhookEvents,
   integrationWebhookSources,
-  ({ many, one }) => ({
-    connection: one(integrationConnections, {
-      fields: [integrationWebhookSources.integrationConnectionId],
-      references: [integrationConnections.id],
-    }),
-    events: many(integrationWebhookEvents),
-    target: one(integrationTargets, {
-      fields: [integrationWebhookSources.targetKey],
-      references: [integrationTargets.targetKey],
-    }),
-  }),
-);
+  userExternalPrincipals,
+  users,
+});
+
+export const integrationConnectionsRelations = defaultRelations.integrationConnectionsRelations;
+export const integrationConnectionResourcesRelations =
+  defaultRelations.integrationConnectionResourcesRelations;
+export const integrationConnectionResourceStatesRelations =
+  defaultRelations.integrationConnectionResourceStatesRelations;
+export const integrationTargetsRelations = defaultRelations.integrationTargetsRelations;
+export const integrationWebhookEventsRelations = defaultRelations.integrationWebhookEventsRelations;
+export const integrationWebhookSourcesRelations =
+  defaultRelations.integrationWebhookSourcesRelations;

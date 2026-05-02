@@ -1,5 +1,8 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import type { MistleLogger } from "@mistle/logging";
 import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
 import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
@@ -9,12 +12,14 @@ import { logger } from "../../logger.js";
 import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
-import { getOpenWorkflowRuntime } from "./runtime.js";
+import { getOpenWorkflowRuntime, type OpenWorkflowRuntime } from "./runtime.js";
 import {
   createSandboxRuntimeAdapter,
   createSandboxRuntimeControl,
 } from "./sandbox-runtime-adapter.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "./tunnel-token-durations.js";
+
+const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
 export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
@@ -33,9 +38,20 @@ export type WorkflowContext = {
   sleeper: Sleeper;
 };
 
+export type WorkflowTestIsolation = {
+  testEnvironmentId: string;
+  testEnvironmentIdHeader: string;
+};
+
+export type HostedWorkflowContext = {
+  context: WorkflowContext;
+  close: () => Promise<void>;
+};
+
 let workflowContextPromise: Promise<WorkflowContext> | undefined;
 let closeWorkflowContextPromise: Promise<void> | undefined;
 let shutdownHandlersRegistered = false;
+const hostedWorkflowContextStorage = new AsyncLocalStorage<WorkflowContext>();
 
 function createDefaultTunnelReadinessPolicy(): {
   timeoutMs: number;
@@ -52,53 +68,115 @@ function createDefaultTunnelReadinessPolicy(): {
   };
 }
 
-async function createWorkflowContext(): Promise<WorkflowContext> {
-  const { workerConfig } = await getOpenWorkflowRuntime();
+async function createWorkflowContext(input?: {
+  runtime?: OpenWorkflowRuntime;
+  testIsolation?: WorkflowTestIsolation;
+  dbPool?: Pool;
+}): Promise<HostedWorkflowContext> {
+  const { workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
   const config = createDataPlaneWorkerRuntimeConfig({ app: workerConfig });
-  const dbPool = new Pool({
-    connectionString: workerConfig.database.url,
-  });
+  const testIsolation = input?.testIsolation ?? readTestIsolationEnv();
+  const dbPool =
+    input?.dbPool ??
+    new Pool({
+      connectionString: workerConfig.database.url,
+    });
+  const ownsDbPool = input?.dbPool === undefined;
   let sandboxRuntimeControl: SandboxRuntimeControl | undefined;
 
   try {
     sandboxRuntimeControl = createSandboxRuntimeControl(config);
-    const controlPlaneInternalClient = new ControlPlaneInternalClient({
-      baseUrl: workerConfig.controlPlaneApi.baseUrl,
-      internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
-    });
+    const hostedSandboxRuntimeControl = sandboxRuntimeControl;
+    const controlPlaneInternalClient =
+      testIsolation === undefined
+        ? new ControlPlaneInternalClient({
+            baseUrl: workerConfig.controlPlaneApi.baseUrl,
+            internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
+          })
+        : new ControlPlaneInternalClient({
+            baseUrl: workerConfig.controlPlaneApi.baseUrl,
+            internalAuthServiceToken: workerConfig.internalAuth.serviceToken,
+            testEnvironmentId: testIsolation.testEnvironmentId,
+            testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+          });
+    const db =
+      testIsolation === undefined
+        ? createDataPlaneDatabase(dbPool)
+        : createDataPlaneDatabase(dbPool, {
+            schemaName: createDataPlaneTestSchemaName(testIsolation.testEnvironmentId),
+          });
+    const runtimeStateReader =
+      testIsolation === undefined
+        ? createSandboxRuntimeStateReader({
+            gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+          })
+        : createSandboxRuntimeStateReader({
+            gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
+            serviceToken: workerConfig.internalAuth.serviceToken,
+            testEnvironmentId: testIsolation.testEnvironmentId,
+            testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+          });
 
     return {
-      config,
-      logger,
-      db: createDataPlaneDatabase(dbPool),
-      dbPool,
-      sandboxAdapter: createSandboxRuntimeAdapter(config),
-      sandboxRuntimeControl,
-      runtimeStateReader: createSandboxRuntimeStateReader({
-        gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
-        serviceToken: workerConfig.internalAuth.serviceToken,
-      }),
-      controlPlaneInternalClient,
-      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),
-      clock: systemClock,
-      sleeper: systemSleeper,
+      context: {
+        config,
+        logger,
+        db,
+        dbPool,
+        sandboxAdapter: createSandboxRuntimeAdapter(config),
+        sandboxRuntimeControl,
+        runtimeStateReader,
+        controlPlaneInternalClient,
+        tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),
+        clock: systemClock,
+        sleeper: systemSleeper,
+      },
+      close: async () => {
+        await hostedSandboxRuntimeControl.close();
+        if (ownsDbPool) {
+          await dbPool.end();
+        }
+      },
     };
   } catch (error) {
     await sandboxRuntimeControl?.close();
-    await dbPool.end();
+    if (ownsDbPool) {
+      await dbPool.end();
+    }
     throw error;
   }
 }
 
+function readTestIsolationEnv(): WorkflowTestIsolation | undefined {
+  const testEnvironmentId = process.env.MISTLE_TEST_ENVIRONMENT_ID;
+  if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+    return undefined;
+  }
+
+  return {
+    testEnvironmentId,
+    testEnvironmentIdHeader:
+      process.env.MISTLE_TEST_ENVIRONMENT_ID_HEADER ?? DefaultTestEnvironmentIdHeader,
+  };
+}
+
 export function getWorkflowContext(): Promise<WorkflowContext> {
+  const hostedContext = hostedWorkflowContextStorage.getStore();
+  if (hostedContext !== undefined) {
+    return Promise.resolve(hostedContext);
+  }
+
   if (workflowContextPromise !== undefined) {
     return workflowContextPromise;
   }
 
-  workflowContextPromise = createWorkflowContext().catch((error: unknown) => {
-    workflowContextPromise = undefined;
-    throw error;
-  });
+  workflowContextPromise = createWorkflowContext()
+    .then((hostedContext) => hostedContext.context)
+    .catch((error: unknown) => {
+      workflowContextPromise = undefined;
+      throw error;
+    });
 
   return workflowContextPromise;
 }
@@ -126,6 +204,21 @@ export async function closeWorkflowContext(): Promise<void> {
   });
 
   await closeWorkflowContextPromise;
+}
+
+export async function createHostedWorkflowContext(input: {
+  runtime: OpenWorkflowRuntime;
+  testIsolation: WorkflowTestIsolation;
+  dbPool: Pool;
+}): Promise<HostedWorkflowContext> {
+  return createWorkflowContext(input);
+}
+
+export function withHostedWorkflowContext<T>(
+  context: WorkflowContext,
+  callback: () => Promise<T> | T,
+): Promise<T> | T {
+  return hostedWorkflowContextStorage.run(context, callback);
 }
 
 export function registerWorkflowContextShutdownHandlers(): void {
