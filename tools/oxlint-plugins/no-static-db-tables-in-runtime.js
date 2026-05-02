@@ -1,5 +1,3 @@
-import { StaticDbTableUsageBaseline } from "./static-db-table-baseline.js";
-
 const ControlPlaneStaticTableNames = new Set([
   "accounts",
   "automationConversationDeliveryProcessors",
@@ -206,10 +204,6 @@ function isRuntimeStaticTableRestrictedPath(filename) {
   return RuntimeStaticTableRestrictedPathPrefixes.some((prefix) => filename.startsWith(prefix));
 }
 
-function shouldReportStaticTableUsage(filename, importedTableName) {
-  return !StaticDbTableUsageBaseline.has(`${filename}#${importedTableName}`);
-}
-
 const noStaticDbTablesInRuntimeRule = {
   meta: {
     type: "problem",
@@ -232,10 +226,7 @@ const noStaticDbTablesInRuntimeRule = {
 
     function reportStaticTableUse(node, localTableName) {
       const importedTableName = staticTableImportsByLocalName.get(localTableName);
-      if (
-        importedTableName === undefined ||
-        !shouldReportStaticTableUsage(filename, importedTableName)
-      ) {
+      if (importedTableName === undefined) {
         return;
       }
 
