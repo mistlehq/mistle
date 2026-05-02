@@ -1,6 +1,7 @@
-import { fetch as undiciFetch, Headers, Pool } from "undici";
+import { fetch as undiciFetch, FormData as UndiciFormData, Headers, Pool } from "undici";
+import type { RequestInit as UndiciRequestInit } from "undici";
 
-import type { TestHttpClient } from "./types.js";
+import type { TestHttpClient, TestHttpRequestInit } from "./types.js";
 
 type SharedHttpPool = {
   origin: string;
@@ -27,7 +28,8 @@ export function createTestHttpClient(input: {
       }
 
       const url = new URL(path, baseUrl);
-      const headers = new Headers(init?.headers);
+      const requestInit = await normalizeRequestInit(init);
+      const headers = new Headers(requestInit?.headers);
       for (const [name, value] of input.defaultHeaders ?? []) {
         if (!headers.has(name)) {
           headers.set(name, value);
@@ -35,7 +37,7 @@ export function createTestHttpClient(input: {
       }
 
       return undiciFetch(url, {
-        ...init,
+        ...requestInit,
         headers,
         dispatcher: sharedPool.pool,
       });
@@ -49,6 +51,52 @@ export function createTestHttpClient(input: {
       await releaseSharedHttpPool(sharedPool);
     },
   };
+}
+
+async function normalizeRequestInit(
+  init: TestHttpRequestInit | undefined,
+): Promise<UndiciRequestInit | undefined> {
+  if (init === undefined) {
+    return undefined;
+  }
+
+  const { body, ...requestInit } = init;
+  if (body === undefined) {
+    return requestInit;
+  }
+
+  if (body instanceof globalThis.FormData) {
+    return {
+      ...requestInit,
+      body: await createUndiciFormData(body),
+    };
+  }
+
+  return {
+    ...requestInit,
+    body,
+  };
+}
+
+async function createUndiciFormData(formData: globalThis.FormData): Promise<UndiciFormData> {
+  const normalized = new UndiciFormData();
+
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === "string") {
+      normalized.append(key, value);
+      continue;
+    }
+
+    normalized.append(
+      key,
+      new File([new Uint8Array(await value.arrayBuffer())], value.name, {
+        lastModified: value.lastModified,
+        type: value.type,
+      }),
+    );
+  }
+
+  return normalized;
 }
 
 function leaseSharedHttpPool(origin: string): SharedHttpPool {
