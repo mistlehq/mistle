@@ -1,4 +1,7 @@
-import { sandboxProfileVersions, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import {
+  getControlPlaneDatabaseSchema,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -7,7 +10,6 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../errors.js";
-import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type PutProfileVersionSetupScriptInput = {
@@ -27,6 +29,8 @@ export async function putProfileVersionSetupScript(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: PutProfileVersionSetupScriptInput,
 ): Promise<PutProfileVersionSetupScriptOutput> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -43,11 +47,28 @@ export async function putProfileVersionSetupScript(
   }
 
   return db.transaction(async (tx) => {
-    const lockedVersion = await lockProfileVersionForUpdateOrThrow({
-      db: tx,
-      profileId: input.profileId,
-      profileVersion: input.profileVersion,
-    });
+    const [lockedVersion] = await tx
+      .select({
+        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+        version: tables.sandboxProfileVersions.version,
+        state: tables.sandboxProfileVersions.state,
+      })
+      .from(tables.sandboxProfileVersions)
+      .where(
+        and(
+          eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(tables.sandboxProfileVersions.version, input.profileVersion),
+        ),
+      )
+      .limit(1)
+      .for("update");
+
+    if (lockedVersion === undefined) {
+      throw new SandboxProfilesNotFoundError(
+        SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+        "Sandbox profile version was not found.",
+      );
+    }
 
     if (lockedVersion.state !== SandboxProfileVersionStates.DRAFT) {
       throw new SandboxProfilesConflictError(
@@ -57,20 +78,20 @@ export async function putProfileVersionSetupScript(
     }
 
     const [updatedVersion] = await tx
-      .update(sandboxProfileVersions)
+      .update(tables.sandboxProfileVersions)
       .set({
         setupScript: input.setupScript,
       })
       .where(
         and(
-          eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
-          eq(sandboxProfileVersions.version, input.profileVersion),
+          eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(tables.sandboxProfileVersions.version, input.profileVersion),
         ),
       )
       .returning({
-        sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
-        version: sandboxProfileVersions.version,
-        setupScript: sandboxProfileVersions.setupScript,
+        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+        version: tables.sandboxProfileVersions.version,
+        setupScript: tables.sandboxProfileVersions.setupScript,
       });
 
     if (updatedVersion === undefined) {

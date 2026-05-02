@@ -1,8 +1,7 @@
 import {
   ControlPlaneConstraintIds,
+  getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
@@ -34,6 +33,8 @@ export async function createProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: CreateProfileVersionDraftInput,
 ): Promise<CreateProfileVersionDraftOutput> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   try {
     return await db.transaction(async (tx) => {
       const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
@@ -101,7 +102,7 @@ export async function createProfileVersionDraft(
       const nextVersionNumber = latestVersion.version + 1;
 
       const [createdDraftVersion] = await tx
-        .insert(sandboxProfileVersions)
+        .insert(tables.sandboxProfileVersions)
         .values({
           sandboxProfileId: input.profileId,
           version: nextVersionNumber,
@@ -109,9 +110,9 @@ export async function createProfileVersionDraft(
           setupScript: latestVersion.setupScript,
         })
         .returning({
-          sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
-          version: sandboxProfileVersions.version,
-          state: sandboxProfileVersions.state,
+          sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+          version: tables.sandboxProfileVersions.version,
+          state: tables.sandboxProfileVersions.state,
         });
 
       if (createdDraftVersion === undefined) {
@@ -121,7 +122,7 @@ export async function createProfileVersionDraft(
       }
 
       if (latestBindings.length > 0) {
-        await tx.insert(sandboxProfileVersionIntegrationBindings).values(
+        await tx.insert(tables.sandboxProfileVersionIntegrationBindings).values(
           latestBindings.map((binding) => ({
             sandboxProfileId: input.profileId,
             sandboxProfileVersion: nextVersionNumber,
