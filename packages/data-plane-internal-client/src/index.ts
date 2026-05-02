@@ -549,7 +549,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             organizationId: stopInput.organizationId,
             idempotencyKey: stopInput.idempotencyKey,
