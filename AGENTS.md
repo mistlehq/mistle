@@ -65,6 +65,7 @@
 - Runtime mode is the default for Mistle services in the new integration lane. Do not use Docker mode for ordinary application behavior tests unless the test explicitly covers packaging/deployment-shape behavior.
 - Request every live service the test intentionally exercises. Service references in the registry are wiring/order hints only; they must not surprise-start extra services.
 - Keep test bodies at the scenario level: arrange the domain state, perform the user/service action, and assert the observable outcome. Move repetitive protocol mechanics, token minting, websocket choreography, polling, and cleanup into well-named file-local helpers so the test reads as behavior. Do not promote those helpers to public harness APIs until multiple real tests prove the abstraction is stable.
+- Prefer `describe.concurrent(...)` for `integration-new` files. Keep a file sequential only when scenarios intentionally depend on ordering, mutate shared setup, restart/stop services, or require another exclusive resource; make that reason obvious in the test file.
 - The default test environment policy is pooled physical infrastructure and pooled stateless services so full suites can run in parallel without excessive container or port churn. Use dangerous isolation only when the test truly needs to restart or mutate a service instance in a way that would affect other tests, and include a clear reason.
 - Infrastructure such as Postgres, PgBouncer, Valkey, and Mailpit is resolved from service dependencies under the hood. Tests should not hand-roll containers when a harness service declaration already describes the required infrastructure.
 - New or migrated harness-backed tests live in `apps/*/integration-new/` and run through the package's `vitest.integration-new.config.ts` / `test:integration:new` lane. This lane is temporary and exists so we can migrate progressively without destabilizing the old integration scaffolding.
@@ -109,7 +110,7 @@
 
 - The environment harness from `@mistle/test-harness` is mandatory for new dependency-bearing integration tests. It dedupes physical infrastructure, gives each environment isolated logical state, pools stateless services by default, and exposes service handles with reusable clients. See `packages/test-harness/src/environment/README.md` for the public API and examples.
 - Prefer Testcontainers for infrastructure under the harness. App integration tests should not directly manage Testcontainers resources unless the registry does not yet model the dependency they need; if the registry is missing a dependency, add it to the registry instead of hand-rolling it in the test.
-- Keep tests parallel-safe by default. Avoid fixed ports, shared mutable databases, and per-test physical containers unless the test explicitly needs them.
+- Keep tests parallel-safe and concurrency-safe by default. Avoid fixed ports, unscoped assertions over shared mutable state, and per-test physical containers unless the test explicitly needs them.
 - When adding a new service dependency, declare it once in the test registry with its exact infra requirements. Do not make individual tests remember that, for example, a service needs Postgres, PgBouncer, Valkey, or Mailpit.
 
 ### Testing Exceptions
