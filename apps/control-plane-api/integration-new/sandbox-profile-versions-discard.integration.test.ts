@@ -27,7 +27,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profile versions discard integration", () => {
+describe.concurrent("sandbox profile versions discard integration", () => {
   it("atomically deletes the draft version and reports that no draft remains", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-discard@example.com",

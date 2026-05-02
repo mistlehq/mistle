@@ -17,7 +17,7 @@ const it = createIntegrationTest({
   services: ["data-plane-worker"],
 });
 
-describe("data-plane worker sandbox instance deadlines", () => {
+describe.concurrent("data-plane worker sandbox instance deadlines", () => {
   it("processes deadline workflows through the hosted worker runtime", async ({ env }) => {
     const sandboxInstanceId = "sbi_integration_new_deadline_generation";
     const ownerLeaseId = "lease_integration_new_deadline_generation";

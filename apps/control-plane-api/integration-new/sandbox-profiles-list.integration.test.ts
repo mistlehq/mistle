@@ -15,7 +15,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profiles list integration", () => {
+describe.concurrent("sandbox profiles list integration", () => {
   it("returns keyset paginated profiles envelope with next and previous page pointers", async ({
     env,
   }) => {

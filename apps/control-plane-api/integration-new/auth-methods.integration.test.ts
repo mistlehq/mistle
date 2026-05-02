@@ -11,7 +11,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("auth methods integration", () => {
+describe.concurrent("auth methods integration", () => {
   it("returns public dashboard auth method availability", async ({ env }) => {
     const response = await env.controlPlaneApi.http.fetch("/v1/auth/methods");
 

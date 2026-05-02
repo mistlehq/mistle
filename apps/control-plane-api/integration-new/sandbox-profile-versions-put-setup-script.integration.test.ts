@@ -18,7 +18,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profile version put setup script integration", () => {
+describe.concurrent("sandbox profile version put setup script integration", () => {
   it("replaces the setup script for the selected profile version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-put-setup-script@example.com",

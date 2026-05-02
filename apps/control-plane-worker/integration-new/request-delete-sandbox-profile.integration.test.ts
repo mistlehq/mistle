@@ -29,7 +29,7 @@ const it = createIntegrationTest({
 const PollIntervalMs = 100;
 const WorkflowTimeoutMs = 15_000;
 
-describe("request delete sandbox profile integration", () => {
+describe.concurrent("request delete sandbox profile integration", () => {
   it("deletes the profile and disables dependent records through the worker workflow", async ({
     env,
   }) => {

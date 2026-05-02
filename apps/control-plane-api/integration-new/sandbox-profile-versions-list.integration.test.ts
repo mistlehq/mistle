@@ -20,7 +20,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profile versions list integration", () => {
+describe.concurrent("sandbox profile versions list integration", () => {
   it("returns profile versions ordered by version descending", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-versions-list@example.com",

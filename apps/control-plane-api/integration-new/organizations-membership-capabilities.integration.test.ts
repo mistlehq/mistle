@@ -13,7 +13,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("organization membership capabilities integration", () => {
+describe.concurrent("organization membership capabilities integration", () => {
   it("returns capabilities for an authenticated organization member", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-membership-capabilities-owner@example.com",

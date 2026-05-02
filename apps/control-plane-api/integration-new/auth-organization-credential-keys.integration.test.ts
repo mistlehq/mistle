@@ -9,7 +9,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("auth organization credential keys integration", () => {
+describe.concurrent("auth organization credential keys integration", () => {
   it("creates an initial organization credential key on organization creation", async ({ env }) => {
     const session = await env.auth.createSession();
 

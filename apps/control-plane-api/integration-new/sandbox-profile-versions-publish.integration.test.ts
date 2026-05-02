@@ -30,7 +30,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
-describe("sandbox profile versions publish integration", () => {
+describe.concurrent("sandbox profile versions publish integration", () => {
   it("publishes a draft version and queues initial snapshot materialization", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publish@example.com",

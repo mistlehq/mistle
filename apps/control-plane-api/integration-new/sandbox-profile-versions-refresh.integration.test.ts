@@ -21,7 +21,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
-describe("sandbox profile versions refresh integration", () => {
+describe.concurrent("sandbox profile versions refresh integration", () => {
   it("queues manual refresh for a usable published version", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-refresh@example.com",

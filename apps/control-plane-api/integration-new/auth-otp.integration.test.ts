@@ -14,7 +14,7 @@ const it = createIntegrationTest({
   extraInfra: ["mailpit"],
 });
 
-describe("auth otp integration", () => {
+describe.concurrent("auth otp integration", () => {
   it("sends the sign-in OTP through the control-plane worker", async ({ env }) => {
     const email = `integration-new-auth-otp-${randomUUID()}@example.com`;
 

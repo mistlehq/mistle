@@ -12,7 +12,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profiles get integration", () => {
+describe.concurrent("sandbox profiles get integration", () => {
   it("returns a sandbox profile in the authenticated user's active organization", async ({
     env,
   }) => {

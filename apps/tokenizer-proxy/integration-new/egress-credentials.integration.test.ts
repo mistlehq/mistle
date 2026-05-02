@@ -28,7 +28,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "tokenizer-proxy"],
 });
 
-describe("tokenizer proxy egress credentials", () => {
+describe.concurrent("tokenizer proxy egress credentials", () => {
   it("resolves connection credentials through the real control-plane API", async ({ env }) => {
     const upstreamEchoService = await startHttpEcho();
 

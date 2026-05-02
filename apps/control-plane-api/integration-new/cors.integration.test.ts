@@ -9,7 +9,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("cors integration", () => {
+describe.concurrent("cors integration", () => {
   it("adds CORS headers for trusted origins on standard requests", async ({ env }) => {
     const trustedOrigin = env.controlPlaneApi.hostBaseUrl;
     const response = await env.controlPlaneApi.http.fetch("/__healthz", {

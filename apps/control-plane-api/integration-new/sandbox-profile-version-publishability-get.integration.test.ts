@@ -26,7 +26,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api"],
 });
 
-describe("sandbox profile version publishability get integration", () => {
+describe.concurrent("sandbox profile version publishability get integration", () => {
   it("returns agent binding required when the draft has no agent bindings", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-publishability-no-agent@example.com",
