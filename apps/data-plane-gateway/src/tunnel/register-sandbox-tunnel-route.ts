@@ -132,6 +132,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
       const admission = await tunnelWebSocketAdmission.admitRequest({
         db: ctx.get("db"),
+        tables: ctx.get("tables"),
         requestUrl: ctx.req.url,
         requestedInstanceId,
       });

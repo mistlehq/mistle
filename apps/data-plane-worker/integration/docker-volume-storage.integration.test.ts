@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceStorages,
   sandboxInstances,
@@ -175,9 +176,11 @@ function createWorkerRuntimeConfig() {
 
 function createDockerVolumeStorageBackendAdapter(input: {
   db: ReturnType<typeof createDataPlaneDatabase>;
+  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
 }) {
   return createSandboxStorageBackendAdapter({
     db: input.db,
+    tables: getDataPlaneDatabaseSchema(input.db),
     controlPlaneInternalClient: new ControlPlaneInternalClient({
       baseUrl: "http://127.0.0.1:1",
       internalAuthServiceToken: "unused",
@@ -257,6 +260,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: SandboxProvider.DOCKER,
         },
         {
@@ -276,6 +280,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
 
       const storageBackendAdapter = createDockerVolumeStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       });
 
       const provisionedStorage = await storageBackendAdapter.provision({
@@ -326,6 +331,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: SandboxProvider.DOCKER,
         },
         {
@@ -345,6 +351,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
 
       const storageBackendAdapter = createDockerVolumeStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       });
 
       const provisionedStorage = await storageBackendAdapter.provision({
@@ -378,6 +385,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: SandboxProvider.DOCKER,
         },
         {
@@ -397,6 +405,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
 
       const storageBackendAdapter = createDockerVolumeStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       });
       const sandboxAdapter = createSandboxAdapter({
         provider: SandboxProvider.DOCKER,
@@ -439,6 +448,7 @@ describeIfDockerVolumeIntegration("docker volume sandbox storage integration", (
       await destroySandbox(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           controlPlaneInternalClient: new ControlPlaneInternalClient({
             baseUrl: "http://127.0.0.1:1",
             internalAuthServiceToken: "unused",

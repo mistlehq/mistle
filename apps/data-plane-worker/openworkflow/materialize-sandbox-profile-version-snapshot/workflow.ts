@@ -43,6 +43,7 @@ type MaterializeSnapshotWorkflowExecutionContext = Pick<
   | "config"
   | "controlPlaneInternalClient"
   | "db"
+  | "tables"
   | "logger"
   | "sandboxAdapter"
   | "sandboxRuntimeControl"
@@ -131,6 +132,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           await destroySandbox(
             {
               db: ctx.db,
+              tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               config: ctx.config,
               sandboxAdapter: ctx.sandboxAdapter,
@@ -165,6 +167,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
           await markSandboxInstanceFailed(
             {
               db: ctx.db,
+              tables: ctx.tables,
             },
             {
               sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -286,6 +289,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await ensureSandboxInstance(
         {
           db: ctx.db,
+          tables: ctx.tables,
           runtimeProvider: ctx.config.sandbox.provider,
         },
         {
@@ -326,6 +330,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await persistSandboxInstanceProvisioning(
         {
           db: ctx.db,
+          tables: ctx.tables,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -360,6 +365,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await markSandboxInstanceRunning(
         {
           db: ctx.db,
+          tables: ctx.tables,
         },
         {
           sandboxInstanceId: workflowInput.sandboxInstanceId,
@@ -379,6 +385,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await destroySandbox(
         {
           db: ctx.db,
+          tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           config: ctx.config,
           sandboxAdapter: ctx.sandboxAdapter,
@@ -398,6 +405,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
     await step.run({ name: "mark-snapshot-sandbox-stopped" }, async () => {
       await markSandboxInstanceStopped({
         db: ctx.db,
+        tables: ctx.tables,
         sandboxInstanceId: workflowInput.sandboxInstanceId,
         stopReason: SandboxStopReasons.SYSTEM,
       });

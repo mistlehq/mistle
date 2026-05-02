@@ -2,6 +2,7 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
@@ -86,6 +87,7 @@ export function shouldExecuteSandboxDisconnectReconciliation(input: {
  */
 async function resolveActiveSandboxInstance(input: {
   db: DataPlaneDatabase;
+  tables: DataPlaneTables;
   sandboxInstanceId: string;
 }): Promise<ActiveSandboxInstance | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
@@ -181,6 +183,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
   controlPlaneInternalClient: ControlPlaneInternalClient;
   sandboxAdapter: SandboxAdapter;
   db: DataPlaneDatabase;
+  tables: DataPlaneTables;
   runtimeStateReader: SandboxRuntimeStateReader;
   clock: Clock;
   expectedOwnerLeaseId: string;
@@ -190,6 +193,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     await stopSandbox(
       {
         db: ctx.db,
+        tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
@@ -209,6 +213,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
     if (ctx.sandboxInstance.persistenceMode !== "persistent") {
       const markFailedOutcome = await markSandboxInstanceFailed({
         db: ctx.db,
+        tables: ctx.tables,
         sandboxInstanceId: ctx.sandboxInstance.id,
         currentStatus: ctx.sandboxInstance.status,
         failureCode: "provider_runtime_missing",
@@ -244,6 +249,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
 
     const markStoppedOutcome = await markSandboxInstanceStopped({
       db: ctx.db,
+      tables: ctx.tables,
       sandboxInstanceId: ctx.sandboxInstance.id,
       currentStatus: ctx.sandboxInstance.status,
       clearProviderSandboxId: true,
@@ -277,6 +283,7 @@ async function stopProviderSandboxOrMarkMissing(ctx: {
 
   const markStoppedOutcome = await markSandboxInstanceStopped({
     db: ctx.db,
+    tables: ctx.tables,
     sandboxInstanceId: ctx.sandboxInstance.id,
     currentStatus: ctx.sandboxInstance.status,
     stillPermitted: async () =>
@@ -320,6 +327,7 @@ export async function reconcileSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
@@ -347,6 +355,7 @@ export async function reconcileSandboxInstance(
 
   const sandboxInstance = await resolveActiveSandboxInstance({
     db: ctx.db,
+    tables: ctx.tables,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstance === null) {
@@ -384,6 +393,7 @@ export async function reconcileSandboxInstance(
     case "fail": {
       const markOutcome = await markSandboxInstanceFailed({
         db: ctx.db,
+        tables: ctx.tables,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
         failureCode: action.failureCode,
@@ -418,6 +428,7 @@ export async function reconcileSandboxInstance(
     case "mark_stopped": {
       const markOutcome = await markSandboxInstanceStopped({
         db: ctx.db,
+        tables: ctx.tables,
         sandboxInstanceId: sandboxInstance.id,
         currentStatus: sandboxInstance.status,
         clearProviderSandboxId: sandboxInstance.persistenceMode === "persistent",
@@ -468,6 +479,7 @@ export async function reconcileSandboxInstance(
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         sandboxAdapter: ctx.sandboxAdapter,
         db: ctx.db,
+        tables: ctx.tables,
         runtimeStateReader: ctx.runtimeStateReader,
         clock: ctx.clock,
         expectedOwnerLeaseId: input.expectedOwnerLeaseId,

@@ -1,7 +1,7 @@
 import {
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePurpose,
 } from "@mistle/db/data-plane";
 import type { SandboxProvider } from "@mistle/sandbox";
@@ -9,6 +9,7 @@ import type { SandboxProvider } from "@mistle/sandbox";
 export async function ensureSandboxInstance(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstances">;
     runtimeProvider: SandboxProvider;
   },
   input: {
@@ -27,6 +28,7 @@ export async function ensureSandboxInstance(
 ): Promise<{
   sandboxInstanceId: string;
 }> {
+  const { sandboxInstances } = ctx.tables;
   const insertedRows = await ctx.db
     .insert(sandboxInstances)
     .values({

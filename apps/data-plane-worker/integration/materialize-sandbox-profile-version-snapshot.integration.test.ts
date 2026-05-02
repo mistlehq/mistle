@@ -16,6 +16,7 @@ import {
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceRuntimePlans,
   sandboxInstances,
@@ -447,6 +448,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
             config: runtimeConfig,
             controlPlaneInternalClient,
             db: dataPlaneDb,
+            tables: getDataPlaneDatabaseSchema(dataPlaneDb),
             logger: dataPlaneWorkerLogger,
             sandboxAdapter: createSandboxAdapter({
               provider: SandboxProvider.DOCKER,
@@ -573,6 +575,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
             config: runtimeConfig,
             controlPlaneInternalClient,
             db: dataPlaneDb,
+            tables: getDataPlaneDatabaseSchema(dataPlaneDb),
             logger: dataPlaneWorkerLogger,
             sandboxAdapter,
             sandboxRuntimeControl,
@@ -751,6 +754,7 @@ describeIfDockerSnapshotIntegration("snapshot materialization workflow integrati
               config: runtimeConfig,
               controlPlaneInternalClient,
               db: dataPlaneDb,
+              tables: getDataPlaneDatabaseSchema(dataPlaneDb),
               logger: dataPlaneWorkerLogger,
               sandboxAdapter,
               sandboxRuntimeControl,

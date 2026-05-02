@@ -1,7 +1,7 @@
 import {
   SandboxInstanceDeadlineKinds,
-  sandboxInstanceDeadlines,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -9,8 +9,10 @@ type DeadlineWritableDatabase = Pick<DataPlaneDatabase, "update">;
 
 export async function clearSandboxInstanceDeadlines(ctx: {
   db: DeadlineWritableDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines">;
   sandboxInstanceId: string;
 }): Promise<void> {
+  const { sandboxInstanceDeadlines } = ctx.tables;
   await ctx.db
     .update(sandboxInstanceDeadlines)
     .set({

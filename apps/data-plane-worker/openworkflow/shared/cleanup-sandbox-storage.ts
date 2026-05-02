@@ -2,6 +2,7 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxInstancePersistenceModes,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePersistenceMode,
 } from "@mistle/db/data-plane";
 import {
@@ -19,6 +20,7 @@ import { withSandboxStorageTelemetry } from "./sandbox-storage/telemetry.js";
 export async function cleanupSandboxStorage(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     workerConfig: DataPlaneWorkerConfig;
     configuredSandboxProvider: SandboxProvider;
@@ -61,6 +63,7 @@ export async function cleanupSandboxStorage(
     fn: async () => {
       const storageBackendAdapter = createSandboxStorageBackendAdapter({
         db: ctx.db,
+        tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         workerConfig: ctx.workerConfig,
         runtimeProvider: input.runtimeProvider,

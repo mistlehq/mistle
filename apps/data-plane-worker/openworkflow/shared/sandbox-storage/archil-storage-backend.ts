@@ -9,10 +9,10 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxInstancePersistenceModes,
   SandboxStorageCredentialKinds,
-  sandboxInstances,
   SandboxStorageProviders,
   SandboxStorageStatuses,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
 import {
@@ -302,6 +302,7 @@ async function tryDeleteArchilDisk(input: { archil: Archil; diskId: string }): P
 
 type ArchilSandboxStorageBackendAdapterContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
   runtimeProvider: "e2b";
@@ -309,12 +310,14 @@ type ArchilSandboxStorageBackendAdapterContext = {
 
 class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAdapter {
   readonly #db: DataPlaneDatabase;
+  readonly #tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
   readonly #controlPlaneInternalClient: ControlPlaneInternalClient;
   readonly #workerConfig: DataPlaneWorkerConfig;
   readonly #runtimeProvider: "e2b";
 
   constructor(input: ArchilSandboxStorageBackendAdapterContext) {
     this.#db = input.db;
+    this.#tables = input.tables;
     this.#controlPlaneInternalClient = input.controlPlaneInternalClient;
     this.#workerConfig = input.workerConfig;
     this.#runtimeProvider = input.runtimeProvider;
@@ -325,6 +328,7 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
     sandboxInstanceId: string;
   }): Promise<SandboxStorageBackendRecord> {
     const compensationActions: CompensationAction[] = [];
+    const { sandboxInstances } = this.#tables;
 
     try {
       const provisionedStorage = await this.#db.transaction(async (tx) => {
@@ -461,6 +465,7 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
             return insertSandboxInstanceStorage(
               {
                 db: tx,
+                tables: this.#tables,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -483,6 +488,7 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
             run: async () => {
               await tryDeleteSandboxInstanceStorageById({
                 db: this.#db,
+                tables: this.#tables,
                 sandboxInstanceStorageId: insertedStorage.id,
               });
             },
@@ -642,6 +648,7 @@ class ArchilSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAda
       await deleteSandboxInstanceStorageBySandboxInstanceId(
         {
           db: this.#db,
+          tables: this.#tables,
         },
         {
           sandboxInstanceId: input.sandboxInstanceId,

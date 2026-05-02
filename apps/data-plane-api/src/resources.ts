@@ -93,6 +93,7 @@ export async function createAppResources(
   }
 
   const openWorkflow = createDataPlaneOpenWorkflow({ backend: workflowBackend });
+  const testTablesByEnvironmentId = new Map<string, DataPlaneTables>();
 
   return {
     db,
@@ -106,7 +107,7 @@ export async function createAppResources(
     controlPlaneInternalClient,
     testWorkflowsByEnvironmentId,
     getDb: (request = {}) => getDataPlaneDb(request),
-    getTables: (request = {}) => getDataPlaneDatabaseSchema(getDataPlaneDb(request)),
+    getTables: (request = {}) => getDataPlaneTables(request),
     getOpenWorkflow: async (request = {}) => {
       const testIsolation = runtimeConfig.app.__dangerouslyEnableTestIsolation;
       if (testIsolation === undefined) {
@@ -220,6 +221,27 @@ export async function createAppResources(
     });
     testDbsByEnvironmentId.set(testEnvironmentId, testDb);
     return testDb;
+  }
+
+  function getDataPlaneTables(request: { testEnvironmentId?: string }): DataPlaneTables {
+    const testIsolation = runtimeConfig.app.__dangerouslyEnableTestIsolation;
+    if (testIsolation === undefined) {
+      return tables;
+    }
+
+    const testEnvironmentId = request.testEnvironmentId;
+    if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+      throw new Error("Expected test environment id for isolated data-plane table request.");
+    }
+
+    const existingTables = testTablesByEnvironmentId.get(testEnvironmentId);
+    if (existingTables !== undefined) {
+      return existingTables;
+    }
+
+    const testTables = getDataPlaneDatabaseSchema(getDataPlaneDb({ testEnvironmentId }));
+    testTablesByEnvironmentId.set(testEnvironmentId, testTables);
+    return testTables;
   }
 }
 

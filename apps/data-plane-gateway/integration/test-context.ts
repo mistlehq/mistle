@@ -8,7 +8,12 @@ import { fileURLToPath } from "node:url";
 
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import {
+  createDataPlaneDatabase,
+  getDataPlaneDatabaseSchema,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import {
   DockerIntegrationConfigPathInContainer,
   createIntegrationRuntimeScopeId,
@@ -76,6 +81,7 @@ export type DataPlaneGatewayIntegrationFixture = {
   databaseStack: DataPlaneGatewayIntegrationDatabaseStack;
   db: DataPlaneDatabase;
   dbPool: Pool;
+  tables: DataPlaneTables;
   internalAuthServiceToken: string;
   otlpRequests: Array<{
     body: string;
@@ -333,6 +339,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             await dbPool.end();
           });
           const db = createDataPlaneDatabase(dbPool);
+          const tables = getDataPlaneDatabaseSchema(db);
           const controlPlaneDb = createControlPlaneDatabase(dbPool);
 
           const dataPlaneApi = await startDataPlaneApi({
@@ -502,6 +509,7 @@ function createIntegrationIt(backend: RuntimeStateBackend) {
             },
             db,
             dbPool,
+            tables,
             internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
             otlpRequests: otlpReceiver.requests,
             runtime,

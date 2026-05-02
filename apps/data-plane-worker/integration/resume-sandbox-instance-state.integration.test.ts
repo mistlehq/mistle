@@ -1,4 +1,5 @@
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceRuntimePlans,
   sandboxInstances,
@@ -132,6 +133,7 @@ describe("resume sandbox instance state integration", () => {
       await expect(
         resolveResumableSandboxInstanceState({
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           sandboxInstanceId,
         }),
       ).resolves.toEqual({
@@ -184,6 +186,7 @@ describe("resume sandbox instance state integration", () => {
       await expect(
         resolveResumableSandboxInstanceState({
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           sandboxInstanceId,
         }),
       ).resolves.toEqual({
@@ -224,6 +227,7 @@ describe("resume sandbox instance state integration", () => {
       await expect(
         resolveResumableSandboxInstanceState({
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           sandboxInstanceId,
         }),
       ).rejects.toThrow(
@@ -256,6 +260,7 @@ describe("resume sandbox instance state integration", () => {
 
       await markSandboxInstanceStarting({
         db,
+        tables: getDataPlaneDatabaseSchema(db),
         sandboxInstanceId,
       });
 
@@ -306,6 +311,7 @@ describe("resume sandbox instance state integration", () => {
 
     await markSandboxInstanceStarting({
       db,
+      tables: getDataPlaneDatabaseSchema(db),
       sandboxInstanceId,
     });
 

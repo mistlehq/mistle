@@ -1,5 +1,5 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import { type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { type DataPlaneDatabase, type DataPlaneTables } from "@mistle/db/data-plane";
 import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerConfig } from "../../core/config.js";
@@ -9,6 +9,7 @@ import { createDockerVolumeSandboxStorageBackendAdapter } from "./docker-volume-
 
 export function createSandboxStorageBackendAdapter(input: {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
   runtimeProvider: SandboxProvider;
@@ -26,6 +27,7 @@ export function createSandboxStorageBackendAdapter(input: {
   ) {
     return createArchilSandboxStorageBackendAdapter({
       db: input.db,
+      tables: input.tables,
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       workerConfig: input.workerConfig,
       runtimeProvider: SandboxProvider.E2B,
@@ -38,6 +40,7 @@ export function createSandboxStorageBackendAdapter(input: {
   ) {
     return createDockerVolumeSandboxStorageBackendAdapter({
       db: input.db,
+      tables: input.tables,
       controlPlaneInternalClient: input.controlPlaneInternalClient,
       workerConfig: input.workerConfig,
       runtimeProvider: SandboxProvider.DOCKER,

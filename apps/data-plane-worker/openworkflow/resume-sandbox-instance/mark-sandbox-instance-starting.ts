@@ -1,14 +1,16 @@
 import {
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
 export async function markSandboxInstanceStarting(ctx: {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
   sandboxInstanceId: string;
 }): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({

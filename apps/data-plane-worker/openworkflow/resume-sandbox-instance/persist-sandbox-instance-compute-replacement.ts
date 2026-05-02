@@ -1,13 +1,14 @@
 import {
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
 export async function persistSandboxInstanceComputeReplacement(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstances">;
   },
   input: {
     sandboxInstanceId: string;
@@ -17,6 +18,7 @@ export async function persistSandboxInstanceComputeReplacement(
 ): Promise<{
   computeGeneration: number;
 }> {
+  const { sandboxInstances } = ctx.tables;
   const nextComputeGeneration = input.previousComputeGeneration + 1;
 
   const updatedRows = await ctx.db

@@ -1,5 +1,9 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import type { DataPlaneDatabase, SandboxInstanceDeadlineKind } from "@mistle/db/data-plane";
+import type {
+  DataPlaneDatabase,
+  DataPlaneTables,
+  SandboxInstanceDeadlineKind,
+} from "@mistle/db/data-plane";
 import type { SandboxAdapter } from "@mistle/sandbox";
 import type { Clock } from "@mistle/time";
 import type { HandleSandboxInstanceDeadlineWorkflowOutput } from "@mistle/workflow-registry/data-plane";
@@ -34,6 +38,7 @@ export async function handleSandboxInstanceDeadline(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
@@ -116,6 +121,7 @@ async function executeDeadlineAction(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
@@ -133,6 +139,7 @@ async function executeDeadlineAction(
         {
           config: ctx.config,
           db: ctx.db,
+          tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxAdapter: ctx.sandboxAdapter,
           runtimeStateReader: ctx.runtimeStateReader,
@@ -149,6 +156,7 @@ async function executeDeadlineAction(
         {
           config: ctx.config,
           db: ctx.db,
+          tables: ctx.tables,
           controlPlaneInternalClient: ctx.controlPlaneInternalClient,
           sandboxAdapter: ctx.sandboxAdapter,
           runtimeStateReader: ctx.runtimeStateReader,

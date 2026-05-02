@@ -62,6 +62,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await markSandboxInstanceFailed(
           {
             db: ctx.db,
+            tables: ctx.tables,
           },
           {
             ...input,
@@ -96,6 +97,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -136,6 +138,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await step.run({ name: "deprovision-sandbox-storage-after-start-failure" }, async () => {
             const storageBackendAdapter = createSandboxStorageBackendAdapter({
               db: ctx.db,
+              tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
               runtimeProvider: ctx.config.sandbox.provider,
@@ -253,6 +256,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       const persisted = await ensureSandboxInstance(
         {
           db: ctx.db,
+          tables: ctx.tables,
           runtimeProvider: ctx.config.sandbox.provider,
         },
         {
@@ -281,6 +285,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           logger.info("Provisioning persistent sandbox storage.");
           const storageBackendAdapter = createSandboxStorageBackendAdapter({
             db: ctx.db,
+            tables: ctx.tables,
             controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             workerConfig: ctx.config.app,
             runtimeProvider: ctx.config.sandbox.provider,
@@ -320,6 +325,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return prepareSandboxStorageForStart(
             {
               db: ctx.db,
+              tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
               configuredSandboxProvider: ctx.config.sandbox.provider,
@@ -403,6 +409,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await attachSandboxStorage(
           {
             db: ctx.db,
+            tables: ctx.tables,
             controlPlaneInternalClient: ctx.controlPlaneInternalClient,
             workerConfig: ctx.config.app,
             configuredSandboxProvider: ctx.config.sandbox.provider,
@@ -447,6 +454,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await persistSandboxInstanceProvisioning(
           {
             db: ctx.db,
+            tables: ctx.tables,
           },
           {
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
@@ -702,6 +710,7 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         await markSandboxInstanceRunning(
           {
             db: ctx.db,
+            tables: ctx.tables,
           },
           {
             sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,

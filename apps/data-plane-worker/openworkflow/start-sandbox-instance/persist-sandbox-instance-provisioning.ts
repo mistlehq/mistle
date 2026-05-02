@@ -1,8 +1,7 @@
 import {
   SandboxInstanceStatuses,
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -10,6 +9,7 @@ import { and, eq, sql } from "drizzle-orm";
 export async function persistSandboxInstanceProvisioning(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstanceRuntimePlans" | "sandboxInstances">;
   },
   input: {
     sandboxInstanceId: string;
@@ -19,6 +19,7 @@ export async function persistSandboxInstanceProvisioning(
     providerSandboxId: string;
   },
 ): Promise<void> {
+  const { sandboxInstanceRuntimePlans, sandboxInstances } = ctx.tables;
   await ctx.db.transaction(async (tx) => {
     const updatedRows = await tx
       .update(sandboxInstances)

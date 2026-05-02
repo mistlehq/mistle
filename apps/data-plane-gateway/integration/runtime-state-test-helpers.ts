@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
   SandboxRuntimeStateSnapshotSchema,
@@ -27,6 +27,7 @@ export async function insertSandboxInstanceRow(input: {
   sandboxInstanceId: string;
   testId: string;
 }): Promise<void> {
+  const { sandboxInstances } = input.fixture.tables;
   await input.fixture.db.insert(sandboxInstances).values({
     id: input.sandboxInstanceId,
     organizationId: `org_${input.testId}`,

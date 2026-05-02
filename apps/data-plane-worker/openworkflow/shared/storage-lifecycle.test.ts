@@ -19,6 +19,7 @@ describe("sandbox storage lifecycle helpers", () => {
       prepareSandboxStorageForStart(
         {
           db: undefined as never,
+          tables: undefined as never,
           controlPlaneInternalClient: undefined as never,
           workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
@@ -43,6 +44,7 @@ describe("sandbox storage lifecycle helpers", () => {
       cleanupSandboxStorage(
         {
           db: undefined as never,
+          tables: undefined as never,
           controlPlaneInternalClient: undefined as never,
           workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
@@ -73,6 +75,7 @@ describe("sandbox storage lifecycle helpers", () => {
       prepareSandboxStorageForStart(
         {
           db: undefined as never,
+          tables: undefined as never,
           controlPlaneInternalClient: undefined as never,
           workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
@@ -99,6 +102,7 @@ describe("sandbox storage lifecycle helpers", () => {
       cleanupSandboxStorage(
         {
           db: undefined as never,
+          tables: undefined as never,
           controlPlaneInternalClient: undefined as never,
           workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.DOCKER,
@@ -131,6 +135,7 @@ describe("sandbox storage lifecycle helpers", () => {
       prepareSandboxStorageForStart(
         {
           db: undefined as never,
+          tables: undefined as never,
           controlPlaneInternalClient: undefined as never,
           workerConfig: undefined as never,
           configuredSandboxProvider: SandboxProvider.E2B,

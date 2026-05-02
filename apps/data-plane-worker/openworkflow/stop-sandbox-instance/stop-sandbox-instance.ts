@@ -2,6 +2,7 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxInstanceStatuses,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePersistenceMode,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
@@ -54,6 +55,7 @@ export function shouldExecuteSandboxStop(input: {
 
 async function resolveRunningSandboxInstanceStopState(input: {
   db: DataPlaneDatabase;
+  tables: DataPlaneTables;
   sandboxInstanceId: string;
 }): Promise<RunningSandboxInstanceStopState | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
@@ -116,6 +118,7 @@ export async function stopSandboxInstance(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
+    tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     sandboxAdapter: SandboxAdapter;
     runtimeStateReader: SandboxRuntimeStateReader;
@@ -144,6 +147,7 @@ export async function stopSandboxInstance(
 
   const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
     db: ctx.db,
+    tables: ctx.tables,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstanceState === null) {
@@ -172,6 +176,7 @@ export async function stopSandboxInstance(
     await stopSandbox(
       {
         db: ctx.db,
+        tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
         sandboxAdapter: ctx.sandboxAdapter,
@@ -191,6 +196,7 @@ export async function stopSandboxInstance(
 
   const markOutcome = await markSandboxInstanceStopped({
     db: ctx.db,
+    tables: ctx.tables,
     sandboxInstanceId: input.sandboxInstanceId,
     stopReason: input.stopReason,
     stillPermitted: async () =>

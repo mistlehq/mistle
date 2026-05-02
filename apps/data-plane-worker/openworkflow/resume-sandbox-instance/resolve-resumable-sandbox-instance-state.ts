@@ -1,7 +1,6 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePersistenceMode,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
@@ -21,8 +20,10 @@ export type ResumableSandboxInstanceState = {
 
 export async function resolveResumableSandboxInstanceState(input: {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceRuntimePlans" | "sandboxInstances">;
   sandboxInstanceId: string;
 }): Promise<ResumableSandboxInstanceState | null> {
+  const { sandboxInstanceRuntimePlans, sandboxInstances } = input.tables;
   // Resume needs both the persisted sandbox row and the currently active compiled runtime
   // plan. Fetch them together so we validate resume preconditions against one DB snapshot.
   const [sandboxInstance] = await input.db

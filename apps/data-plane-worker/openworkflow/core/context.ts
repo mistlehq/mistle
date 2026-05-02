@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import {
+  createDataPlaneDatabase,
+  getDataPlaneDatabaseSchema,
+  type DataPlaneDatabase,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import type { MistleLogger } from "@mistle/logging";
 import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
@@ -25,6 +30,7 @@ export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
   logger: MistleLogger;
   db: DataPlaneDatabase;
+  tables: DataPlaneTables;
   dbPool: Pool;
   sandboxAdapter: SandboxAdapter;
   sandboxRuntimeControl: SandboxRuntimeControl;
@@ -105,6 +111,7 @@ async function createWorkflowContext(input?: {
         : createDataPlaneDatabase(dbPool, {
             schemaName: createDataPlaneTestSchemaName(testIsolation.testEnvironmentId),
           });
+    const tables = getDataPlaneDatabaseSchema(db);
     const runtimeStateReader =
       testIsolation === undefined
         ? createSandboxRuntimeStateReader({
@@ -123,6 +130,7 @@ async function createWorkflowContext(input?: {
         config,
         logger,
         db,
+        tables,
         dbPool,
         sandboxAdapter: createSandboxRuntimeAdapter(config),
         sandboxRuntimeControl,

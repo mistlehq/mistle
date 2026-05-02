@@ -17,16 +17,14 @@ export function createApp(config: DataPlaneGatewayConfig): DataPlaneGatewayApp {
     if (testEnvironmentId !== undefined) {
       ctx.set("testEnvironmentId", testEnvironmentId);
     }
-    ctx.set(
-      "db",
-      resources.getDb(
-        testEnvironmentId === undefined
-          ? undefined
-          : {
-              testEnvironmentId,
-            },
-      ),
-    );
+    const resourceRequest =
+      testEnvironmentId === undefined
+        ? undefined
+        : {
+            testEnvironmentId,
+          };
+    ctx.set("db", resources.getDb(resourceRequest));
+    ctx.set("tables", resources.getTables(resourceRequest));
     await next();
   });
 
