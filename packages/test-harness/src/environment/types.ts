@@ -149,6 +149,7 @@ export type TestEnvironmentRegistryInput<TRegistry extends TestServiceRegistry> 
   id?: string;
   registry: TRegistry;
   services: readonly TestServiceSelection<TRegistry>[];
+  extraInfra?: readonly TestInfraRequirement[];
 };
 
 export type SelectedTestServiceId<

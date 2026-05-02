@@ -16,8 +16,8 @@ import {
   httpEndpoint,
   httpHealth,
   infraValue,
+  infraRequirement,
   resolvedInfra,
-  singleInfra,
 } from "./shared.js";
 
 const Host = "127.0.0.1";
@@ -27,6 +27,10 @@ const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
   HOST_POOLED_URL: "host.pooledUrl",
   DATA_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.dataPlaneNamespaceId",
+};
+
+const InfraIds = {
+  POSTGRES: "postgres.data-plane",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -42,7 +46,7 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.DATA_PLANE_API),
     start: start({
-      postgresInfra: singleInfra(infra, ServiceIds.DATA_PLANE_API),
+      postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.DATA_PLANE_API),
     }),
   };
 }

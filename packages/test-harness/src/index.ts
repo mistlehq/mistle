@@ -6,6 +6,7 @@ export * from "./services/valkey/index.js";
 export * from "./services/shared-mailpit.js";
 export * from "./services/shared-postgres.js";
 export * from "./services/shared-postgres-mailpit.js";
+export * from "./services/shared-seaweedfs.js";
 export * from "./network/reserve-available-port.js";
 export * from "./network/start-docker-network.js";
 export * from "./network/expose-host-ports.js";

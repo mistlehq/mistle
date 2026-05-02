@@ -7,11 +7,13 @@ import { it as base } from "vitest";
 
 import {
   createServiceRegistry,
+  createTestExtraInfra,
   createTestRegistry,
   startTestEnvironment,
 } from "../environment/index.js";
 import type {
   DangerouslyIsolatedTestRegistry,
+  MistleTestExtraInfraId,
   TestInfraRequirement,
   TestServiceLaunchMode,
   TestServiceDefinition,
@@ -39,6 +41,7 @@ type IntegrationServiceSelection =
 
 type CreateIntegrationTestInput = {
   services: readonly IntegrationServiceSelection[];
+  extraInfra?: readonly MistleTestExtraInfraId[];
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
 };
 
@@ -141,6 +144,12 @@ function readCallerFromStack(): string {
 async function registryFor(input: CreateIntegrationTestInput): Promise<TestServiceRegistry> {
   const serviceEntries = await loadSelectedServices(input.services);
   const serviceCatalog = createTestRegistry();
+  const extraInfra =
+    input.extraInfra === undefined
+      ? []
+      : createTestExtraInfra({
+          ids: input.extraInfra,
+        });
   const services: Record<string, TestServiceDefinition> = {};
 
   for (const entry of serviceEntries) {
@@ -148,7 +157,13 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
     if (catalogService === undefined) {
       throw new Error(`Unknown integration test service '${entry.serviceId}'.`);
     }
-    services[entry.serviceId] = entry.service(catalogService.infra);
+    services[entry.serviceId] = entry.service([
+      ...catalogService.infra,
+      ...extraInfraForService({
+        serviceId: entry.serviceId,
+        extraInfra,
+      }),
+    ]);
   }
 
   return createServiceRegistry({
@@ -161,9 +176,31 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
   });
 }
 
+function extraInfraForService(input: {
+  serviceId: ServiceId;
+  extraInfra: readonly TestInfraRequirement[];
+}): readonly TestInfraRequirement[] {
+  const supportedInfraIds = supportedExtraInfraIdsForService(input.serviceId);
+  return input.extraInfra.filter((infra) => supportedInfraIds.some((id) => id === infra.id));
+}
+
+function supportedExtraInfraIdsForService(serviceId: ServiceId): readonly MistleTestExtraInfraId[] {
+  switch (serviceId) {
+    case ServiceIds.CONTROL_PLANE_API:
+      return ["seaweedfs"];
+    case ServiceIds.CONTROL_PLANE_WORKER:
+      return ["mailpit"];
+    case ServiceIds.DATA_PLANE_API:
+    case ServiceIds.DATA_PLANE_GATEWAY:
+    case ServiceIds.DATA_PLANE_WORKER:
+    case ServiceIds.TOKENIZER_PROXY:
+      return [];
+  }
+}
+
 type IntegrationServiceEntry = {
   serviceId: ServiceId;
-  service: (infra: readonly TestInfraRequirement[]) => TestServiceDefinition;
+  service: (infra: TestServiceDefinition["infra"]) => TestServiceDefinition;
 };
 
 async function loadSelectedServices(

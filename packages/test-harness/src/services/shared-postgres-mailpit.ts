@@ -40,6 +40,7 @@ export async function acquireSharedPostgresMailpitInfra(
     key: input.key,
     postgres: input.postgres,
     mailpit: true,
+    seaweedfs: false,
     valkey: false,
   });
 

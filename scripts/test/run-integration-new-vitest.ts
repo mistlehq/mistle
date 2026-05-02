@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { buildDevelopmentTomlConfig, stringifyTomlConfig } from "../config/toml-config.ts";
 import { ensureIntegrationRunnerPoolSession } from "./integration-run-id.ts";
@@ -9,30 +9,37 @@ const IntegrationNewVitestProjects = [
   {
     projectName: "@mistle/control-plane-api",
     packageName: "@mistle/control-plane-api",
+    packageDir: "apps/control-plane-api",
   },
   {
     projectName: "@mistle/control-plane-worker",
     packageName: "@mistle/control-plane-worker",
+    packageDir: "apps/control-plane-worker",
   },
   {
     projectName: "@mistle/data-plane-api",
     packageName: "@mistle/data-plane-api",
+    packageDir: "apps/data-plane-api",
   },
   {
     projectName: "@mistle/data-plane-gateway",
     packageName: "@mistle/data-plane-gateway",
+    packageDir: "apps/data-plane-gateway",
   },
   {
     projectName: "@mistle/data-plane-worker",
     packageName: "@mistle/data-plane-worker",
+    packageDir: "apps/data-plane-worker",
   },
   {
     projectName: "@mistle/tokenizer-proxy",
     packageName: "@mistle/tokenizer-proxy",
+    packageDir: "apps/tokenizer-proxy",
   },
   {
     projectName: "@mistle/dashboard",
     packageName: "@mistle/dashboard",
+    packageDir: "apps/dashboard",
   },
 ] as const;
 
@@ -41,6 +48,7 @@ type IntegrationNewVitestProject = (typeof IntegrationNewVitestProjects)[number]
 type SharedInfraPrewarmPlan = {
   postgres: boolean;
   mailpit: boolean;
+  seaweedfs: boolean;
   valkey: boolean;
 };
 
@@ -59,6 +67,7 @@ type SharedInfraCoordinator = {
     key: string;
     postgres: PostgresPrewarmConfig | undefined;
     mailpit: boolean;
+    seaweedfs: boolean;
     valkey: boolean;
   }) => Promise<unknown>;
   createTestEnvironmentSharedInfraKey: (environment: NodeJS.ProcessEnv) => string;
@@ -127,6 +136,29 @@ function parseProjectFilters(args: ReadonlyArray<string>): string[] {
   return projectFilters;
 }
 
+function parseIntegrationNewFileFilters(args: ReadonlyArray<string>): string[] {
+  const fileFilters: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === undefined) {
+      throw new Error(`Expected an argument at index ${String(index)}.`);
+    }
+    if (argument === "--project") {
+      index += 1;
+      continue;
+    }
+    if (argument.startsWith("--")) {
+      continue;
+    }
+    if (argument.includes("integration-new/") || argument.endsWith(".ts")) {
+      fileFilters.push(argument);
+    }
+  }
+
+  return fileFilters;
+}
+
 function resolveSelectedProjects(
   projectFilters: ReadonlyArray<string>,
 ): IntegrationNewVitestProject[] {
@@ -157,12 +189,92 @@ function formatDuration(milliseconds: number): string {
   return `${(milliseconds / 1000).toFixed(2)}s`;
 }
 
-function resolveSharedInfraPrewarmPlan(
+async function listIntegrationNewTestFiles(directory: string): Promise<string[]> {
+  let entries;
+  try {
+    entries = await readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if (isErrnoException(error) && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listIntegrationNewTestFiles(path)));
+      continue;
+    }
+    if (entry.isFile() && entry.name.endsWith(".test.ts")) {
+      files.push(path);
+    }
+  }
+
+  return files;
+}
+
+function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
+
+async function readExtraInfraPrewarmPlanFromTests(input: {
+  selectedProjects: ReadonlyArray<IntegrationNewVitestProject>;
+  fileFilters: ReadonlyArray<string>;
+}): Promise<Pick<SharedInfraPrewarmPlan, "mailpit" | "seaweedfs">> {
+  const files =
+    input.fileFilters.length === 0
+      ? (
+          await Promise.all(
+            input.selectedProjects.map((project) =>
+              listIntegrationNewTestFiles(
+                resolve(process.cwd(), project.packageDir, "integration-new"),
+              ),
+            ),
+          )
+        ).flat()
+      : input.fileFilters.map((fileFilter) =>
+          isAbsolute(fileFilter) ? fileFilter : resolve(process.cwd(), fileFilter),
+        );
+
+  const plan = {
+    mailpit: false,
+    seaweedfs: false,
+  };
+
+  await Promise.all(
+    files.map(async (file) => {
+      let contents;
+      try {
+        contents = await readFile(file, "utf8");
+      } catch (error) {
+        if (isErrnoException(error) && error.code === "ENOENT") {
+          return;
+        }
+        throw error;
+      }
+
+      if (/extraInfra\s*:\s*\[[^\]]*["']mailpit["']/s.test(contents)) {
+        plan.mailpit = true;
+      }
+      if (/extraInfra\s*:\s*\[[^\]]*["']seaweedfs["']/s.test(contents)) {
+        plan.seaweedfs = true;
+      }
+    }),
+  );
+
+  return plan;
+}
+
+async function resolveSharedInfraPrewarmPlan(
   selectedProjects: ReadonlyArray<IntegrationNewVitestProject>,
-): SharedInfraPrewarmPlan {
+  fileFilters: ReadonlyArray<string>,
+): Promise<SharedInfraPrewarmPlan> {
   const plan: SharedInfraPrewarmPlan = {
     postgres: false,
     mailpit: false,
+    seaweedfs: false,
     valkey: false,
   };
 
@@ -170,15 +282,12 @@ function resolveSharedInfraPrewarmPlan(
     switch (project.projectName) {
       case "@mistle/control-plane-api":
         plan.postgres = true;
-        plan.mailpit = true;
         break;
       case "@mistle/control-plane-worker":
         plan.postgres = true;
-        plan.mailpit = true;
         break;
       case "@mistle/dashboard":
         plan.postgres = true;
-        plan.mailpit = true;
         break;
       case "@mistle/data-plane-api":
         plan.postgres = true;
@@ -195,6 +304,13 @@ function resolveSharedInfraPrewarmPlan(
     }
   }
 
+  const extraInfraPlan = await readExtraInfraPrewarmPlanFromTests({
+    selectedProjects,
+    fileFilters,
+  });
+  plan.mailpit = extraInfraPlan.mailpit;
+  plan.seaweedfs = extraInfraPlan.seaweedfs;
+
   return plan;
 }
 
@@ -206,6 +322,9 @@ function describeSharedInfraPrewarmPlan(plan: SharedInfraPrewarmPlan): string {
   if (plan.mailpit) {
     services.push("mailpit");
   }
+  if (plan.seaweedfs) {
+    services.push("seaweedfs");
+  }
   if (plan.valkey) {
     services.push("valkey");
   }
@@ -215,10 +334,11 @@ function describeSharedInfraPrewarmPlan(plan: SharedInfraPrewarmPlan): string {
 
 async function prewarmSharedInfra(
   selectedProjects: ReadonlyArray<IntegrationNewVitestProject>,
+  fileFilters: ReadonlyArray<string>,
   coordinator: SharedInfraCoordinator,
 ): Promise<void> {
-  const plan = resolveSharedInfraPrewarmPlan(selectedProjects);
-  if (!plan.postgres && !plan.mailpit && !plan.valkey) {
+  const plan = await resolveSharedInfraPrewarmPlan(selectedProjects, fileFilters);
+  if (!plan.postgres && !plan.mailpit && !plan.seaweedfs && !plan.valkey) {
     writeIntegrationTimingEvent("runner shared infra prewarm skipped", "none required");
     return;
   }
@@ -231,6 +351,7 @@ async function prewarmSharedInfra(
     key: coordinator.createTestEnvironmentSharedInfraKey(process.env),
     postgres: plan.postgres ? {} : undefined,
     mailpit: plan.mailpit,
+    seaweedfs: plan.seaweedfs,
     valkey: plan.valkey,
   });
   console.info(
@@ -358,6 +479,7 @@ async function main(): Promise<void> {
   const runnerPoolSession = ensureIntegrationRunnerPoolSession(process.env);
   const cliArgs = normalizeCliArgs(process.argv.slice(2));
   const projectFilters = parseProjectFilters(cliArgs);
+  const fileFilters = parseIntegrationNewFileFilters(cliArgs);
   const selectedProjects = resolveSelectedProjects(projectFilters);
   const selectedBuildPackages = new Set<string>(RequiredBuildPackages);
 
@@ -393,7 +515,7 @@ async function main(): Promise<void> {
   const runnerServicePools = await loadRunnerServicePools();
 
   try {
-    await prewarmSharedInfra(selectedProjects, sharedInfraCoordinator);
+    await prewarmSharedInfra(selectedProjects, fileFilters, sharedInfraCoordinator);
     await runTimedCommand({
       label: "vitest",
       command: "pnpm",

@@ -61,28 +61,25 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     healthCheck: async (runtime) => processHealth(runtime, ServiceIds.CONTROL_PLANE_WORKER),
     start: start({
       postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_WORKER),
-      mailpitInfra: infraRequirement(infra, InfraIds.MAILPIT, ServiceIds.CONTROL_PLANE_WORKER),
     }),
   };
 }
 
 function start(input: {
   postgresInfra: TestInfraRequirement;
-  mailpitInfra: TestInfraRequirement;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
     if (startInput.mode === "runtime") {
       return startRuntimeControlPlaneWorker({
         startInput,
         postgresInfra: input.postgresInfra,
-        mailpitInfra: input.mailpitInfra,
       });
     }
 
     assertMode(startInput.mode, "process", ServiceIds.CONTROL_PLANE_WORKER);
 
     const postgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
-    const mailpit = resolvedInfra(startInput.infra, input.mailpitInfra.id);
+    const mailpit = startInput.infra.get(InfraIds.MAILPIT);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const env = createControlPlaneWorkerEnv({
       environmentId: startInput.environmentId,
@@ -113,10 +110,9 @@ function start(input: {
 async function startRuntimeControlPlaneWorker(input: {
   startInput: TestServiceStartInput;
   postgresInfra: TestInfraRequirement;
-  mailpitInfra: TestInfraRequirement;
 }): Promise<TestService> {
   const postgres = resolvedInfra(input.startInput.infra, input.postgresInfra.id);
-  const mailpit = resolvedInfra(input.startInput.infra, input.mailpitInfra.id);
+  const mailpit = input.startInput.infra.get(InfraIds.MAILPIT);
   const peer = peers(input.startInput.services, input.startInput.plannedEndpoints);
   const env = createControlPlaneWorkerEnv({
     environmentId: input.startInput.environmentId,
@@ -188,7 +184,7 @@ async function startRuntimeControlPlaneWorker(input: {
 function createControlPlaneWorkerEnv(input: {
   environmentId: string;
   postgres: ReturnType<typeof resolvedInfra>;
-  mailpit: ReturnType<typeof resolvedInfra>;
+  mailpit: ReturnType<typeof resolvedInfra> | undefined;
   peer: ReturnType<typeof peers>;
 }): Record<string, string> {
   return {
@@ -210,8 +206,12 @@ function createControlPlaneWorkerEnv(input: {
     MISTLE_SERVICES_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
     MISTLE_EMAIL_SMTP_FROM_ADDRESS: "integration-new@mistle.test",
     MISTLE_EMAIL_SMTP_FROM_NAME: "Mistle Integration",
-    MISTLE_EMAIL_SMTP_HOST: infraValue(input.mailpit, MailpitValues.SMTP_HOST),
-    MISTLE_EMAIL_SMTP_PORT: infraValue(input.mailpit, MailpitValues.SMTP_PORT),
+    MISTLE_EMAIL_SMTP_HOST:
+      input.mailpit === undefined
+        ? "127.0.0.1"
+        : infraValue(input.mailpit, MailpitValues.SMTP_HOST),
+    MISTLE_EMAIL_SMTP_PORT:
+      input.mailpit === undefined ? "9" : infraValue(input.mailpit, MailpitValues.SMTP_PORT),
     MISTLE_EMAIL_SMTP_SECURE: "false",
     MISTLE_EMAIL_SMTP_USERNAME: "integration-new",
     MISTLE_EMAIL_SMTP_PASSWORD: "integration-new",

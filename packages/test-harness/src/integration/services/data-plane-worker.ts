@@ -27,11 +27,11 @@ import { leasePgPool, leasePostgresJsPool } from "./postgres-pools.js";
 import { ServiceIds } from "./service-ids.js";
 import {
   assertMode,
+  infraRequirement,
   infraValue,
   processHealth,
   processService,
   resolvedInfra,
-  singleInfra,
 } from "./shared.js";
 
 const AppDir = fileURLToPath(new URL("../../../../../apps/data-plane-worker", import.meta.url));
@@ -40,6 +40,10 @@ const DockerSocketPath = "/var/run/docker.sock";
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
   HOST_POOLED_URL: "host.pooledUrl",
+};
+
+const InfraIds = {
+  POSTGRES: "postgres.data-plane",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -55,7 +59,7 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     supportedModes: ["runtime", "process"],
     healthCheck: async (runtime) => processHealth(runtime, ServiceIds.DATA_PLANE_WORKER),
     start: start({
-      postgresInfra: singleInfra(infra, ServiceIds.DATA_PLANE_WORKER),
+      postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.DATA_PLANE_WORKER),
     }),
   };
 }

@@ -27,12 +27,14 @@ import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
 import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
 import { registerProcessCleanupTask } from "../cleanup/index.js";
+import { ensureSeaweedfsS3BucketExists } from "../services/seaweedfs/index.js";
 import { createTestEnvironmentSharedInfraKey } from "../services/shared-infra-coordinator.js";
 import { acquireSharedMailpitInfra } from "../services/shared-mailpit.js";
 import {
   acquireSharedPostgresInfra,
   type SharedPostgresLease,
 } from "../services/shared-postgres.js";
+import { acquireSharedSeaweedfsInfra } from "../services/shared-seaweedfs.js";
 import { acquireSharedValkeyInfra, type SharedValkeyLease } from "../services/shared-valkey.js";
 import { DockerIntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
 import { readPreparedTestHarnessRuntime } from "../system/prepared-runtime.js";
@@ -81,6 +83,7 @@ const InfraIds = {
   DATA_PLANE_POSTGRES: "postgres.data-plane",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
+  SEAWEEDFS: "seaweedfs",
 };
 
 const PostgresValues = {
@@ -98,6 +101,7 @@ const InfraKinds = {
   POSTGRES: "postgres",
   VALKEY: "valkey",
   MAILPIT: "mailpit",
+  SEAWEEDFS: "seaweedfs",
 };
 
 const ValkeyValues = {
@@ -110,6 +114,15 @@ const MailpitValues = {
   SMTP_HOST: "smtp.host",
   SMTP_PORT: "smtp.port",
   HTTP_BASE_URL: "http.baseUrl",
+};
+
+const SeaweedfsValues = {
+  BUCKET_NAME: "bucketName",
+  HOST_ENDPOINT: "host.endpoint",
+  CONTAINER_ENDPOINT: "container.endpoint",
+  REGION: "region",
+  ACCESS_KEY_ID: "accessKeyId",
+  SECRET_ACCESS_KEY: "secretAccessKey",
 };
 
 function formatDuration(milliseconds: number): string {
@@ -168,6 +181,8 @@ export type MistleTestServiceId =
   | "data-plane-worker"
   | "tokenizer-proxy";
 
+export type MistleTestExtraInfraId = "mailpit" | "seaweedfs";
+
 export type MistleTestRegistry = TestServiceRegistry & {
   "control-plane-api": TestServiceDefinition;
   "control-plane-worker": TestServiceDefinition;
@@ -214,9 +229,6 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
   const valkey = createValkeyRequirement({
     sharedInfraKey,
   });
-  const mailpit = createMailpitRequirement({
-    sharedInfraKey,
-  });
 
   return createServiceRegistry({
     services: {
@@ -227,7 +239,6 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
       "control-plane-worker": createControlPlaneWorkerService({
         context,
         postgres: controlPlanePostgres,
-        mailpit,
       }),
       "data-plane-api": createDataPlaneApiService({
         context,
@@ -252,6 +263,39 @@ export function createTestRegistry(input: CreateTestRegistryInput = {}): MistleT
           __dangerouslyIsolatedServices: input.__dangerouslyIsolatedServices,
         }),
   });
+}
+
+export function createTestExtraInfra(input: {
+  ids: readonly MistleTestExtraInfraId[];
+  sharedInfraKey?: string;
+}): readonly TestInfraRequirement[] {
+  const sharedInfraKey = input.sharedInfraKey ?? createTestEnvironmentSharedInfraKey();
+  const requirements: TestInfraRequirement[] = [];
+
+  for (const infraId of input.ids) {
+    if (requirements.some((requirement) => requirement.id === infraId)) {
+      continue;
+    }
+
+    switch (infraId) {
+      case "mailpit":
+        requirements.push(
+          createMailpitRequirement({
+            sharedInfraKey,
+          }),
+        );
+        break;
+      case "seaweedfs":
+        requirements.push(
+          createSeaweedfsRequirement({
+            sharedInfraKey,
+          }),
+        );
+        break;
+    }
+  }
+
+  return requirements;
 }
 
 function createRegistryContext(input: {
@@ -644,6 +688,78 @@ function createMailpitProvisioner(input: { sharedInfraKey: string }): TestInfraP
   };
 }
 
+function createSeaweedfsRequirement(input: { sharedInfraKey: string }): TestInfraRequirement {
+  return {
+    id: InfraIds.SEAWEEDFS,
+    kind: InfraKinds.SEAWEEDFS,
+    provisioner: createSeaweedfsProvisioner(input),
+  };
+}
+
+function createSeaweedfsProvisioner(input: { sharedInfraKey: string }): TestInfraProvisioner {
+  return {
+    kind: InfraKinds.SEAWEEDFS,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const lease = await measure(timings, "acquire-physical", async () =>
+        acquireSharedSeaweedfsInfra({
+          key: input.sharedInfraKey,
+        }),
+      );
+      const bucketName = createSeaweedfsBucketName(provisionInput.environmentId);
+      await measure(timings, "create-bucket", async () =>
+        ensureSeaweedfsS3BucketExists({
+          bucketName,
+          endpoint: lease.infra.seaweedfs.endpoint,
+          accessKeyId: lease.infra.seaweedfs.accessKeyId,
+          secretAccessKey: lease.infra.seaweedfs.secretAccessKey,
+          startupTimeoutMs: 15_000,
+        }),
+      );
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "seaweedfs",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([
+          [SeaweedfsValues.BUCKET_NAME, bucketName],
+          [SeaweedfsValues.HOST_ENDPOINT, lease.infra.seaweedfs.endpoint],
+          [
+            SeaweedfsValues.CONTAINER_ENDPOINT,
+            createContainerReachableEndpoint(lease.infra.seaweedfs.endpoint),
+          ],
+          [SeaweedfsValues.REGION, lease.infra.seaweedfs.region],
+          [SeaweedfsValues.ACCESS_KEY_ID, lease.infra.seaweedfs.accessKeyId],
+          [SeaweedfsValues.SECRET_ACCESS_KEY, lease.infra.seaweedfs.secretAccessKey],
+        ]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "release-lease", lease.release);
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "seaweedfs cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+function createSeaweedfsBucketName(environmentId: string): string {
+  return `mistle-${environmentId.replaceAll("_", "-")}`;
+}
+
+function createContainerReachableEndpoint(hostEndpoint: string): string {
+  const url = new URL(hostEndpoint);
+  url.hostname = HostGatewayName;
+  return url.toString().replace(/\/$/u, "");
+}
+
 function createControlPlaneApiService(input: {
   context: MistleRegistryContext;
   postgres: TestInfraRequirement;
@@ -669,6 +785,7 @@ async function startControlPlaneApiDockerService(input: {
   assertDockerMode(input.startInput.mode, "control-plane-api");
   const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
   const postgres = getInfra(input.startInput.infra, InfraIds.CONTROL_PLANE_POSTGRES);
+  const seaweedfs = input.startInput.infra.get(InfraIds.SEAWEEDFS);
   const service = await startControlPlaneApi({
     buildContextHostPath: input.context.buildContextHostPath,
     configPathInContainer: input.context.configPathInContainer,
@@ -697,6 +814,7 @@ async function startControlPlaneApiDockerService(input: {
       }),
       MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL:
         "ws://localhost:5202/tunnel/sandbox",
+      ...createControlPlaneApiObjectStoreEnv(seaweedfs),
     },
     bindMounts: [createConfigBindMount(input.context)],
   });
@@ -710,6 +828,39 @@ async function startControlPlaneApiDockerService(input: {
     }),
     containerId: service.containerId,
     stop: service.stop,
+  };
+}
+
+function createControlPlaneApiObjectStoreEnv(
+  seaweedfs: ResolvedTestInfra | undefined,
+): Record<string, string> {
+  if (seaweedfs === undefined) {
+    return {
+      MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME: "integration-new-media",
+      MISTLE_OBJECT_STORE_ASSETS_REGION: "us-east-1",
+      MISTLE_OBJECT_STORE_ASSETS_ENDPOINT: "http://host.testcontainers.internal:9",
+      MISTLE_OBJECT_STORE_ASSETS_FORCE_PATH_STYLE: "true",
+      MISTLE_OBJECT_STORE_ASSETS_ACCESS_KEY_ID: "integration-new-access-key",
+      MISTLE_OBJECT_STORE_ASSETS_SECRET_ACCESS_KEY: "integration-new-secret-key",
+    };
+  }
+
+  return {
+    MISTLE_OBJECT_STORE_ASSETS_BUCKET_NAME: readInfraValue(seaweedfs, SeaweedfsValues.BUCKET_NAME),
+    MISTLE_OBJECT_STORE_ASSETS_REGION: readInfraValue(seaweedfs, SeaweedfsValues.REGION),
+    MISTLE_OBJECT_STORE_ASSETS_ENDPOINT: readInfraValue(
+      seaweedfs,
+      SeaweedfsValues.CONTAINER_ENDPOINT,
+    ),
+    MISTLE_OBJECT_STORE_ASSETS_FORCE_PATH_STYLE: "true",
+    MISTLE_OBJECT_STORE_ASSETS_ACCESS_KEY_ID: readInfraValue(
+      seaweedfs,
+      SeaweedfsValues.ACCESS_KEY_ID,
+    ),
+    MISTLE_OBJECT_STORE_ASSETS_SECRET_ACCESS_KEY: readInfraValue(
+      seaweedfs,
+      SeaweedfsValues.SECRET_ACCESS_KEY,
+    ),
   };
 }
 
@@ -898,11 +1049,10 @@ function createTokenizerProxyService(input: {
 function createControlPlaneWorkerService(input: {
   context: MistleRegistryContext;
   postgres: TestInfraRequirement;
-  mailpit: TestInfraRequirement;
 }): TestServiceDefinition {
   return {
     id: "control-plane-worker",
-    infra: [input.postgres, input.mailpit],
+    infra: [input.postgres],
     serviceReferences: ["control-plane-api", "data-plane-api"],
     supportedModes: ["docker"],
     healthCheck: async (service) => checkContainerServiceHealth(service, "control-plane-worker"),
@@ -921,7 +1071,7 @@ async function startControlPlaneWorkerDockerService(input: {
   assertDockerMode(input.startInput.mode, "control-plane-worker");
   const preparedRuntime = await readPreparedTestHarnessRuntime(input.context.buildContextHostPath);
   const postgres = getInfra(input.startInput.infra, InfraIds.CONTROL_PLANE_POSTGRES);
-  const mailpit = getInfra(input.startInput.infra, InfraIds.MAILPIT);
+  const mailpit = input.startInput.infra.get(InfraIds.MAILPIT);
   const service = await startControlPlaneWorker({
     buildContextHostPath: input.context.buildContextHostPath,
     configPathInContainer: input.context.configPathInContainer,
@@ -936,8 +1086,12 @@ async function startControlPlaneWorkerDockerService(input: {
         postgres,
         PostgresValues.CONTROL_PLANE_WORKFLOW_NAMESPACE_ID,
       ),
-      MISTLE_EMAIL_SMTP_HOST: readInfraValue(mailpit, MailpitValues.SMTP_HOST),
-      MISTLE_EMAIL_SMTP_PORT: readInfraValue(mailpit, MailpitValues.SMTP_PORT),
+      MISTLE_EMAIL_SMTP_HOST:
+        mailpit === undefined
+          ? "host.testcontainers.internal"
+          : readInfraValue(mailpit, MailpitValues.SMTP_HOST),
+      MISTLE_EMAIL_SMTP_PORT:
+        mailpit === undefined ? "9" : readInfraValue(mailpit, MailpitValues.SMTP_PORT),
       MISTLE_EMAIL_SMTP_SECURE: "false",
       MISTLE_SERVICES_DATA_PLANE_API_INTERNAL_URL: readOptionalServiceContainerBaseUrl({
         services: input.startInput.services,

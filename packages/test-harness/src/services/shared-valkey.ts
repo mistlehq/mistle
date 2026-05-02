@@ -22,6 +22,7 @@ export async function acquireSharedValkeyInfra(
     key: input.key,
     postgres: undefined,
     mailpit: false,
+    seaweedfs: false,
     valkey: true,
   });
 

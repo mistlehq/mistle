@@ -132,19 +132,26 @@ function createPooledServiceKey(input: {
   mode: string;
   environmentId: string;
 }): string {
+  const infraKey =
+    input.service.infra.length === 0
+      ? "infra:none"
+      : `infra:${input.service.infra
+          .map((requirement) => requirement.id)
+          .sort()
+          .join("+")}`;
   const scope = input.service.poolScope ?? "runner";
   if (scope === "environment") {
-    return `${input.service.id}/${input.mode}/${input.environmentId}`;
+    return `${input.service.id}/${input.mode}/${infraKey}/${input.environmentId}`;
   }
 
   if (input.mode === "runtime") {
     // Runtime services run in-process inside the current Vitest worker. They
     // cannot be safely shared by other workers because the owning worker can
     // exit while another worker still has a persisted lease for its port.
-    return `${input.service.id}/${input.mode}/${String(process.pid)}`;
+    return `${input.service.id}/${input.mode}/${infraKey}/${String(process.pid)}`;
   }
 
-  return `${input.service.id}/${input.mode}`;
+  return `${input.service.id}/${input.mode}/${infraKey}`;
 }
 
 function shouldIsolateService(input: {

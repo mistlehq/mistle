@@ -18,6 +18,7 @@ import { describe, expect } from "vitest";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
+  extraInfra: ["mailpit"],
   __dangerouslyIsolatedServices: {
     services: ["control-plane-api"],
     reason:

@@ -1,4 +1,16 @@
 import {
+  DeleteObjectCommand,
+  type DeleteObjectCommandOutput,
+  GetObjectCommand,
+  type GetObjectCommandOutput,
+  HeadObjectCommand,
+  type HeadObjectCommandOutput,
+  PutObjectCommand,
+  type PutObjectCommandInput,
+  type PutObjectCommandOutput,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import {
   createControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
   type ControlPlaneDatabase,
@@ -32,7 +44,29 @@ const PostgresInfraIds = {
   DATA_PLANE: "postgres.data-plane",
 };
 
+const SeaweedfsInfraId = "seaweedfs";
+const SeaweedfsValues = {
+  BUCKET_NAME: "bucketName",
+  HOST_ENDPOINT: "host.endpoint",
+  REGION: "region",
+  ACCESS_KEY_ID: "accessKeyId",
+  SECRET_ACCESS_KEY: "secretAccessKey",
+};
+
 type IntegrationDatabasePoolFactory = (config: PoolConfig) => Pool;
+
+export type IntegrationObjectStore = {
+  putObject: (input: {
+    objectKey: string;
+    Body: NonNullable<PutObjectCommandInput["Body"]>;
+    ContentType?: PutObjectCommandInput["ContentType"];
+    CacheControl?: PutObjectCommandInput["CacheControl"];
+  }) => Promise<PutObjectCommandOutput>;
+  headObject: (objectKey: string) => Promise<HeadObjectCommandOutput>;
+  readObject: (objectKey: string) => Promise<GetObjectCommandOutput>;
+  deleteObject: (objectKey: string) => Promise<DeleteObjectCommandOutput>;
+  destroy: () => void;
+};
 
 export type IntegrationTestEnvironment = {
   id: string;
@@ -48,6 +82,7 @@ export type IntegrationTestEnvironment = {
   dataPlaneGateway: IntegrationHttpService;
   dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
+  objectStore: IntegrationObjectStore;
   tokenizerProxy: IntegrationHttpService;
 };
 
@@ -70,6 +105,7 @@ export function createIntegrationEnvironment(input: {
   let controlPlaneDb: ControlPlaneDatabase | undefined;
   let dataPlaneDb: DataPlaneDatabase | undefined;
   let dataPlaneWorkflowResources: IntegrationWorkflowResources | undefined;
+  let objectStore: IntegrationObjectStore | undefined;
 
   const integrationEnvironment: ManagedIntegrationTestEnvironment = {
     id: input.environment.id,
@@ -149,6 +185,11 @@ export function createIntegrationEnvironment(input: {
         httpBaseUrl,
       });
     },
+    get objectStore() {
+      objectStore ??= createObjectStore(input.environment);
+
+      return objectStore;
+    },
     get tokenizerProxy() {
       return httpService(input.environment.services.get(ServiceIds.TOKENIZER_PROXY));
     },
@@ -163,10 +204,64 @@ export function createIntegrationEnvironment(input: {
         ...pools.map((pool) => pool.end()),
         workflowBackend?.stop() ?? Promise.resolve(),
       ]);
+      objectStore?.destroy();
     },
   };
 
   return integrationEnvironment;
+}
+
+function createObjectStore(environment: TestEnvironment<ServiceId>): IntegrationObjectStore {
+  const seaweedfs = environment.infra.get(SeaweedfsInfraId);
+  if (seaweedfs === undefined) {
+    throw new Error("Expected integration environment to include SeaweedFS infra.");
+  }
+
+  const bucketName = readInfraValue(seaweedfs, SeaweedfsValues.BUCKET_NAME);
+  const client = new S3Client({
+    endpoint: readInfraValue(seaweedfs, SeaweedfsValues.HOST_ENDPOINT),
+    forcePathStyle: true,
+    region: readInfraValue(seaweedfs, SeaweedfsValues.REGION),
+    credentials: {
+      accessKeyId: readInfraValue(seaweedfs, SeaweedfsValues.ACCESS_KEY_ID),
+      secretAccessKey: readInfraValue(seaweedfs, SeaweedfsValues.SECRET_ACCESS_KEY),
+    },
+  });
+
+  return {
+    putObject: async (input) =>
+      client.send(
+        new PutObjectCommand({
+          Body: input.Body,
+          Bucket: bucketName,
+          CacheControl: input.CacheControl,
+          ContentType: input.ContentType,
+          Key: input.objectKey,
+        }),
+      ),
+    headObject: async (objectKey) =>
+      client.send(
+        new HeadObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+        }),
+      ),
+    readObject: async (objectKey) =>
+      client.send(
+        new GetObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+        }),
+      ),
+    deleteObject: async (objectKey) =>
+      client.send(
+        new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+        }),
+      ),
+    destroy: () => client.destroy(),
+  };
 }
 
 type IntegrationWorkflowResources = {
@@ -274,4 +369,16 @@ function readControlPlaneSchemaName(environment: TestEnvironment<ServiceId>): st
   }
 
   return schemaName;
+}
+
+function readInfraValue(
+  infra: { id: string; values: ReadonlyMap<string, string> },
+  key: string,
+): string {
+  const value = infra.values.get(key);
+  if (value === undefined) {
+    throw new Error(`Expected integration infra '${infra.id}' to expose '${key}'.`);
+  }
+
+  return value;
 }

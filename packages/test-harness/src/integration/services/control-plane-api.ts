@@ -12,7 +12,7 @@ import type {
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
-import { httpEndpoint, httpHealth, infraValue, resolvedInfra, singleInfra } from "./shared.js";
+import { httpEndpoint, httpHealth, infraRequirement, infraValue, resolvedInfra } from "./shared.js";
 
 const ControlPlaneHost = "127.0.0.1";
 
@@ -20,6 +20,19 @@ const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
   HOST_POOLED_URL: "host.pooledUrl",
   CONTROL_PLANE_WORKFLOW_NAMESPACE_ID: "workflow.controlPlaneNamespaceId",
+};
+
+const InfraIds = {
+  POSTGRES: "postgres.control-plane",
+  SEAWEEDFS: "seaweedfs",
+};
+
+const SeaweedfsValues = {
+  BUCKET_NAME: "bucketName",
+  HOST_ENDPOINT: "host.endpoint",
+  REGION: "region",
+  ACCESS_KEY_ID: "accessKeyId",
+  SECRET_ACCESS_KEY: "secretAccessKey",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -35,7 +48,7 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.CONTROL_PLANE_API),
     start: start({
-      postgresInfra: singleInfra(infra, ServiceIds.CONTROL_PLANE_API),
+      postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
     }),
   };
 }
@@ -51,6 +64,7 @@ function start(input: {
     }
 
     const resolvedPostgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
+    const resolvedSeaweedfs = startInput.infra.get(InfraIds.SEAWEEDFS);
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const runtime = await createControlPlaneApiRuntime({
@@ -60,6 +74,7 @@ function start(input: {
         dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
         gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
         postgres: resolvedPostgres,
+        seaweedfs: resolvedSeaweedfs,
       }),
     });
 
@@ -90,6 +105,7 @@ function config(input: {
   dataPlaneBaseUrl: string;
   gatewayWsUrl: string;
   postgres: ResolvedTestInfra;
+  seaweedfs: ResolvedTestInfra | undefined;
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -104,12 +120,27 @@ function config(input: {
       migrationUrl: hostDirectUrl,
     },
     objectStore: {
-      bucketName: "integration-new-media",
-      region: "us-east-1",
-      endpoint: "http://127.0.0.1:8333",
+      bucketName:
+        input.seaweedfs === undefined
+          ? "integration-new-media"
+          : infraValue(input.seaweedfs, SeaweedfsValues.BUCKET_NAME),
+      region:
+        input.seaweedfs === undefined
+          ? "us-east-1"
+          : infraValue(input.seaweedfs, SeaweedfsValues.REGION),
+      endpoint:
+        input.seaweedfs === undefined
+          ? "http://127.0.0.1:9"
+          : infraValue(input.seaweedfs, SeaweedfsValues.HOST_ENDPOINT),
       forcePathStyle: true,
-      accessKeyId: "integration-new-access-key",
-      secretAccessKey: "integration-new-secret-key",
+      accessKeyId:
+        input.seaweedfs === undefined
+          ? "integration-new-access-key"
+          : infraValue(input.seaweedfs, SeaweedfsValues.ACCESS_KEY_ID),
+      secretAccessKey:
+        input.seaweedfs === undefined
+          ? "integration-new-secret-key"
+          : infraValue(input.seaweedfs, SeaweedfsValues.SECRET_ACCESS_KEY),
     },
     workflow: {
       databaseUrl: hostDirectUrl,

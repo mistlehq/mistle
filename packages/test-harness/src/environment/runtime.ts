@@ -536,6 +536,7 @@ export async function startTestEnvironment<
   const plan = measureSync(setupTimings, "plan", () =>
     createTestEnvironmentPlan({
       services: requestedServices,
+      ...(input.extraInfra === undefined ? {} : { extraInfra: input.extraInfra }),
     }),
   );
   writeIntegrationTimingEvent(

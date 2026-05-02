@@ -51,6 +51,33 @@ and the harness service definition supports it. Docker mode should be uncommon
 in integration tests. Use it for packaging or deployment-shape behavior, not as
 the default way to test application behavior.
 
+## Extra Infrastructure
+
+Service definitions declare the infrastructure they need to boot and serve
+ordinary behavior. Tests should not request that baseline infrastructure
+manually.
+
+Some feature paths need additional physical infrastructure even though the
+service can run without it. Request those dependencies explicitly with
+`extraInfra`:
+
+```ts
+const it = createIntegrationTest({
+  services: ["control-plane-api", "control-plane-worker"],
+  extraInfra: ["mailpit"],
+});
+```
+
+Supported extra infra ids are:
+
+- `mailpit`: email delivery assertions, such as auth OTP flows.
+- `seaweedfs`: object-store behavior, such as avatar or organization logo
+  uploads.
+
+`extraInfra` is environment-scoped and should be rare. The harness still pools
+the physical containers across the runner and gives each logical environment its
+own scoped wiring, such as a SeaweedFS bucket.
+
 ## Test Shape
 
 Tests receive one fixture field: `env`.

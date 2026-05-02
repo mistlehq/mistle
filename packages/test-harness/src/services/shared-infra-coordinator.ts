@@ -20,6 +20,7 @@ import {
   type PostgresWithPgBouncerService,
   type StartPostgresWithPgBouncerInput,
 } from "./postgres/index.js";
+import { startSeaweedfsS3, type SeaweedfsS3Service } from "./seaweedfs/index.js";
 import { startValkey, type ValkeyService } from "./valkey/index.js";
 
 const STATE_FILE_VERSION = 1;
@@ -121,6 +122,15 @@ type PersistedMailpitInfra = {
   runtimeMetadata: MailpitService["runtimeMetadata"];
 };
 
+type PersistedSeaweedfsInfra = {
+  bucketName: string;
+  endpoint: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  runtimeMetadata: SeaweedfsS3Service["runtimeMetadata"];
+};
+
 type PersistedValkeyInfra = {
   host: string;
   port: number;
@@ -137,6 +147,7 @@ type PersistedLease = {
 type PersistedSharedInfraEntry = {
   postgres: PersistedPostgresInfra | undefined;
   mailpit: PersistedMailpitInfra | undefined;
+  seaweedfs: PersistedSeaweedfsInfra | undefined;
   valkey: PersistedValkeyInfra | undefined;
   leases: Record<string, PersistedLease>;
 };
@@ -150,6 +161,7 @@ type SharedInfraRequest = {
   key: string;
   postgres: PostgresRequestConfig | undefined;
   mailpit: boolean;
+  seaweedfs: boolean;
   valkey: boolean;
 };
 
@@ -157,6 +169,7 @@ export type SharedInfraCoordinatorLease = {
   infra: {
     postgres: PostgresWithPgBouncerService | undefined;
     mailpit: MailpitService | undefined;
+    seaweedfs: SeaweedfsS3Service | undefined;
     valkey: ValkeyService | undefined;
     containerHostGateway: string;
   };
@@ -300,6 +313,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
 
     const postgresValue = value["postgres"];
     const mailpitValue = value["mailpit"];
+    const seaweedfsValue = value["seaweedfs"];
     const valkeyValue = value["valkey"];
 
     const postgres =
@@ -455,7 +469,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
               runtimeMetadata: {
                 postgresContainerId,
                 pgbouncerContainerId,
-                networkId: networkIdValue,
+                networkId: typeof networkIdValue === "string" ? networkIdValue : undefined,
               },
             } satisfies PersistedPostgresInfra;
           })();
@@ -564,9 +578,77 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
             } satisfies PersistedValkeyInfra;
           })();
 
+    const seaweedfs =
+      seaweedfsValue === undefined
+        ? undefined
+        : (() => {
+            if (!isRecord(seaweedfsValue)) {
+              throw new Error(`Shared infra seaweedfs entry for key ${key} must be an object.`);
+            }
+
+            const bucketName = readRecordString(
+              seaweedfsValue,
+              "bucketName",
+              `shared infra seaweedfs bucketName for key ${key}`,
+            );
+            const endpoint = readRecordString(
+              seaweedfsValue,
+              "endpoint",
+              `shared infra seaweedfs endpoint for key ${key}`,
+            );
+            const region = readRecordString(
+              seaweedfsValue,
+              "region",
+              `shared infra seaweedfs region for key ${key}`,
+            );
+            const accessKeyId = readRecordString(
+              seaweedfsValue,
+              "accessKeyId",
+              `shared infra seaweedfs accessKeyId for key ${key}`,
+            );
+            const secretAccessKey = readRecordString(
+              seaweedfsValue,
+              "secretAccessKey",
+              `shared infra seaweedfs secretAccessKey for key ${key}`,
+            );
+            const runtimeMetadata = seaweedfsValue["runtimeMetadata"];
+            if (
+              bucketName === undefined ||
+              endpoint === undefined ||
+              region === undefined ||
+              accessKeyId === undefined ||
+              secretAccessKey === undefined ||
+              !isRecord(runtimeMetadata)
+            ) {
+              throw new Error(`Shared infra seaweedfs entry for key ${key} is missing fields.`);
+            }
+            const containerId = readRecordString(
+              runtimeMetadata,
+              "containerId",
+              `shared infra seaweedfs runtime containerId for key ${key}`,
+            );
+            if (containerId === undefined) {
+              throw new Error(
+                `Shared infra seaweedfs runtime containerId for key ${key} is missing.`,
+              );
+            }
+
+            return {
+              bucketName,
+              endpoint,
+              region,
+              accessKeyId,
+              secretAccessKey,
+              runtimeMetadata: {
+                containerId,
+              },
+            } satisfies PersistedSeaweedfsInfra;
+          })();
+
     entries[key] = {
       postgres,
       mailpit,
+      seaweedfs,
       valkey,
       leases,
     };
@@ -728,6 +810,20 @@ function createMailpitServiceView(input: PersistedMailpitInfra): MailpitService 
   };
 }
 
+function createSeaweedfsServiceView(input: PersistedSeaweedfsInfra): SeaweedfsS3Service {
+  return {
+    bucketName: input.bucketName,
+    endpoint: input.endpoint,
+    region: input.region,
+    accessKeyId: input.accessKeyId,
+    secretAccessKey: input.secretAccessKey,
+    runtimeMetadata: input.runtimeMetadata,
+    stop: async () => {
+      throw new Error("Shared seaweedfs infra is coordinator-managed. Use lease.release().");
+    },
+  };
+}
+
 function createValkeyServiceView(input: PersistedValkeyInfra): ValkeyService {
   return {
     host: input.host,
@@ -802,6 +898,11 @@ async function stopPersistedInfraEntry(
     tasks.push(async () => stopContainerById(valkey.runtimeMetadata.containerId));
   }
 
+  if (input.seaweedfs !== undefined) {
+    const seaweedfs = input.seaweedfs;
+    tasks.push(async () => stopContainerById(seaweedfs.runtimeMetadata.containerId));
+  }
+
   if (input.postgres !== undefined) {
     const postgres = input.postgres;
     tasks.push(async () => stopContainerById(postgres.runtimeMetadata.pgbouncerContainerId));
@@ -860,6 +961,7 @@ function getOrCreateEntry(
   const created: PersistedSharedInfraEntry = {
     postgres: undefined,
     mailpit: undefined,
+    seaweedfs: undefined,
     valkey: undefined,
     leases: {},
   };
@@ -934,6 +1036,33 @@ async function ensureEntryInfraForRequest(
           smtpPort: mailpit.smtpPort,
           httpBaseUrl: mailpit.httpBaseUrl,
           runtimeMetadata: mailpit.runtimeMetadata,
+        };
+      }
+    }
+
+    if (request.seaweedfs) {
+      if (entry.seaweedfs === undefined) {
+        sharedInfraDebug(`startup: starting seaweedfs for key=${key}`);
+        const seaweedfs = await measure(timings, "start-seaweedfs", async () =>
+          startSeaweedfsS3({
+            bucketName: "mistle-integration",
+            manageProcessCleanup: false,
+            containerLabels: {
+              ...sharedLabels,
+              [SHARED_INFRA_SERVICE_LABEL]: "seaweedfs",
+            },
+          }),
+        );
+        startupCleanupTasks.unshift(async () => seaweedfs.stop());
+        sharedInfraDebug(`startup: started seaweedfs for key=${key}`);
+
+        entry.seaweedfs = {
+          bucketName: seaweedfs.bucketName,
+          endpoint: seaweedfs.endpoint,
+          region: seaweedfs.region,
+          accessKeyId: seaweedfs.accessKeyId,
+          secretAccessKey: seaweedfs.secretAccessKey,
+          runtimeMetadata: seaweedfs.runtimeMetadata,
         };
       }
     }
@@ -1020,8 +1149,10 @@ export async function acquireSharedInfraCoordinatorLease(
   request: SharedInfraRequest,
 ): Promise<SharedInfraCoordinatorLease> {
   validateKey(request.key);
-  if (request.postgres === undefined && !request.mailpit && !request.valkey) {
-    throw new Error("Shared infra request must require postgres, mailpit, and/or valkey.");
+  if (request.postgres === undefined && !request.mailpit && !request.seaweedfs && !request.valkey) {
+    throw new Error(
+      "Shared infra request must require postgres, mailpit, seaweedfs, and/or valkey.",
+    );
   }
 
   const leaseOwner = resolveLeaseOwner(process.env);
@@ -1039,19 +1170,24 @@ export async function acquireSharedInfraCoordinatorLease(
 
     if (
       Object.keys(entry.leases).length === 0 &&
-      (entry.postgres !== undefined || entry.mailpit !== undefined || entry.valkey !== undefined)
+      (entry.postgres !== undefined ||
+        entry.mailpit !== undefined ||
+        entry.seaweedfs !== undefined ||
+        entry.valkey !== undefined)
     ) {
       await measure(acquireTimings, "stop-unleased-entry", async () =>
         stopPersistedInfraEntry(entry, request.key),
       );
       entry.postgres = undefined;
       entry.mailpit = undefined;
+      entry.seaweedfs = undefined;
       entry.valkey = undefined;
     }
     if (
       Object.keys(entry.leases).length === 0 &&
       entry.postgres === undefined &&
       entry.mailpit === undefined &&
+      entry.seaweedfs === undefined &&
       entry.valkey === undefined
     ) {
       await measure(acquireTimings, "cleanup-orphans", async () =>
@@ -1077,6 +1213,8 @@ export async function acquireSharedInfraCoordinatorLease(
       postgres:
         entry.postgres === undefined ? undefined : createPostgresServiceView(entry.postgres),
       mailpit: entry.mailpit === undefined ? undefined : createMailpitServiceView(entry.mailpit),
+      seaweedfs:
+        entry.seaweedfs === undefined ? undefined : createSeaweedfsServiceView(entry.seaweedfs),
       valkey: entry.valkey === undefined ? undefined : createValkeyServiceView(entry.valkey),
       containerHostGateway: TESTCONTAINERS_HOST_GATEWAY,
     };

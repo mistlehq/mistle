@@ -78,15 +78,37 @@ function createPostgresRequirement(provisioner: TestInfraProvisioner): TestInfra
   };
 }
 
-function createPostgresProvisioner(cleanupEvents: string[]): TestInfraProvisioner {
+function createMailpitRequirement(provisioner: TestInfraProvisioner): TestInfraRequirement {
   return {
+    id: "mailpit",
+    kind: "mailpit",
+    provisioner,
+  };
+}
+
+function createPostgresProvisioner(cleanupEvents: string[]): TestInfraProvisioner {
+  return createProvisioner({
     kind: "postgres-database",
-    provision: async (input) =>
-      input.requirements.map((requirement) =>
+    cleanupEvents,
+  });
+}
+
+function createMailpitProvisioner(cleanupEvents: string[]): TestInfraProvisioner {
+  return createProvisioner({
+    kind: "mailpit",
+    cleanupEvents,
+  });
+}
+
+function createProvisioner(input: { kind: string; cleanupEvents: string[] }): TestInfraProvisioner {
+  return {
+    kind: input.kind,
+    provision: async (provisionInput) =>
+      provisionInput.requirements.map((requirement) =>
         createResolvedInfra({
           id: requirement.id,
           kind: requirement.kind,
-          cleanupEvents,
+          cleanupEvents: input.cleanupEvents,
         }),
       ),
   };
@@ -291,6 +313,60 @@ describe("startTestEnvironment", () => {
     ]);
 
     await environment.stop();
+  });
+
+  it("makes explicit extra infra available to selected services", async () => {
+    const startEvents: string[] = [];
+    const cleanupEvents: string[] = [];
+    const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+    const mailpitProvisioner = createMailpitProvisioner(cleanupEvents);
+    const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+    const mailpitRequirement = createMailpitRequirement(mailpitProvisioner);
+    const registry = defineTestServiceRegistry({
+      "control-plane-api": {
+        id: "control-plane-api",
+        infra: [postgresRequirement],
+        serviceReferences: [],
+        supportedModes: ["runtime"],
+        healthCheck: async () => {},
+        start: async (startInput) => {
+          const postgres = startInput.infra.get("postgres.control-plane");
+          const mailpit = startInput.infra.get("mailpit");
+          if (postgres === undefined || mailpit === undefined) {
+            throw new Error("Expected postgres and mailpit infra to be resolved.");
+          }
+
+          startEvents.push(`${postgres.id}:${mailpit.id}`);
+
+          return {
+            id: "control-plane-api",
+            mode: startInput.mode,
+            endpoints: {},
+            stop: async () => {
+              cleanupEvents.push("service:control-plane-api");
+            },
+          };
+        },
+      },
+    });
+
+    const environment = await startTestEnvironment({
+      id: "env_extra_infra",
+      registry,
+      services: [{ service: "control-plane-api", mode: "runtime" }],
+      extraInfra: [mailpitRequirement],
+    });
+
+    expect(Array.from(environment.infra.keys())).toEqual(["postgres.control-plane", "mailpit"]);
+    expect(startEvents).toEqual(["postgres.control-plane:mailpit"]);
+
+    await environment.stop();
+
+    expect(cleanupEvents).toEqual([
+      "service:control-plane-api",
+      "infra:mailpit",
+      "infra:postgres.control-plane",
+    ]);
   });
 
   it("allows explicit stop to be called more than once", async () => {

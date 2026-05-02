@@ -88,15 +88,16 @@ function assertServiceRequest(input: {
   }
 }
 
-function collectInfraRequirements(
-  requests: readonly TestServiceRequest[],
-): readonly TestInfraRequirement[] {
+function collectInfraRequirements(input: {
+  requests: readonly TestServiceRequest[];
+  extraInfra: readonly TestInfraRequirement[];
+}): readonly TestInfraRequirement[] {
   // Preserve declaration order for provisioners. A service reference edge should
   // not reorder infrastructure setup because infra does not depend on services.
   const requirementsById = new Map<string, TestInfraRequirement>();
   const orderedRequirements: TestInfraRequirement[] = [];
 
-  for (const request of requests) {
+  for (const request of input.requests) {
     for (const requirement of request.service.infra) {
       appendUniqueInfraRequirement({
         requirementsById,
@@ -104,6 +105,14 @@ function collectInfraRequirements(
         requirement,
       });
     }
+  }
+
+  for (const requirement of input.extraInfra) {
+    appendUniqueInfraRequirement({
+      requirementsById,
+      orderedRequirements,
+      requirement,
+    });
   }
 
   return orderedRequirements;
@@ -196,6 +205,7 @@ function createServiceLayers(
 
 export function createTestEnvironmentPlan(input: {
   services: readonly TestServiceRequest[];
+  extraInfra?: readonly TestInfraRequirement[];
 }): TestEnvironmentPlan {
   // Planning is intentionally side-effect free. It validates the requested graph,
   // dedupes logical infrastructure, and computes parallelizable service layers.
@@ -225,7 +235,10 @@ export function createTestEnvironmentPlan(input: {
   return {
     // Infra is collected from the original requests so provisioners see
     // requirements in declaration order, independent of service reference order.
-    infraRequirements: collectInfraRequirements(input.services),
+    infraRequirements: collectInfraRequirements({
+      requests: input.services,
+      extraInfra: input.extraInfra ?? [],
+    }),
     serviceLayers: createServiceLayers(orderedRequests),
   };
 }

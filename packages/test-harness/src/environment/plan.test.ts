@@ -75,6 +75,20 @@ describe("createTestEnvironmentPlan", () => {
     expect(plan.infraRequirements).toEqual([postgresInfra, mailpitInfra]);
   });
 
+  it("appends explicit extra infra after service-required infra", () => {
+    const controlPlaneApi = createService({
+      id: "control-plane-api",
+      infra: [postgresInfra],
+    });
+
+    const plan = createTestEnvironmentPlan({
+      services: [request(controlPlaneApi)],
+      extraInfra: [mailpitInfra],
+    });
+
+    expect(plan.infraRequirements).toEqual([postgresInfra, mailpitInfra]);
+  });
+
   it("groups selected service references into startup layers", () => {
     const controlPlaneApi = createService({
       id: "control-plane-api",

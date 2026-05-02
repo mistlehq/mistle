@@ -11,6 +11,7 @@ import { readLatestSignInOtp } from "../integration/helpers/sign-in-otp.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "control-plane-worker"],
+  extraInfra: ["mailpit"],
 });
 
 describe("auth otp integration", () => {

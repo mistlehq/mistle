@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createTestRegistry } from "./service-catalog.js";
+import { createTestExtraInfra, createTestRegistry } from "./service-catalog.js";
 import { createDataPlaneTestSchemaName } from "./test-isolation.js";
 
 describe("createTestRegistry", () => {
@@ -25,7 +25,6 @@ describe("createTestRegistry", () => {
     ]);
     expect(registry["control-plane-worker"].infra.map((infra) => infra.id)).toEqual([
       "postgres.control-plane",
-      "mailpit",
     ]);
     expect(registry["data-plane-api"].infra.map((infra) => infra.id)).toEqual([
       "postgres.data-plane",
@@ -38,6 +37,18 @@ describe("createTestRegistry", () => {
       "postgres.data-plane",
     ]);
     expect(registry["tokenizer-proxy"].infra.map((infra) => infra.id)).toEqual([]);
+  });
+
+  it("resolves explicitly requested extra infra independently from service declarations", () => {
+    const registry = createTestRegistry();
+    const extraInfra = createTestExtraInfra({
+      ids: ["mailpit", "seaweedfs"],
+    });
+
+    expect(registry["control-plane-api"].infra.map((infra) => infra.id)).toEqual([
+      "postgres.control-plane",
+    ]);
+    expect(extraInfra.map((infra) => infra.id)).toEqual(["mailpit", "seaweedfs"]);
   });
 
   it("uses one Postgres provisioner for control-plane and data-plane logical resources", () => {

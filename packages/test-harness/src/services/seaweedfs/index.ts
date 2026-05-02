@@ -72,7 +72,7 @@ export async function startSeaweedfsS3(
         ? undefined
         : `http://${networkAlias}:${String(SEAWEEDFS_S3_PORT)}`;
 
-    await ensureBucketExists({
+    await ensureSeaweedfsS3BucketExists({
       accessKeyId,
       bucketName,
       endpoint: hostEndpoint,
@@ -138,7 +138,7 @@ export async function startSeaweedfsS3(
   }
 }
 
-async function ensureBucketExists(input: {
+export async function ensureSeaweedfsS3BucketExists(input: {
   bucketName: string;
   endpoint: string;
   accessKeyId: string;
