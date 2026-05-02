@@ -42,6 +42,25 @@ describe("createSetupScriptTestShellPayload", () => {
 });
 
 describe("resolveSetupScriptTestStatus", () => {
+  it("prefers the terminal exit result over later sandbox status errors", () => {
+    expect(
+      resolveSetupScriptTestStatus({
+        isOpenRequested: false,
+        ptyErrorMessage: null,
+        ptyExitCode: 0,
+        runErrorMessage: "Sandbox instance 'sbi_test' was not found.",
+        scriptIsBlank: false,
+        startIsPending: false,
+        startedRun: {
+          failOnFirstError: true,
+          ptySessionId: "setup-script-test-1",
+          sandboxInstanceId: "sbi_setup_test_1",
+          setupScript: "pnpm install",
+        },
+      }),
+    ).toBe("success");
+  });
+
   it("reports blank only when there is no active setup script test run", () => {
     expect(
       resolveSetupScriptTestStatus({

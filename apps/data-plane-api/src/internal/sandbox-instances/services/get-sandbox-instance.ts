@@ -4,7 +4,7 @@ import {
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import type {
@@ -46,7 +46,10 @@ export async function getSandboxInstance(
       and(
         eq(sandboxInstances.id, input.instanceId),
         eq(sandboxInstances.organizationId, input.organizationId),
-        eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+        or(
+          eq(sandboxInstances.purpose, SandboxInstancePurposes.SESSION),
+          eq(sandboxInstances.purpose, SandboxInstancePurposes.SETUP_CHECK),
+        ),
       ),
     )
     .limit(1);

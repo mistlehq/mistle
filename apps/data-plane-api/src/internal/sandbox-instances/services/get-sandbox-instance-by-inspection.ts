@@ -14,7 +14,7 @@ import {
   type SandboxAdapter,
   type SandboxProvider,
 } from "@mistle/sandbox";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 import type { AppRuntimeResources } from "../../../resources.js";
 import type {
@@ -661,7 +661,10 @@ export async function getSandboxInstanceByInspection(
       whereAnd(
         eq(table.id, input.instanceId),
         whereEq(table.organizationId, input.organizationId),
-        whereEq(table.purpose, SandboxInstancePurposes.SESSION),
+        or(
+          whereEq(table.purpose, SandboxInstancePurposes.SESSION),
+          whereEq(table.purpose, SandboxInstancePurposes.SETUP_CHECK),
+        ),
       ),
   });
   if (sandboxInstance === undefined) {

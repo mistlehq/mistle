@@ -184,12 +184,12 @@ export function resolveSetupScriptTestStatus(input: {
   startIsPending: boolean;
   startedRun: StartedSetupScriptTestRun | null;
 }): SetupScriptTestStatus {
-  if (input.runErrorMessage !== null || input.ptyErrorMessage !== null) {
-    return "failed";
-  }
-
   if (input.ptyExitCode !== null) {
     return input.ptyExitCode === 0 ? "success" : "failed";
+  }
+
+  if (input.runErrorMessage !== null || input.ptyErrorMessage !== null) {
+    return "failed";
   }
 
   if (input.isOpenRequested) {
@@ -457,8 +457,9 @@ export function useSandboxProfileSetupScriptTestRun(
         signal,
       });
     },
-    enabled: startedRun !== null,
+    enabled: startedRun !== null && ptyState.lifecycle.exitInfo === null,
     refetchInterval: (query) =>
+      query.state.error !== null ||
       query.state.data?.connectable === true ||
       query.state.data?.status === "failed" ||
       query.state.data?.status === "stopped"
@@ -470,12 +471,13 @@ export function useSandboxProfileSetupScriptTestRun(
     failureMessage: sandboxStatusQuery.data?.failureMessage,
     status: sandboxStatusQuery.data?.status,
   });
-  const sandboxStatusErrorMessage = sandboxStatusQuery.isError
-    ? resolveApiErrorMessage({
-        error: sandboxStatusQuery.error,
-        fallbackMessage: "Could not check setup script test sandbox status.",
-      })
-    : null;
+  const sandboxStatusErrorMessage =
+    ptyState.lifecycle.exitInfo === null && sandboxStatusQuery.isError
+      ? resolveApiErrorMessage({
+          error: sandboxStatusQuery.error,
+          fallbackMessage: "Could not check setup script test sandbox status.",
+        })
+      : null;
   const testRunErrorMessage = sandboxFailureMessage ?? sandboxStatusErrorMessage ?? runErrorMessage;
   const status = resolveSetupScriptTestStatus({
     isOpenRequested,
