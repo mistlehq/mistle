@@ -161,10 +161,9 @@ async function createRefreshSchedule(
   },
 ): Promise<ProfileVersionRefreshSchedule> {
   const name = input.name ?? DefaultRefreshScheduleName;
-  const schedules = tables.schedules;
   const scheduleTargets = tables.sandboxProfileSnapshotRefreshScheduleTargets;
   const [schedule] = await tx
-    .insert(schedules)
+    .insert(tables.schedules)
     .values({
       organizationId: input.organizationId,
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
@@ -175,12 +174,12 @@ async function createRefreshSchedule(
       nextScheduledAt: input.nextScheduledAt,
     })
     .returning({
-      id: schedules.id,
-      name: schedules.name,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      enabled: schedules.enabled,
-      nextScheduledAt: schedules.nextScheduledAt,
+      id: tables.schedules.id,
+      name: tables.schedules.name,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      enabled: tables.schedules.enabled,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
     });
 
   if (schedule === undefined) {
@@ -209,9 +208,8 @@ async function updateRefreshSchedule(
   },
 ): Promise<ProfileVersionRefreshSchedule> {
   const name = input.name ?? DefaultRefreshScheduleName;
-  const schedules = tables.schedules;
   const [schedule] = await tx
-    .update(schedules)
+    .update(tables.schedules)
     .set({
       name,
       cronExpression: input.cronExpression,
@@ -221,14 +219,14 @@ async function updateRefreshSchedule(
       deletedAt: null,
       updatedAt: sql`now()`,
     })
-    .where(eq(schedules.id, input.scheduleId))
+    .where(eq(tables.schedules.id, input.scheduleId))
     .returning({
-      id: schedules.id,
-      name: schedules.name,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      enabled: schedules.enabled,
-      nextScheduledAt: schedules.nextScheduledAt,
+      id: tables.schedules.id,
+      name: tables.schedules.name,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      enabled: tables.schedules.enabled,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
     });
 
   if (schedule === undefined) {

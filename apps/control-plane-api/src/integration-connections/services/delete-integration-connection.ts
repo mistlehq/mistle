@@ -1,13 +1,7 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
-  integrationCredentials,
-  integrationWebhookSources,
   OrganizationIdentityLinkProviderConfigStatus,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
   type ControlPlaneDatabase,
-  webhookAutomations,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import { IntegrationWebhookSourceLifecycles } from "@mistle/integrations-core";
@@ -36,22 +30,26 @@ async function lockAffectedSandboxProfilesForUpdate(input: {
   organizationId: string;
   connectionId: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   await input.db
     .select({
-      id: sandboxProfiles.id,
+      id: tables.sandboxProfiles.id,
     })
-    .from(sandboxProfiles)
+    .from(tables.sandboxProfiles)
     .where(
       and(
-        eq(sandboxProfiles.organizationId, input.organizationId),
+        eq(tables.sandboxProfiles.organizationId, input.organizationId),
         inArray(
-          sandboxProfiles.id,
+          tables.sandboxProfiles.id,
           input.db
             .select({
-              sandboxProfileId: sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+              sandboxProfileId: tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId,
             })
-            .from(sandboxProfileVersionIntegrationBindings)
-            .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId)),
+            .from(tables.sandboxProfileVersionIntegrationBindings)
+            .where(
+              eq(tables.sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId),
+            ),
         ),
       ),
     )
@@ -63,15 +61,17 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
   organizationId: string;
   connectionId: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const [lockedConnection] = await input.db
     .select({
-      id: integrationConnections.id,
+      id: tables.integrationConnections.id,
     })
-    .from(integrationConnections)
+    .from(tables.integrationConnections)
     .where(
       and(
-        eq(integrationConnections.organizationId, input.organizationId),
-        eq(integrationConnections.id, input.connectionId),
+        eq(tables.integrationConnections.organizationId, input.organizationId),
+        eq(tables.integrationConnections.id, input.connectionId),
       ),
     )
     .limit(1)
@@ -108,12 +108,12 @@ async function assertConnectionDeletionGuardsOrThrow(input: {
     .select({
       automationCount: sql<number>`count(*)::int`,
     })
-    .from(webhookAutomations)
+    .from(tables.webhookAutomations)
     .innerJoin(
-      integrationWebhookSources,
-      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+      tables.integrationWebhookSources,
+      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
     )
-    .where(eq(integrationWebhookSources.integrationConnectionId, lockedConnection.id));
+    .where(eq(tables.integrationWebhookSources.integrationConnectionId, lockedConnection.id));
 
   if ((automationUsage?.automationCount ?? 0) > 0) {
     throw new ConflictError(
@@ -153,6 +153,8 @@ export async function deleteIntegrationConnection(
   input: DeleteIntegrationConnectionInput,
 ): Promise<void> {
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     await assertConnectionDeletionGuardsOrThrow({
       db: tx,
       organizationId: input.organizationId,
@@ -235,8 +237,8 @@ export async function deleteIntegrationConnection(
     }
 
     await tx
-      .delete(sandboxProfileVersionIntegrationBindings)
-      .where(eq(sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId));
+      .delete(tables.sandboxProfileVersionIntegrationBindings)
+      .where(eq(tables.sandboxProfileVersionIntegrationBindings.connectionId, input.connectionId));
 
     const connectionOwnedWebhookSources = await tx.query.integrationWebhookSources.findMany({
       columns: {
@@ -248,8 +250,8 @@ export async function deleteIntegrationConnection(
 
     if (connectionOwnedWebhookSources.length > 0) {
       await tx
-        .delete(integrationWebhookSources)
-        .where(eq(integrationWebhookSources.integrationConnectionId, input.connectionId));
+        .delete(tables.integrationWebhookSources)
+        .where(eq(tables.integrationWebhookSources.integrationConnectionId, input.connectionId));
     }
 
     const webhookSecretCredentialIds = connectionOwnedWebhookSources
@@ -258,47 +260,47 @@ export async function deleteIntegrationConnection(
 
     if (webhookSecretCredentialIds.length > 0) {
       await tx
-        .delete(integrationCredentials)
+        .delete(tables.integrationCredentials)
         .where(
           and(
-            eq(integrationCredentials.organizationId, input.organizationId),
-            inArray(integrationCredentials.id, webhookSecretCredentialIds),
+            eq(tables.integrationCredentials.organizationId, input.organizationId),
+            inArray(tables.integrationCredentials.id, webhookSecretCredentialIds),
           ),
         );
     }
 
     const linkedCredentials = await tx
       .select({
-        credentialId: integrationConnectionCredentials.credentialId,
+        credentialId: tables.integrationConnectionCredentials.credentialId,
       })
-      .from(integrationConnectionCredentials)
-      .where(eq(integrationConnectionCredentials.connectionId, input.connectionId));
+      .from(tables.integrationConnectionCredentials)
+      .where(eq(tables.integrationConnectionCredentials.connectionId, input.connectionId));
 
     await tx
-      .delete(integrationConnectionCredentials)
-      .where(eq(integrationConnectionCredentials.connectionId, input.connectionId));
+      .delete(tables.integrationConnectionCredentials)
+      .where(eq(tables.integrationConnectionCredentials.connectionId, input.connectionId));
 
     const credentialIds = linkedCredentials.map((credential) => credential.credentialId);
     if (credentialIds.length > 0) {
-      await tx.delete(integrationCredentials).where(
+      await tx.delete(tables.integrationCredentials).where(
         and(
-          eq(integrationCredentials.organizationId, input.organizationId),
-          inArray(integrationCredentials.id, credentialIds),
+          eq(tables.integrationCredentials.organizationId, input.organizationId),
+          inArray(tables.integrationCredentials.id, credentialIds),
           sql`not exists (
               select 1
               from "control_plane"."integration_connection_credentials" as linked_credentials
-              where linked_credentials.credential_id = ${integrationCredentials.id}
+              where linked_credentials.credential_id = ${tables.integrationCredentials.id}
             )`,
         ),
       );
     }
 
     await tx
-      .delete(integrationConnections)
+      .delete(tables.integrationConnections)
       .where(
         and(
-          eq(integrationConnections.organizationId, input.organizationId),
-          eq(integrationConnections.id, input.connectionId),
+          eq(tables.integrationConnections.organizationId, input.organizationId),
+          eq(tables.integrationConnections.id, input.connectionId),
         ),
       );
   });

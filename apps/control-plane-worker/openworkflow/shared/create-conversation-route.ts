@@ -1,9 +1,9 @@
 import {
-  automationConversationRoutes,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 
 import {
@@ -21,6 +21,8 @@ export async function createAutomationConversationRoute(
   },
   input: CreateAutomationConversationRouteInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(deps.db);
+
   const existingAutomationConversation = await deps.db.query.automationConversations.findFirst({
     where: (table, { eq }) => eq(table.id, input.conversationId),
   });
@@ -38,7 +40,7 @@ export async function createAutomationConversationRoute(
   }
 
   const insertedRows = await deps.db
-    .insert(automationConversationRoutes)
+    .insert(tables.automationConversationRoutes)
     .values({
       conversationId: input.conversationId,
       sandboxInstanceId: input.sandboxInstanceId,
@@ -48,7 +50,7 @@ export async function createAutomationConversationRoute(
       status: AutomationConversationRouteStatuses.ACTIVE,
     })
     .onConflictDoNothing({
-      target: [automationConversationRoutes.conversationId],
+      target: [tables.automationConversationRoutes.conversationId],
     })
     .returning();
   const insertedRoute = insertedRows[0];

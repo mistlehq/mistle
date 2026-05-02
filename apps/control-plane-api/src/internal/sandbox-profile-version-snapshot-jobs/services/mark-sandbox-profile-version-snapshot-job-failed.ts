@@ -1,7 +1,7 @@
 import {
-  sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -23,15 +23,17 @@ export async function markSandboxProfileVersionSnapshotJobFailed(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedRow] = await tx
       .select({
-        state: sandboxProfileVersionSnapshotJobs.state,
-        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
-        errorCode: sandboxProfileVersionSnapshotJobs.errorCode,
-        errorMessage: sandboxProfileVersionSnapshotJobs.errorMessage,
+        state: tables.sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
+        errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
+        errorMessage: tables.sandboxProfileVersionSnapshotJobs.errorMessage,
       })
-      .from(sandboxProfileVersionSnapshotJobs)
-      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .from(tables.sandboxProfileVersionSnapshotJobs)
+      .where(eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
       .for("update");
 
     if (lockedRow === undefined) {
@@ -67,7 +69,7 @@ export async function markSandboxProfileVersionSnapshotJobFailed(
     }
 
     const updatedRows = await tx
-      .update(sandboxProfileVersionSnapshotJobs)
+      .update(tables.sandboxProfileVersionSnapshotJobs)
       .set({
         state: SandboxProfileVersionSnapshotJobStates.FAILED,
         candidateImageProvider: null,
@@ -79,16 +81,16 @@ export async function markSandboxProfileVersionSnapshotJobFailed(
       })
       .where(
         and(
-          eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+          eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
           eq(
-            sandboxProfileVersionSnapshotJobs.state,
+            tables.sandboxProfileVersionSnapshotJobs.state,
             SandboxProfileVersionSnapshotJobStates.RUNNING,
           ),
-          eq(sandboxProfileVersionSnapshotJobs.workflowRunId, input.workflowRunId),
+          eq(tables.sandboxProfileVersionSnapshotJobs.workflowRunId, input.workflowRunId),
         ),
       )
       .returning({
-        id: sandboxProfileVersionSnapshotJobs.id,
+        id: tables.sandboxProfileVersionSnapshotJobs.id,
       });
 
     if (updatedRows[0] === undefined) {

@@ -1,7 +1,4 @@
-import {
-  integrationConnectionDeviceAuthorizationAttempts,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import {
@@ -39,8 +36,10 @@ async function persistDeviceAuthorizationAttempt(input: {
   expiresAt?: string;
   pollAfterAt: string | null;
 }): Promise<string> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const insertedRows = await input.db
-    .insert(integrationConnectionDeviceAuthorizationAttempts)
+    .insert(tables.integrationConnectionDeviceAuthorizationAttempts)
     .values({
       organizationId: input.organizationId,
       targetKey: input.targetKey,
@@ -53,7 +52,7 @@ async function persistDeviceAuthorizationAttempt(input: {
       ...(input.expiresAt === undefined ? {} : { expiresAt: input.expiresAt }),
     })
     .returning({
-      id: integrationConnectionDeviceAuthorizationAttempts.id,
+      id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
     });
 
   if (insertedRows[0] === undefined) {

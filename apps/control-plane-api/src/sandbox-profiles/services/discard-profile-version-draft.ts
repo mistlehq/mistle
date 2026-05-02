@@ -28,9 +28,9 @@ export async function discardProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: DiscardProfileVersionDraftInput,
 ): Promise<DiscardProfileVersionDraftOutput> {
-  const tables = getControlPlaneDatabaseSchema(db);
-
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
       columns: {
         activeVersion: true,

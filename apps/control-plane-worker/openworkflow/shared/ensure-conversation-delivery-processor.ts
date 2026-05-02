@@ -1,8 +1,8 @@
 import {
-  automationConversationDeliveryProcessors,
   AutomationConversationDeliveryProcessorStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -26,8 +26,10 @@ export async function ensureAutomationConversationDeliveryProcessor(
   },
   input: EnsureAutomationConversationDeliveryProcessorInput,
 ): Promise<EnsureAutomationConversationDeliveryProcessorOutput> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const insertedRows = await ctx.db
-    .insert(automationConversationDeliveryProcessors)
+    .insert(tables.automationConversationDeliveryProcessors)
     .values({
       conversationId: input.conversationId,
       generation: 1,
@@ -35,7 +37,7 @@ export async function ensureAutomationConversationDeliveryProcessor(
       activeWorkflowRunId: null,
     })
     .onConflictDoNothing({
-      target: [automationConversationDeliveryProcessors.conversationId],
+      target: [tables.automationConversationDeliveryProcessors.conversationId],
     })
     .returning();
   const insertedProcessor = insertedRows[0];
@@ -48,18 +50,18 @@ export async function ensureAutomationConversationDeliveryProcessor(
   }
 
   const updatedRows = await ctx.db
-    .update(automationConversationDeliveryProcessors)
+    .update(tables.automationConversationDeliveryProcessors)
     .set({
-      generation: sql`${automationConversationDeliveryProcessors.generation} + 1`,
+      generation: sql`${tables.automationConversationDeliveryProcessors.generation} + 1`,
       status: AutomationConversationDeliveryProcessorStatuses.RUNNING,
       activeWorkflowRunId: null,
       updatedAt: sql`now()`,
     })
     .where(
       and(
-        eq(automationConversationDeliveryProcessors.conversationId, input.conversationId),
+        eq(tables.automationConversationDeliveryProcessors.conversationId, input.conversationId),
         eq(
-          automationConversationDeliveryProcessors.status,
+          tables.automationConversationDeliveryProcessors.status,
           AutomationConversationDeliveryProcessorStatuses.IDLE,
         ),
       ),

@@ -14,10 +14,9 @@ async function markQueuedSnapshotJobFailedToEnqueue(
   },
 ): Promise<void> {
   const tables = getControlPlaneDatabaseSchema(db);
-  const sandboxProfileVersionSnapshotJobs = tables.sandboxProfileVersionSnapshotJobs;
 
   await db
-    .update(sandboxProfileVersionSnapshotJobs)
+    .update(tables.sandboxProfileVersionSnapshotJobs)
     .set({
       state: SandboxProfileVersionSnapshotJobStates.FAILED,
       finishedAt: sql`now()`,
@@ -27,8 +26,11 @@ async function markQueuedSnapshotJobFailedToEnqueue(
     })
     .where(
       and(
-        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
-        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
+        eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.state,
+          SandboxProfileVersionSnapshotJobStates.QUEUED,
+        ),
       ),
     );
 }

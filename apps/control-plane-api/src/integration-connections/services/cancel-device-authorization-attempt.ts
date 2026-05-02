@@ -1,8 +1,8 @@
 import {
-  integrationConnectionDeviceAuthorizationAttempts,
   IntegrationDeviceAuthorizationAttemptStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -57,13 +57,18 @@ async function lockAttemptForUpdateOrThrow(input: {
   organizationId: string;
   attemptId: string;
 }) {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const [lockedAttempt] = await input.db
     .select()
-    .from(integrationConnectionDeviceAuthorizationAttempts)
+    .from(tables.integrationConnectionDeviceAuthorizationAttempts)
     .where(
       and(
-        eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
-        eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+        eq(
+          tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+          input.organizationId,
+        ),
+        eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
       ),
     )
     .limit(1)
@@ -181,6 +186,8 @@ export async function cancelDeviceAuthorizationAttempt(
   }
 
   return ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const lockedAttempt = await lockAttemptForUpdateOrThrow({
       db: tx,
       organizationId: input.organizationId,
@@ -226,7 +233,7 @@ export async function cancelDeviceAuthorizationAttempt(
     }
 
     const [updatedAttempt] = await tx
-      .update(integrationConnectionDeviceAuthorizationAttempts)
+      .update(tables.integrationConnectionDeviceAuthorizationAttempts)
       .set({
         status: IntegrationDeviceAuthorizationAttemptStatuses.CANCELLED,
         cancelledAt: sql`now()`,
@@ -234,12 +241,15 @@ export async function cancelDeviceAuthorizationAttempt(
       })
       .where(
         and(
-          eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
-          eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+            input.organizationId,
+          ),
+          eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
         ),
       )
       .returning({
-        id: integrationConnectionDeviceAuthorizationAttempts.id,
+        id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
       });
 
     if (updatedAttempt === undefined) {

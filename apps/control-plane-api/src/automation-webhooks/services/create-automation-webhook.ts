@@ -1,10 +1,8 @@
 import {
-  automations,
   AutomationKinds,
-  automationTargets,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  webhookAutomations,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
@@ -119,8 +117,10 @@ async function createAutomationAggregate(
   tx: ControlPlaneTransaction,
   input: CreateWebhookAutomationPersistenceInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const insertedAutomationRows = await tx
-    .insert(automations)
+    .insert(tables.automations)
     .values({
       organizationId: input.organizationId,
       kind: AutomationKinds.WEBHOOK,
@@ -128,7 +128,7 @@ async function createAutomationAggregate(
       enabled: input.enabled ?? true,
     })
     .returning({
-      id: automations.id,
+      id: tables.automations.id,
     });
 
   const insertedAutomation = insertedAutomationRows[0];
@@ -137,7 +137,7 @@ async function createAutomationAggregate(
     throw new Error("Expected webhook automation row to be inserted.");
   }
 
-  await tx.insert(webhookAutomations).values({
+  await tx.insert(tables.webhookAutomations).values({
     automationId: insertedAutomation.id,
     integrationWebhookSourceId: input.integrationWebhookSourceId,
     eventTypes: input.eventTypes ?? null,
@@ -148,7 +148,7 @@ async function createAutomationAggregate(
     idempotencyKeyTemplate: input.idempotencyKeyTemplate ?? null,
   });
 
-  await tx.insert(automationTargets).values({
+  await tx.insert(tables.automationTargets).values({
     automationId: insertedAutomation.id,
     sandboxProfileId: input.target.sandboxProfileId,
     sandboxProfileVersion: input.target.sandboxProfileVersion,

@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import {
   type ControlPlaneDatabase,
   type IntegrationConnectionRedirectSession,
-  integrationConnectionRedirectSessions,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { z } from "zod";
@@ -40,8 +40,10 @@ export async function persistRedirectSessionOrThrow(input: {
   pkceVerifierEncrypted?: string;
   providerStateEncrypted?: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const insertedRows = await input.db
-    .insert(integrationConnectionRedirectSessions)
+    .insert(tables.integrationConnectionRedirectSessions)
     .values({
       organizationId: input.organizationId,
       targetKey: input.targetKey,
@@ -55,10 +57,10 @@ export async function persistRedirectSessionOrThrow(input: {
         : { providerStateEncrypted: input.providerStateEncrypted }),
     })
     .onConflictDoNothing({
-      target: integrationConnectionRedirectSessions.state,
+      target: tables.integrationConnectionRedirectSessions.state,
     })
     .returning({
-      id: integrationConnectionRedirectSessions.id,
+      id: tables.integrationConnectionRedirectSessions.id,
     });
 
   if (insertedRows.length !== 1) {

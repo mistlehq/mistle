@@ -25,8 +25,9 @@ export async function deleteProfileVersionRefreshSchedule(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: DeleteProfileVersionRefreshScheduleInput,
 ): Promise<DeleteProfileVersionRefreshScheduleOutput> {
-  const tables = getControlPlaneDatabaseSchema(db);
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     await lockProfileAndVersion(tx, tables, input);
 
     const target = await tx.query.sandboxProfileSnapshotRefreshScheduleTargets.findFirst({

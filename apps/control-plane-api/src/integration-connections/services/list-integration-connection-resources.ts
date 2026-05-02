@@ -1,5 +1,4 @@
 import {
-  integrationConnectionResources,
   type ControlPlaneDatabase,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
@@ -7,6 +6,7 @@ import {
   type IntegrationConnectionResource,
   type IntegrationConnectionResourceState,
   type IntegrationConnectionResourceSyncState,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import {
@@ -110,6 +110,7 @@ export async function listIntegrationConnectionResources(
   input: ListIntegrationConnectionResourcesInput,
 ): Promise<ListIntegrationConnectionResourcesResult> {
   const { db, integrationRegistry } = ctx;
+  const tables = getControlPlaneDatabaseSchema(db);
   let pageSize: number;
 
   try {
@@ -195,6 +196,7 @@ export async function listIntegrationConnectionResources(
         db.query.integrationConnectionResources.findMany({
           where: () =>
             buildResourceWhereClause({
+              tables,
               connectionId: connection.id,
               familyId: target.familyId,
               kind: input.kind,
@@ -213,13 +215,16 @@ export async function listIntegrationConnectionResources(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
+        const tables = getControlPlaneDatabaseSchema(ctx.db);
+
         const [result] = await db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
-          .from(integrationConnectionResources)
+          .from(tables.integrationConnectionResources)
           .where(
             buildResourceWhereClause({
+              tables,
               connectionId: connection.id,
               familyId: target.familyId,
               kind: input.kind,
@@ -348,6 +353,7 @@ function assertResourceStateIsReadable(
 }
 
 function buildResourceWhereClause(input: {
+  tables: ReturnType<typeof getControlPlaneDatabaseSchema>;
   connectionId: string;
   familyId: string;
   kind: string;
@@ -355,24 +361,28 @@ function buildResourceWhereClause(input: {
   direction?: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
   cursorId?: string;
 }) {
+  const { tables } = input;
   const normalizedSearch = normalizeSearch(input.search);
 
   return and(
-    eq(integrationConnectionResources.connectionId, input.connectionId),
-    eq(integrationConnectionResources.familyId, input.familyId),
-    eq(integrationConnectionResources.kind, input.kind),
-    eq(integrationConnectionResources.status, IntegrationConnectionResourceStatuses.ACCESSIBLE),
+    eq(tables.integrationConnectionResources.connectionId, input.connectionId),
+    eq(tables.integrationConnectionResources.familyId, input.familyId),
+    eq(tables.integrationConnectionResources.kind, input.kind),
+    eq(
+      tables.integrationConnectionResources.status,
+      IntegrationConnectionResourceStatuses.ACCESSIBLE,
+    ),
     normalizedSearch === undefined
       ? undefined
       : or(
-          ilike(integrationConnectionResources.displayName, `%${normalizedSearch}%`),
-          ilike(integrationConnectionResources.handle, `%${normalizedSearch}%`),
+          ilike(tables.integrationConnectionResources.displayName, `%${normalizedSearch}%`),
+          ilike(tables.integrationConnectionResources.handle, `%${normalizedSearch}%`),
         ),
     input.cursorId === undefined || input.direction === undefined
       ? undefined
       : input.direction === KeysetPaginationDirections.FORWARD
-        ? gt(integrationConnectionResources.id, input.cursorId)
-        : lt(integrationConnectionResources.id, input.cursorId),
+        ? gt(tables.integrationConnectionResources.id, input.cursorId)
+        : lt(tables.integrationConnectionResources.id, input.cursorId),
   );
 }
 

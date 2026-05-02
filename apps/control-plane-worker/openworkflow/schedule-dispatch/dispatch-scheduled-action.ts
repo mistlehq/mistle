@@ -1,10 +1,10 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import {
   type ControlPlaneDatabase,
-  scheduledActions,
   ScheduledActionStatuses,
   type ScheduleTargetType,
   ScheduleTargetTypes,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -153,17 +153,19 @@ async function markScheduledActionDispatched(
     targetWorkflowId: string | null;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
-    .update(scheduledActions)
+    .update(tables.scheduledActions)
     .set({
       status: ScheduledActionStatuses.DISPATCHED,
       dispatchedAt: sql`now()`,
       targetWorkflowId: input.targetWorkflowId,
-      targetWorkflowStartedAt: sql`coalesce(${scheduledActions.targetWorkflowStartedAt}, now())`,
+      targetWorkflowStartedAt: sql`coalesce(${tables.scheduledActions.targetWorkflowStartedAt}, now())`,
     })
-    .where(eq(scheduledActions.id, input.scheduledActionId))
+    .where(eq(tables.scheduledActions.id, input.scheduledActionId))
     .returning({
-      id: scheduledActions.id,
+      id: tables.scheduledActions.id,
     });
 
   assertSingleScheduledActionUpdate(updatedRows, input.scheduledActionId);
@@ -179,17 +181,19 @@ async function markScheduledActionFailed(
     failureMessage: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
-    .update(scheduledActions)
+    .update(tables.scheduledActions)
     .set({
       status: ScheduledActionStatuses.FAILED,
       failedAt: sql`now()`,
       failureCode: input.failureCode,
       failureMessage: input.failureMessage,
     })
-    .where(eq(scheduledActions.id, input.scheduledActionId))
+    .where(eq(tables.scheduledActions.id, input.scheduledActionId))
     .returning({
-      id: scheduledActions.id,
+      id: tables.scheduledActions.id,
     });
 
   assertSingleScheduledActionUpdate(updatedRows, input.scheduledActionId);

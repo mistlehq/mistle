@@ -4,7 +4,6 @@ import type {
 } from "@mistle/db/control-plane";
 import {
   getControlPlaneDatabaseSchema,
-  sandboxProfileVersionIntegrationBindings,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { IntegrationKinds, runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
@@ -182,7 +181,6 @@ export async function putProfileVersionIntegrationBindings(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: PutProfileVersionIntegrationBindingsInput,
 ): Promise<PutProfileVersionIntegrationBindingsResult> {
-  const tables = getControlPlaneDatabaseSchema(db);
   const duplicateBindingId = findDuplicateBindingId(input.bindings);
   if (duplicateBindingId !== undefined) {
     throw new SandboxProfilesIntegrationBindingsBadRequestError(
@@ -418,6 +416,8 @@ export async function putProfileVersionIntegrationBindings(
   }
 
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const lockedVersion = await lockProfileVersionForUpdateOrThrow({
       db: tx,
       tables,
@@ -464,22 +464,22 @@ export async function putProfileVersionIntegrationBindings(
 
     if (bindingIdsToDelete.length > 0) {
       await tx
-        .delete(sandboxProfileVersionIntegrationBindings)
+        .delete(tables.sandboxProfileVersionIntegrationBindings)
         .where(
           and(
-            eq(sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
+            eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
             eq(
-              sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+              tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
               input.profileVersion,
             ),
-            inArray(sandboxProfileVersionIntegrationBindings.id, bindingIdsToDelete),
+            inArray(tables.sandboxProfileVersionIntegrationBindings.id, bindingIdsToDelete),
           ),
         );
     }
 
     const bindingsToInsert = validatedBindings.filter((binding) => binding.id === undefined);
     if (bindingsToInsert.length > 0) {
-      await tx.insert(sandboxProfileVersionIntegrationBindings).values(
+      await tx.insert(tables.sandboxProfileVersionIntegrationBindings).values(
         bindingsToInsert.map((binding) => ({
           sandboxProfileId: input.profileId,
           sandboxProfileVersion: input.profileVersion,
@@ -508,7 +508,7 @@ export async function putProfileVersionIntegrationBindings(
       }
 
       await tx
-        .update(sandboxProfileVersionIntegrationBindings)
+        .update(tables.sandboxProfileVersionIntegrationBindings)
         .set({
           connectionId: binding.connectionId,
           kind: binding.kind,
@@ -517,12 +517,12 @@ export async function putProfileVersionIntegrationBindings(
         })
         .where(
           and(
-            eq(sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
+            eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
             eq(
-              sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+              tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
               input.profileVersion,
             ),
-            eq(sandboxProfileVersionIntegrationBindings.id, binding.id),
+            eq(tables.sandboxProfileVersionIntegrationBindings.id, binding.id),
           ),
         );
     }

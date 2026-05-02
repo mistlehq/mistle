@@ -1,8 +1,8 @@
 import {
-  automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 
 import {
@@ -22,8 +22,10 @@ export async function enqueueAutomationConversationDeliveryTask(
   },
   input: EnqueueAutomationConversationDeliveryTaskInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const insertedRows = await ctx.db
-    .insert(automationConversationDeliveryTasks)
+    .insert(tables.automationConversationDeliveryTasks)
     .values({
       conversationId: input.conversationId,
       automationRunId: input.automationRunId,
@@ -32,7 +34,7 @@ export async function enqueueAutomationConversationDeliveryTask(
       status: AutomationConversationDeliveryTaskStatuses.QUEUED,
     })
     .onConflictDoNothing({
-      target: [automationConversationDeliveryTasks.automationRunId],
+      target: [tables.automationConversationDeliveryTasks.automationRunId],
     })
     .returning();
   const insertedTask = insertedRows[0];

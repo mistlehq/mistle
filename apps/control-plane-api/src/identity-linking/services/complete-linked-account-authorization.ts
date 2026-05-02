@@ -1,15 +1,12 @@
 import {
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalCredentials,
-  userExternalPrincipalCredentialSecrets,
   type UserExternalPrincipalCredentialSecretKind,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
-  userExternalPrincipalKeys,
   UserExternalPrincipalKeyStatuses,
-  userExternalPrincipals,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import {
@@ -79,20 +76,22 @@ async function retirePrincipalKeys(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.principalIds.length === 0) {
     return;
   }
 
   await input.db
-    .update(userExternalPrincipalKeys)
+    .update(tables.userExternalPrincipalKeys)
     .set({
       status: UserExternalPrincipalKeyStatuses.RETIRED,
       retiredAt: sql`now()`,
     })
     .where(
       and(
-        inArray(userExternalPrincipalKeys.principalId, input.principalIds),
-        eq(userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
+        inArray(tables.userExternalPrincipalKeys.principalId, input.principalIds),
+        eq(tables.userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
       ),
     );
 }
@@ -101,21 +100,23 @@ async function revokePrincipalCredentials(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.principalIds.length === 0) {
     return;
   }
 
   await input.db
-    .update(userExternalPrincipalCredentials)
+    .update(tables.userExternalPrincipalCredentials)
     .set({
       status: UserExternalPrincipalCredentialStatuses.REVOKED,
       updatedAt: sql`now()`,
     })
     .where(
       and(
-        inArray(userExternalPrincipalCredentials.principalId, input.principalIds),
+        inArray(tables.userExternalPrincipalCredentials.principalId, input.principalIds),
         ne(
-          userExternalPrincipalCredentials.status,
+          tables.userExternalPrincipalCredentials.status,
           UserExternalPrincipalCredentialStatuses.REVOKED,
         ),
       ),
@@ -126,18 +127,20 @@ async function unlinkPrincipals(input: {
   db: ControlPlaneDatabase;
   principalIds: string[];
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.principalIds.length === 0) {
     return;
   }
 
   await input.db
-    .update(userExternalPrincipals)
+    .update(tables.userExternalPrincipals)
     .set({
       status: UserExternalPrincipalStatuses.UNLINKED,
       unlinkedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(inArray(userExternalPrincipals.id, input.principalIds));
+    .where(inArray(tables.userExternalPrincipals.id, input.principalIds));
 
   await retirePrincipalKeys(input);
   await revokePrincipalCredentials(input);
@@ -268,6 +271,8 @@ async function persistLinkedAccountAuthorization(input: {
     masterEncryptionKeys: Record<string, string>;
   };
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const completedAuthorization = normalizeCompletedLinkedAccountAuthorizationOrThrow(
     input.completedAuthorization,
   );
@@ -327,7 +332,7 @@ async function persistLinkedAccountAuthorization(input: {
   let principalId = reusablePrincipal?.id;
   if (principalId === undefined) {
     const [insertedPrincipal] = await input.db
-      .insert(userExternalPrincipals)
+      .insert(tables.userExternalPrincipals)
       .values({
         organizationId: input.organizationId,
         userId: input.userId,
@@ -343,7 +348,7 @@ async function persistLinkedAccountAuthorization(input: {
         updatedAt: sql`now()`,
       })
       .returning({
-        id: userExternalPrincipals.id,
+        id: tables.userExternalPrincipals.id,
       });
 
     if (insertedPrincipal === undefined) {
@@ -353,7 +358,7 @@ async function persistLinkedAccountAuthorization(input: {
     principalId = insertedPrincipal.id;
   } else {
     await input.db
-      .update(userExternalPrincipals)
+      .update(tables.userExternalPrincipals)
       .set({
         providerSubjectId,
         organizationProviderConfigId: input.organizationProviderConfigId,
@@ -364,7 +369,7 @@ async function persistLinkedAccountAuthorization(input: {
         unlinkedAt: null,
         updatedAt: sql`now()`,
       })
-      .where(eq(userExternalPrincipals.id, principalId));
+      .where(eq(tables.userExternalPrincipals.id, principalId));
   }
 
   await retirePrincipalKeys({
@@ -372,7 +377,7 @@ async function persistLinkedAccountAuthorization(input: {
     principalIds: [principalId],
   });
 
-  await input.db.insert(userExternalPrincipalKeys).values(
+  await input.db.insert(tables.userExternalPrincipalKeys).values(
     completedAuthorization.keys.map((key) => ({
       organizationId: input.organizationId,
       principalId,
@@ -393,7 +398,7 @@ async function persistLinkedAccountAuthorization(input: {
   }
 
   const [insertedCredential] = await input.db
-    .insert(userExternalPrincipalCredentials)
+    .insert(tables.userExternalPrincipalCredentials)
     .values({
       organizationId: input.organizationId,
       principalId,
@@ -415,7 +420,7 @@ async function persistLinkedAccountAuthorization(input: {
       updatedAt: sql`now()`,
     })
     .returning({
-      id: userExternalPrincipalCredentials.id,
+      id: tables.userExternalPrincipalCredentials.id,
     });
 
   if (insertedCredential === undefined) {
@@ -445,7 +450,7 @@ async function persistLinkedAccountAuthorization(input: {
   });
 
   try {
-    await input.db.insert(userExternalPrincipalCredentialSecrets).values(
+    await input.db.insert(tables.userExternalPrincipalCredentialSecrets).values(
       completedAuthorization.credential.secrets.map((secret) => {
         const encryptedSecret = encryptCredentialUtf8({
           plaintext: secret.plaintext,

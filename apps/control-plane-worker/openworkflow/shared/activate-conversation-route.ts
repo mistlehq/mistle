@@ -1,10 +1,9 @@
 import {
-  automationConversationRoutes,
-  automationConversations,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -28,6 +27,8 @@ export async function activateAutomationConversationRoute(
   input: ActivateAutomationConversationRouteInput,
 ) {
   return deps.db.transaction(async (transaction) => {
+    const tables = getControlPlaneDatabaseSchema(transaction);
+
     const persistedAutomationConversation =
       await transaction.query.automationConversations.findFirst({
         where: (table, { eq: whereEq }) => whereEq(table.id, input.conversationId),
@@ -68,15 +69,15 @@ export async function activateAutomationConversationRoute(
     }
 
     await transaction
-      .update(automationConversations)
+      .update(tables.automationConversations)
       .set({
         status: AutomationConversationStatuses.ACTIVE,
         updatedAt: sql`now()`,
       })
-      .where(eq(automationConversations.id, input.conversationId));
+      .where(eq(tables.automationConversations.id, input.conversationId));
 
     const updatedRouteRows = await transaction
-      .update(automationConversationRoutes)
+      .update(tables.automationConversationRoutes)
       .set({
         sandboxInstanceId: input.sandboxInstanceId,
         providerConversationId: input.providerConversationId,
@@ -85,7 +86,7 @@ export async function activateAutomationConversationRoute(
         status: AutomationConversationRouteStatuses.ACTIVE,
         updatedAt: sql`now()`,
       })
-      .where(eq(automationConversationRoutes.id, input.routeId))
+      .where(eq(tables.automationConversationRoutes.id, input.routeId))
       .returning();
     const updatedRoute = updatedRouteRows[0];
     if (updatedRoute === undefined) {

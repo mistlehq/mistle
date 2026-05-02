@@ -1,6 +1,5 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
-  automationRuns,
   AutomationRunStatuses,
   type AutomationRunStatus,
   type ControlPlaneDatabase,
@@ -8,6 +7,7 @@ import {
   AutomationConversationCreatedByKinds,
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -537,6 +537,8 @@ export async function prepareAutomationRun(
   });
 
   const claimedConversationId = await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const claimedAutomationConversation = await claimAutomationConversation(
       {
         db: tx,
@@ -555,7 +557,7 @@ export async function prepareAutomationRun(
     );
 
     await tx
-      .update(automationRuns)
+      .update(tables.automationRuns)
       .set({
         conversationId: claimedAutomationConversation.id,
         renderedInput: compiledTemplates.renderedInput,
@@ -564,7 +566,7 @@ export async function prepareAutomationRun(
         instructions: webhookAutomation.instructions,
         updatedAt: sql`now()`,
       })
-      .where(eq(automationRuns.id, automationRun.id));
+      .where(eq(tables.automationRuns.id, automationRun.id));
 
     return claimedAutomationConversation.id;
   });
@@ -657,8 +659,10 @@ async function updateAutomationRunTerminalState(
   },
   input: UpdateAutomationRunTerminalStateInput,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   await ctx.db
-    .update(automationRuns)
+    .update(tables.automationRuns)
     .set({
       status: input.status,
       failureCode: input.failureCode,
@@ -668,8 +672,8 @@ async function updateAutomationRunTerminalState(
     })
     .where(
       and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
+        eq(tables.automationRuns.id, input.automationRunId),
+        eq(tables.automationRuns.status, AutomationRunStatuses.RUNNING),
       ),
     );
 }

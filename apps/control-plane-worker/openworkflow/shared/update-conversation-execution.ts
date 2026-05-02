@@ -1,10 +1,9 @@
 import {
-  automationConversationRoutes,
-  automationConversations,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -25,6 +24,8 @@ export async function updateAutomationConversationExecution(
   input: UpdateAutomationConversationExecutionInput,
 ) {
   return deps.db.transaction(async (transaction) => {
+    const tables = getControlPlaneDatabaseSchema(transaction);
+
     const persistedRoute = await transaction.query.automationConversationRoutes.findFirst({
       where: (table, { eq: whereEq }) => whereEq(table.id, input.routeId),
     });
@@ -61,21 +62,21 @@ export async function updateAutomationConversationExecution(
     const updatedRouteRows =
       input.providerState === undefined
         ? await transaction
-            .update(automationConversationRoutes)
+            .update(tables.automationConversationRoutes)
             .set({
               providerExecutionId: input.providerExecutionId,
               updatedAt: sql`now()`,
             })
-            .where(eq(automationConversationRoutes.id, input.routeId))
+            .where(eq(tables.automationConversationRoutes.id, input.routeId))
             .returning()
         : await transaction
-            .update(automationConversationRoutes)
+            .update(tables.automationConversationRoutes)
             .set({
               providerExecutionId: input.providerExecutionId,
               providerState: input.providerState,
               updatedAt: sql`now()`,
             })
-            .where(eq(automationConversationRoutes.id, input.routeId))
+            .where(eq(tables.automationConversationRoutes.id, input.routeId))
             .returning();
     const updatedRoute = updatedRouteRows[0];
     if (updatedRoute === undefined) {
@@ -86,12 +87,12 @@ export async function updateAutomationConversationExecution(
     }
 
     await transaction
-      .update(automationConversations)
+      .update(tables.automationConversations)
       .set({
         lastActivityAt: sql`now()`,
         updatedAt: sql`now()`,
       })
-      .where(eq(automationConversations.id, persistedAutomationConversation.id));
+      .where(eq(tables.automationConversations.id, persistedAutomationConversation.id));
 
     return updatedRoute;
   });

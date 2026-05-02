@@ -1,7 +1,4 @@
-import {
-  integrationConnectionCredentials,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
@@ -24,6 +21,8 @@ export async function resolveValidatedProviderConnectionOrThrow(
     provider: IdentityLinkProviderMetadata;
   },
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const connection = await ctx.db.query.integrationConnections.findFirst({
     columns: {
       id: true,
@@ -76,10 +75,10 @@ export async function resolveValidatedProviderConnectionOrThrow(
 
   const credentialLinks = await ctx.db
     .select({
-      slotKey: integrationConnectionCredentials.slotKey,
+      slotKey: tables.integrationConnectionCredentials.slotKey,
     })
-    .from(integrationConnectionCredentials)
-    .where(eq(integrationConnectionCredentials.connectionId, connection.id));
+    .from(tables.integrationConnectionCredentials)
+    .where(eq(tables.integrationConnectionCredentials.connectionId, connection.id));
   const credentialSlotKeys = new Set(
     credentialLinks.map((credentialLink) => credentialLink.slotKey),
   );

@@ -1,14 +1,12 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
-  integrationCredentials,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   type IntegrationBindingKind,
   type IntegrationTarget,
   type IntegrationCredentialSecretKind,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import {
   createOAuth2AuthorizationCodeCredentialSlotKeys,
@@ -533,13 +531,15 @@ async function markConnectionAsError(
   db: AppContext["var"]["db"],
   connectionId: string,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   await db
-    .update(integrationConnections)
+    .update(tables.integrationConnections)
     .set({
       status: IntegrationConnectionStatuses.ERROR,
       updatedAt: sql`now()`,
     })
-    .where(eq(integrationConnections.id, connectionId));
+    .where(eq(tables.integrationConnections.id, connectionId));
 }
 
 function createOAuth2AuthorizationCodeRefreshFailedError(
@@ -601,17 +601,19 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
   const resolution = await input.db.transaction<OAuth2AuthorizationCodeManagedCredentialResolution>(
     async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const [lockedConnection] = await tx
         .select({
-          id: integrationConnections.id,
-          organizationId: integrationConnections.organizationId,
-          targetKey: integrationConnections.targetKey,
-          status: integrationConnections.status,
-          externalSubjectId: integrationConnections.externalSubjectId,
-          config: integrationConnections.config,
+          id: tables.integrationConnections.id,
+          organizationId: tables.integrationConnections.organizationId,
+          targetKey: tables.integrationConnections.targetKey,
+          status: tables.integrationConnections.status,
+          externalSubjectId: tables.integrationConnections.externalSubjectId,
+          config: tables.integrationConnections.config,
         })
-        .from(integrationConnections)
-        .where(eq(integrationConnections.id, input.connection.id))
+        .from(tables.integrationConnections)
+        .where(eq(tables.integrationConnections.id, input.connection.id))
         .limit(1)
         .for("update");
 
@@ -761,7 +763,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
         });
 
         const [createdAccessTokenCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: lockedConnection.organizationId,
             secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
@@ -777,7 +779,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
               : { expiresAt: refreshedAccessToken.accessTokenExpiresAt }),
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdAccessTokenCredential === undefined) {
@@ -785,7 +787,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
         }
 
         await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: lockedConnection.id,
             credentialId: createdAccessTokenCredential.id,
@@ -793,8 +795,8 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           })
           .onConflictDoUpdate({
             target: [
-              integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.slotKey,
+              tables.integrationConnectionCredentials.connectionId,
+              tables.integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdAccessTokenCredential.id,
@@ -806,15 +808,15 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           accessCredential.credentialId !== createdAccessTokenCredential.id
         ) {
           await tx
-            .update(integrationCredentials)
+            .update(tables.integrationCredentials)
             .set({
               revokedAt: sql`now()`,
               updatedAt: sql`now()`,
             })
             .where(
               and(
-                eq(integrationCredentials.id, accessCredential.credentialId),
-                isNull(integrationCredentials.revokedAt),
+                eq(tables.integrationCredentials.id, accessCredential.credentialId),
+                isNull(tables.integrationCredentials.revokedAt),
               ),
             );
         }
@@ -826,7 +828,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           });
 
           const [createdRefreshTokenCredential] = await tx
-            .insert(integrationCredentials)
+            .insert(tables.integrationCredentials)
             .values({
               organizationId: lockedConnection.organizationId,
               secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
@@ -842,7 +844,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
                 : { expiresAt: refreshedAccessToken.refreshTokenExpiresAt }),
             })
             .returning({
-              id: integrationCredentials.id,
+              id: tables.integrationCredentials.id,
             });
 
           if (createdRefreshTokenCredential === undefined) {
@@ -850,7 +852,7 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
           }
 
           await tx
-            .insert(integrationConnectionCredentials)
+            .insert(tables.integrationConnectionCredentials)
             .values({
               connectionId: lockedConnection.id,
               credentialId: createdRefreshTokenCredential.id,
@@ -858,8 +860,8 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
             })
             .onConflictDoUpdate({
               target: [
-                integrationConnectionCredentials.connectionId,
-                integrationConnectionCredentials.slotKey,
+                tables.integrationConnectionCredentials.connectionId,
+                tables.integrationConnectionCredentials.slotKey,
               ],
               set: {
                 credentialId: createdRefreshTokenCredential.id,
@@ -868,15 +870,15 @@ async function resolveOAuth2AuthorizationCodeManagedCredential(input: {
 
           if (refreshCredential.credentialId !== createdRefreshTokenCredential.id) {
             await tx
-              .update(integrationCredentials)
+              .update(tables.integrationCredentials)
               .set({
                 revokedAt: sql`now()`,
                 updatedAt: sql`now()`,
               })
               .where(
                 and(
-                  eq(integrationCredentials.id, refreshCredential.credentialId),
-                  isNull(integrationCredentials.revokedAt),
+                  eq(tables.integrationCredentials.id, refreshCredential.credentialId),
+                  isNull(tables.integrationCredentials.revokedAt),
                 ),
               );
           }
@@ -950,17 +952,19 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
 
   const resolution = await input.db.transaction<OAuth2ClientCredentialsManagedCredentialResolution>(
     async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const [lockedConnection] = await tx
         .select({
-          id: integrationConnections.id,
-          organizationId: integrationConnections.organizationId,
-          targetKey: integrationConnections.targetKey,
-          status: integrationConnections.status,
-          externalSubjectId: integrationConnections.externalSubjectId,
-          config: integrationConnections.config,
+          id: tables.integrationConnections.id,
+          organizationId: tables.integrationConnections.organizationId,
+          targetKey: tables.integrationConnections.targetKey,
+          status: tables.integrationConnections.status,
+          externalSubjectId: tables.integrationConnections.externalSubjectId,
+          config: tables.integrationConnections.config,
         })
-        .from(integrationConnections)
-        .where(eq(integrationConnections.id, input.connection.id))
+        .from(tables.integrationConnections)
+        .where(eq(tables.integrationConnections.id, input.connection.id))
         .limit(1)
         .for("update");
 
@@ -1072,7 +1076,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
         });
 
         const [createdAccessTokenCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: lockedConnection.organizationId,
             secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
@@ -1088,7 +1092,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
               : {}),
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdAccessTokenCredential === undefined) {
@@ -1096,7 +1100,7 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
         }
 
         await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: lockedConnection.id,
             credentialId: createdAccessTokenCredential.id,
@@ -1104,8 +1108,8 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
           })
           .onConflictDoUpdate({
             target: [
-              integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.slotKey,
+              tables.integrationConnectionCredentials.connectionId,
+              tables.integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdAccessTokenCredential.id,
@@ -1117,15 +1121,15 @@ async function resolveOAuth2ClientCredentialsManagedCredential(input: {
           accessCredential.credentialId !== createdAccessTokenCredential.id
         ) {
           await tx
-            .update(integrationCredentials)
+            .update(tables.integrationCredentials)
             .set({
               revokedAt: sql`now()`,
               updatedAt: sql`now()`,
             })
             .where(
               and(
-                eq(integrationCredentials.id, accessCredential.credentialId),
-                isNull(integrationCredentials.revokedAt),
+                eq(tables.integrationCredentials.id, accessCredential.credentialId),
+                isNull(tables.integrationCredentials.revokedAt),
               ),
             );
         }

@@ -1,10 +1,8 @@
 import {
-  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalKeys,
   UserExternalPrincipalKeyStatuses,
-  userExternalPrincipals,
   UserExternalPrincipalStatuses,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type {
   AnyIntegrationDefinition,
@@ -36,6 +34,8 @@ export async function resolveWebhookActingUser(
     event: IntegrationWebhookEvent;
   },
 ): Promise<ResolvedWebhookActingUser> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const keys =
     (await input.definition.identityLinking?.resolveWebhookActor?.({
       organizationId: input.organizationId,
@@ -49,52 +49,52 @@ export async function resolveWebhookActingUser(
 
   const matchedKeyRows = await db
     .select({
-      principalId: userExternalPrincipals.id,
-      userId: userExternalPrincipals.userId,
-      keyType: userExternalPrincipalKeys.keyType,
-      keyValue: userExternalPrincipalKeys.keyValue,
+      principalId: tables.userExternalPrincipals.id,
+      userId: tables.userExternalPrincipals.userId,
+      keyType: tables.userExternalPrincipalKeys.keyType,
+      keyValue: tables.userExternalPrincipalKeys.keyValue,
     })
-    .from(userExternalPrincipalKeys)
+    .from(tables.userExternalPrincipalKeys)
     .innerJoin(
-      userExternalPrincipals,
-      eq(userExternalPrincipals.id, userExternalPrincipalKeys.principalId),
+      tables.userExternalPrincipals,
+      eq(tables.userExternalPrincipals.id, tables.userExternalPrincipalKeys.principalId),
     )
     .innerJoin(
-      organizationIdentityLinkProviderConfigs,
+      tables.organizationIdentityLinkProviderConfigs,
       and(
         eq(
-          organizationIdentityLinkProviderConfigs.organizationId,
-          userExternalPrincipals.organizationId,
+          tables.organizationIdentityLinkProviderConfigs.organizationId,
+          tables.userExternalPrincipals.organizationId,
         ),
         eq(
-          organizationIdentityLinkProviderConfigs.providerFamily,
-          userExternalPrincipals.providerFamily,
+          tables.organizationIdentityLinkProviderConfigs.providerFamily,
+          tables.userExternalPrincipals.providerFamily,
         ),
         eq(
-          organizationIdentityLinkProviderConfigs.id,
-          userExternalPrincipals.organizationProviderConfigId,
+          tables.organizationIdentityLinkProviderConfigs.id,
+          tables.userExternalPrincipals.organizationProviderConfigId,
         ),
       ),
     )
     .where(
       and(
-        eq(userExternalPrincipals.organizationId, input.organizationId),
-        eq(userExternalPrincipals.providerFamily, input.providerFamily),
-        eq(userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
+        eq(tables.userExternalPrincipals.organizationId, input.organizationId),
+        eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
+        eq(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
         eq(
-          organizationIdentityLinkProviderConfigs.integrationConnectionId,
+          tables.organizationIdentityLinkProviderConfigs.integrationConnectionId,
           input.webhookConnectionId,
         ),
         eq(
-          organizationIdentityLinkProviderConfigs.status,
+          tables.organizationIdentityLinkProviderConfigs.status,
           OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
         ),
-        eq(userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
+        eq(tables.userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
         or(
           ...keys.map((key) =>
             and(
-              eq(userExternalPrincipalKeys.keyType, key.keyType),
-              eq(userExternalPrincipalKeys.keyValue, key.keyValue),
+              eq(tables.userExternalPrincipalKeys.keyType, key.keyType),
+              eq(tables.userExternalPrincipalKeys.keyValue, key.keyValue),
             ),
           ),
         ),

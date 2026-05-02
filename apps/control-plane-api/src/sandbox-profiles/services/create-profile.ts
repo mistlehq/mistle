@@ -17,9 +17,9 @@ export async function createProfile(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   serviceInput: CreateProfileInput,
 ): Promise<SandboxProfile> {
-  const tables = getControlPlaneDatabaseSchema(db);
-
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [createdProfile] = await tx
       .insert(tables.sandboxProfiles)
       .values(serviceInput)

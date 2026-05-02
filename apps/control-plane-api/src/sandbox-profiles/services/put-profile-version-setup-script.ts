@@ -29,8 +29,6 @@ export async function putProfileVersionSetupScript(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: PutProfileVersionSetupScriptInput,
 ): Promise<PutProfileVersionSetupScriptOutput> {
-  const tables = getControlPlaneDatabaseSchema(db);
-
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -47,6 +45,8 @@ export async function putProfileVersionSetupScript(
   }
 
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedVersion] = await tx
       .select({
         sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,

@@ -1,9 +1,8 @@
 import {
-  integrationConnectionResources,
-  integrationConnectionResourceStates,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { DiscoveredIntegrationResource } from "@mistle/integrations-core";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -17,16 +16,18 @@ export async function applySuccessfulResourceSync(input: {
   discoveredResources: ReadonlyArray<DiscoveredIntegrationResource>;
 }): Promise<boolean> {
   return input.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedState] = await tx
       .select({
-        lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
-        syncState: integrationConnectionResourceStates.syncState,
+        lastSyncStartedAt: tables.integrationConnectionResourceStates.lastSyncStartedAt,
+        syncState: tables.integrationConnectionResourceStates.syncState,
       })
-      .from(integrationConnectionResourceStates)
+      .from(tables.integrationConnectionResourceStates)
       .where(
         and(
-          eq(integrationConnectionResourceStates.connectionId, input.connectionId),
-          eq(integrationConnectionResourceStates.kind, input.kind),
+          eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
+          eq(tables.integrationConnectionResourceStates.kind, input.kind),
         ),
       )
       .for("update");
@@ -74,7 +75,7 @@ export async function applySuccessfulResourceSync(input: {
       }
 
       if (matchedResource === undefined) {
-        await tx.insert(integrationConnectionResources).values({
+        await tx.insert(tables.integrationConnectionResources).values({
           connectionId: input.connectionId,
           familyId: input.familyId,
           kind: input.kind,
@@ -101,7 +102,7 @@ export async function applySuccessfulResourceSync(input: {
       matchedExistingIds.add(matchedResource.id);
 
       await tx
-        .update(integrationConnectionResources)
+        .update(tables.integrationConnectionResources)
         .set({
           familyId: input.familyId,
           ...(discoveredResource.externalId === undefined
@@ -116,7 +117,7 @@ export async function applySuccessfulResourceSync(input: {
           removedAt: null,
           updatedAt: sql`now()`,
         })
-        .where(eq(integrationConnectionResources.id, matchedResource.id));
+        .where(eq(tables.integrationConnectionResources.id, matchedResource.id));
     }
 
     const accessibleIdsToMarkUnavailable = existingResources
@@ -129,18 +130,18 @@ export async function applySuccessfulResourceSync(input: {
 
     if (accessibleIdsToMarkUnavailable.length > 0) {
       await tx
-        .update(integrationConnectionResources)
+        .update(tables.integrationConnectionResources)
         .set({
           status: IntegrationConnectionResourceStatuses.UNAVAILABLE,
           unavailableReason: null,
           removedAt: sql`now()`,
           updatedAt: sql`now()`,
         })
-        .where(inArray(integrationConnectionResources.id, accessibleIdsToMarkUnavailable));
+        .where(inArray(tables.integrationConnectionResources.id, accessibleIdsToMarkUnavailable));
     }
 
     await tx
-      .update(integrationConnectionResourceStates)
+      .update(tables.integrationConnectionResourceStates)
       .set({
         familyId: input.familyId,
         syncState: IntegrationConnectionResourceSyncStates.READY,
@@ -152,7 +153,7 @@ export async function applySuccessfulResourceSync(input: {
         updatedAt: sql`now()`,
       })
       .where(
-        sql`${integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${integrationConnectionResourceStates.kind} = ${input.kind}`,
+        sql`${tables.integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${tables.integrationConnectionResourceStates.kind} = ${input.kind}`,
       );
 
     return true;

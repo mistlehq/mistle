@@ -1,9 +1,4 @@
-import {
-  integrationConnectionCredentials,
-  integrationConnections,
-  type ControlPlaneDatabase,
-  integrationCredentials,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
@@ -150,6 +145,8 @@ export async function updateFormConnection(
 
   try {
     return await db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       for (const parsedSecret of parsedSecrets) {
         const encryptedSecret = encryptCredentialUtf8({
           plaintext: parsedSecret.normalizedValue,
@@ -157,7 +154,7 @@ export async function updateFormConnection(
         });
 
         const [createdCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: input.organizationId,
             secretKind: parsedSecret.persistedSecretRef.secretKind,
@@ -167,7 +164,7 @@ export async function updateFormConnection(
             intendedFamilyId: target.familyId,
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdCredential === undefined) {
@@ -175,7 +172,7 @@ export async function updateFormConnection(
         }
 
         await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: existingConnection.id,
             credentialId: createdCredential.id,
@@ -183,8 +180,8 @@ export async function updateFormConnection(
           })
           .onConflictDoUpdate({
             target: [
-              integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.slotKey,
+              tables.integrationConnectionCredentials.connectionId,
+              tables.integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdCredential.id,
@@ -193,7 +190,7 @@ export async function updateFormConnection(
       }
 
       const [updatedConnection] = await tx
-        .update(integrationConnections)
+        .update(tables.integrationConnections)
         .set({
           displayName: input.displayName,
           config: {
@@ -202,7 +199,7 @@ export async function updateFormConnection(
           },
           updatedAt: sql`now()`,
         })
-        .where(eq(integrationConnections.id, existingConnection.id))
+        .where(eq(tables.integrationConnections.id, existingConnection.id))
         .returning();
 
       if (updatedConnection === undefined) {

@@ -1,13 +1,4 @@
-import {
-  automations,
-  automationTargets,
-  AutomationKinds,
-  integrationConnections,
-  integrationTargets,
-  integrationWebhookSources,
-  sandboxProfiles,
-  webhookAutomations,
-} from "@mistle/db/control-plane";
+import { AutomationKinds, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
@@ -296,49 +287,63 @@ async function loadAutomationListPageRows(input: {
   organizationId: string;
   automationIds: readonly string[];
 }): Promise<AutomationWebhookListPageItem[]> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.automationIds.length === 0) {
     return [];
   }
 
   const rows = await input.db
     .select({
-      automationId: automations.id,
-      automationName: automations.name,
-      enabled: automations.enabled,
-      createdAt: automations.createdAt,
-      updatedAt: automations.updatedAt,
-      eventTypes: webhookAutomations.eventTypes,
-      integrationWebhookSourceId: webhookAutomations.integrationWebhookSourceId,
-      resolvedIntegrationWebhookSourceId: integrationWebhookSources.id,
-      resolvedIntegrationConnectionId: integrationConnections.id,
-      sandboxProfileId: automationTargets.sandboxProfileId,
-      sandboxProfileDisplayName: sandboxProfiles.displayName,
-      integrationTargetFamilyId: integrationTargets.familyId,
-      integrationTargetVariantId: integrationTargets.variantId,
-      integrationTargetDisplayNameOverride: integrationTargets.displayNameOverride,
-      integrationTargetDescriptionOverride: integrationTargets.descriptionOverride,
+      automationId: tables.automations.id,
+      automationName: tables.automations.name,
+      enabled: tables.automations.enabled,
+      createdAt: tables.automations.createdAt,
+      updatedAt: tables.automations.updatedAt,
+      eventTypes: tables.webhookAutomations.eventTypes,
+      integrationWebhookSourceId: tables.webhookAutomations.integrationWebhookSourceId,
+      resolvedIntegrationWebhookSourceId: tables.integrationWebhookSources.id,
+      resolvedIntegrationConnectionId: tables.integrationConnections.id,
+      sandboxProfileId: tables.automationTargets.sandboxProfileId,
+      sandboxProfileDisplayName: tables.sandboxProfiles.displayName,
+      integrationTargetFamilyId: tables.integrationTargets.familyId,
+      integrationTargetVariantId: tables.integrationTargets.variantId,
+      integrationTargetDisplayNameOverride: tables.integrationTargets.displayNameOverride,
+      integrationTargetDescriptionOverride: tables.integrationTargets.descriptionOverride,
     })
-    .from(automations)
-    .innerJoin(webhookAutomations, eq(webhookAutomations.automationId, automations.id))
-    .leftJoin(
-      integrationWebhookSources,
-      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+    .from(tables.automations)
+    .innerJoin(
+      tables.webhookAutomations,
+      eq(tables.webhookAutomations.automationId, tables.automations.id),
     )
     .leftJoin(
-      integrationConnections,
-      eq(integrationConnections.id, integrationWebhookSources.integrationConnectionId),
+      tables.integrationWebhookSources,
+      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
     )
     .leftJoin(
-      integrationTargets,
-      eq(integrationTargets.targetKey, integrationWebhookSources.targetKey),
+      tables.integrationConnections,
+      eq(
+        tables.integrationConnections.id,
+        tables.integrationWebhookSources.integrationConnectionId,
+      ),
     )
-    .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
-    .leftJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
+    .leftJoin(
+      tables.integrationTargets,
+      eq(tables.integrationTargets.targetKey, tables.integrationWebhookSources.targetKey),
+    )
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
+    .leftJoin(
+      tables.sandboxProfiles,
+      eq(tables.sandboxProfiles.id, tables.automationTargets.sandboxProfileId),
+    )
     .where(
       and(
-        eq(automations.organizationId, input.organizationId),
-        eq(automations.kind, AutomationKinds.WEBHOOK),
-        inArray(automations.id, input.automationIds),
+        eq(tables.automations.organizationId, input.organizationId),
+        eq(tables.automations.kind, AutomationKinds.WEBHOOK),
+        inArray(tables.automations.id, input.automationIds),
       ),
     );
 
@@ -481,15 +486,17 @@ export async function listAutomationWebhooks(
         });
       },
       countTotalResults: async () => {
+        const tables = getControlPlaneDatabaseSchema(ctx.db);
+
         const [result] = await ctx.db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
-          .from(automations)
+          .from(tables.automations)
           .where(
             and(
-              eq(automations.organizationId, input.organizationId),
-              eq(automations.kind, AutomationKinds.WEBHOOK),
+              eq(tables.automations.organizationId, input.organizationId),
+              eq(tables.automations.kind, AutomationKinds.WEBHOOK),
             ),
           );
 

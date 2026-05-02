@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  sandboxProfiles,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import {
   SandboxInstancePurposes,
@@ -136,25 +135,27 @@ async function resolveLaunchImage(
     profileVersion: number;
   },
 ): Promise<ResolvedLaunchImage> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const [sandboxProfileVersion] = await db
     .select({
-      profileId: sandboxProfiles.id,
-      state: sandboxProfileVersions.state,
-      snapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
-      snapshotImageId: sandboxProfileVersions.snapshotImageId,
+      profileId: tables.sandboxProfiles.id,
+      state: tables.sandboxProfileVersions.state,
+      snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
+      snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
     })
-    .from(sandboxProfiles)
+    .from(tables.sandboxProfiles)
     .leftJoin(
-      sandboxProfileVersions,
+      tables.sandboxProfileVersions,
       and(
-        eq(sandboxProfileVersions.sandboxProfileId, sandboxProfiles.id),
-        eq(sandboxProfileVersions.version, input.profileVersion),
+        eq(tables.sandboxProfileVersions.sandboxProfileId, tables.sandboxProfiles.id),
+        eq(tables.sandboxProfileVersions.version, input.profileVersion),
       ),
     )
     .where(
       and(
-        eq(sandboxProfiles.id, input.profileId),
-        eq(sandboxProfiles.organizationId, input.organizationId),
+        eq(tables.sandboxProfiles.id, input.profileId),
+        eq(tables.sandboxProfiles.organizationId, input.organizationId),
       ),
     );
 

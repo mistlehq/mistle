@@ -1,10 +1,8 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
   IntegrationConnectionStatuses,
-  integrationCredentials,
   IntegrationCredentialSecretKinds,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { createOAuth2AuthorizationCodeCredentialSlotKeys } from "@mistle/integrations-core";
 
@@ -51,8 +49,10 @@ export async function createManagedTokenConnection(
     externalSubjectId?: string;
   },
 ): Promise<CreatedManagedTokenConnection> {
+  const tables = getControlPlaneDatabaseSchema(ctx.tx);
+
   const [createdConnection] = await ctx.tx
-    .insert(integrationConnections)
+    .insert(tables.integrationConnections)
     .values({
       organizationId: input.organizationId,
       targetKey: input.targetKey,
@@ -104,7 +104,7 @@ export async function createManagedTokenConnection(
       organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
     const [createdAccessTokenCredential] = await ctx.tx
-      .insert(integrationCredentials)
+      .insert(tables.integrationCredentials)
       .values({
         organizationId: input.organizationId,
         secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
@@ -120,7 +120,7 @@ export async function createManagedTokenConnection(
             }),
       })
       .returning({
-        id: integrationCredentials.id,
+        id: tables.integrationCredentials.id,
       });
 
     if (createdAccessTokenCredential === undefined) {
@@ -128,14 +128,14 @@ export async function createManagedTokenConnection(
     }
 
     const [createdAccessCredentialLink] = await ctx.tx
-      .insert(integrationConnectionCredentials)
+      .insert(tables.integrationConnectionCredentials)
       .values({
         connectionId: createdConnection.id,
         credentialId: createdAccessTokenCredential.id,
         slotKey: credentialSlotKeys.accessToken,
       })
       .returning({
-        connectionId: integrationConnectionCredentials.connectionId,
+        connectionId: tables.integrationConnectionCredentials.connectionId,
       });
 
     if (createdAccessCredentialLink === undefined) {
@@ -148,7 +148,7 @@ export async function createManagedTokenConnection(
         organizationCredentialKey: unwrappedOrganizationCredentialKey,
       });
       const [createdRefreshTokenCredential] = await ctx.tx
-        .insert(integrationCredentials)
+        .insert(tables.integrationCredentials)
         .values({
           organizationId: input.organizationId,
           secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
@@ -164,7 +164,7 @@ export async function createManagedTokenConnection(
               }),
         })
         .returning({
-          id: integrationCredentials.id,
+          id: tables.integrationCredentials.id,
         });
 
       if (createdRefreshTokenCredential === undefined) {
@@ -172,14 +172,14 @@ export async function createManagedTokenConnection(
       }
 
       const [createdRefreshCredentialLink] = await ctx.tx
-        .insert(integrationConnectionCredentials)
+        .insert(tables.integrationConnectionCredentials)
         .values({
           connectionId: createdConnection.id,
           credentialId: createdRefreshTokenCredential.id,
           slotKey: credentialSlotKeys.refreshToken,
         })
         .returning({
-          connectionId: integrationConnectionCredentials.connectionId,
+          connectionId: tables.integrationConnectionCredentials.connectionId,
         });
 
       if (createdRefreshCredentialLink === undefined) {

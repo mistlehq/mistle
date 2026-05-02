@@ -4,10 +4,9 @@ import {
   automations,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  integrationConnections,
-  integrationTargets,
   sandboxProfiles,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { IntegrationKinds, type IntegrationRegistry } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
@@ -33,6 +32,8 @@ export async function getHomeSummary(
     organizationId: string;
   },
 ): Promise<HomeSummaryResponse> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const agentCapableTargetLocators = input.integrationRegistry
     .listDefinitions()
     .filter((definition) => definition.kind === IntegrationKinds.AGENT)
@@ -50,18 +51,18 @@ export async function getHomeSummary(
   const [agentCapableIntegrationResult, summaryResult, startedSessionResult] = await Promise.all([
     input.db
       .select({
-        familyId: integrationTargets.familyId,
-        variantId: integrationTargets.variantId,
+        familyId: tables.integrationTargets.familyId,
+        variantId: tables.integrationTargets.variantId,
       })
-      .from(integrationConnections)
+      .from(tables.integrationConnections)
       .innerJoin(
-        integrationTargets,
-        sql`${integrationTargets.targetKey} = ${integrationConnections.targetKey}`,
+        tables.integrationTargets,
+        sql`${tables.integrationTargets.targetKey} = ${tables.integrationConnections.targetKey}`,
       )
       .where(
-        sql`${integrationConnections.organizationId} = ${params.organizationId}
-          and ${integrationConnections.status} = ${IntegrationConnectionStatuses.ACTIVE}
-          and ${integrationTargets.enabled} = true`,
+        sql`${tables.integrationConnections.organizationId} = ${params.organizationId}
+          and ${tables.integrationConnections.status} = ${IntegrationConnectionStatuses.ACTIVE}
+          and ${tables.integrationTargets.enabled} = true`,
       ),
     input.db.execute(sql<{
       hasProfiles: boolean;
@@ -81,9 +82,9 @@ export async function getHomeSummary(
             and exists (
               select 1
               from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
-              inner join ${integrationConnections} as icn
+              inner join ${tables.integrationConnections} as icn
                 on icn."id" = spvib."connection_id"
-              inner join ${integrationTargets} as itg
+              inner join ${tables.integrationTargets} as itg
                 on itg."target_key" = icn."target_key"
               where spvib."sandbox_profile_id" = sp."id"
                 and spvib."sandbox_profile_version" = sp."active_version"
@@ -95,10 +96,10 @@ export async function getHomeSummary(
             and not exists (
               select 1
               from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
-              left join ${integrationConnections} as icn
+              left join ${tables.integrationConnections} as icn
                 on icn."id" = spvib."connection_id"
                and icn."organization_id" = ${params.organizationId}
-              left join ${integrationTargets} as itg
+              left join ${tables.integrationTargets} as itg
                 on itg."target_key" = icn."target_key"
               where spvib."sandbox_profile_id" = sp."id"
                 and spvib."sandbox_profile_version" = sp."active_version"

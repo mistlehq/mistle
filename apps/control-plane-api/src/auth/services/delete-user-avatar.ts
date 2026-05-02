@@ -1,4 +1,4 @@
-import { users } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
@@ -19,6 +19,8 @@ export async function deleteUserAvatar(
   ctx: DeleteUserAvatarContext,
   input: DeleteUserAvatarInput,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const existingUser = await ctx.db.query.users.findFirst({
     columns: {
       id: true,
@@ -36,13 +38,13 @@ export async function deleteUserAvatar(
   }
 
   const updatedUsers = await ctx.db
-    .update(users)
+    .update(tables.users)
     .set({
       imageObjectKey: null,
     })
-    .where(eq(users.id, input.userId))
+    .where(eq(tables.users.id, input.userId))
     .returning({
-      id: users.id,
+      id: tables.users.id,
     });
   const [updatedUser] = updatedUsers;
 

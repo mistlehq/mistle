@@ -71,35 +71,33 @@ export async function refreshProfileVersionSnapshot(
   input: RefreshProfileVersionSnapshotInput,
 ): Promise<RefreshProfileVersionSnapshotOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
-  const tables = getControlPlaneDatabaseSchema(db);
-  const sandboxProfiles = tables.sandboxProfiles;
-  const sandboxProfileVersions = tables.sandboxProfileVersions;
-  const sandboxProfileVersionSnapshotJobs = tables.sandboxProfileVersionSnapshotJobs;
 
   try {
     const refreshResult = await db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const [sandboxProfileVersion] = await tx
         .select({
-          profileId: sandboxProfiles.id,
-          activeVersion: sandboxProfiles.activeVersion,
-          sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
-          version: sandboxProfileVersions.version,
-          state: sandboxProfileVersions.state,
-          snapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
-          snapshotImageId: sandboxProfileVersions.snapshotImageId,
+          profileId: tables.sandboxProfiles.id,
+          activeVersion: tables.sandboxProfiles.activeVersion,
+          sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+          version: tables.sandboxProfileVersions.version,
+          state: tables.sandboxProfileVersions.state,
+          snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
+          snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
         })
-        .from(sandboxProfiles)
+        .from(tables.sandboxProfiles)
         .leftJoin(
-          sandboxProfileVersions,
+          tables.sandboxProfileVersions,
           and(
-            eq(sandboxProfileVersions.sandboxProfileId, sandboxProfiles.id),
-            eq(sandboxProfileVersions.version, input.profileVersion),
+            eq(tables.sandboxProfileVersions.sandboxProfileId, tables.sandboxProfiles.id),
+            eq(tables.sandboxProfileVersions.version, input.profileVersion),
           ),
         )
         .where(
           and(
-            eq(sandboxProfiles.id, input.profileId),
-            eq(sandboxProfiles.organizationId, input.organizationId),
+            eq(tables.sandboxProfiles.id, input.profileId),
+            eq(tables.sandboxProfiles.organizationId, input.organizationId),
           ),
         );
 
@@ -135,7 +133,7 @@ export async function refreshProfileVersionSnapshot(
         profileId: input.profileId,
       });
       const [snapshotJob] = await tx
-        .insert(sandboxProfileVersionSnapshotJobs)
+        .insert(tables.sandboxProfileVersionSnapshotJobs)
         .values({
           sandboxProfileId: input.profileId,
           sandboxProfileVersion: input.profileVersion,
@@ -143,14 +141,14 @@ export async function refreshProfileVersionSnapshot(
           state: SandboxProfileVersionSnapshotJobStates.QUEUED,
         })
         .returning({
-          id: sandboxProfileVersionSnapshotJobs.id,
-          trigger: sandboxProfileVersionSnapshotJobs.trigger,
-          state: sandboxProfileVersionSnapshotJobs.state,
-          errorCode: sandboxProfileVersionSnapshotJobs.errorCode,
-          errorMessage: sandboxProfileVersionSnapshotJobs.errorMessage,
-          createdAt: sandboxProfileVersionSnapshotJobs.createdAt,
-          startedAt: sandboxProfileVersionSnapshotJobs.startedAt,
-          finishedAt: sandboxProfileVersionSnapshotJobs.finishedAt,
+          id: tables.sandboxProfileVersionSnapshotJobs.id,
+          trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
+          state: tables.sandboxProfileVersionSnapshotJobs.state,
+          errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
+          errorMessage: tables.sandboxProfileVersionSnapshotJobs.errorMessage,
+          createdAt: tables.sandboxProfileVersionSnapshotJobs.createdAt,
+          startedAt: tables.sandboxProfileVersionSnapshotJobs.startedAt,
+          finishedAt: tables.sandboxProfileVersionSnapshotJobs.finishedAt,
         });
 
       if (snapshotJob === undefined) {

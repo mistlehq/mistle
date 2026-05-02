@@ -1,9 +1,9 @@
 import {
-  automationConversationRoutes,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -23,6 +23,8 @@ export async function rebindAutomationConversationSandbox(
   input: RebindAutomationConversationSandboxInput,
 ) {
   return deps.db.transaction(async (transaction) => {
+    const tables = getControlPlaneDatabaseSchema(transaction);
+
     const persistedRoute = await transaction.query.automationConversationRoutes.findFirst({
       where: (table, { eq: whereEq }) => whereEq(table.id, input.routeId),
     });
@@ -60,13 +62,13 @@ export async function rebindAutomationConversationSandbox(
     // step refreshes the provider conversation metadata. Dashboard sessions
     // that are already open are not currently migrated across this transition.
     const updatedRows = await transaction
-      .update(automationConversationRoutes)
+      .update(tables.automationConversationRoutes)
       .set({
         sandboxInstanceId: input.sandboxInstanceId,
         providerExecutionId: null,
         updatedAt: sql`now()`,
       })
-      .where(eq(automationConversationRoutes.id, input.routeId))
+      .where(eq(tables.automationConversationRoutes.id, input.routeId))
       .returning();
     const updatedRoute = updatedRows[0];
     if (updatedRoute === undefined) {

@@ -41,7 +41,6 @@ export async function listProfiles(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: ListProfilesInput,
 ): Promise<KeysetPaginatedResult<SandboxProfile>> {
-  const tables = getControlPlaneDatabaseSchema(db);
   let pageSize: number;
 
   try {
@@ -121,6 +120,8 @@ export async function listProfiles(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
+        const tables = getControlPlaneDatabaseSchema(db);
+
         const [result] = await db
           .select({
             totalResults: sql<number>`count(*)::int`,

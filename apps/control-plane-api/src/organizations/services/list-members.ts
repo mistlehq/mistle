@@ -1,5 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { members, users } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
 import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 
@@ -53,10 +53,10 @@ type MemberRow = {
   imageObjectKey: string | null;
 };
 
-function buildDirectoryMemberSortName() {
+function buildDirectoryMemberSortName(tables: ReturnType<typeof getControlPlaneDatabaseSchema>) {
   return sql<string>`case
-    when trim(${users.name}) = '' or trim(${users.name}) = ${users.email} then ${users.email}
-    else trim(${users.name})
+    when trim(${tables.users.name}) = '' or trim(${tables.users.name}) = ${tables.users.email} then ${tables.users.email}
+    else trim(${tables.users.name})
   end`;
 }
 
@@ -64,38 +64,40 @@ export async function listMembers(
   ctx: ListMembersContext,
   input: ListMembersInput,
 ): Promise<ListMembersResult> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const search = input.search.trim();
   const whereClause = and(
-    eq(members.organizationId, input.organizationId),
+    eq(tables.members.organizationId, input.organizationId),
     search.length === 0
       ? undefined
       : or(
-          ilike(users.name, `%${escapeLikePattern(search)}%`),
-          ilike(users.email, `%${escapeLikePattern(search)}%`),
-          ilike(members.role, `%${escapeLikePattern(search)}%`),
+          ilike(tables.users.name, `%${escapeLikePattern(search)}%`),
+          ilike(tables.users.email, `%${escapeLikePattern(search)}%`),
+          ilike(tables.members.role, `%${escapeLikePattern(search)}%`),
         ),
   );
 
   const totalRows = await ctx.db
     .select({ totalResults: sql<number>`count(*)::int` })
-    .from(members)
-    .innerJoin(users, eq(users.id, members.userId))
+    .from(tables.members)
+    .innerJoin(tables.users, eq(tables.users.id, tables.members.userId))
     .where(whereClause);
-  const directoryMemberSortName = buildDirectoryMemberSortName();
+  const directoryMemberSortName = buildDirectoryMemberSortName(tables);
   const rows = await ctx.db
     .select({
-      id: members.id,
-      userId: users.id,
-      name: users.name,
-      email: users.email,
-      role: members.role,
-      joinedAt: members.createdAt,
-      imageObjectKey: users.imageObjectKey,
+      id: tables.members.id,
+      userId: tables.users.id,
+      name: tables.users.name,
+      email: tables.users.email,
+      role: tables.members.role,
+      joinedAt: tables.members.createdAt,
+      imageObjectKey: tables.users.imageObjectKey,
     })
-    .from(members)
-    .innerJoin(users, eq(users.id, members.userId))
+    .from(tables.members)
+    .innerJoin(tables.users, eq(tables.users.id, tables.members.userId))
     .where(whereClause)
-    .orderBy(asc(directoryMemberSortName), asc(users.email), desc(members.createdAt))
+    .orderBy(asc(directoryMemberSortName), asc(tables.users.email), desc(tables.members.createdAt))
     .limit(input.limit)
     .offset(input.offset);
 

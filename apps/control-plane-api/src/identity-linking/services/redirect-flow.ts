@@ -1,4 +1,4 @@
-import { identityLinkRedirectSessions, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { buildUrlWithPath } from "@mistle/http";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -98,6 +98,8 @@ export async function persistIdentityLinkRedirectSession(input: {
   masterKeyVersion: number;
   masterEncryptionKeyMaterial: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const pkceVerifierEncrypted =
     input.pkceVerifier === undefined
       ? undefined
@@ -116,7 +118,7 @@ export async function persistIdentityLinkRedirectSession(input: {
         });
 
   const insertedRows = await input.db
-    .insert(identityLinkRedirectSessions)
+    .insert(tables.identityLinkRedirectSessions)
     .values({
       organizationId: input.organizationId,
       userId: input.userId,
@@ -129,10 +131,10 @@ export async function persistIdentityLinkRedirectSession(input: {
       expiresAt: input.expiresAt,
     })
     .onConflictDoNothing({
-      target: identityLinkRedirectSessions.state,
+      target: tables.identityLinkRedirectSessions.state,
     })
     .returning({
-      id: identityLinkRedirectSessions.id,
+      id: tables.identityLinkRedirectSessions.id,
     });
 
   if (insertedRows.length !== 1) {
@@ -144,19 +146,21 @@ export async function markIdentityLinkRedirectSessionUsedOrThrow(input: {
   db: ControlPlaneDatabase;
   redirectSessionId: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const updatedRows = await input.db
-    .update(identityLinkRedirectSessions)
+    .update(tables.identityLinkRedirectSessions)
     .set({
       usedAt: sql`now()`,
     })
     .where(
       and(
-        eq(identityLinkRedirectSessions.id, input.redirectSessionId),
-        isNull(identityLinkRedirectSessions.usedAt),
+        eq(tables.identityLinkRedirectSessions.id, input.redirectSessionId),
+        isNull(tables.identityLinkRedirectSessions.usedAt),
       ),
     )
     .returning({
-      id: identityLinkRedirectSessions.id,
+      id: tables.identityLinkRedirectSessions.id,
     });
 
   if (updatedRows.length !== 1) {

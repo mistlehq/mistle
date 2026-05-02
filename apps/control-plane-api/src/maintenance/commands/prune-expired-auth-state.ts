@@ -1,5 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { sessions, verifications } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { Clock } from "@mistle/time";
 import { asc, inArray, lt } from "drizzle-orm";
 
@@ -43,19 +43,21 @@ async function deleteExpiredVerifications(input: {
   db: ControlPlaneDatabase;
   expiresBefore: Date;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: verifications.id })
-        .from(verifications)
-        .where(lt(verifications.expiresAt, input.expiresBefore))
-        .orderBy(asc(verifications.expiresAt), asc(verifications.id))
+        .select({ id: tables.verifications.id })
+        .from(tables.verifications)
+        .where(lt(tables.verifications.expiresAt, input.expiresBefore))
+        .orderBy(asc(tables.verifications.expiresAt), asc(tables.verifications.id))
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
       input.db
-        .delete(verifications)
-        .where(inArray(verifications.id, ids))
-        .returning({ id: verifications.id }),
+        .delete(tables.verifications)
+        .where(inArray(tables.verifications.id, ids))
+        .returning({ id: tables.verifications.id }),
   });
 }
 
@@ -63,16 +65,21 @@ async function deleteExpiredSessions(input: {
   db: ControlPlaneDatabase;
   expiresBefore: Date;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: sessions.id })
-        .from(sessions)
-        .where(lt(sessions.expiresAt, input.expiresBefore))
-        .orderBy(asc(sessions.expiresAt), asc(sessions.id))
+        .select({ id: tables.sessions.id })
+        .from(tables.sessions)
+        .where(lt(tables.sessions.expiresAt, input.expiresBefore))
+        .orderBy(asc(tables.sessions.expiresAt), asc(tables.sessions.id))
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
-      input.db.delete(sessions).where(inArray(sessions.id, ids)).returning({ id: sessions.id }),
+      input.db
+        .delete(tables.sessions)
+        .where(inArray(tables.sessions.id, ids))
+        .returning({ id: tables.sessions.id }),
   });
 }
 

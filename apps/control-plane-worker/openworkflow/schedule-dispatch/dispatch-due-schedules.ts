@@ -1,11 +1,10 @@
 import {
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  scheduledActions,
   ScheduledActionStatuses,
-  schedules,
   type ScheduleTargetType,
   ScheduleTargetTypes,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { findNextScheduleOccurrence, getScheduledLocalSlot } from "@mistle/time";
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
@@ -188,26 +187,28 @@ async function claimDueScheduleRows(
     cutoffMinute: Date;
   },
 ): Promise<ClaimedScheduleRow[]> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const rows = await tx
     .select({
-      id: schedules.id,
-      organizationId: schedules.organizationId,
-      targetType: schedules.targetType,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      nextScheduledAt: schedules.nextScheduledAt,
-      endAt: schedules.endAt,
+      id: tables.schedules.id,
+      organizationId: tables.schedules.organizationId,
+      targetType: tables.schedules.targetType,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
+      endAt: tables.schedules.endAt,
     })
-    .from(schedules)
+    .from(tables.schedules)
     .where(
       and(
-        eq(schedules.enabled, true),
-        isNull(schedules.deletedAt),
-        isNotNull(schedules.nextScheduledAt),
-        lte(schedules.nextScheduledAt, input.cutoffMinute.toISOString()),
+        eq(tables.schedules.enabled, true),
+        isNull(tables.schedules.deletedAt),
+        isNotNull(tables.schedules.nextScheduledAt),
+        lte(tables.schedules.nextScheduledAt, input.cutoffMinute.toISOString()),
       ),
     )
-    .orderBy(schedules.nextScheduledAt, schedules.id)
+    .orderBy(tables.schedules.nextScheduledAt, tables.schedules.id)
     .limit(ClaimBatchSize)
     .for("update", { skipLocked: true });
 
@@ -461,12 +462,14 @@ async function insertPendingScheduledAction(
     timezone: string;
   },
 ): Promise<string | null> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const localSlot = getScheduledLocalSlot({
     scheduledAt: input.scheduledAt,
     timezone: input.timezone,
   });
   const insertedRows = await tx
-    .insert(scheduledActions)
+    .insert(tables.scheduledActions)
     .values({
       scheduleId: input.scheduleId,
       organizationId: input.organizationId,
@@ -478,7 +481,7 @@ async function insertPendingScheduledAction(
     })
     .onConflictDoNothing()
     .returning({
-      id: scheduledActions.id,
+      id: tables.scheduledActions.id,
     });
 
   return insertedRows[0]?.id ?? null;
@@ -496,12 +499,14 @@ async function insertSkippedLateScheduledAction(
     timezone: string;
   },
 ): Promise<string | null> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const localSlot = getScheduledLocalSlot({
     scheduledAt: input.scheduledAt,
     timezone: input.timezone,
   });
   const insertedRows = await tx
-    .insert(scheduledActions)
+    .insert(tables.scheduledActions)
     .values({
       scheduleId: input.scheduleId,
       organizationId: input.organizationId,
@@ -519,7 +524,7 @@ async function insertSkippedLateScheduledAction(
     })
     .onConflictDoNothing()
     .returning({
-      id: scheduledActions.id,
+      id: tables.scheduledActions.id,
     });
 
   return insertedRows[0]?.id ?? null;
@@ -538,12 +543,14 @@ async function insertFailedScheduledAction(
     timezone: string;
   },
 ): Promise<string | null> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const localSlot = getScheduledLocalSlot({
     scheduledAt: input.scheduledAt,
     timezone: input.timezone,
   });
   const insertedRows = await tx
-    .insert(scheduledActions)
+    .insert(tables.scheduledActions)
     .values({
       scheduleId: input.scheduleId,
       organizationId: input.organizationId,
@@ -559,7 +566,7 @@ async function insertFailedScheduledAction(
     })
     .onConflictDoNothing()
     .returning({
-      id: scheduledActions.id,
+      id: tables.scheduledActions.id,
     });
 
   return insertedRows[0]?.id ?? null;
@@ -599,17 +606,19 @@ async function updateScheduleCursor(
     scheduleId: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const updatedRows = await tx
-    .update(schedules)
+    .update(tables.schedules)
     .set({
       enabled: input.enabled,
       lastScheduledAt: input.lastScheduledAt.toISOString(),
       nextScheduledAt: input.nextScheduledAt?.toISOString() ?? null,
       updatedAt: sql`now()`,
     })
-    .where(eq(schedules.id, input.scheduleId))
+    .where(eq(tables.schedules.id, input.scheduleId))
     .returning({
-      id: schedules.id,
+      id: tables.schedules.id,
     });
 
   assertSingleScheduleUpdated({
@@ -625,8 +634,10 @@ async function softDeleteScheduleWithMissingTarget(
     scheduledAt: Date;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   const updatedRows = await tx
-    .update(schedules)
+    .update(tables.schedules)
     .set({
       enabled: false,
       lastScheduledAt: input.scheduledAt.toISOString(),
@@ -634,9 +645,9 @@ async function softDeleteScheduleWithMissingTarget(
       deletedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(eq(schedules.id, input.scheduleId))
+    .where(eq(tables.schedules.id, input.scheduleId))
     .returning({
-      id: schedules.id,
+      id: tables.schedules.id,
     });
 
   assertSingleScheduleUpdated({

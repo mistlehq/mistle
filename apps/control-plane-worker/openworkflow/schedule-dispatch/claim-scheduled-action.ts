@@ -1,9 +1,9 @@
 import {
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  scheduledActions,
   type ScheduledActionStatus,
   ScheduledActionStatuses,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 
@@ -46,34 +46,39 @@ export async function claimScheduledActionForDispatch(
   },
 ): Promise<ScheduledActionDispatchClaimResult> {
   return ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const candidateRows = await tx
       .select({
-        id: scheduledActions.id,
-        organizationId: scheduledActions.organizationId,
-        scheduleId: scheduledActions.scheduleId,
-        targetType: scheduledActions.targetType,
-        targetPayload: scheduledActions.targetPayload,
-        previousStatus: scheduledActions.status,
-        previousDispatchClaimKey: scheduledActions.dispatchClaimKey,
-        previousDispatchingAt: scheduledActions.dispatchingAt,
-        targetWorkflowId: scheduledActions.targetWorkflowId,
-        targetWorkflowStartedAt: scheduledActions.targetWorkflowStartedAt,
+        id: tables.scheduledActions.id,
+        organizationId: tables.scheduledActions.organizationId,
+        scheduleId: tables.scheduledActions.scheduleId,
+        targetType: tables.scheduledActions.targetType,
+        targetPayload: tables.scheduledActions.targetPayload,
+        previousStatus: tables.scheduledActions.status,
+        previousDispatchClaimKey: tables.scheduledActions.dispatchClaimKey,
+        previousDispatchingAt: tables.scheduledActions.dispatchingAt,
+        targetWorkflowId: tables.scheduledActions.targetWorkflowId,
+        targetWorkflowStartedAt: tables.scheduledActions.targetWorkflowStartedAt,
       })
-      .from(scheduledActions)
+      .from(tables.scheduledActions)
       .where(
         and(
-          eq(scheduledActions.id, input.scheduledActionId),
+          eq(tables.scheduledActions.id, input.scheduledActionId),
           or(
-            eq(scheduledActions.status, ScheduledActionStatuses.PENDING),
+            eq(tables.scheduledActions.status, ScheduledActionStatuses.PENDING),
             and(
-              eq(scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
-              eq(scheduledActions.dispatchClaimKey, input.dispatchClaimKey),
+              eq(tables.scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
+              eq(tables.scheduledActions.dispatchClaimKey, input.dispatchClaimKey),
             ),
             and(
-              eq(scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
+              eq(tables.scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
               or(
-                isNull(scheduledActions.dispatchingAt),
-                lt(scheduledActions.dispatchingAt, input.staleDispatchingBefore.toISOString()),
+                isNull(tables.scheduledActions.dispatchingAt),
+                lt(
+                  tables.scheduledActions.dispatchingAt,
+                  input.staleDispatchingBefore.toISOString(),
+                ),
               ),
             ),
           ),
@@ -90,15 +95,15 @@ export async function claimScheduledActionForDispatch(
     }
 
     const updatedRows = await tx
-      .update(scheduledActions)
+      .update(tables.scheduledActions)
       .set({
         status: ScheduledActionStatuses.DISPATCHING,
         dispatchingAt: sql`now()`,
         dispatchClaimKey: input.dispatchClaimKey,
       })
-      .where(eq(scheduledActions.id, input.scheduledActionId))
+      .where(eq(tables.scheduledActions.id, input.scheduledActionId))
       .returning({
-        id: scheduledActions.id,
+        id: tables.scheduledActions.id,
       });
 
     if (updatedRows.length !== 1) {

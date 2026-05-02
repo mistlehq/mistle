@@ -1,19 +1,17 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  integrationConnections,
-  integrationTargets,
-  sandboxProfiles,
+  type SandboxProfile,
   sandboxProfileVersions,
   SandboxProfileVersionStates,
-  sandboxProfileVersionIntegrationBindings,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 
 import { toRepositoryOptions, type SandboxProfileRepositoryOption } from "./repository-options.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
-export type LaunchableSandboxProfile = typeof sandboxProfiles.$inferSelect & {
+export type LaunchableSandboxProfile = SandboxProfile & {
   latestVersion: number;
   repositoryOptions: SandboxProfileRepositoryOption[];
 };
@@ -26,38 +24,40 @@ export async function listLaunchableProfiles(
 ): Promise<{
   items: LaunchableSandboxProfile[];
 }> {
-  const launchableVersionSql = sql<number>`(${sandboxProfiles.activeVersion})::int`;
+  const tables = getControlPlaneDatabaseSchema(db);
+
+  const launchableVersionSql = sql<number>`(${tables.sandboxProfiles.activeVersion})::int`;
 
   const candidates = await db
     .select({
-      id: sandboxProfiles.id,
-      organizationId: sandboxProfiles.organizationId,
-      displayName: sandboxProfiles.displayName,
-      activeVersion: sandboxProfiles.activeVersion,
-      status: sandboxProfiles.status,
-      createdAt: sandboxProfiles.createdAt,
-      updatedAt: sandboxProfiles.updatedAt,
+      id: tables.sandboxProfiles.id,
+      organizationId: tables.sandboxProfiles.organizationId,
+      displayName: tables.sandboxProfiles.displayName,
+      activeVersion: tables.sandboxProfiles.activeVersion,
+      status: tables.sandboxProfiles.status,
+      createdAt: tables.sandboxProfiles.createdAt,
+      updatedAt: tables.sandboxProfiles.updatedAt,
       latestVersion: launchableVersionSql,
     })
-    .from(sandboxProfiles)
+    .from(tables.sandboxProfiles)
     .where(
-      sql`${eq(sandboxProfiles.organizationId, input.organizationId)}
-        and ${sandboxProfiles.activeVersion} is not null
+      sql`${eq(tables.sandboxProfiles.organizationId, input.organizationId)}
+        and ${tables.sandboxProfiles.activeVersion} is not null
         and exists (
         select 1
         from ${sandboxProfileVersions} as spv
-        where spv."sandbox_profile_id" = ${sandboxProfiles.id}
-          and spv."version" = ${sandboxProfiles.activeVersion}
+        where spv."sandbox_profile_id" = ${tables.sandboxProfiles.id}
+          and spv."version" = ${tables.sandboxProfiles.activeVersion}
           and spv."state" = ${SandboxProfileVersionStates.PUBLISHED}
       )
       and exists (
         select 1
         from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
-        inner join ${integrationConnections} as icn
+        inner join ${tables.integrationConnections} as icn
           on icn."id" = spvib."connection_id"
-        inner join ${integrationTargets} as itg
+        inner join ${tables.integrationTargets} as itg
           on itg."target_key" = icn."target_key"
-        where spvib."sandbox_profile_id" = ${sandboxProfiles.id}
+        where spvib."sandbox_profile_id" = ${tables.sandboxProfiles.id}
           and spvib."sandbox_profile_version" = ${launchableVersionSql}
           and spvib."kind" = ${IntegrationBindingKinds.AGENT}
           and icn."organization_id" = ${input.organizationId}
@@ -66,12 +66,12 @@ export async function listLaunchableProfiles(
       ) and not exists (
         select 1
         from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
-        left join ${integrationConnections} as icn
+        left join ${tables.integrationConnections} as icn
           on icn."id" = spvib."connection_id"
          and icn."organization_id" = ${input.organizationId}
-        left join ${integrationTargets} as itg
+        left join ${tables.integrationTargets} as itg
           on itg."target_key" = icn."target_key"
-        where spvib."sandbox_profile_id" = ${sandboxProfiles.id}
+        where spvib."sandbox_profile_id" = ${tables.sandboxProfiles.id}
           and spvib."sandbox_profile_version" = ${launchableVersionSql}
           and spvib."kind" = ${IntegrationBindingKinds.AGENT}
           and (
@@ -82,7 +82,7 @@ export async function listLaunchableProfiles(
           )
       )`,
     )
-    .orderBy(desc(sandboxProfiles.createdAt), desc(sandboxProfiles.id));
+    .orderBy(desc(tables.sandboxProfiles.createdAt), desc(tables.sandboxProfiles.id));
 
   const candidateIds = candidates.map((candidate) => candidate.id);
   const launchableVersionByProfileId = new Map(
@@ -93,30 +93,34 @@ export async function listLaunchableProfiles(
       ? []
       : await db
           .select({
-            sandboxProfileId: sandboxProfileVersionIntegrationBindings.sandboxProfileId,
-            sandboxProfileVersion: sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-            config: sandboxProfileVersionIntegrationBindings.config,
+            sandboxProfileId: tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+            sandboxProfileVersion:
+              tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            config: tables.sandboxProfileVersionIntegrationBindings.config,
           })
-          .from(sandboxProfileVersionIntegrationBindings)
+          .from(tables.sandboxProfileVersionIntegrationBindings)
           .innerJoin(
-            integrationConnections,
-            eq(integrationConnections.id, sandboxProfileVersionIntegrationBindings.connectionId),
+            tables.integrationConnections,
+            eq(
+              tables.integrationConnections.id,
+              tables.sandboxProfileVersionIntegrationBindings.connectionId,
+            ),
           )
           .innerJoin(
-            integrationTargets,
-            eq(integrationTargets.targetKey, integrationConnections.targetKey),
+            tables.integrationTargets,
+            eq(tables.integrationTargets.targetKey, tables.integrationConnections.targetKey),
           )
           .where(
-            sql`${inArray(sandboxProfileVersionIntegrationBindings.sandboxProfileId, candidateIds)}
-              and ${eq(sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.GIT)}
-              and ${eq(integrationConnections.organizationId, input.organizationId)}
-              and ${eq(integrationConnections.status, IntegrationConnectionStatuses.ACTIVE)}
-              and ${eq(integrationTargets.enabled, true)}`,
+            sql`${inArray(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, candidateIds)}
+              and ${eq(tables.sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.GIT)}
+              and ${eq(tables.integrationConnections.organizationId, input.organizationId)}
+              and ${eq(tables.integrationConnections.status, IntegrationConnectionStatuses.ACTIVE)}
+              and ${eq(tables.integrationTargets.enabled, true)}`,
           )
           .orderBy(
-            sandboxProfileVersionIntegrationBindings.sandboxProfileId,
-            sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
-            sandboxProfileVersionIntegrationBindings.id,
+            tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId,
+            tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+            tables.sandboxProfileVersionIntegrationBindings.id,
           );
 
   const gitBindingsByProfileId = new Map<string, Array<{ config: Record<string, unknown> }>>();

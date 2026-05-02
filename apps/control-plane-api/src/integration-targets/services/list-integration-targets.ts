@@ -1,4 +1,4 @@
-import { integrationTargets, type IntegrationTarget } from "@mistle/db/control-plane";
+import { type IntegrationTarget, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
@@ -111,12 +111,14 @@ export async function listIntegrationTargets(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
+        const tables = getControlPlaneDatabaseSchema(ctx.db);
+
         const [result] = await ctx.db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
-          .from(integrationTargets)
-          .where(eq(integrationTargets.enabled, true));
+          .from(tables.integrationTargets)
+          .where(eq(tables.integrationTargets.enabled, true));
 
         return result?.totalResults ?? 0;
       },

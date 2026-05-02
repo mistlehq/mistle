@@ -33,10 +33,10 @@ export async function createProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: CreateProfileVersionDraftInput,
 ): Promise<CreateProfileVersionDraftOutput> {
-  const tables = getControlPlaneDatabaseSchema(db);
-
   try {
     return await db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
         columns: {
           id: true,

@@ -70,11 +70,10 @@ export async function publishProfileVersion(
   input: PublishProfileVersionInput,
 ): Promise<PublishProfileVersionOutput> {
   const sandboxInstanceId = typeid("sbi").toString();
-  const tables = getControlPlaneDatabaseSchema(db);
-  const sandboxProfileVersions = tables.sandboxProfileVersions;
-  const sandboxProfileVersionSnapshotJobs = tables.sandboxProfileVersionSnapshotJobs;
 
   const publishedResult = await db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
       columns: {
         id: true,
@@ -130,22 +129,22 @@ export async function publishProfileVersion(
     }
 
     const [publishedVersion] = await tx
-      .update(sandboxProfileVersions)
+      .update(tables.sandboxProfileVersions)
       .set({
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: sql`now()`,
       })
       .where(
         and(
-          eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
-          eq(sandboxProfileVersions.version, input.profileVersion),
-          eq(sandboxProfileVersions.state, SandboxProfileVersionStates.DRAFT),
+          eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(tables.sandboxProfileVersions.version, input.profileVersion),
+          eq(tables.sandboxProfileVersions.state, SandboxProfileVersionStates.DRAFT),
         ),
       )
       .returning({
-        sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
-        version: sandboxProfileVersions.version,
-        state: sandboxProfileVersions.state,
+        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+        version: tables.sandboxProfileVersions.version,
+        state: tables.sandboxProfileVersions.state,
       });
 
     if (publishedVersion === undefined) {
@@ -156,7 +155,7 @@ export async function publishProfileVersion(
     }
 
     const [snapshotJob] = await tx
-      .insert(sandboxProfileVersionSnapshotJobs)
+      .insert(tables.sandboxProfileVersionSnapshotJobs)
       .values({
         sandboxProfileId: input.profileId,
         sandboxProfileVersion: input.profileVersion,
@@ -164,14 +163,14 @@ export async function publishProfileVersion(
         state: SandboxProfileVersionSnapshotJobStates.QUEUED,
       })
       .returning({
-        id: sandboxProfileVersionSnapshotJobs.id,
-        trigger: sandboxProfileVersionSnapshotJobs.trigger,
-        state: sandboxProfileVersionSnapshotJobs.state,
-        errorCode: sandboxProfileVersionSnapshotJobs.errorCode,
-        errorMessage: sandboxProfileVersionSnapshotJobs.errorMessage,
-        createdAt: sandboxProfileVersionSnapshotJobs.createdAt,
-        startedAt: sandboxProfileVersionSnapshotJobs.startedAt,
-        finishedAt: sandboxProfileVersionSnapshotJobs.finishedAt,
+        id: tables.sandboxProfileVersionSnapshotJobs.id,
+        trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
+        state: tables.sandboxProfileVersionSnapshotJobs.state,
+        errorCode: tables.sandboxProfileVersionSnapshotJobs.errorCode,
+        errorMessage: tables.sandboxProfileVersionSnapshotJobs.errorMessage,
+        createdAt: tables.sandboxProfileVersionSnapshotJobs.createdAt,
+        startedAt: tables.sandboxProfileVersionSnapshotJobs.startedAt,
+        finishedAt: tables.sandboxProfileVersionSnapshotJobs.finishedAt,
       });
 
     if (snapshotJob === undefined) {

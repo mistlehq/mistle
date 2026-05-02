@@ -1,10 +1,7 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
   IntegrationConnectionStatuses,
-  integrationCredentials,
   IntegrationCredentialSecretKinds,
-  integrationConnectionRedirectSessions,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -169,20 +166,22 @@ export async function completeOAuth2AuthorizationCodeConnection(
     });
 
   return db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const usedAtTimestamp = new Date().toISOString();
     const consumedSessionRows = await tx
-      .update(integrationConnectionRedirectSessions)
+      .update(tables.integrationConnectionRedirectSessions)
       .set({
         usedAt: usedAtTimestamp,
       })
       .where(
         and(
-          eq(integrationConnectionRedirectSessions.id, redirectSession.id),
-          isNull(integrationConnectionRedirectSessions.usedAt),
+          eq(tables.integrationConnectionRedirectSessions.id, redirectSession.id),
+          isNull(tables.integrationConnectionRedirectSessions.usedAt),
         ),
       )
       .returning({
-        id: integrationConnectionRedirectSessions.id,
+        id: tables.integrationConnectionRedirectSessions.id,
       });
 
     if (consumedSessionRows.length !== 1) {
@@ -193,7 +192,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
     }
 
     const [createdConnection] = await tx
-      .insert(integrationConnections)
+      .insert(tables.integrationConnections)
       .values({
         organizationId: redirectSession.organizationId,
         targetKey: input.targetKey,
@@ -252,7 +251,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
         organizationCredentialKey: unwrappedOrganizationCredentialKey,
       });
       const [createdAccessTokenCredential] = await tx
-        .insert(integrationCredentials)
+        .insert(tables.integrationCredentials)
         .values({
           organizationId: redirectSession.organizationId,
           secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
@@ -270,7 +269,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
               }),
         })
         .returning({
-          id: integrationCredentials.id,
+          id: tables.integrationCredentials.id,
         });
 
       if (createdAccessTokenCredential === undefined) {
@@ -278,14 +277,14 @@ export async function completeOAuth2AuthorizationCodeConnection(
       }
 
       const [createdAccessTokenCredentialLink] = await tx
-        .insert(integrationConnectionCredentials)
+        .insert(tables.integrationConnectionCredentials)
         .values({
           connectionId: createdConnection.id,
           credentialId: createdAccessTokenCredential.id,
           slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
         })
         .returning({
-          connectionId: integrationConnectionCredentials.connectionId,
+          connectionId: tables.integrationConnectionCredentials.connectionId,
         });
 
       if (createdAccessTokenCredentialLink === undefined) {
@@ -300,7 +299,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
           organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
         const [createdRefreshTokenCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: redirectSession.organizationId,
             secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
@@ -318,7 +317,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
                 }),
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdRefreshTokenCredential === undefined) {
@@ -328,14 +327,14 @@ export async function completeOAuth2AuthorizationCodeConnection(
         }
 
         const [createdRefreshTokenCredentialLink] = await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: createdConnection.id,
             credentialId: createdRefreshTokenCredential.id,
             slotKey: oauth2AuthorizationCodeSlotKeys.refreshToken,
           })
           .returning({
-            connectionId: integrationConnectionCredentials.connectionId,
+            connectionId: tables.integrationConnectionCredentials.connectionId,
           });
 
         if (createdRefreshTokenCredentialLink === undefined) {
@@ -351,7 +350,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
           organizationCredentialKey: unwrappedOrganizationCredentialKey,
         });
         const [createdClientSecretCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: redirectSession.organizationId,
             secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
@@ -364,7 +363,7 @@ export async function completeOAuth2AuthorizationCodeConnection(
               : { metadata: completedOAuth2AuthorizationCodeConnection.credentialMetadata }),
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdClientSecretCredential === undefined) {
@@ -374,14 +373,14 @@ export async function completeOAuth2AuthorizationCodeConnection(
         }
 
         const [createdClientSecretCredentialLink] = await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: createdConnection.id,
             credentialId: createdClientSecretCredential.id,
             slotKey: oauth2AuthorizationCodeSlotKeys.clientSecret,
           })
           .returning({
-            connectionId: integrationConnectionCredentials.connectionId,
+            connectionId: tables.integrationConnectionCredentials.connectionId,
           });
 
         if (createdClientSecretCredentialLink === undefined) {

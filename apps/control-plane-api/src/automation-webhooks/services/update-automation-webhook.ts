@@ -1,9 +1,7 @@
 import {
-  automations,
-  automationTargets,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  webhookAutomations,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
@@ -148,7 +146,9 @@ async function updateAutomationBaseRow(
   tx: ControlPlaneTransaction,
   input: UpdateWebhookAutomationInput,
 ): Promise<void> {
-  const nextValues: Partial<typeof automations.$inferInsert> = {};
+  const tables = getControlPlaneDatabaseSchema(tx);
+
+  const nextValues: Partial<typeof tables.automations.$inferInsert> = {};
 
   if (input.name !== undefined) {
     nextValues.name = input.name;
@@ -159,19 +159,21 @@ async function updateAutomationBaseRow(
   }
 
   await tx
-    .update(automations)
+    .update(tables.automations)
     .set({
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(automations.id, input.automationId));
+    .where(eq(tables.automations.id, input.automationId));
 }
 
 async function updateWebhookConfigRow(
   tx: ControlPlaneTransaction,
   input: UpdateWebhookAutomationInput,
 ): Promise<void> {
-  const nextValues: Partial<typeof webhookAutomations.$inferInsert> = {};
+  const tables = getControlPlaneDatabaseSchema(tx);
+
+  const nextValues: Partial<typeof tables.webhookAutomations.$inferInsert> = {};
 
   if (input.integrationWebhookSourceId !== undefined) {
     nextValues.integrationWebhookSourceId = input.integrationWebhookSourceId;
@@ -206,12 +208,12 @@ async function updateWebhookConfigRow(
   }
 
   await tx
-    .update(webhookAutomations)
+    .update(tables.webhookAutomations)
     .set({
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(webhookAutomations.automationId, input.automationId));
+    .where(eq(tables.webhookAutomations.automationId, input.automationId));
 }
 
 async function updateAutomationTargetRow(
@@ -225,17 +227,19 @@ async function updateAutomationTargetRow(
       }
     | undefined,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(tx);
+
   if (nextTarget === undefined) {
     return;
   }
 
   await tx
-    .update(automationTargets)
+    .update(tables.automationTargets)
     .set({
       sandboxProfileId: nextTarget.sandboxProfileId,
       sandboxProfileVersion: nextTarget.sandboxProfileVersion,
       primaryRepositoryId: nextTarget.primaryRepositoryId,
       updatedAt: sql`now()`,
     })
-    .where(eq(automationTargets.id, automationTargetId));
+    .where(eq(tables.automationTargets.id, automationTargetId));
 }

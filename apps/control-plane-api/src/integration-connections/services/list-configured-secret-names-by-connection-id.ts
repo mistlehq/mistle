@@ -1,7 +1,4 @@
-import {
-  integrationConnectionCredentials,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type {
   IntegrationConnectionMethodDefinition,
   IntegrationRegistry,
@@ -55,6 +52,8 @@ export async function listConfiguredSecretNamesByConnectionId(input: {
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
 }): Promise<Map<string, string[]>> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.connections.length === 0) {
     return new Map();
   }
@@ -85,13 +84,13 @@ export async function listConfiguredSecretNamesByConnectionId(input: {
 
   const rows = await input.db
     .select({
-      connectionId: integrationConnectionCredentials.connectionId,
-      slotKey: integrationConnectionCredentials.slotKey,
+      connectionId: tables.integrationConnectionCredentials.connectionId,
+      slotKey: tables.integrationConnectionCredentials.slotKey,
     })
-    .from(integrationConnectionCredentials)
+    .from(tables.integrationConnectionCredentials)
     .where(
       inArray(
-        integrationConnectionCredentials.connectionId,
+        tables.integrationConnectionCredentials.connectionId,
         input.connections.map((entry) => entry.id),
       ),
     );

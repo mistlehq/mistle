@@ -1,8 +1,8 @@
 import {
-  automationRuns,
   AutomationRunStatuses,
   IntegrationWebhookEventStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
@@ -43,6 +43,8 @@ export async function prepareIntegrationWebhookEvent(
   },
   input: HandleIntegrationWebhookEventWorkflowInput,
 ): Promise<PrepareIntegrationWebhookEventOutput> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const webhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.webhookEventId),
   });
@@ -152,7 +154,7 @@ export async function prepareIntegrationWebhookEvent(
     let queuedAutomationRunIds: ReadonlyArray<string> = [];
     if (resolvedTargets.length > 0) {
       await ctx.db
-        .insert(automationRuns)
+        .insert(tables.automationRuns)
         .values(
           resolvedTargets.map((resolvedTarget) => ({
             automationId: resolvedTarget.automationId,
@@ -162,7 +164,10 @@ export async function prepareIntegrationWebhookEvent(
           })),
         )
         .onConflictDoNothing({
-          target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
+          target: [
+            tables.automationRuns.automationTargetId,
+            tables.automationRuns.sourceWebhookEventId,
+          ],
         });
 
       const queuedAutomationRuns = await ctx.db.query.automationRuns.findMany({

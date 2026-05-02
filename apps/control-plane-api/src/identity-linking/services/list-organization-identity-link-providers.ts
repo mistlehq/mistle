@@ -2,7 +2,7 @@ import {
   type ControlPlaneDatabase,
   OrganizationIdentityLinkProviderConfigStatus,
   type IntegrationConnection,
-  integrationConnectionCredentials,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { inArray } from "drizzle-orm";
@@ -56,6 +56,8 @@ export async function listOrganizationIdentityLinkProviders(
     organizationId: string;
   },
 ): Promise<OrganizationIdentityLinkProvider[]> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const [providers, configs] = await Promise.all([
     listIdentityLinkProviderMetadata(ctx),
     ctx.db.query.organizationIdentityLinkProviderConfigs.findMany({
@@ -135,13 +137,13 @@ export async function listOrganizationIdentityLinkProviders(
       ? []
       : await ctx.db
           .select({
-            connectionId: integrationConnectionCredentials.connectionId,
-            slotKey: integrationConnectionCredentials.slotKey,
+            connectionId: tables.integrationConnectionCredentials.connectionId,
+            slotKey: tables.integrationConnectionCredentials.slotKey,
           })
-          .from(integrationConnectionCredentials)
+          .from(tables.integrationConnectionCredentials)
           .where(
             inArray(
-              integrationConnectionCredentials.connectionId,
+              tables.integrationConnectionCredentials.connectionId,
               connections.map((connection) => connection.id),
             ),
           );

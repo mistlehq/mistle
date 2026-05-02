@@ -1,13 +1,12 @@
 import { randomBytes } from "node:crypto";
 
 import {
-  integrationCredentials,
   IntegrationCredentialSecretKinds,
-  integrationWebhookSources,
   IntegrationWebhookSourceStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   type IntegrationWebhookSource,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import {
@@ -301,6 +300,8 @@ export async function ensureImplicitConnectionWebhookSource(input: {
   connectionId: string;
   targetKey: string;
 }): Promise<IntegrationWebhookSource> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const existingSource = await input.db.query.integrationWebhookSources.findFirst({
     where: (table, { and: whereAnd, eq: whereEq }) =>
       whereAnd(
@@ -318,7 +319,7 @@ export async function ensureImplicitConnectionWebhookSource(input: {
   const endpointKey = generateEndpointKey();
 
   const [createdSource] = await input.db
-    .insert(integrationWebhookSources)
+    .insert(tables.integrationWebhookSources)
     .values({
       organizationId: input.organizationId,
       integrationConnectionId: input.connectionId,
@@ -418,6 +419,8 @@ async function createWebhookSecretCredential(input: {
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   webhookSecret: string;
 }): Promise<string> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const organizationCredentialKey = await input.db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.organizationId, input.organizationId),
     orderBy: (table, { desc }) => [desc(table.version)],
@@ -442,7 +445,7 @@ async function createWebhookSecretCredential(input: {
       organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
     const [createdCredential] = await input.db
-      .insert(integrationCredentials)
+      .insert(tables.integrationCredentials)
       .values({
         organizationId: input.organizationId,
         secretKind: IntegrationCredentialSecretKinds.WEBHOOK_SECRET,
@@ -452,7 +455,7 @@ async function createWebhookSecretCredential(input: {
         intendedFamilyId: input.familyId,
       })
       .returning({
-        id: integrationCredentials.id,
+        id: tables.integrationCredentials.id,
       });
 
     if (createdCredential === undefined) {
@@ -696,6 +699,8 @@ export async function createIntegrationWebhookSource(
   });
 
   const createdSource = await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const webhookSecretCredentialId = await createWebhookSecretCredential({
       db: tx,
       organizationId: input.organizationId,
@@ -705,7 +710,7 @@ export async function createIntegrationWebhookSource(
     });
 
     const [insertedSource] = await tx
-      .insert(integrationWebhookSources)
+      .insert(tables.integrationWebhookSources)
       .values({
         organizationId: input.organizationId,
         integrationConnectionId: connection.id,
@@ -766,7 +771,7 @@ export async function createIntegrationWebhookSource(
     }
 
     const [updatedSource] = await tx
-      .update(integrationWebhookSources)
+      .update(tables.integrationWebhookSources)
       .set({
         ...(registration.remoteRegistrationId === undefined
           ? {}
@@ -775,7 +780,7 @@ export async function createIntegrationWebhookSource(
           ? {}
           : { providerMetadata: registration.providerMetadata }),
       })
-      .where(eq(integrationWebhookSources.id, insertedSource.id))
+      .where(eq(tables.integrationWebhookSources.id, insertedSource.id))
       .returning();
 
     if (updatedSource === undefined) {
@@ -919,15 +924,19 @@ export async function deleteIntegrationWebhookSource(
   }
 
   await ctx.db.transaction(async (tx) => {
-    await tx.delete(integrationWebhookSources).where(eq(integrationWebhookSources.id, source.id));
+    const tables = getControlPlaneDatabaseSchema(tx);
+
+    await tx
+      .delete(tables.integrationWebhookSources)
+      .where(eq(tables.integrationWebhookSources.id, source.id));
 
     if (
       source.webhookSecretCredentialId !== null &&
       source.webhookSecretCredentialId !== undefined
     ) {
       await tx
-        .delete(integrationCredentials)
-        .where(eq(integrationCredentials.id, source.webhookSecretCredentialId));
+        .delete(tables.integrationCredentials)
+        .where(eq(tables.integrationCredentials.id, source.webhookSecretCredentialId));
     }
   });
 }

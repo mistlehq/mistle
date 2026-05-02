@@ -9,7 +9,7 @@ export async function lockProfileVersionForUpdateOrThrow(input: {
   profileId: string;
   profileVersion: number;
 }) {
-  const sandboxProfileVersions = input.tables.sandboxProfileVersions;
+  const { sandboxProfileVersions } = input.tables;
   const [lockedVersion] = await input.db
     .select({
       sandboxProfileId: sandboxProfileVersions.sandboxProfileId,

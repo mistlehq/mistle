@@ -2,12 +2,11 @@ import { spawn } from "node:child_process";
 
 import {
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { SigningGrantError, verifySigningGrant } from "@mistle/sandbox-signing-auth";
 import { and, eq, isNull } from "drizzle-orm";
@@ -139,6 +138,8 @@ export async function signCommitPayload(
   },
   input: SignCommitPayloadInput,
 ): Promise<SignCommitPayloadResult> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   if (input.format !== SshSigningFormat) {
     throw new InternalIdentityLinkingError(
       InternalIdentityLinkingErrorCodes.UNSUPPORTED_SIGNING_FORMAT,
@@ -240,39 +241,42 @@ export async function signCommitPayload(
 
   const signingCredentialSecrets = await ctx.db
     .select({
-      credentialId: userExternalPrincipalCredentials.id,
-      secretKind: userExternalPrincipalCredentialSecrets.secretKind,
-      ciphertext: userExternalPrincipalCredentialSecrets.ciphertext,
-      nonce: userExternalPrincipalCredentialSecrets.nonce,
+      credentialId: tables.userExternalPrincipalCredentials.id,
+      secretKind: tables.userExternalPrincipalCredentialSecrets.secretKind,
+      ciphertext: tables.userExternalPrincipalCredentialSecrets.ciphertext,
+      nonce: tables.userExternalPrincipalCredentialSecrets.nonce,
       organizationCredentialKeyVersion:
-        userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
-      expiresAt: userExternalPrincipalCredentialSecrets.expiresAt,
-      revokedAt: userExternalPrincipalCredentialSecrets.revokedAt,
-      metadata: userExternalPrincipalCredentialSecrets.metadata,
+        tables.userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
+      expiresAt: tables.userExternalPrincipalCredentialSecrets.expiresAt,
+      revokedAt: tables.userExternalPrincipalCredentialSecrets.revokedAt,
+      metadata: tables.userExternalPrincipalCredentialSecrets.metadata,
     })
-    .from(userExternalPrincipalCredentials)
+    .from(tables.userExternalPrincipalCredentials)
     .innerJoin(
-      userExternalPrincipalCredentialSecrets,
+      tables.userExternalPrincipalCredentialSecrets,
       and(
-        eq(userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
+        eq(tables.userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
         eq(
-          userExternalPrincipalCredentialSecrets.credentialId,
-          userExternalPrincipalCredentials.id,
+          tables.userExternalPrincipalCredentialSecrets.credentialId,
+          tables.userExternalPrincipalCredentials.id,
         ),
         eq(
-          userExternalPrincipalCredentialSecrets.secretKind,
+          tables.userExternalPrincipalCredentialSecrets.secretKind,
           UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
         ),
-        isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+        isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
       ),
     )
     .where(
       and(
-        eq(userExternalPrincipalCredentials.organizationId, input.organizationId),
-        eq(userExternalPrincipalCredentials.principalId, principal.id),
-        eq(userExternalPrincipalCredentials.providerFamily, input.providerFamily),
-        eq(userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
-        eq(userExternalPrincipalCredentials.status, UserExternalPrincipalCredentialStatuses.ACTIVE),
+        eq(tables.userExternalPrincipalCredentials.organizationId, input.organizationId),
+        eq(tables.userExternalPrincipalCredentials.principalId, principal.id),
+        eq(tables.userExternalPrincipalCredentials.providerFamily, input.providerFamily),
+        eq(tables.userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
+        eq(
+          tables.userExternalPrincipalCredentials.status,
+          UserExternalPrincipalCredentialStatuses.ACTIVE,
+        ),
       ),
     );
 

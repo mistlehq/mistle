@@ -1,11 +1,9 @@
 import {
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
-  userExternalPrincipals,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type {
   IntegrationCredentialResolverResult,
@@ -170,13 +168,15 @@ async function markCredentialReauthorizationRequired(input: {
   db: ControlPlaneDatabase;
   credentialId: string;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   await input.db
-    .update(userExternalPrincipalCredentials)
+    .update(tables.userExternalPrincipalCredentials)
     .set({
       status: UserExternalPrincipalCredentialStatuses.REAUTHORIZATION_REQUIRED,
       updatedAt: sql`now()`,
     })
-    .where(eq(userExternalPrincipalCredentials.id, input.credentialId));
+    .where(eq(tables.userExternalPrincipalCredentials.id, input.credentialId));
 }
 
 async function resolveCurrentOrganizationCredentialKeyOrThrow(input: {
@@ -221,6 +221,8 @@ async function upsertRefreshedCredential(input: {
     masterEncryptionKeys: Record<string, string>;
   };
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.tx);
+
   const currentOrganizationCredentialKey = await resolveCurrentOrganizationCredentialKeyOrThrow({
     tx: input.tx,
     organizationId: input.organizationId,
@@ -229,7 +231,7 @@ async function upsertRefreshedCredential(input: {
 
   try {
     await input.tx
-      .update(userExternalPrincipalCredentials)
+      .update(tables.userExternalPrincipalCredentials)
       .set({
         credentialKind: input.refreshedCredential.credentialKind,
         status: UserExternalPrincipalCredentialStatuses.ACTIVE,
@@ -239,7 +241,7 @@ async function upsertRefreshedCredential(input: {
         lastValidatedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
-      .where(eq(userExternalPrincipalCredentials.id, input.credentialId));
+      .where(eq(tables.userExternalPrincipalCredentials.id, input.credentialId));
 
     const refreshedSecretKinds = input.refreshedCredential.secrets.map((secret) =>
       resolvePrincipalCredentialSecretKindOrThrow(secret.secretKind),
@@ -247,16 +249,21 @@ async function upsertRefreshedCredential(input: {
 
     if (refreshedSecretKinds.length > 0) {
       await input.tx
-        .update(userExternalPrincipalCredentialSecrets)
+        .update(tables.userExternalPrincipalCredentialSecrets)
         .set({
           revokedAt: sql`now()`,
           updatedAt: sql`now()`,
         })
         .where(
           and(
-            eq(userExternalPrincipalCredentialSecrets.credentialId, input.credentialId),
-            not(inArray(userExternalPrincipalCredentialSecrets.secretKind, refreshedSecretKinds)),
-            sql`${userExternalPrincipalCredentialSecrets.revokedAt} is null`,
+            eq(tables.userExternalPrincipalCredentialSecrets.credentialId, input.credentialId),
+            not(
+              inArray(
+                tables.userExternalPrincipalCredentialSecrets.secretKind,
+                refreshedSecretKinds,
+              ),
+            ),
+            sql`${tables.userExternalPrincipalCredentialSecrets.revokedAt} is null`,
           ),
         );
     }
@@ -268,7 +275,7 @@ async function upsertRefreshedCredential(input: {
       });
 
       await input.tx
-        .insert(userExternalPrincipalCredentialSecrets)
+        .insert(tables.userExternalPrincipalCredentialSecrets)
         .values({
           organizationId: input.organizationId,
           credentialId: input.credentialId,
@@ -283,8 +290,8 @@ async function upsertRefreshedCredential(input: {
         })
         .onConflictDoUpdate({
           target: [
-            userExternalPrincipalCredentialSecrets.credentialId,
-            userExternalPrincipalCredentialSecrets.secretKind,
+            tables.userExternalPrincipalCredentialSecrets.credentialId,
+            tables.userExternalPrincipalCredentialSecrets.secretKind,
           ],
           set: {
             nonce: encryptedSecret.nonce,
@@ -354,21 +361,23 @@ export async function resolvePrincipalCredential(
 
   try {
     return await ctx.db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const [lockedPrincipal] = await tx
         .select({
-          id: userExternalPrincipals.id,
+          id: tables.userExternalPrincipals.id,
         })
-        .from(userExternalPrincipals)
+        .from(tables.userExternalPrincipals)
         .where(
           and(
-            eq(userExternalPrincipals.organizationId, input.organizationId),
-            eq(userExternalPrincipals.userId, input.actingUserId),
-            eq(userExternalPrincipals.providerFamily, input.providerFamily),
+            eq(tables.userExternalPrincipals.organizationId, input.organizationId),
+            eq(tables.userExternalPrincipals.userId, input.actingUserId),
+            eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
             eq(
-              userExternalPrincipals.organizationProviderConfigId,
+              tables.userExternalPrincipals.organizationProviderConfigId,
               providerContext.organizationProviderConfig.id,
             ),
-            eq(userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
+            eq(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
           ),
         )
         .limit(1)
@@ -384,29 +393,29 @@ export async function resolvePrincipalCredential(
 
       const credentials = await tx
         .select({
-          id: userExternalPrincipalCredentials.id,
-          principalId: userExternalPrincipalCredentials.principalId,
-          organizationId: userExternalPrincipalCredentials.organizationId,
-          providerFamily: userExternalPrincipalCredentials.providerFamily,
-          credentialKind: userExternalPrincipalCredentials.credentialKind,
-          status: userExternalPrincipalCredentials.status,
-          scopes: userExternalPrincipalCredentials.scopes,
-          accessTokenExpiresAt: userExternalPrincipalCredentials.accessTokenExpiresAt,
-          refreshTokenExpiresAt: userExternalPrincipalCredentials.refreshTokenExpiresAt,
+          id: tables.userExternalPrincipalCredentials.id,
+          principalId: tables.userExternalPrincipalCredentials.principalId,
+          organizationId: tables.userExternalPrincipalCredentials.organizationId,
+          providerFamily: tables.userExternalPrincipalCredentials.providerFamily,
+          credentialKind: tables.userExternalPrincipalCredentials.credentialKind,
+          status: tables.userExternalPrincipalCredentials.status,
+          scopes: tables.userExternalPrincipalCredentials.scopes,
+          accessTokenExpiresAt: tables.userExternalPrincipalCredentials.accessTokenExpiresAt,
+          refreshTokenExpiresAt: tables.userExternalPrincipalCredentials.refreshTokenExpiresAt,
         })
-        .from(userExternalPrincipalCredentials)
+        .from(tables.userExternalPrincipalCredentials)
         .where(
           and(
-            eq(userExternalPrincipalCredentials.organizationId, input.organizationId),
-            eq(userExternalPrincipalCredentials.principalId, lockedPrincipal.id),
-            eq(userExternalPrincipalCredentials.providerFamily, input.providerFamily),
+            eq(tables.userExternalPrincipalCredentials.organizationId, input.organizationId),
+            eq(tables.userExternalPrincipalCredentials.principalId, lockedPrincipal.id),
+            eq(tables.userExternalPrincipalCredentials.providerFamily, input.providerFamily),
             ne(
-              userExternalPrincipalCredentials.status,
+              tables.userExternalPrincipalCredentials.status,
               UserExternalPrincipalCredentialStatuses.REVOKED,
             ),
             ...(input.credentialKind === undefined
               ? []
-              : [eq(userExternalPrincipalCredentials.credentialKind, input.credentialKind)]),
+              : [eq(tables.userExternalPrincipalCredentials.credentialKind, input.credentialKind)]),
           ),
         )
         .for("update");
@@ -428,16 +437,16 @@ export async function resolvePrincipalCredential(
 
       const credentialSecrets = await tx
         .select({
-          secretKind: userExternalPrincipalCredentialSecrets.secretKind,
-          ciphertext: userExternalPrincipalCredentialSecrets.ciphertext,
-          nonce: userExternalPrincipalCredentialSecrets.nonce,
+          secretKind: tables.userExternalPrincipalCredentialSecrets.secretKind,
+          ciphertext: tables.userExternalPrincipalCredentialSecrets.ciphertext,
+          nonce: tables.userExternalPrincipalCredentialSecrets.nonce,
           organizationCredentialKeyVersion:
-            userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
-          expiresAt: userExternalPrincipalCredentialSecrets.expiresAt,
-          revokedAt: userExternalPrincipalCredentialSecrets.revokedAt,
+            tables.userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
+          expiresAt: tables.userExternalPrincipalCredentialSecrets.expiresAt,
+          revokedAt: tables.userExternalPrincipalCredentialSecrets.revokedAt,
         })
-        .from(userExternalPrincipalCredentialSecrets)
-        .where(eq(userExternalPrincipalCredentialSecrets.credentialId, credential.id));
+        .from(tables.userExternalPrincipalCredentialSecrets)
+        .where(eq(tables.userExternalPrincipalCredentialSecrets.credentialId, credential.id));
 
       const credentialSecretResolver = await createCredentialSecretResolver({
         tx,
@@ -545,16 +554,16 @@ export async function resolvePrincipalCredential(
 
         const refreshedSecrets = await tx
           .select({
-            secretKind: userExternalPrincipalCredentialSecrets.secretKind,
-            ciphertext: userExternalPrincipalCredentialSecrets.ciphertext,
-            nonce: userExternalPrincipalCredentialSecrets.nonce,
+            secretKind: tables.userExternalPrincipalCredentialSecrets.secretKind,
+            ciphertext: tables.userExternalPrincipalCredentialSecrets.ciphertext,
+            nonce: tables.userExternalPrincipalCredentialSecrets.nonce,
             organizationCredentialKeyVersion:
-              userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
-            expiresAt: userExternalPrincipalCredentialSecrets.expiresAt,
-            revokedAt: userExternalPrincipalCredentialSecrets.revokedAt,
+              tables.userExternalPrincipalCredentialSecrets.organizationCredentialKeyVersion,
+            expiresAt: tables.userExternalPrincipalCredentialSecrets.expiresAt,
+            revokedAt: tables.userExternalPrincipalCredentialSecrets.revokedAt,
           })
-          .from(userExternalPrincipalCredentialSecrets)
-          .where(eq(userExternalPrincipalCredentialSecrets.credentialId, credential.id));
+          .from(tables.userExternalPrincipalCredentialSecrets)
+          .where(eq(tables.userExternalPrincipalCredentialSecrets.credentialId, credential.id));
 
         const refreshedSecretResolver = await createCredentialSecretResolver({
           tx,

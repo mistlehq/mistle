@@ -1,7 +1,7 @@
 import {
   type ControlPlaneDatabase,
-  scheduledActions,
   ScheduledActionStatuses,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { ScheduleDispatchBatchWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { and, eq, isNull, lt, lte, or } from "drizzle-orm";
@@ -92,28 +92,30 @@ async function listRecoverableScheduledActions(
     staleDispatchingBefore: Date;
   },
 ): Promise<RecoverableScheduledActionRow[]> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const rows = await ctx.db
     .select({
-      id: scheduledActions.id,
-      status: scheduledActions.status,
+      id: tables.scheduledActions.id,
+      status: tables.scheduledActions.status,
     })
-    .from(scheduledActions)
+    .from(tables.scheduledActions)
     .where(
       and(
-        lte(scheduledActions.scheduledAt, input.cutoffMinute.toISOString()),
+        lte(tables.scheduledActions.scheduledAt, input.cutoffMinute.toISOString()),
         or(
-          eq(scheduledActions.status, ScheduledActionStatuses.PENDING),
+          eq(tables.scheduledActions.status, ScheduledActionStatuses.PENDING),
           and(
-            eq(scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
+            eq(tables.scheduledActions.status, ScheduledActionStatuses.DISPATCHING),
             or(
-              isNull(scheduledActions.dispatchingAt),
-              lt(scheduledActions.dispatchingAt, input.staleDispatchingBefore.toISOString()),
+              isNull(tables.scheduledActions.dispatchingAt),
+              lt(tables.scheduledActions.dispatchingAt, input.staleDispatchingBefore.toISOString()),
             ),
           ),
         ),
       ),
     )
-    .orderBy(scheduledActions.scheduledAt, scheduledActions.id);
+    .orderBy(tables.scheduledActions.scheduledAt, tables.scheduledActions.id);
 
   return rows.map((row) => {
     if (

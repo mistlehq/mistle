@@ -1,10 +1,8 @@
 import {
-  sandboxProfiles,
-  sandboxProfileVersionSnapshotJobs,
-  sandboxProfileVersions,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -28,38 +26,40 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedRow] = await tx
       .select({
-        state: sandboxProfileVersionSnapshotJobs.state,
-        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
-        candidateImageProvider: sandboxProfileVersionSnapshotJobs.candidateImageProvider,
-        candidateImageId: sandboxProfileVersionSnapshotJobs.candidateImageId,
-        sandboxProfileId: sandboxProfileVersionSnapshotJobs.sandboxProfileId,
-        sandboxProfileVersion: sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
-        versionState: sandboxProfileVersions.state,
-        versionSnapshotImageProvider: sandboxProfileVersions.snapshotImageProvider,
-        versionSnapshotImageId: sandboxProfileVersions.snapshotImageId,
-        activeVersion: sandboxProfiles.activeVersion,
+        state: tables.sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
+        candidateImageProvider: tables.sandboxProfileVersionSnapshotJobs.candidateImageProvider,
+        candidateImageId: tables.sandboxProfileVersionSnapshotJobs.candidateImageId,
+        sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+        sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+        versionState: tables.sandboxProfileVersions.state,
+        versionSnapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
+        versionSnapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
+        activeVersion: tables.sandboxProfiles.activeVersion,
       })
-      .from(sandboxProfileVersionSnapshotJobs)
+      .from(tables.sandboxProfileVersionSnapshotJobs)
       .innerJoin(
-        sandboxProfileVersions,
+        tables.sandboxProfileVersions,
         and(
           eq(
-            sandboxProfileVersions.sandboxProfileId,
-            sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+            tables.sandboxProfileVersions.sandboxProfileId,
+            tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
           ),
           eq(
-            sandboxProfileVersions.version,
-            sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+            tables.sandboxProfileVersions.version,
+            tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
           ),
         ),
       )
       .innerJoin(
-        sandboxProfiles,
-        eq(sandboxProfiles.id, sandboxProfileVersionSnapshotJobs.sandboxProfileId),
+        tables.sandboxProfiles,
+        eq(tables.sandboxProfiles.id, tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId),
       )
-      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .where(eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
       .for("update");
 
     if (lockedRow === undefined) {
@@ -114,7 +114,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       versionSnapshotImageProvider === null && versionSnapshotImageId === null;
 
     const updatedRows = await tx
-      .update(sandboxProfileVersionSnapshotJobs)
+      .update(tables.sandboxProfileVersionSnapshotJobs)
       .set({
         state: SandboxProfileVersionSnapshotJobStates.SUCCEEDED,
         candidateImageProvider: input.image.provider,
@@ -126,16 +126,16 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       })
       .where(
         and(
-          eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+          eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
           eq(
-            sandboxProfileVersionSnapshotJobs.state,
+            tables.sandboxProfileVersionSnapshotJobs.state,
             SandboxProfileVersionSnapshotJobStates.RUNNING,
           ),
-          eq(sandboxProfileVersionSnapshotJobs.workflowRunId, input.workflowRunId),
+          eq(tables.sandboxProfileVersionSnapshotJobs.workflowRunId, input.workflowRunId),
         ),
       )
       .returning({
-        id: sandboxProfileVersionSnapshotJobs.id,
+        id: tables.sandboxProfileVersionSnapshotJobs.id,
       });
 
     if (updatedRows[0] === undefined) {
@@ -147,20 +147,20 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     }
 
     const promotedVersions = await tx
-      .update(sandboxProfileVersions)
+      .update(tables.sandboxProfileVersions)
       .set({
         snapshotImageProvider: input.image.provider,
         snapshotImageId: input.image.imageId,
       })
       .where(
         and(
-          eq(sandboxProfileVersions.sandboxProfileId, sandboxProfileId),
-          eq(sandboxProfileVersions.version, sandboxProfileVersion),
-          eq(sandboxProfileVersions.state, SandboxProfileVersionStates.PUBLISHED),
+          eq(tables.sandboxProfileVersions.sandboxProfileId, sandboxProfileId),
+          eq(tables.sandboxProfileVersions.version, sandboxProfileVersion),
+          eq(tables.sandboxProfileVersions.state, SandboxProfileVersionStates.PUBLISHED),
         ),
       )
       .returning({
-        sandboxProfileId: sandboxProfileVersions.sandboxProfileId,
+        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
       });
 
     if (promotedVersions[0] === undefined) {
@@ -176,11 +176,11 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       (activeVersion === null || activeVersion < sandboxProfileVersion)
     ) {
       await tx
-        .update(sandboxProfiles)
+        .update(tables.sandboxProfiles)
         .set({
           activeVersion: sandboxProfileVersion,
         })
-        .where(eq(sandboxProfiles.id, sandboxProfileId));
+        .where(eq(tables.sandboxProfiles.id, sandboxProfileId));
     }
   });
 
