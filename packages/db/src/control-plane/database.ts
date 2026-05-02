@@ -12,7 +12,13 @@ export type ControlPlaneTransaction = Parameters<ControlPlaneDatabase["transacti
   ? T
   : never;
 
-const ControlPlaneDatabaseSchemas = new WeakMap<ControlPlaneDatabase, ControlPlaneDbSchema>();
+type ControlPlaneSchemaBoundDatabase = ControlPlaneDatabase | ControlPlaneTransaction;
+type ControlPlaneTransactionConfig = Parameters<ControlPlaneDatabase["transaction"]>[1];
+
+const ControlPlaneDatabaseSchemas = new WeakMap<
+  ControlPlaneSchemaBoundDatabase,
+  ControlPlaneDbSchema
+>();
 
 export function createControlPlaneDatabase(
   pool: Pool,
@@ -26,12 +32,13 @@ export function createControlPlaneDatabase(
     schema,
   });
   ControlPlaneDatabaseSchemas.set(database, schema);
+  bindControlPlaneTransactionSchema(database, schema);
 
   return database;
 }
 
 export function getControlPlaneDatabaseSchema(
-  database: ControlPlaneDatabase,
+  database: ControlPlaneSchemaBoundDatabase,
 ): ControlPlaneDbSchema {
   const schema = ControlPlaneDatabaseSchemas.get(database);
   if (schema === undefined) {
@@ -39,4 +46,25 @@ export function getControlPlaneDatabaseSchema(
   }
 
   return schema;
+}
+
+function bindControlPlaneTransactionSchema(
+  database: ControlPlaneSchemaBoundDatabase,
+  schema: ControlPlaneDbSchema,
+): void {
+  const transaction = database.transaction.bind(database);
+
+  database.transaction = async <T>(
+    callback: (tx: ControlPlaneTransaction) => Promise<T>,
+    config?: ControlPlaneTransactionConfig,
+  ): Promise<T> =>
+    transaction(async (tx) => {
+      // Drizzle creates a new transaction object for each transaction and
+      // savepoint. Carry the schema binding forward so runtime code can resolve
+      // schema-bound tables from either the root database or the active tx.
+      ControlPlaneDatabaseSchemas.set(tx, schema);
+      bindControlPlaneTransactionSchema(tx, schema);
+
+      return callback(tx);
+    }, config);
 }
