@@ -1,4 +1,7 @@
-import { sandboxProfileVersions, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import {
+  getControlPlaneDatabaseSchema,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 
 import {
@@ -8,7 +11,6 @@ import {
   SandboxProfilesNotFoundError,
 } from "../errors.js";
 import { softDeleteSnapshotRefreshSchedulesForProfileVersion } from "./delete-profile-version-refresh-schedule.js";
-import { lockProfileVersionForUpdateOrThrow } from "./lock-profile-version-for-update.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type DiscardProfileVersionDraftInput = {
@@ -26,6 +28,8 @@ export async function discardProfileVersionDraft(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
   input: DiscardProfileVersionDraftInput,
 ): Promise<DiscardProfileVersionDraftOutput> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   return db.transaction(async (tx) => {
     const sandboxProfile = await tx.query.sandboxProfiles.findFirst({
       columns: {
@@ -57,11 +61,28 @@ export async function discardProfileVersionDraft(
       );
     }
 
-    const lockedVersion = await lockProfileVersionForUpdateOrThrow({
-      db: tx,
-      profileId: input.profileId,
-      profileVersion: input.profileVersion,
-    });
+    const [lockedVersion] = await tx
+      .select({
+        sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
+        version: tables.sandboxProfileVersions.version,
+        state: tables.sandboxProfileVersions.state,
+      })
+      .from(tables.sandboxProfileVersions)
+      .where(
+        and(
+          eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(tables.sandboxProfileVersions.version, input.profileVersion),
+        ),
+      )
+      .limit(1)
+      .for("update");
+
+    if (lockedVersion === undefined) {
+      throw new SandboxProfilesNotFoundError(
+        SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+        "Sandbox profile version was not found.",
+      );
+    }
 
     if (lockedVersion.state !== SandboxProfileVersionStates.DRAFT) {
       throw new SandboxProfilesConflictError(
@@ -71,21 +92,22 @@ export async function discardProfileVersionDraft(
     }
 
     await softDeleteSnapshotRefreshSchedulesForProfileVersion(tx, {
+      tables,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
     });
 
     const [deletedVersion] = await tx
-      .delete(sandboxProfileVersions)
+      .delete(tables.sandboxProfileVersions)
       .where(
         and(
-          eq(sandboxProfileVersions.sandboxProfileId, input.profileId),
-          eq(sandboxProfileVersions.version, input.profileVersion),
-          eq(sandboxProfileVersions.state, SandboxProfileVersionStates.DRAFT),
+          eq(tables.sandboxProfileVersions.sandboxProfileId, input.profileId),
+          eq(tables.sandboxProfileVersions.version, input.profileVersion),
+          eq(tables.sandboxProfileVersions.state, SandboxProfileVersionStates.DRAFT),
         ),
       )
       .returning({
-        version: sandboxProfileVersions.version,
+        version: tables.sandboxProfileVersions.version,
       });
 
     if (deletedVersion === undefined) {

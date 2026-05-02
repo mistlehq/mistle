@@ -1,4 +1,5 @@
 import {
+  type ControlPlaneTables,
   type ControlPlaneTransaction,
   sandboxProfileSnapshotRefreshScheduleTargets,
   schedules,
@@ -97,34 +98,38 @@ async function lockProfileAndVersion(
 export async function softDeleteSnapshotRefreshSchedulesForProfileVersion(
   tx: ControlPlaneTransaction,
   input: {
+    tables?: ControlPlaneTables;
     profileId: string;
     profileVersion: number;
   },
 ): Promise<void> {
+  const tables = input.tables;
+  const scheduleTargets =
+    tables?.sandboxProfileSnapshotRefreshScheduleTargets ??
+    sandboxProfileSnapshotRefreshScheduleTargets;
+  const scheduleTable = tables?.schedules ?? schedules;
+
   const targets = await tx
     .select({
-      scheduleId: sandboxProfileSnapshotRefreshScheduleTargets.scheduleId,
+      scheduleId: scheduleTargets.scheduleId,
     })
-    .from(sandboxProfileSnapshotRefreshScheduleTargets)
+    .from(scheduleTargets)
     .where(
       and(
-        eq(sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileId, input.profileId),
-        eq(
-          sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileVersion,
-          input.profileVersion,
-        ),
+        eq(scheduleTargets.sandboxProfileId, input.profileId),
+        eq(scheduleTargets.sandboxProfileVersion, input.profileVersion),
       ),
     );
 
   for (const target of targets) {
     await tx
-      .update(schedules)
+      .update(scheduleTable)
       .set({
         enabled: false,
         nextScheduledAt: null,
         deletedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
-      .where(eq(schedules.id, target.scheduleId));
+      .where(eq(scheduleTable.id, target.scheduleId));
   }
 }
