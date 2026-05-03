@@ -33,6 +33,7 @@ import {
   StartSandboxProfileInstanceConflictResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
   StartSandboxProfileInstanceResponseSchema,
+  StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { createDisposableDataPlaneRuntime } from "./helpers/disposable-data-plane-runtime.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
@@ -44,6 +45,7 @@ const StartWorkflowName = "data-plane.sandbox-instances.start";
 const WorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   actingUserId: z.string().min(1).optional(),
+  purpose: z.enum(["session", "snapshot", "setup_check"]).optional(),
   image: z
     .object({
       imageId: z.string().min(1),
@@ -340,6 +342,102 @@ describe("sandbox profile version start instance integration", () => {
     }
     expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
   });
+
+  it("returns 400 when the setup script test run body is blank", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-setup-script-test-run-blank@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_setup_script_test_run_blank",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Setup Script Test Run Blank Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_setup_script_test_run_blank",
+      version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_setup_script_test_run_blank/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "   \n\t",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("queues setup script test runs from the base image without persisted setup script or agent binding", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_setup_script_test_run",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+
+    try {
+      const authenticatedSession = await fixture.authSession({
+        email: "integration-sandbox-profile-setup-script-test-run@example.com",
+      });
+
+      await fixture.db.insert(sandboxProfiles).values({
+        id: "sbp_setup_script_test_run",
+        organizationId: authenticatedSession.organizationId,
+        displayName: "Setup Script Test Run Profile",
+        status: "active",
+      });
+      await fixture.db.insert(sandboxProfileVersions).values({
+        sandboxProfileId: "sbp_setup_script_test_run",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted setup script",
+      });
+
+      const response = await fixture.request(
+        "/v1/sandbox/profiles/sbp_setup_script_test_run/versions/1/setup-script/test-runs",
+        {
+          method: "POST",
+          headers: {
+            cookie: authenticatedSession.cookie,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            setupScript: "echo visible editor setup script",
+          }),
+        },
+      );
+      expect(response.status).toBe(201);
+
+      const body = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(await response.json());
+      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+        dataPlaneDbPool: dataPlaneFixture.dbPool,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: body.sandboxInstanceId,
+      });
+
+      expect(queuedWorkflowInput.purpose).toBe("setup_check");
+      expect(queuedWorkflowInput.image?.kind).toBe("base");
+      expect(queuedWorkflowInput.runtimePlan.image.source).toBe("base");
+      expect(queuedWorkflowInput.runtimePlan).not.toHaveProperty("setupScript");
+      expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(0);
+    } finally {
+      await dataPlaneFixture.stop();
+    }
+  }, 60_000);
 
   it("queues launches for usable published versions from the stored snapshot image", async ({
     fixture,

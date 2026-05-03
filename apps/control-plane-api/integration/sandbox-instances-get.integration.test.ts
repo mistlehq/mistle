@@ -10,6 +10,7 @@ import {
 import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
+  SandboxInstancePurposes,
   SandboxInstanceStatuses,
 } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
@@ -329,6 +330,59 @@ describe("sandbox instances get integration", () => {
     expect(body.title).toBeNull();
     expect(body.connectable).toBe(false);
     expect(body.automationConversation).toBeNull();
+  });
+
+  it("returns setup-check sandbox instances by id", async ({ fixture }) => {
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_setup_check",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const session = await fixture.authSession({
+      email: "integration-sandbox-instances-get-setup-check@example.com",
+    });
+
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_cp_get_setup_check_001",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_dp_get_setup_check_001",
+      title: "Setup check run",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-cp-get-setup-check-001",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "user",
+      startedById: session.userId,
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      createdAt: "2026-03-21T00:00:00.000Z",
+      updatedAt: "2026-03-21T00:00:00.000Z",
+    });
+
+    const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_setup_check_001", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
+
+    expect(body).toEqual({
+      id: "sbi_cp_get_setup_check_001",
+      title: "Setup check run",
+      status: "stopped",
+      connectable: false,
+      failureCode: null,
+      failureMessage: null,
+      runtimeContext: null,
+      automationConversation: null,
+    });
   });
 
   it("returns the most recently updated automation conversation metadata when multiple active automation conversations match the sandbox", async ({

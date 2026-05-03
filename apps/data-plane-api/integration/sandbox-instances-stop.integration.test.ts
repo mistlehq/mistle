@@ -1,8 +1,13 @@
 import {
   createDataPlaneSandboxInstancesClient,
+  DataPlaneSandboxInstancesClientError,
   type StopSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  sandboxInstances,
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+} from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -34,6 +39,23 @@ const WorkflowRunIdempotencyKeySchema = z
     action: z.literal("stop"),
     stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
+const UserRequestedWorkflowRunInputSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    stopReason: z.literal("user"),
+  })
+  .strict();
+
+const UserRequestedWorkflowRunIdempotencyKeySchema = z
+  .object({
+    version: z.literal(1),
+    sandboxInstanceId: z.string().min(1),
+    action: z.literal("user_stop"),
+    organizationId: z.string().min(1),
     idempotencyKey: z.string().min(1),
   })
   .strict();
@@ -202,5 +224,114 @@ describe("sandboxInstances.stop integration", () => {
 
     expect(workflowRuns).toHaveLength(1);
     expect(workflowRuns[0]?.id).toBe(firstResponse.workflowRunId);
+  }, 60_000);
+
+  it("queues user-requested setup-check stops without an owner lease", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxInstanceId = "sbi_dp_api_setup_check_stop";
+    const organizationId = "org_dp_api_setup_check_stop";
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId,
+      sandboxProfileId: "sbp_dp_api_setup_check_stop",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-user-requested-stop",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_dp_api_setup_check_stop",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+    });
+
+    const response = await client.stopUserRequestedSandboxInstance({
+      organizationId,
+      sandboxInstanceId,
+      idempotencyKey: "dashboard-user-stop-001",
+    });
+
+    expect(response.status).toBe("accepted");
+    expect(response.sandboxInstanceId).toBe(sandboxInstanceId);
+    expect(response.workflowRunId).not.toBeNull();
+
+    const workflowRuns = await waitForWorkflowRuns({
+      runQuery: async (instanceId) => {
+        const result = await fixture.dbPool.query<WorkflowRunRow>(
+          `
+            select id, namespace_id, workflow_name, status, input, output, idempotency_key
+            from data_plane_openworkflow.workflow_runs
+            where
+              namespace_id = $1
+              and workflow_name = $2
+              and input->>'sandboxInstanceId' = $3
+            order by created_at asc
+          `,
+          [fixture.config.workflow.namespaceId, WorkflowName, instanceId],
+        );
+        return result.rows;
+      },
+      sandboxInstanceId,
+    });
+
+    expect(workflowRuns).toHaveLength(1);
+    const queuedRun = workflowRuns[0];
+    if (queuedRun === undefined) {
+      throw new Error("Expected queued setup-check stop workflow run row to exist.");
+    }
+
+    expect(queuedRun.id).toBe(response.workflowRunId);
+    expect(UserRequestedWorkflowRunInputSchema.parse(queuedRun.input)).toEqual({
+      sandboxInstanceId,
+      stopReason: "user",
+    });
+    expect(
+      UserRequestedWorkflowRunIdempotencyKeySchema.parse(
+        JSON.parse(queuedRun.idempotency_key ?? ""),
+      ),
+    ).toEqual({
+      version: 1,
+      sandboxInstanceId,
+      action: "user_stop",
+      organizationId,
+      idempotencyKey: "dashboard-user-stop-001",
+    });
+  }, 60_000);
+
+  it("rejects user-requested stops for non setup-check sandboxes", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxInstanceId = "sbi_dp_api_user_stop_session";
+    const organizationId = "org_dp_api_user_stop_session";
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId,
+      sandboxProfileId: "sbp_dp_api_user_stop_session",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerSandboxId: "provider-user-stop-session",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_dp_api_user_stop_session",
+      source: "dashboard",
+      purpose: SandboxInstancePurposes.SESSION,
+    });
+
+    let rejectedStatus: number | null = null;
+    try {
+      await client.stopUserRequestedSandboxInstance({
+        organizationId,
+        sandboxInstanceId,
+        idempotencyKey: "dashboard-user-stop-session-001",
+      });
+    } catch (error) {
+      if (!(error instanceof DataPlaneSandboxInstancesClientError)) {
+        throw error;
+      }
+
+      rejectedStatus = error.status;
+    }
+
+    expect(rejectedStatus).toBe(409);
   }, 60_000);
 });
