@@ -4,6 +4,7 @@
 
 import { createHmac, generateKeyPairSync } from "node:crypto";
 
+import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
@@ -183,6 +184,49 @@ describe.concurrent("integration webhooks ingest integration", () => {
     });
     expect(persistedEvents).toHaveLength(1);
   });
+
+  it("returns Slack URL verification challenges without storing webhook events", async ({
+    env,
+  }) => {
+    await seedSlackTarget(env);
+    const { endpointKey } = await createSlackWebhookConnection({
+      env,
+      email: "integration-new-webhooks-ingest-slack-url-verification@example.com",
+      signingSecret: "slack-signing-secret",
+    });
+
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const payload = JSON.stringify({
+      token: "verification-token",
+      challenge: "challenge-value",
+      type: "url_verification",
+    });
+    const response = await env.controlPlaneApi.http.fetch(
+      `/p/integration/webhooks/slack-default/${endpointKey}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-slack-request-timestamp": timestamp,
+          "x-slack-signature": signSlackWebhookPayload({
+            secret: "slack-signing-secret",
+            payload,
+            timestamp,
+          }),
+        },
+        body: payload,
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("text/plain");
+    await expect(response.text()).resolves.toBe("challenge-value");
+    await expect(
+      env.controlPlaneDb.query.integrationWebhookEvents.findMany({
+        where: (table, { eq }) => eq(table.targetKey, "slack-default"),
+      }),
+    ).resolves.toEqual([]);
+  });
 });
 
 function createGitHubWebhookPayload(): Record<string, unknown> {
@@ -214,6 +258,19 @@ function signGitHubWebhookPayload(input: { secret: string; payload: string }): s
   return `sha256=${digest}`;
 }
 
+function signSlackWebhookPayload(input: {
+  secret: string;
+  payload: string;
+  timestamp: string;
+}): string {
+  // Slack signs `v0:<timestamp>:<body>` with the app signing secret.
+  // https://api.slack.com/docs/verifying-requests-from-slack
+  const digest = createHmac("sha256", input.secret)
+    .update(`v0:${input.timestamp}:${input.payload}`, "utf8")
+    .digest("hex");
+  return `v0=${digest}`;
+}
+
 async function seedGitHubTarget(env: IntegrationTestEnvironment, targetKey: string): Promise<void> {
   await seedIntegrationTarget(env, {
     targetKey,
@@ -222,6 +279,17 @@ async function seedGitHubTarget(env: IntegrationTestEnvironment, targetKey: stri
     config: {
       api_base_url: "https://api.github.com",
       web_base_url: "https://github.com",
+    },
+  });
+}
+
+async function seedSlackTarget(env: IntegrationTestEnvironment): Promise<void> {
+  await seedIntegrationTarget(env, {
+    targetKey: "slack-default",
+    familyId: "slack",
+    variantId: "slack-default",
+    config: {
+      api_base_url: "https://slack.com/api",
     },
   });
 }
@@ -295,6 +363,47 @@ async function createGitHubWebhookConnection(input: {
     connectionId: connection.id,
     endpointKey: webhookSource.endpointKey,
     organizationId: session.organizationId,
+  };
+}
+
+async function createSlackWebhookConnection(input: {
+  env: IntegrationTestEnvironment;
+  email: string;
+  signingSecret: string;
+}): Promise<{ endpointKey: string }> {
+  const session = await input.env.auth.createSession({
+    email: input.email,
+  });
+  const response = await createFormConnection({
+    env: input.env,
+    targetKey: "slack-default",
+    cookie: session.cookie,
+    body: {
+      displayName: "Slack Events API",
+      methodId: SlackConnectionMethodIds.SLACK_APP,
+      config: {
+        connection_method: SlackConnectionMethodIds.SLACK_APP,
+      },
+      secrets: {
+        botToken: "xoxb-test-bot-token",
+        signingSecret: input.signingSecret,
+        clientSecret: "slack-client-secret",
+      },
+    },
+  });
+  expect(response.status).toBe(201);
+  const connection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
+
+  const webhookSource = await input.env.controlPlaneDb.query.integrationWebhookSources.findFirst({
+    where: (table, { and, eq }) =>
+      and(eq(table.integrationConnectionId, connection.id), eq(table.targetKey, "slack-default")),
+  });
+  if (webhookSource?.endpointKey === undefined || webhookSource.endpointKey === null) {
+    throw new Error("Expected persisted Slack webhook source endpoint key.");
+  }
+
+  return {
+    endpointKey: webhookSource.endpointKey,
   };
 }
 
