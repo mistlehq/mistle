@@ -9,6 +9,7 @@ import type { Context, Hono } from "hono";
 import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
+import type { GoogleProviderConfig } from "./auth/providers/types.js";
 
 type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
@@ -17,6 +18,7 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"] & {
   __dangerouslyEnableTestIsolation?: {
     testEnvironmentIdHeader: string;
+    googleAuth?: GoogleProviderConfig;
   };
 };
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;

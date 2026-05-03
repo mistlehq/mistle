@@ -19,10 +19,7 @@ import { OpenAiConnectionMethodIds } from "./model-capabilities.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
 const OpenAiAuthIssuer = "https://auth.openai.com";
-const OpenAiDeviceAuthorizationApiBaseUrl = `${OpenAiAuthIssuer}/api/accounts/deviceauth`;
-const OpenAiDeviceAuthorizationVerificationUrl = `${OpenAiAuthIssuer}/codex/device`;
 const OpenAiDeviceAuthorizationClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
-const OpenAiDeviceAuthorizationRedirectUri = `${OpenAiAuthIssuer}/deviceauth/callback`;
 
 const StringOrNumberSchema = z.union([z.string(), z.number()]);
 
@@ -88,6 +85,23 @@ function parsePositiveInteger(input: string | number): number {
   }
 
   return value;
+}
+
+function resolveOpenAiAuthBaseUrl(targetConfig: OpenAiApiKeyTargetConfig): string {
+  const authBaseUrl = targetConfig.authBaseUrl ?? OpenAiAuthIssuer;
+  return authBaseUrl.endsWith("/") ? authBaseUrl.slice(0, -1) : authBaseUrl;
+}
+
+function resolveOpenAiDeviceAuthorizationApiBaseUrl(authBaseUrl: string): string {
+  return `${authBaseUrl}/api/accounts/deviceauth`;
+}
+
+function resolveOpenAiDeviceAuthorizationVerificationUrl(authBaseUrl: string): string {
+  return `${authBaseUrl}/codex/device`;
+}
+
+function resolveOpenAiDeviceAuthorizationRedirectUri(authBaseUrl: string): string {
+  return `${authBaseUrl}/deviceauth/callback`;
 }
 
 export function parseJwtClaimsOrThrow(token: string): OpenAiJwtClaims {
@@ -380,22 +394,25 @@ export function resolveOpenAiDeviceAuthorizationCompletionFromTokens(input: {
   };
 }
 
-async function requestOpenAiDeviceAuthorizationStart(): Promise<{
+async function requestOpenAiDeviceAuthorizationStart(input: { authBaseUrl: string }): Promise<{
   verificationUrl: string;
   userCode: string;
   intervalSeconds: number;
   expiresAt?: string;
   providerState: OpenAiDeviceAuthorizationProviderState;
 }> {
-  const response = await fetch(`${OpenAiDeviceAuthorizationApiBaseUrl}/usercode`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
+  const response = await fetch(
+    `${resolveOpenAiDeviceAuthorizationApiBaseUrl(input.authBaseUrl)}/usercode`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        client_id: OpenAiDeviceAuthorizationClientId,
+      }),
     },
-    body: JSON.stringify({
-      client_id: OpenAiDeviceAuthorizationClientId,
-    }),
-  });
+  );
 
   if (!response.ok) {
     throw new Error(
@@ -412,7 +429,7 @@ async function requestOpenAiDeviceAuthorizationStart(): Promise<{
   const intervalSeconds = parsePositiveInteger(parsed.interval);
 
   return {
-    verificationUrl: OpenAiDeviceAuthorizationVerificationUrl,
+    verificationUrl: resolveOpenAiDeviceAuthorizationVerificationUrl(input.authBaseUrl),
     userCode,
     intervalSeconds,
     ...(parsed.expires_at === undefined ? {} : { expiresAt: parsed.expires_at }),
@@ -425,6 +442,7 @@ async function requestOpenAiDeviceAuthorizationStart(): Promise<{
 }
 
 async function exchangeAuthorizationCodeForTokens(input: {
+  authBaseUrl: string;
   authorizationCode: string;
   codeVerifier: string;
 }): Promise<{
@@ -436,11 +454,11 @@ async function exchangeAuthorizationCodeForTokens(input: {
   const form = new URLSearchParams();
   form.set("grant_type", "authorization_code");
   form.set("code", input.authorizationCode);
-  form.set("redirect_uri", OpenAiDeviceAuthorizationRedirectUri);
+  form.set("redirect_uri", resolveOpenAiDeviceAuthorizationRedirectUri(input.authBaseUrl));
   form.set("client_id", OpenAiDeviceAuthorizationClientId);
   form.set("code_verifier", input.codeVerifier);
 
-  const response = await fetch(`${OpenAiAuthIssuer}/oauth/token`, {
+  const response = await fetch(`${input.authBaseUrl}/oauth/token`, {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -456,9 +474,10 @@ async function exchangeAuthorizationCodeForTokens(input: {
 }
 
 async function refreshOpenAiAccessToken(input: {
+  authBaseUrl: string;
   refreshToken: string;
 }): Promise<IntegrationOAuth2AuthorizationCodeRefreshAccessTokenResult> {
-  const response = await fetch(`${OpenAiAuthIssuer}/oauth/token`, {
+  const response = await fetch(`${input.authBaseUrl}/oauth/token`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -491,9 +510,10 @@ async function refreshOpenAiAccessToken(input: {
 }
 
 async function pollOpenAiDeviceAuthorization(
+  authBaseUrl: string,
   providerState: OpenAiDeviceAuthorizationProviderState,
 ): Promise<IntegrationDeviceAuthorizationPollResult<OpenAiConnectionConfig>> {
-  const response = await fetch(`${OpenAiDeviceAuthorizationApiBaseUrl}/token`, {
+  const response = await fetch(`${resolveOpenAiDeviceAuthorizationApiBaseUrl(authBaseUrl)}/token`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -525,6 +545,7 @@ async function pollOpenAiDeviceAuthorization(
     await response.json(),
   );
   const tokens = await exchangeAuthorizationCodeForTokens({
+    authBaseUrl,
     authorizationCode: authorizationCodeGrant.authorization_code,
     codeVerifier: authorizationCodeGrant.code_verifier,
   });
@@ -554,7 +575,9 @@ export const OpenAiDeviceAuthorizationCapability: IntegrationDeviceAuthorization
       throw new Error(`Unsupported OpenAI device authorization method '${input.methodId}'.`);
     }
 
-    const startedAuthorization = await requestOpenAiDeviceAuthorizationStart();
+    const startedAuthorization = await requestOpenAiDeviceAuthorizationStart({
+      authBaseUrl: resolveOpenAiAuthBaseUrl(input.target.config),
+    });
 
     return {
       verificationUrl: startedAuthorization.verificationUrl,
@@ -573,7 +596,10 @@ export const OpenAiDeviceAuthorizationCapability: IntegrationDeviceAuthorization
     }
 
     const providerState = OpenAiDeviceAuthorizationProviderStateSchema.parse(input.providerState);
-    return pollOpenAiDeviceAuthorization(providerState);
+    return pollOpenAiDeviceAuthorization(
+      resolveOpenAiAuthBaseUrl(input.target.config),
+      providerState,
+    );
   },
 };
 
@@ -597,6 +623,7 @@ export const OpenAiDeviceAuthorizationOAuth2Capability: IntegrationOAuth2Authori
   async refreshAccessToken(input) {
     assertOpenAiChatGptDeviceCodeConnectionConfig(input.connection.config);
     return refreshOpenAiAccessToken({
+      authBaseUrl: resolveOpenAiAuthBaseUrl(input.target.config),
       refreshToken: input.refreshToken,
     });
   },

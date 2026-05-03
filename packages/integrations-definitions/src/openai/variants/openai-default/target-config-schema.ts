@@ -23,10 +23,12 @@ export const OpenAiChatGptResponsesApiBaseUrl = "https://chatgpt.com/backend-api
 export const OpenAiApiKeyTargetConfigSchema = z
   .object({
     api_base_url: OpenAiApiBaseUrlSchema,
+    auth_base_url: OpenAiApiBaseUrlSchema.optional(),
   })
   .strict()
   .transform((input) => ({
     apiBaseUrl: input.api_base_url,
+    ...(input.auth_base_url === undefined ? {} : { authBaseUrl: input.auth_base_url }),
   }));
 
 export type OpenAiApiKeyTargetConfig = z.output<typeof OpenAiApiKeyTargetConfigSchema>;

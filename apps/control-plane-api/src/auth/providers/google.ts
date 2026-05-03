@@ -9,6 +9,11 @@ export function createGoogleSocialProvider(
     google: {
       clientId: config.clientId,
       clientSecret: config.clientSecret,
+      ...(config.authorizationEndpoint === undefined
+        ? {}
+        : { authorizationEndpoint: config.authorizationEndpoint }),
+      ...(config.verifyIdToken === undefined ? {} : { verifyIdToken: config.verifyIdToken }),
+      ...(config.getUserInfo === undefined ? {} : { getUserInfo: config.getUserInfo }),
     },
   };
 }

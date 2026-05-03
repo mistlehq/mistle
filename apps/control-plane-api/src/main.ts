@@ -136,6 +136,11 @@ function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlP
     authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
     authGoogleClientId: config.auth.google?.clientId ?? null,
     authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
+    ...(config.__dangerouslyEnableTestIsolation?.googleAuth === undefined
+      ? {}
+      : {
+          authGoogleProviderOverrides: config.__dangerouslyEnableTestIsolation.googleAuth,
+        }),
     activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
     masterEncryptionKeys: config.integrations.masterEncryptionKeys,
   };

@@ -262,6 +262,24 @@ about calling an external or non-Mistle upstream. For example, tokenizer-proxy
 egress tests may use `startHttpEcho()` because the upstream is the outside
 provider being called by Mistle.
 
+Provider-auth behavior should use harness-owned provider switches instead of
+app-local Better Auth setup. For Google id-token sign-in and linking coverage,
+select the simulated Google auth boundary explicitly:
+
+```ts
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+  auth: {
+    google: "simulated",
+  },
+});
+```
+
+This enables Google only for that test environment and keeps ordinary
+`control-plane-api` service pooling unchanged. Tests should still exercise the
+real control-plane API route and keep any simulated provider payload grounded in
+official provider docs and production provider code.
+
 ## Dangerous Service Isolation
 
 The default policy is pooled stateless services. Do not restart, stop, or mutate

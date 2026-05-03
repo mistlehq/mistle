@@ -8,6 +8,7 @@ import type { OpenWorkflow } from "openworkflow";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
+import type { GoogleProviderConfig } from "./providers/types.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
@@ -23,6 +24,7 @@ export type ControlPlaneAuthConfig = {
   authOTPAllowedAttempts: number;
   authGoogleClientId: string | null;
   authGoogleClientSecret: string | null;
+  authGoogleProviderOverrides?: Omit<GoogleProviderConfig, "clientId" | "clientSecret">;
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
 };
@@ -60,6 +62,9 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
       : {
           clientId: config.authGoogleClientId,
           clientSecret: config.authGoogleClientSecret,
+          ...(config.authGoogleProviderOverrides === undefined
+            ? {}
+            : config.authGoogleProviderOverrides),
         };
   const providers = createAuthProviders({
     config: {

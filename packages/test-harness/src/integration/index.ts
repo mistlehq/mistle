@@ -42,6 +42,9 @@ type IntegrationServiceSelection =
 type CreateIntegrationTestInput = {
   services: readonly IntegrationServiceSelection[];
   extraInfra?: readonly MistleTestExtraInfraId[];
+  auth?: {
+    google?: "simulated";
+  };
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
 };
 
@@ -157,13 +160,23 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
     if (catalogService === undefined) {
       throw new Error(`Unknown integration test service '${entry.serviceId}'.`);
     }
-    services[entry.serviceId] = entry.service([
-      ...catalogService.infra,
-      ...extraInfraForService({
-        serviceId: entry.serviceId,
-        extraInfra,
-      }),
-    ]);
+    services[entry.serviceId] = entry.service(
+      [
+        ...catalogService.infra,
+        ...extraInfraForService({
+          serviceId: entry.serviceId,
+          extraInfra,
+        }),
+      ],
+      {
+        controlPlaneApi:
+          input.auth?.google === undefined
+            ? {}
+            : {
+                googleAuth: input.auth.google,
+              },
+      },
+    );
   }
 
   return createServiceRegistry({
@@ -200,7 +213,16 @@ function supportedExtraInfraIdsForService(serviceId: ServiceId): readonly Mistle
 
 type IntegrationServiceEntry = {
   serviceId: ServiceId;
-  service: (infra: TestServiceDefinition["infra"]) => TestServiceDefinition;
+  service: (
+    infra: TestServiceDefinition["infra"],
+    options: IntegrationServiceOptions,
+  ) => TestServiceDefinition;
+};
+
+type IntegrationServiceOptions = {
+  controlPlaneApi: {
+    googleAuth?: "simulated";
+  };
 };
 
 async function loadSelectedServices(

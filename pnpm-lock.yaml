@@ -183,6 +183,12 @@ importers:
       '@types/sshpk':
         specifier: ^1.17.4
         version: 1.17.4
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      ws:
+        specifier: ^8.20.0
+        version: 8.20.0
 
   apps/control-plane-worker:
     dependencies:

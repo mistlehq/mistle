@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createControlPlaneApiRuntime } from "@mistle/control-plane-api/runtime";
 import type { ControlPlaneApiConfig } from "@mistle/control-plane-api/types";
+import { z } from "zod";
 
 import type {
   ResolvedTestInfra,
@@ -40,7 +41,25 @@ const SeaweedfsValues = {
   SECRET_ACCESS_KEY: "secretAccessKey",
 };
 
-export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
+const SimulatedGoogleIdTokenSchema = z.object({
+  aud: z.string(),
+  email: z.string(),
+  email_verified: z.boolean(),
+  exp: z.number(),
+  iss: z.union([z.literal("https://accounts.google.com"), z.literal("accounts.google.com")]),
+  name: z.string().optional(),
+  picture: z.string().optional(),
+  sub: z.string(),
+});
+
+export function service(
+  infra: readonly TestInfraRequirement[],
+  options?: {
+    controlPlaneApi?: {
+      googleAuth?: "simulated";
+    };
+  },
+): TestServiceDefinition {
   return {
     id: ServiceIds.CONTROL_PLANE_API,
     infra,
@@ -50,16 +69,25 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
         host: ControlPlaneHost,
       },
     },
+    ...(options?.controlPlaneApi?.googleAuth === "simulated" ? { poolScope: "environment" } : {}),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.CONTROL_PLANE_API),
-    start: start({
-      postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
-    }),
+    start: start(
+      options?.controlPlaneApi?.googleAuth === undefined
+        ? {
+            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
+          }
+        : {
+            postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
+            googleAuth: options.controlPlaneApi.googleAuth,
+          },
+    ),
   };
 }
 
 function start(input: {
   postgresInfra: TestInfraRequirement;
+  googleAuth?: "simulated";
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
     if (startInput.mode !== "runtime") {
@@ -73,14 +101,26 @@ function start(input: {
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const runtime = await createControlPlaneApiRuntime({
-      app: config({
-        controlPlaneBaseUrl: endpoint.hostBaseUrl,
-        controlPlanePort: endpoint.port,
-        dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-        gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-        postgres: resolvedPostgres,
-        seaweedfs: resolvedSeaweedfs,
-      }),
+      app: config(
+        input.googleAuth === undefined
+          ? {
+              controlPlaneBaseUrl: endpoint.hostBaseUrl,
+              controlPlanePort: endpoint.port,
+              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
+              gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+              postgres: resolvedPostgres,
+              seaweedfs: resolvedSeaweedfs,
+            }
+          : {
+              controlPlaneBaseUrl: endpoint.hostBaseUrl,
+              controlPlanePort: endpoint.port,
+              dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
+              gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+              postgres: resolvedPostgres,
+              seaweedfs: resolvedSeaweedfs,
+              googleAuth: input.googleAuth,
+            },
+      ),
     });
 
     try {
@@ -111,6 +151,7 @@ function config(input: {
   gatewayWsUrl: string;
   postgres: ResolvedTestInfra;
   seaweedfs: ResolvedTestInfra | undefined;
+  googleAuth?: "simulated";
 }): ControlPlaneApiConfig {
   const hostPooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const hostDirectUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -197,12 +238,63 @@ function config(input: {
       otpLength: 6,
       otpExpiresInSeconds: 300,
       otpAllowedAttempts: 3,
+      ...(input.googleAuth === "simulated"
+        ? {
+            google: {
+              clientId: "integration-new-google-client-id",
+              clientSecret: "integration-new-google-client-secret",
+            },
+          }
+        : {}),
     },
     commitSign: {
       binaryPath: CommitSignBinaryPath,
     },
     __dangerouslyEnableTestIsolation: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
+      ...(input.googleAuth === "simulated"
+        ? {
+            googleAuth: {
+              clientId: "integration-new-google-client-id",
+              clientSecret: "integration-new-google-client-secret",
+              verifyIdToken: async (token: string) =>
+                readSimulatedGoogleIdToken(token).aud === "integration-new-google-client-id",
+              getUserInfo: async (token) => {
+                if (token.idToken === undefined) {
+                  return null;
+                }
+
+                const profile = readSimulatedGoogleIdToken(token.idToken);
+
+                return {
+                  user: {
+                    id: profile.sub,
+                    name: profile.name ?? profile.email,
+                    email: profile.email,
+                    ...(profile.picture === undefined ? {} : { image: profile.picture }),
+                    emailVerified: profile.email_verified,
+                  },
+                  data: profile,
+                };
+              },
+            },
+          }
+        : {}),
     },
   };
+}
+
+function readSimulatedGoogleIdToken(token: string): z.infer<typeof SimulatedGoogleIdTokenSchema> {
+  const [, encodedPayload] = token.split(".");
+  if (encodedPayload === undefined) {
+    throw new Error("Expected simulated Google ID token to include a JWT payload.");
+  }
+
+  const parsed = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf8"));
+  const profile = SimulatedGoogleIdTokenSchema.parse(parsed);
+  if (profile.exp <= Math.floor(Date.now() / 1000)) {
+    throw new Error("Expected simulated Google ID token to be unexpired.");
+  }
+
+  return profile;
 }
