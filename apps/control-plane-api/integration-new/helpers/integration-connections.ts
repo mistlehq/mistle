@@ -12,6 +12,11 @@ const IntegrationNewMasterEncryptionKeys = {
   "1": "integration-new-master-key-testing",
 };
 
+export const IntegrationNewIntegrationsConfig = {
+  activeMasterEncryptionKeyVersion: 1,
+  masterEncryptionKeys: IntegrationNewMasterEncryptionKeys,
+};
+
 export type SeedIntegrationTargetInput = {
   targetKey: string;
   familyId: string;
