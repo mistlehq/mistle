@@ -250,7 +250,7 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                   Kind
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Starts when
+                  Trigger
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Runs with
