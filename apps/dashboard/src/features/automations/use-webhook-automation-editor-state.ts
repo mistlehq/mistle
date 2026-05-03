@@ -65,12 +65,11 @@ type SelectedProfileTriggerState = {
   disabledState: WebhookAutomationTriggerPickerDisabledState | null;
 };
 
-const NoProfileSelectedMessage = "Select a sandbox profile to choose triggers.";
-const InvalidProfileBindingMessage =
-  "The selected profile has no bindings with automation triggers.";
+const NoProfileSelectedMessage = "Select a sandbox profile to choose events.";
+const InvalidProfileBindingMessage = "The selected profile has no bindings with automation events.";
 const LoadProfileBindingsErrorMessage = "Could not load profile bindings.";
 const RequiredFieldSummaryMessage = "Please address the fields highlighted in red.";
-const RequiredTriggerSelectionMessage = "Please add a trigger";
+const RequiredTriggerSelectionMessage = "Please add an event";
 const MissingProfileVersionQueryId = 0;
 
 function resolveActiveVersion(versions: readonly SandboxProfileVersion[]): number | null {

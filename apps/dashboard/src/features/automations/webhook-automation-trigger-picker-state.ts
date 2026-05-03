@@ -88,7 +88,7 @@ export function resolveWebhookAutomationTriggerPickerState(input: {
       disabled: true,
       helperMessage: input.disabledState.reason,
       helperVariant: input.disabledState.variant,
-      inputPlaceholder: "No triggers available",
+      inputPlaceholder: "No events available",
     };
   }
 
@@ -103,10 +103,8 @@ export function resolveWebhookAutomationTriggerPickerState(input: {
     availableEventOptions,
     groupedAvailableEventOptions: groupWebhookAutomationEventOptions(availableEventOptions),
     disabled: !input.hasConnectedIntegrations || !hasAvailableTriggers,
-    helperMessage: input.hasConnectedIntegrations
-      ? null
-      : "Connect an integration to add triggers.",
+    helperMessage: input.hasConnectedIntegrations ? null : "Connect an integration to add events.",
     helperVariant: "default",
-    inputPlaceholder: hasAvailableTriggers ? "Add trigger" : "No triggers available",
+    inputPlaceholder: hasAvailableTriggers ? "Add event" : "No events available",
   };
 }

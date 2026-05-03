@@ -22,7 +22,7 @@ export function resolveWebhookAutomationEventOptionAvailabilityCopy(
   if (availability === "wrong_profile") {
     return {
       badgeLabel: "Wrong profile",
-      description: "Trigger is unavailable for the selected sandbox profile.",
+      description: "Event is unavailable for the selected sandbox profile.",
     };
   }
 
@@ -67,7 +67,7 @@ export function resolveSelectedWebhookAutomationEventIssues(input: {
     }
 
     uniqueIssues.add(
-      option.description ?? "Remove triggers that are no longer available before saving.",
+      option.description ?? "Remove events that are no longer available before saving.",
     );
   }
 

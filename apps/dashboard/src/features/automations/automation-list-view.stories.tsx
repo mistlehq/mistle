@@ -99,7 +99,7 @@ const MixedItems: readonly AutomationListItemViewModel[] = [
 ];
 
 const ScheduleOnlyItems = MixedItems.filter((item) => item.kind === "schedule");
-const TriggerOnlyItems = MixedItems.filter((item) => item.kind === "webhook");
+const EventOnlyItems = MixedItems.filter((item) => item.kind === "webhook");
 
 const RowLevelIssueItem: AutomationListItemViewModel = {
   ...createRowLevelIssueWebhookAutomationListItemViewModel(),
@@ -173,10 +173,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Mixed: Story = {};
 
-export const TriggerOnly: Story = {
+export const EventOnly: Story = {
   args: {
-    items: TriggerOnlyItems,
-    totalResults: TriggerOnlyItems.length,
+    items: EventOnlyItems,
+    totalResults: EventOnlyItems.length,
   },
 };
 

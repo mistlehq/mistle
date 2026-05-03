@@ -302,7 +302,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/Trigger/TriggerPicker",
+  title: "Dashboard/Automations/Event/EventPicker",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {
@@ -349,7 +349,7 @@ export const NoConnectedIntegrations: Story = {
   },
 };
 
-export const NoTriggersAvailable: Story = {
+export const NoEventsAvailable: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
@@ -358,7 +358,7 @@ export const NoTriggersAvailable: Story = {
   },
 };
 
-export const UnavailableSavedTrigger: Story = {
+export const UnavailableSavedEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
@@ -381,7 +381,7 @@ export const UnavailableSavedTrigger: Story = {
   },
 };
 
-export const WrongProfileSavedTrigger: Story = {
+export const WrongProfileSavedEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
@@ -397,7 +397,7 @@ export const WrongProfileSavedTrigger: Story = {
         category: "GitHub Engineering / Issues",
         logoKey: "github",
         availability: "wrong_profile",
-        description: "Trigger is unavailable for the selected sandbox profile.",
+        description: "Event is unavailable for the selected sandbox profile.",
       },
     ],
   },
@@ -431,7 +431,7 @@ export const SlackUnavailableArchivedChannelSelection: Story = {
   },
 };
 
-export const AddSecondTrigger: Story = {
+export const AddSecondEvent: Story = {
   args: {
     hasConnectedIntegrations: true,
     selectedConnectionId: GitHubConnectionId,
@@ -445,7 +445,7 @@ export const AddSecondTrigger: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
-    const addTriggerInput = canvas.getByPlaceholderText("Add trigger");
+    const addTriggerInput = canvas.getByPlaceholderText("Add event");
 
     await userEvent.click(addTriggerInput);
     await userEvent.click(await canvas.findByRole("option", { name: "Pull request opened" }));

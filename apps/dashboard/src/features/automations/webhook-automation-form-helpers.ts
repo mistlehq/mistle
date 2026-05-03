@@ -137,7 +137,7 @@ export function validateWebhookAutomationFormValues(
   }
 
   if (values.triggerIds.length === 0) {
-    errors.triggerIds = "Please add a trigger";
+    errors.triggerIds = "Please add an event";
   } else {
     const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
       eventOptions,

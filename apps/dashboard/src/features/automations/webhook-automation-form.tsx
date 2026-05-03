@@ -330,7 +330,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         header={
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1">
-              <h2 className="text-base font-semibold">Triggers</h2>
+              <h2 className="text-base font-semibold">Events</h2>
               {formState.triggerHeaderMessage === undefined ? null : (
                 <p className="text-destructive text-sm">{formState.triggerHeaderMessage}</p>
               )}

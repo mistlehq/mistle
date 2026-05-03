@@ -334,7 +334,7 @@ describe("validateWebhookAutomationFormValues", () => {
       ),
     ).toEqual({
       name: "Automation name is required.",
-      triggerIds: "Please add a trigger",
+      triggerIds: "Please add an event",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "User message is required.",
       conversationKeyTemplate: "Conversation key template is required.",
@@ -403,12 +403,12 @@ describe("validateWebhookAutomationFormValues", () => {
             connectionId: GitHubConnectionId,
             connectionLabel: "GitHub Engineering",
             availability: "wrong_profile",
-            description: "Trigger is unavailable for the selected sandbox profile.",
+            description: "Event is unavailable for the selected sandbox profile.",
           }),
         ],
       ),
     ).toEqual({
-      triggerIds: "Trigger is unavailable for the selected sandbox profile.",
+      triggerIds: "Event is unavailable for the selected sandbox profile.",
     });
   });
 

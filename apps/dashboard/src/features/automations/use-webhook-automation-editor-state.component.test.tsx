@@ -189,7 +189,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
     expect(result.current.formError).toBeNull();
     expect(result.current.triggerPickerDisabledState).toEqual({
-      reason: "Select a sandbox profile to choose triggers.",
+      reason: "Select a sandbox profile to choose events.",
       variant: "default",
     });
   });
@@ -205,7 +205,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
         directoryData: createDirectoryData(),
       }).disabledState,
     ).toEqual({
-      reason: "The selected profile has no bindings with automation triggers.",
+      reason: "The selected profile has no bindings with automation events.",
       variant: "default",
     });
   });
@@ -859,7 +859,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
       name: "Automation name is required.",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "User message is required.",
-      triggerIds: "Please add a trigger",
+      triggerIds: "Please add an event",
     });
   });
 
@@ -905,7 +905,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     expect(result.current.validationSummaryError).toBe(
       "Please address the fields highlighted in red.",
     );
-    expect(result.current.fieldErrors.triggerIds).toBe("Please add a trigger");
+    expect(result.current.fieldErrors.triggerIds).toBe("Please add an event");
   });
 
   it("clears stale trigger validation errors when the sandbox profile changes", () => {
@@ -980,7 +980,7 @@ describe("useLoadedWebhookAutomationEditorState", () => {
     });
 
     expect(result.current.fieldErrors.triggerIds).toBe(
-      "Trigger is unavailable for the selected sandbox profile.",
+      "Event is unavailable for the selected sandbox profile.",
     );
 
     act(() => {

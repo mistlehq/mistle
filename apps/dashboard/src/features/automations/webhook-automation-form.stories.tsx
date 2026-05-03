@@ -466,7 +466,7 @@ function StoryHarness(input: {
 }
 
 const meta = {
-  title: "Dashboard/Automations/Trigger/Form",
+  title: "Dashboard/Automations/Event/Form",
   component: StoryHarness,
   decorators: [withDashboardPageStory],
   parameters: {
@@ -482,7 +482,7 @@ export const CreatePageLayout: Story = {
   args: {
     mode: "create",
     triggerPickerDisabledState: {
-      reason: "Select a sandbox profile to choose triggers.",
+      reason: "Select a sandbox profile to choose events.",
       variant: "default",
     },
     values: EmptyCreateValues,
@@ -502,7 +502,7 @@ export const ValidationErrors: Story = {
     mode: "create",
     validationSummaryError: "Please address the fields highlighted in red.",
     fieldErrors: {
-      triggerIds: "Please add a trigger",
+      triggerIds: "Please add an event",
       name: "Required field.",
       sandboxProfileId: "Required field.",
       inputTemplate: "Required field.",
@@ -533,11 +533,11 @@ export const Saving: Story = {
   },
 };
 
-export const NoTriggersAvailable: Story = {
+export const NoEventsAvailable: Story = {
   args: {
     mode: "create",
     triggerPickerDisabledState: {
-      reason: "The selected profile has no bindings with automation triggers.",
+      reason: "The selected profile has no bindings with automation events.",
       variant: "default",
     },
     values: {
@@ -631,7 +631,7 @@ export const WrongProfileSavedEvent: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     fieldErrors: {
-      triggerIds: "Trigger is unavailable for the selected sandbox profile.",
+      triggerIds: "Event is unavailable for the selected sandbox profile.",
     },
     values: {
       ...ExistingAutomationValues,
@@ -643,7 +643,7 @@ export const WrongProfileSavedEvent: Story = {
       {
         ...GitHubWebhookEventOptions[0]!,
         availability: "wrong_profile",
-        description: "Trigger is unavailable for the selected sandbox profile.",
+        description: "Event is unavailable for the selected sandbox profile.",
       },
     ],
   },

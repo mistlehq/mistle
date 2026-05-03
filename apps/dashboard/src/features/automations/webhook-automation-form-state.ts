@@ -76,7 +76,7 @@ export function resolveWebhookAutomationFormState(input: {
   const triggerHeaderMessage =
     input.selectedTriggerIds.length > 0 &&
     input.triggerIdsError !== undefined &&
-    input.triggerIdsError !== "Trigger is unavailable for the selected sandbox profile."
+    input.triggerIdsError !== "Event is unavailable for the selected sandbox profile."
       ? input.triggerIdsError
       : undefined;
 

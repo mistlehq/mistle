@@ -53,7 +53,7 @@ describe("AutomationCreatePage", () => {
 
     expect(screen.getByRole("heading", { name: "Create automation" })).toBeDefined();
     expect(screen.getByText("Automation type")).toBeDefined();
-    expect(screen.getByRole("heading", { name: "Triggers" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "Events" })).toBeDefined();
     expect(screen.getByRole("textbox", { name: "User message" })).toBeDefined();
   });
 

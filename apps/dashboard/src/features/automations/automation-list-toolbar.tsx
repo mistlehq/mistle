@@ -20,7 +20,7 @@ export function AutomationListToolbar(input: {
       onFilterValueChange={(nextValue) => input.onFilterChange(toAutomationListFilter(nextValue))}
       onSearchValueChange={input.onSearchValueChange}
       searchAriaLabel="Search automations"
-      searchPlaceholder="Search automations, targets, schedules, or events"
+      searchPlaceholder="Search automations, events, schedules, profiles, or repositories"
       searchValue={input.searchValue}
     />
   );

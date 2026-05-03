@@ -12,7 +12,7 @@ const UnavailableSavedEventItem = SampleItems[2];
 const RowLevelIssueItem = createRowLevelIssueWebhookAutomationListItemViewModel();
 
 const meta = {
-  title: "Dashboard/Automations/Trigger/ListView",
+  title: "Dashboard/Automations/Event/ListView",
   component: WebhookAutomationListView,
   decorators: [withDashboardCenteredStory],
   parameters: {

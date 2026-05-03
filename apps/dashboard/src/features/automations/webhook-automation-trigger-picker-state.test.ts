@@ -60,7 +60,7 @@ describe("webhook automation trigger picker state", () => {
     expect(
       resolveWebhookAutomationTriggerPickerState({
         disabledState: {
-          reason: "The selected profile has no bindings with automation triggers.",
+          reason: "The selected profile has no bindings with automation events.",
           variant: "default",
         },
         eventOptions: WebhookEventOptions,
@@ -71,9 +71,9 @@ describe("webhook automation trigger picker state", () => {
       availableEventOptions: [],
       groupedAvailableEventOptions: [],
       disabled: true,
-      helperMessage: "The selected profile has no bindings with automation triggers.",
+      helperMessage: "The selected profile has no bindings with automation events.",
       helperVariant: "default",
-      inputPlaceholder: "No triggers available",
+      inputPlaceholder: "No events available",
     });
   });
 });

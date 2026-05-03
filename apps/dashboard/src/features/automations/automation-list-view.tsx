@@ -74,7 +74,7 @@ function AutomationKindBadge(input: {
       ) : (
         <WebhooksLogoIcon aria-hidden className="size-3.5" />
       )}
-      {isSchedule ? "Schedule" : "Trigger"}
+      {isSchedule ? "Schedule" : "Event"}
     </span>
   );
 }
@@ -247,13 +247,13 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                   Automation
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Type
+                  Kind
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Source
+                  Starts when
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Target
+                  Runs with
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase whitespace-nowrap">
                   Updated

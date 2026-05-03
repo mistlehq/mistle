@@ -151,7 +151,7 @@ describe("resolveWebhookAutomationFormState", () => {
       webhookEventOptions: [],
       selectedTriggerIds: ["missing-source::missing.event"],
       conversationKeyTemplate: "",
-      triggerIdsError: "Trigger is unavailable for the selected sandbox profile.",
+      triggerIdsError: "Event is unavailable for the selected sandbox profile.",
     });
 
     expect(state.triggerHeaderMessage).toBeUndefined();
@@ -167,10 +167,10 @@ describe("resolveWebhookAutomationFormState", () => {
         }),
       ],
       conversationKeyTemplate: "",
-      triggerIdsError: "Please add a trigger",
+      triggerIdsError: "Please add an event",
     });
 
-    expect(state.triggerHeaderMessage).toBe("Please add a trigger");
+    expect(state.triggerHeaderMessage).toBe("Please add an event");
   });
 
   it("derives the selected grouping label from the supported conversation key options", () => {

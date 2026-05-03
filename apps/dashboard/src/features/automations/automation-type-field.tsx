@@ -13,7 +13,7 @@ import {
 export type AutomationTypeValue = "trigger" | "scheduled";
 
 export function formatAutomationTypeValue(value: AutomationTypeValue): string {
-  return value === "scheduled" ? "Scheduled" : "Trigger";
+  return value === "scheduled" ? "Schedule" : "Event";
 }
 
 export function AutomationTypeSelectField(input: {
@@ -38,8 +38,8 @@ export function AutomationTypeSelectField(input: {
             <SelectValue>{formatAutomationTypeValue(input.value)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="trigger">Trigger</SelectItem>
-            <SelectItem value="scheduled">Scheduled</SelectItem>
+            <SelectItem value="trigger">Event</SelectItem>
+            <SelectItem value="scheduled">Schedule</SelectItem>
           </SelectContent>
         </Select>
       </FieldContent>

@@ -67,7 +67,7 @@ export function WebhookAutomationTriggerPicker(input: {
     eventOptions: input.eventOptions,
     selectedTriggerIds: input.selectedTriggerIds,
   });
-  const emptyStateMessage = input.error === undefined ? "No triggers added yet." : input.error;
+  const emptyStateMessage = input.error === undefined ? "No events added yet." : input.error;
 
   return (
     <div className="space-y-3">
@@ -120,7 +120,7 @@ export function WebhookAutomationTriggerPicker(input: {
                   </div>
                 </div>
                 <Button
-                  aria-label={`Remove ${option.label} trigger`}
+                  aria-label={`Remove ${option.label} event`}
                   className="size-7 shrink-0 self-start"
                   onClick={() => {
                     input.onValueChange(
@@ -209,7 +209,7 @@ export function WebhookAutomationTriggerPickerAddButton(input: {
             variant="outline"
           >
             <PlusIcon aria-hidden className="size-4" />
-            Add trigger
+            Add event
           </Button>
         ) : (
           <div className="relative">
