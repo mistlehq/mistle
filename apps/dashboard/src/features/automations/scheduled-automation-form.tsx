@@ -416,12 +416,12 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
             <SelectField
               disabled={input.isDeleting || input.isSaving}
               error={input.fieldErrors.conversationMode}
-              label="Conversation"
+              label="Group runs by"
               onValueChange={(value) => {
                 input.onValueChange("conversationMode", value);
               }}
               options={ScheduledAutomationConversationOptions}
-              placeholder="Select conversation behavior"
+              placeholder="Select run grouping"
               value={input.values.conversationMode}
             />
           </div>

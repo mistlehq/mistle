@@ -18,15 +18,18 @@ export const ScheduledAutomationNewConversationEachRunKeyTemplate =
 export const ScheduledAutomationConversationOptions = [
   {
     value: ScheduledAutomationConversationModes.SAME,
-    label: "Same conversation",
+    label: "Schedule",
+    description: "Every run from this schedule goes to one conversation.",
   },
   {
     value: ScheduledAutomationConversationModes.NEW_EACH_RUN,
-    label: "New conversation each run",
+    label: "Run",
+    description: "Each scheduled run starts its own conversation.",
   },
 ] satisfies readonly {
   value: ScheduledAutomationConversationMode;
   label: string;
+  description: string;
 }[];
 
 export function readBrowserTimezone(): string {
