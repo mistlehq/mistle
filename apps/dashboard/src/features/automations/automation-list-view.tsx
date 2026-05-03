@@ -62,31 +62,20 @@ type AutomationListViewProps = {
   onOpenAutomation: (automation: { id: string; kind: AutomationListItemViewModel["kind"] }) => void;
 };
 
-function AutomationKindStatusIcon(input: {
-  enabled: boolean;
+function AutomationKindBadge(input: {
   kind: AutomationListItemViewModel["kind"];
 }): React.JSX.Element {
   const isSchedule = input.kind === "schedule";
-  const kindLabel = isSchedule ? "Scheduled automation" : "Trigger automation";
-  const statusLabel = input.enabled ? "enabled" : "disabled";
-  const label = `${kindLabel}, ${statusLabel}`;
 
   return (
-    <Tooltip delay={0}>
-      <TooltipTrigger
-        aria-label={label}
-        className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md border bg-background outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-          input.enabled ? "text-foreground" : "text-muted-foreground"
-        } ${input.enabled ? "border-emerald-500/70" : "border-muted-foreground/25"}`}
-      >
-        {isSchedule ? (
-          <CalendarBlankIcon aria-hidden className="size-5" />
-        ) : (
-          <WebhooksLogoIcon aria-hidden className="size-5" />
-        )}
-      </TooltipTrigger>
-      <TooltipContent side="top">{label}</TooltipContent>
-    </Tooltip>
+    <span className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground">
+      {isSchedule ? (
+        <CalendarBlankIcon aria-hidden className="size-3.5" />
+      ) : (
+        <WebhooksLogoIcon aria-hidden className="size-3.5" />
+      )}
+      {isSchedule ? "Schedule" : "Trigger"}
+    </span>
   );
 }
 
@@ -153,13 +142,26 @@ function SourceDetailsCell(input: { item: AutomationListItemViewModel }): React.
   return <ScheduleSummaryCell item={input.item.source} />;
 }
 
+function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
+  return (
+    <>
+      <span
+        aria-hidden
+        className={`inline-block size-2 shrink-0 rounded-full ${
+          input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+        }`}
+      />
+      <span className="sr-only">{input.enabled ? "Enabled" : "Disabled"}</span>
+    </>
+  );
+}
+
 function AutomationIssueIndicator(input: {
   issue: AutomationListItemViewModel["issue"];
   enabled: boolean;
-  kind: AutomationListItemViewModel["kind"];
 }): React.JSX.Element {
   if (input.issue === undefined) {
-    return <AutomationKindStatusIcon enabled={input.enabled} kind={input.kind} />;
+    return <AutomationStatusDot enabled={input.enabled} />;
   }
 
   return (
@@ -184,11 +186,7 @@ function AutomationIdentityCell(input: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <AutomationIssueIndicator
-          enabled={input.item.enabled}
-          issue={input.item.issue}
-          kind={input.item.kind}
-        />
+        <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
         <button
           className={textLinkVariants({
             variant: "listItem",
@@ -242,11 +240,14 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
             />
           ) : null}
 
-          <Table className="min-w-[60rem]">
+          <Table className="min-w-[68rem]">
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Automation
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Type
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Source
@@ -262,7 +263,7 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
             <TableBody>
               {visibleItems.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={4}>
+                  <TableCell className="text-muted-foreground" colSpan={5}>
                     {hasItems
                       ? "No automations match the current search or filter."
                       : "No automations have been created yet."}
@@ -273,6 +274,9 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-normal">
                     <AutomationIdentityCell item={item} onOpenAutomation={input.onOpenAutomation} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <AutomationKindBadge kind={item.kind} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-normal">
                     <SourceDetailsCell item={item} />
