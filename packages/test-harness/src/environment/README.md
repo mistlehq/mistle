@@ -159,6 +159,7 @@ Common `env` properties include:
   handles.
 - `env.controlPlaneTables`, `env.dataPlaneTables`: schema-bound Drizzle tables
   for inserts, updates, deletes, joins, and predicates.
+- `env.controlPlaneWorkflow`: workflow client for control-plane worker behavior.
 - `env.dataPlaneWorkflow`: workflow client for data-plane worker behavior.
 - `env.mailpit`, `env.objectStore`: optional clients available only when the
   matching `extraInfra` was requested and attached to a selected service.

@@ -349,6 +349,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   relayCoordinator: input.relayCoordinator,
                   sandboxInstanceId,
                   sourcePeerSide,
+                  ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                   tunnelProtocolTranslator,
                 });
               })().catch((error: unknown) => {

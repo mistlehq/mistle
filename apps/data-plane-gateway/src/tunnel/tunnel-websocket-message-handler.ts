@@ -63,6 +63,7 @@ export async function handleTunnelWebSocketMessage(input: {
   relayCoordinator: TunnelRelayCoordinator;
   sandboxInstanceId: string;
   sourcePeerSide: RelayPeerSide;
+  testEnvironmentId?: string;
   tunnelProtocolTranslator: TunnelProtocolTranslator;
 }): Promise<void> {
   const translation = await input.tunnelProtocolTranslator.translateInboundMessage({
@@ -83,6 +84,9 @@ export async function handleTunnelWebSocketMessage(input: {
       message: translation.keepaliveControlMessage,
       sandboxInstanceId: input.sandboxInstanceId,
       ownerLeaseId: input.bootstrapOwnerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   }
 

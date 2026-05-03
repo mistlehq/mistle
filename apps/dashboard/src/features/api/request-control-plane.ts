@@ -16,6 +16,29 @@ type RequestControlPlaneInput = {
   errorFactory?: (input: HttpApiErrorInput) => Error;
 };
 
+let requestHeadersForTest: HeadersInit | undefined;
+
+export function setControlPlaneRequestHeadersForTest(headers: HeadersInit | undefined): void {
+  requestHeadersForTest = headers;
+}
+
+function createRequestHeaders(input: { hasBody: boolean; isMultipartBody: boolean }): Headers {
+  const headers = new Headers();
+  headers.set("accept", "application/json");
+
+  if (input.hasBody && !input.isMultipartBody) {
+    headers.set("content-type", "application/json");
+  }
+
+  if (requestHeadersForTest !== undefined) {
+    new Headers(requestHeadersForTest).forEach((value, key) => {
+      headers.set(key, value);
+    });
+  }
+
+  return headers;
+}
+
 async function readResponsePayload(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.toLowerCase().includes("application/json")) {
@@ -66,19 +89,10 @@ export async function requestControlPlane(input: RequestControlPlaneInput): Prom
     method: input.method,
     credentials: "include",
     ...(input.signal === undefined ? {} : { signal: input.signal }),
-    headers:
-      input.body === undefined
-        ? {
-            accept: "application/json",
-          }
-        : isMultipartBody
-          ? {
-              accept: "application/json",
-            }
-          : {
-              accept: "application/json",
-              "content-type": "application/json",
-            },
+    headers: createRequestHeaders({
+      hasBody: input.body !== undefined,
+      isMultipartBody,
+    }),
     body: requestBody,
   });
 

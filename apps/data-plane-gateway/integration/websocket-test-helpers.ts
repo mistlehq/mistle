@@ -96,11 +96,16 @@ export function connectSandboxTunnelWebSocket(input: {
   );
 }
 
-export function connectWebSocketExpectFailure(url: string): Promise<FailedWebSocketConnectResult> {
+export function connectWebSocketExpectFailure(
+  url: string,
+  options?: WebSocketConnectOptions,
+): Promise<FailedWebSocketConnectResult> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(
       url,
       createWebSocketClientOptions({
+        ...(options?.headers === undefined ? {} : { headers: options.headers }),
+        ...(options?.autoPong === undefined ? {} : { autoPong: options.autoPong }),
         handshakeTimeoutMs: ConnectTimeoutMs,
       }),
     );
