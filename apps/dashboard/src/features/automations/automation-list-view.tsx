@@ -75,18 +75,18 @@ function AutomationKindStatusIcon(input: {
     <Tooltip delay={0}>
       <TooltipTrigger
         aria-label={label}
-        className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md border bg-background outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+        className={`relative inline-flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
           input.enabled ? "text-foreground" : "text-muted-foreground"
         }`}
       >
         {isSchedule ? (
-          <CalendarBlankIcon aria-hidden className="size-3.5" />
+          <CalendarBlankIcon aria-hidden className="size-5" />
         ) : (
-          <WebhooksLogoIcon aria-hidden className="size-3.5" />
+          <WebhooksLogoIcon aria-hidden className="size-5" />
         )}
         <span
           aria-hidden
-          className={`absolute -right-1 -bottom-1 size-2.5 rounded-full border-2 border-background ${
+          className={`absolute right-0 bottom-0 size-2 rounded-full ${
             input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
           }`}
         />
