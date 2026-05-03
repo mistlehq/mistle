@@ -39,6 +39,12 @@ describe.concurrent("user avatar endpoints integration", () => {
     const session = await env.auth.createSession({
       email: "integration-new-avatar-upload@example.com",
     });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.users)
+      .set({
+        image: "https://example.com/existing-avatar.png",
+      })
+      .where(eq(env.controlPlaneTables.users.id, session.userId));
 
     const uploadPayload = await uploadProfileImage({
       cookie: session.cookie,
@@ -58,11 +64,15 @@ describe.concurrent("user avatar endpoints integration", () => {
 
     const persistedUser = await env.controlPlaneDb.query.users.findFirst({
       columns: {
+        image: true,
         imageObjectKey: true,
       },
       where: (table, { eq }) => eq(table.id, session.userId),
     });
-    expect(persistedUser?.imageObjectKey).toBe(uploadPayload.imageVersion);
+    expect(persistedUser).toEqual({
+      image: "https://example.com/existing-avatar.png",
+      imageObjectKey: uploadPayload.imageVersion,
+    });
 
     const storedObject = await env.objectStore.headObject(uploadPayload.imageVersion);
     expect(storedObject.ContentType).toBe("image/webp");

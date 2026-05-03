@@ -20,6 +20,12 @@ describe.concurrent("organization logo write integration", () => {
     const session = await env.auth.createSession({
       email: "integration-new-organization-logo-upload@example.com",
     });
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.organizations)
+      .set({
+        logo: "https://example.com/existing-logo.png",
+      })
+      .where(eq(env.controlPlaneTables.organizations.id, session.organizationId));
 
     const uploadPayload = await uploadOrganizationLogo({
       cookie: session.cookie,
@@ -45,7 +51,7 @@ describe.concurrent("organization logo write integration", () => {
       where: (table, { eq }) => eq(table.id, session.organizationId),
     });
     expect(persistedOrganization).toEqual({
-      logo: null,
+      logo: "https://example.com/existing-logo.png",
       logoObjectKey: uploadPayload.imageVersion,
     });
 
