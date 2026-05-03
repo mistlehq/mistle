@@ -563,6 +563,89 @@ describe.concurrent("sandbox profile version put integration bindings integratio
     expect(body.code).toBe("INVALID_BINDING_REFERENCE");
   });
 
+  it("defaults Jira connector binding tool selections to an empty array", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-put-bindings-jira@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+      targetKey: "jira-default-put-bindings-route",
+      familyId: "jira",
+      variantId: "jira-default",
+      enabled: true,
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_put_bindings_route_jira_001",
+      organizationId: session.organizationId,
+      targetKey: "jira-default-put-bindings-route",
+      displayName: "Jira Connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_put_bindings_route_jira_001",
+        organizationId: session.organizationId,
+        displayName: "Jira Binding Profile",
+        createdAt: "2026-03-03T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_put_bindings_route_jira_001",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_jira_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_jira_001",
+              kind: IntegrationBindingKinds.CONNECTOR,
+              config: {},
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = PutSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.bindings).toHaveLength(1);
+    expect(body.bindings[0]?.config).toEqual({
+      tools: [],
+    });
+
+    const persistedBinding =
+      await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_put_bindings_route_jira_001"),
+            eq(table.sandboxProfileVersion, 1),
+            eq(table.connectionId, "icn_put_bindings_route_jira_001"),
+          ),
+      });
+    expect(persistedBinding?.config).toEqual({
+      tools: [],
+    });
+  });
+
   it("returns 400 for invalid request payload shape", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-put-bindings-validation@example.com",
