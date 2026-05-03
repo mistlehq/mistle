@@ -164,6 +164,15 @@ function pickResolvedSecret(input: {
   return undefined;
 }
 
+function toIsoTimestamp(value: string): string {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) {
+    throw new Error(`Expected credential expiry '${value}' to be parseable as a timestamp.`);
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
 async function markCredentialReauthorizationRequired(input: {
   db: ControlPlaneDatabase;
   credentialId: string;
@@ -331,7 +340,7 @@ async function resolveStaticCredentialValue(input: {
   return {
     kind: "value",
     value,
-    ...(expiresAt === undefined ? {} : { expiresAt }),
+    ...(expiresAt === undefined ? {} : { expiresAt: toIsoTimestamp(expiresAt) }),
   };
 }
 

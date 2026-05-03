@@ -1,6 +1,7 @@
 import {
   IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
+  type UserExternalPrincipalCredentialSecretKind,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalKeyStatuses,
@@ -296,7 +297,7 @@ export async function insertPrincipalCredentialSecret(
   input: {
     organizationId: string;
     credentialId: string;
-    secretKind: string;
+    secretKind: UserExternalPrincipalCredentialSecretKind;
     plaintext: string;
     metadata?: Record<string, unknown>;
   },
@@ -390,6 +391,35 @@ export async function decryptPrincipalCredentialSecret(
   } finally {
     organizationCredentialKeyMaterial.fill(0);
   }
+}
+
+export async function decryptPrincipalCredentialSecretByKind(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    credentialId: string;
+    secretKind: UserExternalPrincipalCredentialSecretKind;
+  },
+): Promise<string> {
+  const secret = await env.controlPlaneDb.query.userExternalPrincipalCredentialSecrets.findFirst({
+    where: (table, { and, eq, isNull }) =>
+      and(
+        eq(table.organizationId, input.organizationId),
+        eq(table.credentialId, input.credentialId),
+        eq(table.secretKind, input.secretKind),
+        isNull(table.revokedAt),
+      ),
+  });
+  if (secret === undefined) {
+    throw new Error("Expected encrypted linked-principal credential secret.");
+  }
+
+  return decryptPrincipalCredentialSecret(env, {
+    organizationId: input.organizationId,
+    organizationCredentialKeyVersion: secret.organizationCredentialKeyVersion,
+    nonce: secret.nonce,
+    ciphertext: secret.ciphertext,
+  });
 }
 
 async function readOrganizationCredentialKey(

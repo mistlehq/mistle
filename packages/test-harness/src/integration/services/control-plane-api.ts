@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createControlPlaneApiRuntime } from "@mistle/control-plane-api/runtime";
 import type { ControlPlaneApiConfig } from "@mistle/control-plane-api/types";
@@ -15,6 +17,9 @@ import { ServiceIds } from "./service-ids.js";
 import { httpEndpoint, httpHealth, infraRequirement, infraValue, resolvedInfra } from "./shared.js";
 
 const ControlPlaneHost = "127.0.0.1";
+const CommitSignBinaryPath = fileURLToPath(
+  new URL("../../../../commit-sign/target/debug/commit-sign", import.meta.url),
+);
 
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
@@ -192,6 +197,9 @@ function config(input: {
       otpLength: 6,
       otpExpiresInSeconds: 300,
       otpAllowedAttempts: 3,
+    },
+    commitSign: {
+      binaryPath: CommitSignBinaryPath,
     },
     __dangerouslyEnableTestIsolation: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
