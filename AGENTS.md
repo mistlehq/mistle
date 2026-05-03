@@ -13,12 +13,14 @@
 
 ## Testing Philosophy
 
-- Strict rule: do **not** use mocking, stubbing, faking, or simulated behavior in tests.
+- Strict rule: do **not** use mocking, stubbing, faking, or simulated behavior in tests, except for the narrow simulated external-system rule below.
 - Disallowed mocking APIs include `vi.fn`, `vi.spyOn`, `vi.mock`, `jest.*`, `sinon`, `nock`, `msw`, and equivalent libraries.
 - Disallowed manual doubles include `Fake*`, `Stub*`, `Noop*`, in-memory replacements of external systems, and any test-only implementation that simulates behavior not exercised in production.
 - Disallowed assertion style includes interaction assertions on doubles (for example `toHaveBeenCalled*`). Assert observable behavior instead (HTTP response, persisted state, emitted events, UI output).
 - Do not use fake timers or patched global time (`Date`, timers, `setSystemTime`, etc.). For time-sensitive behavior, use explicit injected dependencies from `@mistle/time` (for example `Clock` / `Sleeper` / `Scheduler`) and test with concrete deterministic implementations.
 - Prefer real boundaries: pure unit tests for pure logic only; all dependency-bearing behavior should be covered by integration/system/e2e tests against real dependencies.
+- The only allowed simulated behavior is a small local HTTP simulator for a non-Mistle external system that cannot be used directly in CI. Name it honestly with `Simulated` / `Simulator`, keep it direct and scoped to the provider endpoints the test exercises, and never use it to replace a Mistle service, database, queue, worker, or runtime.
+- Every simulated external-system endpoint, payload field, signature, status code, callback, or token response must be grounded in the provider's official documentation and/or our production integration code. Add source comments or links near the simulator behavior. Do not invent provider behavior from memory.
 - Read `docs/development/no-mocking.md` before adding or changing tests.
 - Test **everything**. Tests must be rigorous. Our intent is ensuring a new person contributing to the same code base cannot break our stuff and that nothing slips by.
 - Do not write coverage theater. A test must protect a real behavior, contract, regression, or user/service workflow. Avoid tests that only prove code can be called, assert implementation trivia, duplicate another test at a different layer, or exercise impossible/corrupt state without a clear production risk.
@@ -66,7 +68,8 @@
 - New integration tests must use `@mistle/test-harness` through the temporary `integration-new/` lane. Use `createIntegrationTest(...)` from the harness; do not create app-local bespoke setup unless you are implementing harness support itself.
 - `integration-new` is not limited to HTTP API tests. It is the required lane for dependency-bearing app/service behavior, whether the entrypoint is HTTP, a service/module function, a workflow, or another production code path. Choose the entrypoint that best matches the behavior under test.
 - Prefer HTTP/API entrypoints when the public endpoint contract, authorization, validation, serialization, or emitted side effect is the behavior. Use a lower-level production service/module entrypoint when HTTP would add ceremony without improving the assertion and the behavior is genuinely below the API boundary.
-- Do not spin up ad hoc HTTP servers, local handlers, or app-local doubles to emulate Mistle services. If a test needs a Mistle service, add/select that service through `createIntegrationTest(...)` so the real service runs with the harness-managed environment. Ad hoc HTTP servers are acceptable only when the behavior under test is explicitly about calling an external/non-Mistle upstream, such as an echo server or provider callback endpoint.
+- Do not spin up ad hoc HTTP servers, local handlers, or app-local doubles to emulate Mistle services. If a test needs a Mistle service, add/select that service through `createIntegrationTest(...)` so the real service runs with the harness-managed environment.
+- Integration tests may use small simulated local HTTP servers only for external/non-Mistle systems, such as a provider API, provider callback endpoint, or arbitrary upstream echo server. Keep simulators file-local unless reuse is proven, name them explicitly (`startSimulatedGitHubApi`, `startSimulatedGoogleOAuthServer`), and document the official provider docs or production integration code that grounds the simulated behavior.
 - `@mistle/test-harness` may dynamically import selected integration service implementations behind `createIntegrationTest(...)` so small tests do not transform every Mistle app and worker runtime before fixtures start. Keep this exception inside the harness service loader; app/test code should still use ordinary static imports.
 - New integration tests must receive a single `{ env }` fixture. Do not expose many one-off fixture fields when they can be modeled under `env`.
 - Runtime mode is the default for Mistle services in the new integration lane. Do not use Docker mode for ordinary application behavior tests unless the test explicitly covers packaging/deployment-shape behavior.
