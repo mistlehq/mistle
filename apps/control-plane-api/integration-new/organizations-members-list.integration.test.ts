@@ -11,6 +11,7 @@ import { MembersPageResponseSchema } from "../src/organizations/index.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api"],
+  extraInfra: ["seaweedfs"],
 });
 
 describe.concurrent("organization members list integration", () => {
@@ -51,6 +52,11 @@ describe.concurrent("organization members list integration", () => {
       name: "Completely Different Name",
       userId: memberTwoSession.userId,
     });
+    await putMemberAvatar({
+      env,
+      objectKey: `avatars/users/${memberOneSession.userId}/members_case_alpha.webp`,
+      userId: memberOneSession.userId,
+    });
 
     const firstPage = await listMembers({
       cookie: ownerSession.cookie,
@@ -90,6 +96,20 @@ describe.concurrent("organization members list integration", () => {
       expectedEmail: "members-case-beta@example.com",
       search: "admin",
     });
+
+    const avatarPage = await listMembers({
+      cookie: ownerSession.cookie,
+      env,
+      query: "limit=1&offset=0&search=members-case-alpha@example.com",
+    });
+    const avatarUrl = avatarPage.members[0]?.avatar.imageUrl;
+    if (avatarUrl === undefined || avatarUrl === null) {
+      throw new Error("Expected member with stored avatar to include an avatar URL.");
+    }
+
+    const avatarResponse = await fetch(avatarUrl);
+    expect(avatarResponse.status).toBe(200);
+    expect(avatarResponse.headers.get("content-type")).toBe("image/webp");
   });
 
   it("paginates members by the normalized display name returned to clients", async ({ env }) => {
@@ -216,6 +236,24 @@ async function renameUser(input: {
     .update(input.env.controlPlaneTables.users)
     .set({
       name: input.name,
+    })
+    .where(eq(input.env.controlPlaneTables.users.id, input.userId));
+}
+
+async function putMemberAvatar(input: {
+  env: IntegrationTestEnvironment;
+  userId: string;
+  objectKey: string;
+}): Promise<void> {
+  await input.env.objectStore.putObject({
+    Body: Buffer.from("integration-new-member-avatar"),
+    ContentType: "image/webp",
+    objectKey: input.objectKey,
+  });
+  await input.env.controlPlaneDb
+    .update(input.env.controlPlaneTables.users)
+    .set({
+      imageObjectKey: input.objectKey,
     })
     .where(eq(input.env.controlPlaneTables.users.id, input.userId));
 }
