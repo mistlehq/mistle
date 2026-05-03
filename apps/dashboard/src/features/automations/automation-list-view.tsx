@@ -62,23 +62,34 @@ type AutomationListViewProps = {
   onOpenAutomation: (automation: { id: string; kind: AutomationListItemViewModel["kind"] }) => void;
 };
 
-function AutomationKindIcon(input: {
+function AutomationKindStatusIcon(input: {
+  enabled: boolean;
   kind: AutomationListItemViewModel["kind"];
 }): React.JSX.Element {
   const isSchedule = input.kind === "schedule";
-  const label = isSchedule ? "Scheduled automation" : "Trigger automation";
+  const kindLabel = isSchedule ? "Scheduled automation" : "Trigger automation";
+  const statusLabel = input.enabled ? "enabled" : "disabled";
+  const label = `${kindLabel}, ${statusLabel}`;
 
   return (
     <Tooltip delay={0}>
       <TooltipTrigger
         aria-label={label}
-        className="text-muted-foreground inline-flex size-6 shrink-0 items-center justify-center rounded-md border bg-background outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className={`relative inline-flex size-7 shrink-0 items-center justify-center rounded-md border bg-background outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+          input.enabled ? "text-foreground" : "text-muted-foreground"
+        }`}
       >
         {isSchedule ? (
           <CalendarBlankIcon aria-hidden className="size-3.5" />
         ) : (
           <WebhooksLogoIcon aria-hidden className="size-3.5" />
         )}
+        <span
+          aria-hidden
+          className={`absolute -right-1 -bottom-1 size-2.5 rounded-full border-2 border-background ${
+            input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+          }`}
+        />
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>
     </Tooltip>
@@ -148,26 +159,13 @@ function SourceDetailsCell(input: { item: AutomationListItemViewModel }): React.
   return <ScheduleSummaryCell item={input.item.source} />;
 }
 
-function AutomationStatusDot(input: { enabled: boolean }): React.JSX.Element {
-  return (
-    <>
-      <span
-        aria-hidden
-        className={`inline-block size-2 shrink-0 rounded-full ${
-          input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
-        }`}
-      />
-      <span className="sr-only">{input.enabled ? "Enabled" : "Disabled"}</span>
-    </>
-  );
-}
-
 function AutomationIssueIndicator(input: {
   issue: AutomationListItemViewModel["issue"];
   enabled: boolean;
+  kind: AutomationListItemViewModel["kind"];
 }): React.JSX.Element {
   if (input.issue === undefined) {
-    return <AutomationStatusDot enabled={input.enabled} />;
+    return <AutomationKindStatusIcon enabled={input.enabled} kind={input.kind} />;
   }
 
   return (
@@ -192,8 +190,11 @@ function AutomationIdentityCell(input: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <AutomationIssueIndicator enabled={input.item.enabled} issue={input.item.issue} />
-        <AutomationKindIcon kind={input.item.kind} />
+        <AutomationIssueIndicator
+          enabled={input.item.enabled}
+          issue={input.item.issue}
+          kind={input.item.kind}
+        />
         <button
           className={textLinkVariants({
             variant: "listItem",
