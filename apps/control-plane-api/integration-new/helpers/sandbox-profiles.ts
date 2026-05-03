@@ -67,6 +67,7 @@ export function integrationConnectionRow(input: {
   targetKey: string;
   displayName: string;
   status: IntegrationConnectionStatus;
+  config?: Record<string, unknown>;
 }) {
   return {
     id: input.id,
@@ -74,6 +75,7 @@ export function integrationConnectionRow(input: {
     targetKey: input.targetKey,
     displayName: input.displayName,
     status: input.status,
+    ...(input.config === undefined ? {} : { config: input.config }),
   };
 }
 
