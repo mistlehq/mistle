@@ -1,3 +1,4 @@
+import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { sql } from "drizzle-orm";
@@ -7,6 +8,7 @@ const WorkflowRunPersistTimeoutMs = 30_000;
 const WorkflowRunPersistPollIntervalMs = 100;
 
 export const MaterializeWorkflowName = "data-plane.sandbox-profile-version-snapshots.materialize";
+export const StartWorkflowName = "data-plane.sandbox-instances.start";
 
 const MaterializeWorkflowRunInputSchema = z.looseObject({
   snapshotJobId: z.string().min(1),
@@ -19,6 +21,37 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
       kind: z.literal("base"),
     })
     .strict(),
+});
+
+const StartWorkflowRunInputSchema = z.looseObject({
+  sandboxInstanceId: z.string().min(1),
+  actingUserId: z.string().min(1).optional(),
+  image: z
+    .object({
+      imageId: z.string().min(1),
+      createdAt: z.iso.datetime().optional(),
+      kind: z.enum(["base", "snapshot"]),
+      provider: z.enum(["docker", "e2b"]).optional(),
+    })
+    .strict()
+    .optional(),
+  runtimePlan: CompiledRuntimePlanSchema,
+  gitIdentity: z
+    .object({
+      name: z.string().min(1),
+      email: z.email(),
+      signing: z
+        .object({
+          format: z.literal("ssh"),
+          program: z.string().min(1),
+          keyRef: z.string().min(1),
+          organizationId: z.string().min(1),
+          providerFamily: z.string().min(1),
+          actingUserId: z.string().min(1),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export async function waitForQueuedMaterializeWorkflowInput(input: {
@@ -47,5 +80,34 @@ export async function waitForQueuedMaterializeWorkflowInput(input: {
 
   throw new Error(
     `Timed out waiting for queued snapshot materialization workflow input for snapshot job '${input.snapshotJobId}'.`,
+  );
+}
+
+export async function waitForQueuedStartWorkflowInput(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}) {
+  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    const result = await input.env.dataPlaneDb.execute(sql<{ input: unknown }>`
+      select input
+      from data_plane_openworkflow.workflow_runs
+      where
+        workflow_name = ${StartWorkflowName}
+        and input->>'sandboxInstanceId' = ${input.sandboxInstanceId}
+      order by created_at desc
+      limit 1
+    `);
+    const row = result.rows[0];
+    if (row !== undefined) {
+      return StartWorkflowRunInputSchema.parse(row.input);
+    }
+
+    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for queued start workflow input for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
