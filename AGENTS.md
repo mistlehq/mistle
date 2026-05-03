@@ -92,7 +92,7 @@
 - Make HTTP requests to running services (do not import service code directly).
 - Located in `tests/system/` folders.
 - Use system tests for full-stack smoke, packaging, deployment-shape, and end-to-end service interaction checks that cannot be expressed as an app integration test.
-- Do not put ordinary multi-service app behavior in system tests just because more than one service is involved. If one service is the subject and the other services are dependencies, prefer an integration test composed with `startTestEnvironment(...)`.
+- Do not put ordinary multi-service app behavior in system tests just because more than one service is involved. If one service is the subject and the other services are dependencies, prefer an integration test composed with `createIntegrationTest(...)` from `@mistle/test-harness/integration`.
 - Example: Testing that a fully packaged control-plane/data-plane stack starts with the production-like entrypoints and exposes all expected health checks.
 
 **E2E tests** (`*.e2e.test.ts`):

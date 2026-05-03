@@ -27,9 +27,17 @@ This repository uses a strict testing policy: test real behavior, not simulated 
 ## Test Type Expectations
 
 - Unit: pure logic only, no external dependencies.
-- Integration: single app/service with real dependencies (prefer Testcontainers).
-- System: multiple services interacting over HTTP.
+- Integration: one app/service/worker behavior as the subject, composed with
+  any required real Mistle services and infrastructure through
+  `@mistle/test-harness` in the `integration-new/` lane.
+- System: the deployed multi-service system itself as the subject, with
+  services interacting over HTTP.
 - E2E: browser-driven full user flows.
+
+Integration tests must use `createIntegrationTest(...)` from
+`@mistle/test-harness/integration` unless the test is legacy coverage that has
+not yet been migrated. Do not emulate Mistle services with local doubles or
+ad hoc HTTP servers; select the real service through the harness instead.
 
 ## Property-Based Testing
 
