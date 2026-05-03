@@ -38,3 +38,21 @@ export async function waitForQueuedControlPlaneWorkflowInput(input: {
 
   throw new Error(`Timed out waiting for queued workflow '${input.workflowName}'.`);
 }
+
+export async function countQueuedControlPlaneWorkflows(input: {
+  env: IntegrationTestEnvironment;
+  workflowName: string;
+  inputEquals: Record<string, unknown>;
+}): Promise<number> {
+  const workflowNamespaceId = createControlPlaneWorkflowNamespaceId(input.env.id);
+  const result = await input.env.controlPlaneDb.execute(sql<{ count: string }>`
+    select count(*)::text as count
+    from control_plane_openworkflow.workflow_runs
+    where
+      namespace_id = ${workflowNamespaceId}
+      and workflow_name = ${input.workflowName}
+      and input @> ${JSON.stringify(input.inputEquals)}::jsonb
+  `);
+
+  return Number(result.rows[0]?.count ?? "0");
+}
