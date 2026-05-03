@@ -1,6 +1,8 @@
-import type { AutomationListEvent, AutomationListIssue } from "./automations-types.js";
-
-export type AutomationListKind = "webhook" | "schedule";
+import type {
+  AutomationListEvent,
+  AutomationListIssue,
+  AutomationListItem,
+} from "./automations-types.js";
 
 export type AutomationListTargetViewModel = {
   sandboxProfileId: string;
@@ -23,7 +25,7 @@ export type AutomationListWebhookSourceViewModel = {
 
 export type AutomationListItemViewModel = {
   id: string;
-  kind: AutomationListKind;
+  kind: AutomationListItem["kind"];
   name: string;
   enabled: boolean;
   target: AutomationListTargetViewModel;

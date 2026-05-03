@@ -206,9 +206,7 @@ async function createOrResolveAutomationRun(
         ControlPlaneConstraintIds.AUTOMATION_RUN_SOURCE_SCHEDULED_ACTION,
       )
     ) {
-      return loadAutomationRunForScheduledAction(ctx, {
-        scheduledActionId: input.scheduledActionId,
-      });
+      return loadAutomationRunForScheduledAction(ctx, input.scheduledActionId);
     }
 
     throw error;
@@ -219,19 +217,17 @@ async function loadAutomationRunForScheduledAction(
   ctx: {
     db: ControlPlaneDatabase;
   },
-  input: {
-    scheduledActionId: string;
-  },
+  scheduledActionId: string,
 ): Promise<{ id: string }> {
   const automationRun = await ctx.db.query.automationRuns.findFirst({
     columns: {
       id: true,
     },
-    where: (table, { eq }) => eq(table.sourceScheduledActionId, input.scheduledActionId),
+    where: (table, { eq }) => eq(table.sourceScheduledActionId, scheduledActionId),
   });
   if (automationRun === undefined) {
     throw new Error(
-      `Expected automation run for scheduled action '${input.scheduledActionId}' to exist after source uniqueness conflict.`,
+      `Expected automation run for scheduled action '${scheduledActionId}' to exist after source uniqueness conflict.`,
     );
   }
 

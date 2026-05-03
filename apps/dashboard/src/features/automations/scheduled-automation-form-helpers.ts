@@ -1,5 +1,6 @@
 import type {
   ScheduledAutomationConversationMode,
+  ScheduledAutomationFormOption,
   ScheduledAutomationFormValueKey,
   ScheduledAutomationFormValues,
 } from "./scheduled-automation-form-types.js";
@@ -26,11 +27,7 @@ export const ScheduledAutomationConversationOptions = [
     label: "Run",
     description: "Each scheduled run starts its own conversation.",
   },
-] satisfies readonly {
-  value: ScheduledAutomationConversationMode;
-  label: string;
-  description: string;
-}[];
+] satisfies readonly ScheduledAutomationFormOption[];
 
 export function readBrowserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";

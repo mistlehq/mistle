@@ -368,23 +368,23 @@ function createWebhookAutomationListPageItem(
   };
 }
 
-function createScheduleAutomationListPageItem(input: {
-  row: ScheduleAutomationListPageRow;
-}): AutomationListPageItem {
+function createScheduleAutomationListPageItem(
+  row: ScheduleAutomationListPageRow,
+): AutomationListPageItem {
   const target = createListTarget({
-    sandboxProfileId: input.row.sandboxProfileId,
-    sandboxProfileDisplayName: input.row.sandboxProfileDisplayName,
-    primaryRepositoryId: input.row.primaryRepositoryId,
+    sandboxProfileId: row.sandboxProfileId,
+    sandboxProfileDisplayName: row.sandboxProfileDisplayName,
+    primaryRepositoryId: row.primaryRepositoryId,
   });
 
   return {
-    id: input.row.automationId,
+    id: row.automationId,
     kind: AutomationKinds.SCHEDULE,
-    name: input.row.automationName,
-    enabled: input.row.enabled,
-    createdAt: input.row.createdAt,
+    name: row.automationName,
+    enabled: row.enabled,
+    createdAt: row.createdAt,
     target,
-    ...(input.row.sandboxProfileDisplayName === null
+    ...(row.sandboxProfileDisplayName === null
       ? {
           issue: {
             code: "MISSING_SANDBOX_PROFILE",
@@ -395,11 +395,11 @@ function createScheduleAutomationListPageItem(input: {
       : {}),
     source: {
       kind: "schedule",
-      cronExpression: input.row.cronExpression,
-      timezone: input.row.timezone,
-      nextScheduledAt: input.row.nextScheduledAt,
+      cronExpression: row.cronExpression,
+      timezone: row.timezone,
+      nextScheduledAt: row.nextScheduledAt,
     },
-    updatedAt: input.row.updatedAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -579,10 +579,7 @@ async function loadScheduleAutomationListPageItems(input: {
       );
     }
 
-    rowsByAutomationId.set(
-      automationId,
-      createScheduleAutomationListPageItem({ row: automationRow }),
-    );
+    rowsByAutomationId.set(automationId, createScheduleAutomationListPageItem(automationRow));
   }
 
   return input.automationIds.map((automationId) => {
