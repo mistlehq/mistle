@@ -76,7 +76,7 @@ function AutomationKindStatusIcon(input: {
       <TooltipTrigger
         aria-label={label}
         className={`relative inline-flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-          input.enabled ? "text-emerald-600" : "text-muted-foreground/45"
+          input.enabled ? "text-foreground" : "text-muted-foreground"
         }`}
       >
         {isSchedule ? (
@@ -84,6 +84,12 @@ function AutomationKindStatusIcon(input: {
         ) : (
           <WebhooksLogoIcon aria-hidden className="size-5" />
         )}
+        <span
+          aria-hidden
+          className={`absolute right-0 bottom-0 size-2 rounded-full ${
+            input.enabled ? "bg-emerald-500" : "bg-muted-foreground/35"
+          }`}
+        />
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>
     </Tooltip>
