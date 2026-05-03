@@ -2,7 +2,6 @@ import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
   type SandboxProfile,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
@@ -45,35 +44,35 @@ export async function listLaunchableProfiles(
         and ${tables.sandboxProfiles.activeVersion} is not null
         and exists (
         select 1
-        from ${sandboxProfileVersions} as spv
-        where spv."sandbox_profile_id" = ${tables.sandboxProfiles.id}
-          and spv."version" = ${tables.sandboxProfiles.activeVersion}
-          and spv."state" = ${SandboxProfileVersionStates.PUBLISHED}
+        from ${tables.sandboxProfileVersions}
+        where ${tables.sandboxProfileVersions.sandboxProfileId} = ${tables.sandboxProfiles.id}
+          and ${tables.sandboxProfileVersions.version} = ${tables.sandboxProfiles.activeVersion}
+          and ${tables.sandboxProfileVersions.state} = ${SandboxProfileVersionStates.PUBLISHED}
       )
       and exists (
         select 1
-        from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
+        from ${tables.sandboxProfileVersionIntegrationBindings}
         inner join ${tables.integrationConnections} as icn
-          on icn."id" = spvib."connection_id"
+          on icn."id" = ${tables.sandboxProfileVersionIntegrationBindings.connectionId}
         inner join ${tables.integrationTargets} as itg
           on itg."target_key" = icn."target_key"
-        where spvib."sandbox_profile_id" = ${tables.sandboxProfiles.id}
-          and spvib."sandbox_profile_version" = ${launchableVersionSql}
-          and spvib."kind" = ${IntegrationBindingKinds.AGENT}
+        where ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId} = ${tables.sandboxProfiles.id}
+          and ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion} = ${launchableVersionSql}
+          and ${tables.sandboxProfileVersionIntegrationBindings.kind} = ${IntegrationBindingKinds.AGENT}
           and icn."organization_id" = ${input.organizationId}
           and icn."status" = ${IntegrationConnectionStatuses.ACTIVE}
           and itg."enabled" = true
       ) and not exists (
         select 1
-        from "control_plane"."sandbox_profile_version_integration_bindings" as spvib
+        from ${tables.sandboxProfileVersionIntegrationBindings}
         left join ${tables.integrationConnections} as icn
-          on icn."id" = spvib."connection_id"
+          on icn."id" = ${tables.sandboxProfileVersionIntegrationBindings.connectionId}
          and icn."organization_id" = ${input.organizationId}
         left join ${tables.integrationTargets} as itg
           on itg."target_key" = icn."target_key"
-        where spvib."sandbox_profile_id" = ${tables.sandboxProfiles.id}
-          and spvib."sandbox_profile_version" = ${launchableVersionSql}
-          and spvib."kind" = ${IntegrationBindingKinds.AGENT}
+        where ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId} = ${tables.sandboxProfiles.id}
+          and ${tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion} = ${launchableVersionSql}
+          and ${tables.sandboxProfileVersionIntegrationBindings.kind} = ${IntegrationBindingKinds.AGENT}
           and (
             icn."id" is null
             or icn."status" <> ${IntegrationConnectionStatuses.ACTIVE}
