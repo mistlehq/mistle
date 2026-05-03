@@ -237,7 +237,13 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
             />
           ) : null}
 
-          <Table className="min-w-[68rem]">
+          <Table className="table-fixed">
+            <colgroup>
+              <col className="w-[36%]" />
+              <col className="w-[36%]" />
+              <col className="w-[22%]" />
+              <col className="w-[6rem]" />
+            </colgroup>
             <TableHeader className="bg-muted/60">
               <TableRow className="h-9 border-b">
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
