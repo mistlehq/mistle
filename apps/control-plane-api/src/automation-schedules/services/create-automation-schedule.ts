@@ -52,6 +52,12 @@ type CreateScheduleAutomationPersistenceInput = Omit<
   };
 };
 
+export function resolveCreateScheduleAutomationIdempotencyKeyTemplate(
+  value: string | null | undefined,
+): string | null {
+  return value === undefined ? DefaultIdempotencyKeyTemplate : value;
+}
+
 export async function createAutomationSchedule(
   ctx: { db: ControlPlaneDatabase },
   input: CreateScheduleAutomationInput,
@@ -151,7 +157,9 @@ async function createAutomationAggregate(
     automationId: insertedAutomation.id,
     inputTemplate: input.inputTemplate,
     conversationKeyTemplate: input.conversationKeyTemplate ?? DefaultConversationKeyTemplate,
-    idempotencyKeyTemplate: input.idempotencyKeyTemplate ?? DefaultIdempotencyKeyTemplate,
+    idempotencyKeyTemplate: resolveCreateScheduleAutomationIdempotencyKeyTemplate(
+      input.idempotencyKeyTemplate,
+    ),
   });
 
   await tx.insert(automationTargets).values({

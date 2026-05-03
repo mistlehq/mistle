@@ -159,6 +159,7 @@ export function useLoadedScheduledAutomationEditorState(
 } {
   const queryClient = useQueryClient();
   const [formValues, setFormValues] = useState(input.initialValues);
+  const [savedFormValues, setSavedFormValues] = useState(input.initialValues);
   const [selectedSandboxProfileVersion, setSelectedSandboxProfileVersion] =
     useState<SelectedSandboxProfileVersion | null>(
       input.initialSandboxProfileVersion === undefined ||
@@ -287,7 +288,9 @@ export function useLoadedScheduledAutomationEditorState(
       return updateScheduledAutomation({
         payload: {
           automationId: input.automationId,
-          payload: toUpdateScheduledAutomationPayload(values),
+          payload: toUpdateScheduledAutomationPayload(values, {
+            initialValues: savedFormValues,
+          }),
         },
       });
     },
@@ -296,7 +299,9 @@ export function useLoadedScheduledAutomationEditorState(
         profileId: automation.target.sandboxProfileId,
         version: automation.target.sandboxProfileVersion,
       });
-      setFormValues(toScheduledAutomationFormValues(automation));
+      const nextFormValues = toScheduledAutomationFormValues(automation);
+      setFormValues(nextFormValues);
+      setSavedFormValues(nextFormValues);
       setFieldErrors({});
       setValidationSummaryError(null);
       setFormError(null);

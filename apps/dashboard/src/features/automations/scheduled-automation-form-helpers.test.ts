@@ -159,6 +159,48 @@ describe("toUpdateScheduledAutomationPayload", () => {
     });
   });
 
+  it("omits the target when the persisted target selection did not change", () => {
+    expect(
+      toUpdateScheduledAutomationPayload(
+        {
+          ...BaseFormValues,
+          name: "Renamed triage",
+          primaryRepositoryId: "  repo_001  ",
+        },
+        {
+          initialValues: BaseFormValues,
+        },
+      ),
+    ).toEqual({
+      name: "Renamed triage",
+      enabled: true,
+      schedule: {
+        name: "Renamed triage",
+        cronExpression: "0 10 * * 1-5",
+        timezone: "Asia/Singapore",
+      },
+      inputTemplate: "Review the queued issues.",
+    });
+  });
+
+  it("includes the target when the sandbox profile changes", () => {
+    expect(
+      toUpdateScheduledAutomationPayload(
+        {
+          ...BaseFormValues,
+          sandboxProfileId: "sbp_002",
+          primaryRepositoryId: "",
+        },
+        {
+          initialValues: BaseFormValues,
+        },
+      ).target,
+    ).toEqual({
+      sandboxProfileId: "sbp_002",
+      primaryRepositoryId: null,
+    });
+  });
+
   it("stores an empty repository selection as null", () => {
     expect(
       toUpdateScheduledAutomationPayload({

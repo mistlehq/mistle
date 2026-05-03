@@ -105,8 +105,22 @@ export function toCreateScheduledAutomationPayload(
   };
 }
 
+function hasScheduledAutomationTargetChanged(input: {
+  values: ScheduledAutomationFormValues;
+  initialValues: ScheduledAutomationFormValues;
+}): boolean {
+  return (
+    input.values.sandboxProfileId.trim() !== input.initialValues.sandboxProfileId.trim() ||
+    toPrimaryRepositoryId(input.values.primaryRepositoryId) !==
+      toPrimaryRepositoryId(input.initialValues.primaryRepositoryId)
+  );
+}
+
 export function toUpdateScheduledAutomationPayload(
   values: ScheduledAutomationFormValues,
+  input?: {
+    initialValues: ScheduledAutomationFormValues;
+  },
 ): UpdateScheduledAutomationPatch {
   const name = values.name.trim();
 
@@ -119,9 +133,13 @@ export function toUpdateScheduledAutomationPayload(
       timezone: values.timezone.trim(),
     },
     inputTemplate: values.inputTemplate.trim(),
-    target: {
-      sandboxProfileId: values.sandboxProfileId.trim(),
-      primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),
-    },
+    ...(input === undefined || hasScheduledAutomationTargetChanged({ values, ...input })
+      ? {
+          target: {
+            sandboxProfileId: values.sandboxProfileId.trim(),
+            primaryRepositoryId: toPrimaryRepositoryId(values.primaryRepositoryId),
+          },
+        }
+      : {}),
   };
 }
