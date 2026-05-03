@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   DefaultScheduledAutomationCronExpression,
+  ScheduledAutomationNewConversationEachRunKeyTemplate,
+  ScheduledAutomationSameConversationKeyTemplate,
   readBrowserTimezone,
   toCreateScheduledAutomationPayload,
   toScheduledAutomationFormValues,
   toUpdateScheduledAutomationPayload,
   validateScheduledAutomationFormValues,
 } from "./scheduled-automation-form-helpers.js";
+import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
 import type { ScheduledAutomationFormValues } from "./scheduled-automation-form-types.js";
 import type { ScheduledAutomation } from "./scheduled-automations-types.js";
 import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
@@ -27,7 +30,7 @@ const SampleAutomation: ScheduledAutomation = {
     lastScheduledAt: null,
   },
   inputTemplate: "Review the queued issues.",
-  conversationKeyTemplate: "{{schedule.id}}",
+  conversationKeyTemplate: ScheduledAutomationSameConversationKeyTemplate,
   idempotencyKeyTemplate: "{{schedule.scheduledActionId}}",
   target: {
     id: "aut_target_001",
@@ -46,6 +49,7 @@ const BaseFormValues: ScheduledAutomationFormValues = {
   enabled: true,
   cronExpression: "0 10 * * 1-5",
   timezone: "Asia/Singapore",
+  conversationMode: ScheduledAutomationConversationModes.SAME,
   inputTemplate: "Review the queued issues.",
 };
 
@@ -58,6 +62,7 @@ describe("toScheduledAutomationFormValues", () => {
       enabled: true,
       cronExpression: DefaultScheduledAutomationCronExpression,
       timezone: readBrowserTimezone(),
+      conversationMode: ScheduledAutomationConversationModes.SAME,
       inputTemplate: "",
     });
   });
@@ -77,6 +82,24 @@ describe("toScheduledAutomationFormValues", () => {
       }).primaryRepositoryId,
     ).toBe("");
   });
+
+  it("hydrates new-conversation scheduled automations", () => {
+    expect(
+      toScheduledAutomationFormValues({
+        ...SampleAutomation,
+        conversationKeyTemplate: ScheduledAutomationNewConversationEachRunKeyTemplate,
+      }).conversationMode,
+    ).toBe(ScheduledAutomationConversationModes.NEW_EACH_RUN);
+  });
+
+  it("rejects unsupported conversation templates", () => {
+    expect(() =>
+      toScheduledAutomationFormValues({
+        ...SampleAutomation,
+        conversationKeyTemplate: "{{schedule.custom}}",
+      }),
+    ).toThrow("Unsupported scheduled automation conversation key template.");
+  });
 });
 
 describe("validateScheduledAutomationFormValues", () => {
@@ -93,6 +116,7 @@ describe("validateScheduledAutomationFormValues", () => {
         enabled: true,
         cronExpression: "",
         timezone: " ",
+        conversationMode: ScheduledAutomationConversationModes.SAME,
         inputTemplate: "",
       }),
     ).toEqual({
@@ -124,11 +148,21 @@ describe("toCreateScheduledAutomationPayload", () => {
         timezone: "Asia/Singapore",
       },
       inputTemplate: "Review the queued issues.",
+      conversationKeyTemplate: ScheduledAutomationSameConversationKeyTemplate,
       target: {
         sandboxProfileId: "sbp_001",
         primaryRepositoryId: "repo_001",
       },
     });
+  });
+
+  it("builds a create request for new conversations on each run", () => {
+    expect(
+      toCreateScheduledAutomationPayload({
+        ...BaseFormValues,
+        conversationMode: ScheduledAutomationConversationModes.NEW_EACH_RUN,
+      }).conversationKeyTemplate,
+    ).toBe(ScheduledAutomationNewConversationEachRunKeyTemplate);
   });
 
   it("stores workspace-root repository selection as null", () => {
@@ -151,6 +185,7 @@ describe("toUpdateScheduledAutomationPayload", () => {
         cronExpression: "0 10 * * 1-5",
         timezone: "Asia/Singapore",
       },
+      conversationKeyTemplate: ScheduledAutomationSameConversationKeyTemplate,
       inputTemplate: "Review the queued issues.",
       target: {
         sandboxProfileId: "sbp_001",
@@ -179,6 +214,7 @@ describe("toUpdateScheduledAutomationPayload", () => {
         cronExpression: "0 10 * * 1-5",
         timezone: "Asia/Singapore",
       },
+      conversationKeyTemplate: ScheduledAutomationSameConversationKeyTemplate,
       inputTemplate: "Review the queued issues.",
     });
   });

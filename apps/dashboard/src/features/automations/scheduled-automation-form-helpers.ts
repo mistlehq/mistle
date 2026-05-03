@@ -1,7 +1,9 @@
 import type {
+  ScheduledAutomationConversationMode,
   ScheduledAutomationFormValueKey,
   ScheduledAutomationFormValues,
 } from "./scheduled-automation-form-types.js";
+import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
 import type {
   CreateScheduledAutomationInput,
   ScheduledAutomation,
@@ -10,6 +12,22 @@ import type {
 import { WebhookAutomationWorkspaceRootRepositoryOptionValue } from "./webhook-automation-option-builders.js";
 
 export const DefaultScheduledAutomationCronExpression = "0 9 * * *";
+export const ScheduledAutomationSameConversationKeyTemplate = "{{schedule.id}}";
+export const ScheduledAutomationNewConversationEachRunKeyTemplate =
+  "{{schedule.scheduledActionId}}";
+export const ScheduledAutomationConversationOptions = [
+  {
+    value: ScheduledAutomationConversationModes.SAME,
+    label: "Same conversation",
+  },
+  {
+    value: ScheduledAutomationConversationModes.NEW_EACH_RUN,
+    label: "New conversation each run",
+  },
+] satisfies readonly {
+  value: ScheduledAutomationConversationMode;
+  label: string;
+}[];
 
 export function readBrowserTimezone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "";
@@ -28,6 +46,30 @@ function toPrimaryRepositoryId(value: string): string | null {
   return trimmedValue;
 }
 
+function toConversationMode(conversationKeyTemplate: string): ScheduledAutomationConversationMode {
+  if (conversationKeyTemplate === ScheduledAutomationSameConversationKeyTemplate) {
+    return ScheduledAutomationConversationModes.SAME;
+  }
+
+  if (conversationKeyTemplate === ScheduledAutomationNewConversationEachRunKeyTemplate) {
+    return ScheduledAutomationConversationModes.NEW_EACH_RUN;
+  }
+
+  throw new Error(`Unsupported scheduled automation conversation key template.`);
+}
+
+function toConversationKeyTemplate(conversationMode: ScheduledAutomationConversationMode): string {
+  if (conversationMode === ScheduledAutomationConversationModes.SAME) {
+    return ScheduledAutomationSameConversationKeyTemplate;
+  }
+
+  if (conversationMode === ScheduledAutomationConversationModes.NEW_EACH_RUN) {
+    return ScheduledAutomationNewConversationEachRunKeyTemplate;
+  }
+
+  throw new Error(`Unsupported scheduled automation conversation mode.`);
+}
+
 export function toScheduledAutomationFormValues(
   automation: ScheduledAutomation | null,
 ): ScheduledAutomationFormValues {
@@ -39,6 +81,7 @@ export function toScheduledAutomationFormValues(
       enabled: true,
       cronExpression: DefaultScheduledAutomationCronExpression,
       timezone: readBrowserTimezone(),
+      conversationMode: ScheduledAutomationConversationModes.SAME,
       inputTemplate: "",
     };
   }
@@ -50,6 +93,7 @@ export function toScheduledAutomationFormValues(
     enabled: automation.enabled,
     cronExpression: automation.schedule.cronExpression,
     timezone: automation.schedule.timezone,
+    conversationMode: toConversationMode(automation.conversationKeyTemplate),
     inputTemplate: automation.inputTemplate,
   };
 }
@@ -97,6 +141,7 @@ export function toCreateScheduledAutomationPayload(
       cronExpression,
       timezone,
     },
+    conversationKeyTemplate: toConversationKeyTemplate(values.conversationMode),
     inputTemplate: values.inputTemplate.trim(),
     target: {
       sandboxProfileId: values.sandboxProfileId.trim(),
@@ -132,6 +177,7 @@ export function toUpdateScheduledAutomationPayload(
       cronExpression: values.cronExpression.trim(),
       timezone: values.timezone.trim(),
     },
+    conversationKeyTemplate: toConversationKeyTemplate(values.conversationMode),
     inputTemplate: values.inputTemplate.trim(),
     ...(input === undefined || hasScheduledAutomationTargetChanged({ values, ...input })
       ? {

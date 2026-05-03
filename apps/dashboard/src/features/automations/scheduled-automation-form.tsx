@@ -28,6 +28,7 @@ import {
 } from "../pages/sandbox-profile-editor-page-model.js";
 import { FormPageFooter, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { AgentInstructionsEditor } from "./agent-instructions-editor.js";
+import { ScheduledAutomationConversationOptions } from "./scheduled-automation-form-helpers.js";
 import { resolveScheduledAutomationFormPresentation } from "./scheduled-automation-form-state.js";
 import type {
   ScheduledAutomationFormOption,
@@ -408,6 +409,20 @@ export function ScheduledAutomationForm(input: ScheduledAutomationFormProps): Re
             <CronExpressionBreakdownList
               breakdown={cronExpressionBreakdown}
               message={scheduleBehaviorDescription}
+            />
+          </div>
+
+          <div className="mt-4">
+            <SelectField
+              disabled={input.isDeleting || input.isSaving}
+              error={input.fieldErrors.conversationMode}
+              label="Conversation"
+              onValueChange={(value) => {
+                input.onValueChange("conversationMode", value);
+              }}
+              options={ScheduledAutomationConversationOptions}
+              placeholder="Select conversation behavior"
+              value={input.values.conversationMode}
             />
           </div>
         </div>

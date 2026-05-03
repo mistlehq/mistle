@@ -5,6 +5,7 @@ import { withDashboardPageStory } from "../../storybook/decorators.js";
 import { FormPageFrame } from "../shared/page-frame.js";
 import { AutomationTypeDisplayField, AutomationTypeSelectField } from "./automation-type-field.js";
 import { validateScheduledAutomationFormValues } from "./scheduled-automation-form-helpers.js";
+import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
 import {
   ScheduledAutomationForm,
   type ScheduledAutomationFormOption,
@@ -48,6 +49,7 @@ const EmptyCreateValues: ScheduledAutomationFormValues = {
   enabled: true,
   cronExpression: "0 9 * * *",
   timezone: "Asia/Singapore",
+  conversationMode: ScheduledAutomationConversationModes.SAME,
   inputTemplate: "",
 };
 
@@ -58,6 +60,7 @@ const ExistingAutomationValues: ScheduledAutomationFormValues = {
   enabled: true,
   cronExpression: "0 9 * * 1-5",
   timezone: "Asia/Singapore",
+  conversationMode: ScheduledAutomationConversationModes.SAME,
   inputTemplate: "Review open pull requests and summarize anything blocked.",
 };
 
@@ -172,6 +175,17 @@ export const WithPrimaryRepositorySelection: Story = {
       ...EmptyCreateValues,
       sandboxProfileId: "sbp_repo_maintainer",
       primaryRepositoryId: "mistlehq/platform",
+    },
+  },
+};
+
+export const NewConversationEachRun: Story = {
+  args: {
+    mode: "create",
+    primaryRepositoryOptions: PrimaryRepositoryOptions,
+    values: {
+      ...ExistingAutomationValues,
+      conversationMode: ScheduledAutomationConversationModes.NEW_EACH_RUN,
     },
   },
 };

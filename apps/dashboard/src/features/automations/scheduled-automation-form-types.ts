@@ -5,6 +5,14 @@ export type ScheduledAutomationFormOption = {
   path?: string;
 };
 
+export const ScheduledAutomationConversationModes = {
+  SAME: "same",
+  NEW_EACH_RUN: "new_each_run",
+} as const;
+
+export type ScheduledAutomationConversationMode =
+  (typeof ScheduledAutomationConversationModes)[keyof typeof ScheduledAutomationConversationModes];
+
 export type ScheduledAutomationFormValues = {
   name: string;
   sandboxProfileId: string;
@@ -12,6 +20,7 @@ export type ScheduledAutomationFormValues = {
   enabled: boolean;
   cronExpression: string;
   timezone: string;
+  conversationMode: ScheduledAutomationConversationMode;
   inputTemplate: string;
 };
 
