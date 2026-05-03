@@ -4,10 +4,14 @@
 
 import {
   IntegrationBindingKinds,
+  IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import { createIntegrationTest } from "@mistle/test-harness/integration";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -646,6 +650,270 @@ describe.concurrent("sandbox profile version put integration bindings integratio
     });
   });
 
+  it("accepts selected GitHub repositories from a ready resource snapshot", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-put-bindings-github-resources@example.com",
+    });
+
+    await insertGitHubBindingFixture({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_put_bindings_route_github_resources_001",
+      connectionId: "icn_put_bindings_route_github_resources_001",
+      targetKey: "github-cloud-put-bindings-route-resources",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
+      .values({
+        connectionId: "icn_put_bindings_route_github_resources_001",
+        familyId: "github",
+        kind: "repository",
+        syncState: IntegrationConnectionResourceSyncStates.READY,
+        totalCount: 2,
+        lastSyncedAt: "2026-03-09T10:00:00.000Z",
+      });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values([
+      {
+        id: "rsc_put_bindings_route_github_resources_001",
+        connectionId: "icn_put_bindings_route_github_resources_001",
+        familyId: "github",
+        kind: "repository",
+        handle: "mistlehq/mistle",
+        displayName: "mistlehq/mistle",
+        metadata: {
+          visibility: "private",
+        },
+        lastSeenAt: "2026-03-09T10:00:00.000Z",
+      },
+      {
+        id: "rsc_put_bindings_route_github_resources_002",
+        connectionId: "icn_put_bindings_route_github_resources_001",
+        familyId: "github",
+        kind: "repository",
+        handle: "mistlehq/platform",
+        displayName: "mistlehq/platform",
+        metadata: {
+          visibility: "private",
+        },
+        lastSeenAt: "2026-03-09T10:00:00.000Z",
+      },
+    ]);
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_github_resources_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_github_resources_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/mistle", "mistlehq/platform"],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = PutSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.bindings).toHaveLength(1);
+    expect(body.bindings[0]?.config).toEqual({
+      repositories: ["mistlehq/mistle", "mistlehq/platform"],
+      tools: [],
+    });
+  });
+
+  it("accepts a GitHub binding without selected repositories", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-put-bindings-github-empty@example.com",
+    });
+
+    await insertGitHubBindingFixture({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_put_bindings_route_github_empty_001",
+      connectionId: "icn_put_bindings_route_github_empty_001",
+      targetKey: "github-cloud-put-bindings-route-empty",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_github_empty_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_github_empty_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: [],
+                tools: ["github-cli"],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = PutSandboxProfileVersionIntegrationBindingsResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.bindings).toHaveLength(1);
+    expect(body.bindings[0]?.config).toEqual({
+      repositories: [],
+      tools: ["github-cli"],
+    });
+  });
+
+  it("returns 400 when selected GitHub repositories are not in the resource snapshot", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-put-bindings-github-unavailable@example.com",
+    });
+
+    await insertGitHubBindingFixture({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_put_bindings_route_github_unavailable_001",
+      connectionId: "icn_put_bindings_route_github_unavailable_001",
+      targetKey: "github-cloud-put-bindings-route-unavailable",
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
+      .values({
+        connectionId: "icn_put_bindings_route_github_unavailable_001",
+        familyId: "github",
+        kind: "repository",
+        syncState: IntegrationConnectionResourceSyncStates.READY,
+        totalCount: 1,
+        lastSyncedAt: "2026-03-09T10:00:00.000Z",
+      });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnectionResources).values({
+      id: "rsc_put_bindings_route_github_unavailable_001",
+      connectionId: "icn_put_bindings_route_github_unavailable_001",
+      familyId: "github",
+      kind: "repository",
+      handle: "mistlehq/mistle",
+      displayName: "mistlehq/mistle",
+      metadata: {
+        visibility: "private",
+      },
+      lastSeenAt: "2026-03-09T10:00:00.000Z",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_github_unavailable_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              clientRef: "draft-github-binding",
+              connectionId: "icn_put_bindings_route_github_unavailable_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/private-repo"],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
+    expect(body.details).toEqual({
+      issues: [
+        {
+          clientRef: "draft-github-binding",
+          bindingIdOrDraftIndex: "draft:0",
+          validatorCode: "system.inaccessible_resource_reference",
+          field: "repositories",
+          safeMessage:
+            "Selected repository 'mistlehq/private-repo' is no longer accessible for this connection.",
+        },
+      ],
+    });
+  });
+
+  it("returns 400 when GitHub repository sync has not produced a usable snapshot", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-version-put-bindings-github-sync-required@example.com",
+    });
+
+    await insertGitHubBindingFixture({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_put_bindings_route_github_sync_required_001",
+      connectionId: "icn_put_bindings_route_github_sync_required_001",
+      targetKey: "github-cloud-put-bindings-route-sync-required",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_github_sync_required_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_github_sync_required_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/mistle"],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(body.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
+    expect(body.details).toEqual({
+      issues: [
+        {
+          bindingIdOrDraftIndex: "draft:0",
+          validatorCode: "system.resource_sync_required",
+          field: "repositories",
+          safeMessage:
+            "Resource sync is required before repositories can be selected for this connection.",
+        },
+      ],
+    });
+  });
+
   it("returns 400 for invalid request payload shape", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-version-put-bindings-validation@example.com",
@@ -714,3 +982,49 @@ describe.concurrent("sandbox profile version put integration bindings integratio
     });
   });
 });
+
+async function insertGitHubBindingFixture(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  profileId: string;
+  connectionId: string;
+  targetKey: string;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey: input.targetKey,
+    familyId: "github",
+    variantId: "github-cloud",
+    enabled: true,
+    config: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
+  });
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationConnections).values(
+    integrationConnectionRow({
+      id: input.connectionId,
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      displayName: "GitHub Connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "api-key",
+      },
+    }),
+  );
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values(
+    sandboxProfileRow({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "GitHub Binding Profile",
+      createdAt: "2026-03-03T00:00:00.000Z",
+    }),
+  );
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfileVersions).values(
+    sandboxProfileVersionRow({
+      sandboxProfileId: input.profileId,
+      version: 1,
+      state: SandboxProfileVersionStates.DRAFT,
+    }),
+  );
+}
