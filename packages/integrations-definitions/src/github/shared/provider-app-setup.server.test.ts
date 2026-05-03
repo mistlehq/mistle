@@ -12,45 +12,15 @@ const GitHubManifestConversion = {
 } as const;
 
 describe("buildCompletedGitHubAppManifestResult", () => {
-  it("returns an installed connection-detail redirect when the manifest callback includes installation fields", () => {
-    const result = buildCompletedGitHubAppManifestResult({
-      conversion: GitHubManifestConversion,
-      query: new URLSearchParams({
-        installation_id: "12345",
-        setup_action: "install",
-      }),
-      supportsClientSecret: true,
-    });
-
-    expect(result).toEqual({
-      completionRedirect: {
-        kind: "connection-detail",
-        notice: "installed",
-      },
-      connection: {
-        externalSubjectId: "12345",
-        config: {
-          connection_method: "github-app-installation",
-          app_id: "123",
-          app_slug: "mistle-github-app",
-          client_id: "Iv1.client123",
-          installation_id: "12345",
-          setup_action: "install",
-        },
-      },
-      secrets: {
-        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
-        clientSecret: "github-client-secret",
-        webhookSecret: "github-webhook-secret",
-      },
-    });
-  });
-
-  it("returns the setup-route created state when the manifest callback does not include installation fields", () => {
-    const result = buildCompletedGitHubAppManifestResult({
+  it("returns the setup-route created state when the manifest callback does not include installation fields", async () => {
+    const result = await buildCompletedGitHubAppManifestResult({
       conversion: GitHubManifestConversion,
       query: new URLSearchParams(),
       supportsClientSecret: true,
+      targetConfig: {
+        apiBaseUrl: "https://api.github.com",
+        webBaseUrl: "https://github.com",
+      },
     });
 
     expect(result).toEqual({

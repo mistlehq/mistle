@@ -3,6 +3,8 @@ import {
   type IntegrationProviderAppSetupCapability,
   type IntegrationProviderAppSetupCompleteResult,
 } from "@mistle/integrations-core";
+import { createAppAuth } from "@octokit/auth-app";
+import { request } from "@octokit/request";
 import { z } from "zod";
 
 import {
@@ -26,6 +28,12 @@ import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
 type GitHubProviderAppSetupCapabilityOptions = {
+  appPrivateKeySecret: {
+    secretKind: "api_key";
+    slotKey:
+      | typeof GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM
+      | typeof GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM;
+  };
   requiredInstallationSecrets: ReadonlyArray<{
     secretKind: "api_key" | "oauth2_client_secret";
     slotKey:
@@ -56,6 +64,14 @@ const GitHubAppManifestStartBodySchema = z
           },
   }));
 
+const GitHubAppInstallationResponseSchema = z
+  .object({
+    app_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+    app_slug: z.string().min(1),
+    id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+  })
+  .loose();
+
 async function convertGitHubAppManifest(input: {
   apiBaseUrl: string;
   code: string;
@@ -84,10 +100,80 @@ async function convertGitHubAppManifest(input: {
   return parseGitHubAppManifestConversionResponse(responseJson);
 }
 
-function completeGitHubAppInstallation(input: {
+function parseGitHubAppInstallationId(input: { installationId: string }): number {
+  const numericInstallationId = Number(input.installationId);
+  if (!Number.isInteger(numericInstallationId) || numericInstallationId <= 0) {
+    throw new Error(
+      "GitHub App installation callback query must include numeric `installation_id`.",
+    );
+  }
+
+  return numericInstallationId;
+}
+
+async function verifyGitHubAppInstallation(input: {
+  apiBaseUrl: string;
+  appId: string;
+  appPrivateKeyPem: string;
+  appSlug: string;
+  installationId: string;
+}): Promise<void> {
+  const numericInstallationId = parseGitHubAppInstallationId({
+    installationId: input.installationId,
+  });
+  const appAuth = createAppAuth({
+    appId: input.appId,
+    privateKey: input.appPrivateKeyPem,
+    request: request.defaults({
+      baseUrl: input.apiBaseUrl,
+    }),
+  });
+  const authentication = await appAuth({ type: "app" });
+
+  let responseJson: unknown;
+  try {
+    const response = await request("GET /app/installations/{installation_id}", {
+      baseUrl: input.apiBaseUrl,
+      installation_id: numericInstallationId,
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${authentication.token}`,
+        "x-github-api-version": "2022-11-28",
+      },
+    });
+    responseJson = response.data;
+  } catch (error) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' could not be verified: ${
+        error instanceof Error ? error.message : "GitHub API request failed."
+      }`,
+    );
+  }
+
+  const installation = GitHubAppInstallationResponseSchema.parse(responseJson);
+  if (installation.id.toString() !== input.installationId) {
+    throw new Error(
+      `GitHub App installation verification returned installation '${installation.id.toString()}', expected '${input.installationId}'.`,
+    );
+  }
+  if (installation.app_id.toString() !== input.appId) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' belongs to app '${installation.app_id.toString()}', expected '${input.appId}'.`,
+    );
+  }
+  if (installation.app_slug !== input.appSlug) {
+    throw new Error(
+      `GitHub App installation '${input.installationId}' belongs to app slug '${installation.app_slug}', expected '${input.appSlug}'.`,
+    );
+  }
+}
+
+async function completeGitHubAppInstallation(input: {
+  appPrivateKeyPem: string;
   connectionConfig: GitHubConnectionConfig;
   query: URLSearchParams;
-}): IntegrationProviderAppSetupCompleteResult {
+  targetConfig: GitHubTargetConfig;
+}): Promise<IntegrationProviderAppSetupCompleteResult> {
   const installationId = input.query.get("installation_id");
   if (installationId === null || installationId.length === 0) {
     throw new Error("GitHub App installation callback query must include `installation_id`.");
@@ -95,6 +181,17 @@ function completeGitHubAppInstallation(input: {
 
   const setupAction = input.query.get("setup_action");
   const parsedConfig = parseGitHubAppInstallationConnectionConfig(input.connectionConfig);
+
+  // GitHub documents `installation_id` on setup URL callbacks as spoofable:
+  // https://docs.github.com/en/enterprise-cloud@latest/apps/creating-github-apps/registering-a-github-app/about-the-setup-url
+  // Verify the id with app authentication before storing it on the connection.
+  await verifyGitHubAppInstallation({
+    apiBaseUrl: input.targetConfig.apiBaseUrl,
+    appId: parsedConfig.app_id,
+    appPrivateKeyPem: input.appPrivateKeyPem,
+    appSlug: parsedConfig.app_slug,
+    installationId,
+  });
 
   return {
     completionRedirect: {
@@ -112,11 +209,12 @@ function completeGitHubAppInstallation(input: {
   };
 }
 
-export function buildCompletedGitHubAppManifestResult(input: {
+export async function buildCompletedGitHubAppManifestResult(input: {
   conversion: ReturnType<typeof parseGitHubAppManifestConversionResponse>;
   query: URLSearchParams;
   supportsClientSecret: boolean;
-}): IntegrationProviderAppSetupCompleteResult {
+  targetConfig: GitHubTargetConfig;
+}): Promise<IntegrationProviderAppSetupCompleteResult> {
   const convertedConnectionConfig = parseGitHubAppInstallationConnectionConfig(
     buildConvertedGitHubAppConnectionConfig({
       conversion: input.conversion,
@@ -129,9 +227,16 @@ export function buildCompletedGitHubAppManifestResult(input: {
 
   const installationId = input.query.get("installation_id");
   if (installationId !== null && installationId.length > 0) {
-    const installationResult = completeGitHubAppInstallation({
+    const appPrivateKeyPem = convertedConnectionSecrets["appPrivateKeyPem"];
+    if (appPrivateKeyPem === undefined) {
+      throw new Error("GitHub App manifest conversion did not return an app private key.");
+    }
+
+    const installationResult = await completeGitHubAppInstallation({
+      appPrivateKeyPem,
       connectionConfig: convertedConnectionConfig,
       query: input.query,
+      targetConfig: input.targetConfig,
     });
 
     return {
@@ -203,9 +308,15 @@ export function createGitHubProviderAppSetupCapability(
         },
         async complete(input) {
           if (input.callbackRouteKey === GitHubAppInstallationCallbackRouteKey) {
+            const appPrivateKeyPem = await input.resolveConnectionSecret(
+              options.appPrivateKeySecret,
+            );
+
             return completeGitHubAppInstallation({
+              appPrivateKeyPem,
               connectionConfig: input.connection.config,
               query: input.query,
+              targetConfig: input.target.config,
             });
           }
 
@@ -223,6 +334,7 @@ export function createGitHubProviderAppSetupCapability(
             conversion,
             query: input.query,
             supportsClientSecret: options.supportsClientSecret,
+            targetConfig: input.target.config,
           });
         },
       },
@@ -249,9 +361,13 @@ export function createGitHubProviderAppSetupCapability(
           };
         },
         async complete(input) {
+          const appPrivateKeyPem = await input.resolveConnectionSecret(options.appPrivateKeySecret);
+
           return completeGitHubAppInstallation({
+            appPrivateKeyPem,
             connectionConfig: input.connection.config,
             query: input.query,
+            targetConfig: input.target.config,
           });
         },
       },
@@ -260,6 +376,10 @@ export function createGitHubProviderAppSetupCapability(
 }
 
 export const GitHubCloudProviderAppSetupCapability = createGitHubProviderAppSetupCapability({
+  appPrivateKeySecret: {
+    slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM,
+    secretKind: "api_key",
+  },
   requiredInstallationSecrets: [
     {
       slotKey: GitHubCredentialSlotKeys.GITHUB_CLOUD_APP_PRIVATE_KEY_PEM,
@@ -279,6 +399,10 @@ export const GitHubCloudProviderAppSetupCapability = createGitHubProviderAppSetu
 
 export const GitHubEnterpriseServerProviderAppSetupCapability =
   createGitHubProviderAppSetupCapability({
+    appPrivateKeySecret: {
+      slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,
+      secretKind: "api_key",
+    },
     requiredInstallationSecrets: [
       {
         slotKey: GitHubCredentialSlotKeys.GITHUB_ENTERPRISE_SERVER_APP_PRIVATE_KEY_PEM,
