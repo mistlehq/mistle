@@ -210,7 +210,7 @@ describe("internal sandbox instances get integration", () => {
     await expect(response.json()).resolves.toBeNull();
   });
 
-  it("returns setup-check-purpose sandbox instances", async ({ fixture }) => {
+  it("returns null for setup-check-purpose sandbox instances", async ({ fixture }) => {
     await fixture.db.insert(sandboxInstances).values({
       id: "sbi_conventional_get_setup_check",
       organizationId: "org_dp_api_conventional_get",
@@ -239,15 +239,7 @@ describe("internal sandbox instances get integration", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      id: "sbi_conventional_get_setup_check",
-      title: "Setup check",
-      status: "stopped",
-      connectable: false,
-      failureCode: null,
-      failureMessage: null,
-      runtimePlan: null,
-    });
+    await expect(response.json()).resolves.toBeNull();
   });
 
   it("returns pending before provider provisioning begins", async ({ fixture }) => {
