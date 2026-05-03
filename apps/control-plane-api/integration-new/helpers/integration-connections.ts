@@ -4,6 +4,7 @@ import { expect } from "vitest";
 
 import {
   decryptCredentialUtf8,
+  encryptDeviceAuthorizationProviderStateUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../src/lib/crypto.js";
@@ -16,6 +17,13 @@ export const IntegrationNewIntegrationsConfig = {
   activeMasterEncryptionKeyVersion: 1,
   masterEncryptionKeys: IntegrationNewMasterEncryptionKeys,
 };
+
+const IntegrationNewMasterKeyVersion = 1;
+const IntegrationNewMasterEncryptionKeyMaterial =
+  IntegrationNewMasterEncryptionKeys[String(IntegrationNewMasterKeyVersion)];
+if (IntegrationNewMasterEncryptionKeyMaterial === undefined) {
+  throw new Error("Expected integration-new master encryption key material.");
+}
 
 export type SeedIntegrationTargetInput = {
   targetKey: string;
@@ -180,6 +188,16 @@ export async function expectImplicitWebhookSource(input: {
   }
 
   expect(webhookSource.endpointKey.length).toBeGreaterThan(0);
+}
+
+export function encryptDeviceAuthorizationProviderStateForTest(input: {
+  value: Record<string, unknown>;
+}): string {
+  return encryptDeviceAuthorizationProviderStateUtf8({
+    plaintext: JSON.stringify(input.value),
+    masterKeyVersion: IntegrationNewMasterKeyVersion,
+    masterEncryptionKeyMaterial: IntegrationNewMasterEncryptionKeyMaterial,
+  });
 }
 
 async function decryptStoredCredential(
