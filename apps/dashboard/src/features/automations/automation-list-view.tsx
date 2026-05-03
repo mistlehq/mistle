@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
   textLinkVariants,
 } from "@mistle/ui";
-import { CalendarBlankIcon, WarningCircleIcon, WebhooksLogoIcon } from "@phosphor-icons/react";
+import { WarningCircleIcon } from "@phosphor-icons/react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
@@ -62,23 +62,6 @@ type AutomationListViewProps = {
   onOpenAutomation: (automation: { id: string; kind: AutomationListItemViewModel["kind"] }) => void;
 };
 
-function AutomationKindBadge(input: {
-  kind: AutomationListItemViewModel["kind"];
-}): React.JSX.Element {
-  const isSchedule = input.kind === "schedule";
-
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground">
-      {isSchedule ? (
-        <CalendarBlankIcon aria-hidden className="size-3.5" />
-      ) : (
-        <WebhooksLogoIcon aria-hidden className="size-3.5" />
-      )}
-      {isSchedule ? "Schedule" : "Event"}
-    </span>
-  );
-}
-
 function EventSummaryCell(input: {
   item: Extract<AutomationListItemViewModel["source"], { kind: "webhook" }>;
 }): React.JSX.Element {
@@ -116,6 +99,20 @@ function EventSummaryCell(input: {
   );
 }
 
+function formatScheduleTimezone(timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    timeZoneName: "shortOffset",
+  }).formatToParts(new Date());
+  const timezoneName = parts.find((part) => part.type === "timeZoneName");
+
+  if (timezoneName === undefined) {
+    throw new Error(`Could not format timezone: ${timezone}.`);
+  }
+
+  return timezoneName.value;
+}
+
 function ScheduleSummaryCell(input: {
   item: Extract<AutomationListItemViewModel["source"], { kind: "schedule" }>;
 }): React.JSX.Element {
@@ -125,7 +122,7 @@ function ScheduleSummaryCell(input: {
         {input.item.cronExpression}
       </span>
       <span className="truncate text-xs">
-        {input.item.timezone}
+        {formatScheduleTimezone(input.item.timezone)}
         {input.item.nextScheduledAtLabel === null
           ? " · Not scheduled"
           : ` · Next ${input.item.nextScheduledAtLabel}`}
@@ -247,9 +244,6 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                   Automation
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
-                  Kind
-                </TableHead>
-                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
                   Trigger
                 </TableHead>
                 <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
@@ -263,7 +257,7 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
             <TableBody>
               {visibleItems.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={5}>
+                  <TableCell className="text-muted-foreground" colSpan={4}>
                     {hasItems
                       ? "No automations match the current search or filter."
                       : "No automations have been created yet."}
@@ -274,9 +268,6 @@ export function AutomationListView(input: AutomationListViewProps): React.JSX.El
                 <TableRow key={item.id}>
                   <TableCell className="whitespace-normal">
                     <AutomationIdentityCell item={item} onOpenAutomation={input.onOpenAutomation} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <AutomationKindBadge kind={item.kind} />
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-normal">
                     <SourceDetailsCell item={item} />
