@@ -35,7 +35,7 @@ const ScheduleDispatchWorkflowInputSchema = z
   })
   .strict();
 
-describe.concurrent("internal schedules dispatch integration", () => {
+describe("internal schedules dispatch integration", () => {
   it("rejects requests without the internal service token", async ({ env }) => {
     const response = await env.controlPlaneApi.http.fetch(
       `${INTERNAL_SCHEDULES_ROUTE_BASE_PATH}/dispatch`,
@@ -62,7 +62,9 @@ describe.concurrent("internal schedules dispatch integration", () => {
     expect(body.idempotencyKey).toBe(`schedule-dispatch:${body.cutoffMinute}`);
     expect(body.cutoffMinute).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u);
 
-    const workflowRuns = await listScheduleDispatchWorkflowRuns(env);
+    const workflowRuns = await listScheduleDispatchWorkflowRuns(env, {
+      idempotencyKey: body.idempotencyKey,
+    });
     expect(workflowRuns).toHaveLength(1);
     const workflowRun = readOnlyWorkflowRun(workflowRuns);
 
@@ -89,7 +91,11 @@ describe.concurrent("internal schedules dispatch integration", () => {
     expect(secondBody.cutoffMinute).toBe(firstBody.cutoffMinute);
     expect(secondBody.idempotencyKey).toBe(firstBody.idempotencyKey);
 
-    const workflowRun = readOnlyWorkflowRun(await listScheduleDispatchWorkflowRuns(env));
+    const workflowRun = readOnlyWorkflowRun(
+      await listScheduleDispatchWorkflowRuns(env, {
+        idempotencyKey: firstBody.idempotencyKey,
+      }),
+    );
     expect(workflowRun.idempotencyKey).toBe(firstBody.idempotencyKey);
   });
 
@@ -109,7 +115,11 @@ describe.concurrent("internal schedules dispatch integration", () => {
     expect(secondBody.cutoffMinute).toBe(firstBody.cutoffMinute);
     expect(secondBody.idempotencyKey).toBe(firstBody.idempotencyKey);
 
-    const workflowRun = readOnlyWorkflowRun(await listScheduleDispatchWorkflowRuns(env));
+    const workflowRun = readOnlyWorkflowRun(
+      await listScheduleDispatchWorkflowRuns(env, {
+        idempotencyKey: firstBody.idempotencyKey,
+      }),
+    );
     expect(workflowRun.idempotencyKey).toBe(firstBody.idempotencyKey);
   });
 
@@ -161,6 +171,7 @@ async function requestScheduleDispatch(env: IntegrationTestEnvironment): Promise
 
 async function listScheduleDispatchWorkflowRuns(
   env: IntegrationTestEnvironment,
+  input: { idempotencyKey: string },
 ): Promise<ReadonlyArray<PersistedScheduleDispatchWorkflowRun>> {
   const namespaceId = createControlPlaneWorkflowNamespaceId(env.id);
   const result = await env.controlPlaneDb.execute(sql<{
@@ -177,6 +188,7 @@ async function listScheduleDispatchWorkflowRuns(
     from control_plane_openworkflow.workflow_runs wr
     where wr.namespace_id = ${namespaceId}
       and wr.workflow_name = ${ScheduleDispatchWorkflowName}
+      and wr.idempotency_key = ${input.idempotencyKey}
     order by wr.created_at asc
   `);
 

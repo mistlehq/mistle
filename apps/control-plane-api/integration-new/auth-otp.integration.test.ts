@@ -21,7 +21,7 @@ const it = createIntegrationTest({
 });
 const OtpAllowedAttempts = 3;
 
-describe.concurrent("auth otp integration", () => {
+describe("auth otp integration", () => {
   it("sends OTP, signs in, and leaves organization context empty", async ({ env }) => {
     const email = `integration-new-auth-otp-${randomUUID()}@example.com`;
 
@@ -227,6 +227,7 @@ describe.concurrent("auth otp integration", () => {
 
   it("rejects sign-in with an expired OTP", async ({ env }) => {
     const email = `integration-new-auth-otp-expired-${randomUUID()}@example.com`;
+    const identifier = `sign-in-otp-${email.toLowerCase()}`;
 
     await sendOtp({ env, email });
     const otp = await readIssuedOtp({ env, email });
@@ -234,7 +235,7 @@ describe.concurrent("auth otp integration", () => {
       columns: {
         id: true,
       },
-      where: (table, { eq }) => eq(table.identifier, `sign-in-otp-${email.toLowerCase()}`),
+      where: (table, { eq }) => eq(table.identifier, identifier),
       orderBy: (table, { desc }) => [desc(table.createdAt)],
     });
     expect(verification).toBeDefined();
@@ -247,11 +248,13 @@ describe.concurrent("auth otp integration", () => {
       .set({
         expiresAt: new Date(0),
       })
-      .where(eq(env.controlPlaneTables.verifications.id, verification.id))
+      .where(eq(env.controlPlaneTables.verifications.identifier, identifier))
       .returning({
         id: env.controlPlaneTables.verifications.id,
+        expiresAt: env.controlPlaneTables.verifications.expiresAt,
       });
-    expect(updatedVerifications).toHaveLength(1);
+    expect(updatedVerifications.length).toBeGreaterThanOrEqual(1);
+    expect(updatedVerifications.every((row) => row.expiresAt.getTime() === 0)).toBe(true);
 
     const response = await signInWithOtp({ env, email, otp });
     expect(response.status).toBe(400);
