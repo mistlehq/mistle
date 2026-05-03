@@ -427,6 +427,140 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/automations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          after?: string;
+          before?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List automations for the active organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                enabled: boolean;
+                id: string;
+                issue?: {
+                  /** @enum {string} */
+                  code:
+                    | "MISSING_TARGET_METADATA"
+                    | "MISSING_WEBHOOK_SOURCE"
+                    | "MISSING_INTEGRATION_CONNECTION"
+                    | "MISSING_SANDBOX_PROFILE";
+                  message: string;
+                };
+                /** @enum {string} */
+                kind: "webhook" | "schedule";
+                name: string;
+                source:
+                  | {
+                      events: {
+                        label: string;
+                        logoKey?: string;
+                        unavailable?: boolean;
+                      }[];
+                      /** @enum {string} */
+                      kind: "webhook";
+                    }
+                  | {
+                      cronExpression: string;
+                      /** @enum {string} */
+                      kind: "schedule";
+                      nextScheduledAt: string | null;
+                      timezone: string;
+                    };
+                target: {
+                  primaryRepositoryId: string | null;
+                  primaryRepositoryName: string | null;
+                  sandboxProfileId: string;
+                  sandboxProfileName: string | null;
+                };
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_LIST_AUTOMATIONS_INPUT" | "INVALID_PAGINATION_CURSOR";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/automations/schedules": {
     parameters: {
       query?: never;

@@ -8,6 +8,7 @@ import type { OpenWorkflow } from "openworkflow";
 import { createAuthRoutes } from "./auth/routes.js";
 import { createAutomationSchedulesRoutes } from "./automation-schedules/index.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
+import { createAutomationsRoutes } from "./automations/index.js";
 import { createHomeRoutes } from "./home/index.js";
 import { createIdentityLinkingCallbacksRoutes } from "./identity-linking-callbacks/index.js";
 import { createIntegrationCallbacksRoutes } from "./integration-callbacks/index.js";
@@ -118,6 +119,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authRoutes = createAuthRoutes();
+  const automationsRoutes = withActiveOrganizationAccess(createAutomationsRoutes());
   const automationSchedulesRoutes = withActiveOrganizationAccess(createAutomationSchedulesRoutes());
   const automationWebhooksRoutes = withActiveOrganizationAccess(createAutomationWebhooksRoutes());
   const homeRoutes = withActiveOrganizationAccess(createHomeRoutes());
@@ -135,6 +137,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const sandboxProfilesRoutes = withActiveOrganizationAccess(createSandboxProfilesRoutes());
 
   app.route(authRoutes.basePath, authRoutes.routes);
+  app.route(automationsRoutes.basePath, automationsRoutes.routes);
   app.route(automationSchedulesRoutes.basePath, automationSchedulesRoutes.routes);
   app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);
   app.route(homeRoutes.basePath, homeRoutes.routes);

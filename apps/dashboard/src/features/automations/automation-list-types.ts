@@ -1,7 +1,4 @@
-import type {
-  WebhookAutomationListEvent,
-  WebhookAutomationListIssue,
-} from "./webhook-automations-types.js";
+import type { AutomationListEvent, AutomationListIssue } from "./automations-types.js";
 
 export type AutomationListKind = "webhook" | "schedule";
 
@@ -21,7 +18,7 @@ export type AutomationListScheduleSourceViewModel = {
 
 export type AutomationListWebhookSourceViewModel = {
   kind: "webhook";
-  events: readonly WebhookAutomationListEvent[];
+  events: readonly AutomationListEvent[];
 };
 
 export type AutomationListItemViewModel = {
@@ -30,7 +27,7 @@ export type AutomationListItemViewModel = {
   name: string;
   enabled: boolean;
   target: AutomationListTargetViewModel;
-  issue?: WebhookAutomationListIssue;
+  issue?: AutomationListIssue;
   source: AutomationListWebhookSourceViewModel | AutomationListScheduleSourceViewModel;
   updatedAtLabel: string;
 };

@@ -1,5 +1,13 @@
 export const AUTOMATIONS_QUERY_KEY_PREFIX: readonly ["automations"] = ["automations"];
 
+export function automationsListQueryKey(input: {
+  limit: number;
+  after: string | null;
+  before: string | null;
+}): readonly ["automations", "list", number, string | null, string | null] {
+  return [AUTOMATIONS_QUERY_KEY_PREFIX[0], "list", input.limit, input.after, input.before];
+}
+
 export function webhookAutomationsListQueryKey(input: {
   limit: number;
   after: string | null;

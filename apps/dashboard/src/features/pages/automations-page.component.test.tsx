@@ -7,18 +7,18 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import {
-  createWebhookAutomationListEvent,
-  createWebhookAutomationListItem,
-} from "../automations/webhook-automation-test-fixtures.js";
-import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
-import type { WebhookAutomationsListResult } from "../automations/webhook-automations-types.js";
+import type {
+  AutomationListItem,
+  AutomationsListResult,
+} from "../automations/automations-types.js";
+import { createWebhookAutomationListEvent } from "../automations/webhook-automation-test-fixtures.js";
+import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { AutomationsPage } from "./automations-page.js";
 
 function createListResult(
-  items: WebhookAutomationsListResult["items"],
-  overrides?: Partial<WebhookAutomationsListResult>,
-): WebhookAutomationsListResult {
+  items: AutomationsListResult["items"],
+  overrides?: Partial<AutomationsListResult>,
+): AutomationsListResult {
   return {
     items,
     nextPage: null,
@@ -28,12 +28,33 @@ function createListResult(
   };
 }
 
+function createAutomationListItem(overrides?: Partial<AutomationListItem>): AutomationListItem {
+  return {
+    id: "atm_webhook_123",
+    kind: "webhook",
+    name: "Review automation",
+    enabled: true,
+    target: {
+      sandboxProfileId: "sbp_repo_maintainer",
+      sandboxProfileName: "Repo Maintainer",
+      primaryRepositoryId: "mistlehq/platform",
+      primaryRepositoryName: "mistlehq/platform",
+    },
+    source: {
+      kind: "webhook",
+      events: [createWebhookAutomationListEvent()],
+    },
+    updatedAt: "2026-04-30T02:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function seedAutomationsList(
   queryClient: ReturnType<typeof createTestQueryClient>,
-  listResult: WebhookAutomationsListResult,
+  listResult: AutomationsListResult,
 ): void {
   queryClient.setQueryData(
-    webhookAutomationsListQueryKey({
+    automationsListQueryKey({
       limit: 25,
       after: null,
       before: null,
@@ -67,7 +88,7 @@ describe("AutomationsPage", () => {
       staleTime: Number.POSITIVE_INFINITY,
     });
 
-    seedAutomationsList(queryClient, createListResult([createWebhookAutomationListItem()]));
+    seedAutomationsList(queryClient, createListResult([createAutomationListItem()]));
 
     const markup = renderToStaticMarkup(
       <QueryClientProvider client={queryClient}>
@@ -81,9 +102,7 @@ describe("AutomationsPage", () => {
     expect(markup).toContain("Create");
     expect(markup).toContain("justify-between");
     expect(markup).toContain('data-slot="table-container" class="relative w-full overflow-x-auto"');
-    expect(markup).toContain(
-      'data-slot="table" class="w-full caption-bottom text-sm min-w-[56rem]"',
-    );
+    expect(markup).toContain('data-slot="table" class="w-full caption-bottom text-sm table-fixed"');
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
@@ -97,7 +116,7 @@ describe("AutomationsPage", () => {
     seedAutomationsList(
       queryClient,
       createListResult([
-        createWebhookAutomationListItem({
+        createAutomationListItem({
           name: "Single automation",
         }),
       ]),
@@ -116,12 +135,58 @@ describe("AutomationsPage", () => {
     expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
   });
 
+  it("renders event and schedule automations from the unified list", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    seedAutomationsList(
+      queryClient,
+      createListResult([
+        createAutomationListItem({
+          name: "Event automation",
+        }),
+        createAutomationListItem({
+          id: "atm_schedule_123",
+          kind: "schedule",
+          name: "Daily schedule",
+          target: {
+            sandboxProfileId: "sbp_repo_maintainer",
+            sandboxProfileName: "Repo Maintainer",
+            primaryRepositoryId: null,
+            primaryRepositoryName: null,
+          },
+          source: {
+            kind: "schedule",
+            cronExpression: "0 9 * * 1-5",
+            timezone: "Asia/Singapore",
+            nextScheduledAt: "2026-05-04T01:00:00.000Z",
+          },
+        }),
+      ]),
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Event automation" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Daily schedule" })).toBeDefined();
+    expect(screen.getByText("0 9 * * 1-5")).toBeDefined();
+    expect(screen.getByText("Workspace root")).toBeDefined();
+  });
+
   it("does not render the result summary when the automation query is in error", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,
       staleTime: Number.POSITIVE_INFINITY,
     });
-    const listResult = createListResult([createWebhookAutomationListItem()], {
+    const listResult = createListResult([createAutomationListItem()], {
       nextPage: {
         after: "cursor_next",
         limit: 25,
@@ -130,7 +195,7 @@ describe("AutomationsPage", () => {
 
     seedAutomationsList(queryClient, listResult);
     const automationsListQuery = queryClient.getQueryCache().build(queryClient, {
-      queryKey: webhookAutomationsListQueryKey({
+      queryKey: automationsListQueryKey({
         limit: 25,
         after: null,
         before: null,
@@ -168,13 +233,16 @@ describe("AutomationsPage", () => {
     seedAutomationsList(
       queryClient,
       createListResult([
-        createWebhookAutomationListItem({
+        createAutomationListItem({
           name: "Alpha automation",
         }),
-        createWebhookAutomationListItem({
-          id: "aut_456",
+        createAutomationListItem({
+          id: "atm_456",
           name: "Backlog sync",
-          events: [createWebhookAutomationListEvent({ label: "Issue comment created" })],
+          source: {
+            kind: "webhook",
+            events: [createWebhookAutomationListEvent({ label: "Issue comment created" })],
+          },
         }),
       ]),
     );

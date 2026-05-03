@@ -55,6 +55,328 @@
         }
       }
     },
+    "/v1/automations": {
+      "get": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List automations for the active organization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalResults": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["webhook", "schedule"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "sandboxProfileId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sandboxProfileName": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "primaryRepositoryId": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              },
+                              "primaryRepositoryName": {
+                                "type": ["string", "null"],
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "sandboxProfileId",
+                              "sandboxProfileName",
+                              "primaryRepositoryId",
+                              "primaryRepositoryName"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "issue": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": [
+                                  "MISSING_TARGET_METADATA",
+                                  "MISSING_WEBHOOK_SOURCE",
+                                  "MISSING_INTEGRATION_CONNECTION",
+                                  "MISSING_SANDBOX_PROFILE"
+                                ]
+                              },
+                              "message": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": ["code", "message"],
+                            "additionalProperties": false
+                          },
+                          "source": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["webhook"]
+                                  },
+                                  "events": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "label": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "logoKey": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "unavailable": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": ["label"],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": ["kind", "events"],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["schedule"]
+                                  },
+                                  "cronExpression": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "timezone": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "nextScheduledAt": {
+                                    "type": ["string", "null"],
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "cronExpression",
+                                  "timezone",
+                                  "nextScheduledAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "name",
+                          "enabled",
+                          "target",
+                          "source",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "after": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["after", "limit"],
+                      "additionalProperties": false
+                    },
+                    "previousPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["before", "limit"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_LIST_AUTOMATIONS_INPUT", "INVALID_PAGINATION_CURSOR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/automations/schedules": {
       "post": {
         "tags": ["Automations"],

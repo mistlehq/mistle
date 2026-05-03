@@ -3,10 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { formatWebhookAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
-import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
-import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
-import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
+import type { AutomationListItemViewModel } from "../automations/automation-list-types.js";
+import { AutomationListView } from "../automations/automation-list-view.js";
+import { listAutomations } from "../automations/automations-service.js";
+import type { AutomationListItem } from "../automations/automations-types.js";
+import { formatAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
+import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
+import { formatDateTime } from "../shared/date-formatters.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
 
@@ -19,6 +22,32 @@ function parseCursor(rawValue: string | null): string | null {
   return normalized.length === 0 ? null : normalized;
 }
 
+function toAutomationListItemViewModel(
+  automation: AutomationListItem,
+): AutomationListItemViewModel {
+  return {
+    id: automation.id,
+    kind: automation.kind,
+    name: automation.name,
+    enabled: automation.enabled,
+    target: automation.target,
+    ...(automation.issue === undefined ? {} : { issue: automation.issue }),
+    source:
+      automation.source.kind === "webhook"
+        ? automation.source
+        : {
+            kind: "schedule",
+            cronExpression: automation.source.cronExpression,
+            timezone: automation.source.timezone,
+            nextScheduledAtLabel:
+              automation.source.nextScheduledAt === null
+                ? null
+                : formatDateTime(automation.source.nextScheduledAt),
+          },
+    updatedAtLabel: formatAutomationUpdatedAt(automation.updatedAt),
+  };
+}
+
 export function AutomationsPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,13 +55,13 @@ export function AutomationsPage(): React.JSX.Element {
   const before = after === null ? parseCursor(searchParams.get("before")) : null;
 
   const automationsQuery = useQuery({
-    queryKey: webhookAutomationsListQueryKey({
+    queryKey: automationsListQueryKey({
       limit: AUTOMATIONS_LIST_LIMIT,
       after,
       before,
     }),
     queryFn: async ({ signal }) =>
-      listWebhookAutomations({
+      listAutomations({
         limit: AUTOMATIONS_LIST_LIMIT,
         after,
         before,
@@ -41,16 +70,7 @@ export function AutomationsPage(): React.JSX.Element {
     retry: false,
   });
 
-  const items =
-    automationsQuery.data?.items.map((automation) => ({
-      id: automation.id,
-      name: automation.name,
-      enabled: automation.enabled,
-      targetName: automation.targetName,
-      ...(automation.issue === undefined ? {} : { issue: automation.issue }),
-      events: automation.events,
-      updatedAtLabel: formatWebhookAutomationUpdatedAt(automation.updatedAt),
-    })) ?? [];
+  const items = automationsQuery.data?.items.map(toAutomationListItemViewModel) ?? [];
 
   const errorMessage = automationsQuery.isError
     ? resolveApiErrorMessage({
@@ -87,7 +107,7 @@ export function AutomationsPage(): React.JSX.Element {
       </div>
 
       {automationsQuery.isPending ? null : (
-        <WebhookAutomationListView
+        <AutomationListView
           errorMessage={errorMessage}
           hasNextPage={automationsQuery.data?.nextPage != null}
           hasPreviousPage={automationsQuery.data?.previousPage != null}
@@ -104,8 +124,13 @@ export function AutomationsPage(): React.JSX.Element {
               nextBefore: null,
             });
           }}
-          onOpenAutomation={(automationId) => {
-            void navigate(`/automations/${automationId}`);
+          onOpenAutomation={(automation) => {
+            if (automation.kind === "schedule") {
+              void navigate(`/automations/schedules/${automation.id}`);
+              return;
+            }
+
+            void navigate(`/automations/${automation.id}`);
           }}
           onPreviousPage={() => {
             const previousPage = automationsQuery.data?.previousPage;
