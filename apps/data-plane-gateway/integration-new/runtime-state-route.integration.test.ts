@@ -291,6 +291,50 @@ it(
   TestTimeoutMs,
 );
 
+it("releases connection presence when the websocket stops responding to health checks", async ({
+  env,
+}) => {
+  const sandboxInstanceId = typeid("sbi").toString();
+  await insertSandboxInstanceRow({
+    env,
+    sandboxInstanceId,
+    testId: "runtime_state_route_unresponsive_presence",
+  });
+
+  const bootstrapSocket = await connectBootstrapSocket({
+    env,
+    sandboxInstanceId,
+  });
+  const connectionSocket = await connectConnectionSocket({
+    env,
+    sandboxInstanceId,
+    autoPong: false,
+  });
+
+  try {
+    const activePresence = await waitForRuntimeState({
+      env,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.presence.activeCount === 1,
+    });
+    expect(activePresence.presence.activeCount).toBe(1);
+
+    await expect(waitForWebSocketClose(connectionSocket)).resolves.toEqual({
+      code: 1011,
+      reason: "Sandbox connection websocket stopped responding to ping.",
+    });
+
+    const releasedPresence = await waitForRuntimeState({
+      env,
+      sandboxInstanceId,
+      predicate: (snapshot) => snapshot.presence.activeCount === 0,
+    });
+    expect(releasedPresence.presence.activeCount).toBe(0);
+  } finally {
+    await Promise.all([closeIfOpen(connectionSocket), closeIfOpen(bootstrapSocket)]);
+  }
+}, 30_000);
+
 async function insertSandboxInstanceRow(input: {
   env: IntegrationTestEnvironment;
   sandboxInstanceId: string;
@@ -402,6 +446,14 @@ async function waitForRuntimeState(input: {
   throw new Error(
     `Timed out waiting for runtime-state snapshot for sandbox '${input.sandboxInstanceId}'.`,
   );
+}
+
+async function closeIfOpen(socket: WebSocket | undefined): Promise<void> {
+  if (socket === undefined || socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  await closeWebSocket(socket);
 }
 
 function createWebSocketBaseUrl(httpBaseUrl: string): string {
