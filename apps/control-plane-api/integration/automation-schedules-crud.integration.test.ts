@@ -478,6 +478,113 @@ describe("automation schedules CRUD integration", () => {
     expect(body.target.primaryRepositoryId).toBe("mistlehq/platform");
   });
 
+  it("preserves the pinned profile version when updating only the primary repository", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "automation-schedules-pinned-version-repository-update@example.com",
+    });
+
+    await insertIntegrationTargets(fixture);
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_schedule_pinned_repo_update_001",
+      organizationId: authenticatedSession.organizationId,
+      targetKey: GitHubTarget.targetKey,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      displayName: "GitHub",
+      externalSubjectId: "acct_schedule_pinned_repo_update_001",
+      config: {},
+      targetSnapshotConfig: {},
+    });
+    await insertSandboxProfileWithVersion(fixture, {
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_schedule_pinned_repo_update_001",
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "spvib_schedule_pinned_repo_update_v1_001",
+        sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
+        sandboxProfileVersion: 1,
+        kind: IntegrationBindingKinds.GIT,
+        connectionId: "icn_schedule_pinned_repo_update_001",
+        config: {
+          repositories: ["mistlehq/original", "mistlehq/pinned-only"],
+        },
+      },
+    ]);
+
+    const createdResponse = await fixture.request("/v1/automations/schedules", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        name: "Pinned version schedule",
+        schedule: {
+          cronExpression: "0 9 * * *",
+          timezone: "Asia/Singapore",
+        },
+        inputTemplate: "Run",
+        target: {
+          sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
+          primaryRepositoryId: "mistlehq/original",
+        },
+      }),
+    });
+
+    expect(createdResponse.status).toBe(201);
+    const created = AutomationScheduleSchema.parse(await createdResponse.json());
+    expect(created.target.sandboxProfileVersion).toBe(1);
+
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
+      version: 2,
+    });
+    await fixture.db
+      .update(sandboxProfiles)
+      .set({
+        activeVersion: 2,
+      })
+      .where(eq(sandboxProfiles.id, "sbp_schedule_pinned_repo_update_001"));
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "spvib_schedule_pinned_repo_update_v2_001",
+      sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
+      sandboxProfileVersion: 2,
+      kind: IntegrationBindingKinds.GIT,
+      connectionId: "icn_schedule_pinned_repo_update_001",
+      config: {
+        repositories: ["mistlehq/original"],
+      },
+    });
+
+    const updateResponse = await fixture.request(`/v1/automations/schedules/${created.id}`, {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        target: {
+          sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
+          primaryRepositoryId: "mistlehq/pinned-only",
+        },
+      }),
+    });
+
+    expect(updateResponse.status).toBe(200);
+    const updated = AutomationScheduleSchema.parse(await updateResponse.json());
+    expect(updated.target.sandboxProfileVersion).toBe(1);
+    expect(updated.target.primaryRepositoryId).toBe("mistlehq/pinned-only");
+
+    const persistedTarget = await fixture.db.query.automationTargets.findFirst({
+      where: (table, { eq }) => eq(table.id, updated.target.id),
+    });
+    expect(persistedTarget?.sandboxProfileVersion).toBe(1);
+    expect(persistedTarget?.primaryRepositoryId).toBe("mistlehq/pinned-only");
+  });
+
   it("fails explicitly when a schedule automation aggregate is malformed", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "automation-schedules-malformed@example.com",

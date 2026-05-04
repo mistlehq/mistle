@@ -56,10 +56,13 @@ export async function updateAutomationSchedule(
 
   const sandboxProfileId =
     input.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
+  const sandboxProfileChanged =
+    input.target?.sandboxProfileId !== undefined &&
+    input.target.sandboxProfileId !== existingAutomation.target.sandboxProfileId;
   const requestedSandboxProfileVersion =
     input.target?.sandboxProfileVersion !== undefined
       ? input.target.sandboxProfileVersion
-      : input.target?.sandboxProfileId !== undefined
+      : sandboxProfileChanged
         ? undefined
         : existingAutomation.target.sandboxProfileVersion;
   const primaryRepositoryId =
