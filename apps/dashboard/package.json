@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@mistle/config": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@rolldown/plugin-babel": "0.2.3",
     "@storybook/react-vite": "^10.3.5",
     "@tailwindcss/vite": "^4.2.4",
