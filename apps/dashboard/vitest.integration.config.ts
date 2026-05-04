@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
+import { WorkspaceAliases as ControlPlaneWorkspaceAliases } from "../control-plane-api/vitest.integration.config.js";
+
 const require = createRequire(import.meta.url);
 const IntegrationsDefinitionsSrcPath = fileURLToPath(
   new URL("../../packages/integrations-definitions/src", import.meta.url),
@@ -100,11 +102,14 @@ export const WorkspaceAliases = [
 
 export default defineConfig({
   resolve: {
-    alias: WorkspaceAliases,
+    alias: [...WorkspaceAliases, ...ControlPlaneWorkspaceAliases],
     tsconfigPaths: true,
   },
   test: {
     include: ["integration/**/*.integration.test.ts", "integration/**/*.integration.test.tsx"],
-    setupFiles: ["./integration/setup-vitest.ts"],
+    fileParallelism: true,
+    testTimeout: 180_000,
+    hookTimeout: 180_000,
+    teardownTimeout: 180_000,
   },
 });
