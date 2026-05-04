@@ -1,283 +1,257 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended integration `it` fixture imported from test context.
+ * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   mintTunnelExchangeToken,
   verifyBootstrapToken,
   verifyTunnelExchangeToken,
 } from "@mistle/gateway-tunnel-auth";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
-import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
+const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
+const BootstrapTokenIssuer = "integration-new-data-plane-worker";
+const GatewayTokenAudience = "integration-new-data-plane-gateway";
 
-const IntegrationTestTimeoutMs = 30_000;
+const TokenExchangeResponseSchema = z
+  .object({
+    bootstrapToken: z.string().min(1),
+    tunnelExchangeToken: z.string().min(1),
+  })
+  .strict();
 
-function isTunnelTokenExchangeResponse(value: unknown): value is {
-  bootstrapToken: string;
-  tunnelExchangeToken: string;
-} {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
+const it = createIntegrationTest({
+  services: ["data-plane-gateway"],
+});
 
-  if (!("bootstrapToken" in value) || !("tunnelExchangeToken" in value)) {
-    return false;
-  }
+describe.concurrent("sandbox tunnel token exchange integration", () => {
+  it("returns fresh bootstrap and exchange tokens for an eligible sandbox instance", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    const exchangeTokenJti = randomUUID();
 
-  return typeof value.bootstrapToken === "string" && typeof value.tunnelExchangeToken === "string";
-}
+    await insertSandboxInstanceRow(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
 
-async function insertSandboxInstanceRow(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-  status?: (typeof SandboxInstanceStatuses)[keyof typeof SandboxInstanceStatuses];
-}): Promise<void> {
-  await input.fixture.db.insert(sandboxInstances).values({
+    const response = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId,
+      exchangeToken: await mintExchangeToken({
+        sandboxInstanceId,
+        jti: exchangeTokenJti,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = TokenExchangeResponseSchema.parse(await response.json());
+    const verifiedBootstrapToken = await verifyBootstrapToken({
+      config: bootstrapTokenConfig(),
+      token: body.bootstrapToken,
+    });
+    const verifiedExchangeToken = await verifyTunnelExchangeToken({
+      config: exchangeTokenConfig(),
+      token: body.tunnelExchangeToken,
+    });
+
+    expect(verifiedBootstrapToken.sandboxInstanceId).toBe(sandboxInstanceId);
+    expect(verifiedExchangeToken).toEqual({
+      bootstrapTokenTtlSeconds: 120,
+      exchangeTokenTtlSeconds: 3600,
+      jti: verifiedExchangeToken.jti,
+      sandboxInstanceId,
+    });
+    await expect(countRedemptions(env, exchangeTokenJti)).resolves.toBe(1);
+  });
+
+  it("rejects exchange token replay after the first successful redemption", async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    const exchangeTokenJti = randomUUID();
+    const exchangeToken = await mintExchangeToken({
+      sandboxInstanceId,
+      jti: exchangeTokenJti,
+    });
+
+    await insertSandboxInstanceRow(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const firstResponse = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId,
+      exchangeToken,
+    });
+    const secondResponse = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId,
+      exchangeToken,
+    });
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(409);
+    await expect(secondResponse.json()).resolves.toEqual({
+      error: "Tunnel exchange token has already been redeemed.",
+    });
+    await expect(countRedemptions(env, exchangeTokenJti)).resolves.toBe(1);
+  });
+
+  it("rejects exchange when authorization bearer token is missing", async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const response = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId,
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Tunnel exchange token bearer authorization is required.",
+    });
+  });
+
+  it("rejects exchange when the token sandbox id does not match the request path", async ({
+    env,
+  }) => {
+    const requestedSandboxInstanceId = typeid("sbi").toString();
+    const tokenSandboxInstanceId = typeid("sbi").toString();
+
+    await insertSandboxInstanceRow(env, {
+      sandboxInstanceId: requestedSandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+    });
+
+    const response = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId: requestedSandboxInstanceId,
+      exchangeToken: await mintExchangeToken({
+        sandboxInstanceId: tokenSandboxInstanceId,
+        jti: randomUUID(),
+      }),
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Tunnel exchange token sandboxInstanceId claim does not match request path.",
+    });
+  });
+
+  it("rejects exchange when the sandbox instance is not eligible", async ({ env }) => {
+    const sandboxInstanceId = typeid("sbi").toString();
+    await insertSandboxInstanceRow(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.STOPPED,
+    });
+
+    const response = await postTunnelTokenExchange({
+      env,
+      sandboxInstanceId,
+      exchangeToken: await mintExchangeToken({
+        sandboxInstanceId,
+        jti: randomUUID(),
+      }),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "Sandbox instance is not eligible for tunnel token exchange.",
+    });
+  });
+});
+
+async function insertSandboxInstanceRow(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    status: (typeof SandboxInstanceStatuses)[keyof typeof SandboxInstanceStatuses];
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
-    organizationId: "org_data_plane_gateway_integration",
-    sandboxProfileId: "sbp_data_plane_gateway_integration",
+    organizationId: "org_gateway_token_exchange",
+    sandboxProfileId: "sbp_gateway_token_exchange",
     sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.app.sandbox.provider,
+    runtimeProvider: "docker",
     providerSandboxId: `provider-${input.sandboxInstanceId}`,
-    status: input.status ?? SandboxInstanceStatuses.RUNNING,
+    status: input.status,
     startedByKind: "system",
-    startedById: "workflow_data_plane_gateway_integration",
+    startedById: "workflow_gateway_token_exchange",
     source: "webhook",
   });
 }
 
-async function postTunnelTokenExchange(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
+function postTunnelTokenExchange(input: {
+  env: IntegrationTestEnvironment;
   sandboxInstanceId: string;
   exchangeToken?: string;
-}): Promise<Response> {
-  const headers =
-    input.exchangeToken === undefined
-      ? undefined
-      : ({
-          Authorization: `Bearer ${input.exchangeToken}`,
-        } satisfies HeadersInit);
-
-  return fetch(
-    `${input.fixture.baseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}/token-exchange`,
+}) {
+  return input.env.dataPlaneGateway.http.fetch(
+    `/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}/token-exchange`,
     {
       method: "POST",
-      ...(headers === undefined ? {} : { headers }),
+      ...(input.exchangeToken === undefined
+        ? {}
+        : {
+            headers: {
+              authorization: `Bearer ${input.exchangeToken}`,
+            },
+          }),
     },
   );
 }
 
-describe("sandbox tunnel token exchange endpoint integration", () => {
-  it(
-    "returns fresh bootstrap and exchange tokens for an eligible sandbox instance",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-      const exchangeTokenJti = randomUUID();
-      const exchangeToken = await mintTunnelExchangeToken({
-        config: {
-          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: exchangeTokenJti,
-        sandboxInstanceId,
-        bootstrapTokenTtlSeconds: 120,
-        exchangeTokenTtlSeconds: 3600,
-        ttlSeconds: 3600,
-      });
+function mintExchangeToken(input: { sandboxInstanceId: string; jti: string }): Promise<string> {
+  return mintTunnelExchangeToken({
+    config: exchangeTokenConfig(),
+    jti: input.jti,
+    sandboxInstanceId: input.sandboxInstanceId,
+    bootstrapTokenTtlSeconds: 120,
+    exchangeTokenTtlSeconds: 3600,
+    ttlSeconds: 3600,
+  });
+}
 
-      const response = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId,
-        exchangeToken,
-      });
+function bootstrapTokenConfig() {
+  return {
+    bootstrapTokenSecret: BootstrapTokenSecret,
+    tokenIssuer: BootstrapTokenIssuer,
+    tokenAudience: GatewayTokenAudience,
+  };
+}
 
-      expect(response.status).toBe(200);
-      const body = await response.json();
-      if (!isTunnelTokenExchangeResponse(body)) {
-        throw new Error("Tunnel token exchange response payload is invalid.");
-      }
+function exchangeTokenConfig() {
+  return {
+    tokenSecret: BootstrapTokenSecret,
+    tokenIssuer: BootstrapTokenIssuer,
+    tokenAudience: GatewayTokenAudience,
+  };
+}
 
-      const verifiedBootstrapToken = await verifyBootstrapToken({
-        config: {
-          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        token: body.bootstrapToken,
-      });
-      const verifiedExchangeToken = await verifyTunnelExchangeToken({
-        config: {
-          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        token: body.tunnelExchangeToken,
-      });
-
-      expect(verifiedBootstrapToken.sandboxInstanceId).toBe(sandboxInstanceId);
-      expect(verifiedExchangeToken).toEqual({
-        bootstrapTokenTtlSeconds: 120,
-        exchangeTokenTtlSeconds: 3600,
-        jti: verifiedExchangeToken.jti,
-        sandboxInstanceId,
-      });
-      await expect(
-        fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
-          where: (table, { eq }) => eq(table.tokenJti, exchangeTokenJti),
-        }),
-      ).resolves.toHaveLength(1);
+async function countRedemptions(
+  env: IntegrationTestEnvironment,
+  tokenJti: string,
+): Promise<number> {
+  const rows = await env.dataPlaneDb.query.sandboxTunnelTokenRedemptions.findMany({
+    columns: {
+      tokenJti: true,
     },
-    IntegrationTestTimeoutMs,
-  );
+    where: (table, { eq }) => eq(table.tokenJti, tokenJti),
+  });
 
-  it(
-    "rejects exchange token replay after the first successful redemption",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-      const exchangeTokenJti = randomUUID();
-      const exchangeToken = await mintTunnelExchangeToken({
-        config: {
-          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: exchangeTokenJti,
-        sandboxInstanceId,
-        bootstrapTokenTtlSeconds: 120,
-        exchangeTokenTtlSeconds: 3600,
-        ttlSeconds: 3600,
-      });
-
-      const firstResponse = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId,
-        exchangeToken,
-      });
-      const secondResponse = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId,
-        exchangeToken,
-      });
-
-      expect(firstResponse.status).toBe(200);
-      expect(secondResponse.status).toBe(409);
-      await expect(secondResponse.json()).resolves.toEqual({
-        error: "Tunnel exchange token has already been redeemed.",
-      });
-      await expect(
-        fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
-          where: (table, { eq }) => eq(table.tokenJti, exchangeTokenJti),
-        }),
-      ).resolves.toHaveLength(1);
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it(
-    "rejects exchange when authorization bearer token is missing",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-
-      const response = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId,
-      });
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({
-        error: "Tunnel exchange token bearer authorization is required.",
-      });
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it(
-    "rejects exchange when the exchange token sandbox instance does not match the request path",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      const otherSandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId: otherSandboxInstanceId,
-      });
-      const exchangeToken = await mintTunnelExchangeToken({
-        config: {
-          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        bootstrapTokenTtlSeconds: 120,
-        exchangeTokenTtlSeconds: 3600,
-        ttlSeconds: 3600,
-      });
-
-      const response = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId: otherSandboxInstanceId,
-        exchangeToken,
-      });
-
-      expect(response.status).toBe(401);
-      await expect(response.json()).resolves.toEqual({
-        error: "Tunnel exchange token sandboxInstanceId claim does not match request path.",
-      });
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it(
-    "rejects exchange when the sandbox instance is not eligible",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-        status: SandboxInstanceStatuses.STOPPED,
-      });
-      const exchangeToken = await mintTunnelExchangeToken({
-        config: {
-          tokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        bootstrapTokenTtlSeconds: 120,
-        exchangeTokenTtlSeconds: 3600,
-        ttlSeconds: 3600,
-      });
-
-      const response = await postTunnelTokenExchange({
-        fixture,
-        sandboxInstanceId,
-        exchangeToken,
-      });
-
-      expect(response.status).toBe(409);
-      await expect(response.json()).resolves.toEqual({
-        error: "Sandbox instance is not eligible for tunnel token exchange.",
-      });
-    },
-    IntegrationTestTimeoutMs,
-  );
-});
+  return rows.length;
+}

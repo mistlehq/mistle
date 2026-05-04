@@ -1,117 +1,61 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended integration `it` fixture imported from test context.
+ * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
   parseStreamControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
+import {
+  TestEnvironmentIdHeader,
+  type IntegrationTestEnvironment,
+  createIntegrationTest,
+} from "@mistle/test-harness/integration";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
-import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
-  connectWebSocket,
+  connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
   sendWebSocketPingAndExpectPong,
   waitForNoWebSocketMessage,
   waitForWebSocketMessage,
-} from "./websocket-test-helpers.js";
+} from "../integration/websocket-test-helpers.js";
 
-const IntegrationTestTimeoutMs = 30_000;
+const TestTimeoutMs = 30_000;
+const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
+const BootstrapTokenIssuer = "integration-new-data-plane-worker";
+const GatewayTokenAudience = "integration-new-data-plane-gateway";
+const ConnectionTokenSecret = "integration-new-connection-secret";
+const ConnectionTokenIssuer = "integration-new-control-plane-api";
 
-function parseStreamMessage(data: string | Buffer): StreamControlMessage {
-  if (typeof data !== "string") {
-    throw new Error("Expected websocket message data to be a string.");
-  }
+const it = createIntegrationTest({
+  services: ["data-plane-api", "data-plane-gateway"],
+});
 
-  const parsedPayload = parseStreamControlMessage(data);
-  if (parsedPayload === undefined) {
-    throw new Error("Expected websocket message payload to be a valid stream control message.");
-  }
-
-  return parsedPayload;
-}
-
-async function insertSandboxInstanceRow(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-}): Promise<void> {
-  await input.fixture.db.insert(sandboxInstances).values({
-    id: input.sandboxInstanceId,
-    organizationId: "org_data_plane_gateway_integration",
-    sandboxProfileId: "sbp_data_plane_gateway_integration",
-    sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.app.sandbox.provider,
-    providerSandboxId: `provider-${input.sandboxInstanceId}`,
-    status: SandboxInstanceStatuses.STARTING,
-    startedByKind: "system",
-    startedById: "workflow_data_plane_gateway_integration",
-    source: "webhook",
-  });
-}
-
-async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
-  if (socket === undefined) {
-    return;
-  }
-  if (socket.readyState !== WebSocket.OPEN) {
-    return;
-  }
-
-  await closeWebSocket(socket);
-}
-
-describe("sandbox tunnel session lifecycle integration", () => {
+describe.concurrent("sandbox tunnel session integration", () => {
   it(
-    "forwards exec stream opens to the bootstrap peer and relays the acknowledgement back to the client",
-    async ({ fixture }) => {
+    "forwards exec stream opens to the bootstrap peer and relays acknowledgements back to the client",
+    async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-      const bootstrapToken = await mintBootstrapToken({
-        config: {
-          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
-      const connectionToken = await mintConnectionToken({
-        config: {
-          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
 
       let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
       try {
-        bootstrapSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-        );
-        clientSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
-        );
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
         const clientStreamId = 88;
-        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        const forwardedOpen = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           clientSocket,
           JSON.stringify({
@@ -123,10 +67,8 @@ describe("sandbox tunnel session lifecycle integration", () => {
             },
           }),
         );
-        const forwardedOpen = await forwardedOpenPromise;
 
-        expect(forwardedOpen.isBinary).toBe(false);
-        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+        expect(parseStreamMessage((await forwardedOpen).data)).toEqual({
           type: "stream.open",
           streamId: 1,
           channel: {
@@ -135,7 +77,7 @@ describe("sandbox tunnel session lifecycle integration", () => {
           },
         });
 
-        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        const forwardedOpenOk = waitForWebSocketMessage(clientSocket);
         await sendWebSocketMessage(
           bootstrapSocket,
           JSON.stringify({
@@ -143,89 +85,44 @@ describe("sandbox tunnel session lifecycle integration", () => {
             streamId: 1,
           }),
         );
-        const forwardedOpenOk = await forwardedOpenOkPromise;
 
-        expect(forwardedOpenOk.isBinary).toBe(false);
-        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+        expect(parseStreamMessage((await forwardedOpenOk).data)).toEqual({
           type: "stream.open.ok",
           streamId: clientStreamId,
         });
       } finally {
-        await Promise.all([
-          closeWebSocketIfOpen(bootstrapSocket),
-          closeWebSocketIfOpen(clientSocket),
-        ]);
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
       }
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 
   it(
-    "keeps the bootstrap peer connected after a connection peer disconnects and accepts a fresh connection token",
-    async ({ fixture }) => {
+    "keeps the bootstrap peer connected after a connection peer disconnects",
+    async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-      const bootstrapToken = await mintBootstrapToken({
-        config: {
-          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
-      const firstConnectionToken = await mintConnectionToken({
-        config: {
-          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
-      const secondConnectionToken = await mintConnectionToken({
-        config: {
-          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
 
       let bootstrapSocket: WebSocket | undefined;
       let firstClientSocket: WebSocket | undefined;
       let secondClientSocket: WebSocket | undefined;
 
       try {
-        bootstrapSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-        );
-        firstClientSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(firstConnectionToken)}`,
-        );
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        firstClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
-        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
         await closeWebSocket(firstClientSocket);
         firstClientSocket = undefined;
-        await bootstrapNoMessagePromise;
+        await bootstrapNoMessage;
 
         await sendWebSocketPingAndExpectPong(
           bootstrapSocket,
           Buffer.from("bootstrap-still-open", "utf8"),
         );
 
-        secondClientSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(secondConnectionToken)}`,
-        );
-
-        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        secondClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+        const forwardedOpen = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           secondClientSocket,
           JSON.stringify({
@@ -236,10 +133,8 @@ describe("sandbox tunnel session lifecycle integration", () => {
             },
           }),
         );
-        const forwardedOpen = await forwardedOpenPromise;
 
-        expect(forwardedOpen.isBinary).toBe(false);
-        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+        expect(parseStreamMessage((await forwardedOpen).data)).toEqual({
           type: "stream.open",
           streamId: 1,
           channel: {
@@ -248,57 +143,30 @@ describe("sandbox tunnel session lifecycle integration", () => {
         });
       } finally {
         await Promise.all([
-          closeWebSocketIfOpen(bootstrapSocket),
-          closeWebSocketIfOpen(firstClientSocket),
-          closeWebSocketIfOpen(secondClientSocket),
+          closeIfOpen(bootstrapSocket),
+          closeIfOpen(firstClientSocket),
+          closeIfOpen(secondClientSocket),
         ]);
       }
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 
   it(
-    "notifies active connection peers when the bootstrap tunnel disconnects and keeps the client websocket open",
-    async ({ fixture }) => {
+    "resets active client streams when the bootstrap peer disconnects but keeps the client websocket open",
+    async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-      });
-      const bootstrapToken = await mintBootstrapToken({
-        config: {
-          bootstrapTokenSecret: fixture.config.app.sandbox.bootstrap.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.bootstrap.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.bootstrap.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
-      const connectionToken = await mintConnectionToken({
-        config: {
-          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
-        },
-        jti: randomUUID(),
-        sandboxInstanceId,
-        ttlSeconds: 120,
-      });
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
 
       let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
       try {
-        bootstrapSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-        );
-        clientSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
-        );
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
 
         const clientStreamId = 77;
-        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        const forwardedOpen = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           clientSocket,
           JSON.stringify({
@@ -309,10 +177,8 @@ describe("sandbox tunnel session lifecycle integration", () => {
             },
           }),
         );
-        const forwardedOpen = await forwardedOpenPromise;
 
-        expect(forwardedOpen.isBinary).toBe(false);
-        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+        expect(parseStreamMessage((await forwardedOpen).data)).toEqual({
           type: "stream.open",
           streamId: 1,
           channel: {
@@ -320,7 +186,7 @@ describe("sandbox tunnel session lifecycle integration", () => {
           },
         });
 
-        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        const forwardedOpenOk = waitForWebSocketMessage(clientSocket);
         await sendWebSocketMessage(
           bootstrapSocket,
           JSON.stringify({
@@ -328,21 +194,16 @@ describe("sandbox tunnel session lifecycle integration", () => {
             streamId: 1,
           }),
         );
-        const forwardedOpenOk = await forwardedOpenOkPromise;
-
-        expect(forwardedOpenOk.isBinary).toBe(false);
-        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+        expect(parseStreamMessage((await forwardedOpenOk).data)).toEqual({
           type: "stream.open.ok",
           streamId: clientStreamId,
         });
 
-        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        const clientReset = waitForWebSocketMessage(clientSocket);
         await closeWebSocket(bootstrapSocket);
         bootstrapSocket = undefined;
-        const clientReset = await clientResetPromise;
 
-        expect(clientReset.isBinary).toBe(false);
-        expect(parseStreamMessage(clientReset.data)).toEqual({
+        expect(parseStreamMessage((await clientReset).data)).toEqual({
           type: "stream.reset",
           streamId: clientStreamId,
           code: "bootstrap_disconnected",
@@ -355,12 +216,102 @@ describe("sandbox tunnel session lifecycle integration", () => {
           Buffer.from("client-still-open-after-bootstrap-disconnect", "utf8"),
         );
       } finally {
-        await Promise.all([
-          closeWebSocketIfOpen(bootstrapSocket),
-          closeWebSocketIfOpen(clientSocket),
-        ]);
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
       }
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 });
+
+async function insertSandboxInstanceRow(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: "org_integration_new_tunnel_session",
+    sandboxProfileId: "sbp_integration_new_tunnel_session",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: "workflow_integration_new_tunnel_session",
+    source: "webhook",
+  });
+}
+
+async function connectBootstrapSocket(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<WebSocket> {
+  return await connectSandboxTunnelWebSocket({
+    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: "bootstrap",
+    token: await mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: BootstrapTokenSecret,
+        tokenIssuer: BootstrapTokenIssuer,
+        tokenAudience: GatewayTokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: 120,
+    }),
+    headers: {
+      [TestEnvironmentIdHeader]: input.env.id,
+    },
+  });
+}
+
+async function connectConnectionSocket(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<WebSocket> {
+  return await connectSandboxTunnelWebSocket({
+    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: "connect",
+    token: await mintConnectionToken({
+      config: {
+        connectionTokenSecret: ConnectionTokenSecret,
+        tokenIssuer: ConnectionTokenIssuer,
+        tokenAudience: GatewayTokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: 120,
+    }),
+    headers: {
+      [TestEnvironmentIdHeader]: input.env.id,
+    },
+  });
+}
+
+function parseStreamMessage(data: string | Buffer): StreamControlMessage {
+  if (typeof data !== "string") {
+    throw new Error("Expected websocket message data to be a string.");
+  }
+
+  const parsedMessage = parseStreamControlMessage(data);
+  if (parsedMessage === undefined) {
+    throw new Error("Expected websocket message payload to be a stream control message.");
+  }
+
+  return parsedMessage;
+}
+
+async function closeIfOpen(socket: WebSocket | undefined): Promise<void> {
+  if (socket === undefined || socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  await closeWebSocket(socket);
+}
+
+function createWebSocketBaseUrl(httpBaseUrl: string): string {
+  const url = new URL(httpBaseUrl);
+  url.protocol = "ws:";
+  return url.toString().replace(/\/$/u, "");
+}

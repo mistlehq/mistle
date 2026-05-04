@@ -1,51 +1,28 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { randomUUID } from "node:crypto";
 
-import { readTestContext } from "@mistle/test-harness";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { describe, expect } from "vitest";
 
 import { ValkeySandboxKeepaliveStore } from "../src/runtime-state/adapters/valkey-sandbox-keepalive-store.js";
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
-import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
+import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 
-const TestContextId = "data-plane-gateway.integration";
+const it = createIntegrationTest({
+  services: ["data-plane-gateway"],
+});
 
-const SharedInfraConfigSchema = z
-  .object({
-    valkeyUrl: z.string().min(1),
-  })
-  .loose();
-
-async function readValkeyUrl(): Promise<string> {
-  const testContext = await readTestContext({
-    id: TestContextId,
-    schema: SharedInfraConfigSchema,
-  });
-
-  return testContext.valkeyUrl;
-}
-
-async function deleteKeysByPrefix(input: {
-  client: ReturnType<typeof createValkeyClient>;
-  keyPrefix: string;
-}): Promise<void> {
-  const keys = await input.client.keys(`${input.keyPrefix}:*`);
-  if (keys.length === 0) {
-    return;
-  }
-
-  await input.client.del(keys);
-}
-
-describe("runtime-state store integrations", () => {
-  it("expires attachment records when their TTL elapses", async () => {
-    const keyPrefix = `mistle:runtime-state:expiry-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+describe.concurrent("runtime-state store integrations", () => {
+  it("expires attachment records when their TTL elapses", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -79,11 +56,10 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("fences attachment clears by owner lease id", async () => {
-    const keyPrefix = `mistle:runtime-state:attachment-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("fences attachment clears by owner lease id", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -128,11 +104,10 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("tracks active presence leases until they are released or expire", async () => {
-    const keyPrefix = `mistle:runtime-state:presence-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("tracks active presence leases until they are released or expire", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -211,11 +186,12 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("ignores orphaned presence index entries left by overlapping release and touch operations", async () => {
-    const keyPrefix = `mistle:runtime-state:presence-orphan-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("ignores orphaned presence index entries left by overlapping release and touch operations", async ({
+    env,
+  }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -235,10 +211,8 @@ describe("runtime-state store integrations", () => {
         nowMs: Date.now(),
       });
 
-      // Emulate an old release interleaving with a concurrent touch on the same lease id:
-      // 1. stale release removes the sorted-set member
-      // 2. current touch recreates the lease detail + sorted-set member
-      // 3. stale release deletes the recreated detail key
+      // Reproduces the only durable state a stale release can leave behind:
+      // an index member whose TTL-backed detail key is already gone.
       await client.zRem(indexKey, leaseId);
       await store.touchLease({
         sandboxInstanceId,
@@ -272,11 +246,10 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("renews keepalives without losing their stored metadata", async () => {
-    const keyPrefix = `mistle:runtime-state:keepalive-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("renews keepalives without losing their stored metadata", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -337,11 +310,12 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("ignores orphaned keepalive index entries left by overlapping release and renew operations", async () => {
-    const keyPrefix = `mistle:runtime-state:keepalive-orphan-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("ignores orphaned keepalive index entries left by overlapping release and renew operations", async ({
+    env,
+  }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -361,10 +335,8 @@ describe("runtime-state store integrations", () => {
         nowMs: Date.now(),
       });
 
-      // Emulate an old release interleaving with a current renew on the same keepalive id:
-      // 1. stale release removes the sorted-set member
-      // 2. renew recreates the sorted-set member + detail key
-      // 3. stale release deletes the recreated detail key
+      // Reproduces the only durable state a stale release can leave behind:
+      // an index member whose TTL-backed detail key is already gone.
       await client.zRem(indexKey, keepaliveId);
       await expect(
         store.renewKeepalive({
@@ -393,11 +365,10 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("summarizes owner-fenced keepalive state from valkey", async () => {
-    const keyPrefix = `mistle:runtime-state:keepalive-state-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("summarizes owner-fenced keepalive state from valkey", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -454,11 +425,10 @@ describe("runtime-state store integrations", () => {
     }
   });
 
-  it("summarizes owner-fenced runtime readiness from valkey", async () => {
-    const keyPrefix = `mistle:runtime-state:runtime-ready-it:${randomUUID()}`;
-    const valkeyUrl = await readValkeyUrl();
+  it("summarizes owner-fenced runtime readiness from valkey", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
-      url: valkeyUrl,
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
     });
     await client.connect();
 
@@ -508,3 +478,19 @@ describe("runtime-state store integrations", () => {
     }
   });
 });
+
+function createRuntimeStateKeyPrefix(environmentKeyPrefix: string): string {
+  return `${environmentKeyPrefix}runtime-state-store:${randomUUID()}`;
+}
+
+async function deleteKeysByPrefix(input: {
+  client: ReturnType<typeof createValkeyClient>;
+  keyPrefix: string;
+}): Promise<void> {
+  const keys = await input.client.keys(`${input.keyPrefix}:*`);
+  if (keys.length === 0) {
+    return;
+  }
+
+  await input.client.del(keys);
+}

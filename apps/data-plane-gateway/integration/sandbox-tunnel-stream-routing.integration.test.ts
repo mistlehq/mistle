@@ -32,7 +32,7 @@ import { typeid } from "typeid-js";
 import { beforeAll, describe, expect } from "vitest";
 import WebSocket from "ws";
 
-import { ensureCommitSignBinary } from "../../control-plane-api/integration-new/helpers/commit-sign.js";
+import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
 import {
   insertGitHubSigningCredential,
   seedGitHubLinkedPrincipal,
@@ -40,7 +40,7 @@ import {
   seedIdentityProviderConfig,
   seedPrincipalCredential,
   upsertGitHubIdentityTarget,
-} from "../../control-plane-api/integration-new/helpers/identity-linking.js";
+} from "../../control-plane-api/integration/helpers/identity-linking.js";
 import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
