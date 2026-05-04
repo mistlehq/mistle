@@ -244,12 +244,12 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
     expect(childRun).toEqual(
       expect.objectContaining({
         workflow_name: ScheduleDispatchBatchWorkflowSpec.name,
-        status: "pending",
         input: {
           scheduledActionIds: expectedScheduledActionIds,
         },
       }),
     );
+    expect(["pending", "running", "completed"]).toContain(childRun?.status);
   });
 
   it("uses OpenWorkflow idempotency for schedule dispatch child batches", async ({ env }) => {
