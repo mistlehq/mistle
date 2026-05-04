@@ -31,6 +31,7 @@ import {
   createDataPlaneWorkflowNamespaceId,
 } from "../environment/test-isolation.js";
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
+import { readOtlpTestCollector, type OtlpTestCollector } from "../services/otlp-test-collector.js";
 import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import { httpService, type IntegrationHttpService } from "./services/shared.js";
@@ -50,6 +51,10 @@ const PostgresInfraIds = {
 };
 
 const SeaweedfsInfraId = "seaweedfs";
+const OtlpInfraId = "otlp";
+const OtlpValues = {
+  COLLECTOR_ID: "collectorId",
+};
 const SeaweedfsValues = {
   BUCKET_NAME: "bucketName",
   HOST_ENDPOINT: "host.endpoint",
@@ -89,6 +94,7 @@ export type IntegrationTestEnvironment = {
   dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
   objectStore: IntegrationObjectStore;
+  otlpCollector: OtlpTestCollector;
   tokenizerProxy: IntegrationHttpService;
 };
 
@@ -201,6 +207,15 @@ export function createIntegrationEnvironment(input: {
       objectStore ??= createObjectStore(input.environment);
 
       return objectStore;
+    },
+    get otlpCollector() {
+      const otlp = input.environment.infra.get(OtlpInfraId);
+      const collectorId = otlp?.values.get(OtlpValues.COLLECTOR_ID);
+      if (collectorId === undefined) {
+        throw new Error("Expected integration environment to include OTLP collector infra.");
+      }
+
+      return readOtlpTestCollector(collectorId);
     },
     get tokenizerProxy() {
       return httpService(input.environment.services.get(ServiceIds.TOKENIZER_PROXY));

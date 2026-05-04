@@ -203,8 +203,9 @@ function supportedExtraInfraIdsForService(serviceId: ServiceId): readonly Mistle
       return ["seaweedfs"];
     case ServiceIds.CONTROL_PLANE_WORKER:
       return ["mailpit"];
-    case ServiceIds.DATA_PLANE_API:
     case ServiceIds.DATA_PLANE_GATEWAY:
+      return ["otlp"];
+    case ServiceIds.DATA_PLANE_API:
     case ServiceIds.DATA_PLANE_WORKER:
     case ServiceIds.TOKENIZER_PROXY:
       return [];

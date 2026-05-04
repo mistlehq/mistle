@@ -42,13 +42,13 @@ describe("createTestRegistry", () => {
   it("resolves explicitly requested extra infra independently from service declarations", () => {
     const registry = createTestRegistry();
     const extraInfra = createTestExtraInfra({
-      ids: ["mailpit", "seaweedfs"],
+      ids: ["mailpit", "otlp", "seaweedfs"],
     });
 
     expect(registry["control-plane-api"].infra.map((infra) => infra.id)).toEqual([
       "postgres.control-plane",
     ]);
-    expect(extraInfra.map((infra) => infra.id)).toEqual(["mailpit", "seaweedfs"]);
+    expect(extraInfra.map((infra) => infra.id)).toEqual(["mailpit", "otlp", "seaweedfs"]);
   });
 
   it("uses one Postgres provisioner for control-plane and data-plane logical resources", () => {

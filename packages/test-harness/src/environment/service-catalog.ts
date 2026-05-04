@@ -27,6 +27,7 @@ import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
 import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
 import { registerProcessCleanupTask } from "../cleanup/index.js";
+import { startOtlpTestCollector } from "../services/otlp-test-collector.js";
 import { ensureSeaweedfsS3BucketExists } from "../services/seaweedfs/index.js";
 import { createTestEnvironmentSharedInfraKey } from "../services/shared-infra-coordinator.js";
 import { acquireSharedMailpitInfra } from "../services/shared-mailpit.js";
@@ -84,6 +85,7 @@ const InfraIds = {
   VALKEY: "valkey",
   MAILPIT: "mailpit",
   SEAWEEDFS: "seaweedfs",
+  OTLP: "otlp",
 };
 
 const PostgresValues = {
@@ -102,6 +104,7 @@ const InfraKinds = {
   VALKEY: "valkey",
   MAILPIT: "mailpit",
   SEAWEEDFS: "seaweedfs",
+  OTLP: "otlp",
 };
 
 const ValkeyValues = {
@@ -123,6 +126,14 @@ const SeaweedfsValues = {
   REGION: "region",
   ACCESS_KEY_ID: "accessKeyId",
   SECRET_ACCESS_KEY: "secretAccessKey",
+};
+
+const OtlpValues = {
+  COLLECTOR_ID: "collectorId",
+  BASE_URL: "baseUrl",
+  TRACES_ENDPOINT: "traces.endpoint",
+  LOGS_ENDPOINT: "logs.endpoint",
+  METRICS_ENDPOINT: "metrics.endpoint",
 };
 
 function formatDuration(milliseconds: number): string {
@@ -181,7 +192,7 @@ export type MistleTestServiceId =
   | "data-plane-worker"
   | "tokenizer-proxy";
 
-export type MistleTestExtraInfraId = "mailpit" | "seaweedfs";
+export type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
 export type MistleTestRegistry = TestServiceRegistry & {
   "control-plane-api": TestServiceDefinition;
@@ -284,6 +295,9 @@ export function createTestExtraInfra(input: {
             sharedInfraKey,
           }),
         );
+        break;
+      case "otlp":
+        requirements.push(createOtlpRequirement());
         break;
       case "seaweedfs":
         requirements.push(
@@ -680,6 +694,50 @@ function createMailpitProvisioner(input: { sharedInfraKey: string }): TestInfraP
           writeProvisionerTimingSummary({
             environmentId: provisionInput.environmentId,
             provisioner: "mailpit cleanup",
+            timings: cleanupTimings,
+          });
+        },
+      }));
+    },
+  };
+}
+
+function createOtlpRequirement(): TestInfraRequirement {
+  return {
+    id: InfraIds.OTLP,
+    kind: InfraKinds.OTLP,
+    provisioner: createOtlpProvisioner(),
+  };
+}
+
+function createOtlpProvisioner(): TestInfraProvisioner {
+  return {
+    kind: InfraKinds.OTLP,
+    provision: async (provisionInput) => {
+      const timings = new Map<string, number>();
+      const collector = await measure(timings, "start", startOtlpTestCollector);
+      writeProvisionerTimingSummary({
+        environmentId: provisionInput.environmentId,
+        provisioner: "otlp",
+        timings,
+      });
+
+      return provisionInput.requirements.map((requirement) => ({
+        id: requirement.id,
+        kind: requirement.kind,
+        values: new Map([
+          [OtlpValues.COLLECTOR_ID, collector.id],
+          [OtlpValues.BASE_URL, collector.baseUrl],
+          [OtlpValues.TRACES_ENDPOINT, collector.endpointForPath("/v1/traces")],
+          [OtlpValues.LOGS_ENDPOINT, collector.endpointForPath("/v1/logs")],
+          [OtlpValues.METRICS_ENDPOINT, collector.endpointForPath("/v1/metrics")],
+        ]),
+        stop: async () => {
+          const cleanupTimings = new Map<string, number>();
+          await measure(cleanupTimings, "stop", collector.stop);
+          writeProvisionerTimingSummary({
+            environmentId: provisionInput.environmentId,
+            provisioner: "otlp cleanup",
             timings: cleanupTimings,
           });
         },

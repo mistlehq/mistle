@@ -161,8 +161,9 @@ Common `env` properties include:
   for inserts, updates, deletes, joins, and predicates.
 - `env.controlPlaneWorkflow`: workflow client for control-plane worker behavior.
 - `env.dataPlaneWorkflow`: workflow client for data-plane worker behavior.
-- `env.mailpit`, `env.objectStore`: optional clients available only when the
-  matching `extraInfra` was requested and attached to a selected service.
+- `env.mailpit`, `env.objectStore`, `env.otlpCollector`: optional clients
+  available only when the matching `extraInfra` was requested and attached to a
+  selected service.
 
 ## Authentication
 
@@ -241,12 +242,15 @@ Supported extra infra ids are:
 
 - `mailpit`: email delivery assertions, such as auth OTP flows through the
   control-plane worker.
+- `otlp`: telemetry assertions through services that emit or forward OTLP
+  requests, such as data-plane gateway sandbox tunnel telemetry.
 - `seaweedfs`: object-store behavior, such as avatar or organization logo
   uploads through the control-plane API.
 
-`extraInfra` is environment-scoped and should be rare. The harness still pools
-the physical containers across the runner and gives each logical environment its
-own scoped wiring, such as a SeaweedFS bucket.
+`extraInfra` is environment-scoped and should be rare. When an extra dependency
+has a shareable physical backing resource, the harness pools it across the
+runner and gives each logical environment its own scoped wiring, such as a
+SeaweedFS bucket.
 
 Optional clients fail fast if the matching infrastructure was not requested.
 That is intentional; request `extraInfra` only when the scenario exercises that
@@ -508,7 +512,8 @@ When migrating:
 - Use `createIntegrationTest(...)`; do not copy legacy per-file containers,
   bespoke registries, or direct service bootstrapping.
 - Select only the services the scenario intentionally exercises.
-- Use `extraInfra` for optional dependencies such as `mailpit` or `seaweedfs`.
+- Use `extraInfra` for optional dependencies such as `mailpit`, `otlp`, or
+  `seaweedfs`.
 - Use `env.auth`, `env.*Db`, `env.*Tables`, service handles, and reusable
   clients instead of app-local setup wrappers.
 - Prefer `describe.concurrent(...)` and make data unique enough for concurrent
