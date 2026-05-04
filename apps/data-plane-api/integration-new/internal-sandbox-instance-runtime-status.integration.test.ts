@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   createDataPlaneSandboxInstancesClient,
+  type StartSandboxInstanceInput,
   type DataPlaneSandboxInstancesClient,
 } from "@mistle/data-plane-internal-client";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
@@ -43,7 +44,7 @@ const it = createIntegrationTest({
   services: ["data-plane-api", "data-plane-gateway"],
 });
 
-it("reports a provider-running sandbox as connectable once the gateway runtime is ready", async ({
+it("reports a provider-running sandbox as starting until the gateway runtime is ready", async ({
   env,
 }) => {
   const adapter = createSandboxAdapter({
@@ -62,6 +63,11 @@ it("reports a provider-running sandbox as connectable once the gateway runtime i
     },
   });
   let bootstrapSocket: WebSocket | undefined;
+  const runtimePlan = createRuntimePlan({
+    sandboxProfileId: "sbp_integration_new_runtime_status",
+    version: 1,
+    cwd: "/root/mistlehq/mistle",
+  });
 
   try {
     await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
@@ -76,6 +82,25 @@ it("reports a provider-running sandbox as connectable once the gateway runtime i
       startedById: "usr_integration_new_runtime_status",
       source: "dashboard",
     });
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
+      sandboxInstanceId,
+      revision: 1,
+      compiledRuntimePlan: runtimePlan,
+      compiledFromProfileId: "sbp_integration_new_runtime_status",
+      compiledFromProfileVersion: 1,
+    });
+
+    await expect(
+      clientFor(env).getSandboxInstance({
+        organizationId,
+        instanceId: sandboxInstanceId,
+      }),
+    ).resolves.toMatchObject({
+      id: sandboxInstanceId,
+      status: "starting",
+      connectable: false,
+      runtimePlan,
+    });
 
     bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
     await sendWebSocketMessage(
@@ -86,23 +111,96 @@ it("reports a provider-running sandbox as connectable once the gateway runtime i
       }),
     );
 
+    const runningSandbox = await waitForSandboxStatus({
+      client: clientFor(env),
+      organizationId,
+      sandboxInstanceId,
+      status: "running",
+    });
+    expect(runningSandbox).toMatchObject({
+      id: sandboxInstanceId,
+      status: "running",
+      connectable: true,
+      runtimePlan,
+    });
+
+    await adapter.destroy({
+      id: sandbox.id,
+    });
     await expect(
       waitForSandboxStatus({
         client: clientFor(env),
         organizationId,
         sandboxInstanceId,
-        status: "running",
+        status: "failed",
       }),
     ).resolves.toMatchObject({
       id: sandboxInstanceId,
-      status: "running",
-      connectable: true,
+      status: "failed",
+      connectable: false,
+      failureCode: "provider_runtime_missing",
+      failureMessage: "Sandbox runtime was not found at the provider during inspection.",
     });
   } finally {
     await closeIfOpen(bootstrapSocket);
     await destroySandbox(adapter, sandbox);
   }
 }, 60_000);
+
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  version: number;
+  cwd: string;
+}): StartSandboxInstanceInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    image: {
+      source: "base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClients: [],
+    workspaceSources: [
+      {
+        sourceKind: "git-clone",
+        resourceKind: "repository",
+        path: input.cwd,
+        originUrl: "https://github.com/mistlehq/mistle.git",
+      },
+    ],
+    agentRuntimes: [
+      {
+        bindingId: "ibd_integration_new_runtime_status",
+        runtimeId: "codex",
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server",
+        ptyLaunch: {
+          runtimeId: "codex",
+          displayName: "Codex",
+          newLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: input.cwd,
+            command: "codex",
+            args: [],
+          },
+          resumeLaunch: {
+            ptySessionId: "cli",
+            cols: 120,
+            rows: 32,
+            cwd: input.cwd,
+            command: "codex",
+            args: [],
+          },
+        },
+      },
+    ],
+  };
+}
 
 function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesClient {
   return createDataPlaneSandboxInstancesClient({
