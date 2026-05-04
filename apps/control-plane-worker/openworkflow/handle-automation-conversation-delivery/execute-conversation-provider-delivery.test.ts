@@ -397,7 +397,10 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
       }
 
       if (methodPayload.method === "thread/start") {
-        if (scenario !== "create_conversation") {
+        if (
+          scenario !== "create_conversation" &&
+          scenario !== "schedule_stream_reset_after_delivery_context"
+        ) {
           throw new Error("Unexpected thread/start request for this scenario.");
         }
         expectRequestModel({

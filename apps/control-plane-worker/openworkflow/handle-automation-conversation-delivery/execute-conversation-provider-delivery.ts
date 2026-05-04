@@ -7,7 +7,11 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationSteerRecoveryAction,
 } from "./automation-conversation-delivery.js";
-import { getConversationProviderAdapter } from "./provider-adapter.js";
+import {
+  type ConversationProviderAdapter,
+  type ProviderConnection,
+  getConversationProviderAdapter,
+} from "./provider-adapter.js";
 import {
   type ExecutedConversationProviderDelivery,
   type ExecuteConversationProviderDeliveryInput,
@@ -16,6 +20,21 @@ import {
 class ConversationDeliveryExecutionError extends Error {}
 
 const DeliveryContextNotificationMethod = "mistle/setDeliveryContext";
+const ProviderDeliveryAttemptLimit = 2;
+
+class RecoverableProviderSetupError extends Error {
+  readonly originalError: unknown;
+
+  constructor(error: unknown) {
+    super(
+      error instanceof Error ? error.message : "Provider setup failed with a recoverable error.",
+      {
+        cause: error,
+      },
+    );
+    this.originalError = error;
+  }
+}
 
 type DeliveryTraceCarrier = {
   traceparent: string;
@@ -45,9 +64,48 @@ export function resolveDeliveryContextNotificationParams(
   };
 }
 
+function hasErrorCause(input: unknown): input is { cause: unknown } {
+  return typeof input === "object" && input !== null && "cause" in input;
+}
+
+function readErrorMessage(input: unknown): string | null {
+  if (input instanceof Error) {
+    return input.message;
+  }
+  if (
+    typeof input === "object" &&
+    input !== null &&
+    "message" in input &&
+    typeof input.message === "string"
+  ) {
+    return input.message;
+  }
+  return null;
+}
+
+function isSandboxAgentStreamUnavailableError(input: unknown): boolean {
+  let current: unknown = input;
+  for (let depth = 0; depth < 8; depth += 1) {
+    const message = readErrorMessage(current);
+    if (
+      message !== null &&
+      (message.includes("Sandbox session stream is not open.") ||
+        message.includes("Sandbox session stream reset"))
+    ) {
+      return true;
+    }
+
+    if (!hasErrorCause(current)) {
+      return false;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
 async function steerConversationExecution(input: {
-  adapter: ReturnType<typeof getConversationProviderAdapter>;
-  connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
+  adapter: ConversationProviderAdapter;
+  connection: ProviderConnection;
   conversationId: string;
   runtimeId: string;
   providerConversationId: string | null;
@@ -74,8 +132,8 @@ async function steerConversationExecution(input: {
 }
 
 async function recoverLateSteerExecution(input: {
-  adapter: ReturnType<typeof getConversationProviderAdapter>;
-  connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
+  adapter: ConversationProviderAdapter;
+  connection: ProviderConnection;
   conversationId: string;
   providerConversationId: string;
   providerExecutionId: string;
@@ -126,13 +184,16 @@ async function recoverLateSteerExecution(input: {
   }
 }
 
-export async function executeConversationProviderDelivery(
+async function executeConversationProviderDeliveryAttempt(
+  adapter: ConversationProviderAdapter,
   input: ExecuteConversationProviderDeliveryInput,
 ): Promise<ExecutedConversationProviderDelivery> {
-  const adapter = getConversationProviderAdapter(input.runtimeId);
   const connection = await adapter.connect({
     connectionUrl: input.connectionUrl,
   });
+
+  let providerConversationId = input.providerConversationId;
+  let didAttemptProviderExecution = false;
 
   try {
     if (connection.notify === undefined) {
@@ -146,7 +207,6 @@ export async function executeConversationProviderDelivery(
       params: resolveDeliveryContextNotificationParams(input.deliveryContext),
     });
 
-    let providerConversationId = input.providerConversationId;
     let createdConversationState: unknown;
     if (providerConversationId === null) {
       const createdConversation = await adapter.createAutomationConversation({
@@ -179,6 +239,7 @@ export async function executeConversationProviderDelivery(
     let executionUpdate;
     switch (executionAction) {
       case AutomationConversationExecutionActions.START:
+        didAttemptProviderExecution = true;
         executionUpdate = await adapter.startExecution({
           connection,
           providerConversationId,
@@ -194,6 +255,7 @@ export async function executeConversationProviderDelivery(
         }
 
         try {
+          didAttemptProviderExecution = true;
           executionUpdate = await steerConversationExecution({
             adapter,
             connection,
@@ -242,7 +304,39 @@ export async function executeConversationProviderDelivery(
       providerExecutionId: executionUpdate.providerExecutionId,
       providerState: executionUpdate.providerState ?? createdConversationState,
     };
+  } catch (error) {
+    if (
+      providerConversationId === null &&
+      !didAttemptProviderExecution &&
+      isSandboxAgentStreamUnavailableError(error)
+    ) {
+      throw new RecoverableProviderSetupError(error);
+    }
+    throw error;
   } finally {
     await connection.close();
   }
+}
+
+export async function executeConversationProviderDelivery(
+  input: ExecuteConversationProviderDeliveryInput,
+): Promise<ExecutedConversationProviderDelivery> {
+  const adapter = getConversationProviderAdapter(input.runtimeId);
+
+  for (let attempt = 1; attempt <= ProviderDeliveryAttemptLimit; attempt += 1) {
+    try {
+      return await executeConversationProviderDeliveryAttempt(adapter, input);
+    } catch (error) {
+      if (!(error instanceof RecoverableProviderSetupError)) {
+        throw error;
+      }
+      if (attempt === ProviderDeliveryAttemptLimit) {
+        throw error.originalError;
+      }
+    }
+  }
+
+  throw new ConversationDeliveryExecutionError(
+    "Automation conversation delivery exhausted provider setup attempts.",
+  );
 }
