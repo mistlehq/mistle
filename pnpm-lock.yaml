@@ -665,12 +665,6 @@ importers:
       '@types/pg':
         specifier: ^8.20.0
         version: 8.20.0
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      ws:
-        specifier: ^8.20.0
-        version: 8.20.0
 
   apps/tokenizer-proxy:
     dependencies:
