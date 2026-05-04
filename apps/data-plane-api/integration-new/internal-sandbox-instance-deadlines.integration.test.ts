@@ -23,6 +23,10 @@ import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_SANDBOX_ROUTE_BASE_PATH,
 } from "../src/internal/index.js";
+import {
+  createSandboxInstanceDeadlineAdvisoryLockResourceKey,
+  SandboxInstanceDeadlineAdvisoryLockNamespace,
+} from "../src/internal/sandbox-instances/services/put-sandbox-instance-deadline.js";
 
 const InternalServiceToken = "integration-new-internal-service-token";
 const CanonicalDueAt = "2026-04-15T12:00:00.000Z";
@@ -268,14 +272,112 @@ describe.concurrent("internal sandbox instance deadlines integration", () => {
       message: "Invalid request.",
     });
   });
+
+  it("applies last-write-wins semantics for concurrent deadline writes", async ({ env }) => {
+    const sandboxInstanceId = "sbi_dp_api_deadline_concurrent_put";
+    await insertRunningSandboxInstance(env, sandboxInstanceId);
+    let firstRequestPromise:
+      | ReturnType<DataPlaneSandboxInstancesClient["putSandboxInstanceDeadline"]>
+      | undefined;
+    let secondRequestPromise:
+      | ReturnType<DataPlaneSandboxInstancesClient["putSandboxInstanceDeadline"]>
+      | undefined;
+
+    await env.dataPlaneDb.transaction(async (transaction) => {
+      await transaction.execute(sql`
+        select pg_advisory_xact_lock(
+          ${SandboxInstanceDeadlineAdvisoryLockNamespace},
+          hashtext(${createSandboxInstanceDeadlineAdvisoryLockResourceKey({
+            sandboxInstanceId,
+            kind: "disconnect",
+          })})
+        )
+      `);
+
+      const client = clientFor(env, 15_000);
+      firstRequestPromise = client.putSandboxInstanceDeadline({
+        sandboxInstanceId,
+        kind: "disconnect",
+        ownerLeaseId: "sol_dp_api_deadline_concurrent_put_first",
+        dueAt: CanonicalDueAt,
+      });
+      await waitForPendingDeadlineWriteLockWaiters({
+        env,
+        sandboxInstanceId,
+        kind: "disconnect",
+      });
+
+      secondRequestPromise = client.putSandboxInstanceDeadline({
+        sandboxInstanceId,
+        kind: "disconnect",
+        ownerLeaseId: "sol_dp_api_deadline_concurrent_put_second",
+        dueAt: AlternateCanonicalDueAt,
+      });
+      await waitForPendingDeadlineWriteLockWaiters({
+        env,
+        sandboxInstanceId,
+        minimumCount: 2,
+        kind: "disconnect",
+      });
+    });
+
+    if (firstRequestPromise === undefined || secondRequestPromise === undefined) {
+      throw new Error("Expected both concurrent deadline requests to be started.");
+    }
+
+    const [firstResponse, secondResponse] = await Promise.all([
+      firstRequestPromise,
+      secondRequestPromise,
+    ]);
+    expect(firstResponse.status).toBe("accepted");
+    expect(secondResponse.status).toBe("accepted");
+
+    const workflowRuns = await waitForDeadlineWorkflowRuns(env, sandboxInstanceId, 2);
+    expect(workflowRuns).toHaveLength(2);
+
+    const parsedInputs = workflowRuns.map((run) => DeadlineWorkflowInputSchema.parse(run.input));
+    expect(parsedInputs).toEqual(
+      expect.arrayContaining([
+        {
+          sandboxInstanceId,
+          kind: "disconnect",
+          ownerLeaseId: "sol_dp_api_deadline_concurrent_put_first",
+          dueAt: CanonicalDueAt,
+          generation: 1,
+        },
+        {
+          sandboxInstanceId,
+          kind: "disconnect",
+          ownerLeaseId: "sol_dp_api_deadline_concurrent_put_second",
+          dueAt: AlternateCanonicalDueAt,
+          generation: 2,
+        },
+      ]),
+    );
+
+    const persistedDeadline = await readDeadline(env, sandboxInstanceId, "disconnect");
+    expect(persistedDeadline).toEqual({
+      ownerLeaseId: "sol_dp_api_deadline_concurrent_put_second",
+      dueAt: expect.any(String),
+      generation: 2,
+      clearedAt: null,
+    });
+    expect(canonicalizePersistedDueAt(persistedDeadline?.dueAt ?? "")).toBe(
+      AlternateCanonicalDueAt,
+    );
+  });
 });
 
-function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesClient {
+function clientFor(
+  env: IntegrationTestEnvironment,
+  requestTimeoutMs?: number,
+): DataPlaneSandboxInstancesClient {
   return createDataPlaneSandboxInstancesClient({
     baseUrl: env.dataPlaneApi.hostBaseUrl,
     serviceToken: InternalServiceToken,
     testEnvironmentId: env.id,
     testEnvironmentIdHeader: TestEnvironmentIdHeader,
+    requestTimeoutMs,
   });
 }
 
@@ -330,12 +432,13 @@ type WorkflowRunRow = {
 async function waitForDeadlineWorkflowRuns(
   env: IntegrationTestEnvironment,
   sandboxInstanceId: string,
+  minimumCount = 1,
 ): Promise<WorkflowRunRow[]> {
   const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
 
   while (systemClock.nowMs() < deadline) {
     const workflowRuns = await listDeadlineWorkflowRuns(env, sandboxInstanceId);
-    if (workflowRuns.length > 0) {
+    if (workflowRuns.length >= minimumCount) {
       return workflowRuns;
     }
 
@@ -343,6 +446,43 @@ async function waitForDeadlineWorkflowRuns(
   }
 
   throw new Error(`Timed out waiting for deadline workflow for sandbox '${sandboxInstanceId}'.`);
+}
+
+async function waitForPendingDeadlineWriteLockWaiters(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+  kind: DeadlineKind;
+  minimumCount?: number;
+}): Promise<void> {
+  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
+  const minimumCount = input.minimumCount ?? 1;
+  const resourceKey = createSandboxInstanceDeadlineAdvisoryLockResourceKey({
+    sandboxInstanceId: input.sandboxInstanceId,
+    kind: input.kind,
+  });
+
+  while (systemClock.nowMs() < deadline) {
+    const result = await input.env.dataPlaneDb.execute(sql<{ waiters: number }>`
+      select count(*)::int as waiters
+      from pg_locks
+      where
+        locktype = 'advisory'
+        and classid = ${SandboxInstanceDeadlineAdvisoryLockNamespace}
+        and objid = hashtext(${resourceKey})
+        and objsubid = 2
+        and granted = false
+    `);
+
+    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
+      return;
+    }
+
+    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${String(minimumCount)} pending deadline lock waiter(s) for sandbox '${input.sandboxInstanceId}' and kind '${input.kind}'.`,
+  );
 }
 
 async function listDeadlineWorkflowRuns(

@@ -8,14 +8,25 @@ import {
   SandboxInstancePurposes,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
+  SandboxStopReasons,
 } from "@mistle/db/data-plane";
-import { createIntegrationTest } from "@mistle/test-harness/integration";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { HandleSandboxInstanceDeadlineWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { describe, expect } from "vitest";
+
+import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-failed.js";
+import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringReconcile } from "../openworkflow/reconcile-sandbox-instance/mark-sandbox-instance-stopped.js";
+import { markSandboxInstanceFailed as markSandboxInstanceFailedDuringStart } from "../openworkflow/start-sandbox-instance/mark-sandbox-instance-failed.js";
+import { markSandboxInstanceStopped as markSandboxInstanceStoppedDuringStop } from "../openworkflow/stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 
 const it = createIntegrationTest({
   services: ["data-plane-worker"],
 });
+
+const MatchingDeadlineDueAt = "2026-04-14T12:00:00.000Z";
 
 describe.concurrent("data-plane worker sandbox instance deadlines", () => {
   it("processes deadline workflows through the hosted worker runtime", async ({ env }) => {
@@ -79,4 +90,164 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
       stopReason: null,
     });
   });
+
+  it("clears both deadline kinds when the stop workflow marks a sandbox instance stopped", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_stop_clears";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-stop-clears",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await markSandboxInstanceStoppedDuringStop({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+      stopReason: SandboxStopReasons.IDLE,
+    });
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+  });
+
+  it("clears both deadline kinds when start failure marks a sandbox instance failed", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_start_failure_clears";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.STARTING,
+      providerSandboxId: "provider-integration-new-deadline-start-failure-clears",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await markSandboxInstanceFailedDuringStart(
+      {
+        db: env.dataPlaneDb,
+        tables: env.dataPlaneTables,
+      },
+      {
+        sandboxInstanceId,
+        failureCode: "sandbox_init_failed",
+        failureMessage: "sandbox initialization failed during integration-new test",
+      },
+    );
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+  });
+
+  it("clears both deadline kinds when reconcile marks a sandbox instance stopped", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_reconcile_stop_clears";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-reconcile-stop-clears",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await markSandboxInstanceStoppedDuringReconcile({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+      currentStatus: "running",
+    });
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+  });
+
+  it("clears both deadline kinds when reconcile marks a sandbox instance failed", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_reconcile_failure_clears";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-reconcile-failure-clears",
+    });
+    await insertBothDeadlineKinds(env, sandboxInstanceId);
+
+    await markSandboxInstanceFailedDuringReconcile({
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      sandboxInstanceId,
+      currentStatus: "running",
+      failureCode: "provider_runtime_missing",
+      failureMessage: "provider runtime missing during integration-new test",
+    });
+
+    await expectDeadlinesCleared(env, sandboxInstanceId);
+  });
 });
+
+async function insertSandboxInstance(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    status: typeof SandboxInstanceStatuses.RUNNING | typeof SandboxInstanceStatuses.STARTING;
+    providerSandboxId: string;
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: `org_${input.sandboxInstanceId}`,
+    sandboxProfileId: `sbp_${input.sandboxInstanceId}`,
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: input.providerSandboxId,
+    status: input.status,
+    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
+    purpose: SandboxInstancePurposes.SESSION,
+    startedByKind: "system",
+    startedById: `worker_${input.sandboxInstanceId}`,
+    source: SandboxInstanceSources.DASHBOARD,
+  });
+}
+
+async function insertBothDeadlineKinds(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceDeadlines).values([
+    {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: `owner_idle_${sandboxInstanceId}`,
+      dueAt: MatchingDeadlineDueAt,
+    },
+    {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+      ownerLeaseId: `owner_disconnect_${sandboxInstanceId}`,
+      dueAt: MatchingDeadlineDueAt,
+    },
+  ]);
+}
+
+async function expectDeadlinesCleared(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+): Promise<void> {
+  const deadlineRows = await env.dataPlaneDb.query.sandboxInstanceDeadlines.findMany({
+    columns: {
+      kind: true,
+      clearedAt: true,
+    },
+    where: (table, { eq }) => eq(table.sandboxInstanceId, sandboxInstanceId),
+    orderBy: (table, { asc }) => asc(table.kind),
+  });
+
+  expect(deadlineRows).toEqual([
+    {
+      kind: SandboxInstanceDeadlineKinds.DISCONNECT,
+      clearedAt: expect.any(String),
+    },
+    {
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      clearedAt: expect.any(String),
+    },
+  ]);
+}

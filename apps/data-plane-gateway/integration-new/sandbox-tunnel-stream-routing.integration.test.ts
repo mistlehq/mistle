@@ -30,6 +30,7 @@ import {
   connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
   sendWebSocketPingAndExpectPong,
+  waitForNoWebSocketMessage,
   waitForWebSocketMessage,
 } from "../integration/websocket-test-helpers.js";
 
@@ -332,6 +333,67 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
     },
     TestTimeoutMs,
   );
+
+  it(
+    "releases PTY stream bindings on client close and ignores late exit events",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        await openPtyStream({
+          bootstrapSocket,
+          clientSocket,
+          clientStreamId: 41,
+          bootstrapStreamId: 1,
+        });
+
+        const forwardedClose = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.close",
+            streamId: 41,
+          }),
+        );
+        expect(parseStreamMessage((await forwardedClose).data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientNoMessage = waitForNoWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.event",
+            streamId: 1,
+            event: {
+              type: "pty.exit",
+              exitCode: 0,
+            },
+          }),
+        );
+        await Promise.all([bootstrapNoMessage, clientNoMessage]);
+
+        await openPtyStream({
+          bootstrapSocket,
+          clientSocket,
+          clientStreamId: 42,
+          bootstrapStreamId: 2,
+        });
+      } finally {
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
+      }
+    },
+    TestTimeoutMs,
+  );
 });
 
 async function insertSandboxInstanceRow(input: {
@@ -426,6 +488,53 @@ function encodeWebSocketTextDataFrame(input: { payload: string; streamId: number
     streamId: input.streamId,
     payloadKind: PayloadKindWebSocketText,
     payload: Buffer.from(input.payload, "utf8"),
+  });
+}
+
+async function openPtyStream(input: {
+  bootstrapSocket: WebSocket;
+  clientSocket: WebSocket;
+  clientStreamId: number;
+  bootstrapStreamId: number;
+}): Promise<void> {
+  const forwardedOpen = waitForWebSocketMessage(input.bootstrapSocket);
+  await sendWebSocketMessage(
+    input.clientSocket,
+    JSON.stringify({
+      type: "stream.open",
+      streamId: input.clientStreamId,
+      channel: {
+        kind: "pty",
+        session: "create",
+        ptySessionId: "terminal",
+        cols: 120,
+        rows: 40,
+      },
+    }),
+  );
+  expect(parseStreamMessage((await forwardedOpen).data)).toEqual({
+    type: "stream.open",
+    streamId: input.bootstrapStreamId,
+    channel: {
+      kind: "pty",
+      session: "create",
+      ptySessionId: "terminal",
+      cols: 120,
+      rows: 40,
+    },
+  });
+
+  const forwardedOpenOk = waitForWebSocketMessage(input.clientSocket);
+  await sendWebSocketMessage(
+    input.bootstrapSocket,
+    JSON.stringify({
+      type: "stream.open.ok",
+      streamId: input.bootstrapStreamId,
+    }),
+  );
+  expect(parseStreamMessage((await forwardedOpenOk).data)).toEqual({
+    type: "stream.open.ok",
+    streamId: input.clientStreamId,
   });
 }
 
