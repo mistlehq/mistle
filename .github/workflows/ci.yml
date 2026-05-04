@@ -25,7 +25,7 @@ jobs:
       ts_static: ${{ steps.filter.outputs.ts_static }}
       ts_build: ${{ steps.filter.outputs.ts_build }}
       ts_test: ${{ steps.filter.outputs.ts_test }}
-      ts_integration_new: ${{ steps.filter.outputs.ts_integration_new }}
+      ts_integration: ${{ steps.filter.outputs.ts_integration }}
       ts_component: ${{ steps.filter.outputs.ts_component }}
       knip: ${{ steps.filter.outputs.knip }}
       rust_static: ${{ steps.filter.outputs.rust_static }}
@@ -80,10 +80,10 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'turbo.json'
               - 'tsconfig.base.json'
-            ts_integration_new:
+            ts_integration:
               - '.envrc'
-              - 'apps/**/integration-new/**'
-              - 'apps/**/vitest.integration-new.config.ts'
+              - 'apps/**/integration/**'
+              - 'apps/**/vitest.integration.config.ts'
               - 'packages/test-harness/**'
               - 'scripts/test/**'
               - 'flake.nix'
@@ -642,13 +642,13 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-component-${{ github.sha }}
 
-  test-ts-integration-new:
-    name: TS Integration New
+  test-ts-integration:
+    name: TS Integration
     runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 60
     needs:
       - changes
-    if: needs.changes.outputs.ts_integration_new == 'true'
+    if: needs.changes.outputs.ts_integration == 'true'
     env:
       CI: true
       TURBO_TELEMETRY_DISABLED: "1"
@@ -681,7 +681,7 @@ jobs:
           install_options: --no-daemon
 
       - name: Restore pnpm store cache
-        id: test-ts-integration-new-pnpm-store-cache
+        id: test-ts-integration-pnpm-store-cache
         uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -690,13 +690,13 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Restore Turbo local cache
-        id: test-ts-integration-new-turbo-cache
+        id: test-ts-integration-turbo-cache
         uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-new-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-new-
+            ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-
             ${{ runner.os }}-turbo-
 
       - name: Materialize Nix shell
@@ -706,7 +706,7 @@ jobs:
         run: nix develop --command pnpm install --frozen-lockfile
 
       - name: Save pnpm store cache
-        if: steps.test-ts-integration-new-pnpm-store-cache.outputs.cache-hit != 'true'
+        if: steps.test-ts-integration-pnpm-store-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ~/.local/share/pnpm/store
@@ -716,14 +716,14 @@ jobs:
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
       - name: Run new TS integration tests in Nix shell
-        run: nix develop --command pnpm test:integration:new
+        run: nix develop --command pnpm test:integration
 
       - name: Save Turbo local cache
-        if: ${{ always() && !cancelled() && steps.test-ts-integration-new-turbo-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && !cancelled() && steps.test-ts-integration-turbo-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
           path: .turbo/cache
-          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-new-${{ github.sha }}
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-test-ts-integration-${{ github.sha }}
 
   test-commit-sign:
     name: Commit Sign Test
@@ -999,7 +999,7 @@ jobs:
       - static-ts
       - static-rust
       - test-ts
-      - test-ts-integration-new
+      - test-ts-integration
       - test-ts-component
       - test-commit-sign
       - test-sandboxd
@@ -1015,7 +1015,7 @@ jobs:
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
-      TS_INTEGRATION_NEW_RESULT: ${{ needs.test-ts-integration-new.result }}
+      TS_INTEGRATION_RESULT: ${{ needs.test-ts-integration.result }}
       TS_COMPONENT_TEST_RESULT: ${{ needs.test-ts-component.result }}
       COMMIT_SIGN_TEST_RESULT: ${{ needs.test-commit-sign.result }}
       SANDBOXD_TEST_RESULT: ${{ needs.test-sandboxd.result }}
@@ -1046,7 +1046,7 @@ jobs:
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
-              os.environ["TS_INTEGRATION_NEW_RESULT"],
+              os.environ["TS_INTEGRATION_RESULT"],
               os.environ["TS_COMPONENT_TEST_RESULT"],
               os.environ["COMMIT_SIGN_TEST_RESULT"],
               os.environ["SANDBOXD_TEST_RESULT"],

@@ -81,9 +81,7 @@ function writeSharedInfraTimingSummary(input: {
   const phases = [...input.timings.entries()]
     .map(([label, milliseconds]) => `${label}=${formatDuration(milliseconds)}`)
     .join(", ");
-  process.stderr.write(
-    `[integration-new] shared infra ${input.operation} ${input.key}: ${phases}.\n`,
-  );
+  process.stderr.write(`[integration] shared infra ${input.operation} ${input.key}: ${phases}.\n`);
 }
 
 export function createTestEnvironmentSharedInfraKey(

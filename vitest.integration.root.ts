@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import {
   defineConfig,
   defineProject,
@@ -12,13 +14,10 @@ import dataPlaneApiConfig from "./apps/data-plane-api/vitest.integration.config.
 import dataPlaneGatewayConfig from "./apps/data-plane-gateway/vitest.integration.config.ts";
 import dataPlaneWorkerConfig from "./apps/data-plane-worker/vitest.integration.config.ts";
 import tokenizerProxyConfig from "./apps/tokenizer-proxy/vitest.integration.config.ts";
-import configConfig from "./packages/config/vitest.integration.config.ts";
-import dbConfig from "./packages/db/vitest.integration.config.ts";
-import emailsConfig from "./packages/emails/vitest.integration.config.ts";
-import integrationsCoreConfig from "./packages/integrations-core/vitest.integration.config.ts";
-import objectStoreConfig from "./packages/object-store/vitest.integration.config.ts";
-import sandboxConfig from "./packages/sandbox/vitest.integration.config.ts";
-import testHarnessConfig from "./packages/test-harness/vitest.integration.config.ts";
+
+const TimingSetupFilePath = fileURLToPath(
+  new URL("./packages/test-harness/src/integration/vitest-timing-setup.ts", import.meta.url),
+);
 
 function createNamedProject(input: {
   name: string;
@@ -31,6 +30,7 @@ function createNamedProject(input: {
       root: input.root,
       test: {
         name: input.name,
+        setupFiles: [TimingSetupFilePath],
       },
     }),
   );
@@ -73,41 +73,6 @@ export default defineConfig({
         name: "@mistle/tokenizer-proxy",
         root: "./apps/tokenizer-proxy",
         config: tokenizerProxyConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/config",
-        root: "./packages/config",
-        config: configConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/db",
-        root: "./packages/db",
-        config: dbConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/emails",
-        root: "./packages/emails",
-        config: emailsConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/integrations-core",
-        root: "./packages/integrations-core",
-        config: integrationsCoreConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/object-store",
-        root: "./packages/object-store",
-        config: objectStoreConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/sandbox",
-        root: "./packages/sandbox",
-        config: sandboxConfig,
-      }),
-      createNamedProject({
-        name: "@mistle/test-harness",
-        root: "./packages/test-harness",
-        config: testHarnessConfig,
       }),
     ],
   },

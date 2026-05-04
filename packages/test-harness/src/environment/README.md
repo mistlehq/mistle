@@ -6,19 +6,19 @@ pooling, clients, logical isolation, and cleanup so application developers can
 write behavior-focused tests without juggling containers, ports, databases, or
 service lifecycle details.
 
-This document is the practical guide for writing tests in the temporary
-`integration-new/` lane. Harness implementation details are covered near the end
-for contributors who are adding service support.
+This document is the practical guide for writing harness-backed app integration
+tests. Harness implementation details are covered near the end for contributors
+who are adding service support.
 
 ## Mental Model
 
-An `integration-new` test has one primary subject: the app, service, worker, or
+An `integration` test has one primary subject: the app, service, worker, or
 production entrypoint whose behavior is being verified. The test may compose any
 other real Mistle services required to exercise that behavior.
 
 The harness layers are:
 
-1. The root runner (`pnpm test:integration:new`) creates one run session and
+1. The root runner (`pnpm test:integration`) creates one run session and
    prewarms shared physical infrastructure when possible.
 2. `createIntegrationTest(...)` declares the services and optional extra
    infrastructure needed by a test file.
@@ -131,7 +131,7 @@ expect(await handle.result({ timeoutMs: 15_000 })).toEqual({
 });
 ```
 
-`integration-new` is not limited to HTTP tests. It is the lane for
+`integration` is not limited to HTTP tests. It is the lane for
 dependency-bearing app/service behavior, whether the entrypoint is HTTP, a
 worker workflow, a production service/module function, or another real code
 path.
@@ -176,7 +176,7 @@ control-plane user and organization.
 
 ```ts
 const session = await env.auth.createSession({
-  email: "integration-new-example@example.com",
+  email: "integration-example@example.com",
   organizationName: "Integration Example",
 });
 
@@ -329,7 +329,7 @@ Good integration tests should read like behavior:
 ```ts
 it("deletes an uploaded organization logo and removes the stored object", async ({ env }) => {
   const session = await env.auth.createSession({
-    email: "integration-new-logo-delete@example.com",
+    email: "integration-logo-delete@example.com",
   });
   const objectKey = await seedOrganizationLogo({ env, organizationId: session.organizationId });
 
@@ -352,7 +352,7 @@ verified.
 
 ## Reviewability Checklist
 
-An `integration-new` test should make the behavior under review obvious without
+An `integration` test should make the behavior under review obvious without
 requiring the reviewer to mentally execute harness setup.
 
 Use this checklist when writing or reviewing a test:
@@ -394,7 +394,7 @@ const it = createIntegrationTest({
 describe.concurrent("sandbox profiles create integration", () => {
   it("creates a sandbox profile in the authenticated user's organization", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-profile-create@example.com",
+      email: "integration-profile-create@example.com",
       organizationName: "Profile Create Integration",
     });
 
@@ -458,17 +458,17 @@ state assertion.
 
 ## Files And Commands
 
-New and migrated integration tests live in `apps/*/integration-new/`.
+App integration tests live in `apps/*/integration/`.
 
-Each package with migrated tests should expose:
+Each app package with integration tests should expose:
 
-- `vitest.integration-new.config.ts`
-- `test:integration:new`
+- `vitest.integration.config.ts`
+- `test:integration`
 
-Run all currently migrated new-lane integration tests from the repo root:
+Run app and package integration tests from the repo root:
 
 ```bash
-pnpm test:integration:new
+pnpm test:integration
 ```
 
 The root command uses one integration runner session across all selected
@@ -477,42 +477,40 @@ projects, so pooled physical infrastructure and pooled services can be reused.
 Run one package through the same root runner:
 
 ```bash
-pnpm test:integration:new -- --project @mistle/data-plane-gateway
+pnpm test:integration -- --project @mistle/data-plane-gateway
 ```
 
 Run one file through the same root runner when pooling or timing behavior
 matters:
 
 ```bash
-pnpm test:integration:new -- --project @mistle/data-plane-gateway integration-new/gateway-restart.integration.test.ts
+pnpm test:integration -- --project @mistle/data-plane-gateway integration/gateway-restart.integration.test.ts
 ```
 
 Detailed setup timing is opt-in:
 
 ```bash
-MISTLE_TEST_TIMING=1 pnpm test:integration:new
+MISTLE_TEST_TIMING=1 pnpm test:integration
 ```
 
 For targeted single-file debugging, use direct package Vitest execution:
 
 ```bash
-pnpm --filter @mistle/data-plane-gateway exec vitest run -c vitest.integration-new.config.ts integration-new/gateway-restart.integration.test.ts
+pnpm --filter @mistle/data-plane-gateway exec vitest run -c vitest.integration.config.ts integration/gateway-restart.integration.test.ts
 ```
 
 Direct package Vitest execution is useful for tight local debugging, but it is
 not the canonical way to measure full-suite pooling or timing behavior.
 
-The old `apps/*/integration/` lane is legacy. Keep it working while migrating,
-but do not add new coverage there.
+## Migrating Legacy Patterns
 
-## Migrating Legacy Integration Tests
+Do not revive old per-file fixtures, bespoke Testcontainers setup, or direct
+in-process app runtimes. First identify the behavior being asserted, then choose
+the production entrypoint that best exercises that behavior.
 
-Do not blindly port legacy tests. First identify the behavior being asserted,
-then choose the production entrypoint that best exercises that behavior.
+When replacing old scaffolding:
 
-When migrating:
-
-- Preserve observable behavior, not old scaffolding.
+- Preserve observable behavior, not old setup mechanics.
 - Use `createIntegrationTest(...)`; do not copy legacy per-file containers,
   bespoke registries, or direct service bootstrapping.
 - Select only the services the scenario intentionally exercises.
@@ -627,7 +625,7 @@ service definition.
 
 ## What Not To Do
 
-- Do not add new tests to the legacy `integration/` lane.
+- Do not reintroduce legacy per-file fixtures or bespoke app launchers.
 - Do not make app developers define registries, provisioners, or service
   launchers in ordinary test files.
 - Do not expose many fixture fields when one `env` object is enough.

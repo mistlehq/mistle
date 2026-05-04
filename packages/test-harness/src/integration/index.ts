@@ -5,21 +5,17 @@
 
 import { it as base } from "vitest";
 
-import {
-  createServiceRegistry,
-  createTestExtraInfra,
-  createTestRegistry,
-  startTestEnvironment,
-} from "../environment/index.js";
+import { createServiceRegistry } from "../environment/registry.js";
+import type { DangerouslyIsolatedTestRegistry } from "../environment/registry.js";
+import { startTestEnvironment } from "../environment/runtime.js";
+import { TestEnvironmentIdHeader } from "../environment/test-isolation.js";
 import type {
-  DangerouslyIsolatedTestRegistry,
-  MistleTestExtraInfraId,
   TestInfraRequirement,
   TestServiceLaunchMode,
   TestServiceDefinition,
   TestServiceRegistry,
   TestServiceSelection,
-} from "../environment/index.js";
+} from "../environment/types.js";
 import type { IntegrationTestEnvironment } from "./environment.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import {
@@ -28,9 +24,11 @@ import {
   writeIntegrationTimingLine,
 } from "./timing.js";
 
-export { TestEnvironmentIdHeader } from "../environment/index.js";
+export { TestEnvironmentIdHeader };
 export type { IntegrationAuthenticatedSession, IntegrationAuth } from "./auth.js";
 export type { IntegrationTestEnvironment } from "./environment.js";
+
+type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
 type IntegrationServiceSelection =
   | ServiceId
@@ -95,21 +93,21 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
         const setupDurationMs = Date.now() - setupStartedAt;
 
         writeIntegrationTimingLine(
-          `[integration-new] env ${environment.id} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
+          `[integration] env ${environment.id} setup completed in ${formatIntegrationDuration(setupDurationMs)} for ${selectedServices}.`,
         );
 
         try {
           const testStartedAt = Date.now();
           await use(integrationEnvironment);
           writeIntegrationTimingLine(
-            `[integration-new] env ${environment.id} test body completed in ${formatIntegrationDuration(Date.now() - testStartedAt)}.`,
+            `[integration] env ${environment.id} test body completed in ${formatIntegrationDuration(Date.now() - testStartedAt)}.`,
           );
         } finally {
           const teardownStartedAt = Date.now();
           await integrationEnvironment.stop();
           await environment.stop();
           writeIntegrationTimingLine(
-            `[integration-new] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
+            `[integration] env ${environment.id} teardown completed in ${formatIntegrationDuration(Date.now() - teardownStartedAt)}.`,
           );
         }
       },
@@ -146,6 +144,8 @@ function readCallerFromStack(): string {
 
 async function registryFor(input: CreateIntegrationTestInput): Promise<TestServiceRegistry> {
   const serviceEntries = await loadSelectedServices(input.services);
+  const { createTestExtraInfra, createTestRegistry } =
+    await import("../environment/service-catalog.js");
   const serviceCatalog = createTestRegistry();
   const extraInfra =
     input.extraInfra === undefined
@@ -256,48 +256,71 @@ async function loadService(serviceId: ServiceId): Promise<IntegrationServiceEntr
   // service graphs before fixtures even start.
   switch (serviceId) {
     case ServiceIds.CONTROL_PLANE_API: {
-      const module = await import("./services/control-plane-api.js");
+      const module = await loadServiceModule("./services/control-plane-api.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
     case ServiceIds.CONTROL_PLANE_WORKER: {
-      const module = await import("./services/control-plane-worker.js");
+      const module = await loadServiceModule("./services/control-plane-worker.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
     case ServiceIds.DATA_PLANE_API: {
-      const module = await import("./services/data-plane-api.js");
+      const module = await loadServiceModule("./services/data-plane-api.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
     case ServiceIds.DATA_PLANE_GATEWAY: {
-      const module = await import("./services/data-plane-gateway.js");
+      const module = await loadServiceModule("./services/data-plane-gateway.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
     case ServiceIds.DATA_PLANE_WORKER: {
-      const module = await import("./services/data-plane-worker.js");
+      const module = await loadServiceModule("./services/data-plane-worker.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
     case ServiceIds.TOKENIZER_PROXY: {
-      const module = await import("./services/tokenizer-proxy.js");
+      const module = await loadServiceModule("./services/tokenizer-proxy.ts");
       return {
         serviceId,
         service: module.service,
       };
     }
   }
+}
+
+async function loadServiceModule(
+  modulePath: string,
+): Promise<{ service: IntegrationServiceEntry["service"] }> {
+  const moduleUrl = new URL(modulePath, import.meta.url).href;
+  const module: unknown = await import(/* @vite-ignore */ moduleUrl);
+  if (!isIntegrationServiceModule(module)) {
+    throw new Error(`Expected integration service module '${modulePath}' to export service().`);
+  }
+
+  return module;
+}
+
+function isIntegrationServiceModule(
+  value: unknown,
+): value is { service: IntegrationServiceEntry["service"] } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "service" in value &&
+    typeof value.service === "function"
+  );
 }
 
 function selections(input: {

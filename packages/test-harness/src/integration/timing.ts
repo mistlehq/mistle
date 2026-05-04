@@ -29,7 +29,7 @@ export function writeIntegrationTimingEvent(event: string, details: string): voi
   }
 
   writeIntegrationTimingLine(
-    `[integration-new] ${formatTimingOffset()} pid=${String(process.pid)} ${formatWorkerLabel()} ${event}: ${details}.`,
+    `[integration] ${formatTimingOffset()} pid=${String(process.pid)} ${formatWorkerLabel()} ${event}: ${details}.`,
   );
 }
 

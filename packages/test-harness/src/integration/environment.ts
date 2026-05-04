@@ -25,11 +25,11 @@ import { OpenWorkflow } from "openworkflow";
 import { BackendPostgres } from "openworkflow/postgres";
 import { Pool, type PoolConfig } from "pg";
 
-import type { TestEnvironment, TestServiceHandle } from "../environment/index.js";
 import {
   createControlPlaneWorkflowNamespaceId,
   createDataPlaneWorkflowNamespaceId,
 } from "../environment/test-isolation.js";
+import type { TestEnvironment, TestServiceHandle } from "../environment/types.js";
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
 import { readOtlpTestCollector, type OtlpTestCollector } from "../services/otlp-test-collector.js";
 import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";

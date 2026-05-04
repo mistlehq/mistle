@@ -180,7 +180,7 @@ function writeProvisionerTimingSummary(input: {
   );
 
   writeTimingLine(
-    `[integration-new] env ${input.environmentId} ${input.provisioner} phases: ${parts.join(", ")}.`,
+    `[integration] env ${input.environmentId} ${input.provisioner} phases: ${parts.join(", ")}.`,
   );
 }
 
