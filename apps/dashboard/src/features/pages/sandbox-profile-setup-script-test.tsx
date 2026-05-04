@@ -1,8 +1,9 @@
 import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-client";
-import { Button, InlineCode, Label, Notice, Switch } from "@mistle/ui";
+import { Button, ButtonGroup, InlineCode, Label, Notice, Switch } from "@mistle/ui";
 import {
   CheckCircleIcon,
   PlayIcon,
+  SidebarSimpleIcon,
   SpinnerGapIcon,
   WarningCircleIcon,
   XIcon,
@@ -38,6 +39,12 @@ type SetupScriptTestViewProps = {
   ptyLifecycleState?: SandboxPtyState;
   status: SetupScriptTestStatus;
   statusMessage?: string | null;
+  writeWithAgent?: {
+    disabled: boolean;
+    isStarting: boolean;
+    onClick: () => void;
+    title: string;
+  };
 };
 
 type SetupScriptTestRunnerProps = {
@@ -261,21 +268,42 @@ export function SandboxProfileSetupScriptTestButton(
           Fail on first command error
         </Label>
       </div>
-      <Button
-        disabled={isButtonDisabled}
-        onClick={input.onRun}
-        size="sm"
-        title={resolveSetupScriptTestButtonTitle({
-          disabled: input.disabled === true,
-          isDraft: input.isDraft,
-          status: input.status,
-        })}
-        type="button"
-        variant="outline"
-      >
-        {resolveSetupScriptTestButtonIcon(input.status)}
-        {resolveSetupScriptTestButtonLabel(input.status)}
-      </Button>
+      <ButtonGroup>
+        <Button
+          disabled={isButtonDisabled}
+          onClick={input.onRun}
+          size="sm"
+          title={resolveSetupScriptTestButtonTitle({
+            disabled: input.disabled === true,
+            isDraft: input.isDraft,
+            status: input.status,
+          })}
+          type="button"
+          variant="outline"
+        >
+          {resolveSetupScriptTestButtonIcon(input.status)}
+          {resolveSetupScriptTestButtonLabel(input.status)}
+        </Button>
+        {input.writeWithAgent === undefined ? null : (
+          <Button
+            disabled={input.writeWithAgent.disabled}
+            onClick={input.writeWithAgent.onClick}
+            size="sm"
+            title={input.writeWithAgent.title}
+            type="button"
+            variant="outline"
+          >
+            {input.writeWithAgent.isStarting ? (
+              "Starting agent..."
+            ) : (
+              <>
+                <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
+                Write with agent
+              </>
+            )}
+          </Button>
+        )}
+      </ButtonGroup>
     </div>
   );
 }

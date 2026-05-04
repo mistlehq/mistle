@@ -317,6 +317,12 @@ export const startSandboxProfileSetupScriptTestRunBodySchema = z
   })
   .strict();
 
+export const startSandboxProfileSetupAssistantBodySchema = z
+  .object({
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
 export const sandboxProfileDeletionAcceptedResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -333,6 +339,9 @@ export const startSandboxProfileInstanceResponseSchema = z
   .strict();
 
 export const startSandboxProfileSetupScriptTestRunResponseSchema =
+  startSandboxProfileInstanceResponseSchema;
+
+export const startSandboxProfileSetupAssistantResponseSchema =
   startSandboxProfileInstanceResponseSchema;
 
 export const listSandboxProfilesQuerySchema = createKeysetPaginationQuerySchema({

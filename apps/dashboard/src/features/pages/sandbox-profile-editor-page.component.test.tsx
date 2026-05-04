@@ -1579,12 +1579,16 @@ describe("SandboxProfileEditorPage", () => {
     const testButton = screen.getByRole("button", {
       name: "Test",
     });
+    const writeWithAgentButton = screen.getByRole("button", {
+      name: "Write with agent",
+    });
     const failOnFirstErrorSwitch = screen.getByRole("switch", {
       name: "Fail on first command error",
     });
 
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
+    expect(writeWithAgentButton.hasAttribute("disabled")).toBe(false);
     expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(failOnFirstErrorSwitch);
@@ -1601,8 +1605,12 @@ describe("SandboxProfileEditorPage", () => {
     const emptyDraftTestButton = screen.getByRole("button", {
       name: "Test",
     });
+    const emptyDraftWriteButton = screen.getByRole("button", {
+      name: "Write with agent",
+    });
     expect(emptyDraftTestButton.hasAttribute("disabled")).toBe(true);
     expect(emptyDraftTestButton.getAttribute("title")).toBe("Add a setup script before testing.");
+    expect(emptyDraftWriteButton.hasAttribute("disabled")).toBe(false);
 
     cleanup();
 
@@ -1615,10 +1623,14 @@ describe("SandboxProfileEditorPage", () => {
     const publishedTestButton = screen.getByRole("button", {
       name: "Test",
     });
+    const publishedWriteButton = screen.getByRole("button", {
+      name: "Write with agent",
+    });
     expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
     expect(publishedTestButton.getAttribute("title")).toBe(
       "Setup script testing is only available while editing a draft.",
     );
+    expect(publishedWriteButton.hasAttribute("disabled")).toBe(true);
   });
 
   it("renders published profiles as read-only", () => {

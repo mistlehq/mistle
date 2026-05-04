@@ -81,5 +81,7 @@ export type SandboxProfileVersionSetupScript =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileSetupScriptTestRun =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/test-runs"]["post"]["responses"][201]["content"]["application/json"];
+export type SandboxProfileSetupAssistant =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant"]["post"]["responses"][201]["content"]["application/json"];
 export type SandboxProfileVersionAutomationConfig =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"];

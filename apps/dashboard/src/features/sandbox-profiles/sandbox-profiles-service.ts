@@ -18,6 +18,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProfileSetupAssistant,
   SandboxProfileSetupScriptTestRun,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
@@ -445,6 +446,8 @@ const SandboxProfileSetupScriptTestRunResponseSchema = z
     sandboxInstanceId: z.string().min(1),
   })
   .strict();
+
+const SandboxProfileSetupAssistantResponseSchema = SandboxProfileSetupScriptTestRunResponseSchema;
 
 export async function listSandboxProfileVersions(input: {
   profileId: string;
@@ -994,6 +997,49 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
         operation: "startSandboxProfileSetupScriptTestRun",
         error,
         fallbackMessage: "Could not start setup script test run.",
+      }),
+    );
+  }
+}
+
+export async function startSandboxProfileSetupAssistant(input: {
+  profileId: string;
+  version: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileSetupAssistant> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startSandboxProfileSetupAssistant",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/setup-script/assistant`,
+      body: {
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not start setup assistant.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileSetupAssistantResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "startSandboxProfileSetupAssistant",
+        status: 500,
+        body: responseBody,
+        message: "Setup assistant response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "startSandboxProfileSetupAssistant",
+        error,
+        fallbackMessage: "Could not start setup assistant.",
       }),
     );
   }

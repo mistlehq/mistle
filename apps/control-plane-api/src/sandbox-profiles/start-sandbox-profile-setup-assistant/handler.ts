@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { startProfileSetupScriptTestRun } from "../services/start-profile-setup-script-test-run.js";
+import { startProfileSetupCheckSandbox } from "../services/start-profile-setup-check-sandbox.js";
 import { route } from "./route.js";
 
 const routeHandler = async (
@@ -17,7 +17,7 @@ const routeHandler = async (
   const { profileId, version } = ctx.req.valid("param");
   const body = ctx.req.valid("json");
 
-  const startedSandboxInstance = await startProfileSetupScriptTestRun(
+  const startedSandboxInstance = await startProfileSetupCheckSandbox(
     {
       db,
       integrationsConfig,
