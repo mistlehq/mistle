@@ -42,11 +42,7 @@
         "groups": [
           {
             "group": "Quickstart",
-            "pages": ["guides/self-hosted-local-compose-quickstart"]
-          },
-          {
-            "group": "Configuration Reference",
-            "pages": ["guides/self-hosted-configuration"]
+            "pages": ["guides/self-hosted-docker-compose-quickstart"]
           },
           {
             "group": "Integrations",
@@ -55,6 +51,10 @@
               "guides/self-hosted-integration-targets",
               "guides/self-hosted-webhook-callbacks"
             ]
+          },
+          {
+            "group": "Configuration Reference",
+            "pages": ["guides/self-hosted-configuration"]
           }
         ]
       }

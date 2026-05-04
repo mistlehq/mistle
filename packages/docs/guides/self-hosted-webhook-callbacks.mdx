@@ -37,4 +37,4 @@ Provider-specific setup details still belong in each connection guide. This page
 
 When you test a self-hosted setup locally, provider callback and webhook delivery still require a public URL that can reach your control plane.
 
-In this repository's local compose workflow, `./up.sh` starts a Cloudflare quick tunnel when needed. Use that printed public control-plane URL when configuring provider apps and webhook registrations.
+In this repository's Docker Compose workflow, `./up.sh` starts a Cloudflare quick tunnel when needed. Use that printed public control-plane URL when configuring provider apps and webhook registrations.

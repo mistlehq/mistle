@@ -25,7 +25,7 @@ const WaitTimeoutMs = 3 * 60_000;
 const PollIntervalMs = 1_000;
 const OpenAiTargetKey = "openai-default";
 const OpenAiConnectionMethodId = "api-key";
-const OpenAiApiKey = "sk-local-compose-smoke-test";
+const OpenAiApiKey = "sk-docker-compose-smoke-test";
 
 type SmokeTestOptions = {
   envFilePath: string;
@@ -473,8 +473,8 @@ async function createOrganization(cookie: string): Promise<string> {
       origin: AuthOrigin,
     },
     body: JSON.stringify({
-      name: "Local Compose Smoke Test Organization",
-      slug: `local-compose-${randomUUID()}`,
+      name: "Docker Compose Smoke Test Organization",
+      slug: `docker-compose-${randomUUID()}`,
     }),
   });
 
@@ -490,7 +490,7 @@ async function createOrganization(cookie: string): Promise<string> {
 }
 
 async function authenticateThroughMailpit(): Promise<AuthSession> {
-  const email = `local-compose-smoke-${randomUUID()}@example.com`;
+  const email = `docker-compose-smoke-${randomUUID()}@example.com`;
   const sendOtpResponse = await requestApi("/v1/auth/email-otp/send-verification-otp", {
     method: "POST",
     headers: {
@@ -580,13 +580,13 @@ async function assertSmokeTestIntegrationTargetAvailable(cookie: string): Promis
   const openAiTarget = targets.find((target) => target.targetKey === OpenAiTargetKey);
   if (openAiTarget === undefined) {
     throw new Error(
-      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be present in integration-targets.json or adjust the smoke test prerequisites.`,
+      `Docker Compose smoke test requires integration target '${OpenAiTargetKey}' to be present in integration-targets.json or adjust the smoke test prerequisites.`,
     );
   }
 
   if (!openAiTarget.enabled) {
     throw new Error(
-      `Local compose smoke test requires integration target '${OpenAiTargetKey}' to be enabled.`,
+      `Docker Compose smoke test requires integration target '${OpenAiTargetKey}' to be enabled.`,
     );
   }
 
@@ -595,7 +595,7 @@ async function assertSmokeTestIntegrationTargetAvailable(cookie: string): Promis
   );
   if (!supportsExpectedMethod) {
     throw new Error(
-      `Local compose smoke test requires '${OpenAiTargetKey}' to expose form connection method '${OpenAiConnectionMethodId}'.`,
+      `Docker Compose smoke test requires '${OpenAiTargetKey}' to expose form connection method '${OpenAiConnectionMethodId}'.`,
     );
   }
 }
@@ -615,7 +615,7 @@ async function configureBaselineIntegrationAndProfile(cookie: string): Promise<s
         cookie,
       },
       body: JSON.stringify({
-        displayName: `Local Compose Smoke OpenAI ${randomUUID()}`,
+        displayName: `Docker Compose Smoke OpenAI ${randomUUID()}`,
         methodId: OpenAiConnectionMethodId,
         config: {
           connection_method: OpenAiConnectionMethodId,
@@ -639,7 +639,7 @@ async function configureBaselineIntegrationAndProfile(cookie: string): Promise<s
         cookie,
       },
       body: JSON.stringify({
-        displayName: `Local Compose Smoke Sandbox ${randomUUID()}`,
+        displayName: `Docker Compose Smoke Sandbox ${randomUUID()}`,
       }),
     },
   });
@@ -778,7 +778,7 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
 
     await ptyClient.connect();
 
-    const marker = `mistle-local-compose-${randomUUID()}`;
+    const marker = `mistle-docker-compose-${randomUUID()}`;
     let cleanupPtyListeners = (): void => {};
     const waitForPtyExit = new Promise<void>((resolvePromise, rejectPromise) => {
       const timeoutSignal = AbortSignal.timeout(30_000);
@@ -854,7 +854,7 @@ async function assertPtyRoundTrip(cookie: string, sandboxInstanceId: string): Pr
       throw error;
     }
   } finally {
-    transport.disconnect(1000, "local compose smoke test cleanup");
+    transport.disconnect(1000, "docker compose smoke test cleanup");
   }
 }
 
@@ -943,7 +943,7 @@ async function run(): Promise<void> {
   await assertPtyRoundTrip(session.cookie, sandboxInstanceId);
 
   if (options.restartCheck) {
-    console.log("Restarting local compose stack to verify persisted state...");
+    console.log("Restarting Docker Compose stack to verify persisted state...");
     await restartLocalComposeStack(config.envFilePath);
     await waitForCoreServicesAfterRestart(config.envFilePath);
     await assertAuthenticatedHome(session.cookie);
@@ -953,7 +953,7 @@ async function run(): Promise<void> {
     await waitForSandboxRunningAndConnectable(session.cookie, restartedSandboxInstanceId);
   }
 
-  console.log("Local compose smoke test passed.");
+  console.log("Docker Compose smoke test passed.");
 }
 
 await run();

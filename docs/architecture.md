@@ -59,4 +59,4 @@ Instead, HTTP requests are routed through the Tokenizer Proxy that lives outside
                                                            +---------------------------+
 ```
 
-NOTE: this doesn't prevent you from actually putting secrets directly into the sandbox environment. You are free to do so based on your security posture.
+NOTE: The caveat is that this doesn't prevent you from actually putting secrets directly into the sandbox environment. You are free to do so based on your security posture.

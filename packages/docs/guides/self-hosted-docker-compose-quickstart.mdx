@@ -1,12 +1,11 @@
 ---
-title: Local Compose Quickstart
-description: Run a local Mistle stack with the repository's single-node compose workflow
+title: Docker Compose Quickstart
+description: Run Mistle locally using Docker Compose
 ---
 
 ## Overview
 
-For local self-hosted setups, use the single-node compose workflow in `deploy/compose/local`.
-It starts the required infrastructure services and one Mistle container for local development and verification.
+The easiest way to get Mistle up and running is to use [Docker Compose](https://docs.docker.com/compose/).
 
 ## Prerequisites
 
@@ -22,14 +21,13 @@ Choose one of these two entry points:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/deploy/compose/local/install.sh | sh
-cd ~/.mistle/local
-./up.sh
 ```
 
 2. **Alternative: from a source checkout (recommended for contributors/workflow customization):**
 
 ```bash
-cd deploy/compose/local
+git clone git@github.com:mistlehq/mistle.git
+cd ./mistle/deploy/compose/local
 ./up.sh
 ```
 
@@ -104,5 +102,6 @@ Use [Webhook and Callback URLs](/guides/self-hosted-webhook-callbacks) when conf
 
 ## Next steps
 
+- Read [Integrations Overview](/guides/self-hosted-integrations-overview)
 - Confirm deployment settings in [Configuration Reference](/guides/self-hosted-configuration)
 - Enable provider targets in [Provision Integration Targets](/guides/self-hosted-integration-targets)

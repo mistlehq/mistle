@@ -1,15 +1,14 @@
 ---
-title: Self-Hosted Integrations Overview
-description: Operator guide to enabling integration targets in a self-hosted Mistle deployment
+title: Integrations Overview
+description: Operator guide to managing integrations in Mistle
 ---
 
 ## Overview
 
-Self-hosted integration setup has two separate concerns:
+There are two main roles when it comes to running Mistle:
 
-1. Operators run the local compose quickstart, then configure the deployment and public control-plane URL.
-2. Operators enable Mistle integration targets in the deployment.
-3. Users or workspace admins create provider-specific connections in the dashboard.
+- Operator: the person deploying / running Mistle
+- User / Workspace admins: the people who use the deployed Mistle instance
 
 This section is for the operator-owned integration setup after the deployment
 configuration exists.
@@ -20,14 +19,12 @@ Use the connection guides when you need provider-specific setup such as GitHub A
 
 Operators are responsible for:
 
-- choosing which built-in targets are enabled
-- maintaining `integration-targets.json`
-- running `integration-targets:sync`
-- making sure the control-plane base URL is publicly reachable when integrations need callbacks or webhooks
+- choosing which integration targets are enabled
+- making sure the control-plane base URL is publicly reachable when integrations need callbacks or webhooks (if you're using the Docker Compose stack, this is done via Cloudflare Tunnel).
 
-## Built-In Targets
+## Supported Integrations
 
-Mistle currently ships these built-in targets:
+Mistle currently ships these integrations:
 
 | Integration | Target key(s)                              |
 | ----------- | ------------------------------------------ |
@@ -41,10 +38,13 @@ Mistle currently ships these built-in targets:
 | SigNoz      | `signoz-mcp`                               |
 | Slack       | `slack-default`                            |
 
+`github-enterprise-server` ships disabled by default. Enable it only when your
+deployment should connect to a GitHub Enterprise Server instance.
+
 ## Next Steps
 
-- Read [Local Compose Quickstart](/guides/self-hosted-local-compose-quickstart) if you have not started a stack yet.
-- Read [Configuration Reference](/guides/self-hosted-configuration)
+- Read [Docker Compose Quickstart](/guides/self-hosted-docker-compose-quickstart) if you have not started a stack yet.
 - Read [Provision Integration Targets](/guides/self-hosted-integration-targets)
 - Read [Webhook And Callback URLs](/guides/self-hosted-webhook-callbacks)
+- Read [Configuration Reference](/guides/self-hosted-configuration)
 - Then use the provider-specific connection guides in the `Connect Integrations` section
