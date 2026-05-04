@@ -189,38 +189,50 @@ describe.concurrent("integration webhooks ingest integration", () => {
     env,
   }) => {
     await seedSlackTarget(env);
+    const challenge = "challenge-value";
     const { endpointKey } = await createSlackWebhookConnection({
       env,
       email: "integration-new-webhooks-ingest-slack-url-verification@example.com",
       signingSecret: "slack-signing-secret",
     });
 
-    const timestamp = Math.floor(Date.now() / 1000).toString();
-    const payload = JSON.stringify({
-      token: "verification-token",
-      challenge: "challenge-value",
-      type: "url_verification",
+    const response = await postSlackUrlVerification({
+      env,
+      endpointKey,
+      signingSecret: "slack-signing-secret",
+      challenge,
     });
-    const response = await env.controlPlaneApi.http.fetch(
-      `/p/integration/webhooks/slack-default/${endpointKey}`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-slack-request-timestamp": timestamp,
-          "x-slack-signature": signSlackWebhookPayload({
-            secret: "slack-signing-secret",
-            payload,
-            timestamp,
-          }),
-        },
-        body: payload,
-      },
-    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("text/plain");
-    await expect(response.text()).resolves.toBe("challenge-value");
+    await expect(response.text()).resolves.toBe(challenge);
+    await expect(
+      env.controlPlaneDb.query.integrationWebhookEvents.findMany({
+        where: (table, { eq }) => eq(table.targetKey, "slack-default"),
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("rejects Slack URL verification challenges when signature verification fails", async ({
+    env,
+  }) => {
+    await seedSlackTarget(env);
+    const { endpointKey } = await createSlackWebhookConnection({
+      env,
+      email: "integration-new-webhooks-ingest-slack-url-verification-invalid@example.com",
+      signingSecret: "slack-signing-secret",
+    });
+
+    const response = await postSlackUrlVerification({
+      env,
+      endpointKey,
+      signingSecret: "wrong-slack-signing-secret",
+      challenge: "challenge-value",
+    });
+
+    expect(response.status).toBe(400);
+    const body = IntegrationWebhooksBadRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("INVALID_WEBHOOK_REQUEST");
     await expect(
       env.controlPlaneDb.query.integrationWebhookEvents.findMany({
         where: (table, { eq }) => eq(table.targetKey, "slack-default"),
@@ -228,6 +240,41 @@ describe.concurrent("integration webhooks ingest integration", () => {
     ).resolves.toEqual([]);
   });
 });
+
+function createSlackUrlVerificationPayload(input: { challenge: string }): string {
+  return JSON.stringify({
+    token: "verification-token",
+    challenge: input.challenge,
+    type: "url_verification",
+  });
+}
+
+async function postSlackUrlVerification(input: {
+  env: IntegrationTestEnvironment;
+  endpointKey: string;
+  signingSecret: string;
+  challenge: string;
+}): Promise<Response> {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const payload = createSlackUrlVerificationPayload({ challenge: input.challenge });
+
+  return input.env.controlPlaneApi.http.fetch(
+    `/p/integration/webhooks/slack-default/${input.endpointKey}`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-slack-request-timestamp": timestamp,
+        "x-slack-signature": signSlackWebhookPayload({
+          secret: input.signingSecret,
+          payload,
+          timestamp,
+        }),
+      },
+      body: payload,
+    },
+  );
+}
 
 function createGitHubWebhookPayload(): Record<string, unknown> {
   return {
