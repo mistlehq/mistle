@@ -9,6 +9,16 @@ describe("Signoz target schemas", () => {
     expect(SignozTargetSecretSchema.parse({})).toEqual({});
   });
 
+  it("accepts an explicit issuer base URL", () => {
+    expect(
+      SignozTargetConfigSchema.parse({
+        issuer_base_url: "https://mcp.us.signoz.cloud",
+      }),
+    ).toEqual({
+      issuer_base_url: "https://mcp.us.signoz.cloud",
+    });
+  });
+
   it("rejects unexpected target config fields", () => {
     expect(() => SignozTargetConfigSchema.parse({ unexpected: true })).toThrow(/Unrecognized key/u);
     expect(() => SignozTargetSecretSchema.parse({ unexpected: "value" })).toThrow(

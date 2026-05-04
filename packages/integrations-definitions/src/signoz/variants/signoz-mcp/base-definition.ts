@@ -77,9 +77,10 @@ export const SignozMcpBaseDefinition: SignozMcpBaseIntegrationDefinition = {
             serverId: SignozToolIds.SIGNOZ_MCP,
             serverName: "signoz",
             transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-            url: resolveSignozMcpUrl(
-              SignozConnectionConfigSchema.parse(input.connection.config).region,
-            ),
+            url: resolveSignozMcpUrl({
+              region: SignozConnectionConfigSchema.parse(input.connection.config).region,
+              issuerBaseUrl: SignozTargetConfigSchema.parse(input.target.config).issuer_base_url,
+            }),
             description: "SigNoz MCP",
           },
         ]
