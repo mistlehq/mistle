@@ -116,17 +116,18 @@ function formatScheduleTimezone(timezone: string): string {
 function ScheduleSummaryCell(input: {
   item: Extract<AutomationListItemViewModel["source"], { kind: "schedule" }>;
 }): React.JSX.Element {
+  const timezoneOffset = formatScheduleTimezone(input.item.timezone);
+  const scheduleTiming =
+    input.item.nextScheduledAtLabel === null
+      ? `Not scheduled · ${timezoneOffset}`
+      : `Next ${input.item.nextScheduledAtLabel} ${timezoneOffset}`;
+
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="truncate font-mono text-xs text-foreground">
         {input.item.cronExpression}
       </span>
-      <span className="truncate text-xs">
-        {formatScheduleTimezone(input.item.timezone)}
-        {input.item.nextScheduledAtLabel === null
-          ? " · Not scheduled"
-          : ` · Next ${input.item.nextScheduledAtLabel}`}
-      </span>
+      <span className="truncate text-xs">{scheduleTiming}</span>
     </div>
   );
 }
