@@ -1,52 +1,30 @@
-import {
-  automationRuns,
-  automations,
-  sandboxProfiles,
-  SandboxProfileStatuses,
-} from "@mistle/db/control-plane";
-import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import { afterEach, describe, expect } from "vitest";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { SandboxProfileStatuses } from "@mistle/db/control-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { describe, expect } from "vitest";
 
 import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
-import {
-  createDisposableDataPlaneRuntime,
-  type DisposableDataPlaneRuntime,
-} from "./helpers/disposable-data-plane-runtime.js";
-import { it } from "./test-context.js";
 
-const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
-
-afterEach(async () => {
-  while (startedDataPlaneFixtures.length > 0) {
-    const fixture = startedDataPlaneFixtures.pop();
-    if (fixture !== undefined) {
-      await fixture.stop();
-    }
-  }
+const it = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-api"],
 });
 
-describe("sandbox instances list integration", () => {
-  it("returns the authenticated organization's sandbox instances through control plane", async ({
-    fixture,
+describe.concurrent("sandbox instances list integration", () => {
+  it("returns the authenticated organization's sandbox instances through the data plane", async ({
+    env,
   }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_sandbox_instances",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-list-org-a@example.com",
     });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const firstOrgSession = await fixture.authSession({
-      email: "integration-sandbox-instances-list-org-a@example.com",
-    });
-    const secondOrgSession = await fixture.authSession({
-      email: "integration-sandbox-instances-list-org-b@example.com",
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-list-org-b@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values([
       {
         id: "sbp_cp_list",
         organizationId: firstOrgSession.organizationId,
@@ -65,7 +43,7 @@ describe("sandbox instances list integration", () => {
       },
     ]);
 
-    await fixture.db.insert(automations).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
       id: "atm_cp_list",
       organizationId: firstOrgSession.organizationId,
       kind: "webhook",
@@ -74,8 +52,7 @@ describe("sandbox instances list integration", () => {
       createdAt: "2026-03-02T00:00:00.000Z",
       updatedAt: "2026-03-02T00:00:00.000Z",
     });
-
-    await fixture.db.insert(automationRuns).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.automationRuns).values({
       id: "aru_cp_list",
       automationId: "atm_cp_list",
       status: "running",
@@ -84,7 +61,7 @@ describe("sandbox instances list integration", () => {
       updatedAt: "2026-03-11T00:00:00.000Z",
     });
 
-    await dataPlaneFixture.db.insert(sandboxInstances).values([
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
       {
         id: "sbi_cp_list_a_001",
         organizationId: firstOrgSession.organizationId,
@@ -149,11 +126,14 @@ describe("sandbox instances list integration", () => {
       },
     ]);
 
-    const firstPageResponse = await fixture.request("/v1/sandbox/instances?limit=2", {
-      headers: {
-        cookie: firstOrgSession.cookie,
+    const firstPageResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/instances?limit=2",
+      {
+        headers: {
+          cookie: firstOrgSession.cookie,
+        },
       },
-    });
+    );
     expect(firstPageResponse.status).toBe(200);
     const firstPage = ListSandboxInstancesResponseSchema.parse(await firstPageResponse.json());
 
@@ -188,7 +168,7 @@ describe("sandbox instances list integration", () => {
       throw new Error("Expected next page cursor.");
     }
 
-    const secondPageResponse = await fixture.request(
+    const secondPageResponse = await env.controlPlaneApi.http.fetch(
       `/v1/sandbox/instances?limit=2&after=${encodeURIComponent(firstPage.nextPage.after)}`,
       {
         headers: {
@@ -210,7 +190,7 @@ describe("sandbox instances list integration", () => {
     expect(secondPage.previousPage).not.toBeNull();
     expect(secondPage.nextPage).toBeNull();
 
-    const secondOrgResponse = await fixture.request("/v1/sandbox/instances", {
+    const secondOrgResponse = await env.controlPlaneApi.http.fetch("/v1/sandbox/instances", {
       headers: {
         cookie: secondOrgSession.cookie,
       },
@@ -222,22 +202,12 @@ describe("sandbox instances list integration", () => {
     expect(secondOrgList.items[0]?.sandboxProfileDisplayName).toBe("Other Org Profile");
   });
 
-  it("returns 400 when the list cursor is invalid", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_sandbox_instances",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const session = await fixture.authSession({
-      email: "integration-sandbox-instances-list-invalid-cursor@example.com",
+  it("returns 400 when the list cursor is invalid", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-instances-list-invalid-cursor@example.com",
     });
 
-    const response = await fixture.request("/v1/sandbox/instances?after=invalid!", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/instances?after=invalid!", {
       headers: {
         cookie: session.cookie,
       },

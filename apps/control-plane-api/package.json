@@ -33,7 +33,6 @@
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "test:integration:new": "vitest run -c vitest.integration-new.config.ts",
     "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
     "openapi:generate": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/generate-spec.ts",
     "openapi:check": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/check-spec-drift.ts",

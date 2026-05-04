@@ -1,68 +1,39 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  automations,
-  integrationConnections,
+  AutomationKinds,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  integrationTargets,
-  members,
-  SandboxProfileVersionStates,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-  sandboxProfiles,
   SandboxProfileStatuses,
+  SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import {
-  sandboxInstances,
   SandboxInstanceSources,
   SandboxInstanceStatuses,
+  type SandboxInstanceSource,
 } from "@mistle/db/data-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
-import { afterEach, describe, expect } from "vitest";
+import { describe, expect } from "vitest";
 
 import { homeSummaryResponseSchema } from "../src/home/schema.js";
-import {
-  createDisposableDataPlaneRuntime,
-  type DisposableDataPlaneRuntime,
-} from "./helpers/disposable-data-plane-runtime.js";
-import { it } from "./test-context.js";
 
-const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
-
-afterEach(async () => {
-  while (startedDataPlaneFixtures.length > 0) {
-    const fixture = startedDataPlaneFixtures.pop();
-    if (fixture !== undefined) {
-      await fixture.stop();
-    }
-  }
+const it = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-api"],
 });
 
-describe("home summary integration", () => {
+describe.concurrent("home summary integration", () => {
   it("returns onboarding readiness booleans for the authenticated organization", async ({
-    fixture,
+    env,
   }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary@example.com",
     });
 
-    const baselineResponse = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(baselineResponse.status).toBe(200);
-    const baselineBody = homeSummaryResponseSchema.parse(await baselineResponse.json());
-    expect(baselineBody).toStrictEqual({
+    await expectHomeSummary(env, session.cookie, {
       onboarding: {
         hasIntegrations: false,
         hasProfiles: false,
@@ -73,78 +44,14 @@ describe("home summary integration", () => {
       },
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-home-summary",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {},
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_home_summary",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "openai-home-summary",
-      displayName: "OpenAI",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_home_summary",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Default Profile",
-      activeVersion: 1,
-      status: SandboxProfileStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_home_summary",
-      version: 1,
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_home_summary",
-      sandboxProfileId: "sbp_home_summary",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_home_summary",
-      kind: "agent",
-      config: {},
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await fixture.db.insert(automations).values({
-      id: "atm_home_summary",
-      organizationId: authenticatedSession.organizationId,
-      kind: "webhook",
-      name: "Home Summary Automation",
-      enabled: true,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await dataPlaneFixture.db.insert(sandboxInstances).values({
-      id: "sbi_home_summary",
-      organizationId: authenticatedSession.organizationId,
-      sandboxProfileId: "sbp_home_summary",
-      title: "Investigate issue",
-      sandboxProfileVersion: 1,
-      runtimeProvider: "docker",
-      providerSandboxId: "provider-home-summary",
-      status: SandboxInstanceStatuses.RUNNING,
-      startedByKind: "user",
-      startedById: authenticatedSession.userId,
-      source: "dashboard",
-      createdAt: "2026-03-02T00:00:00.000Z",
-      updatedAt: "2026-03-02T00:00:00.000Z",
+    await seedAgentReadyHomeState({
+      env,
+      idPrefix: "ready",
+      organizationId: session.organizationId,
+      userId: session.userId,
     });
 
-    const seededResponse = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(seededResponse.status).toBe(200);
-    const seededBody = homeSummaryResponseSchema.parse(await seededResponse.json());
-    expect(seededBody).toStrictEqual({
+    await expectHomeSummary(env, session.cookie, {
       onboarding: {
         hasIntegrations: true,
         hasProfiles: true,
@@ -156,77 +63,47 @@ describe("home summary integration", () => {
     });
   });
 
-  it("does not count inactive connections as completed integrations", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary_inactive_connection",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-inactive-connection@example.com",
+  it("does not count inactive connections as completed integrations", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-inactive-connection@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
+    await seedIntegrationTarget({
+      env,
       targetKey: "openai-home-summary-inactive",
       familyId: "openai",
       variantId: "openai-default",
-      enabled: true,
-      config: {},
     });
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_home_summary_inactive",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-home-summary-inactive",
-        displayName: "OpenAI inactive",
-        status: IntegrationConnectionStatuses.ERROR,
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_home_summary_inactive",
+      organizationId: session.organizationId,
+      targetKey: "openai-home-summary-inactive",
+      displayName: "OpenAI inactive",
+      status: IntegrationConnectionStatuses.ERROR,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
 
-    const response = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(response.status).toBe(200);
-    const body = homeSummaryResponseSchema.parse(await response.json());
+    const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding.hasIntegrations).toBe(false);
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
   });
 
-  it("uses the active published version when a newer draft exists", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary_active_version",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-active-version@example.com",
+  it("uses the active published version when a newer draft exists", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-active-version@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
+    await seedIntegrationTarget({
+      env,
       targetKey: "openai-home-summary-active-version",
       familyId: "openai",
       variantId: "openai-default",
-      enabled: true,
-      config: {},
     });
-    await fixture.db.insert(integrationConnections).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
       {
         id: "icn_home_summary_active_version",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-home-summary-active-version",
         displayName: "OpenAI",
         status: IntegrationConnectionStatuses.ACTIVE,
@@ -235,7 +112,7 @@ describe("home summary integration", () => {
       },
       {
         id: "icn_home_summary_active_version_inactive",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-home-summary-active-version",
         displayName: "OpenAI inactive",
         status: IntegrationConnectionStatuses.ERROR,
@@ -243,16 +120,13 @@ describe("home summary integration", () => {
         updatedAt: "2026-03-02T00:00:00.000Z",
       },
     ]);
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_home_summary_active_version",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Default Profile",
+    await seedSandboxProfile({
+      env,
+      profileId: "sbp_home_summary_active_version",
+      organizationId: session.organizationId,
       activeVersion: 1,
-      status: SandboxProfileStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
     });
-    await fixture.db.insert(sandboxProfileVersions).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
       {
         sandboxProfileId: "sbp_home_summary_active_version",
         version: 1,
@@ -266,62 +140,55 @@ describe("home summary integration", () => {
         publishedAt: null,
       },
     ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_home_summary_active_version_v1",
-        sandboxProfileId: "sbp_home_summary_active_version",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_home_summary_active_version",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-      {
-        id: "ibd_home_summary_active_version_v2",
-        sandboxProfileId: "sbp_home_summary_active_version",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_home_summary_active_version_inactive",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-        createdAt: "2026-03-02T00:00:00.000Z",
-        updatedAt: "2026-03-02T00:00:00.000Z",
-      },
-    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        {
+          id: "ibd_home_summary_active_version_v1",
+          sandboxProfileId: "sbp_home_summary_active_version",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_home_summary_active_version",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+        {
+          id: "ibd_home_summary_active_version_v2",
+          sandboxProfileId: "sbp_home_summary_active_version",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_home_summary_active_version_inactive",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+          createdAt: "2026-03-02T00:00:00.000Z",
+          updatedAt: "2026-03-02T00:00:00.000Z",
+        },
+      ]);
 
-    const response = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    const body = homeSummaryResponseSchema.parse(await response.json());
+    const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding).toMatchObject({
       hasProfiles: true,
       hasUsableProfiles: true,
     });
   });
 
-  it("returns 403 when the active organization membership has been revoked", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-revoked-membership@example.com",
+  it("returns 403 when the active organization membership has been revoked", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-revoked-membership@example.com",
     });
 
-    await fixture.db
-      .delete(members)
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
       .where(
         and(
-          eq(members.organizationId, authenticatedSession.organizationId),
-          eq(members.userId, authenticatedSession.userId),
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
         ),
       );
 
-    const response = await fixture.request("/v1/home", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/home", {
       headers: {
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
     });
 
@@ -332,83 +199,22 @@ describe("home summary integration", () => {
     });
   });
 
-  it("counts system-started sandbox instances as a started session", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary_system_started",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-system-started@example.com",
+  it("counts system-started sandbox instances as a started session", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-system-started@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-home-summary-system-started",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {},
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_home_summary_system_started",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "openai-home-summary-system-started",
-      displayName: "OpenAI",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_home_summary_system_started",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Default Profile",
-      activeVersion: 1,
-      status: SandboxProfileStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_home_summary_system_started",
-      version: 1,
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_home_summary_system_started",
-      sandboxProfileId: "sbp_home_summary_system_started",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_home_summary_system_started",
-      kind: "agent",
-      config: {},
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
-    });
-    await dataPlaneFixture.db.insert(sandboxInstances).values({
-      id: "sbi_home_summary_system_started",
-      organizationId: authenticatedSession.organizationId,
-      sandboxProfileId: "sbp_home_summary_system_started",
-      title: "Automation-triggered task",
-      sandboxProfileVersion: 1,
-      runtimeProvider: "docker",
-      providerSandboxId: "provider-home-summary-system-started",
-      status: SandboxInstanceStatuses.RUNNING,
-      startedByKind: "system",
+    await seedAgentReadyHomeState({
+      env,
+      idPrefix: "system_started",
+      organizationId: session.organizationId,
+      sandboxInstanceSource: SandboxInstanceSources.WEBHOOK,
       startedById: "aru_home_summary_system_started",
-      source: SandboxInstanceSources.WEBHOOK,
-      createdAt: "2026-03-02T00:00:00.000Z",
-      updatedAt: "2026-03-02T00:00:00.000Z",
+      startedByKind: "system",
+      userId: session.userId,
     });
 
-    const response = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(response.status).toBe(200);
-    const body = homeSummaryResponseSchema.parse(await response.json());
+    const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding).toMatchObject({
       hasIntegrations: true,
       hasProfiles: true,
@@ -417,90 +223,53 @@ describe("home summary integration", () => {
     });
   });
 
-  it("does not count active non-agent integrations as completed integrations", async ({
-    fixture,
-  }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary_non_agent_connection",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-non-agent-connection@example.com",
+  it("does not count active non-agent integrations as completed integrations", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-non-agent-connection@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
+    await seedIntegrationTarget({
+      env,
       targetKey: "github-home-summary-active-git",
       familyId: "github",
       variantId: "github-cloud",
-      enabled: true,
-      config: {},
     });
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_home_summary_active_git",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-home-summary-active-git",
-        displayName: "GitHub",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-    ]);
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_home_summary_active_git",
+      organizationId: session.organizationId,
+      targetKey: "github-home-summary-active-git",
+      displayName: "GitHub",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
 
-    const response = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(response.status).toBe(200);
-    const body = homeSummaryResponseSchema.parse(await response.json());
+    const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding.hasIntegrations).toBe(false);
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(true);
   });
 
-  it("ignores non-agent bindings when checking whether a profile is usable", async ({
-    fixture,
-  }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_home_summary_non_agent_binding",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-    startedDataPlaneFixtures.push(dataPlaneFixture);
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-home-summary-non-agent-binding@example.com",
+  it("ignores non-agent bindings when checking whether a profile is usable", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-home-summary-non-agent-binding@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values([
-      {
-        targetKey: "openai-home-summary-agent",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {},
-      },
-      {
-        targetKey: "github-home-summary-git",
-        familyId: "github",
-        variantId: "github-default",
-        enabled: true,
-        config: {},
-      },
-    ]);
-    await fixture.db.insert(integrationConnections).values([
+    await seedIntegrationTarget({
+      env,
+      targetKey: "openai-home-summary-agent",
+      familyId: "openai",
+      variantId: "openai-default",
+    });
+    await seedIntegrationTarget({
+      env,
+      targetKey: "github-home-summary-git",
+      familyId: "github",
+      variantId: "github-default",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
       {
         id: "icn_home_summary_agent",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-home-summary-agent",
         displayName: "OpenAI",
         status: IntegrationConnectionStatuses.ACTIVE,
@@ -509,7 +278,7 @@ describe("home summary integration", () => {
       },
       {
         id: "icn_home_summary_git",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "github-home-summary-git",
         displayName: "GitHub",
         status: IntegrationConnectionStatuses.ERROR,
@@ -517,50 +286,180 @@ describe("home summary integration", () => {
         updatedAt: "2026-03-01T00:00:00.000Z",
       },
     ]);
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_home_summary_non_agent",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Profile with stale git binding",
+    await seedSandboxProfile({
+      env,
+      profileId: "sbp_home_summary_non_agent",
+      organizationId: session.organizationId,
       activeVersion: 1,
-      status: SandboxProfileStatuses.ACTIVE,
-      createdAt: "2026-03-01T00:00:00.000Z",
-      updatedAt: "2026-03-01T00:00:00.000Z",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
       sandboxProfileId: "sbp_home_summary_non_agent",
       version: 1,
     });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_home_summary_agent",
-        sandboxProfileId: "sbp_home_summary_non_agent",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_home_summary_agent",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-      {
-        id: "ibd_home_summary_git",
-        sandboxProfileId: "sbp_home_summary_non_agent",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_home_summary_git",
-        kind: IntegrationBindingKinds.GIT,
-        config: {},
-        createdAt: "2026-03-01T00:00:00.000Z",
-        updatedAt: "2026-03-01T00:00:00.000Z",
-      },
-    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        {
+          id: "ibd_home_summary_agent",
+          sandboxProfileId: "sbp_home_summary_non_agent",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_home_summary_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {},
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+        {
+          id: "ibd_home_summary_git",
+          sandboxProfileId: "sbp_home_summary_non_agent",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_home_summary_git",
+          kind: IntegrationBindingKinds.GIT,
+          config: {},
+          createdAt: "2026-03-01T00:00:00.000Z",
+          updatedAt: "2026-03-01T00:00:00.000Z",
+        },
+      ]);
 
-    const response = await fixture.request("/v1/home", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
-    expect(response.status).toBe(200);
-    const body = homeSummaryResponseSchema.parse(await response.json());
+    const body = await readHomeSummary(env, session.cookie);
     expect(body.onboarding.hasUsableProfiles).toBe(true);
     expect(body.onboarding.hasWebhookCapableIntegration).toBe(false);
   });
 });
+
+type HomeSummary = ReturnType<typeof homeSummaryResponseSchema.parse>;
+
+async function expectHomeSummary(
+  env: IntegrationTestEnvironment,
+  cookie: string,
+  expected: HomeSummary,
+): Promise<void> {
+  await expect(readHomeSummary(env, cookie)).resolves.toStrictEqual(expected);
+}
+
+async function readHomeSummary(
+  env: IntegrationTestEnvironment,
+  cookie: string,
+): Promise<HomeSummary> {
+  const response = await env.controlPlaneApi.http.fetch("/v1/home", {
+    headers: {
+      cookie,
+    },
+  });
+
+  expect(response.status).toBe(200);
+
+  return homeSummaryResponseSchema.parse(await response.json());
+}
+
+async function seedAgentReadyHomeState(input: {
+  env: IntegrationTestEnvironment;
+  idPrefix: string;
+  organizationId: string;
+  userId: string;
+  startedByKind?: "system" | "user";
+  startedById?: string;
+  sandboxInstanceSource?: SandboxInstanceSource;
+}): Promise<void> {
+  const targetKey = `openai-home-summary-${input.idPrefix}`;
+  const connectionId = `icn_home_summary_${input.idPrefix}`;
+  const profileId = `sbp_home_summary_${input.idPrefix}`;
+
+  await seedIntegrationTarget({
+    env: input.env,
+    targetKey,
+    familyId: "openai",
+    variantId: "openai-default",
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId: input.organizationId,
+      targetKey,
+      displayName: "OpenAI",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+  await seedSandboxProfile({
+    env: input.env,
+    profileId,
+    organizationId: input.organizationId,
+    activeVersion: 1,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId: profileId,
+      version: 1,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: `ibd_home_summary_${input.idPrefix}`,
+      sandboxProfileId: profileId,
+      sandboxProfileVersion: 1,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {},
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+    });
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
+    id: `atm_home_summary_${input.idPrefix}`,
+    organizationId: input.organizationId,
+    kind: AutomationKinds.WEBHOOK,
+    name: "Home Summary Automation",
+    enabled: true,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+  });
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
+    id: `sbi_home_summary_${input.idPrefix}`,
+    organizationId: input.organizationId,
+    sandboxProfileId: profileId,
+    title: "Investigate issue",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-home-summary-${input.idPrefix}`,
+    status: SandboxInstanceStatuses.RUNNING,
+    startedByKind: input.startedByKind ?? "user",
+    startedById: input.startedById ?? input.userId,
+    source: input.sandboxInstanceSource ?? SandboxInstanceSources.DASHBOARD,
+    createdAt: "2026-03-02T00:00:00.000Z",
+    updatedAt: "2026-03-02T00:00:00.000Z",
+  });
+}
+
+async function seedIntegrationTarget(input: {
+  env: IntegrationTestEnvironment;
+  targetKey: string;
+  familyId: string;
+  variantId: string;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey: input.targetKey,
+    familyId: input.familyId,
+    variantId: input.variantId,
+    enabled: true,
+    config: {},
+  });
+}
+
+async function seedSandboxProfile(input: {
+  env: IntegrationTestEnvironment;
+  profileId: string;
+  organizationId: string;
+  activeVersion: number | null;
+}): Promise<void> {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+    id: input.profileId,
+    organizationId: input.organizationId,
+    displayName: "Default Profile",
+    activeVersion: input.activeVersion,
+    status: SandboxProfileStatuses.ACTIVE,
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+  });
+}

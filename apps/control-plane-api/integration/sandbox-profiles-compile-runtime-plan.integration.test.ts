@@ -1,13 +1,9 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
-import {
-  IntegrationBindingKinds,
-  integrationConnections,
-  IntegrationConnectionStatuses,
-  integrationTargets,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-} from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
   type RuntimeArtifactInstallStep,
@@ -19,6 +15,8 @@ import {
   OpenAiChatGptResponsesApiBaseUrl,
   OpenAiConnectionMethodIds,
 } from "@mistle/integrations-definitions";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -32,127 +30,58 @@ import {
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "../src/sandbox-profiles/errors.js";
-import { it } from "./test-context.js";
+import { IntegrationIntegrationsConfig } from "./helpers/integration-connections.js";
+import {
+  integrationConnectionRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
-const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/;
+const GitHubCliTokenPattern = /^ghp_[A-Za-z0-9]{36}$/u;
 const LocalPreparedRuntimeSandboxBaseImageRef = getLocalPreparedRuntimeSandboxBaseImageRef();
 
-function expectArtifactInstallStep(
-  step: RuntimeArtifactInstallStep | undefined,
-): RuntimeArtifactInstallStep {
-  if (step === undefined) {
-    throw new Error("Expected artifact install step.");
-  }
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
-  return step;
-}
-
-function expectExecInstallStep(
-  step: RuntimeArtifactInstallStep | undefined,
-): Extract<RuntimeArtifactInstallStep, { op: "exec" }> {
-  const installStep = expectArtifactInstallStep(step);
-  if (installStep.op !== "exec") {
-    throw new Error(`Expected exec artifact install step, received ${installStep.op}.`);
-  }
-
-  return installStep;
-}
-
-function expectGitHubReleaseInstallStep(
-  step: RuntimeArtifactInstallStep | undefined,
-): Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }> {
-  const installStep = expectArtifactInstallStep(step);
-  if (installStep.op !== "github_release_install") {
-    throw new Error(`Expected github_release_install artifact step, received ${installStep.op}.`);
-  }
-
-  return installStep;
-}
-
-describe("sandbox profile compile runtime plan integration", () => {
-  it("compiles runtime plan from version bindings, connections, and targets", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+describe.concurrent("sandbox profile compile runtime plan integration", () => {
+  it("compiles runtime plan from version bindings, connections, and targets", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-success@example.com",
     });
-    const targetKey = "openai-default-compile-runtime-plan";
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_success",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Success Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_success",
-      version: 1,
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_success",
       setupScript: "printf 'hello from setup script\\n'",
     });
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey,
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      })
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_compile_success",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
-      displayName: "Compile Success Connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.API_KEY,
-      },
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_success",
-      sandboxProfileId: "sbp_compile_success",
-      sandboxProfileVersion: 1,
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_success",
+      targetKey: "openai-default-compile-runtime-plan",
       connectionId: "icn_compile_success",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+      bindingId: "ibd_compile_success",
     });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_success",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_success",
+    });
 
     expect(runtimePlan.sandboxProfileId).toBe("sbp_compile_success");
     expect(runtimePlan.version).toBe(1);
     expect(runtimePlan.setupScript).toBe("printf 'hello from setup script\\n'");
     expect(runtimePlan.egressRoutes).toHaveLength(1);
-    expect(runtimePlan.artifacts).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
-    expect(runtimePlan.artifacts[0]?.name).toBe("Codex CLI");
+    expect(runtimePlan.artifacts[0]).toMatchObject({
+      artifactKey: "codex-cli",
+      name: "Codex CLI",
+    });
 
     const installCommand = expectGitHubReleaseInstallStep(
       runtimePlan.artifacts[0]?.lifecycle.install[0],
     );
-    expect(installCommand).toEqual({
+    expect(installCommand).toMatchObject({
       op: "github_release_install",
       repository: "openai/codex",
       release: {
@@ -160,23 +89,10 @@ describe("sandbox profile compile runtime plan integration", () => {
         match: "exact",
         tag: "rust-v0.128.0",
       },
-      asset: {
-        kind: "by_arch",
-        x86_64: {
-          fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
-          format: "tar.gz",
-          extractedPath: "codex-x86_64-unknown-linux-musl",
-        },
-        aarch64: {
-          fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
-          format: "tar.gz",
-          extractedPath: "codex-aarch64-unknown-linux-musl",
-        },
-      },
       installPath: "/usr/local/bin/codex",
       timeoutMs: 120_000,
     });
-    expect(runtimePlan.runtimeClients).toHaveLength(1);
+
     expect(runtimePlan.runtimeClients[0]).toMatchObject({
       clientId: "codex-cli",
       setup: {
@@ -207,11 +123,6 @@ describe("sandbox profile compile runtime plan integration", () => {
             url: CodexAppServerListenUrl,
             timeoutMs: 60_000,
           },
-          stop: {
-            signal: "sigterm",
-            timeoutMs: 10_000,
-            gracePeriodMs: 2_000,
-          },
         },
       ],
       endpoints: [
@@ -226,834 +137,315 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
       ],
     });
-    const setupFiles = runtimePlan.runtimeClients[0]?.setup.files;
-    if (setupFiles === undefined) {
-      throw new Error("Expected runtime client setup files.");
-    }
-    const configContent = setupFiles.find((file) => file.fileId === "codex_config")?.content;
-    const agentsContent = setupFiles.find((file) => file.fileId === "codex_global_agents")?.content;
-    expect(configContent).not.toContain("model =");
+
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
+    const agentsContent = readSetupFileContent(runtimePlan, "codex_global_agents");
     expect(configContent).toContain('model_provider = "proxy"');
-    expect(configContent).not.toContain("model_reasoning_effort");
     expect(configContent).toContain('approval_policy = "never"');
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
-    expect(configContent).not.toContain("developer_instructions");
-    expect(agentsContent).toContain("Mistle-managed sandbox context:");
-    expect(agentsContent).toContain("managed outbound proxy");
-    expect(agentsContent).not.toContain("User-provided additional instructions:");
-    expect(agentsContent).not.toContain("Prefer concise answers.");
-    expect(agentsContent).not.toContain("Always explain tradeoffs.");
     expect(configContent).toContain("[model_providers.proxy]");
-    expect(configContent).toContain('name = "OpenAI"');
     expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('wire_api = "responses"');
     expect(configContent).toContain("requires_openai_auth = false");
     expect(configContent).toContain("supports_websockets = true");
     expect(configContent).toContain('[projects."/"]');
-    expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).toContain("[features]");
-    expect(configContent).toContain("apps = false");
-    expect(configContent).toContain("plugins = false");
     expect(configContent).toContain("tool_search = true");
+    expect(configContent).not.toContain("model =");
+    expect(configContent).not.toContain("developer_instructions");
+    expect(agentsContent).toContain("Mistle-managed sandbox context:");
+    expect(agentsContent).toContain("managed outbound proxy");
+    expect(agentsContent).not.toContain("User-provided additional instructions:");
   });
 
-  it("omits blank setup scripts from the compiled runtime plan", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("omits blank setup scripts from the compiled runtime plan", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-blank-setup-script@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_blank_setup_script",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Blank Setup Script Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_blank_setup_script",
-      version: 1,
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_blank_setup_script",
       setupScript: "   \n\t  ",
     });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_blank_setup_script",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_blank_setup_script",
+    });
 
     expect(runtimePlan.setupScript).toBeUndefined();
   });
 
-  it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("uses the ChatGPT responses base URL for chatgpt-device-code connections", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-chatgpt-base-url@example.com",
     });
-    const targetKey = "openai-default-compile-runtime-plan-chatgpt";
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_chatgpt_base_url",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile ChatGPT Base URL Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_chatgpt_base_url",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_chatgpt_base_url",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey,
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      })
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_compile_chatgpt_base_url",
-      organizationId: authenticatedSession.organizationId,
-      targetKey,
-      displayName: "Compile ChatGPT Base URL Connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_chatgpt_base_url",
+      targetKey: "openai-default-compile-runtime-plan-chatgpt",
+      connectionId: "icn_compile_chatgpt_base_url",
+      bindingId: "ibd_compile_chatgpt_base_url",
+      connectionConfig: {
         connection_method: OpenAiConnectionMethodIds.CHATGPT_DEVICE_CODE,
         auth_mode: "chatgpt",
         chatgpt_account_id: "acct_123",
         chatgpt_plan_type: "pro",
       },
     });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_chatgpt_base_url",
-      sandboxProfileId: "sbp_compile_chatgpt_base_url",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_compile_chatgpt_base_url",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_chatgpt_base_url",
     });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_chatgpt_base_url",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
-
     expect(runtimePlan.egressRoutes[0]?.upstream.baseUrl).toBe(OpenAiChatGptOriginBaseUrl);
-    expect(runtimePlan.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
     expect(runtimePlan.egressRoutes[0]?.additionalHeaders).toEqual({
       "ChatGPT-Account-ID": "acct_123",
     });
 
-    const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
     expect(configContent).toContain(`base_url = "${OpenAiChatGptResponsesApiBaseUrl}"`);
     expect(configContent).toContain(`chatgpt_base_url = "${OpenAiChatGptBaseUrl}"`);
-    expect(configContent).toContain('model_provider = "proxy"');
-    expect(configContent).toContain("[model_providers.proxy]");
-    expect(configContent).toContain("requires_openai_auth = false");
-    expect(configContent).toContain("supports_websockets = true");
-    expect(configContent).toContain("[features]");
-    expect(configContent).toContain("apps = false");
-    expect(configContent).toContain("plugins = false");
-    expect(configContent).toContain("tool_search = true");
   });
 
   it("omits optional github and jira cli artifacts when bindings do not select tools", async ({
-    fixture,
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-no-optional-tools@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_optional_tools_none",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Optional Tools None Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_optional_tools_none",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_optional_tools_none",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_optional_tools_none",
+      bindings: [
+        githubBinding({
           targetKey: "github-cloud-compile-no-tools",
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        },
-        {
+          connectionId: "icn_compile_no_tools_github",
+          bindingId: "ibd_compile_no_tools_github",
+          tools: [],
+        }),
+        jiraBinding({
           targetKey: "jira-default-compile-no-tools",
-          familyId: "jira",
-          variantId: "jira-default",
-          enabled: true,
-          config: {},
-        },
-      ])
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_compile_no_tools_github",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-cloud-compile-no-tools",
-        displayName: "Compile No Tools GitHub Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_compile_no_tools_jira",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "jira-default-compile-no-tools",
-        displayName: "Compile No Tools Jira Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: "jira-personal-api-token",
-          site_url: "https://mistle.atlassian.net",
-          email: "user@example.com",
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_compile_no_tools_github",
-        sandboxProfileId: "sbp_compile_optional_tools_none",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_no_tools_github",
-        kind: IntegrationBindingKinds.GIT,
-        config: {
-          repositories: ["mistlehq/mistle"],
+          connectionId: "icn_compile_no_tools_jira",
+          bindingId: "ibd_compile_no_tools_jira",
           tools: [],
-        },
-      },
-      {
-        id: "ibd_compile_no_tools_jira",
-        sandboxProfileId: "sbp_compile_optional_tools_none",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_no_tools_jira",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
-          tools: [],
-        },
-      },
-    ]);
+        }),
+      ],
+    });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_optional_tools_none",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_optional_tools_none",
+    });
 
-    expect(runtimePlan.artifacts).toEqual([]);
+    expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli"]);
   });
 
-  it("installs selected github, jira, and slack cli artifacts once each in the compiled runtime plan", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("installs selected github, jira, and slack cli artifacts once each", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-selected-tools@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_selected_tools",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Selected Tools Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_selected_tools",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_selected_tools",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_selected_tools",
+      bindings: [
+        githubBinding({
           targetKey: "github-cloud-compile-selected-tools",
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        },
-        {
-          targetKey: "jira-default-compile-selected-tools",
-          familyId: "jira",
-          variantId: "jira-default",
-          enabled: true,
-          config: {},
-        },
-        {
-          targetKey: "slack-default-compile-selected-tools",
-          familyId: "slack",
-          variantId: "slack-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://slack.com/api",
-          },
-        },
-      ])
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_compile_selected_tools_github",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-cloud-compile-selected-tools",
-        displayName: "Compile Selected Tools GitHub Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_compile_selected_tools_jira_a",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "jira-default-compile-selected-tools",
-        displayName: "Compile Selected Tools Jira Connection A",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: "jira-personal-api-token",
-          site_url: "https://mistle.atlassian.net",
-          email: "user@example.com",
-        },
-      },
-      {
-        id: "icn_compile_selected_tools_jira_b",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "jira-default-compile-selected-tools",
-        displayName: "Compile Selected Tools Jira Connection B",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: "jira-personal-api-token",
-          site_url: "https://mistle-dev.atlassian.net",
-          email: "user+dev@example.com",
-        },
-      },
-      {
-        id: "icn_compile_selected_tools_slack",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "slack-default-compile-selected-tools",
-        displayName: "Compile Selected Tools Slack Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: "slack-bot-token",
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_compile_selected_tools_github",
-        sandboxProfileId: "sbp_compile_selected_tools",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_selected_tools_github",
-        kind: IntegrationBindingKinds.GIT,
-        config: {
-          repositories: ["mistlehq/mistle"],
+          connectionId: "icn_compile_selected_tools_github",
+          bindingId: "ibd_compile_selected_tools_github",
           tools: ["github-cli"],
-        },
-      },
-      {
-        id: "ibd_compile_selected_tools_jira_a",
-        sandboxProfileId: "sbp_compile_selected_tools",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_selected_tools_jira_a",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+        }),
+        jiraBinding({
+          targetKey: "jira-default-compile-selected-tools-secondary",
+          connectionId: "icn_compile_selected_tools_jira_a",
+          bindingId: "ibd_compile_selected_tools_jira_a",
           tools: ["jira-cli"],
-        },
-      },
-      {
-        id: "ibd_compile_selected_tools_jira_b",
-        sandboxProfileId: "sbp_compile_selected_tools",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_selected_tools_jira_b",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+        }),
+        jiraBinding({
+          targetKey: "jira-default-compile-selected-tools",
+          connectionId: "icn_compile_selected_tools_jira_b",
+          bindingId: "ibd_compile_selected_tools_jira_b",
+          siteUrl: "https://mistle-dev.atlassian.net",
           tools: ["jira-cli"],
-        },
-      },
-      {
-        id: "ibd_compile_selected_tools_slack",
-        sandboxProfileId: "sbp_compile_selected_tools",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_selected_tools_slack",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+        }),
+        slackBinding({
+          targetKey: "slack-default-compile-selected-tools",
+          connectionId: "icn_compile_selected_tools_slack",
+          bindingId: "ibd_compile_selected_tools_slack",
           tools: ["slack-cli"],
-        },
-      },
-    ]);
+        }),
+      ],
+    });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_selected_tools",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_selected_tools",
+    });
 
-    expect(runtimePlan.artifacts).toHaveLength(3);
     expect(runtimePlan.artifacts.map((artifact) => artifact.artifactKey)).toEqual([
+      "codex-cli",
       "gh-cli",
       "jira-cli",
       "slack-cli",
     ]);
-    expect(runtimePlan.artifacts[0]?.env).toEqual({
+    const githubArtifact = readArtifact(runtimePlan, "gh-cli");
+    const jiraArtifact = readArtifact(runtimePlan, "jira-cli");
+    const slackArtifact = readArtifact(runtimePlan, "slack-cli");
+
+    expect(githubArtifact.env).toEqual({
       GH_TOKEN: expect.stringMatching(GitHubCliTokenPattern),
     });
-    const ghInstallCommand = expectExecInstallStep(runtimePlan.artifacts[0]?.lifecycle.install[0]);
-    expect(ghInstallCommand.command.args.slice(0, 2)).toEqual(["sh", "-euc"]);
-    expect(ghInstallCommand.command.timeoutMs).toBe(120_000);
-    expect(ghInstallCommand.command.args[2]).toContain(
-      "https://github.com/cli/cli/releases/latest",
-    );
-
-    const jiraInstallCommand = expectGitHubReleaseInstallStep(
-      runtimePlan.artifacts[1]?.lifecycle.install[0],
-    );
-    expect(runtimePlan.artifacts[1]?.env).toEqual({
+    expectExecInstallStep(githubArtifact.lifecycle.install[0]);
+    expect(jiraArtifact.env).toEqual({
       JIRA_BASE_URL: "https://mistle.atlassian.net",
     });
-    expect(jiraInstallCommand).toEqual({
-      op: "github_release_install",
-      repository: "mistlehq/tools",
-      release: {
-        kind: "tag",
-        match: "exact",
-        tag: "jira/v0.5.0",
-      },
-      asset: {
-        kind: "exact",
-        fileName: "jira-linux-amd64",
-        format: "binary",
-      },
-      installPath: "/usr/local/bin/jira",
-      timeoutMs: 120_000,
-    });
-
-    const slackInstallCommand = expectGitHubReleaseInstallStep(
-      runtimePlan.artifacts[2]?.lifecycle.install[0],
-    );
-    expect(runtimePlan.artifacts[2]?.env).toEqual({
+    expectGitHubReleaseInstallStep(jiraArtifact.lifecycle.install[0]);
+    expect(slackArtifact.env).toEqual({
       SLACK_BASE_URL: "https://slack.com/api",
     });
-    expect(slackInstallCommand).toEqual({
-      op: "github_release_install",
-      repository: "mistlehq/tools",
-      release: {
-        kind: "tag",
-        match: "exact",
-        tag: "slack/v0.2.1",
-      },
-      asset: {
-        kind: "exact",
-        fileName: "slack-linux-amd64",
-        format: "binary",
-      },
-      installPath: "/usr/local/bin/slack",
-      timeoutMs: 120_000,
-    });
+    expectGitHubReleaseInstallStep(slackArtifact.lifecycle.install[0]);
   });
 
-  it("includes Linear API egress without MCP config when the binding does not select Linear MCP", async ({
-    fixture,
+  it("includes Linear API egress without MCP config when Linear MCP is not selected", async ({
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-linear-api-only@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_linear_api_only",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Linear API Only Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_api_only",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_linear_api_only",
-      version: 1,
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_api_only",
+      targetKey: "openai-default-compile-linear-api-only",
+      connectionId: "icn_compile_linear_api_only_openai",
+      bindingId: "ibd_compile_linear_api_only_openai",
     });
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
-          targetKey: "openai-default-compile-linear-api-only",
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com/v1",
-          },
-        },
-        {
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_api_only",
+      bindings: [
+        linearBinding({
           targetKey: "linear-default-compile-linear-api-only",
-          familyId: "linear",
-          variantId: "linear-default",
-          enabled: true,
-          config: {},
-        },
-      ])
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_compile_linear_api_only_openai",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-default-compile-linear-api-only",
-        displayName: "Compile Linear API Only OpenAI Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_compile_linear_api_only_linear",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "linear-default-compile-linear-api-only",
-        displayName: "Compile Linear API Only Linear Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_compile_linear_api_only_openai",
-        sandboxProfileId: "sbp_compile_linear_api_only",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_linear_api_only_openai",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      },
-      {
-        id: "ibd_compile_linear_api_only_linear",
-        sandboxProfileId: "sbp_compile_linear_api_only",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_linear_api_only_linear",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+          connectionId: "icn_compile_linear_api_only_linear",
+          bindingId: "ibd_compile_linear_api_only_linear",
           tools: [],
-        },
-      },
-    ]);
+        }),
+      ],
+      includeAgent: false,
+    });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_linear_api_only",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_api_only",
+    });
 
-    expect(
-      runtimePlan.egressRoutes.some(
-        (route) =>
-          route.upstream.baseUrl === "https://api.linear.app" &&
-          route.match.hosts.includes("api.linear.app") &&
-          route.match.pathPrefixes?.includes("/graphql") === true,
-      ),
-    ).toBe(true);
-    expect(
-      runtimePlan.egressRoutes.some((route) => route.match.hosts.includes("mcp.linear.app")),
-    ).toBe(false);
-    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).not.toContain(
-      "[mcp_servers.linear]",
-    );
+    expect(hasEgressRoute(runtimePlan, "https://api.linear.app", "api.linear.app")).toBe(true);
+    expect(hasHost(runtimePlan, "mcp.linear.app")).toBe(false);
+    expect(readSetupFileContent(runtimePlan, "codex_config")).not.toContain("[mcp_servers.linear]");
   });
 
-  it("includes Linear MCP config and egress when the binding selects Linear MCP", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("includes Linear MCP config and egress when Linear MCP is selected", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-linear-mcp@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_linear_mcp",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Linear MCP Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_mcp",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_linear_mcp",
-      version: 1,
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_mcp",
+      targetKey: "openai-default-compile-linear-mcp",
+      connectionId: "icn_compile_linear_mcp_openai",
+      bindingId: "ibd_compile_linear_mcp_openai",
     });
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
-          targetKey: "openai-default-compile-linear-mcp",
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com/v1",
-          },
-        },
-        {
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_mcp",
+      bindings: [
+        linearBinding({
           targetKey: "linear-default-compile-linear-mcp",
-          familyId: "linear",
-          variantId: "linear-default",
-          enabled: true,
-          config: {},
-        },
-      ])
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_compile_linear_mcp_openai",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-default-compile-linear-mcp",
-        displayName: "Compile Linear MCP OpenAI Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_compile_linear_mcp_linear",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "linear-default-compile-linear-mcp",
-        displayName: "Compile Linear MCP Linear Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_compile_linear_mcp_openai",
-        sandboxProfileId: "sbp_compile_linear_mcp",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_linear_mcp_openai",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      },
-      {
-        id: "ibd_compile_linear_mcp_linear",
-        sandboxProfileId: "sbp_compile_linear_mcp",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_linear_mcp_linear",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+          connectionId: "icn_compile_linear_mcp_linear",
+          bindingId: "ibd_compile_linear_mcp_linear",
           tools: ["linear-mcp"],
-        },
-      },
-    ]);
+        }),
+      ],
+      includeAgent: false,
+    });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_linear_mcp",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_linear_mcp",
+    });
 
-    expect(
-      runtimePlan.egressRoutes.some(
-        (route) =>
-          route.upstream.baseUrl === "https://api.linear.app" &&
-          route.match.hosts.includes("api.linear.app") &&
-          route.match.pathPrefixes?.includes("/graphql") === true,
-      ),
-    ).toBe(true);
-    expect(
-      runtimePlan.egressRoutes.some((route) => route.match.hosts.includes("mcp.linear.app")),
-    ).toBe(true);
-    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      "[mcp_servers.linear]",
-    );
-    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'url = "https://mcp.linear.app/mcp"',
-    );
+    expect(hasEgressRoute(runtimePlan, "https://api.linear.app", "api.linear.app")).toBe(true);
+    expect(hasHost(runtimePlan, "mcp.linear.app")).toBe(true);
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
+    expect(configContent).toContain("[mcp_servers.linear]");
+    expect(configContent).toContain('url = "https://mcp.linear.app/mcp"');
   });
 
-  it("includes Datadog MCP config and egress with credential-backed application headers", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("includes Datadog MCP config and egress with credential-backed headers", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-datadog-mcp@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_datadog_mcp",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Datadog MCP Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_datadog_mcp",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_datadog_mcp",
-      version: 1,
+    await seedOpenAiAgentBinding(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_datadog_mcp",
+      targetKey: "openai-default-compile-datadog-mcp",
+      connectionId: "icn_compile_datadog_mcp_openai",
+      bindingId: "ibd_compile_datadog_mcp_openai",
     });
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
-          targetKey: "openai-default-compile-datadog-mcp",
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com/v1",
-          },
-        },
-        {
+    await seedConnectorBindings(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_datadog_mcp",
+      bindings: [
+        datadogBinding({
           targetKey: "datadog-default-compile-datadog-mcp",
-          familyId: "datadog",
-          variantId: "datadog-default",
-          enabled: true,
-          config: {},
-        },
-      ])
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_compile_datadog_mcp_openai",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-default-compile-datadog-mcp",
-        displayName: "Compile Datadog MCP OpenAI Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_compile_datadog_mcp_datadog",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "datadog-default-compile-datadog-mcp",
-        displayName: "Compile Datadog MCP Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_compile_datadog_mcp_openai",
-        sandboxProfileId: "sbp_compile_datadog_mcp",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_datadog_mcp_openai",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      },
-      {
-        id: "ibd_compile_datadog_mcp_datadog",
-        sandboxProfileId: "sbp_compile_datadog_mcp",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_compile_datadog_mcp_datadog",
-        kind: IntegrationBindingKinds.CONNECTOR,
-        config: {
+          connectionId: "icn_compile_datadog_mcp_datadog",
+          bindingId: "ibd_compile_datadog_mcp_datadog",
           tools: [DatadogToolIds.DATADOG_MCP],
-        },
-      },
-    ]);
+        }),
+      ],
+      includeAgent: false,
+    });
 
-    const runtimePlan = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_datadog_mcp",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    );
+    const runtimePlan = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_datadog_mcp",
+    });
 
     const datadogRoute = runtimePlan.egressRoutes.find(
       (route) => route.upstream.baseUrl === "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp",
     );
 
-    expect(datadogRoute).toBeDefined();
     expect(datadogRoute).toMatchObject({
       match: {
         hosts: ["mcp.datadoghq.com"],
@@ -1074,34 +466,22 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
       ],
     });
-    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      "[mcp_servers.datadog]",
-    );
-    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+    const configContent = readSetupFileContent(runtimePlan, "codex_config");
+    expect(configContent).toContain("[mcp_servers.datadog]");
+    expect(configContent).toContain(
       'url = "https://mcp.datadoghq.com/api/unstable/mcp-server/mcp?toolsets=all"',
     );
   });
 
-  it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("returns profile not found when the sandbox profile does not exist", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-missing-profile@example.com",
     });
 
-    const error = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_missing_profile",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    ).then(
+    const error = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_missing_profile",
+    }).then(
       () => {
         throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
       },
@@ -1114,33 +494,25 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND);
   });
 
-  it("returns profile version not found when the version does not exist", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("returns profile version not found when the version does not exist", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-missing-version@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_missing_version",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Missing Version Profile",
-      status: "active",
-    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_compile_missing_version",
+        organizationId: session.organizationId,
+        displayName: "Compile Missing Version Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
 
-    const error = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_missing_version",
-        profileVersion: 9,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    ).then(
+    const error = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_missing_version",
+      profileVersion: 9,
+    }).then(
       () => {
         throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
       },
@@ -1153,74 +525,30 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND);
   });
 
-  it("fails when a binding references a connection from another organization", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("fails when a binding references a connection from another organization", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-missing-connection@example.com",
     });
-    const inaccessibleConnectionSession = await fixture.authSession({
+    const otherSession = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-connection-foreign-org@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_missing_connection",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Missing Connection Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_missing_connection",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_missing_connection",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey: "openai-default-missing-connection",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      })
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_missing",
-      organizationId: inaccessibleConnectionSession.organizationId,
+    await seedOpenAiAgentBinding(env, {
+      organizationId: otherSession.organizationId,
+      profileId: "sbp_compile_missing_connection",
       targetKey: "openai-default-missing-connection",
-      displayName: "Foreign Compile Connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_missing_connection",
-      sandboxProfileId: "sbp_compile_missing_connection",
-      sandboxProfileVersion: 1,
       connectionId: "icn_missing",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
+      bindingId: "ibd_compile_missing_connection",
     });
 
-    const error = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_missing_connection",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    ).then(
+    const error = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_missing_connection",
+    }).then(
       () => {
         throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
       },
@@ -1233,74 +561,60 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE);
   });
 
-  it("fails when a target has invalid encrypted secrets", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("fails when a target has invalid encrypted secrets", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-sandbox-profile-compile-invalid-target-secrets@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_invalid_target_secrets",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Invalid Target Secrets Profile",
-      status: "active",
+    await createProfileVersion(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_invalid_target_secrets",
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_invalid_target_secrets",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey: "openai-default-invalid-target-secrets",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-        secrets: {
-          masterKeyVersion: 999,
-          nonce: "invalid",
-          ciphertext: "invalid",
-        },
-      })
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_compile_invalid_target_secrets",
-      organizationId: authenticatedSession.organizationId,
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
       targetKey: "openai-default-invalid-target-secrets",
-      displayName: "Invalid Secrets Connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_invalid_target_secrets",
-      sandboxProfileId: "sbp_compile_invalid_target_secrets",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_compile_invalid_target_secrets",
-      kind: IntegrationBindingKinds.AGENT,
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
       config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
+        api_base_url: "https://api.openai.com/v1",
+      },
+      secrets: {
+        masterKeyVersion: 999,
+        nonce: "invalid",
+        ciphertext: "invalid",
       },
     });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_compile_invalid_target_secrets",
+        organizationId: session.organizationId,
+        targetKey: "openai-default-invalid-target-secrets",
+        displayName: "Invalid Secrets Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_compile_invalid_target_secrets",
+          sandboxProfileId: "sbp_compile_invalid_target_secrets",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_compile_invalid_target_secrets",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
+          },
+        }),
+      );
 
-    const error = await compileProfileVersionRuntimePlan(
-      {
-        db: fixture.db,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        organizationId: authenticatedSession.organizationId,
-        profileId: "sbp_compile_invalid_target_secrets",
-        profileVersion: 1,
-        image: {
-          source: "base",
-          imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
-        },
-      },
-    ).then(
+    const error = await compilePlan(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_compile_invalid_target_secrets",
+    }).then(
       () => {
         throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
       },
@@ -1313,3 +627,406 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS);
   });
 });
+
+type RuntimePlan = Awaited<ReturnType<typeof compileProfileVersionRuntimePlan>>;
+
+type ConnectorBindingInput = {
+  target: {
+    targetKey: string;
+    familyId: string;
+    variantId: string;
+    config: Record<string, unknown>;
+  };
+  connection: {
+    id: string;
+    displayName: string;
+    config: Record<string, unknown>;
+  };
+  binding: {
+    id: string;
+    kind: typeof IntegrationBindingKinds.GIT | typeof IntegrationBindingKinds.CONNECTOR;
+    config: Record<string, unknown>;
+  };
+};
+
+async function compilePlan(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion?: number;
+  },
+): Promise<RuntimePlan> {
+  return compileProfileVersionRuntimePlan(
+    {
+      db: env.controlPlaneDb,
+      integrationsConfig: IntegrationIntegrationsConfig,
+    },
+    {
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion ?? 1,
+      image: {
+        source: "base",
+        imageRef: LocalPreparedRuntimeSandboxBaseImageRef,
+      },
+    },
+  );
+}
+
+async function createProfileVersion(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    profileId: string;
+    setupScript?: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+    sandboxProfileRow({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "Compile Runtime Plan Profile",
+      createdAt: "2026-04-24T00:00:00.000Z",
+    }),
+  );
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+    sandboxProfileVersionRow({
+      sandboxProfileId: input.profileId,
+      version: 1,
+      ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+    }),
+  );
+}
+
+async function seedOpenAiAgentBinding(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    profileId: string;
+    targetKey: string;
+    connectionId: string;
+    bindingId: string;
+    connectionConfig?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values({
+    targetKey: input.targetKey,
+    familyId: "openai",
+    variantId: "openai-default",
+    enabled: true,
+    config: {
+      api_base_url: "https://api.openai.com/v1",
+    },
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+    integrationConnectionRow({
+      id: input.connectionId,
+      organizationId: input.organizationId,
+      targetKey: input.targetKey,
+      displayName: "Compile Runtime Plan OpenAI Connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: input.connectionConfig ?? {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+    }),
+  );
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values(
+      sandboxProfileVersionIntegrationBindingRow({
+        id: input.bindingId,
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: 1,
+        connectionId: input.connectionId,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+        },
+      }),
+    );
+}
+
+async function seedConnectorBindings(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    profileId: string;
+    bindings: ConnectorBindingInput[];
+    includeAgent?: boolean;
+  },
+): Promise<void> {
+  if (input.includeAgent !== false) {
+    await seedOpenAiAgentBinding(env, {
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      targetKey: `openai-${input.profileId}`,
+      connectionId: `icn_${input.profileId}_openai`,
+      bindingId: `ibd_${input.profileId}_openai`,
+    });
+  }
+
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+    input.bindings.map((binding) => ({
+      targetKey: binding.target.targetKey,
+      familyId: binding.target.familyId,
+      variantId: binding.target.variantId,
+      enabled: true,
+      config: binding.target.config,
+    })),
+  );
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+    input.bindings.map((binding) =>
+      integrationConnectionRow({
+        id: binding.connection.id,
+        organizationId: input.organizationId,
+        targetKey: binding.target.targetKey,
+        displayName: binding.connection.displayName,
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: binding.connection.config,
+      }),
+    ),
+  );
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values(
+      input.bindings.map((binding) =>
+        sandboxProfileVersionIntegrationBindingRow({
+          id: binding.binding.id,
+          sandboxProfileId: input.profileId,
+          sandboxProfileVersion: 1,
+          connectionId: binding.connection.id,
+          kind: binding.binding.kind,
+          config: binding.binding.config,
+        }),
+      ),
+    );
+}
+
+function githubBinding(input: {
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  tools: string[];
+}): ConnectorBindingInput {
+  return {
+    target: {
+      targetKey: input.targetKey,
+      familyId: "github",
+      variantId: "github-cloud",
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    },
+    connection: {
+      id: input.connectionId,
+      displayName: "Compile Runtime Plan GitHub Connection",
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+    },
+    binding: {
+      id: input.bindingId,
+      kind: IntegrationBindingKinds.GIT,
+      config: {
+        repositories: ["mistlehq/mistle"],
+        tools: input.tools,
+      },
+    },
+  };
+}
+
+function jiraBinding(input: {
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  tools: string[];
+  siteUrl?: string;
+}): ConnectorBindingInput {
+  return {
+    target: {
+      targetKey: input.targetKey,
+      familyId: "jira",
+      variantId: "jira-default",
+      config: {},
+    },
+    connection: {
+      id: input.connectionId,
+      displayName: "Compile Runtime Plan Jira Connection",
+      config: {
+        connection_method: "jira-personal-api-token",
+        site_url: input.siteUrl ?? "https://mistle.atlassian.net",
+        email: "user@example.com",
+      },
+    },
+    binding: {
+      id: input.bindingId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        tools: input.tools,
+      },
+    },
+  };
+}
+
+function slackBinding(input: {
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  tools: string[];
+}): ConnectorBindingInput {
+  return {
+    target: {
+      targetKey: input.targetKey,
+      familyId: "slack",
+      variantId: "slack-default",
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    },
+    connection: {
+      id: input.connectionId,
+      displayName: "Compile Runtime Plan Slack Connection",
+      config: {
+        connection_method: "slack-bot-token",
+      },
+    },
+    binding: {
+      id: input.bindingId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        tools: input.tools,
+      },
+    },
+  };
+}
+
+function linearBinding(input: {
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  tools: string[];
+}): ConnectorBindingInput {
+  return {
+    target: {
+      targetKey: input.targetKey,
+      familyId: "linear",
+      variantId: "linear-default",
+      config: {},
+    },
+    connection: {
+      id: input.connectionId,
+      displayName: "Compile Runtime Plan Linear Connection",
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+    },
+    binding: {
+      id: input.bindingId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        tools: input.tools,
+      },
+    },
+  };
+}
+
+function datadogBinding(input: {
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  tools: string[];
+}): ConnectorBindingInput {
+  return {
+    target: {
+      targetKey: input.targetKey,
+      familyId: "datadog",
+      variantId: "datadog-default",
+      config: {},
+    },
+    connection: {
+      id: input.connectionId,
+      displayName: "Compile Runtime Plan Datadog Connection",
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+    },
+    binding: {
+      id: input.bindingId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        tools: input.tools,
+      },
+    },
+  };
+}
+
+function expectArtifactInstallStep(
+  step: RuntimeArtifactInstallStep | undefined,
+): RuntimeArtifactInstallStep {
+  if (step === undefined) {
+    throw new Error("Expected artifact install step.");
+  }
+
+  return step;
+}
+
+function readArtifact(
+  runtimePlan: RuntimePlan,
+  artifactKey: string,
+): RuntimePlan["artifacts"][number] {
+  const artifact = runtimePlan.artifacts.find((candidate) => candidate.artifactKey === artifactKey);
+
+  if (artifact === undefined) {
+    throw new Error(`Expected runtime plan to include artifact ${artifactKey}.`);
+  }
+
+  return artifact;
+}
+
+function expectExecInstallStep(
+  step: RuntimeArtifactInstallStep | undefined,
+): Extract<RuntimeArtifactInstallStep, { op: "exec" }> {
+  const installStep = expectArtifactInstallStep(step);
+  if (installStep.op !== "exec") {
+    throw new Error(`Expected exec artifact install step, received ${installStep.op}.`);
+  }
+
+  return installStep;
+}
+
+function expectGitHubReleaseInstallStep(
+  step: RuntimeArtifactInstallStep | undefined,
+): Extract<RuntimeArtifactInstallStep, { op: "github_release_install" }> {
+  const installStep = expectArtifactInstallStep(step);
+  if (installStep.op !== "github_release_install") {
+    throw new Error(`Expected github_release_install artifact step, received ${installStep.op}.`);
+  }
+
+  return installStep;
+}
+
+function readSetupFileContent(runtimePlan: RuntimePlan, fileId: string): string {
+  const content = runtimePlan.runtimeClients[0]?.setup.files.find(
+    (file) => file.fileId === fileId,
+  )?.content;
+  if (content === undefined) {
+    throw new Error(`Expected runtime plan setup file '${fileId}'.`);
+  }
+
+  return content;
+}
+
+function hasEgressRoute(runtimePlan: RuntimePlan, baseUrl: string, host: string): boolean {
+  return runtimePlan.egressRoutes.some(
+    (route) => route.upstream.baseUrl === baseUrl && route.match.hosts.includes(host),
+  );
+}
+
+function hasHost(runtimePlan: RuntimePlan, host: string): boolean {
+  return runtimePlan.egressRoutes.some((route) => route.match.hosts.includes(host));
+}

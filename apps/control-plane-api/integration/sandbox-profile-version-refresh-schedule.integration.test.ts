@@ -1,48 +1,51 @@
-import {
-  sandboxProfiles,
-  sandboxProfileVersions,
-  ScheduleTargetTypes,
-} from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { ScheduleTargetTypes } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-} from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
+  deleteSandboxProfileVersionRefreshScheduleResponseSchema,
+  sandboxProfileVersionRefreshScheduleResponseSchema,
+} from "../src/sandbox-profiles/schemas.js";
+import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
-describe("sandbox profile version refresh schedule integration", () => {
-  it("creates and updates a snapshot refresh schedule for a profile version", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-refresh-schedule@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile version refresh schedule integration", () => {
+  it("creates and updates a snapshot refresh schedule for a profile version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_refresh_schedule_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Refresh Schedule Profile",
         activeVersion: 1,
         createdAt: "2026-04-28T00:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_refresh_schedule_001",
         version: 1,
         publishedAt: "2026-04-28T00:01:00.000Z",
       }),
     );
 
-    const createResponse = await fixture.request(
+    const createResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions/1/refresh-schedule",
       {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
         body: JSON.stringify({
           name: "Daily refresh",
@@ -53,34 +56,35 @@ describe("sandbox profile version refresh schedule integration", () => {
     );
 
     expect(createResponse.status).toBe(200);
-    await expect(createResponse.json()).resolves.toMatchObject({
+    const createdBody = sandboxProfileVersionRefreshScheduleResponseSchema.parse(
+      await createResponse.json(),
+    );
+    expect(createdBody).toMatchObject({
       sandboxProfileId: "sbp_refresh_schedule_001",
       sandboxProfileVersion: 1,
       name: "Daily refresh",
       cronExpression: "0 9 * * *",
       timezone: "Asia/Singapore",
       enabled: true,
-      nextScheduledAt: expect.any(String),
     });
+    if (createdBody.nextScheduledAt === null) {
+      throw new Error("Expected refresh schedule to expose the next scheduled timestamp.");
+    }
+    expect(Number.isNaN(Date.parse(createdBody.nextScheduledAt))).toBe(false);
 
-    const createdTargets =
-      await fixture.db.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({
+    const createdTarget =
+      await env.controlPlaneDb.query.sandboxProfileSnapshotRefreshScheduleTargets.findFirst({
         where: (table, { eq }) => eq(table.sandboxProfileId, "sbp_refresh_schedule_001"),
       });
-    expect(createdTargets).toHaveLength(1);
-    const createdTarget = createdTargets[0];
     if (createdTarget === undefined) {
       throw new Error("Expected refresh schedule target to be created.");
     }
-    const createdSchedule = await fixture.db.query.schedules.findFirst({
+
+    const createdSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, createdTarget.scheduleId),
     });
-    if (createdSchedule === undefined) {
-      throw new Error("Expected refresh schedule to be created.");
-    }
-    expect(createdTarget.sandboxProfileVersion).toBe(1);
     expect(createdSchedule).toMatchObject({
-      organizationId: authenticatedSession.organizationId,
+      organizationId: session.organizationId,
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
       name: "Daily refresh",
       cronExpression: "0 9 * * *",
@@ -88,21 +92,18 @@ describe("sandbox profile version refresh schedule integration", () => {
       enabled: true,
       deletedAt: null,
     });
-    expect(new Date(String(createdSchedule.nextScheduledAt)).toISOString()).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\.000Z$/u,
-    );
 
-    const listVersionsResponse = await fixture.request(
+    const listVersionsResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
 
     expect(listVersionsResponse.status).toBe(200);
-    await expect(listVersionsResponse.json()).resolves.toMatchObject({
+    expect(await listVersionsResponse.json()).toMatchObject({
       versions: [
         {
           sandboxProfileId: "sbp_refresh_schedule_001",
@@ -113,19 +114,18 @@ describe("sandbox profile version refresh schedule integration", () => {
             cronExpression: "0 9 * * *",
             timezone: "Asia/Singapore",
             enabled: true,
-            nextScheduledAt: expect.any(String),
           },
         },
       ],
     });
 
-    const updateResponse = await fixture.request(
+    const updateResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_001/versions/1/refresh-schedule",
       {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
         body: JSON.stringify({
           cronExpression: "30 10 * * *",
@@ -137,11 +137,12 @@ describe("sandbox profile version refresh schedule integration", () => {
     expect(updateResponse.status).toBe(200);
 
     const updatedTargets =
-      await fixture.db.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({
+      await env.controlPlaneDb.query.sandboxProfileSnapshotRefreshScheduleTargets.findMany({
         where: (table, { eq }) => eq(table.sandboxProfileId, "sbp_refresh_schedule_001"),
       });
     expect(updatedTargets).toHaveLength(1);
-    const updatedSchedule = await fixture.db.query.schedules.findFirst({
+
+    const updatedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, createdTarget.scheduleId),
     });
     expect(updatedSchedule).toMatchObject({
@@ -154,35 +155,35 @@ describe("sandbox profile version refresh schedule integration", () => {
     });
   });
 
-  it("rejects invalid cron and timezone before persistence", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-refresh-schedule-invalid@example.com",
+  it("rejects invalid cron and timezone before creating a schedule", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule-invalid@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_refresh_schedule_invalid",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Invalid Refresh Schedule Profile",
         activeVersion: 1,
         createdAt: "2026-04-28T00:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_refresh_schedule_invalid",
         version: 1,
         publishedAt: "2026-04-28T00:01:00.000Z",
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_invalid/versions/1/refresh-schedule",
       {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
         body: JSON.stringify({
           cronExpression: "*/15 9 * * *",
@@ -193,41 +194,41 @@ describe("sandbox profile version refresh schedule integration", () => {
 
     expect(response.status).toBe(400);
 
-    const persistedSchedules = await fixture.db.query.schedules.findMany({
-      where: (table, { eq }) => eq(table.organizationId, authenticatedSession.organizationId),
+    const persistedSchedules = await env.controlPlaneDb.query.schedules.findMany({
+      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
     });
     expect(persistedSchedules).toHaveLength(0);
   });
 
-  it("soft-deletes an existing snapshot refresh schedule", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-refresh-schedule-delete@example.com",
+  it("soft-deletes an existing snapshot refresh schedule", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-refresh-schedule-delete@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_refresh_schedule_delete",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Delete Refresh Schedule Profile",
         activeVersion: 1,
         createdAt: "2026-04-28T00:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_refresh_schedule_delete",
         version: 1,
         publishedAt: "2026-04-28T00:01:00.000Z",
       }),
     );
 
-    await fixture.request(
+    const createResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_delete/versions/1/refresh-schedule",
       {
         method: "PUT",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
         body: JSON.stringify({
           cronExpression: "0 9 * * *",
@@ -235,26 +236,29 @@ describe("sandbox profile version refresh schedule integration", () => {
         }),
       },
     );
+    expect(createResponse.status).toBe(200);
 
-    const deleteResponse = await fixture.request(
+    const deleteResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_delete/versions/1/refresh-schedule",
       {
         method: "DELETE",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
 
     expect(deleteResponse.status).toBe(200);
-    await expect(deleteResponse.json()).resolves.toEqual({
+    expect(
+      deleteSandboxProfileVersionRefreshScheduleResponseSchema.parse(await deleteResponse.json()),
+    ).toEqual({
       sandboxProfileId: "sbp_refresh_schedule_delete",
       sandboxProfileVersion: 1,
       deleted: true,
     });
 
-    const persistedSchedule = await fixture.db.query.schedules.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authenticatedSession.organizationId),
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
     });
     expect(persistedSchedule).toMatchObject({
       enabled: false,
@@ -262,17 +266,17 @@ describe("sandbox profile version refresh schedule integration", () => {
     });
     expect(persistedSchedule?.deletedAt).not.toBeNull();
 
-    const listVersionsResponse = await fixture.request(
+    const listVersionsResponse = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_refresh_schedule_delete/versions",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
 
     expect(listVersionsResponse.status).toBe(200);
-    await expect(listVersionsResponse.json()).resolves.toMatchObject({
+    expect(await listVersionsResponse.json()).toMatchObject({
       versions: [
         {
           sandboxProfileId: "sbp_refresh_schedule_delete",

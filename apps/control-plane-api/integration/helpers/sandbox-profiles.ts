@@ -5,7 +5,7 @@ import {
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
-export function createSandboxProfileFixture(input: {
+export function sandboxProfileRow(input: {
   id: string;
   organizationId: string;
   displayName: string;
@@ -24,7 +24,7 @@ export function createSandboxProfileFixture(input: {
   };
 }
 
-export function createSandboxProfileVersionFixture(input: {
+export function sandboxProfileVersionRow(input: {
   sandboxProfileId: string;
   version: number;
   state?: "draft" | "published";
@@ -45,7 +45,7 @@ export function createSandboxProfileVersionFixture(input: {
   };
 }
 
-export function createIntegrationTargetFixture(input: {
+export function integrationTargetRow(input: {
   targetKey: string;
   variantId: string;
   enabled: boolean;
@@ -61,12 +61,13 @@ export function createIntegrationTargetFixture(input: {
   };
 }
 
-export function createIntegrationConnectionFixture(input: {
+export function integrationConnectionRow(input: {
   id: string;
   organizationId: string;
   targetKey: string;
   displayName: string;
   status: IntegrationConnectionStatus;
+  config?: Record<string, unknown>;
 }) {
   return {
     id: input.id,
@@ -74,10 +75,11 @@ export function createIntegrationConnectionFixture(input: {
     targetKey: input.targetKey,
     displayName: input.displayName,
     status: input.status,
+    ...(input.config === undefined ? {} : { config: input.config }),
   };
 }
 
-export function createSandboxProfileVersionIntegrationBindingFixture(input: {
+export function sandboxProfileVersionIntegrationBindingRow(input: {
   id: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;

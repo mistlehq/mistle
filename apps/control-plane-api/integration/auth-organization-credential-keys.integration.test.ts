@@ -1,20 +1,25 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import { it } from "./test-context.js";
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
-describe("auth organization credential keys integration", () => {
-  it("creates an initial organization credential key on organization creation", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession();
+describe.concurrent("auth organization credential keys integration", () => {
+  it("creates an initial organization credential key on organization creation", async ({ env }) => {
+    const session = await env.auth.createSession();
 
-    const credentialKeys = await fixture.db.query.organizationCredentialKeys.findMany({
+    const credentialKeys = await env.controlPlaneDb.query.organizationCredentialKeys.findMany({
       columns: {
         version: true,
         masterKeyVersion: true,
         ciphertext: true,
       },
-      where: (table, { eq }) => eq(table.organizationId, authenticatedSession.organizationId),
+      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
     });
     expect(credentialKeys).toHaveLength(1);
 
@@ -24,9 +29,7 @@ describe("auth organization credential keys integration", () => {
     }
 
     expect(credentialKey.version).toBe(1);
-    expect(credentialKey.masterKeyVersion).toBe(
-      fixture.config.integrations.activeMasterEncryptionKeyVersion,
-    );
-    expect(credentialKey.ciphertext).toMatch(/^v1\.[^.\s]+\.[^.\s]+\.[^.\s]+$/);
+    expect(credentialKey.masterKeyVersion).toBe(1);
+    expect(credentialKey.ciphertext).toMatch(/^v1\.[^.\s]+\.[^.\s]+\.[^.\s]+$/u);
   });
 });

@@ -1,11 +1,10 @@
-import {
-  MemberRoles,
-  members,
-  organizationSandboxStorageSettings,
-  SandboxStorageBackend,
-  SandboxStorageConfigSources,
-  sessions,
-} from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { SandboxStorageBackend, SandboxStorageConfigSources } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -13,29 +12,28 @@ import {
   GetOrganizationSandboxStorageSettingsResponseSchema,
   PutOrganizationSandboxStorageSettingsResponseSchema,
 } from "../src/organizations/schemas.js";
-import { upsertOrganizationSandboxStorageSettings } from "../src/sandbox-storage/services/organization-sandbox-storage-settings.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-import { it } from "./test-context.js";
 
-describe("organization sandbox storage settings", () => {
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("organization sandbox storage settings integration", () => {
   it("returns managed defaults when the organization has no explicit storage settings", async ({
-    fixture,
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "organization-sandbox-storage-defaults@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-defaults@example.com",
     });
 
-    const response = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      headers: {
-        cookie: session.cookie,
-      },
+    const response = await getSandboxStorageSettings({
+      cookie: session.cookie,
+      env,
     });
 
     expect(response.status).toBe(200);
     const payload = GetOrganizationSandboxStorageSettingsResponseSchema.parse(
       await response.json(),
     );
-
     expect(payload).toEqual({
       persistentSandboxesEnabled: false,
       storageConfigSource: "managed",
@@ -45,20 +43,17 @@ describe("organization sandbox storage settings", () => {
     });
   });
 
-  it("stores organization override settings encrypted and returns only redacted summaries", async ({
-    fixture,
+  it("stores organization override settings encrypted and returns redacted summaries", async ({
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "organization-sandbox-storage-override@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-override@example.com",
     });
 
-    const response = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: session.cookie,
-      },
-      body: JSON.stringify({
+    const putResponse = await putSandboxStorageSettings({
+      cookie: session.cookie,
+      env,
+      body: {
         persistentSandboxesEnabled: true,
         storageConfigSource: "organization",
         organizationStorageConfig: {
@@ -76,14 +71,13 @@ describe("organization sandbox storage settings", () => {
             },
           ],
         },
-      }),
+      },
     });
 
-    expect(response.status).toBe(200);
+    expect(putResponse.status).toBe(200);
     const payload = PutOrganizationSandboxStorageSettingsResponseSchema.parse(
-      await response.json(),
+      await putResponse.json(),
     );
-
     expect(payload).toEqual({
       persistentSandboxesEnabled: true,
       storageConfigSource: "organization",
@@ -106,10 +100,10 @@ describe("organization sandbox storage settings", () => {
       },
     });
 
-    const storedSettings = await fixture.db.query.organizationSandboxStorageSettings.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
-    });
-
+    const storedSettings =
+      await env.controlPlaneDb.query.organizationSandboxStorageSettings.findFirst({
+        where: (table, { eq }) => eq(table.organizationId, session.organizationId),
+      });
     expect(storedSettings).toMatchObject({
       organizationId: session.organizationId,
       persistentSandboxesEnabled: true,
@@ -121,52 +115,46 @@ describe("organization sandbox storage settings", () => {
     expect(storedSettings?.storageConfigNonce).toEqual(expect.any(String));
     expect(storedSettings?.organizationCredentialKeyVersion).toEqual(expect.any(Number));
 
-    const getResponse = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      headers: {
-        cookie: session.cookie,
-      },
+    const getResponse = await getSandboxStorageSettings({
+      cookie: session.cookie,
+      env,
     });
-
     expect(getResponse.status).toBe(200);
     await expect(getResponse.json()).resolves.toEqual(payload);
   });
 
-  it("switches back to managed settings and clears stored override material", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-sandbox-storage-managed@example.com",
+  it("switches back to managed settings and clears stored override material", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-managed@example.com",
     });
 
-    await fixture.db.insert(organizationSandboxStorageSettings).values({
-      organizationId: session.organizationId,
-      persistentSandboxesEnabled: true,
-      storageBackend: SandboxStorageBackend.ARCHIL,
-      storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
-      storageConfigVersion: 1,
-      storageConfigCiphertext: "ciphertext",
-      storageConfigNonce: "nonce",
-      organizationCredentialKeyVersion: 1,
-    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.organizationSandboxStorageSettings)
+      .values({
+        organizationId: session.organizationId,
+        persistentSandboxesEnabled: true,
+        storageBackend: SandboxStorageBackend.ARCHIL,
+        storageConfigSource: SandboxStorageConfigSources.ORGANIZATION,
+        storageConfigVersion: 1,
+        storageConfigCiphertext: "ciphertext",
+        storageConfigNonce: "nonce",
+        organizationCredentialKeyVersion: 1,
+      });
 
-    const response = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: session.cookie,
-      },
-      body: JSON.stringify({
+    const response = await putSandboxStorageSettings({
+      cookie: session.cookie,
+      env,
+      body: {
         persistentSandboxesEnabled: false,
         storageConfigSource: "managed",
         organizationStorageConfig: null,
-      }),
+      },
     });
 
     expect(response.status).toBe(200);
     const payload = PutOrganizationSandboxStorageSettingsResponseSchema.parse(
       await response.json(),
     );
-
     expect(payload).toEqual({
       persistentSandboxesEnabled: false,
       storageConfigSource: "managed",
@@ -175,10 +163,10 @@ describe("organization sandbox storage settings", () => {
       organizationStorageConfigSummary: null,
     });
 
-    const storedSettings = await fixture.db.query.organizationSandboxStorageSettings.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, session.organizationId),
-    });
-
+    const storedSettings =
+      await env.controlPlaneDb.query.organizationSandboxStorageSettings.findFirst({
+        where: (table, { eq }) => eq(table.organizationId, session.organizationId),
+      });
     expect(storedSettings).toMatchObject({
       organizationId: session.organizationId,
       persistentSandboxesEnabled: false,
@@ -191,82 +179,17 @@ describe("organization sandbox storage settings", () => {
     });
   });
 
-  it("returns forbidden when a same-organization member reads sandbox storage settings", async ({
-    fixture,
+  it("rejects managed settings when an organization override payload is provided", async ({
+    env,
   }) => {
-    const ownerSession = await fixture.authSession({
-      email: "organization-sandbox-storage-settings-member-read-owner@example.com",
-    });
-    const memberSession = await fixture.authSession({
-      email: "organization-sandbox-storage-settings-member-read-member@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-managed-contract@example.com",
     });
 
-    await addMemberToActiveOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: memberSession.userId,
-    });
-
-    const response = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      headers: {
-        cookie: memberSession.cookie,
-      },
-    });
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      code: "FORBIDDEN",
-      message: "Forbidden API request.",
-    });
-  });
-
-  it("returns forbidden when a same-organization member updates sandbox storage settings", async ({
-    fixture,
-  }) => {
-    const ownerSession = await fixture.authSession({
-      email: "organization-sandbox-storage-settings-member-update-owner@example.com",
-    });
-    const memberSession = await fixture.authSession({
-      email: "organization-sandbox-storage-settings-member-update-member@example.com",
-    });
-
-    await addMemberToActiveOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: memberSession.userId,
-    });
-
-    const response = await fixture.request("/v1/organization/sandbox-storage-settings", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: memberSession.cookie,
-      },
-      body: JSON.stringify({
-        persistentSandboxesEnabled: true,
-        storageConfigSource: "managed",
-        organizationStorageConfig: null,
-      }),
-    });
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      code: "FORBIDDEN",
-      message: "Forbidden API request.",
-    });
-  });
-
-  it("fails fast when managed storage settings are paired with an organization override payload", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-sandbox-storage-settings-managed-contract@example.com",
-    });
-
-    await expect(
-      upsertOrganizationSandboxStorageSettings({
-        db: fixture.db,
-        organizationId: session.organizationId,
+    const response = await putSandboxStorageSettings({
+      cookie: session.cookie,
+      env,
+      body: {
         persistentSandboxesEnabled: true,
         storageConfigSource: "managed",
         organizationStorageConfig: {
@@ -284,31 +207,120 @@ describe("organization sandbox storage settings", () => {
             },
           ],
         },
-        encryptionConfig: {
-          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-        },
-      }),
-    ).rejects.toThrow(
-      "Organization storage config must be null when storage config source is managed.",
-    );
+      },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
+  });
+
+  it("returns forbidden when a same-organization member reads sandbox storage settings", async ({
+    env,
+  }) => {
+    const ownerSession = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-member-read-owner@example.com",
+    });
+    const memberSession = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-member-read-member@example.com",
+    });
+
+    await addMemberToActiveOrganization({
+      env,
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+    });
+
+    const response = await getSandboxStorageSettings({
+      cookie: memberSession.cookie,
+      env,
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+  });
+
+  it("returns forbidden when a same-organization member updates sandbox storage settings", async ({
+    env,
+  }) => {
+    const ownerSession = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-member-update-owner@example.com",
+    });
+    const memberSession = await env.auth.createSession({
+      email: "integration-new-organization-sandbox-storage-member-update-member@example.com",
+    });
+
+    await addMemberToActiveOrganization({
+      env,
+      organizationId: ownerSession.organizationId,
+      userId: memberSession.userId,
+    });
+
+    const response = await putSandboxStorageSettings({
+      cookie: memberSession.cookie,
+      env,
+      body: {
+        persistentSandboxesEnabled: true,
+        storageConfigSource: "managed",
+        organizationStorageConfig: null,
+      },
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
   });
 });
 
+async function getSandboxStorageSettings(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+}) {
+  return await input.env.controlPlaneApi.http.fetch("/v1/organization/sandbox-storage-settings", {
+    method: "GET",
+    headers: {
+      cookie: input.cookie,
+    },
+  });
+}
+
+async function putSandboxStorageSettings(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  body: unknown;
+}) {
+  return await input.env.controlPlaneApi.http.fetch("/v1/organization/sandbox-storage-settings", {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      cookie: input.cookie,
+    },
+    body: JSON.stringify(input.body),
+  });
+}
+
 async function addMemberToActiveOrganization(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
+  env: IntegrationTestEnvironment;
   organizationId: string;
   userId: string;
 }): Promise<void> {
-  await input.fixture.db.insert(members).values({
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.members).values({
     organizationId: input.organizationId,
     userId: input.userId,
-    role: MemberRoles.MEMBER,
+    role: "member",
   });
 
-  await input.fixture.db
-    .update(sessions)
+  await input.env.controlPlaneDb
+    .update(input.env.controlPlaneTables.sessions)
     .set({
       activeOrganizationId: input.organizationId,
     })
-    .where(eq(sessions.userId, input.userId));
+    .where(eq(input.env.controlPlaneTables.sessions.userId, input.userId));
 }

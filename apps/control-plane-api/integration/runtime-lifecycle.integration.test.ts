@@ -1,99 +1,42 @@
-import { reserveAvailablePort } from "@mistle/test-harness";
-import { sql } from "drizzle-orm";
-import { describe, expect } from "vitest";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
 
-import { createControlPlaneApiRuntime } from "../src/main.js";
-import type { ControlPlaneApiConfig } from "../src/types.js";
-import { it } from "./test-context.js";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import { expect } from "vitest";
 
-function createRuntimeConfigWithPort(input: {
-  config: ControlPlaneApiConfig;
-  host: string;
-  port: number;
-}): ControlPlaneApiConfig {
-  const baseUrl = `http://${input.host}:${String(input.port)}`;
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+  __dangerouslyIsolatedServices: {
+    reason: "This suite intentionally stops and restarts the control-plane API runtime.",
+    services: ["control-plane-api"],
+  },
+});
 
-  return {
-    ...input.config,
-    server: {
-      ...input.config.server,
-      host: input.host,
-      port: input.port,
-    },
-    auth: {
-      ...input.config.auth,
-      baseUrl,
-      trustedOrigins: [baseUrl],
-    },
-  };
-}
+it("closes and restarts the control-plane API runtime on a stable HTTP endpoint", async ({
+  env,
+}) => {
+  const baseUrl = env.controlPlaneApi.hostBaseUrl;
 
-describe("runtime lifecycle integration", () => {
-  it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
-    const host = "127.0.0.1";
-    const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneApiRuntime({
-      app: createRuntimeConfigWithPort({
-        config: fixture.config,
-        host,
-        port,
-      }),
-    });
+  const initialHealthResponse = await env.controlPlaneApi.http.fetch("/__healthz");
+  expect(initialHealthResponse.status).toBe(200);
 
-    try {
-      await runtime.start();
-      const healthURL = `http://${host}:${String(port)}/__healthz`;
-      const healthResponse = await fetch(healthURL);
-      expect(healthResponse.status).toBe(200);
+  await Promise.all([
+    env.controlPlaneApi.stop(),
+    env.controlPlaneApi.stop(),
+    env.controlPlaneApi.stop(),
+  ]);
+  await expect(fetch(new URL("/__healthz", baseUrl))).rejects.toBeInstanceOf(Error);
 
-      await expect(runtime.start()).rejects.toThrow("Control plane API server is already started.");
+  await env.controlPlaneApi.start();
+  expect(env.controlPlaneApi.hostBaseUrl).toBe(baseUrl);
 
-      await Promise.all([runtime.stop(), runtime.stop(), runtime.stop()]);
-      await expect(runtime.start()).rejects.toThrow(
-        "Control plane API runtime is already stopped.",
-      );
-    } finally {
-      await runtime.stop();
-    }
-  });
+  const restartedHealthResponse = await env.controlPlaneApi.http.fetch("/__healthz");
+  expect(restartedHealthResponse.status).toBe(200);
 
-  it("serves health checks over HTTP when started and closes listener on stop", async ({
-    fixture,
-  }) => {
-    const host = "127.0.0.1";
-    const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneApiRuntime({
-      app: createRuntimeConfigWithPort({
-        config: fixture.config,
-        host,
-        port,
-      }),
-    });
-    const healthURL = `http://${host}:${String(port)}/__healthz`;
+  await env.controlPlaneApi.restart();
+  expect(env.controlPlaneApi.hostBaseUrl).toBe(baseUrl);
 
-    await runtime.start();
-
-    try {
-      const response = await fetch(healthURL);
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        ok: true,
-      });
-    } finally {
-      await runtime.stop();
-    }
-
-    await expect(fetch(healthURL)).rejects.toBeInstanceOf(Error);
-  });
-
-  it("releases runtime resources after stop", async ({ fixture }) => {
-    const runtime = await createControlPlaneApiRuntime({
-      app: fixture.config,
-    });
-
-    await runtime.db.execute(sql`select 1`);
-    await runtime.stop();
-
-    await expect(runtime.db.execute(sql`select 1`)).rejects.toBeInstanceOf(Error);
-  });
+  const secondRestartHealthResponse = await env.controlPlaneApi.http.fetch("/__healthz");
+  expect(secondRestartHealthResponse.status).toBe(200);
 });

@@ -1,62 +1,336 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The test cases use an extended Vitest fixture created by the test harness.
+ */
+
 import { randomUUID } from "node:crypto";
 
-import { MemberRoles, members, verifications } from "@mistle/db/control-plane";
-import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import { MemberRoles } from "@mistle/db/control-plane";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { readLatestSignInOtp } from "../integration/helpers/sign-in-otp.js";
 import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
-import { readLatestSignInOtp } from "./helpers/sign-in-otp.js";
-import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-import { it } from "./test-context.js";
 
-async function sendOTPRequest(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  recipient: string;
-}): Promise<Response> {
-  return input.fixture.request("/v1/auth/email-otp/send-verification-otp", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      email: input.recipient,
-      type: "sign-in",
-    }),
+const it = createIntegrationTest({
+  services: ["control-plane-api", "control-plane-worker"],
+  extraInfra: ["mailpit"],
+});
+const OtpAllowedAttempts = 3;
+
+describe("auth otp integration", () => {
+  it("sends OTP, signs in, and leaves organization context empty", async ({ env }) => {
+    const email = `integration-new-auth-otp-${randomUUID()}@example.com`;
+
+    await sendOtp({ env, email });
+
+    const receivedMessage = await env.mailpit.waitForMessage({
+      timeoutMs: 15_000,
+      description: `sign-in OTP email for ${email}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your Mistle sign-in code" &&
+        message.To.some((recipient) => recipient.Address === email),
+    });
+    const messageSummary = await env.mailpit.getMessageSummary(receivedMessage.ID);
+    const otp = await readIssuedOtp({ env, email });
+    expect(messageSummary.Text).toContain(otp);
+
+    await signInWithOtp({ env, email, otp });
+
+    const user = await env.controlPlaneDb.query.users.findFirst({
+      columns: {
+        id: true,
+        emailVerified: true,
+      },
+      where: (table, { eq }) => eq(table.email, email),
+    });
+    expect(user).toBeDefined();
+    if (user === undefined) {
+      throw new Error("Expected OTP sign-in to create a user.");
+    }
+    expect(user.emailVerified).toBe(true);
+
+    const ownerMembership = await env.controlPlaneDb.query.members.findFirst({
+      columns: {
+        organizationId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.userId, user.id), eq(table.role, MemberRoles.OWNER)),
+    });
+    expect(ownerMembership).toBeUndefined();
+
+    const teamMembership = await env.controlPlaneDb.query.teamMembers.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.userId, user.id),
+    });
+    expect(teamMembership).toBeUndefined();
+
+    const session = await readLatestSession({ env, userId: user.id });
+    expect(session.activeOrganizationId).toBeNull();
   });
+
+  it("uses the issued session cookie against protected organization endpoints after organization creation", async ({
+    env,
+  }) => {
+    const email = `integration-new-auth-otp-protected-${randomUUID()}@example.com`;
+    const cookie = await signInAndReadCookie({ env, email });
+    const organizationId = await createOrganization({
+      env,
+      cookie,
+      name: "Integration OTP Organization",
+      slug: `integration-otp-${randomUUID()}`,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/membership-capabilities",
+      {
+        headers: {
+          cookie,
+        },
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const capabilities = MembershipCapabilitiesSchema.parse(await response.json());
+    expect(capabilities.organizationId).toBe(organizationId);
+    expect(capabilities.actorRole).toBe("owner");
+  });
+
+  it("switches the active organization for a user who belongs to more than one organization", async ({
+    env,
+  }) => {
+    const email = `integration-new-auth-otp-switch-org-${randomUUID()}@example.com`;
+    const cookie = await signInAndReadCookie({ env, email });
+    const firstOrganizationId = await createOrganization({
+      env,
+      cookie,
+      name: "First Switch Organization",
+      slug: `integration-switch-first-${randomUUID()}`,
+    });
+    const secondOrganizationId = await createOrganization({
+      env,
+      cookie,
+      name: "Second Switch Organization",
+      slug: `integration-switch-second-${randomUUID()}`,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/auth/organization/set-active", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie,
+      },
+      body: JSON.stringify({
+        organizationId: firstOrganizationId,
+      }),
+    });
+    expect(response.status).toBe(200);
+
+    const user = await readUser({ env, email });
+    const session = await readLatestSession({ env, userId: user.id });
+    expect(session.activeOrganizationId).toBe(firstOrganizationId);
+    expect(session.activeOrganizationId).not.toBe(secondOrganizationId);
+  });
+
+  it("does not bootstrap an organization for a newly invited user", async ({ env }) => {
+    const inviterSession = await env.auth.createSession({
+      email: `integration-new-auth-otp-invite-sender-${randomUUID()}@example.com`,
+    });
+    const email = `integration-new-auth-otp-invitee-${randomUUID()}@example.com`;
+
+    const inviteResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/auth/organization/invite-member",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: inviterSession.cookie,
+        },
+        body: JSON.stringify({
+          organizationId: inviterSession.organizationId,
+          email,
+          role: "member",
+        }),
+      },
+    );
+    expect(inviteResponse.status).toBe(200);
+
+    await signInAndReadCookie({ env, email });
+
+    const user = await readUser({ env, email });
+    const ownerMembership = await env.controlPlaneDb.query.members.findFirst({
+      columns: {
+        organizationId: true,
+      },
+      where: (table, { and, eq }) =>
+        and(eq(table.userId, user.id), eq(table.role, MemberRoles.OWNER)),
+    });
+    expect(ownerMembership).toBeUndefined();
+
+    const teamMembership = await env.controlPlaneDb.query.teamMembers.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.userId, user.id),
+    });
+    expect(teamMembership).toBeUndefined();
+
+    const session = await readLatestSession({ env, userId: user.id });
+    expect(session.activeOrganizationId).toBeNull();
+  });
+
+  it("rejects sign-in with an incorrect OTP and does not create a user", async ({ env }) => {
+    const email = `integration-new-auth-otp-wrong-code-${randomUUID()}@example.com`;
+
+    await sendOtp({ env, email });
+
+    const response = await signInWithOtp({ env, email, otp: "000000" });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('"code":"INVALID_OTP"');
+
+    await expectUserMissing({ env, email });
+  });
+
+  it("rejects sign-in when no OTP was issued and does not create a user", async ({ env }) => {
+    const email = `integration-new-auth-otp-no-send-${randomUUID()}@example.com`;
+
+    const response = await signInWithOtp({ env, email, otp: "123456" });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('"code":"INVALID_OTP"');
+
+    await expectUserMissing({ env, email });
+  });
+
+  it("locks OTP verification after allowed failed attempts", async ({ env }) => {
+    const email = `integration-new-auth-otp-attempt-limit-${randomUUID()}@example.com`;
+
+    await sendOtp({ env, email });
+    const otp = await readIssuedOtp({ env, email });
+
+    for (let attemptIndex = 0; attemptIndex < OtpAllowedAttempts; attemptIndex += 1) {
+      const response = await signInWithOtp({ env, email, otp: "000000" });
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain('"code":"INVALID_OTP"');
+    }
+
+    const blockedResponse = await signInWithOtp({ env, email, otp });
+    expect(blockedResponse.status).toBe(403);
+    expect(await blockedResponse.text()).toContain('"code":"TOO_MANY_ATTEMPTS"');
+
+    await expectUserMissing({ env, email });
+  });
+
+  it("rejects sign-in with an expired OTP", async ({ env }) => {
+    const email = `integration-new-auth-otp-expired-${randomUUID()}@example.com`;
+    const identifier = `sign-in-otp-${email.toLowerCase()}`;
+
+    await sendOtp({ env, email });
+    const otp = await readIssuedOtp({ env, email });
+    const verification = await env.controlPlaneDb.query.verifications.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.identifier, identifier),
+      orderBy: (table, { desc }) => [desc(table.createdAt)],
+    });
+    expect(verification).toBeDefined();
+    if (verification === undefined) {
+      throw new Error("Expected sign-in OTP verification row to exist.");
+    }
+
+    const updatedVerifications = await env.controlPlaneDb
+      .update(env.controlPlaneTables.verifications)
+      .set({
+        expiresAt: new Date(0),
+      })
+      .where(eq(env.controlPlaneTables.verifications.identifier, identifier))
+      .returning({
+        id: env.controlPlaneTables.verifications.id,
+        expiresAt: env.controlPlaneTables.verifications.expiresAt,
+      });
+    expect(updatedVerifications.length).toBeGreaterThanOrEqual(1);
+    expect(updatedVerifications.every((row) => row.expiresAt.getTime() === 0)).toBe(true);
+
+    const response = await signInWithOtp({ env, email, otp });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('"code":"OTP_EXPIRED"');
+
+    await expectUserMissing({ env, email });
+  });
+
+  it("does not create organization bootstrap records on repeated sign-ins", async ({ env }) => {
+    const email = `integration-new-auth-otp-idempotent-bootstrap-${randomUUID()}@example.com`;
+
+    await signInAndReadCookie({ env, email });
+    const user = await readUser({ env, email });
+    await expectNoOrganizationBootstrapRecords({ env, userId: user.id });
+
+    await signInAndReadCookie({ env, email });
+    await expectNoOrganizationBootstrapRecords({ env, userId: user.id });
+  });
+});
+
+type AuthOtpEnvironment = IntegrationTestEnvironment;
+
+async function sendOtp(input: { env: AuthOtpEnvironment; email: string }): Promise<void> {
+  const response = await input.env.controlPlaneApi.http.fetch(
+    "/v1/auth/email-otp/send-verification-otp",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        email: input.email,
+        type: "sign-in",
+      }),
+    },
+  );
+  expect(response.status).toBe(200);
 }
 
-async function signInWithOTP(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  recipient: string;
-  otp: string;
-}): Promise<Response> {
-  return input.fixture.request("/v1/auth/sign-in/email-otp", {
+async function signInWithOtp(input: { env: AuthOtpEnvironment; email: string; otp: string }) {
+  return await input.env.controlPlaneApi.http.fetch("/v1/auth/sign-in/email-otp", {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      email: input.recipient,
+      email: input.email,
       otp: input.otp,
     }),
   });
 }
 
-async function readIssuedOtp(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  recipient: string;
+async function signInAndReadCookie(input: {
+  env: AuthOtpEnvironment;
+  email: string;
 }): Promise<string> {
-  return readLatestSignInOtp({
-    db: input.fixture.db,
-    email: input.recipient,
-    otpLength: input.fixture.config.auth.otpLength,
+  await sendOtp(input);
+  const otp = await readIssuedOtp(input);
+  const response = await signInWithOtp({ ...input, otp });
+  expect(response.status).toBe(200);
+
+  return readRequestCookie(response);
+}
+
+async function readIssuedOtp(input: { env: AuthOtpEnvironment; email: string }): Promise<string> {
+  return await readLatestSignInOtp({
+    db: input.env.controlPlaneDb,
+    email: input.email,
+    otpLength: 6,
   });
 }
 
-function extractRequestCookie(signInResponse: Response): string {
-  const setCookie = signInResponse.headers.get("set-cookie");
+function readRequestCookie(response: {
+  headers: { get: (name: string) => string | null };
+}): string {
+  const setCookie = response.headers.get("set-cookie");
   if (typeof setCookie !== "string" || setCookie.length === 0) {
     throw new Error("Expected sign-in response to include set-cookie.");
   }
@@ -69,47 +343,13 @@ function extractRequestCookie(signInResponse: Response): string {
   return cookiePair;
 }
 
-async function signInAndReadRequestCookie(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  recipient: string;
-}): Promise<string> {
-  const sendResponse = await sendOTPRequest({
-    fixture: input.fixture,
-    recipient: input.recipient,
-  });
-  expect(sendResponse.status).toBe(200);
-
-  const otp = await readIssuedOtp({
-    fixture: input.fixture,
-    recipient: input.recipient,
-  });
-
-  const signInResponse = await signInWithOTP({
-    fixture: input.fixture,
-    recipient: input.recipient,
-    otp,
-  });
-  expect(signInResponse.status).toBe(200);
-
-  return extractRequestCookie(signInResponse);
-}
-
-function readOrganizationIdFromPayload(payload: unknown): string | null {
-  if (typeof payload !== "object" || payload === null) {
-    return null;
-  }
-
-  const id = Reflect.get(payload, "id");
-  return typeof id === "string" && id.length > 0 ? id : null;
-}
-
-async function createOrganizationAndReadId(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
+async function createOrganization(input: {
+  env: AuthOtpEnvironment;
   cookie: string;
   name: string;
   slug: string;
 }): Promise<string> {
-  const response = await input.fixture.request("/v1/auth/organization/create", {
+  const response = await input.env.controlPlaneApi.http.fetch("/v1/auth/organization/create", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -123,8 +363,7 @@ async function createOrganizationAndReadId(input: {
   expect(response.status).toBe(200);
 
   const payload: unknown = await response.json().catch(() => null);
-  const organizationId = readOrganizationIdFromPayload(payload);
-  expect(organizationId).not.toBeNull();
+  const organizationId = readStringField(payload, "id");
   if (organizationId === null) {
     throw new Error("Expected organization create response to include organization id.");
   }
@@ -132,563 +371,81 @@ async function createOrganizationAndReadId(input: {
   return organizationId;
 }
 
-describe("auth otp integration", () => {
-  it("sends OTP, signs in, and leaves organization context empty", async ({ fixture }) => {
-    const recipient = "integration-auth-otp@example.com";
-    const workflowRunCountBefore = await countControlPlaneWorkflowRuns({
-      databaseUrl: fixture.databaseStack.directUrl,
-      workflowName: SendVerificationOTPWorkflowSpec.name,
-      inputEquals: {
-        email: recipient,
-        type: "sign-in",
-      },
-    });
-
-    const sendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(sendResponse.status).toBe(200);
-
-    const workflowRunCountAfter = await countControlPlaneWorkflowRuns({
-      databaseUrl: fixture.databaseStack.directUrl,
-      workflowName: SendVerificationOTPWorkflowSpec.name,
-      inputEquals: {
-        email: recipient,
-        type: "sign-in",
-      },
-    });
-    expect(workflowRunCountAfter).toBe(workflowRunCountBefore + 1);
-
-    const otp = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    const signInResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp,
-    });
-    expect(signInResponse.status).toBe(200);
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-        emailVerified: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeDefined();
-    if (user === undefined) {
-      throw new Error("Expected user to be created after OTP sign-in.");
-    }
-    expect(user.emailVerified).toBe(true);
-
-    const ownerMembership = await fixture.db.query.members.findFirst({
-      columns: {
-        organizationId: true,
-      },
-      where: (members, { and, eq }) =>
-        and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
-    });
-    expect(ownerMembership).toBeUndefined();
-
-    const teamMembership = await fixture.db.query.teamMembers.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
-    });
-    expect(teamMembership).toBeUndefined();
-
-    const session = await fixture.db.query.sessions.findFirst({
-      columns: {
-        activeOrganizationId: true,
-      },
-      where: (sessions, { eq }) => eq(sessions.userId, user.id),
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-    expect(session).toBeDefined();
-    if (session === undefined) {
-      throw new Error("Expected session to exist after OTP sign-in.");
-    }
-    expect(session.activeOrganizationId).toBeNull();
+async function readUser(input: {
+  env: AuthOtpEnvironment;
+  email: string;
+}): Promise<{ id: string }> {
+  const user = await input.env.controlPlaneDb.query.users.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { eq }) => eq(table.email, input.email),
   });
+  if (user === undefined) {
+    throw new Error(`Expected user '${input.email}' to exist.`);
+  }
 
-  it("uses the issued session cookie against protected organization endpoints after organization creation", async ({
-    fixture,
-  }) => {
-    const recipient = `integration-auth-otp-protected-${randomUUID()}@example.com`;
-    const requestCookie = await signInAndReadRequestCookie({
-      fixture,
-      recipient,
-    });
-    const organizationId = await createOrganizationAndReadId({
-      fixture,
-      cookie: requestCookie,
-      name: "Integration OTP Organization",
-      slug: `integration-otp-${randomUUID()}`,
-    });
+  return user;
+}
 
-    const capabilitiesResponse = await fixture.request("/v1/organization/membership-capabilities", {
-      headers: {
-        cookie: requestCookie,
-      },
-    });
-    expect(capabilitiesResponse.status).toBe(200);
-
-    const capabilities = MembershipCapabilitiesSchema.parse(await capabilitiesResponse.json());
-    expect(capabilities.organizationId).toBe(organizationId);
-    expect(capabilities.actorRole).toBe("owner");
+async function readLatestSession(input: {
+  env: AuthOtpEnvironment;
+  userId: string;
+}): Promise<{ activeOrganizationId: string | null }> {
+  const session = await input.env.controlPlaneDb.query.sessions.findFirst({
+    columns: {
+      activeOrganizationId: true,
+    },
+    where: (table, { eq }) => eq(table.userId, input.userId),
+    orderBy: (table, { desc }) => [desc(table.createdAt)],
   });
+  if (session === undefined) {
+    throw new Error(`Expected latest session to exist for user '${input.userId}'.`);
+  }
 
-  it("switches the active organization for a user who belongs to more than one organization", async ({
-    fixture,
-  }) => {
-    const recipient = `integration-auth-otp-switch-org-${randomUUID()}@example.com`;
-    const requestCookie = await signInAndReadRequestCookie({
-      fixture,
-      recipient,
-    });
-    const firstOrganizationId = await createOrganizationAndReadId({
-      fixture,
-      cookie: requestCookie,
-      name: "First Switch Organization",
-      slug: `integration-switch-first-${randomUUID()}`,
-    });
-    const secondOrganizationId = await createOrganizationAndReadId({
-      fixture,
-      cookie: requestCookie,
-      name: "Second Switch Organization",
-      slug: `integration-switch-second-${randomUUID()}`,
-    });
+  return session;
+}
 
-    const setActiveOrganizationResponse = await fixture.request(
-      "/v1/auth/organization/set-active",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: requestCookie,
-        },
-        body: JSON.stringify({
-          organizationId: firstOrganizationId,
-        }),
-      },
-    );
-    expect(setActiveOrganizationResponse.status).toBe(200);
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeDefined();
-    if (user === undefined) {
-      throw new Error("Expected user after organization switching sign-in.");
-    }
-
-    const session = await fixture.db.query.sessions.findFirst({
-      columns: {
-        activeOrganizationId: true,
-      },
-      where: (sessions, { eq }) => eq(sessions.userId, user.id),
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-    expect(session).toBeDefined();
-    if (session === undefined) {
-      throw new Error("Expected session after switching active organization.");
-    }
-
-    expect(session.activeOrganizationId).toBe(firstOrganizationId);
-    expect(session.activeOrganizationId).not.toBe(secondOrganizationId);
+async function expectUserMissing(input: { env: AuthOtpEnvironment; email: string }): Promise<void> {
+  const user = await input.env.controlPlaneDb.query.users.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { eq }) => eq(table.email, input.email),
   });
+  expect(user).toBeUndefined();
+}
 
-  it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {
-    const inviterSession = await fixture.authSession({
-      email: "integration-auth-otp-pending-invite-sender@example.com",
-    });
-    const recipient = `integration-auth-otp-pending-invite-${randomUUID()}@example.com`;
-
-    const inviteResponse = await fixture.request("/v1/auth/organization/invite-member", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: inviterSession.cookie,
-      },
-      body: JSON.stringify({
-        organizationId: inviterSession.organizationId,
-        email: recipient,
-        role: "member",
-      }),
-    });
-    expect(inviteResponse.status).toBe(200);
-
-    const sendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(sendResponse.status).toBe(200);
-
-    const otp = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    const signInResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp,
-    });
-    expect(signInResponse.status).toBe(200);
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq: eqUsers }) => eqUsers(users.email, recipient),
-    });
-    expect(user).toBeDefined();
-    if (user === undefined) {
-      throw new Error("Expected user to be created after OTP sign-in.");
-    }
-
-    const ownerMembership = await fixture.db.query.members.findFirst({
-      columns: {
-        organizationId: true,
-      },
-      where: (members, { and, eq: eqMembers }) =>
-        and(eqMembers(members.userId, user.id), eqMembers(members.role, MemberRoles.OWNER)),
-    });
-    expect(ownerMembership).toBeUndefined();
-
-    const teamMembership = await fixture.db.query.teamMembers.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (teamMembers, { eq: eqTeamMembers }) => eqTeamMembers(teamMembers.userId, user.id),
-    });
-    expect(teamMembership).toBeUndefined();
-
-    const session = await fixture.db.query.sessions.findFirst({
-      columns: {
-        activeOrganizationId: true,
-      },
-      where: (sessions, { eq: eqSessions }) => eqSessions(sessions.userId, user.id),
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-    expect(session).toBeDefined();
-    if (session === undefined) {
-      throw new Error("Expected session to exist after OTP sign-in.");
-    }
-    expect(session.activeOrganizationId).toBeNull();
+async function expectNoOrganizationBootstrapRecords(input: {
+  env: AuthOtpEnvironment;
+  userId: string;
+}): Promise<void> {
+  const ownerMemberships = await input.env.controlPlaneDb.query.members.findMany({
+    columns: {
+      organizationId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.userId, input.userId), eq(table.role, MemberRoles.OWNER)),
   });
+  expect(ownerMemberships).toHaveLength(0);
 
-  it("rejects sign-in with an incorrect OTP and does not create a user", async ({ fixture }) => {
-    const recipient = "integration-auth-otp-wrong-code@example.com";
-
-    const sendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(sendResponse.status).toBe(200);
-
-    const wrongOTPResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp: "000000",
-    });
-    expect(wrongOTPResponse.status).toBe(400);
-
-    const wrongOTPBody = await wrongOTPResponse.text();
-    expect(wrongOTPBody).toContain('"code":"INVALID_OTP"');
-    expect(wrongOTPBody).toContain('"message":"Invalid OTP"');
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeUndefined();
+  const teamMemberships = await input.env.controlPlaneDb.query.teamMembers.findMany({
+    columns: {
+      teamId: true,
+    },
+    where: (table, { eq }) => eq(table.userId, input.userId),
   });
+  expect(teamMemberships).toHaveLength(0);
 
-  it("rejects sign-in when no OTP was issued and does not create a user", async ({ fixture }) => {
-    const recipient = "integration-auth-otp-no-send@example.com";
+  const session = await readLatestSession(input);
+  expect(session.activeOrganizationId).toBeNull();
+}
 
-    const signInResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp: "123456",
-    });
-    expect(signInResponse.status).toBe(400);
+function readStringField(payload: unknown, field: string): string | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
 
-    const signInBody = await signInResponse.text();
-    expect(signInBody).toContain('"code":"INVALID_OTP"');
-    expect(signInBody).toContain('"message":"Invalid OTP"');
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeUndefined();
-  });
-
-  it("locks OTP verification after allowed failed attempts", async ({ fixture }) => {
-    const recipient = "integration-auth-otp-attempt-limit@example.com";
-
-    const sendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(sendResponse.status).toBe(200);
-
-    const otp = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    for (
-      let attemptIndex = 0;
-      attemptIndex < fixture.config.auth.otpAllowedAttempts;
-      attemptIndex += 1
-    ) {
-      const invalidAttemptResponse = await signInWithOTP({
-        fixture,
-        recipient,
-        otp: "000000",
-      });
-      expect(invalidAttemptResponse.status).toBe(400);
-
-      const invalidAttemptBody = await invalidAttemptResponse.text();
-      expect(invalidAttemptBody).toContain('"code":"INVALID_OTP"');
-      expect(invalidAttemptBody).toContain('"message":"Invalid OTP"');
-    }
-
-    const blockedResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp,
-    });
-    expect(blockedResponse.status).toBe(403);
-
-    const blockedBody = await blockedResponse.text();
-    expect(blockedBody).toContain('"code":"TOO_MANY_ATTEMPTS"');
-    expect(blockedBody).toContain('"message":"Too many attempts"');
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeUndefined();
-  });
-
-  it("rejects sign-in with an expired OTP", async ({ fixture }) => {
-    const recipient = "integration-auth-otp-expired@example.com";
-
-    const sendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(sendResponse.status).toBe(200);
-
-    const otp = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    const verificationIdentifier = `sign-in-otp-${recipient}`;
-    const verification = await fixture.db.query.verifications.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (table, { eq }) => eq(table.identifier, verificationIdentifier),
-      orderBy: (table, { desc }) => [desc(table.createdAt)],
-    });
-    expect(verification).toBeDefined();
-    if (verification === undefined) {
-      throw new Error("Expected sign-in OTP verification row to exist.");
-    }
-
-    const updatedVerifications = await fixture.db
-      .update(verifications)
-      .set({
-        expiresAt: new Date(0),
-      })
-      .where(eq(verifications.id, verification.id))
-      .returning({
-        id: verifications.id,
-      });
-    expect(updatedVerifications).toHaveLength(1);
-
-    const expiredResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp,
-    });
-    expect(expiredResponse.status).toBe(400);
-
-    const expiredBody = await expiredResponse.text();
-    expect(expiredBody).toContain('"code":"OTP_EXPIRED"');
-    expect(expiredBody).toContain('"message":"OTP expired"');
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeUndefined();
-  });
-
-  it("does not create organization bootstrap records on repeated sign-ins", async ({ fixture }) => {
-    const recipient = "integration-auth-otp-idempotent-bootstrap@example.com";
-
-    const firstSendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(firstSendResponse.status).toBe(200);
-
-    const firstOTP = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    const firstSignInResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp: firstOTP,
-    });
-    expect(firstSignInResponse.status).toBe(200);
-
-    const user = await fixture.db.query.users.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (users, { eq }) => eq(users.email, recipient),
-    });
-    expect(user).toBeDefined();
-    if (user === undefined) {
-      throw new Error("Expected user to exist after the first sign-in.");
-    }
-
-    const firstOwnerMemberships = await fixture.db.query.members.findMany({
-      columns: {
-        organizationId: true,
-      },
-      where: (members, { and, eq }) =>
-        and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
-    });
-    expect(firstOwnerMemberships).toHaveLength(0);
-
-    const firstTeams = await fixture.db.query.teams.findMany({
-      columns: {
-        id: true,
-      },
-      where: (teams, { inArray }) =>
-        inArray(
-          teams.organizationId,
-          fixture.db
-            .select({
-              organizationId: members.organizationId,
-            })
-            .from(members)
-            .where(eq(members.userId, user.id)),
-        ),
-    });
-    expect(firstTeams).toHaveLength(0);
-
-    const firstTeamMemberships = await fixture.db.query.teamMembers.findMany({
-      columns: {
-        teamId: true,
-      },
-      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
-    });
-    expect(firstTeamMemberships).toHaveLength(0);
-
-    const firstSession = await fixture.db.query.sessions.findFirst({
-      columns: {
-        activeOrganizationId: true,
-      },
-      where: (sessions, { eq }) => eq(sessions.userId, user.id),
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-    expect(firstSession).toBeDefined();
-    if (firstSession === undefined) {
-      throw new Error("Expected session to exist after first sign-in.");
-    }
-    expect(firstSession.activeOrganizationId).toBeNull();
-
-    const secondSendResponse = await sendOTPRequest({
-      fixture,
-      recipient,
-    });
-    expect(secondSendResponse.status).toBe(200);
-
-    const secondOTP = await readIssuedOtp({
-      fixture,
-      recipient,
-    });
-
-    const secondSignInResponse = await signInWithOTP({
-      fixture,
-      recipient,
-      otp: secondOTP,
-    });
-    expect(secondSignInResponse.status).toBe(200);
-
-    const secondOwnerMemberships = await fixture.db.query.members.findMany({
-      columns: {
-        organizationId: true,
-      },
-      where: (members, { and, eq }) =>
-        and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
-    });
-    expect(secondOwnerMemberships).toHaveLength(0);
-
-    const secondTeams = await fixture.db.query.teams.findMany({
-      columns: {
-        id: true,
-      },
-      where: (teams, { inArray }) =>
-        inArray(
-          teams.organizationId,
-          fixture.db
-            .select({
-              organizationId: members.organizationId,
-            })
-            .from(members)
-            .where(eq(members.userId, user.id)),
-        ),
-    });
-    expect(secondTeams).toHaveLength(0);
-
-    const secondTeamMemberships = await fixture.db.query.teamMembers.findMany({
-      columns: {
-        teamId: true,
-      },
-      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
-    });
-    expect(secondTeamMemberships).toHaveLength(0);
-
-    const secondSession = await fixture.db.query.sessions.findFirst({
-      columns: {
-        activeOrganizationId: true,
-      },
-      where: (sessions, { eq }) => eq(sessions.userId, user.id),
-      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
-    });
-    expect(secondSession).toBeDefined();
-    if (secondSession === undefined) {
-      throw new Error("Expected session to exist after second sign-in.");
-    }
-    expect(secondSession.activeOrganizationId).toBeNull();
-  });
-});
+  const value = Reflect.get(payload, field);
+  return typeof value === "string" && value.length > 0 ? value : null;
+}

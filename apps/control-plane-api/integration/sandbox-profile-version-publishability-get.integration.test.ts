@@ -1,13 +1,13 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  integrationConnections,
-  integrationTargets,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -15,42 +15,45 @@ import {
   GetSandboxProfileVersionPublishabilityResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import {
-  createIntegrationConnectionFixture,
-  createIntegrationTargetFixture,
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-  createSandboxProfileVersionIntegrationBindingFixture,
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
 } from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
 
-describe("sandbox profile version publishability get integration", () => {
-  it("returns agent binding required when the draft has no agent bindings", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-no-agent@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile version publishability get integration", () => {
+  it("returns agent binding required when the draft has no agent bindings", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-no-agent@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_publishability_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Publishability No Agent Profile",
         activeVersion: null,
         createdAt: "2026-03-13T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_publishability_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_001/versions/1/publishability",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -69,102 +72,101 @@ describe("sandbox profile version publishability get integration", () => {
         },
       ],
     });
-  }, 60_000);
+  });
 
   it("returns structured issues for inaccessible, inactive, and disabled agent references", async ({
-    fixture,
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-issues@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-issues@example.com",
     });
-    const otherOrganizationSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-issues-other-org@example.com",
+    const otherOrganizationSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-issues-other-org@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values([
-      createIntegrationTargetFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
+      integrationTargetRow({
         targetKey: "openai-publishability-active",
         variantId: "openai-default",
         enabled: true,
       }),
-      createIntegrationTargetFixture({
+      integrationTargetRow({
         targetKey: "openai-publishability-disabled",
         variantId: "openai-default",
         enabled: false,
       }),
     ]);
-    await fixture.db.insert(integrationConnections).values([
-      createIntegrationConnectionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
         id: "icn_publishability_other_org",
         organizationId: otherOrganizationSession.organizationId,
         targetKey: "openai-publishability-active",
         displayName: "Other Organization Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
-      createIntegrationConnectionFixture({
+      integrationConnectionRow({
         id: "icn_publishability_inactive",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-publishability-active",
         displayName: "Inactive Connection",
         status: IntegrationConnectionStatuses.ERROR,
       }),
-      createIntegrationConnectionFixture({
+      integrationConnectionRow({
         id: "icn_publishability_disabled_target",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-publishability-disabled",
         displayName: "Disabled Target Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
     ]);
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_publishability_issues_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Publishability Issues Profile",
         activeVersion: null,
         createdAt: "2026-03-14T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_publishability_issues_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_publishability_missing_connection",
-        sandboxProfileId: "sbp_publishability_issues_001",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_publishability_other_org",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_publishability_inactive_connection",
-        sandboxProfileId: "sbp_publishability_issues_001",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_publishability_inactive",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_publishability_disabled_target",
-        sandboxProfileId: "sbp_publishability_issues_001",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_publishability_disabled_target",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-      }),
-    ]);
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_publishability_missing_connection",
+          sandboxProfileId: "sbp_publishability_issues_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_other_org",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_publishability_inactive_connection",
+          sandboxProfileId: "sbp_publishability_issues_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_inactive",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_publishability_disabled_target",
+          sandboxProfileId: "sbp_publishability_issues_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_disabled_target",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+      ]);
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_issues_001/versions/1/publishability",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -200,24 +202,24 @@ describe("sandbox profile version publishability get integration", () => {
         },
       ],
     });
-  }, 60_000);
+  });
 
-  it("returns profile version not draft for published versions", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-published@example.com",
+  it("returns profile version not draft for published versions", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-published@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_publishability_published_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Published Profile",
         activeVersion: 1,
         createdAt: "2026-03-15T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_publishability_published_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
@@ -225,11 +227,11 @@ describe("sandbox profile version publishability get integration", () => {
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_published_001/versions/1/publishability",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -247,62 +249,63 @@ describe("sandbox profile version publishability get integration", () => {
         },
       ],
     });
-  }, 60_000);
+  });
 
-  it("returns publishable true for a valid draft", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-valid@example.com",
+  it("returns publishable true for a valid draft", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-valid@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values(
-      createIntegrationTargetFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
         targetKey: "openai-publishability-valid",
         variantId: "openai-default",
         enabled: true,
       }),
     );
-    await fixture.db.insert(integrationConnections).values(
-      createIntegrationConnectionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
         id: "icn_publishability_valid",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-publishability-valid",
         displayName: "Valid Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
     );
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_publishability_valid_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Valid Publishability Profile",
         activeVersion: null,
         createdAt: "2026-03-16T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_publishability_valid_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values(
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_publishability_valid",
-        sandboxProfileId: "sbp_publishability_valid_001",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_publishability_valid",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {},
-      }),
-    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_publishability_valid",
+          sandboxProfileId: "sbp_publishability_valid_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_publishability_valid",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+      );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_valid_001/versions/1/publishability",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -315,36 +318,36 @@ describe("sandbox profile version publishability get integration", () => {
       publishable: true,
       issues: [],
     });
-  }, 60_000);
+  });
 
   it("returns 404 when the profile version is outside the authenticated organization", async ({
-    fixture,
+    env,
   }) => {
-    const firstOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-org-a@example.com",
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-org-a@example.com",
     });
-    const secondOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-publishability-org-b@example.com",
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-publishability-org-b@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_publishability_org_b_001",
         organizationId: secondOrgSession.organizationId,
         displayName: "Other Org Publishability Profile",
         activeVersion: null,
         createdAt: "2026-03-17T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_publishability_org_b_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_publishability_org_b_001/versions/1/publishability",
       {
         headers: {
@@ -358,5 +361,5 @@ describe("sandbox profile version publishability get integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("PROFILE_NOT_FOUND");
-  }, 60_000);
+  });
 });
