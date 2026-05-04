@@ -82,6 +82,26 @@ describe("aws credential resolver helpers", () => {
     });
   });
 
+  it("resolves a custom STS endpoint from target config", () => {
+    expect(
+      resolveAwsAssumeRoleContext(
+        createResolverInput({
+          target: {
+            familyId: "aws",
+            variantId: "aws-cli-default",
+            enabled: true,
+            config: {
+              stsEndpointUrl: "http://127.0.0.1:4566",
+            },
+            secrets: {},
+          },
+        }),
+      ),
+    ).toMatchObject({
+      stsEndpointUrl: "http://127.0.0.1:4566",
+    });
+  });
+
   it("builds AssumeRole input with optional external id and duration", () => {
     expect(
       createAssumeRoleCommandInput({

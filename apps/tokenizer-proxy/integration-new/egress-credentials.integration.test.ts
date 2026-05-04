@@ -2,7 +2,7 @@
  * The test cases use an extended Vitest fixture created by the test harness.
  */
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
 import {
   createServer,
   request as httpRequest,
@@ -11,9 +11,17 @@ import {
 } from "node:http";
 import { gzipSync } from "node:zlib";
 
-import { IntegrationBindingKinds } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  OrganizationIdentityLinkProviderConfigStatus,
+  UserExternalPrincipalCredentialSecretKinds,
+} from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
+  AwsConnectionMethodIds,
+  AwsCredentialResolverKeys,
+  AwsCredentialSecretTypes,
+  AwsCredentialSlotKeys,
   DatadogCredentialSecretTypes,
   DatadogCredentialSlotKeys,
   SlackConnectionMethodIds,
@@ -29,6 +37,14 @@ import {
 } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
+import {
+  createGitHubIdentityConnection,
+  insertPrincipalCredentialSecret,
+  seedGitHubLinkedPrincipal,
+  seedIdentityProviderConfig,
+  seedPrincipalCredential,
+  upsertGitHubIdentityTarget,
+} from "../../control-plane-api/integration-new/helpers/identity-linking.js";
 import { EgressRequestHeaders } from "../src/egress/constants.js";
 
 const EgressGrantConfig = {
@@ -100,6 +116,269 @@ describe.concurrent("tokenizer proxy egress credentials", () => {
       expect(readEchoHeader(body, "dd_application_key")).toBe("datadog-application-key");
     } finally {
       await upstreamEchoService.stop();
+    }
+  });
+
+  it("resolves linked-principal credentials through the real control-plane API", async ({
+    env,
+  }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const uniqueId = createUniqueId();
+
+    try {
+      const linkedPrincipal = await createGitHubLinkedPrincipal({
+        env,
+        uniqueId,
+      });
+      const egressGrant = await mintEgressGrant({
+        config: EgressGrantConfig,
+        claims: {
+          sub: `sbi_${uniqueId}`,
+          jti: `egress_rule_${uniqueId}`,
+          bindingId: `ibd_${uniqueId}`,
+          organizationId: linkedPrincipal.organizationId,
+          familyId: "github",
+          variantId: "github-cloud",
+          actingUserId: linkedPrincipal.userId,
+          credentialResolverKind: "linked_principal",
+          providerFamily: "github",
+          actingUserRequired: true,
+          resolutionMode: "required",
+          credentialKind: "github_app_user_access_token",
+          upstreamBaseUrl: upstreamEchoService.baseUrl,
+          authInjectionType: "bearer",
+          authInjectionTarget: "authorization",
+          allowedMethods: ["GET"],
+          allowedPathPrefixes: ["/linked"],
+        },
+        ttlSeconds: 60,
+      });
+
+      const response = await env.tokenizerProxy.http.fetch("/tokenizer-proxy/egress/linked", {
+        method: "GET",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer ghu-integration-new-token");
+    } finally {
+      await upstreamEchoService.stop();
+    }
+  });
+
+  it("selects linked-principal credentials for GitHub pull request creation", async ({ env }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const simulatedGitHub = await startSimulatedGitHubAppApi({
+      installationToken: "ghs-installation-token-should-not-be-used",
+    });
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createGitHubAppEgressBinding({
+        env,
+        uniqueId,
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        installationId: "10001",
+        linkedPrincipalAccessToken: "ghu-pr-creation-token",
+      });
+      const egressGrant = await mintGitHubInstallationEgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamEchoService.baseUrl,
+        actingUserId: binding.userId,
+      });
+
+      const response = await env.tokenizerProxy.http.fetch(
+        "/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls",
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer ghu-pr-creation-token");
+      expect(simulatedGitHub.installationAccessTokenRequests()).toEqual([]);
+    } finally {
+      await Promise.all([upstreamEchoService.stop(), simulatedGitHub.stop()]);
+    }
+  });
+
+  it("falls back to GitHub installation credentials when linked-principal resolution misses", async ({
+    env,
+  }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const simulatedGitHub = await startSimulatedGitHubAppApi({
+      installationToken: "ghs-installation-fallback-token",
+    });
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createGitHubAppEgressBinding({
+        env,
+        uniqueId,
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        installationId: "10002",
+      });
+      const egressGrant = await mintGitHubInstallationEgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamEchoService.baseUrl,
+        actingUserId: binding.userId,
+      });
+
+      const response = await env.tokenizerProxy.http.fetch(
+        "/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls",
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer ghs-installation-fallback-token");
+      expect(simulatedGitHub.installationAccessTokenRequests()).toEqual([
+        {
+          installationId: "10002",
+        },
+      ]);
+    } finally {
+      await Promise.all([upstreamEchoService.stop(), simulatedGitHub.stop()]);
+    }
+  });
+
+  it("uses GitHub installation credentials when pull request egress lacks an acting user", async ({
+    env,
+  }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const simulatedGitHub = await startSimulatedGitHubAppApi({
+      installationToken: "ghs-installation-no-actor-token",
+    });
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createGitHubAppEgressBinding({
+        env,
+        uniqueId,
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        installationId: "10003",
+        linkedPrincipalAccessToken: "ghu-should-not-be-selected-without-actor",
+      });
+      const egressGrant = await mintGitHubInstallationEgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamEchoService.baseUrl,
+      });
+
+      const response = await env.tokenizerProxy.http.fetch(
+        "/tokenizer-proxy/egress/repos/mistlehq/mistle/pulls",
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Add identity linking",
+            head: "mistlehq:feature/identity-linking",
+            base: "main",
+          }),
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer ghs-installation-no-actor-token");
+      expect(simulatedGitHub.installationAccessTokenRequests()).toEqual([
+        {
+          installationId: "10003",
+        },
+      ]);
+    } finally {
+      await Promise.all([upstreamEchoService.stop(), simulatedGitHub.stop()]);
+    }
+  });
+
+  it("signs AWS SigV4 requests with temporary session credentials from real control-plane resolution", async ({
+    env,
+  }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const simulatedSts = await startSimulatedAwsSts();
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createAwsEgressBinding({
+        env,
+        uniqueId,
+        stsEndpointUrl: simulatedSts.baseUrl,
+      });
+      const egressGrant = await mintAwsSigV4EgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamEchoService.baseUrl,
+        service: "secretsmanager",
+      });
+
+      for (const requestIndex of [1, 2]) {
+        const response = await env.tokenizerProxy.http.fetch("/tokenizer-proxy/egress/", {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            requestIndex,
+          }),
+        });
+        const body: unknown = await response.json();
+        const authorizationHeader = readEchoHeader(body, "authorization");
+
+        expect(response.status).toBe(200);
+        if (authorizationHeader === undefined) {
+          throw new Error("Expected SigV4 authorization header.");
+        }
+        expect(authorizationHeader).toContain("AWS4-HMAC-SHA256");
+        expect(authorizationHeader).toContain("Credential=ASIAEXAMPLEACCESS/");
+        expect(authorizationHeader).toContain("/us-east-1/secretsmanager/aws4_request");
+        expect(authorizationHeader).toContain("SignedHeaders=");
+        expect(authorizationHeader).toContain("host");
+        expect(authorizationHeader).toContain("x-amz-content-sha256");
+        expect(authorizationHeader).toContain("x-amz-date");
+        expect(authorizationHeader).toContain("x-amz-security-token");
+        expect(readEchoHeader(body, "x-amz-security-token")).toBe("example-session-token");
+        expect(readEchoHeader(body, "x-amz-date")).toBeDefined();
+        expect(readEchoHeader(body, "x-amz-content-sha256")).toBeDefined();
+      }
+
+      expect(simulatedSts.assumeRoleRequests()).toEqual([
+        expect.objectContaining({
+          roleArn: "arn:aws:iam::123456789012:role/mistle-integration-new",
+        }),
+      ]);
+      expect(simulatedSts.assumeRoleRequests()[0]?.roleSessionName).toMatch(/^mistle-/u);
+    } finally {
+      await Promise.all([upstreamEchoService.stop(), simulatedSts.stop()]);
     }
   });
 
@@ -283,6 +562,104 @@ describe.concurrent("tokenizer proxy egress credentials", () => {
       expect(forwardedBody["text"]).toBe(
         `hello from integration-new\n\n──────────\n<${env.controlPlaneApi.hostBaseUrl}/p/sessions/${sandboxInstanceId}|🔗 View session>`,
       );
+    } finally {
+      await upstreamEchoService.stop();
+    }
+  });
+
+  it("continues forwarding when request middleware cannot be resolved", async ({ env }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId,
+      });
+      const egressGrant = await mintDatadogEgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamEchoService.baseUrl,
+        authInjectionType: "bearer",
+        authInjectionTarget: "authorization",
+        requestMiddleware: ["missing-session-link-middleware"],
+        allowedMethods: ["POST"],
+        allowedPathPrefixes: ["/repos/mistlehq/mistle/issues/123/comments"],
+      });
+
+      const response = await env.tokenizerProxy.http.fetch(
+        "/tokenizer-proxy/egress/repos/mistlehq/mistle/issues/123/comments",
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "text/plain",
+          },
+          body: "comment without resolved middleware",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoString(body, "method")).toBe("POST");
+      expect(readEchoString(body, "path")).toBe("/repos/mistlehq/mistle/issues/123/comments");
+      expect(readEchoString(body, "body")).toBe("comment without resolved middleware");
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer datadog-api-key");
+    } finally {
+      await upstreamEchoService.stop();
+    }
+  });
+
+  it("continues forwarding when production request middleware throws", async ({ env }) => {
+    const upstreamEchoService = await startHttpEcho();
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createSlackBinding({
+        env,
+        uniqueId,
+      });
+      const egressGrant = await mintEgressGrant({
+        config: EgressGrantConfig,
+        claims: {
+          sub: `sbi_${uniqueId}`,
+          jti: `egress_rule_${uniqueId}`,
+          bindingId: binding.bindingId,
+          organizationId: binding.organizationId,
+          familyId: "slack",
+          variantId: "slack-default",
+          credentialResolverKind: "integration_connection",
+          connectionId: binding.connectionId,
+          secretType: SlackCredentialSecretTypes.API_KEY,
+          slotKey: SlackCredentialSlotKeys.BOT_TOKEN,
+          upstreamBaseUrl: upstreamEchoService.baseUrl,
+          authInjectionType: "bearer",
+          authInjectionTarget: "authorization",
+          requestMiddleware: [SlackAppendSessionLinkMiddlewareId],
+          allowedMethods: ["POST"],
+          allowedPathPrefixes: ["/api/chat.postMessage"],
+        },
+        ttlSeconds: 60,
+      });
+
+      const response = await env.tokenizerProxy.http.fetch(
+        "/tokenizer-proxy/egress/api/chat.postMessage",
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.GRANT]: egressGrant,
+            "content-type": "application/json",
+          },
+          body: "not-json",
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(readEchoString(body, "method")).toBe("POST");
+      expect(readEchoString(body, "path")).toBe("/api/chat.postMessage");
+      expect(readEchoString(body, "body")).toBe("not-json");
+      expect(readEchoHeader(body, "authorization")).toBe("Bearer xoxb-integration-new-slack");
     } finally {
       await upstreamEchoService.stop();
     }
@@ -538,6 +915,60 @@ describe.concurrent("tokenizer proxy egress credentials", () => {
     }
   });
 
+  it("resolves linked-principal credentials for websocket upgrades", async ({ env }) => {
+    const upstreamService = await startWebSocketUpstream({
+      host: "127.0.0.1",
+      path: "/linked-ws",
+    });
+    const uniqueId = createUniqueId();
+
+    try {
+      const linkedPrincipal = await createGitHubLinkedPrincipal({
+        env,
+        uniqueId,
+      });
+      const egressGrant = await mintEgressGrant({
+        config: EgressGrantConfig,
+        claims: {
+          sub: `sbi_${uniqueId}`,
+          jti: `egress_rule_${uniqueId}`,
+          bindingId: `ibd_${uniqueId}`,
+          organizationId: linkedPrincipal.organizationId,
+          familyId: "github",
+          variantId: "github-cloud",
+          actingUserId: linkedPrincipal.userId,
+          credentialResolverKind: "linked_principal",
+          providerFamily: "github",
+          actingUserRequired: true,
+          resolutionMode: "required",
+          credentialKind: "github_app_user_access_token",
+          upstreamBaseUrl: upstreamService.baseUrl,
+          authInjectionType: "bearer",
+          authInjectionTarget: "authorization",
+          allowedMethods: ["GET"],
+          allowedPathPrefixes: ["/linked-ws"],
+        },
+        ttlSeconds: 60,
+      });
+
+      const message = await performUpgradeRequest({
+        baseUrl: env.tokenizerProxy.hostBaseUrl,
+        path: "/tokenizer-proxy/egress/linked-ws",
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+          [TestEnvironmentIdHeader]: env.id,
+        },
+      });
+
+      expect(message).toBe("pong\n");
+      expect(upstreamService.capturedAuthorizationHeader()).toBe(
+        "Bearer ghu-integration-new-token",
+      );
+    } finally {
+      await upstreamService.stop();
+    }
+  });
+
   it("adds additional credential-backed headers to websocket upgrades", async ({ env }) => {
     const upstreamService = await startWebSocketUpstream({
       host: "127.0.0.1",
@@ -714,6 +1145,7 @@ function mintDatadogEgressGrant(input: {
   authInjectionType: "bearer" | "header";
   authInjectionTarget: string;
   additionalHeaders?: Readonly<Record<string, string>>;
+  requestMiddleware?: readonly string[];
   allowedMethods: readonly string[];
   allowedPathPrefixes: readonly string[];
 }): Promise<string> {
@@ -736,8 +1168,80 @@ function mintDatadogEgressGrant(input: {
       ...(input.additionalHeaders === undefined
         ? {}
         : { additionalHeaders: input.additionalHeaders }),
+      ...(input.requestMiddleware === undefined
+        ? {}
+        : { requestMiddleware: input.requestMiddleware }),
       allowedMethods: input.allowedMethods,
       allowedPathPrefixes: input.allowedPathPrefixes,
+    },
+    ttlSeconds: 60,
+  });
+}
+
+function mintGitHubInstallationEgressGrant(input: {
+  binding: {
+    bindingId: string;
+    connectionId: string;
+    organizationId: string;
+  };
+  jti: string;
+  upstreamBaseUrl: string;
+  actingUserId?: string;
+}): Promise<string> {
+  return mintEgressGrant({
+    config: EgressGrantConfig,
+    claims: {
+      sub: `sbi_${input.jti}`,
+      jti: input.jti,
+      bindingId: input.binding.bindingId,
+      organizationId: input.binding.organizationId,
+      familyId: "github",
+      variantId: "github-cloud",
+      ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
+      credentialResolverKind: "integration_connection",
+      connectionId: input.binding.connectionId,
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+      upstreamBaseUrl: input.upstreamBaseUrl,
+      authInjectionType: "bearer",
+      authInjectionTarget: "authorization",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/repos"],
+    },
+    ttlSeconds: 60,
+  });
+}
+
+function mintAwsSigV4EgressGrant(input: {
+  binding: {
+    bindingId: string;
+    connectionId: string;
+    organizationId: string;
+  };
+  jti: string;
+  upstreamBaseUrl: string;
+  service: string;
+}): Promise<string> {
+  return mintEgressGrant({
+    config: EgressGrantConfig,
+    claims: {
+      sub: `sbi_${input.jti}`,
+      jti: input.jti,
+      bindingId: input.binding.bindingId,
+      organizationId: input.binding.organizationId,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      credentialResolverKind: "integration_connection",
+      connectionId: input.binding.connectionId,
+      secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
+      slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
+      resolverKey: AwsCredentialResolverKeys.ASSUME_ROLE_SESSION,
+      upstreamBaseUrl: input.upstreamBaseUrl,
+      authInjectionType: "aws_sigv4",
+      authInjectionService: input.service,
+      authInjectionRegion: "us-east-1",
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
     },
     ttlSeconds: 60,
   });
@@ -765,6 +1269,175 @@ async function startGzipUpstream(input: {
   });
 
   return await startHttpServer({ server, host: input.host, port });
+}
+
+type SimulatedGitHubInstallationAccessTokenRequest = {
+  installationId: string;
+  repositoryNames?: string[];
+};
+
+async function startSimulatedGitHubAppApi(input: { installationToken: string }): Promise<{
+  baseUrl: string;
+  installationAccessTokenRequests: () => SimulatedGitHubInstallationAccessTokenRequest[];
+  stop: () => Promise<void>;
+}> {
+  const host = "127.0.0.1";
+  const port = await reserveAvailablePort({ host });
+  const installationAccessTokenRequests: SimulatedGitHubInstallationAccessTokenRequest[] = [];
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    void (async () => {
+      const requestUrl = request.url ?? "/";
+      const accessTokenMatch = /^\/app\/installations\/([^/]+)\/access_tokens$/u.exec(requestUrl);
+      if (request.method !== "POST" || accessTokenMatch === null) {
+        response.statusCode = 404;
+        response.end("not found");
+        return;
+      }
+
+      const installationId = accessTokenMatch[1];
+      if (installationId === undefined) {
+        response.statusCode = 404;
+        response.end("not found");
+        return;
+      }
+
+      const body = parseJsonRecord(await readRequestBody(request));
+      const repositoryNames = readOptionalStringArray(body, "repository_names");
+      installationAccessTokenRequests.push({
+        installationId,
+        ...(repositoryNames === undefined ? {} : { repositoryNames }),
+      });
+
+      // GitHub App installation access tokens are created with
+      // `POST /app/installations/{installation_id}/access_tokens`. GitHub's
+      // response includes a token and expiry; repository scoping is requested
+      // with `repository_names`.
+      // Source:
+      // https://docs.github.com/en/rest/apps/apps#create-an-installation-access-token-for-an-app
+      response.statusCode = 201;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          token: input.installationToken,
+          expires_at: "2099-01-01T00:00:00Z",
+          repository_selection: "selected",
+          permissions: {},
+        }),
+      );
+    })().catch((error: unknown) => {
+      response.statusCode = 500;
+      response.setHeader("content-type", "application/json");
+      response.end(
+        JSON.stringify({
+          message: error instanceof Error ? error.message : "simulated GitHub API failed",
+        }),
+      );
+    });
+  });
+
+  const startedServer = await startHttpServer({
+    server,
+    host,
+    port,
+  });
+
+  return {
+    baseUrl: startedServer.baseUrl,
+    installationAccessTokenRequests: () => [...installationAccessTokenRequests],
+    stop: startedServer.stop,
+  };
+}
+
+type SimulatedAwsAssumeRoleRequest = {
+  roleArn: string;
+  roleSessionName: string;
+};
+
+async function startSimulatedAwsSts(): Promise<{
+  baseUrl: string;
+  assumeRoleRequests: () => SimulatedAwsAssumeRoleRequest[];
+  stop: () => Promise<void>;
+}> {
+  const host = "127.0.0.1";
+  const port = await reserveAvailablePort({ host });
+  const assumeRoleRequests: SimulatedAwsAssumeRoleRequest[] = [];
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    void (async () => {
+      if (request.method !== "POST" || request.url !== "/") {
+        response.statusCode = 404;
+        response.end("not found");
+        return;
+      }
+
+      const body = new URLSearchParams(await readRequestBody(request));
+      const action = body.get("Action");
+      const roleArn = body.get("RoleArn");
+      const roleSessionName = body.get("RoleSessionName");
+      if (action !== "AssumeRole" || roleArn === null || roleSessionName === null) {
+        response.statusCode = 400;
+        response.end("invalid AssumeRole request");
+        return;
+      }
+
+      assumeRoleRequests.push({
+        roleArn,
+        roleSessionName,
+      });
+
+      // AWS STS uses the Query API. `AssumeRole` returns temporary
+      // credentials under `AssumeRoleResult/Credentials`.
+      // Source:
+      // https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+      response.statusCode = 200;
+      response.setHeader("content-type", "text/xml");
+      response.end(`<?xml version="1.0" encoding="UTF-8"?>
+<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <AssumeRoleResult>
+    <Credentials>
+      <AccessKeyId>ASIAEXAMPLEACCESS</AccessKeyId>
+      <SecretAccessKey>example-secret-access-key</SecretAccessKey>
+      <SessionToken>example-session-token</SessionToken>
+      <Expiration>2099-01-01T00:00:00Z</Expiration>
+    </Credentials>
+  </AssumeRoleResult>
+  <ResponseMetadata>
+    <RequestId>integration-new-aws-sts</RequestId>
+  </ResponseMetadata>
+</AssumeRoleResponse>`);
+    })().catch((error: unknown) => {
+      response.statusCode = 500;
+      response.setHeader("content-type", "text/plain");
+      response.end(error instanceof Error ? error.message : "simulated AWS STS failed");
+    });
+  });
+
+  const startedServer = await startHttpServer({
+    server,
+    host,
+    port,
+  });
+
+  return {
+    baseUrl: startedServer.baseUrl,
+    assumeRoleRequests: () => [...assumeRoleRequests],
+    stop: startedServer.stop,
+  };
+}
+
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk, "utf8"));
+      continue;
+    }
+
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 async function startStreamingUpstream(input: {
@@ -964,6 +1637,369 @@ async function startHttpServer(input: {
   };
 }
 
+async function createGitHubAppEgressBinding(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+  apiBaseUrl: string;
+  installationId: string;
+  linkedPrincipalAccessToken?: string;
+}): Promise<{
+  bindingId: string;
+  connectionId: string;
+  organizationId: string;
+  userId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}-github-app-egress@example.com`,
+  });
+  const targetKey = `github_${input.uniqueId}`;
+  const sandboxProfileId = `sbp_${input.uniqueId}_github_app`;
+  const bindingId = `ibd_${input.uniqueId}_github_app`;
+
+  await upsertGitHubIdentityTarget(input.env, {
+    targetKey,
+    apiBaseUrl: input.apiBaseUrl,
+  });
+  const connectionId = await createGitHubAppInstallationConnection({
+    env: input.env,
+    cookie: session.cookie,
+    targetKey,
+    installationId: input.installationId,
+  });
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+    id: sandboxProfileId,
+    organizationId: session.organizationId,
+    displayName: "Tokenizer proxy GitHub App egress profile",
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId,
+      version: 1,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      connectionId,
+      kind: IntegrationBindingKinds.GIT,
+      config: {
+        repositories: ["mistlehq/mistle"],
+      },
+    });
+
+  if (input.linkedPrincipalAccessToken !== undefined) {
+    await seedGitHubAppLinkedPrincipal({
+      env: input.env,
+      uniqueId: input.uniqueId,
+      organizationId: session.organizationId,
+      userId: session.userId,
+      targetKey,
+      connectionId,
+      accessToken: input.linkedPrincipalAccessToken,
+    });
+  }
+
+  return {
+    bindingId,
+    connectionId,
+    organizationId: session.organizationId,
+    userId: session.userId,
+  };
+}
+
+async function createGitHubAppInstallationConnection(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  targetKey: string;
+  installationId: string;
+}): Promise<string> {
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Tokenizer proxy GitHub App installation",
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "123",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
+          installation_id: input.installationId,
+        },
+        secrets: {
+          appPrivateKeyPem: createPrivateKeyPem(),
+          clientSecret: "github-client-secret",
+          webhookSecret: "github-webhook-secret",
+        },
+      }),
+    },
+  );
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Expected GitHub App installation connection creation status 201, got ${String(response.status)}.`,
+    );
+  }
+
+  return readConnectionId(await response.json());
+}
+
+function createPrivateKeyPem(): string {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: {
+      type: "pkcs8",
+      format: "pem",
+    },
+    publicKeyEncoding: {
+      type: "spki",
+      format: "pem",
+    },
+  });
+
+  return privateKey;
+}
+
+async function seedGitHubAppLinkedPrincipal(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+  organizationId: string;
+  userId: string;
+  targetKey: string;
+  connectionId: string;
+  accessToken: string;
+}): Promise<void> {
+  const providerConfigId = `ilp_${input.uniqueId}_github_app`;
+  const principalId = `uep_${input.uniqueId}_github_app`;
+  const credentialId = `upc_${input.uniqueId}_github_app`;
+
+  await seedIdentityProviderConfig(input.env, {
+    configId: providerConfigId,
+    connectionId: input.connectionId,
+    organizationId: input.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    targetKey: input.targetKey,
+    userId: input.userId,
+  });
+  await seedGitHubLinkedPrincipal(input.env, {
+    organizationId: input.organizationId,
+    userId: input.userId,
+    principalId,
+    providerConfigId,
+    connectionId: input.connectionId,
+    providerSubjectId: "12345",
+    profile: {
+      login: "mistle-user",
+    },
+  });
+  await seedPrincipalCredential(input.env, {
+    credentialId,
+    organizationId: input.organizationId,
+    principalId,
+    providerFamily: "github",
+    credentialKind: "github_app_user_access_token",
+    accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+    refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: input.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    plaintext: input.accessToken,
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: input.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+    plaintext: "ghr-integration-new-refresh-token",
+  });
+}
+
+async function createAwsEgressBinding(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+  stsEndpointUrl: string;
+}): Promise<{
+  bindingId: string;
+  connectionId: string;
+  organizationId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}-aws-egress@example.com`,
+  });
+  const targetKey = `aws_${input.uniqueId}`;
+  const sandboxProfileId = `sbp_${input.uniqueId}_aws`;
+  const bindingId = `ibd_${input.uniqueId}_aws`;
+
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {
+        sts_endpoint_url: input.stsEndpointUrl,
+      },
+    })
+    .onConflictDoUpdate({
+      target: input.env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: "aws",
+        variantId: "aws-cli-default",
+        enabled: true,
+        config: {
+          sts_endpoint_url: input.stsEndpointUrl,
+        },
+      },
+    });
+
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(targetKey)}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Tokenizer proxy AWS AssumeRole connection",
+        methodId: AwsConnectionMethodIds.AWS_ASSUME_ROLE,
+        config: {
+          connection_method: AwsConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAEXAMPLE",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-integration-new",
+          durationSeconds: 3600,
+        },
+        secrets: {
+          secretAccessKey: "aws-secret-access-key-value",
+        },
+      }),
+    },
+  );
+
+  if (response.status !== 201) {
+    throw new Error(`Expected AWS connection creation status 201, got ${String(response.status)}.`);
+  }
+  const connectionId = readConnectionId(await response.json());
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+    id: sandboxProfileId,
+    organizationId: session.organizationId,
+    displayName: "Tokenizer proxy AWS egress profile",
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId,
+      version: 1,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      connectionId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        services: ["secretsmanager"],
+        regions: ["us-east-1"],
+        defaultRegion: "us-east-1",
+        tools: [],
+      },
+    });
+
+  return {
+    bindingId,
+    connectionId,
+    organizationId: session.organizationId,
+  };
+}
+
+async function createGitHubLinkedPrincipal(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+}): Promise<{
+  organizationId: string;
+  userId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}-github-linked-principal@example.com`,
+  });
+  const targetKey = `github_${input.uniqueId}`;
+
+  await upsertGitHubIdentityTarget(input.env, {
+    targetKey,
+  });
+
+  const connectionId = await createGitHubIdentityConnection(input.env, {
+    displayName: "Tokenizer proxy linked principal GitHub App",
+    session,
+    targetKey,
+  });
+  const providerConfigId = `ilp_${input.uniqueId}`;
+  const principalId = `uep_${input.uniqueId}`;
+  const credentialId = `upc_${input.uniqueId}`;
+
+  await seedIdentityProviderConfig(input.env, {
+    configId: providerConfigId,
+    connectionId,
+    organizationId: session.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    targetKey,
+    userId: session.userId,
+  });
+  await seedGitHubLinkedPrincipal(input.env, {
+    organizationId: session.organizationId,
+    userId: session.userId,
+    principalId,
+    providerConfigId,
+    connectionId,
+    providerSubjectId: "12345",
+    profile: {
+      login: "mistle-user",
+    },
+  });
+  await seedPrincipalCredential(input.env, {
+    credentialId,
+    organizationId: session.organizationId,
+    principalId,
+    providerFamily: "github",
+    credentialKind: "github_app_user_access_token",
+    accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+    refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: session.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    plaintext: "ghu-integration-new-token",
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: session.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+    plaintext: "ghr-integration-new-refresh-token",
+  });
+
+  return {
+    organizationId: session.organizationId,
+    userId: session.userId,
+  };
+}
+
 async function createDatadogConnection(input: {
   targetKey: string;
   cookie: string;
@@ -1160,6 +2196,28 @@ function parseJsonRecord(value: string | undefined): Record<string, unknown> {
   }
 
   return parsed;
+}
+
+function readOptionalStringArray(
+  value: Record<string, unknown>,
+  propertyName: string,
+): string[] | undefined {
+  const property = value[propertyName];
+  if (property === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(property)) {
+    throw new Error(`Expected '${propertyName}' to be an array.`);
+  }
+
+  return property.map((item) => {
+    if (typeof item !== "string") {
+      throw new Error(`Expected '${propertyName}' to contain only strings.`);
+    }
+
+    return item;
+  });
 }
 
 async function expectProxyErrorResponse(
