@@ -27,6 +27,15 @@ const it = createIntegrationTest({
 });
 
 const MatchingDeadlineDueAt = "2026-04-14T12:00:00.000Z";
+const AlternateDeadlineDueAt = "2026-04-14T12:05:00.000Z";
+
+type DeadlineWorkflowInput = {
+  sandboxInstanceId: string;
+  kind: typeof SandboxInstanceDeadlineKinds.IDLE | typeof SandboxInstanceDeadlineKinds.DISCONNECT;
+  ownerLeaseId: string;
+  dueAt: string;
+  generation: number;
+};
 
 describe.concurrent("data-plane worker sandbox instance deadlines", () => {
   it("processes deadline workflows through the hosted worker runtime", async ({ env }) => {
@@ -89,6 +98,106 @@ describe.concurrent("data-plane worker sandbox instance deadlines", () => {
       status: SandboxInstanceStatuses.RUNNING,
       stopReason: null,
     });
+  });
+
+  it("does not execute a deadline when the persisted owner lease no longer matches", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_owner_mismatch";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-owner-mismatch",
+    });
+    await insertDeadline(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-owner-current",
+      dueAt: MatchingDeadlineDueAt,
+    });
+
+    const result = await runDeadlineWorkflow(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-owner-stale",
+      dueAt: MatchingDeadlineDueAt,
+      generation: 1,
+    });
+
+    expect(result).toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      executed: false,
+      outcome: "deadline_owner_lease_mismatch",
+    });
+    await expectSandboxStillRunning(env, sandboxInstanceId);
+  });
+
+  it("does not execute a deadline when the persisted due time no longer matches", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_due_at_mismatch";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-due-at-mismatch",
+    });
+    await insertDeadline(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-due-at",
+      dueAt: MatchingDeadlineDueAt,
+    });
+
+    const result = await runDeadlineWorkflow(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-due-at",
+      dueAt: AlternateDeadlineDueAt,
+      generation: 1,
+    });
+
+    expect(result).toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      executed: false,
+      outcome: "deadline_due_at_mismatch",
+    });
+    await expectSandboxStillRunning(env, sandboxInstanceId);
+  });
+
+  it("does not execute a deadline after the persisted row has already been cleared", async ({
+    env,
+  }) => {
+    const sandboxInstanceId = "sbi_integration_new_deadline_cleared";
+    await insertSandboxInstance(env, {
+      sandboxInstanceId,
+      status: SandboxInstanceStatuses.RUNNING,
+      providerSandboxId: "provider-integration-new-deadline-cleared",
+    });
+    await insertDeadline(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-cleared",
+      dueAt: MatchingDeadlineDueAt,
+      clearedAt: MatchingDeadlineDueAt,
+    });
+
+    const result = await runDeadlineWorkflow(env, {
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      ownerLeaseId: "owner-integration-new-deadline-cleared",
+      dueAt: MatchingDeadlineDueAt,
+      generation: 1,
+    });
+
+    expect(result).toEqual({
+      sandboxInstanceId,
+      kind: SandboxInstanceDeadlineKinds.IDLE,
+      executed: false,
+      outcome: "deadline_cleared",
+    });
+    await expectSandboxStillRunning(env, sandboxInstanceId);
   });
 
   it("clears both deadline kinds when the stop workflow marks a sandbox instance stopped", async ({
@@ -225,6 +334,56 @@ async function insertBothDeadlineKinds(
       dueAt: MatchingDeadlineDueAt,
     },
   ]);
+}
+
+async function insertDeadline(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    kind: typeof SandboxInstanceDeadlineKinds.IDLE | typeof SandboxInstanceDeadlineKinds.DISCONNECT;
+    ownerLeaseId: string;
+    dueAt: string;
+    generation?: number;
+    clearedAt?: string | null;
+  },
+): Promise<void> {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceDeadlines).values({
+    sandboxInstanceId: input.sandboxInstanceId,
+    kind: input.kind,
+    ownerLeaseId: input.ownerLeaseId,
+    dueAt: input.dueAt,
+    generation: input.generation ?? 1,
+    clearedAt: input.clearedAt ?? null,
+  });
+}
+
+async function runDeadlineWorkflow(env: IntegrationTestEnvironment, input: DeadlineWorkflowInput) {
+  const handle = await env.dataPlaneWorkflow.runWorkflow(
+    HandleSandboxInstanceDeadlineWorkflowSpec,
+    input,
+  );
+
+  return await handle.result({
+    timeoutMs: 15_000,
+  });
+}
+
+async function expectSandboxStillRunning(
+  env: IntegrationTestEnvironment,
+  sandboxInstanceId: string,
+): Promise<void> {
+  const persistedInstance = await env.dataPlaneDb.query.sandboxInstances.findFirst({
+    columns: {
+      status: true,
+      stopReason: true,
+    },
+    where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+  });
+
+  expect(persistedInstance).toEqual({
+    status: SandboxInstanceStatuses.RUNNING,
+    stopReason: null,
+  });
 }
 
 async function expectDeadlinesCleared(
