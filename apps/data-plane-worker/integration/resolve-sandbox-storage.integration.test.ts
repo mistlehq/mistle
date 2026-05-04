@@ -1,353 +1,96 @@
-import { randomUUID } from "node:crypto";
+/* eslint-disable jest/no-standalone-expect --
+ * The test cases use an extended Vitest fixture created by the test harness.
+ */
 
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
-  createControlPlaneDatabase,
-  organizationCredentialKeys,
-  organizationSandboxStorageSettings,
-  organizations,
-  SandboxStorageConfigSources,
-} from "@mistle/db/control-plane";
-import {
-  getDataPlaneDatabaseSchema,
-  createDataPlaneDatabase,
-  sandboxInstanceStorages,
-  sandboxInstances,
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
+  SandboxInstanceSources,
   SandboxStorageCredentialKinds,
   SandboxStorageProviders,
   SandboxStorageStatuses,
 } from "@mistle/db/data-plane";
-import {
-  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-  MigrationTracking,
-  runControlPlaneMigrations,
-  runDataPlaneMigrations,
-} from "@mistle/db/migrator";
 import { SandboxProvider, SandboxStorageBackend } from "@mistle/sandbox";
-import { reserveAvailablePort, startPostgresWithPgBouncer } from "@mistle/test-harness";
-import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  createIntegrationTest,
+  TestEnvironmentIdHeader,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
+import { describe, expect } from "vitest";
 
-import { ensureCommitSignBinary } from "../../control-plane-api/integration/helpers/commit-sign.js";
+import type { DataPlaneWorkerConfig } from "../openworkflow/core/config.js";
 import { createSandboxStorageBackendAdapter } from "../openworkflow/shared/sandbox-storage/create-sandbox-storage-backend-adapter.js";
 import { insertSandboxInstanceStorage } from "../openworkflow/shared/sandbox-storage/storage-persistence.js";
 import { ensureSandboxInstance } from "../openworkflow/start-sandbox-instance/ensure-sandbox-instance.js";
-import { startControlPlaneApiProcess } from "./helpers/control-plane-api.js";
-import { insertInitialOrganizationCredentialKey } from "./helpers/organization-credential-keys.js";
 
-const IntegrationTestTimeoutMs = 60_000;
-const InternalAuthServiceToken = "integration-service-token";
-const MasterEncryptionKeyVersion = 1;
-const OrganizationCredentialKeyVersion = 1;
-const MasterEncryptionKeys = {
-  "1": "integration-master-key-testing",
-} as const;
+const InternalServiceToken = "integration-new-internal-service-token";
 
-type DatabaseStack = {
-  directUrl: string;
-  stop: () => Promise<void>;
-};
+const it = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-worker"],
+});
 
-let databaseStack: DatabaseStack | undefined;
-let dbPool: Pool | undefined;
-let controlPlaneApi: Awaited<ReturnType<typeof startControlPlaneApiProcess>> | undefined;
-let commitSignBinaryPath: string | undefined;
+describe.concurrent("data-plane worker Archil sandbox storage resolution", () => {
+  it("loads ready storage metadata and resolves its disk token through control plane", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      organizationName: "Worker Storage Resolve",
+    });
+    const sandboxInstanceId = "sbi_storage_resolve_ready_integration_new";
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
 
-function getCommitSignBinaryPath(): string {
-  if (commitSignBinaryPath === undefined) {
-    throw new Error("Expected commit-sign binary path to be initialized.");
-  }
-
-  return commitSignBinaryPath;
-}
-
-function getDbPool(): Pool {
-  if (dbPool === undefined) {
-    throw new Error("Expected integration database pool to be initialized.");
-  }
-
-  return dbPool;
-}
-
-function createControlPlaneDb() {
-  return createControlPlaneDatabase(getDbPool());
-}
-
-function createDataPlaneDb() {
-  return createDataPlaneDatabase(getDbPool());
-}
-
-function createArchilStorageBackendAdapter(input: {
-  db: ReturnType<typeof createDataPlaneDb>;
-  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
-  controlPlaneInternalClient: ControlPlaneInternalClient;
-}) {
-  return createSandboxStorageBackendAdapter({
-    db: input.db,
-    tables: getDataPlaneDatabaseSchema(input.db),
-    controlPlaneInternalClient: input.controlPlaneInternalClient,
-    workerConfig: {
-      database: { url: "postgresql://unused" },
-      workflow: {
-        databaseUrl: "postgresql://unused",
-        namespaceId: "integration",
-        runMigrations: false,
-        concurrency: 1,
-      },
-      runtimeState: {
-        gatewayBaseUrl: "http://127.0.0.1:5202",
-      },
-      controlPlaneApi: {
-        baseUrl: "http://127.0.0.1:5100",
-      },
-      sandbox: {
-        provider: "e2b",
-        storage: {
-          backend: "archil",
-        },
-        internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-        bootstrap: {
-          tokenSecret: "integration-bootstrap-secret",
-          tokenIssuer: "integration-data-plane-worker",
-          tokenAudience: "integration-data-plane-gateway",
-        },
-        egress: {
-          tokenSecret: "integration-egress-secret",
-          tokenIssuer: "integration-data-plane-worker",
-          tokenAudience: "integration-tokenizer-proxy",
-        },
-        tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
-      },
-      sandboxStorage: {
-        archil: {
-          apiKey: "managed-api-key",
-          region: "aws-us-east-1",
-        },
-      },
-      internalAuth: {
-        serviceToken: "integration-service-token",
-      },
-      telemetry: {
-        enabled: false,
-        debug: false,
-      },
-    },
-    runtimeProvider: SandboxProvider.E2B,
-    storageBackend: SandboxStorageBackend.ARCHIL,
-  });
-}
-
-async function seedOrganizationWithCredentialKey(input: { organizationId: string }): Promise<void> {
-  const controlPlaneDb = createControlPlaneDb();
-
-  await controlPlaneDb.insert(organizations).values({
-    id: input.organizationId,
-    slug: `org-pr5-${randomUUID().replaceAll("-", "").slice(0, 12)}`,
-    name: "PR5 integration organization",
-  });
-  await insertInitialOrganizationCredentialKey({
-    db: controlPlaneDb,
-    organizationId: input.organizationId,
-    organizationCredentialKeyVersion: OrganizationCredentialKeyVersion,
-    masterEncryptionKeyVersion: MasterEncryptionKeyVersion,
-    masterEncryptionKeys: MasterEncryptionKeys,
-  });
-  await controlPlaneDb.insert(organizationSandboxStorageSettings).values({
-    organizationId: input.organizationId,
-    persistentSandboxesEnabled: true,
-    storageConfigSource: SandboxStorageConfigSources.MANAGED,
-  });
-}
-
-describe("resolve ready Archil sandbox storage integration", () => {
-  beforeAll(async () => {
-    commitSignBinaryPath = await ensureCommitSignBinary();
-    databaseStack = await startPostgresWithPgBouncer();
-
-    await runControlPlaneMigrations({
-      connectionString: databaseStack.directUrl,
-      schemaName: "control_plane",
-      migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-      migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
-      migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
+    await ensurePersistentSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: session.organizationId,
+    });
+    const encryptedCredential = await controlPlaneInternalClient.encryptStorageCredential({
+      organizationId: session.organizationId,
+      credentialKind: "disk_token",
+      plaintext: "disk-token-integration-new",
+    });
+    await insertReadyStorage(env, {
+      sandboxInstanceId,
+      encryptedCredential,
     });
 
-    await runDataPlaneMigrations({
-      connectionString: databaseStack.directUrl,
-      schemaName: "data_plane",
-      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-      migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
-      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
+    const resolvedStorage = await createArchilStorageBackendAdapter({
+      env,
+      controlPlaneInternalClient,
+    }).resolveAttachment({
+      organizationId: session.organizationId,
+      sandboxInstanceId,
     });
 
-    dbPool = new Pool({
-      connectionString: databaseStack.directUrl,
-    });
-
-    const controlPlanePort = await reserveAvailablePort({ host: "127.0.0.1" });
-    controlPlaneApi = await startControlPlaneApiProcess({
-      host: "127.0.0.1",
-      port: controlPlanePort,
-      databaseUrl: databaseStack.directUrl,
-      dataPlaneApiBaseUrl: "http://127.0.0.1:5201",
-      workflowNamespaceId: "integration",
-      internalAuthServiceToken: InternalAuthServiceToken,
-      sandboxStorageBackend: SandboxStorageBackend.ARCHIL,
-      commitSignBinaryPath: getCommitSignBinaryPath(),
-    });
-  }, IntegrationTestTimeoutMs);
-
-  afterAll(async () => {
-    await controlPlaneApi?.stop();
-    await dbPool?.end();
-    await databaseStack?.stop();
-  });
-
-  beforeEach(async () => {
-    await createDataPlaneDb().delete(sandboxInstanceStorages);
-    await createDataPlaneDb().delete(sandboxInstances);
-    await createControlPlaneDb().delete(organizationSandboxStorageSettings);
-    await createControlPlaneDb().delete(organizationCredentialKeys);
-    await createControlPlaneDb().delete(organizations);
-  });
-
-  it(
-    "loads the ready Archil storage row and resolves its disk token through control plane",
-    async () => {
-      if (controlPlaneApi === undefined) {
-        throw new Error("Expected control-plane API process to be initialized.");
-      }
-
-      const controlPlaneInternalClient = new ControlPlaneInternalClient({
-        baseUrl: controlPlaneApi.baseUrl,
-        internalAuthServiceToken: InternalAuthServiceToken,
-      });
-      const organizationId = `org_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-      const sandboxInstanceId = `sbi_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-
-      await seedOrganizationWithCredentialKey({
-        organizationId,
-      });
-
-      await ensureSandboxInstance(
-        {
-          db: createDataPlaneDb(),
-          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-          runtimeProvider: "e2b",
-        },
-        {
-          sandboxInstanceId,
-          organizationId,
-          sandboxProfileId: "sbp_pr5_integration",
-          sandboxProfileVersion: 1,
-          persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-          purpose: SandboxInstancePurposes.SESSION,
-          startedBy: {
-            kind: "system",
-            id: "worker_pr5_integration",
-          },
-          source: "dashboard",
-        },
-      );
-
-      const encryptedCredential = await controlPlaneInternalClient.encryptStorageCredential({
-        organizationId,
-        credentialKind: "disk_token",
-        plaintext: "disk-token-pr5",
-      });
-
-      await insertSandboxInstanceStorage(
-        {
-          db: createDataPlaneDb(),
-          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-        },
-        {
-          sandboxInstanceId,
-          provider: SandboxStorageProviders.ARCHIL,
-          handle: "dsk-0123456789abcdef",
-          region: "aws-us-east-1",
-          status: SandboxStorageStatuses.READY,
-          credentialCiphertext: encryptedCredential.ciphertext,
-          credentialNonce: encryptedCredential.nonce,
-          credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-          organizationCredentialKeyVersion: encryptedCredential.organizationCredentialKeyVersion,
-        },
-      );
-
-      const storageBackendAdapter = createArchilStorageBackendAdapter({
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-        controlPlaneInternalClient,
-      });
-
-      const resolvedStorage = await storageBackendAdapter.resolveAttachment({
-        organizationId,
-        sandboxInstanceId,
-      });
-
-      if (resolvedStorage.backend !== SandboxStorageBackend.ARCHIL) {
-        throw new Error("Expected Archil sandbox storage attachment.");
-      }
-
-      expect(resolvedStorage.credential).toBe("disk-token-pr5");
-      expect(resolvedStorage).toMatchObject({
-        backend: SandboxStorageBackend.ARCHIL,
-        handle: "dsk-0123456789abcdef",
-        region: "aws-us-east-1",
-      });
-    },
-    IntegrationTestTimeoutMs,
-  );
-
-  it("fails when no sandbox storage row exists", async () => {
-    if (controlPlaneApi === undefined) {
-      throw new Error("Expected control-plane API process to be initialized.");
+    if (resolvedStorage.backend !== SandboxStorageBackend.ARCHIL) {
+      throw new Error("Expected Archil sandbox storage attachment.");
     }
 
-    const controlPlaneInternalClient = new ControlPlaneInternalClient({
-      baseUrl: controlPlaneApi.baseUrl,
-      internalAuthServiceToken: InternalAuthServiceToken,
+    expect(resolvedStorage).toMatchObject({
+      backend: SandboxStorageBackend.ARCHIL,
+      handle: "dsk-integration-new-ready",
+      region: "aws-us-east-1",
+      credential: "disk-token-integration-new",
     });
-    const organizationId = `org_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    const sandboxInstanceId = `sbi_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+  });
 
-    await seedOrganizationWithCredentialKey({
-      organizationId,
+  it("fails when no sandbox storage row exists", async ({ env }) => {
+    const session = await env.auth.createSession({
+      organizationName: "Worker Storage Missing Row",
     });
+    const sandboxInstanceId = "sbi_storage_resolve_missing_integration_new";
 
-    await ensureSandboxInstance(
-      {
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-        runtimeProvider: "e2b",
-      },
-      {
-        sandboxInstanceId,
-        organizationId,
-        sandboxProfileId: "sbp_pr5_integration",
-        sandboxProfileVersion: 1,
-        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-        purpose: SandboxInstancePurposes.SESSION,
-        startedBy: {
-          kind: "system",
-          id: "worker_pr5_integration",
-        },
-        source: "dashboard",
-      },
-    );
-
-    const storageBackendAdapter = createArchilStorageBackendAdapter({
-      db: createDataPlaneDb(),
-      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-      controlPlaneInternalClient,
+    await ensurePersistentSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: session.organizationId,
     });
 
     await expect(
-      storageBackendAdapter.resolveAttachment({
-        organizationId,
+      createArchilStorageBackendAdapter({
+        env,
+        controlPlaneInternalClient: createControlPlaneInternalClient(env),
+      }).resolveAttachment({
+        organizationId: session.organizationId,
         sandboxInstanceId,
       }),
     ).rejects.toThrow(
@@ -355,76 +98,40 @@ describe("resolve ready Archil sandbox storage integration", () => {
     );
   });
 
-  it("fails when the sandbox storage row is not ready", async () => {
-    if (controlPlaneApi === undefined) {
-      throw new Error("Expected control-plane API process to be initialized.");
-    }
-
-    const controlPlaneInternalClient = new ControlPlaneInternalClient({
-      baseUrl: controlPlaneApi.baseUrl,
-      internalAuthServiceToken: InternalAuthServiceToken,
+  it("fails when the sandbox storage row is not ready", async ({ env }) => {
+    const session = await env.auth.createSession({
+      organizationName: "Worker Storage Not Ready",
     });
-    const organizationId = `org_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    const sandboxInstanceId = `sbi_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
+    const sandboxInstanceId = "sbi_storage_resolve_failed_integration_new";
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
 
-    await seedOrganizationWithCredentialKey({
-      organizationId,
+    await ensurePersistentSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: session.organizationId,
     });
-
-    await ensureSandboxInstance(
-      {
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-        runtimeProvider: "e2b",
-      },
-      {
-        sandboxInstanceId,
-        organizationId,
-        sandboxProfileId: "sbp_pr5_integration",
-        sandboxProfileVersion: 1,
-        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-        purpose: SandboxInstancePurposes.SESSION,
-        startedBy: {
-          kind: "system",
-          id: "worker_pr5_integration",
-        },
-        source: "dashboard",
-      },
-    );
-
     const encryptedCredential = await controlPlaneInternalClient.encryptStorageCredential({
-      organizationId,
+      organizationId: session.organizationId,
       credentialKind: "disk_token",
-      plaintext: "disk-token-pr5",
+      plaintext: "disk-token-failed",
     });
-
-    await insertSandboxInstanceStorage(
-      {
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-      },
-      {
-        sandboxInstanceId,
-        provider: SandboxStorageProviders.ARCHIL,
-        handle: "dsk-0123456789abcdef",
-        region: "aws-us-east-1",
-        status: SandboxStorageStatuses.FAILED,
-        credentialCiphertext: encryptedCredential.ciphertext,
-        credentialNonce: encryptedCredential.nonce,
-        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-        organizationCredentialKeyVersion: encryptedCredential.organizationCredentialKeyVersion,
-      },
-    );
-
-    const storageBackendAdapter = createArchilStorageBackendAdapter({
-      db: createDataPlaneDb(),
-      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-      controlPlaneInternalClient,
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstanceStorages).values({
+      sandboxInstanceId,
+      provider: SandboxStorageProviders.ARCHIL,
+      handle: "dsk-integration-new-failed",
+      region: "aws-us-east-1",
+      status: SandboxStorageStatuses.FAILED,
+      credentialCiphertext: encryptedCredential.ciphertext,
+      credentialNonce: encryptedCredential.nonce,
+      credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+      organizationCredentialKeyVersion: encryptedCredential.organizationCredentialKeyVersion,
     });
 
     await expect(
-      storageBackendAdapter.resolveAttachment({
-        organizationId,
+      createArchilStorageBackendAdapter({
+        env,
+        controlPlaneInternalClient,
+      }).resolveAttachment({
+        organizationId: session.organizationId,
         sandboxInstanceId,
       }),
     ).rejects.toThrow(
@@ -432,77 +139,36 @@ describe("resolve ready Archil sandbox storage integration", () => {
     );
   });
 
-  it("propagates control-plane decrypt failures unchanged", async () => {
-    if (controlPlaneApi === undefined) {
-      throw new Error("Expected control-plane API process to be initialized.");
-    }
-
-    const controlPlaneInternalClient = new ControlPlaneInternalClient({
-      baseUrl: controlPlaneApi.baseUrl,
-      internalAuthServiceToken: InternalAuthServiceToken,
+  it("propagates control-plane decrypt failures unchanged", async ({ env }) => {
+    const session = await env.auth.createSession({
+      organizationName: "Worker Storage Wrong Organization",
     });
-    const organizationId = `org_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    const wrongOrganizationId = `org_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-    const sandboxInstanceId = `sbi_pr5_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
-
-    await seedOrganizationWithCredentialKey({
-      organizationId,
+    const otherSession = await env.auth.createSession({
+      organizationName: "Worker Storage Other Organization",
     });
+    const sandboxInstanceId = "sbi_storage_resolve_wrong_org_integration_new";
+    const controlPlaneInternalClient = createControlPlaneInternalClient(env);
 
-    await ensureSandboxInstance(
-      {
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-        runtimeProvider: "e2b",
-      },
-      {
-        sandboxInstanceId,
-        organizationId,
-        sandboxProfileId: "sbp_pr5_integration",
-        sandboxProfileVersion: 1,
-        persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
-        purpose: SandboxInstancePurposes.SESSION,
-        startedBy: {
-          kind: "system",
-          id: "worker_pr5_integration",
-        },
-        source: "dashboard",
-      },
-    );
-
+    await ensurePersistentSandboxInstance(env, {
+      sandboxInstanceId,
+      organizationId: session.organizationId,
+    });
     const encryptedCredential = await controlPlaneInternalClient.encryptStorageCredential({
-      organizationId,
+      organizationId: session.organizationId,
       credentialKind: "disk_token",
-      plaintext: "disk-token-pr5",
+      plaintext: "disk-token-wrong-organization",
     });
-
-    await insertSandboxInstanceStorage(
-      {
-        db: createDataPlaneDb(),
-        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-      },
-      {
-        sandboxInstanceId,
-        provider: SandboxStorageProviders.ARCHIL,
-        handle: "dsk-0123456789abcdef",
-        region: "aws-us-east-1",
-        status: SandboxStorageStatuses.READY,
-        credentialCiphertext: encryptedCredential.ciphertext,
-        credentialNonce: encryptedCredential.nonce,
-        credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
-        organizationCredentialKeyVersion: encryptedCredential.organizationCredentialKeyVersion,
-      },
-    );
-
-    const storageBackendAdapter = createArchilStorageBackendAdapter({
-      db: createDataPlaneDb(),
-      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
-      controlPlaneInternalClient,
+    await insertReadyStorage(env, {
+      sandboxInstanceId,
+      encryptedCredential,
     });
 
     await expect(
-      storageBackendAdapter.resolveAttachment({
-        organizationId: wrongOrganizationId,
+      createArchilStorageBackendAdapter({
+        env,
+        controlPlaneInternalClient,
+      }).resolveAttachment({
+        organizationId: otherSession.organizationId,
         sandboxInstanceId,
       }),
     ).rejects.toThrow(
@@ -510,3 +176,138 @@ describe("resolve ready Archil sandbox storage integration", () => {
     );
   });
 });
+
+function createControlPlaneInternalClient(
+  env: IntegrationTestEnvironment,
+): ControlPlaneInternalClient {
+  return new ControlPlaneInternalClient({
+    baseUrl: env.controlPlaneApi.hostBaseUrl,
+    internalAuthServiceToken: InternalServiceToken,
+    testEnvironmentId: env.id,
+    testEnvironmentIdHeader: TestEnvironmentIdHeader,
+  });
+}
+
+function createArchilStorageBackendAdapter(input: {
+  env: IntegrationTestEnvironment;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+}) {
+  return createSandboxStorageBackendAdapter({
+    db: input.env.dataPlaneDb,
+    tables: input.env.dataPlaneTables,
+    controlPlaneInternalClient: input.controlPlaneInternalClient,
+    workerConfig: createWorkerConfig(),
+    runtimeProvider: SandboxProvider.E2B,
+    storageBackend: SandboxStorageBackend.ARCHIL,
+  });
+}
+
+function createWorkerConfig(): DataPlaneWorkerConfig {
+  return {
+    database: {
+      url: "postgresql://unused",
+    },
+    workflow: {
+      databaseUrl: "postgresql://unused",
+      namespaceId: "integration-new-worker-resolve-storage",
+      runMigrations: false,
+      concurrency: 1,
+    },
+    runtimeState: {
+      gatewayBaseUrl: "http://127.0.0.1:5202",
+    },
+    controlPlaneApi: {
+      baseUrl: "http://127.0.0.1:5100",
+    },
+    sandbox: {
+      provider: "e2b",
+      storage: {
+        backend: "archil",
+      },
+      internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      bootstrap: {
+        tokenSecret: "integration-new-bootstrap-token-secret",
+        tokenIssuer: "integration-new-data-plane-worker",
+        tokenAudience: "integration-new-data-plane-gateway",
+      },
+      egress: {
+        tokenSecret: "integration-new-egress-token-secret",
+        tokenIssuer: "integration-new-data-plane-worker",
+        tokenAudience: "integration-new-tokenizer-proxy",
+      },
+      tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy/tokenizer-proxy/egress",
+    },
+    sandboxStorage: {
+      archil: {
+        apiKey: "managed-api-key",
+        region: "aws-us-east-1",
+      },
+    },
+    internalAuth: {
+      serviceToken: InternalServiceToken,
+    },
+    telemetry: {
+      enabled: false,
+      debug: false,
+    },
+  };
+}
+
+async function ensurePersistentSandboxInstance(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    organizationId: string;
+  },
+): Promise<void> {
+  await ensureSandboxInstance(
+    {
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+      runtimeProvider: "e2b",
+    },
+    {
+      sandboxInstanceId: input.sandboxInstanceId,
+      organizationId: input.organizationId,
+      sandboxProfileId: "sbp_storage_resolve_integration_new",
+      sandboxProfileVersion: 1,
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+      purpose: SandboxInstancePurposes.SESSION,
+      startedBy: {
+        kind: "system",
+        id: "worker_storage_resolve_integration_new",
+      },
+      source: SandboxInstanceSources.DASHBOARD,
+    },
+  );
+}
+
+async function insertReadyStorage(
+  env: IntegrationTestEnvironment,
+  input: {
+    sandboxInstanceId: string;
+    encryptedCredential: {
+      ciphertext: string;
+      nonce: string;
+      organizationCredentialKeyVersion: number;
+    };
+  },
+): Promise<void> {
+  await insertSandboxInstanceStorage(
+    {
+      db: env.dataPlaneDb,
+      tables: env.dataPlaneTables,
+    },
+    {
+      sandboxInstanceId: input.sandboxInstanceId,
+      provider: SandboxStorageProviders.ARCHIL,
+      handle: "dsk-integration-new-ready",
+      region: "aws-us-east-1",
+      status: SandboxStorageStatuses.READY,
+      credentialCiphertext: input.encryptedCredential.ciphertext,
+      credentialNonce: input.encryptedCredential.nonce,
+      credentialKind: SandboxStorageCredentialKinds.DISK_TOKEN,
+      organizationCredentialKeyVersion: input.encryptedCredential.organizationCredentialKeyVersion,
+    },
+  );
+}
