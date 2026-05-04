@@ -3,7 +3,10 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
+import { OrganizationIdentityLinkProviderConfigStatus } from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
@@ -13,18 +16,31 @@ import {
   PayloadKindWebSocketText,
   decodeDataFrame,
   encodeDataFrame,
+  parseSigningControlMessage,
   parseStreamControlMessage,
+  type SigningControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
+import { mintSigningGrant } from "@mistle/sandbox-signing-auth";
 import {
   TestEnvironmentIdHeader,
   createIntegrationTest,
+  type IntegrationAuthenticatedSession,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
 import { typeid } from "typeid-js";
-import { describe, expect } from "vitest";
+import { beforeAll, describe, expect } from "vitest";
 import WebSocket from "ws";
 
+import { ensureCommitSignBinary } from "../../control-plane-api/integration-new/helpers/commit-sign.js";
+import {
+  insertGitHubSigningCredential,
+  seedGitHubLinkedPrincipal,
+  seedIdentityConnection,
+  seedIdentityProviderConfig,
+  seedPrincipalCredential,
+  upsertGitHubIdentityTarget,
+} from "../../control-plane-api/integration-new/helpers/identity-linking.js";
 import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
@@ -41,12 +57,101 @@ const BootstrapTokenIssuer = "integration-new-data-plane-worker";
 const GatewayTokenAudience = "integration-new-data-plane-gateway";
 const ConnectionTokenSecret = "integration-new-connection-secret";
 const ConnectionTokenIssuer = "integration-new-control-plane-api";
+const TestPrivateKeyPath = fileURLToPath(
+  new URL("../../../packages/commit-sign/tests/fixtures/ed25519_private_key", import.meta.url),
+);
+const TestPrivateKey = readFileSync(TestPrivateKeyPath, "utf8");
+const TestPublicKey =
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILM+rvN+ot98qgEN796jTiQfZfG1KaT0PtFDJ/XFSqti user@example.com";
+const GitHubAppInstallationConnectionMethodId = "github-app-installation";
 
 const it = createIntegrationTest({
-  services: ["data-plane-api", "data-plane-gateway"],
+  services: ["control-plane-api", "data-plane-api", "data-plane-gateway"],
+});
+
+beforeAll(async () => {
+  await ensureCommitSignBinary();
 });
 
 describe.concurrent("sandbox tunnel stream routing integration", () => {
+  it(
+    "returns signed results for valid bootstrap signing requests",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const session = await env.auth.createSession({
+        email: "data-plane-gateway-signing-success-integration-new@example.com",
+      });
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      await seedGitHubSigningContext(env, {
+        session,
+        targetKey: "github-gateway-signing-success-integration-new",
+        connectionId: "icn_gateway_signing_success_integration_new",
+        providerConfigId: "ilp_gateway_signing_success_integration_new",
+        principalId: "uep_gateway_signing_success_integration_new",
+        credentialId: "upc_gateway_signing_success_integration_new",
+      });
+      const signingGrant = await mintSigningGrant({
+        config: {
+          tokenSecret: BootstrapTokenSecret,
+          tokenIssuer: BootstrapTokenIssuer,
+          tokenAudience: GatewayTokenAudience,
+        },
+        claims: {
+          sub: sandboxInstanceId,
+          jti: randomUUID(),
+          organizationId: session.organizationId,
+          actingUserId: session.userId,
+          providerFamily: "github",
+          format: "ssh",
+          keyRef: `key::${TestPublicKey}`,
+        },
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+
+        const signingResult = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "signing.request",
+            requestId: "sign_req_integration_new_gateway",
+            organizationId: session.organizationId,
+            sandboxInstanceId,
+            actingUserId: session.userId,
+            providerFamily: "github",
+            format: "ssh",
+            keyRef: `key::${TestPublicKey}`,
+            grant: signingGrant,
+            payload: "c2lnbi1tZQ==",
+            encoding: "base64",
+          }),
+        );
+
+        const parsedSigningResult = parseSigningMessage((await signingResult).data);
+        expect(parsedSigningResult).toEqual({
+          type: "signing.result",
+          requestId: "sign_req_integration_new_gateway",
+          ok: true,
+          signature: expect.any(String),
+          encoding: "base64",
+        });
+        if (parsedSigningResult.type !== "signing.result" || !parsedSigningResult.ok) {
+          throw new Error("Expected signing result to succeed.");
+        }
+        expect(Buffer.from(parsedSigningResult.signature, "base64").toString("utf8")).toMatch(
+          /^-----BEGIN SSH SIGNATURE-----\n[\s\S]+-----END SSH SIGNATURE-----\n$/u,
+        );
+      } finally {
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
   it(
     "routes file upload streams through gateway bindings and relays raw bytes plus completion events",
     async ({ env }) => {
@@ -967,6 +1072,19 @@ function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   return parsedMessage;
 }
 
+function parseSigningMessage(data: string | Buffer): SigningControlMessage {
+  if (typeof data !== "string") {
+    throw new Error("Expected websocket message data to be a string.");
+  }
+
+  const parsedMessage = parseSigningControlMessage(data);
+  if (parsedMessage === undefined) {
+    throw new Error("Expected websocket message payload to be a signing control message.");
+  }
+
+  return parsedMessage;
+}
+
 function parseDataFrame(data: string | Buffer): ReturnType<typeof decodeDataFrame> {
   if (typeof data === "string") {
     throw new Error("Expected websocket message data to be binary.");
@@ -1081,4 +1199,65 @@ function createWebSocketBaseUrl(httpBaseUrl: string): string {
   const url = new URL(httpBaseUrl);
   url.protocol = "ws:";
   return url.toString().replace(/\/$/u, "");
+}
+
+async function seedGitHubSigningContext(
+  env: IntegrationTestEnvironment,
+  input: {
+    session: IntegrationAuthenticatedSession;
+    targetKey: string;
+    connectionId: string;
+    providerConfigId: string;
+    principalId: string;
+    credentialId: string;
+  },
+): Promise<void> {
+  await upsertGitHubIdentityTarget(env, {
+    targetKey: input.targetKey,
+  });
+  await seedIdentityConnection(env, {
+    connectionId: input.connectionId,
+    displayName: "GitHub Gateway Signing",
+    methodId: GitHubAppInstallationConnectionMethodId,
+    organizationId: input.session.organizationId,
+    targetKey: input.targetKey,
+  });
+  await seedIdentityProviderConfig(env, {
+    configId: input.providerConfigId,
+    connectionId: input.connectionId,
+    organizationId: input.session.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    targetKey: input.targetKey,
+    userId: input.session.userId,
+  });
+  await seedGitHubLinkedPrincipal(env, {
+    organizationId: input.session.organizationId,
+    userId: input.session.userId,
+    principalId: input.principalId,
+    providerConfigId: input.providerConfigId,
+    connectionId: input.connectionId,
+    providerSubjectId: randomUUID(),
+    profile: {
+      login: "gateway-signing-user",
+      preferredEmail: "gateway-signing-user@example.com",
+    },
+  });
+  await seedPrincipalCredential(env, {
+    credentialId: `upc_oauth_${input.principalId}`,
+    organizationId: input.session.organizationId,
+    principalId: input.principalId,
+    providerFamily: "github",
+    credentialKind: "github_app_user_access_token",
+  });
+  await insertGitHubSigningCredential(env, {
+    organizationId: input.session.organizationId,
+    principalId: input.principalId,
+    credentialId: input.credentialId,
+    privateKey: TestPrivateKey,
+    metadata: {
+      publicKey: TestPublicKey,
+      publicKeyFingerprint: "SHA256:test-gateway-signing",
+    },
+  });
 }
