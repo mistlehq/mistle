@@ -44,7 +44,7 @@ import {
   seedIdentityProviderConfig,
   seedPrincipalCredential,
   upsertGitHubIdentityTarget,
-} from "../../control-plane-api/integration-new/helpers/identity-linking.js";
+} from "../../control-plane-api/integration/helpers/identity-linking.js";
 import { EgressRequestHeaders } from "../src/egress/constants.js";
 
 const EgressGrantConfig = {
@@ -58,6 +58,10 @@ const SlackAppendSessionLinkMiddlewareId = "append-session-link-to-slack-text";
 const it = createIntegrationTest({
   services: ["control-plane-api", "tokenizer-proxy"],
 });
+
+type TokenizerProxyHttpResponse = Awaited<
+  ReturnType<IntegrationTestEnvironment["tokenizerProxy"]["http"]["fetch"]>
+>;
 
 describe.concurrent("tokenizer proxy egress credentials", () => {
   it("resolves connection credentials through the real control-plane API", async ({ env }) => {
@@ -2221,7 +2225,7 @@ function readOptionalStringArray(
 }
 
 async function expectProxyErrorResponse(
-  response: Response,
+  response: TokenizerProxyHttpResponse,
   input: {
     status: number;
     code: string;

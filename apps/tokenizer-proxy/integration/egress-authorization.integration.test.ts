@@ -3,7 +3,10 @@
  */
 
 import { mintEgressGrant } from "@mistle/sandbox-egress-auth";
-import { createIntegrationTest } from "@mistle/test-harness/integration";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import { EgressRequestHeaders } from "../src/egress/constants.js";
@@ -17,6 +20,10 @@ const EgressGrantConfig = {
 const it = createIntegrationTest({
   services: ["control-plane-api", "tokenizer-proxy"],
 });
+
+type TokenizerProxyHttpResponse = Awaited<
+  ReturnType<IntegrationTestEnvironment["tokenizerProxy"]["http"]["fetch"]>
+>;
 
 describe.concurrent("tokenizer proxy egress authorization", () => {
   it("serves health checks through the integration harness", async ({ env }) => {
@@ -127,7 +134,7 @@ async function mintScopedEgressGrant(input: {
 }
 
 async function expectProxyErrorResponse(
-  response: Response,
+  response: TokenizerProxyHttpResponse,
   input: {
     status: number;
     code: string;
