@@ -48,7 +48,6 @@
     "test:property": "turbo run test:property",
     "test-harness:prepare-runtime": "tsx ./scripts/test/prepare-test-harness-runtime.ts",
     "test:integration": "tsx ./scripts/test/run-integration-vitest.ts",
-    "test:integration:new": "tsx ./scripts/test/run-integration-new-vitest.ts",
     "test:integration:rust": "pnpm --filter @mistle/sandboxd test:integration",
     "test:integration:all": "pnpm test:integration && pnpm test:integration:rust",
     "sandbox-base:inventory:update": "pnpm sandbox-base:inventory:check-spec && tsx ./scripts/sandbox-base/generate-inventory.ts --write",
