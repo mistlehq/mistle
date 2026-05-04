@@ -1,4 +1,4 @@
-import { integrationConnections, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
@@ -86,6 +86,8 @@ export async function updateIntegrationConnection(
   }: { db: ControlPlaneDatabase; integrationRegistry: IntegrationRegistry },
   input: UpdateConnectionInput,
 ): Promise<UpdatedConnection> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const existingConnection = await db.query.integrationConnections.findFirst({
     where: (table, { and, eq }) =>
       and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
@@ -171,13 +173,13 @@ export async function updateIntegrationConnection(
   }
 
   const [updatedConnection] = await db
-    .update(integrationConnections)
+    .update(tables.integrationConnections)
     .set({
       displayName: input.displayName,
       ...(nextConfig === undefined ? {} : { config: nextConfig }),
       updatedAt: sql`now()`,
     })
-    .where(eq(integrationConnections.id, existingConnection.id))
+    .where(eq(tables.integrationConnections.id, existingConnection.id))
     .returning();
 
   if (updatedConnection === undefined) {

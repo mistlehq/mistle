@@ -93,6 +93,7 @@ describe("sandbox tunnel websocket admission integration", () => {
 
       const result = await admission.admitRequest({
         db: fixture.db,
+        tables: fixture.tables,
         requestUrl,
         requestedInstanceId: sandboxInstanceId,
       });

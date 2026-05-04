@@ -1,7 +1,7 @@
-import type { InsertSandboxProfile, SandboxProfile } from "@mistle/db/control-plane";
 import {
-  sandboxProfiles,
-  sandboxProfileVersions,
+  type InsertSandboxProfile,
+  type SandboxProfile,
+  getControlPlaneDatabaseSchema,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
@@ -18,14 +18,19 @@ export async function createProfile(
   serviceInput: CreateProfileInput,
 ): Promise<SandboxProfile> {
   return db.transaction(async (tx) => {
-    const [createdProfile] = await tx.insert(sandboxProfiles).values(serviceInput).returning();
+    const tables = getControlPlaneDatabaseSchema(tx);
+
+    const [createdProfile] = await tx
+      .insert(tables.sandboxProfiles)
+      .values(serviceInput)
+      .returning();
 
     if (createdProfile === undefined) {
       throw new Error("Failed to create sandbox profile.");
     }
 
     const [createdInitialVersion] = await tx
-      .insert(sandboxProfileVersions)
+      .insert(tables.sandboxProfileVersions)
       .values({
         sandboxProfileId: createdProfile.id,
         version: INITIAL_SANDBOX_PROFILE_VERSION,

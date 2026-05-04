@@ -1,6 +1,10 @@
 import type {
   AnyIntegrationDefinition,
   IntegrationFormConnectionMethodSetupManifestDraft,
+  IntegrationFormConnectionMethodSetupFlow,
+  IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodSetupPaneMetadata,
+  IntegrationFormConnectionMethodSetupStartForm,
 } from "@mistle/integrations-core";
 import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definitions/browser";
 
@@ -32,6 +36,66 @@ export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
   connection: IntegrationConnection;
   setupRoute: IntegrationConnectionSetupRoute;
 }): IntegrationSetupAppManifestDraftBuilder {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.appManifestDraft === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define an app manifest draft builder for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.appManifestDraft.build;
+}
+
+export function resolveIntegrationSetupStartFormOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodSetupStartForm {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.startForm === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define a setup start form for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.startForm;
+}
+
+export function resolveIntegrationProviderAppSetupOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodProviderAppSetup {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.providerAppSetup === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define provider app setup for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.providerAppSetup;
+}
+
+export function resolveIntegrationSetupPaneOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodSetupPaneMetadata {
+  const setupFlow = resolveIntegrationSetupFlowOrThrow(input);
+
+  if (setupFlow.setupPane === undefined) {
+    throw new Error(
+      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define a setup pane for target '${input.connection.targetKey}'.`,
+    );
+  }
+
+  return setupFlow.setupPane;
+}
+
+function resolveIntegrationSetupFlowOrThrow(input: {
+  connection: IntegrationConnection;
+  setupRoute: IntegrationConnectionSetupRoute;
+}): IntegrationFormConnectionMethodSetupFlow {
   const definition = resolveIntegrationDefinitionByTargetKey(input.connection.targetKey);
   const method =
     definition.connectionMethods.find((candidate) => candidate.id === input.setupRoute.methodId) ??
@@ -49,19 +113,15 @@ export function resolveIntegrationSetupAppManifestDraftBuilderOrThrow(input: {
     );
   }
 
-  if (method.setupFlow.routeSegment !== input.setupRoute.routeSegment) {
+  const setupFlow = method.setupFlow;
+
+  if (setupFlow.routeSegment !== input.setupRoute.routeSegment) {
     throw new Error(
-      `Integration setup route '${input.setupRoute.routeSegment}' does not match browser definition route '${method.setupFlow.routeSegment}' for target '${input.connection.targetKey}'.`,
+      `Integration setup route '${input.setupRoute.routeSegment}' does not match browser definition route '${setupFlow.routeSegment}' for target '${input.connection.targetKey}'.`,
     );
   }
 
-  if (method.setupFlow.appManifestDraft === undefined) {
-    throw new Error(
-      `Integration setup flow '${input.setupRoute.methodId}/${input.setupRoute.routeSegment}' does not define an app manifest draft builder for target '${input.connection.targetKey}'.`,
-    );
-  }
-
-  return method.setupFlow.appManifestDraft.build;
+  return setupFlow;
 }
 
 function resolveIntegrationDefinitionByTargetKey(targetKey: string): AnyIntegrationDefinition {

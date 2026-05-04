@@ -1,7 +1,7 @@
 import {
-  sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -21,13 +21,15 @@ export async function claimSandboxProfileVersionSnapshotJob(
   },
 ): Promise<{ status: "ok" }> {
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedRow] = await tx
       .select({
-        state: sandboxProfileVersionSnapshotJobs.state,
-        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
+        state: tables.sandboxProfileVersionSnapshotJobs.state,
+        workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
       })
-      .from(sandboxProfileVersionSnapshotJobs)
-      .where(eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
+      .from(tables.sandboxProfileVersionSnapshotJobs)
+      .where(eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId))
       .for("update");
 
     if (lockedRow === undefined) {
@@ -63,24 +65,24 @@ export async function claimSandboxProfileVersionSnapshotJob(
     }
 
     const updatedRows = await tx
-      .update(sandboxProfileVersionSnapshotJobs)
+      .update(tables.sandboxProfileVersionSnapshotJobs)
       .set({
         state: SandboxProfileVersionSnapshotJobStates.RUNNING,
         workflowRunId: input.workflowRunId,
-        startedAt: sql`coalesce(${sandboxProfileVersionSnapshotJobs.startedAt}, now())`,
+        startedAt: sql`coalesce(${tables.sandboxProfileVersionSnapshotJobs.startedAt}, now())`,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+          eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
           eq(
-            sandboxProfileVersionSnapshotJobs.state,
+            tables.sandboxProfileVersionSnapshotJobs.state,
             SandboxProfileVersionSnapshotJobStates.QUEUED,
           ),
         ),
       )
       .returning({
-        id: sandboxProfileVersionSnapshotJobs.id,
+        id: tables.sandboxProfileVersionSnapshotJobs.id,
       });
 
     if (updatedRows[0] === undefined) {

@@ -1,5 +1,4 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import type { GitHubAppManifestOwner } from "@mistle/integrations-definitions/browser";
 
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
@@ -8,7 +7,6 @@ import {
   type CreatedIntegrationConnection,
   type DeletedIntegrationConnection,
   type IntegrationConnectionMethod,
-  type StartedGitHubAppManifestConnection,
   type StartedProviderAppSetup,
   type StartedRedirectConnection,
   type StartedDeviceAuthorizationConnection,
@@ -16,7 +14,6 @@ import {
   CreatedFormIntegrationConnectionSchema,
   DeletedIntegrationConnectionSchema,
   IntegrationConnectionSchema,
-  StartedGitHubAppManifestConnectionSchema,
   StartedProviderAppSetupSchema,
   StartedDeviceAuthorizationConnectionSchema,
   StartedRedirectConnectionSchema,
@@ -376,58 +373,4 @@ export async function startProviderAppSetup(input: {
       fallbackMessage: input.fallbackMessage,
     });
   }
-}
-
-export async function startGitHubAppManifestCreation(input: {
-  connectionId: string;
-  manifest: Record<string, unknown>;
-  owner: GitHubAppManifestOwner;
-}): Promise<StartedGitHubAppManifestConnection> {
-  const startedSetup = await startProviderAppSetup({
-    connectionId: input.connectionId,
-    routeSegment: "github-app",
-    body: {
-      manifest: input.manifest,
-      owner: input.owner,
-    },
-    fallbackMessage: "Could not create GitHub App manifest.",
-  });
-  if (startedSetup.kind !== "form-post") {
-    throw new Error("GitHub App manifest setup did not return a form submission.");
-  }
-
-  const manifest = startedSetup.fields["manifest"];
-  if (manifest === undefined) {
-    throw new Error("GitHub App manifest setup did not return a manifest field.");
-  }
-
-  return StartedGitHubAppManifestConnectionSchema.parse({
-    submissionUrl: startedSetup.submissionUrl,
-    fields: {
-      manifest,
-    },
-  });
-}
-
-export async function startSlackAppManifestCreation(input: {
-  connectionId: string;
-  manifest: Record<string, unknown>;
-  appConfigToken: string;
-}): Promise<StartedRedirectConnection> {
-  const startedSetup = await startProviderAppSetup({
-    connectionId: input.connectionId,
-    routeSegment: "slack-app",
-    body: {
-      manifest: input.manifest,
-      appConfigToken: input.appConfigToken,
-    },
-    fallbackMessage: "Could not create Slack app manifest.",
-  });
-  if (startedSetup.kind !== "redirect") {
-    throw new Error("Slack app manifest setup did not return a redirect URL.");
-  }
-
-  return {
-    authorizationUrl: startedSetup.authorizationUrl,
-  };
 }

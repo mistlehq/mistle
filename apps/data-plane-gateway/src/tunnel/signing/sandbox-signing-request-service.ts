@@ -37,6 +37,7 @@ export class SandboxSigningRequestService {
   public async handleBootstrapSigningRequest(input: {
     liveSandboxInstanceId: string;
     request: SigningRequest;
+    testEnvironmentId?: string;
   }): Promise<SigningResult> {
     if (input.request.sandboxInstanceId !== input.liveSandboxInstanceId) {
       return createFailureResult({
@@ -100,17 +101,24 @@ export class SandboxSigningRequestService {
     }
 
     try {
-      const signedPayload = await this.config.controlPlaneClient.signIdentityLinkCommitPayload({
-        organizationId: input.request.organizationId,
-        sandboxInstanceId: input.request.sandboxInstanceId,
-        actingUserId: input.request.actingUserId,
-        providerFamily: input.request.providerFamily,
-        format: input.request.format,
-        keyRef: input.request.keyRef,
-        grant: input.request.grant,
-        payload: input.request.payload,
-        encoding: input.request.encoding,
-      });
+      const signedPayload = await this.config.controlPlaneClient.signIdentityLinkCommitPayload(
+        {
+          organizationId: input.request.organizationId,
+          sandboxInstanceId: input.request.sandboxInstanceId,
+          actingUserId: input.request.actingUserId,
+          providerFamily: input.request.providerFamily,
+          format: input.request.format,
+          keyRef: input.request.keyRef,
+          grant: input.request.grant,
+          payload: input.request.payload,
+          encoding: input.request.encoding,
+        },
+        {
+          ...(input.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: input.testEnvironmentId }),
+        },
+      );
 
       return {
         type: "signing.result",

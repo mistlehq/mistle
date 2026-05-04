@@ -1,11 +1,10 @@
 import {
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
@@ -63,6 +62,8 @@ export async function resolveActingUserGitIdentity(
     actingUser?: SandboxActingUser;
   },
 ): Promise<SandboxGitIdentity | undefined> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const actingUser = input.actingUser;
   if (actingUser === undefined) {
     return undefined;
@@ -175,31 +176,34 @@ export async function resolveActingUserGitIdentity(
 
   const signingCredentialRows = await db
     .select({
-      metadata: userExternalPrincipalCredentialSecrets.metadata,
+      metadata: tables.userExternalPrincipalCredentialSecrets.metadata,
     })
-    .from(userExternalPrincipalCredentials)
+    .from(tables.userExternalPrincipalCredentials)
     .innerJoin(
-      userExternalPrincipalCredentialSecrets,
+      tables.userExternalPrincipalCredentialSecrets,
       and(
-        eq(userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
+        eq(tables.userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
         eq(
-          userExternalPrincipalCredentialSecrets.credentialId,
-          userExternalPrincipalCredentials.id,
+          tables.userExternalPrincipalCredentialSecrets.credentialId,
+          tables.userExternalPrincipalCredentials.id,
         ),
         eq(
-          userExternalPrincipalCredentialSecrets.secretKind,
+          tables.userExternalPrincipalCredentialSecrets.secretKind,
           UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
         ),
-        isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+        isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
       ),
     )
     .where(
       and(
-        eq(userExternalPrincipalCredentials.organizationId, input.organizationId),
-        eq(userExternalPrincipalCredentials.principalId, githubPrincipal.id),
-        eq(userExternalPrincipalCredentials.providerFamily, GitHubProviderFamily),
-        eq(userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
-        eq(userExternalPrincipalCredentials.status, UserExternalPrincipalCredentialStatuses.ACTIVE),
+        eq(tables.userExternalPrincipalCredentials.organizationId, input.organizationId),
+        eq(tables.userExternalPrincipalCredentials.principalId, githubPrincipal.id),
+        eq(tables.userExternalPrincipalCredentials.providerFamily, GitHubProviderFamily),
+        eq(tables.userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
+        eq(
+          tables.userExternalPrincipalCredentials.status,
+          UserExternalPrincipalCredentialStatuses.ACTIVE,
+        ),
       ),
     );
 

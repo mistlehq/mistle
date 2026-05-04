@@ -10,6 +10,7 @@ import type { AutomationListItem } from "../automations/automations-types.js";
 import { formatAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { formatDateTime } from "../shared/date-formatters.js";
+import { PageFrame } from "../shared/page-frame.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
 
@@ -93,9 +94,8 @@ export function AutomationsPage(): React.JSX.Element {
   const canShowSummary = automationsQuery.data !== undefined && !automationsQuery.isError;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-row items-start justify-between gap-3">
-        <h1 className="text-xl font-semibold">Automations</h1>
+    <PageFrame
+      headerActions={
         <Button
           onClick={() => {
             void navigate("/automations/new");
@@ -104,8 +104,9 @@ export function AutomationsPage(): React.JSX.Element {
         >
           Create
         </Button>
-      </div>
-
+      }
+      title="Automations"
+    >
       {automationsQuery.isPending ? null : (
         <AutomationListView
           errorMessage={errorMessage}
@@ -147,6 +148,6 @@ export function AutomationsPage(): React.JSX.Element {
           totalResults={canShowSummary ? automationsQuery.data.totalResults : null}
         />
       )}
-    </div>
+    </PageFrame>
   );
 }

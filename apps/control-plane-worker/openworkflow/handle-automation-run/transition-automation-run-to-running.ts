@@ -1,8 +1,8 @@
 import {
-  automationRuns,
   AutomationRunStatuses,
   type AutomationRunStatus,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflow-registry/control-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -29,8 +29,10 @@ export async function transitionAutomationRunToRunning(
   },
   input: HandleAutomationRunWorkflowInput,
 ): Promise<TransitionAutomationRunToRunningOutput> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const transitionedRows = await ctx.db
-    .update(automationRuns)
+    .update(tables.automationRuns)
     .set({
       status: AutomationRunStatuses.RUNNING,
       startedAt: sql`now()`,
@@ -38,8 +40,8 @@ export async function transitionAutomationRunToRunning(
     })
     .where(
       and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.QUEUED),
+        eq(tables.automationRuns.id, input.automationRunId),
+        eq(tables.automationRuns.status, AutomationRunStatuses.QUEUED),
       ),
     )
     .returning();

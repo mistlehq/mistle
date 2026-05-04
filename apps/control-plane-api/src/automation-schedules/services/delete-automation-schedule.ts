@@ -1,4 +1,4 @@
-import { automations, type ControlPlaneDatabase, schedules } from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
 import { ScheduleActionFailureCodes } from "../constants.js";
@@ -23,23 +23,24 @@ export async function deleteAutomationSchedule(
   );
 
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
     await tx
-      .update(automations)
+      .update(tables.automations)
       .set({
         enabled: false,
         updatedAt: sql`now()`,
       })
-      .where(eq(automations.id, input.automationId));
+      .where(eq(tables.automations.id, input.automationId));
 
     await tx
-      .update(schedules)
+      .update(tables.schedules)
       .set({
         enabled: false,
         nextScheduledAt: null,
         deletedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
-      .where(eq(schedules.id, existingAutomation.schedule.id));
+      .where(eq(tables.schedules.id, existingAutomation.schedule.id));
 
     await failPendingScheduledActions(tx, {
       scheduleId: existingAutomation.schedule.id,

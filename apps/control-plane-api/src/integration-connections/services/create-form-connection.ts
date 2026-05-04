@@ -1,9 +1,7 @@
 import {
-  integrationConnectionCredentials,
-  integrationConnections,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
   IntegrationConnectionStatuses,
-  integrationCredentials,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type {
@@ -103,6 +101,7 @@ export async function createFormConnection(
   input: CreateFormConnectionInput,
 ): Promise<CreatedFormIntegrationConnection> {
   const { db, integrationRegistry, integrationsConfig } = ctx;
+  const tables = getControlPlaneDatabaseSchema(db);
 
   const target = await db.query.integrationTargets.findFirst({
     where: (table, { and, eq }) =>
@@ -167,7 +166,7 @@ export async function createFormConnection(
   try {
     const createdConnection = await db.transaction(async (tx) => {
       const [createdConnection] = await tx
-        .insert(integrationConnections)
+        .insert(tables.integrationConnections)
         .values({
           organizationId: input.organizationId,
           targetKey: input.targetKey,
@@ -192,7 +191,7 @@ export async function createFormConnection(
         });
 
         const [createdCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: input.organizationId,
             secretKind: parsedSecret.persistedSecretRef.secretKind,
@@ -202,14 +201,14 @@ export async function createFormConnection(
             intendedFamilyId: target.familyId,
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdCredential === undefined) {
           throw new Error("Failed to create integration credential.");
         }
 
-        await tx.insert(integrationConnectionCredentials).values({
+        await tx.insert(tables.integrationConnectionCredentials).values({
           connectionId: createdConnection.id,
           credentialId: createdCredential.id,
           slotKey: parsedSecret.persistedSecretRef.slotKey,

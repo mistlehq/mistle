@@ -132,6 +132,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
       const admission = await tunnelWebSocketAdmission.admitRequest({
         db: ctx.get("db"),
+        tables: ctx.get("tables"),
         requestUrl: ctx.req.url,
         requestedInstanceId,
       });
@@ -161,6 +162,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         const sourceTokenKind: TokenKind = admittedRequest.kind;
         const sourcePeerSide = toSourcePeerSide(sourceTokenKind);
         const sourceTokenJti = admittedRequest.tokenJti;
+        const testEnvironmentId = ctx.get("testEnvironmentId");
         const deliveryCorrelationScope = getSandboxTunnelDeliveryCorrelationScope({
           tokenKind: sourceTokenKind,
         });
@@ -238,6 +240,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   relaySessionId,
                   sandboxInstanceId,
                   socket: ws,
+                  ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                 });
                 return;
               }
@@ -267,6 +270,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 relaySessionId,
                 sandboxInstanceId,
                 socket: ws,
+                ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
               });
             } catch (error) {
               recordTunnelSessionError({
@@ -324,6 +328,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
                         liveSandboxInstanceId: sandboxInstanceId,
                         request: delivery.message,
+                        ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                       });
                     ws.send(JSON.stringify(result));
                   },
@@ -442,6 +447,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                       attachedPeer,
                       leaseId: admittedRequest.ownerLeaseId,
                       sandboxInstanceId,
+                      ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                     })
                     .catch((error: unknown) => {
                       logger.error(

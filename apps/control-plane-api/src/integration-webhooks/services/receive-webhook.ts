@@ -1,11 +1,9 @@
 import {
   IntegrationConnectionStatuses,
-  integrationCredentials,
-  integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
   IntegrationWebhookSourceStatuses,
-  organizationCredentialKeys,
   type IntegrationWebhookSource,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
@@ -107,6 +105,8 @@ async function resolveWebhookSourceSecretOrThrow(input: {
   source: IntegrationWebhookSource;
   integrationsConfig: AppContext["var"]["config"]["integrations"];
 }): Promise<Record<string, string>> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const webhookSecretCredentialId = input.source.webhookSecretCredentialId;
   if (webhookSecretCredentialId == null) {
     return {};
@@ -121,27 +121,30 @@ async function resolveWebhookSourceSecretOrThrow(input: {
 
   const [credential] = await input.db
     .select({
-      credentialCiphertext: integrationCredentials.ciphertext,
-      credentialNonce: integrationCredentials.nonce,
-      organizationCredentialKeyCiphertext: organizationCredentialKeys.ciphertext,
-      organizationCredentialKeyMasterKeyVersion: organizationCredentialKeys.masterKeyVersion,
+      credentialCiphertext: tables.integrationCredentials.ciphertext,
+      credentialNonce: tables.integrationCredentials.nonce,
+      organizationCredentialKeyCiphertext: tables.organizationCredentialKeys.ciphertext,
+      organizationCredentialKeyMasterKeyVersion: tables.organizationCredentialKeys.masterKeyVersion,
     })
-    .from(integrationCredentials)
+    .from(tables.integrationCredentials)
     .innerJoin(
-      organizationCredentialKeys,
+      tables.organizationCredentialKeys,
       and(
-        eq(organizationCredentialKeys.organizationId, integrationCredentials.organizationId),
         eq(
-          organizationCredentialKeys.version,
-          integrationCredentials.organizationCredentialKeyVersion,
+          tables.organizationCredentialKeys.organizationId,
+          tables.integrationCredentials.organizationId,
+        ),
+        eq(
+          tables.organizationCredentialKeys.version,
+          tables.integrationCredentials.organizationCredentialKeyVersion,
         ),
       ),
     )
     .where(
       and(
-        eq(integrationCredentials.id, webhookSecretCredentialId),
-        eq(integrationCredentials.organizationId, organizationId),
-        isNull(integrationCredentials.revokedAt),
+        eq(tables.integrationCredentials.id, webhookSecretCredentialId),
+        eq(tables.integrationCredentials.organizationId, organizationId),
+        isNull(tables.integrationCredentials.revokedAt),
       ),
     )
     .limit(1);
@@ -459,10 +462,12 @@ export async function receiveIntegrationWebhook(
       },
     },
     async (span) => {
+      const tables = getControlPlaneDatabaseSchema(db);
+
       span.setAttribute("mistle.webhook.event_type", resolvedWebhookRequest.event.eventType);
 
       const persistedRows = await db
-        .insert(integrationWebhookEvents)
+        .insert(tables.integrationWebhookEvents)
         .values({
           organizationId: resolvedConnection.organizationId,
           integrationConnectionId: resolvedConnection.id,
@@ -485,12 +490,12 @@ export async function receiveIntegrationWebhook(
         })
         .onConflictDoNothing({
           target: [
-            integrationWebhookEvents.integrationWebhookSourceId,
-            integrationWebhookEvents.externalEventId,
+            tables.integrationWebhookEvents.integrationWebhookSourceId,
+            tables.integrationWebhookEvents.externalEventId,
           ],
         })
         .returning({
-          id: integrationWebhookEvents.id,
+          id: tables.integrationWebhookEvents.id,
         });
 
       const insertedWebhookEvent = persistedRows[0];

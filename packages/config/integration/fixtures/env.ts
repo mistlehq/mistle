@@ -1,6 +1,7 @@
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "../../src/sandbox-base-images.js";
 
 const baseIntegrationEnv: NodeJS.ProcessEnv = {
+  MISTLE_ENV: "development",
   NODE_ENV: "development",
   MISTLE_TELEMETRY_ENABLED: "true",
   MISTLE_TELEMETRY_DEBUG: "false",

@@ -1,5 +1,5 @@
 import {
-  sandboxProfileVersionSnapshotJobs,
+  getControlPlaneDatabaseSchema,
   SandboxProfileVersionSnapshotJobStates,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -13,8 +13,10 @@ async function markQueuedSnapshotJobFailedToEnqueue(
     message: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   await db
-    .update(sandboxProfileVersionSnapshotJobs)
+    .update(tables.sandboxProfileVersionSnapshotJobs)
     .set({
       state: SandboxProfileVersionSnapshotJobStates.FAILED,
       finishedAt: sql`now()`,
@@ -24,8 +26,11 @@ async function markQueuedSnapshotJobFailedToEnqueue(
     })
     .where(
       and(
-        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
-        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
+        eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.state,
+          SandboxProfileVersionSnapshotJobStates.QUEUED,
+        ),
       ),
     );
 }

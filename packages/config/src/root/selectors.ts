@@ -194,7 +194,7 @@ export function selectControlPlaneApiConfig(config: Config): ControlPlaneApiConf
       baseUrl: config.services.dashboard.public_url,
     },
     workflow: {
-      databaseUrl: config.postgres.control_plane.pooled_url,
+      databaseUrl: config.postgres.control_plane.direct_url,
       migrationUrl: config.postgres.control_plane.direct_url,
       namespaceId: config.workflow.control_plane.namespace_id,
     },
@@ -249,8 +249,11 @@ export function selectControlPlaneApiMaintenanceConfig(
 
 export function selectControlPlaneWorkerConfig(config: Config): ControlPlaneWorkerConfig {
   return {
+    database: {
+      url: config.postgres.control_plane.pooled_url,
+    },
     workflow: {
-      databaseUrl: config.postgres.control_plane.pooled_url,
+      databaseUrl: config.postgres.control_plane.direct_url,
       namespaceId: config.workflow.control_plane.namespace_id,
       runMigrations: false,
       concurrency: config.services.control_plane_worker.workflow_concurrency,
@@ -290,7 +293,7 @@ export function selectDataPlaneApiConfig(config: Config): DataPlaneApiConfig {
       migrationUrl: config.postgres.data_plane.direct_url,
     },
     workflow: {
-      databaseUrl: config.postgres.data_plane.pooled_url,
+      databaseUrl: config.postgres.data_plane.direct_url,
       migrationUrl: config.postgres.data_plane.direct_url,
       namespaceId: config.workflow.data_plane.namespace_id,
     },
@@ -373,7 +376,7 @@ export function selectDataPlaneWorkerConfig(config: Config): DataPlaneWorkerConf
       url: config.postgres.data_plane.pooled_url,
     },
     workflow: {
-      databaseUrl: config.postgres.data_plane.pooled_url,
+      databaseUrl: config.postgres.data_plane.direct_url,
       namespaceId: config.workflow.data_plane.namespace_id,
       runMigrations: false,
       concurrency: config.services.data_plane_worker.workflow_concurrency,

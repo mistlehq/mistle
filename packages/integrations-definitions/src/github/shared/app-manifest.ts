@@ -5,6 +5,11 @@ import {
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import {
+  GitHubAppInstallationSetupPath,
+  GitHubAppManifestSetupPath,
+} from "./provider-app-setup-routes.js";
+
 const GitHubAppManifestConversionResponseSchema = z
   .object({
     id: z.union([z.string().min(1), z.number().int().nonnegative()]),
@@ -197,17 +202,11 @@ export function buildGitHubAppManifest(input: {
       active: true,
       url: input.webhookCallbackUrl,
     },
-    redirect_url: buildUrlWithPath(
-      input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/setup/github-app-manifest",
-    ),
+    redirect_url: buildUrlWithPath(input.controlPlaneBaseUrl, GitHubAppManifestSetupPath),
     callback_urls: [
       buildUrlWithPath(input.controlPlaneBaseUrl, "/p/identity-linking/callbacks/github"),
     ],
-    setup_url: buildUrlWithPath(
-      input.controlPlaneBaseUrl,
-      "/p/integration/callbacks/setup/github-app-installation",
-    ),
+    setup_url: buildUrlWithPath(input.controlPlaneBaseUrl, GitHubAppInstallationSetupPath),
   };
 }
 

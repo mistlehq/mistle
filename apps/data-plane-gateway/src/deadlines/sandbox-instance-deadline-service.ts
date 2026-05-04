@@ -26,6 +26,7 @@ export class SandboxInstanceDeadlineService {
   public async handleBootstrapAttach(input: {
     sandboxInstanceId: string;
     ownerLeaseId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     await this.touchIdleDeadline(input);
   }
@@ -33,18 +34,23 @@ export class SandboxInstanceDeadlineService {
   public async touchIdleDeadline(input: {
     sandboxInstanceId: string;
     ownerLeaseId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     await this.dataPlaneClient.putSandboxInstanceDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "idle",
       ownerLeaseId: input.ownerLeaseId,
       dueAt: new Date(this.clock.nowMs() + this.lifecycleDurations.idleTimeoutMs).toISOString(),
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   }
 
   public async handleBootstrapDisconnect(input: {
     sandboxInstanceId: string;
     ownerLeaseId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     await this.clearIdleDeadline(input);
     await this.dataPlaneClient.putSandboxInstanceDeadline({
@@ -54,17 +60,24 @@ export class SandboxInstanceDeadlineService {
       dueAt: new Date(
         this.clock.nowMs() + this.lifecycleDurations.bootstrapDisconnectGraceMs,
       ).toISOString(),
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   }
 
   public async clearIdleDeadline(input: {
     sandboxInstanceId: string;
     ownerLeaseId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     await this.dataPlaneClient.deleteSandboxInstanceDeadline({
       sandboxInstanceId: input.sandboxInstanceId,
       kind: "idle",
       ownerLeaseId: input.ownerLeaseId,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   }
 }

@@ -25,7 +25,7 @@ import {
   updateProfileDisplayName,
   uploadProfileImage,
 } from "../settings/profile/profile-service.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
   createSingletonImageContentUrl,
   ProfileImageContentPath,
@@ -280,7 +280,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame width="form" description={description} title={title}>
       <ProfileSettingsPageView
         displayName={persistedDisplayName}
         email={session.user.email}
@@ -332,6 +332,6 @@ export function ProfileSettingsPage(): React.JSX.Element {
         pendingLinkedAccountProviderFamilies={pendingLinkedAccountProviderFamilies}
         saving={saveMutation.isPending}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }

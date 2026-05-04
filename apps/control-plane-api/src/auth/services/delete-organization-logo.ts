@@ -1,4 +1,4 @@
-import { organizations } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
@@ -19,6 +19,8 @@ export async function deleteOrganizationLogo(
   ctx: DeleteOrganizationLogoContext,
   input: DeleteOrganizationLogoInput,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const existingOrganization = await ctx.db.query.organizations.findFirst({
     columns: {
       id: true,
@@ -39,13 +41,13 @@ export async function deleteOrganizationLogo(
   }
 
   const updatedOrganizations = await ctx.db
-    .update(organizations)
+    .update(tables.organizations)
     .set({
       logoObjectKey: null,
     })
-    .where(eq(organizations.id, input.organizationId))
+    .where(eq(tables.organizations.id, input.organizationId))
     .returning({
-      id: organizations.id,
+      id: tables.organizations.id,
     });
   const [updatedOrganization] = updatedOrganizations;
 

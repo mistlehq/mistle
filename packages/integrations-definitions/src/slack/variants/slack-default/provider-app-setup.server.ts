@@ -27,6 +27,7 @@ import {
   type SlackConnectionConfig,
 } from "./auth.js";
 import { SlackAppManifestBotEvents, SlackAppManifestBotScopes } from "./manifest.js";
+import { SlackAppInstallationCallbackRouteKey } from "./provider-app-setup-routes.js";
 import type { SlackTargetConfig } from "./target-config-schema.js";
 import type { SlackTargetSecrets } from "./target-secret-schema.js";
 
@@ -119,7 +120,7 @@ export const SlackProviderAppSetupCapability: IntegrationProviderAppSetupCapabil
 > = {
   flows: [
     {
-      callbackRouteKey: "slack-app-installation",
+      callbackRouteKey: SlackAppInstallationCallbackRouteKey,
       methodId: SlackConnectionMethodId,
       requiresWebhookCallbackUrl: true,
       routeSegment: "slack-app",

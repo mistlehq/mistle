@@ -33,6 +33,8 @@ export async function acquireSharedPostgresInfra(
     key: input.key,
     postgres: input.postgres,
     mailpit: false,
+    seaweedfs: false,
+    valkey: false,
   });
 
   const postgres = coordinatorLease.infra.postgres;

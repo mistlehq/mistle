@@ -164,6 +164,8 @@ export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
 export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
+export { createControlPlaneDbSchema } from "./factory.js";
+export type { ControlPlaneDbSchema } from "./factory.js";
 export {
   organizationCredentialKeys,
   type InsertOrganizationCredentialKey,

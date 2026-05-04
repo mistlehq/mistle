@@ -25,6 +25,7 @@ export interface AppShellViewProps {
   autosaveIndicator: React.ReactNode | null;
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
+  showHeader: boolean;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
   showHeaderLeadingContent: boolean;
@@ -35,6 +36,11 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
+  const shouldRenderHeaderContent =
+    input.showHeader &&
+    (input.showHeaderLeadingContent ||
+      input.headerActions !== null ||
+      input.autosaveIndicator !== null);
 
   return (
     <SidebarProvider style={SidebarWidthStyle}>
@@ -57,7 +63,7 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
         }
       >
         {input.topLoadingBar}
-        <AppShellStickyHeader {...input} />
+        <AppShellStickyHeader {...input} showHeaderContent={shouldRenderHeaderContent} />
         <div className={contentContainerClassName}>
           <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
         </div>
@@ -70,23 +76,38 @@ function AppShellStickyHeader(
   input: Pick<
     AppShellViewProps,
     "autosaveIndicator" | "headerLeadingContent" | "headerActions" | "showHeaderLeadingContent"
-  >,
-): React.JSX.Element {
+  > & {
+    showHeaderContent: boolean;
+  },
+): React.JSX.Element | null {
   const { isMobile, openMobile, state } = useSidebar();
-  const shouldRenderSidebarTrigger = isMobile ? !openMobile : state === "collapsed";
+  const shouldRenderSidebarTrigger = shouldRenderAppShellSidebarTrigger({
+    isMobile,
+    openMobile,
+    sidebarState: state,
+  });
   const hasHeaderTrailingContent = input.headerActions !== null || input.autosaveIndicator !== null;
+
+  if (
+    !shouldRenderAppShellStickyHeader({
+      hasHeaderContent: input.showHeaderContent,
+      hasSidebarTrigger: shouldRenderSidebarTrigger,
+    })
+  ) {
+    return null;
+  }
 
   return (
     <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
       {shouldRenderSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null}
-      {input.showHeaderLeadingContent ? (
+      {input.showHeaderContent && input.showHeaderLeadingContent ? (
         <div className={`${shouldRenderSidebarTrigger ? "ml-2" : ""} min-w-0 flex-1`}>
           {input.headerLeadingContent}
         </div>
       ) : (
         <div className="flex-1" />
       )}
-      {hasHeaderTrailingContent ? (
+      {input.showHeaderContent && hasHeaderTrailingContent ? (
         <div className="ml-4 flex shrink-0 items-center gap-2">
           {input.headerActions}
           {input.autosaveIndicator}
@@ -94,6 +115,21 @@ function AppShellStickyHeader(
       ) : null}
     </header>
   );
+}
+
+export function shouldRenderAppShellSidebarTrigger(input: {
+  isMobile: boolean;
+  openMobile: boolean;
+  sidebarState: "expanded" | "collapsed";
+}): boolean {
+  return input.isMobile ? !input.openMobile : input.sidebarState === "collapsed";
+}
+
+export function shouldRenderAppShellStickyHeader(input: {
+  hasHeaderContent: boolean;
+  hasSidebarTrigger: boolean;
+}): boolean {
+  return input.hasHeaderContent || input.hasSidebarTrigger;
 }
 
 function resolveContentContainerClassName(input: {

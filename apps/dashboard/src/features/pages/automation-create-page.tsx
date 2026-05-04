@@ -5,7 +5,7 @@ import {
   type AutomationTypeValue,
 } from "../automations/automation-type-field.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { CreateScheduledAutomationEditor } from "./scheduled-automation-editor-page.js";
 import { CreateWebhookAutomationEditor } from "./webhook-automation-editor-page.js";
 
@@ -33,7 +33,7 @@ export function AutomationCreatePage(): React.JSX.Element {
   const automationTypeField = <AutomationTypeSelectField onValueChange={updateKind} value={kind} />;
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame description={description} title={title} width="form">
       {kind === "scheduled" ? (
         <CreateScheduledAutomationEditor
           automationTypeField={automationTypeField}
@@ -45,6 +45,6 @@ export function AutomationCreatePage(): React.JSX.Element {
           navigate={navigate}
         />
       )}
-    </FormPageFrame>
+    </PageFrame>
   );
 }

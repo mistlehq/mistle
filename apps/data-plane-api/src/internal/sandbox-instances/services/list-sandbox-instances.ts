@@ -1,7 +1,7 @@
 import {
   SandboxInstancePurposes,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstance,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -50,6 +50,7 @@ type ListSandboxInstanceRow = Pick<
 
 type ListSandboxInstancesContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
 };
 
 function createInvalidCursorErrorMessage(input: {
@@ -72,6 +73,8 @@ export async function listSandboxInstances(
   input: ListSandboxInstancesInput,
 ): Promise<ListSandboxInstancesResponse> {
   try {
+    const { sandboxInstances } = ctx.tables;
+
     const response = await paginateKeyset<ListSandboxInstanceRow, SandboxInstancesCursor>({
       query: {
         after: input.after,

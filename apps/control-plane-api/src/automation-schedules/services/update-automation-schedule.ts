@@ -1,12 +1,8 @@
 import {
-  automations,
-  automationTargets,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  scheduleAutomations,
-  scheduledActions,
   ScheduledActionStatuses,
-  schedules,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -127,7 +123,8 @@ async function updateAutomationBaseRow(
   tx: ControlPlaneTransaction,
   input: UpdateScheduleAutomationInput,
 ): Promise<void> {
-  const nextValues: Partial<typeof automations.$inferInsert> = {};
+  const tables = getControlPlaneDatabaseSchema(tx);
+  const nextValues: Partial<typeof tables.automations.$inferInsert> = {};
 
   if (input.name !== undefined) {
     nextValues.name = input.name;
@@ -138,12 +135,12 @@ async function updateAutomationBaseRow(
   }
 
   await tx
-    .update(automations)
+    .update(tables.automations)
     .set({
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(automations.id, input.automationId));
+    .where(eq(tables.automations.id, input.automationId));
 }
 
 async function updateScheduleRow(
@@ -167,7 +164,8 @@ async function updateScheduleRow(
           now: input.now,
         })
       : undefined;
-  const nextValues: Partial<typeof schedules.$inferInsert> = {};
+  const tables = getControlPlaneDatabaseSchema(tx);
+  const nextValues: Partial<typeof tables.schedules.$inferInsert> = {};
 
   if (input.schedule?.name !== undefined) {
     nextValues.name = input.schedule.name;
@@ -196,19 +194,20 @@ async function updateScheduleRow(
   }
 
   await tx
-    .update(schedules)
+    .update(tables.schedules)
     .set({
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(schedules.id, existingAutomation.schedule.id));
+    .where(eq(tables.schedules.id, existingAutomation.schedule.id));
 }
 
 async function updateScheduleAutomationConfigRow(
   tx: ControlPlaneTransaction,
   input: UpdateScheduleAutomationInput,
 ): Promise<void> {
-  const nextValues: Partial<typeof scheduleAutomations.$inferInsert> = {};
+  const tables = getControlPlaneDatabaseSchema(tx);
+  const nextValues: Partial<typeof tables.scheduleAutomations.$inferInsert> = {};
 
   if (input.inputTemplate !== undefined) {
     nextValues.inputTemplate = input.inputTemplate;
@@ -227,12 +226,12 @@ async function updateScheduleAutomationConfigRow(
   }
 
   await tx
-    .update(scheduleAutomations)
+    .update(tables.scheduleAutomations)
     .set({
       ...nextValues,
       updatedAt: sql`now()`,
     })
-    .where(eq(scheduleAutomations.automationId, input.automationId));
+    .where(eq(tables.scheduleAutomations.automationId, input.automationId));
 }
 
 async function updateAutomationTargetRow(
@@ -250,15 +249,16 @@ async function updateAutomationTargetRow(
     return;
   }
 
+  const tables = getControlPlaneDatabaseSchema(tx);
   await tx
-    .update(automationTargets)
+    .update(tables.automationTargets)
     .set({
       sandboxProfileId: nextTarget.sandboxProfileId,
       sandboxProfileVersion: nextTarget.sandboxProfileVersion,
       primaryRepositoryId: nextTarget.primaryRepositoryId,
       updatedAt: sql`now()`,
     })
-    .where(eq(automationTargets.id, automationTargetId));
+    .where(eq(tables.automationTargets.id, automationTargetId));
 }
 
 export async function failPendingScheduledActions(
@@ -269,8 +269,9 @@ export async function failPendingScheduledActions(
     failureMessage: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(tx);
   await tx
-    .update(scheduledActions)
+    .update(tables.scheduledActions)
     .set({
       status: ScheduledActionStatuses.FAILED,
       failedAt: sql`now()`,
@@ -279,8 +280,8 @@ export async function failPendingScheduledActions(
     })
     .where(
       and(
-        eq(scheduledActions.scheduleId, input.scheduleId),
-        eq(scheduledActions.status, ScheduledActionStatuses.PENDING),
+        eq(tables.scheduledActions.scheduleId, input.scheduleId),
+        eq(tables.scheduledActions.status, ScheduledActionStatuses.PENDING),
       ),
     );
 }

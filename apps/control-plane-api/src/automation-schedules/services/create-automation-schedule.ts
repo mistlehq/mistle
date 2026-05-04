@@ -1,12 +1,9 @@
 import {
-  automations,
   AutomationKinds,
-  automationTargets,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  scheduleAutomations,
-  schedules,
   ScheduleTargetTypes,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 
 import { loadScheduleAutomationAggregateOrThrow } from "./load-schedule-automation-aggregate-or-throw.js";
@@ -113,8 +110,9 @@ async function createAutomationAggregate(
   tx: ControlPlaneTransaction,
   input: CreateScheduleAutomationPersistenceInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(tx);
   const insertedAutomationRows = await tx
-    .insert(automations)
+    .insert(tables.automations)
     .values({
       organizationId: input.organizationId,
       kind: AutomationKinds.SCHEDULE,
@@ -122,7 +120,7 @@ async function createAutomationAggregate(
       enabled: input.enabled,
     })
     .returning({
-      id: automations.id,
+      id: tables.automations.id,
     });
 
   const insertedAutomation = insertedAutomationRows[0];
@@ -132,7 +130,7 @@ async function createAutomationAggregate(
   }
 
   const insertedScheduleRows = await tx
-    .insert(schedules)
+    .insert(tables.schedules)
     .values({
       organizationId: input.organizationId,
       targetType: ScheduleTargetTypes.AUTOMATION_RUN,
@@ -143,7 +141,7 @@ async function createAutomationAggregate(
       nextScheduledAt: input.nextScheduledAt,
     })
     .returning({
-      id: schedules.id,
+      id: tables.schedules.id,
     });
 
   const insertedSchedule = insertedScheduleRows[0];
@@ -152,7 +150,7 @@ async function createAutomationAggregate(
     throw new Error("Expected schedule row to be inserted.");
   }
 
-  await tx.insert(scheduleAutomations).values({
+  await tx.insert(tables.scheduleAutomations).values({
     scheduleId: insertedSchedule.id,
     automationId: insertedAutomation.id,
     inputTemplate: input.inputTemplate,
@@ -162,7 +160,7 @@ async function createAutomationAggregate(
     ),
   });
 
-  await tx.insert(automationTargets).values({
+  await tx.insert(tables.automationTargets).values({
     automationId: insertedAutomation.id,
     sandboxProfileId: input.target.sandboxProfileId,
     sandboxProfileVersion: input.target.sandboxProfileVersion,

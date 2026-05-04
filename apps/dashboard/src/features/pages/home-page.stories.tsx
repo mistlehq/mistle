@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { HomePageStoryModels } from "./home-page-view-model.js";
-import { HomePageShell, HomePageView } from "./home-page-view.js";
+import { HomePageView } from "./home-page-view.js";
 
 const meta = {
   title: "Dashboard/Home/Page",
@@ -17,9 +18,9 @@ const meta = {
   },
   render: function RenderStory(args): React.JSX.Element {
     return (
-      <HomePageShell>
+      <PageFrame width="normal" title="Get started">
         <HomePageView {...args} />
-      </HomePageShell>
+      </PageFrame>
     );
   },
 } satisfies Meta<typeof HomePageView>;

@@ -3,9 +3,9 @@ import {
   ControlPlaneConstraintIds,
   type ControlPlaneDatabase,
   isControlPlaneUniqueViolation,
-  sandboxProfileVersionSnapshotJobs,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
@@ -100,9 +100,11 @@ async function createOrResolveSnapshotRefreshJob(
     sandboxProfileVersion: number;
   },
 ): Promise<SnapshotRefreshJobResolution> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   try {
     const [snapshotJob] = await ctx.db
-      .insert(sandboxProfileVersionSnapshotJobs)
+      .insert(tables.sandboxProfileVersionSnapshotJobs)
       .values({
         sandboxProfileId: input.sandboxProfileId,
         sandboxProfileVersion: input.sandboxProfileVersion,
@@ -111,11 +113,11 @@ async function createOrResolveSnapshotRefreshJob(
         sourceScheduledActionId: input.scheduledActionId,
       })
       .returning({
-        id: sandboxProfileVersionSnapshotJobs.id,
-        sandboxProfileId: sandboxProfileVersionSnapshotJobs.sandboxProfileId,
-        sandboxProfileVersion: sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
-        workflowRunId: sandboxProfileVersionSnapshotJobs.workflowRunId,
-        state: sandboxProfileVersionSnapshotJobs.state,
+        id: tables.sandboxProfileVersionSnapshotJobs.id,
+        sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
+        sandboxProfileVersion: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileVersion,
+        workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
+        state: tables.sandboxProfileVersionSnapshotJobs.state,
       });
 
     if (snapshotJob === undefined) {
@@ -236,8 +238,10 @@ async function markQueuedSnapshotJobFailedToEnqueue(
     message: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   await ctx.db
-    .update(sandboxProfileVersionSnapshotJobs)
+    .update(tables.sandboxProfileVersionSnapshotJobs)
     .set({
       state: SandboxProfileVersionSnapshotJobStates.FAILED,
       finishedAt: sql`now()`,
@@ -247,8 +251,11 @@ async function markQueuedSnapshotJobFailedToEnqueue(
     })
     .where(
       and(
-        eq(sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
-        eq(sandboxProfileVersionSnapshotJobs.state, SandboxProfileVersionSnapshotJobStates.QUEUED),
+        eq(tables.sandboxProfileVersionSnapshotJobs.id, input.snapshotJobId),
+        eq(
+          tables.sandboxProfileVersionSnapshotJobs.state,
+          SandboxProfileVersionSnapshotJobStates.QUEUED,
+        ),
       ),
     );
 }

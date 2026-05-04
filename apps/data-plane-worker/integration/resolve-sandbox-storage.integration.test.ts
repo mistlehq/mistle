@@ -9,6 +9,7 @@ import {
   SandboxStorageConfigSources,
 } from "@mistle/db/control-plane";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceStorages,
   sandboxInstances,
@@ -81,10 +82,12 @@ function createDataPlaneDb() {
 
 function createArchilStorageBackendAdapter(input: {
   db: ReturnType<typeof createDataPlaneDb>;
+  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
   controlPlaneInternalClient: ControlPlaneInternalClient;
 }) {
   return createSandboxStorageBackendAdapter({
     db: input.db,
+    tables: getDataPlaneDatabaseSchema(input.db),
     controlPlaneInternalClient: input.controlPlaneInternalClient,
     workerConfig: {
       database: { url: "postgresql://unused" },
@@ -232,6 +235,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: "e2b",
         },
         {
@@ -258,6 +262,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
       await insertSandboxInstanceStorage(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         },
         {
           sandboxInstanceId,
@@ -274,6 +279,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         controlPlaneInternalClient,
       });
 
@@ -315,6 +321,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         runtimeProvider: "e2b",
       },
       {
@@ -334,6 +341,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
 
     const storageBackendAdapter = createArchilStorageBackendAdapter({
       db: createDataPlaneDb(),
+      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       controlPlaneInternalClient,
     });
 
@@ -366,6 +374,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         runtimeProvider: "e2b",
       },
       {
@@ -392,6 +401,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await insertSandboxInstanceStorage(
       {
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       },
       {
         sandboxInstanceId,
@@ -408,6 +418,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
 
     const storageBackendAdapter = createArchilStorageBackendAdapter({
       db: createDataPlaneDb(),
+      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       controlPlaneInternalClient,
     });
 
@@ -441,6 +452,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await ensureSandboxInstance(
       {
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         runtimeProvider: "e2b",
       },
       {
@@ -467,6 +479,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
     await insertSandboxInstanceStorage(
       {
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       },
       {
         sandboxInstanceId,
@@ -483,6 +496,7 @@ describe("resolve ready Archil sandbox storage integration", () => {
 
     const storageBackendAdapter = createArchilStorageBackendAdapter({
       db: createDataPlaneDb(),
+      tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
       controlPlaneInternalClient,
     });
 

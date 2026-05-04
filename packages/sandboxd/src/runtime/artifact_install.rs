@@ -913,14 +913,14 @@ mod tests {
     fn builds_direct_download_urls_for_exact_tag_assets() {
         let url = github_release_asset_download_url(
             "openai/codex",
-            "rust-v0.125.0",
+            "rust-v0.128.0",
             "codex-x86_64-unknown-linux-musl.tar.gz",
         )
         .expect("exact tag asset url should build");
 
         assert_eq!(
             url.as_str(),
-            "https://github.com/openai/codex/releases/download/rust-v0.125.0/codex-x86_64-unknown-linux-musl.tar.gz"
+            "https://github.com/openai/codex/releases/download/rust-v0.128.0/codex-x86_64-unknown-linux-musl.tar.gz"
         );
     }
 

@@ -1,4 +1,4 @@
-import { organizations } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
@@ -27,6 +27,8 @@ export async function putOrganizationLogo(
   ctx: PutOrganizationLogoContext,
   input: PutOrganizationLogoInput,
 ): Promise<PutOrganizationLogoResult> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const existingOrganization = await ctx.db.query.organizations.findFirst({
     columns: {
       id: true,
@@ -59,14 +61,14 @@ export async function putOrganizationLogo(
 
   try {
     const updatedOrganizations = await ctx.db
-      .update(organizations)
+      .update(tables.organizations)
       .set({
         logoObjectKey,
       })
-      .where(eq(organizations.id, input.organizationId))
+      .where(eq(tables.organizations.id, input.organizationId))
       .returning({
-        id: organizations.id,
-        logoObjectKey: organizations.logoObjectKey,
+        id: tables.organizations.id,
+        logoObjectKey: tables.organizations.logoObjectKey,
       });
     [updatedOrganization] = updatedOrganizations;
   } catch (error) {

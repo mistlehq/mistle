@@ -1,9 +1,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  integrationConnections,
-  integrationTargets,
-  sandboxProfileVersionIntegrationBindings,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 import { and, eq } from "drizzle-orm";
@@ -58,27 +56,35 @@ export async function listProfileVersionRepositoryOptions(
     profileVersion: number;
   },
 ): Promise<SandboxProfileRepositoryOption[]> {
+  const tables = getControlPlaneDatabaseSchema(db);
+
   const gitBindings = await db
     .select({
-      config: sandboxProfileVersionIntegrationBindings.config,
+      config: tables.sandboxProfileVersionIntegrationBindings.config,
     })
-    .from(sandboxProfileVersionIntegrationBindings)
+    .from(tables.sandboxProfileVersionIntegrationBindings)
     .innerJoin(
-      integrationConnections,
-      eq(integrationConnections.id, sandboxProfileVersionIntegrationBindings.connectionId),
+      tables.integrationConnections,
+      eq(
+        tables.integrationConnections.id,
+        tables.sandboxProfileVersionIntegrationBindings.connectionId,
+      ),
     )
     .innerJoin(
-      integrationTargets,
-      eq(integrationTargets.targetKey, integrationConnections.targetKey),
+      tables.integrationTargets,
+      eq(tables.integrationTargets.targetKey, tables.integrationConnections.targetKey),
     )
     .where(
       and(
-        eq(sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
-        eq(sandboxProfileVersionIntegrationBindings.sandboxProfileVersion, input.profileVersion),
-        eq(sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.GIT),
-        eq(integrationConnections.organizationId, input.organizationId),
-        eq(integrationConnections.status, IntegrationConnectionStatuses.ACTIVE),
-        eq(integrationTargets.enabled, true),
+        eq(tables.sandboxProfileVersionIntegrationBindings.sandboxProfileId, input.profileId),
+        eq(
+          tables.sandboxProfileVersionIntegrationBindings.sandboxProfileVersion,
+          input.profileVersion,
+        ),
+        eq(tables.sandboxProfileVersionIntegrationBindings.kind, IntegrationBindingKinds.GIT),
+        eq(tables.integrationConnections.organizationId, input.organizationId),
+        eq(tables.integrationConnections.status, IntegrationConnectionStatuses.ACTIVE),
+        eq(tables.integrationTargets.enabled, true),
       ),
     );
 

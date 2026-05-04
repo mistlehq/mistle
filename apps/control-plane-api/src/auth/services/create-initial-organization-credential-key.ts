@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { ControlPlaneDbSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/control-plane";
 
 import {
   resolveMasterEncryptionKeyMaterial,
@@ -15,6 +15,7 @@ type CreateInitialOrganizationCredentialKeyInput = {
   organizationId: string;
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
+  table: ControlPlaneTables["organizationCredentialKeys"];
 };
 
 export async function createInitialOrganizationCredentialKey(
@@ -32,7 +33,7 @@ export async function createInitialOrganizationCredentialKey(
       masterEncryptionKeyMaterial,
     });
 
-    await input.db.insert(ControlPlaneDbSchema.organizationCredentialKeys).values({
+    await input.db.insert(input.table).values({
       organizationId: input.organizationId,
       version: ORGANIZATION_CREDENTIAL_KEY_VERSION,
       masterKeyVersion: input.activeMasterEncryptionKeyVersion,

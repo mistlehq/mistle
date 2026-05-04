@@ -1,4 +1,4 @@
 #!/bin/sh
 set -eu
 
-exec node /app/packages/config/dist/cli/mistle-config.js "$@"
+exec /app/node_modules/.bin/mistle-config "$@"

@@ -1,4 +1,4 @@
-import { users } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { S3CompatibleObjectStore } from "@mistle/object-store";
@@ -27,6 +27,8 @@ export async function putUserAvatar(
   ctx: PutUserAvatarContext,
   input: PutUserAvatarInput,
 ): Promise<PutUserAvatarResult> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const existingUser = await ctx.db.query.users.findFirst({
     columns: {
       id: true,
@@ -59,14 +61,14 @@ export async function putUserAvatar(
 
   try {
     const updatedUsers = await ctx.db
-      .update(users)
+      .update(tables.users)
       .set({
         imageObjectKey,
       })
-      .where(eq(users.id, input.userId))
+      .where(eq(tables.users.id, input.userId))
       .returning({
-        id: users.id,
-        imageObjectKey: users.imageObjectKey,
+        id: tables.users.id,
+        imageObjectKey: tables.users.imageObjectKey,
       });
     [updatedUser] = updatedUsers;
   } catch (error) {

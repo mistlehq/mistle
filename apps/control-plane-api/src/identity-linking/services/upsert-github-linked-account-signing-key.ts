@@ -1,10 +1,9 @@
 import {
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -97,6 +96,8 @@ export async function upsertGitHubLinkedAccountSigningKey(
   });
 
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const existingCredential = await tx.query.userExternalPrincipalCredentials.findFirst({
       columns: {
         id: true,
@@ -113,29 +114,29 @@ export async function upsertGitHubLinkedAccountSigningKey(
 
     if (existingCredential !== undefined) {
       await tx
-        .update(userExternalPrincipalCredentials)
+        .update(tables.userExternalPrincipalCredentials)
         .set({
           status: UserExternalPrincipalCredentialStatuses.REVOKED,
           updatedAt: sql`now()`,
         })
-        .where(eq(userExternalPrincipalCredentials.id, existingCredential.id));
+        .where(eq(tables.userExternalPrincipalCredentials.id, existingCredential.id));
 
       await tx
-        .update(userExternalPrincipalCredentialSecrets)
+        .update(tables.userExternalPrincipalCredentialSecrets)
         .set({
           revokedAt: sql`now()`,
           updatedAt: sql`now()`,
         })
         .where(
           and(
-            eq(userExternalPrincipalCredentialSecrets.credentialId, existingCredential.id),
-            isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+            eq(tables.userExternalPrincipalCredentialSecrets.credentialId, existingCredential.id),
+            isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
           ),
         );
     }
 
     const [insertedCredential] = await tx
-      .insert(userExternalPrincipalCredentials)
+      .insert(tables.userExternalPrincipalCredentials)
       .values({
         organizationId: input.organizationId,
         principalId,
@@ -146,14 +147,14 @@ export async function upsertGitHubLinkedAccountSigningKey(
         updatedAt: sql`now()`,
       })
       .returning({
-        id: userExternalPrincipalCredentials.id,
+        id: tables.userExternalPrincipalCredentials.id,
       });
 
     if (insertedCredential === undefined) {
       throw new Error("Failed to insert GitHub signing credential.");
     }
 
-    await tx.insert(userExternalPrincipalCredentialSecrets).values({
+    await tx.insert(tables.userExternalPrincipalCredentialSecrets).values({
       organizationId: input.organizationId,
       credentialId: insertedCredential.id,
       secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,

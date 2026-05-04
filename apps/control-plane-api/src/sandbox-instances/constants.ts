@@ -14,4 +14,5 @@ export const SandboxInstancesNotFoundCodes = {
 export const SandboxInstancesConflictCodes = {
   INSTANCE_NOT_RESUMABLE: "INSTANCE_NOT_RESUMABLE",
   INSTANCE_FAILED: "INSTANCE_FAILED",
+  INSTANCE_STOP_NOT_SUPPORTED: "INSTANCE_STOP_NOT_SUPPORTED",
 } as const;

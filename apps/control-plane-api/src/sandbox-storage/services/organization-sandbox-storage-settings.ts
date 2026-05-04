@@ -1,10 +1,10 @@
 import {
-  organizationSandboxStorageSettings,
   SandboxStorageBackend as SandboxStorageBackendValues,
   SandboxStorageConfigSources,
   type ControlPlaneDatabase,
   type SandboxStorageBackend,
   type SandboxStorageConfigSource,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { sql } from "drizzle-orm";
 
@@ -143,8 +143,10 @@ export async function upsertOrganizationSandboxStorageSettings(input: {
   organizationStorageConfig: OrganizationSandboxStorageConfigV1 | null;
   encryptionConfig: OrganizationCredentialEncryptionConfig;
 }): Promise<ResolvedOrganizationSandboxStorageSettings> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   let updateValues: Pick<
-    typeof organizationSandboxStorageSettings.$inferInsert,
+    typeof tables.organizationSandboxStorageSettings.$inferInsert,
     | "persistentSandboxesEnabled"
     | "storageBackend"
     | "storageConfigSource"
@@ -194,13 +196,13 @@ export async function upsertOrganizationSandboxStorageSettings(input: {
   }
 
   await input.db
-    .insert(organizationSandboxStorageSettings)
+    .insert(tables.organizationSandboxStorageSettings)
     .values({
       organizationId: input.organizationId,
       ...updateValues,
     })
     .onConflictDoUpdate({
-      target: organizationSandboxStorageSettings.organizationId,
+      target: tables.organizationSandboxStorageSettings.organizationId,
       set: {
         ...updateValues,
         updatedAt: sql`now()`,

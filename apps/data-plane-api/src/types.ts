@@ -7,7 +7,11 @@ import type { AppRuntimeResources } from "./resources.js";
 
 type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_API>>;
 
-export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
+export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"] & {
+  __dangerouslyEnableTestIsolation?: {
+    testEnvironmentIdHeader: string;
+  };
+};
 type DataPlaneApiSandboxStorageConfig = NonNullable<DataPlaneApiConfig["sandbox"]["storage"]>;
 export type DataPlaneApiSandboxStorageBackend = DataPlaneApiSandboxStorageConfig["backend"];
 export type DataPlaneApiRuntimeConfig = {

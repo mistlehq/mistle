@@ -1,7 +1,7 @@
 import {
-  integrationConnectionResourceStates,
   IntegrationConnectionResourceSyncStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { sql } from "drizzle-orm";
 
@@ -11,8 +11,10 @@ export async function markResourceSyncing(input: {
   familyId: string;
   kind: string;
 }): Promise<string> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const updatedStates = await input.db
-    .insert(integrationConnectionResourceStates)
+    .insert(tables.integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
       familyId: input.familyId,
@@ -25,8 +27,8 @@ export async function markResourceSyncing(input: {
     })
     .onConflictDoUpdate({
       target: [
-        integrationConnectionResourceStates.connectionId,
-        integrationConnectionResourceStates.kind,
+        tables.integrationConnectionResourceStates.connectionId,
+        tables.integrationConnectionResourceStates.kind,
       ],
       set: {
         familyId: input.familyId,
@@ -38,7 +40,7 @@ export async function markResourceSyncing(input: {
       },
     })
     .returning({
-      lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
+      lastSyncStartedAt: tables.integrationConnectionResourceStates.lastSyncStartedAt,
     });
 
   const updatedState = updatedStates[0];

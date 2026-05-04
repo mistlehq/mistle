@@ -177,7 +177,7 @@ const controlPlaneApiEnvConfig = {
     baseUrl: "http://127.0.0.1:5173",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
   },
@@ -237,8 +237,11 @@ const controlPlaneApiBaseFixtureConfig = {
 } as const;
 
 const controlPlaneWorkerEnvConfig = {
+  database: {
+    url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+  },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
     runMigrations: false,
     concurrency: 1,
@@ -260,6 +263,9 @@ const controlPlaneWorkerEnvConfig = {
   },
   internalAuth: {
     serviceToken,
+  },
+  sandbox: {
+    defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
   },
 } as const;
 
@@ -288,7 +294,7 @@ const dataPlaneApiEnvConfig = {
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     migrationUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
   },
@@ -384,7 +390,7 @@ const dataPlaneWorkerEnvConfig = {
     url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
     runMigrations: false,
     concurrency: 1,
@@ -451,7 +457,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "fixture-docker",
     runMigrations: false,
     concurrency: 3,
@@ -551,9 +557,12 @@ const controlPlaneApiFixtureConfig = {
 
 const controlPlaneWorkerFixtureConfig = {
   ...controlPlaneWorkerBaseFixtureConfig,
+  database: {
+    url: pooledPostgresUrl,
+  },
   workflow: {
     ...controlPlaneWorkerBaseFixtureConfig.workflow,
-    databaseUrl: pooledPostgresUrl,
+    databaseUrl: directPostgresUrl,
     runMigrations: false,
   },
 };
@@ -566,6 +575,7 @@ const dataPlaneApiFixtureConfig = {
   },
   workflow: {
     ...dataPlaneApiBaseFixtureConfig.workflow,
+    databaseUrl: directPostgresUrl,
     migrationUrl: directPostgresUrl,
   },
 };
@@ -584,6 +594,7 @@ const dataPlaneWorkerFixtureConfig = {
   },
   workflow: {
     ...dataPlaneWorkerBaseFixtureConfig.workflow,
+    databaseUrl: directPostgresUrl,
     runMigrations: false,
   },
 };
@@ -771,6 +782,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
         MISTLE_SERVICES_CONTROL_PLANE_API_HOST: "localhost",
         MISTLE_SERVICES_CONTROL_PLANE_API_PORT: "5300",
@@ -838,6 +850,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_WORKER,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
       }),
     });
@@ -897,6 +910,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_API,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
         MISTLE_SERVICES_DATA_PLANE_API_HOST: "localhost",
         MISTLE_SERVICES_DATA_PLANE_API_PORT: "5302",
@@ -923,7 +937,7 @@ describe("loadConfig integrations", () => {
           MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: undefined,
         }),
       }),
-    ).toThrow(/services.*control_plane_api.*internal_url/is);
+    ).toThrow(/controlPlaneApi/is);
   });
 
   it("loads data-plane-api from both config file and env, with env precedence", () => {
@@ -975,6 +989,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_GATEWAY,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_HOST: "localhost",
         MISTLE_SERVICES_DATA_PLANE_GATEWAY_PORT: "5303",
@@ -995,6 +1010,7 @@ describe("loadConfig integrations", () => {
 
   it("loads data-plane-gateway when lifecycle config is omitted from env", () => {
     const env = createIntegrationEnv({
+      MISTLE_ENV: "production",
       NODE_ENV: "production",
     });
 
@@ -1067,6 +1083,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
       }),
     });
@@ -1081,6 +1098,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
         MISTLE_SANDBOX_PROVIDER: "docker",
         MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
@@ -1161,6 +1179,7 @@ describe("loadConfig integrations", () => {
       loadConfig({
         app: AppIds.DATA_PLANE_WORKER,
         env: createIntegrationEnv({
+          MISTLE_ENV: "production",
           NODE_ENV: "production",
           MISTLE_SANDBOX_PROVIDER: "docker",
           MISTLE_SANDBOX_DOCKER_SOCKET_PATH: undefined,
@@ -1178,7 +1197,7 @@ describe("loadConfig integrations", () => {
           MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: undefined,
         }),
       }),
-    ).toThrow(/services.*control_plane_api.*internal_url/is);
+    ).toThrow(/controlPlaneApi/is);
   });
 
   it("rejects data-plane-worker config when Archil storage is enabled but worker Archil config is missing", () => {
@@ -1193,7 +1212,7 @@ describe("loadConfig integrations", () => {
           MISTLE_SANDBOX_STORAGE_ARCHIL_MOUNT_OBJECT_STORE: undefined,
         }),
       }),
-    ).toThrow(/sandbox\.storage\.archil is required when sandbox\.storage\.backend is 'archil'/);
+    ).toThrow(/sandboxStorage\.archil is required when sandbox\.storage\.backend is 'archil'/);
   });
 
   it("loads data-plane-worker config when provider-specific durable storage is omitted and worker storage config is omitted", () => {
@@ -1254,6 +1273,7 @@ describe("loadConfig integrations", () => {
     const config = loadConfig({
       app: AppIds.TOKENIZER_PROXY,
       env: createIntegrationEnv({
+        MISTLE_ENV: "production",
         NODE_ENV: "production",
         MISTLE_SERVICES_TOKENIZER_PROXY_HOST: "localhost",
         MISTLE_SERVICES_TOKENIZER_PROXY_PORT: "5306",

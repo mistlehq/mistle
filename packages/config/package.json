@@ -4,6 +4,10 @@
   "bin": {
     "mistle-config": "./dist/cli/mistle-config.js"
   },
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
   "type": "module",
   "exports": {
     ".": {

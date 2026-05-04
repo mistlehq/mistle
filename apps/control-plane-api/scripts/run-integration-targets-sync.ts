@@ -1,5 +1,3 @@
-import { pathToFileURL } from "node:url";
-
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions/server";
 import { Pool } from "pg";
@@ -11,6 +9,7 @@ import {
   seedIntegrationTargets,
 } from "./integration-targets/seed-integration-targets.js";
 import { syncIntegrationTargets } from "./integration-targets/sync-integration-targets.js";
+import { isDirectEntrypoint } from "./script-entrypoint.js";
 
 async function main(): Promise<void> {
   const loadedConfig = loadIntegrationTargetsSyncConfigFromModuleUrl({
@@ -61,7 +60,7 @@ async function main(): Promise<void> {
   }
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isDirectEntrypoint({ argvPath: process.argv[1], moduleUrl: import.meta.url })) {
   void main().catch((error) => {
     logger.error({ err: error }, "Failed to sync integration targets");
     process.exit(1);

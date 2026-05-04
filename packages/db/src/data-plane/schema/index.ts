@@ -1,4 +1,6 @@
 export { DATA_PLANE_SCHEMA_NAME } from "./namespace.js";
+export { createDataPlaneDbSchema } from "./factory.js";
+export type { DataPlaneDbSchema } from "./factory.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,

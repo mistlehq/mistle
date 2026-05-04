@@ -14,7 +14,7 @@ import { useLoadedScheduledAutomationEditorState } from "../automations/use-sche
 import { useScheduledAutomationPrerequisites } from "../automations/use-scheduled-automation-prerequisites.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 
 type ScheduledAutomationEditorPageProps = {
   mode: "create" | "edit";
@@ -32,9 +32,9 @@ export function ScheduledAutomationEditorPage(
 
   if (input.mode === "create") {
     return (
-      <FormPageFrame description={description} title={title}>
+      <PageFrame description={description} title={title} width="form">
         <CreateScheduledAutomationEditor navigate={navigate} />
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -44,9 +44,9 @@ export function ScheduledAutomationEditorPage(
   }
 
   return (
-    <FormPageFrame description={description} title={title}>
+    <PageFrame description={description} title={title} width="form">
       <EditScheduledAutomationEditor automationId={automationId} navigate={navigate} />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

@@ -1,9 +1,7 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
-  identityLinkRedirectSessions,
-  integrationConnectionDeviceAuthorizationAttempts,
   IntegrationDeviceAuthorizationAttemptStatuses,
-  integrationConnectionRedirectSessions,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { Clock } from "@mistle/time";
 import { and, asc, inArray, isNotNull, lt } from "drizzle-orm";
@@ -75,22 +73,24 @@ async function deleteExpiredIntegrationRedirectSessions(input: {
   db: ControlPlaneDatabase;
   expiresBefore: string;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: integrationConnectionRedirectSessions.id })
-        .from(integrationConnectionRedirectSessions)
-        .where(lt(integrationConnectionRedirectSessions.expiresAt, input.expiresBefore))
+        .select({ id: tables.integrationConnectionRedirectSessions.id })
+        .from(tables.integrationConnectionRedirectSessions)
+        .where(lt(tables.integrationConnectionRedirectSessions.expiresAt, input.expiresBefore))
         .orderBy(
-          asc(integrationConnectionRedirectSessions.expiresAt),
-          asc(integrationConnectionRedirectSessions.id),
+          asc(tables.integrationConnectionRedirectSessions.expiresAt),
+          asc(tables.integrationConnectionRedirectSessions.id),
         )
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
       input.db
-        .delete(integrationConnectionRedirectSessions)
-        .where(inArray(integrationConnectionRedirectSessions.id, ids))
-        .returning({ id: integrationConnectionRedirectSessions.id }),
+        .delete(tables.integrationConnectionRedirectSessions)
+        .where(inArray(tables.integrationConnectionRedirectSessions.id, ids))
+        .returning({ id: tables.integrationConnectionRedirectSessions.id }),
   });
 }
 
@@ -98,19 +98,24 @@ async function deleteExpiredIdentityLinkRedirectSessions(input: {
   db: ControlPlaneDatabase;
   expiresBefore: string;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: identityLinkRedirectSessions.id })
-        .from(identityLinkRedirectSessions)
-        .where(lt(identityLinkRedirectSessions.expiresAt, input.expiresBefore))
-        .orderBy(asc(identityLinkRedirectSessions.expiresAt), asc(identityLinkRedirectSessions.id))
+        .select({ id: tables.identityLinkRedirectSessions.id })
+        .from(tables.identityLinkRedirectSessions)
+        .where(lt(tables.identityLinkRedirectSessions.expiresAt, input.expiresBefore))
+        .orderBy(
+          asc(tables.identityLinkRedirectSessions.expiresAt),
+          asc(tables.identityLinkRedirectSessions.id),
+        )
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
       input.db
-        .delete(identityLinkRedirectSessions)
-        .where(inArray(identityLinkRedirectSessions.id, ids))
-        .returning({ id: identityLinkRedirectSessions.id }),
+        .delete(tables.identityLinkRedirectSessions)
+        .where(inArray(tables.identityLinkRedirectSessions.id, ids))
+        .returning({ id: tables.identityLinkRedirectSessions.id }),
   });
 }
 
@@ -118,31 +123,36 @@ async function deleteTerminalDeviceAuthorizationAttempts(input: {
   db: ControlPlaneDatabase;
   updatedBefore: string;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: integrationConnectionDeviceAuthorizationAttempts.id })
-        .from(integrationConnectionDeviceAuthorizationAttempts)
+        .select({ id: tables.integrationConnectionDeviceAuthorizationAttempts.id })
+        .from(tables.integrationConnectionDeviceAuthorizationAttempts)
         .where(
           and(
-            inArray(integrationConnectionDeviceAuthorizationAttempts.status, [
+            inArray(tables.integrationConnectionDeviceAuthorizationAttempts.status, [
               IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED,
               IntegrationDeviceAuthorizationAttemptStatuses.FAILED,
               IntegrationDeviceAuthorizationAttemptStatuses.CANCELLED,
             ]),
-            lt(integrationConnectionDeviceAuthorizationAttempts.updatedAt, input.updatedBefore),
+            lt(
+              tables.integrationConnectionDeviceAuthorizationAttempts.updatedAt,
+              input.updatedBefore,
+            ),
           ),
         )
         .orderBy(
-          asc(integrationConnectionDeviceAuthorizationAttempts.updatedAt),
-          asc(integrationConnectionDeviceAuthorizationAttempts.id),
+          asc(tables.integrationConnectionDeviceAuthorizationAttempts.updatedAt),
+          asc(tables.integrationConnectionDeviceAuthorizationAttempts.id),
         )
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
       input.db
-        .delete(integrationConnectionDeviceAuthorizationAttempts)
-        .where(inArray(integrationConnectionDeviceAuthorizationAttempts.id, ids))
-        .returning({ id: integrationConnectionDeviceAuthorizationAttempts.id }),
+        .delete(tables.integrationConnectionDeviceAuthorizationAttempts)
+        .where(inArray(tables.integrationConnectionDeviceAuthorizationAttempts.id, ids))
+        .returning({ id: tables.integrationConnectionDeviceAuthorizationAttempts.id }),
   });
 }
 
@@ -150,30 +160,35 @@ async function deleteExpiredPendingDeviceAuthorizationAttempts(input: {
   db: ControlPlaneDatabase;
   expiresBefore: string;
 }): Promise<DeleteBatchLoopResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   return deleteInBatches({
     selectIds: async () =>
       input.db
-        .select({ id: integrationConnectionDeviceAuthorizationAttempts.id })
-        .from(integrationConnectionDeviceAuthorizationAttempts)
+        .select({ id: tables.integrationConnectionDeviceAuthorizationAttempts.id })
+        .from(tables.integrationConnectionDeviceAuthorizationAttempts)
         .where(
           and(
-            inArray(integrationConnectionDeviceAuthorizationAttempts.status, [
+            inArray(tables.integrationConnectionDeviceAuthorizationAttempts.status, [
               IntegrationDeviceAuthorizationAttemptStatuses.PENDING,
             ]),
-            isNotNull(integrationConnectionDeviceAuthorizationAttempts.expiresAt),
-            lt(integrationConnectionDeviceAuthorizationAttempts.expiresAt, input.expiresBefore),
+            isNotNull(tables.integrationConnectionDeviceAuthorizationAttempts.expiresAt),
+            lt(
+              tables.integrationConnectionDeviceAuthorizationAttempts.expiresAt,
+              input.expiresBefore,
+            ),
           ),
         )
         .orderBy(
-          asc(integrationConnectionDeviceAuthorizationAttempts.expiresAt),
-          asc(integrationConnectionDeviceAuthorizationAttempts.id),
+          asc(tables.integrationConnectionDeviceAuthorizationAttempts.expiresAt),
+          asc(tables.integrationConnectionDeviceAuthorizationAttempts.id),
         )
         .limit(DeleteBatchSize),
     deleteIds: async (ids) =>
       input.db
-        .delete(integrationConnectionDeviceAuthorizationAttempts)
-        .where(inArray(integrationConnectionDeviceAuthorizationAttempts.id, ids))
-        .returning({ id: integrationConnectionDeviceAuthorizationAttempts.id }),
+        .delete(tables.integrationConnectionDeviceAuthorizationAttempts)
+        .where(inArray(tables.integrationConnectionDeviceAuthorizationAttempts.id, ids))
+        .returning({ id: tables.integrationConnectionDeviceAuthorizationAttempts.id }),
   });
 }
 

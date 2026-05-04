@@ -3943,7 +3943,106 @@ export interface paths {
                               /** @enum {string} */
                               kind: "all-of";
                             };
+                        providerAppSetup?: {
+                          description: string;
+                          existingApp: {
+                            configFields: {
+                              configKey: string;
+                              label: string;
+                              name: string;
+                              required: boolean;
+                            }[];
+                            connectLabel: string;
+                            description: string;
+                            installedDetection: {
+                              configFields: string[];
+                              secretFields: string[];
+                            };
+                            saveErrorMessage: string;
+                            secretFields: {
+                              /** @enum {string} */
+                              inputType: "password" | "textarea";
+                              label: string;
+                              name: string;
+                              placeholder?: string;
+                              required: boolean;
+                              rows?: number;
+                              secretLabel: string;
+                            }[];
+                            startAction?: {
+                              /** @enum {string} */
+                              expectedResultKind: "redirect";
+                              installedDetection?: {
+                                configFields?: string[];
+                                externalSubject?: boolean;
+                              };
+                              installedLabel?: string;
+                              installedOpensInNewWindow?: boolean;
+                              pendingLabel?: string;
+                              routeSegment: string;
+                              startErrorMessage: string;
+                              unexpectedResultMessage: string;
+                            };
+                            title: string;
+                          };
+                          manifest: {
+                            createErrorMessage: string;
+                            description: string;
+                            startAction: {
+                              /** @enum {string} */
+                              expectedResultKind: "form-post" | "redirect";
+                              manifestBodyField: string;
+                              unexpectedResultMessage: string;
+                            };
+                            title: string;
+                          };
+                          title: string;
+                          urls: {
+                            description: string;
+                            setupCallback?: {
+                              label: string;
+                              path: string;
+                            };
+                            title: string;
+                            webhookCallback: {
+                              errorTitle: string;
+                              label: string;
+                              missingMessage: string;
+                              missingTitle: string;
+                            };
+                          };
+                        };
                         routeSegment: string;
+                        setupPane?: {
+                          /** @enum {string} */
+                          kind: "provider-app";
+                        };
+                        startForm?: {
+                          fields: {
+                            actions?: {
+                              /** Format: uri */
+                              href: string;
+                              label: string;
+                              opensInNewWindow?: boolean;
+                            }[];
+                            description?: string;
+                            /** @enum {string} */
+                            inputType: "password" | "radio" | "text" | "textarea";
+                            label: string;
+                            name: string;
+                            options?: {
+                              label: string;
+                              value: string;
+                            }[];
+                            placeholder?: string;
+                            required?: boolean;
+                            visibleWhen?: {
+                              field: string;
+                              value: string;
+                            };
+                          }[];
+                          submitLabel: string;
+                        };
                       };
                     }
                   | {
@@ -6766,7 +6865,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
               message: string;
             };
           };
@@ -7007,7 +7106,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE";
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
               message: string;
             };
           };
@@ -7120,6 +7219,128 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/instances/{instanceId}/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Stop a sandbox instance when its purpose supports user-requested stops. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted" | "already_stopped" | "already_terminal";
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance cannot be stopped from its current state or purpose. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_FAILED" | "INSTANCE_NOT_RESUMABLE" | "INSTANCE_STOP_NOT_SUPPORTED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -9445,6 +9666,142 @@ export interface paths {
       };
     };
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/test-runs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            idempotencyKey?: string;
+            setupScript: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Start a setup script test run for the specified sandbox profile version. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_PRIMARY_REPOSITORY";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "AGENT_RUNTIME_REQUIRED"
+                    | "INVALID_BINDING_CONNECTION_REFERENCE"
+                    | "INVALID_CONNECTION_TARGET_REFERENCE"
+                    | "CONNECTION_MISMATCH"
+                    | "TARGET_DISABLED"
+                    | "CONNECTION_NOT_ACTIVE"
+                    | "KIND_MISMATCH"
+                    | "INVALID_TARGET_CONFIG"
+                    | "INVALID_TARGET_SECRETS"
+                    | "INVALID_BINDING_CONFIG"
+                    | "ROUTE_CONFLICT"
+                    | "ARTIFACT_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_INVALID_REF";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "VALIDATION_ERROR";
+                  message: string;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

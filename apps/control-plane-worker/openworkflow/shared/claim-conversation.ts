@@ -1,5 +1,4 @@
 import {
-  automationConversations,
   AutomationConversationStatuses,
   AutomationConversationOwnerKinds,
   type AutomationConversationCreatedByKind,
@@ -7,6 +6,7 @@ import {
   type AutomationConversationOwnerKind,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { typeid } from "typeid-js";
 
@@ -32,6 +32,8 @@ export async function claimAutomationConversation(
   },
   input: ClaimAutomationConversationInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const resolvedConversationId =
     input.ownerKind === AutomationConversationOwnerKinds.INTEGRATION_BINDING
       ? typeid("cnv").toString()
@@ -72,14 +74,14 @@ export async function claimAutomationConversation(
   };
 
   const insertedRows = await ctx.db
-    .insert(automationConversations)
+    .insert(tables.automationConversations)
     .values(insertValues)
     .onConflictDoNothing({
       target: [
-        automationConversations.organizationId,
-        automationConversations.ownerKind,
-        automationConversations.ownerId,
-        automationConversations.conversationKey,
+        tables.automationConversations.organizationId,
+        tables.automationConversations.ownerKind,
+        tables.automationConversations.ownerId,
+        tables.automationConversations.conversationKey,
       ],
     })
     .returning();

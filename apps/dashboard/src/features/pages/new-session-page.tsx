@@ -18,7 +18,7 @@ import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profi
 import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { shouldClearSelectedProfile } from "./sessions-page.js";
 
 type NewSessionPageRepositoryOption = {
@@ -188,7 +188,7 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
   }
 
   return (
-    <FormPageFrame title="Start new session">
+    <PageFrame width="form" title="Start new session">
       <div className="mx-auto my-auto w-full max-w-3xl">
         {startErrorMessage ? (
           <Notice title="Session start failed" variant="alert">
@@ -297,6 +297,6 @@ export function NewSessionPage(input?: { initialSelectedProfileId?: string }): R
           </form>
         )}
       </div>
-    </FormPageFrame>
+    </PageFrame>
   );
 }

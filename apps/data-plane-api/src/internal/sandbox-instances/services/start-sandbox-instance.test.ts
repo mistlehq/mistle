@@ -1,4 +1,4 @@
-import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
+import { SandboxInstancePersistenceModes, SandboxInstancePurposes } from "@mistle/db/data-plane";
 import { describe, expect, it } from "vitest";
 
 import { resolveSandboxInstancePersistenceMode } from "./start-sandbox-instance.js";
@@ -8,6 +8,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     expect(
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SESSION,
         persistentSandboxesEnabled: false,
         sandboxProvider: "e2b",
         configuredStorageBackend: "archil",
@@ -19,6 +20,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     expect(
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SESSION,
         persistentSandboxesEnabled: true,
         sandboxProvider: "e2b",
         configuredStorageBackend: "archil",
@@ -30,6 +32,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     expect(
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SESSION,
         persistentSandboxesEnabled: true,
         sandboxProvider: "docker",
         configuredStorageBackend: "docker_volume",
@@ -41,6 +44,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     expect(() =>
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SESSION,
         persistentSandboxesEnabled: true,
         sandboxProvider: "docker",
         configuredStorageBackend: undefined,
@@ -48,5 +52,17 @@ describe("resolveSandboxInstancePersistenceMode", () => {
     ).toThrow(
       "Persistent sandboxes are enabled for organization 'org_test' but no supported durable storage backend is configured for this deployment.",
     );
+  });
+
+  it("returns ephemeral for setup-check sandboxes even when persistent sandboxes are enabled", () => {
+    expect(
+      resolveSandboxInstancePersistenceMode({
+        organizationId: "org_test",
+        purpose: SandboxInstancePurposes.SETUP_CHECK,
+        persistentSandboxesEnabled: true,
+        sandboxProvider: "e2b",
+        configuredStorageBackend: "archil",
+      }),
+    ).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
   });
 });

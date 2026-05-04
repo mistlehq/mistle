@@ -1,8 +1,8 @@
-import {
-  sandboxInstanceStorages,
-  type DataPlaneDatabase,
-  type InsertSandboxInstanceStorage,
-  type SandboxInstanceStorage,
+import type {
+  DataPlaneDatabase,
+  DataPlaneTables,
+  InsertSandboxInstanceStorage,
+  SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -10,9 +10,12 @@ export type CompensationAction = {
   run: () => Promise<void>;
 };
 
+export type SandboxStorageTables = Pick<DataPlaneTables, "sandboxInstanceStorages">;
+
 export async function getSandboxInstanceStorageBySandboxInstanceId(
   ctx: {
     db: DataPlaneDatabase;
+    tables?: SandboxStorageTables;
   },
   input: {
     sandboxInstanceId: string;
@@ -26,9 +29,11 @@ export async function getSandboxInstanceStorageBySandboxInstanceId(
 export async function insertSandboxInstanceStorage(
   ctx: {
     db: DataPlaneDatabase;
+    tables: SandboxStorageTables;
   },
   input: InsertSandboxInstanceStorage,
 ): Promise<SandboxInstanceStorage> {
+  const { sandboxInstanceStorages } = ctx.tables;
   const insertedRows = await ctx.db
     .insert(sandboxInstanceStorages)
     .values(input)
@@ -50,6 +55,7 @@ export async function insertSandboxInstanceStorage(
 export async function updateSandboxInstanceStorageCredential(
   ctx: {
     db: DataPlaneDatabase;
+    tables: SandboxStorageTables;
   },
   input: {
     sandboxInstanceId: string;
@@ -60,6 +66,7 @@ export async function updateSandboxInstanceStorageCredential(
     credentialKind: SandboxInstanceStorage["credentialKind"];
   },
 ): Promise<void> {
+  const { sandboxInstanceStorages } = ctx.tables;
   const updatedRows = await ctx.db
     .update(sandboxInstanceStorages)
     .set({
@@ -85,11 +92,13 @@ export async function updateSandboxInstanceStorageCredential(
 export async function deleteSandboxInstanceStorageBySandboxInstanceId(
   ctx: {
     db: DataPlaneDatabase;
+    tables: SandboxStorageTables;
   },
   input: {
     sandboxInstanceId: string;
   },
 ): Promise<void> {
+  const { sandboxInstanceStorages } = ctx.tables;
   const deletedRows = await ctx.db
     .delete(sandboxInstanceStorages)
     .where(eq(sandboxInstanceStorages.sandboxInstanceId, input.sandboxInstanceId))
@@ -106,8 +115,10 @@ export async function deleteSandboxInstanceStorageBySandboxInstanceId(
 
 export async function tryDeleteSandboxInstanceStorageById(input: {
   db: DataPlaneDatabase;
+  tables: SandboxStorageTables;
   sandboxInstanceStorageId: string;
 }): Promise<void> {
+  const { sandboxInstanceStorages } = input.tables;
   try {
     await input.db
       .delete(sandboxInstanceStorages)

@@ -1,5 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { invitations, users } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { and, asc, desc, eq, gte, ilike, lt, ne, or, sql } from "drizzle-orm";
 
 import {
@@ -57,6 +57,8 @@ export async function listInvitations(
   ctx: ListInvitationsContext,
   input: ListInvitationsInput,
 ): Promise<ListInvitationsResult> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const search = input.search.trim();
   const normalizedSearch = search.toLowerCase();
   const searchPattern = `%${escapeLikePattern(search)}%`;
@@ -67,46 +69,46 @@ export async function listInvitations(
   const searchMatchesRejected = "rejected".includes(normalizedSearch);
   const searchMatchesRevoked = "revoked".includes(normalizedSearch);
   const whereClause = and(
-    eq(invitations.organizationId, input.organizationId),
-    ne(invitations.status, "accepted"),
+    eq(tables.invitations.organizationId, input.organizationId),
+    ne(tables.invitations.status, "accepted"),
     search.length === 0
       ? undefined
       : or(
-          ilike(invitations.email, searchPattern),
-          ilike(invitations.role, searchPattern),
+          ilike(tables.invitations.email, searchPattern),
+          ilike(tables.invitations.role, searchPattern),
           searchMatchesPending
-            ? and(eq(invitations.status, "pending"), gte(invitations.expiresAt, now))
+            ? and(eq(tables.invitations.status, "pending"), gte(tables.invitations.expiresAt, now))
             : undefined,
           searchMatchesExpired
-            ? and(eq(invitations.status, "pending"), lt(invitations.expiresAt, now))
+            ? and(eq(tables.invitations.status, "pending"), lt(tables.invitations.expiresAt, now))
             : undefined,
-          searchMatchesCanceled ? eq(invitations.status, "canceled") : undefined,
-          searchMatchesRejected ? eq(invitations.status, "rejected") : undefined,
-          searchMatchesRevoked ? eq(invitations.status, "revoked") : undefined,
+          searchMatchesCanceled ? eq(tables.invitations.status, "canceled") : undefined,
+          searchMatchesRejected ? eq(tables.invitations.status, "rejected") : undefined,
+          searchMatchesRevoked ? eq(tables.invitations.status, "revoked") : undefined,
         ),
   );
 
   const totalRows = await ctx.db
     .select({ totalResults: sql<number>`count(*)::int` })
-    .from(invitations)
+    .from(tables.invitations)
     .where(whereClause);
   const rows = await ctx.db
     .select({
-      id: invitations.id,
-      organizationId: invitations.organizationId,
-      email: invitations.email,
-      role: invitations.role,
-      inviterId: invitations.inviterId,
-      inviterName: users.name,
-      inviterEmail: users.email,
-      status: invitations.status,
-      expiresAt: invitations.expiresAt,
-      createdAt: invitations.createdAt,
+      id: tables.invitations.id,
+      organizationId: tables.invitations.organizationId,
+      email: tables.invitations.email,
+      role: tables.invitations.role,
+      inviterId: tables.invitations.inviterId,
+      inviterName: tables.users.name,
+      inviterEmail: tables.users.email,
+      status: tables.invitations.status,
+      expiresAt: tables.invitations.expiresAt,
+      createdAt: tables.invitations.createdAt,
     })
-    .from(invitations)
-    .innerJoin(users, eq(users.id, invitations.inviterId))
+    .from(tables.invitations)
+    .innerJoin(tables.users, eq(tables.users.id, tables.invitations.inviterId))
     .where(whereClause)
-    .orderBy(desc(invitations.createdAt), asc(invitations.email))
+    .orderBy(desc(tables.invitations.createdAt), asc(tables.invitations.email))
     .limit(input.limit)
     .offset(input.offset);
 

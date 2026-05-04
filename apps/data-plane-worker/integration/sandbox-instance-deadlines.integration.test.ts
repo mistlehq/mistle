@@ -1,6 +1,7 @@
 import { getLocalTestSandboxBaseImageRef } from "@mistle/config";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceDeadlines,
   sandboxInstances,
@@ -103,6 +104,7 @@ function createDeadlineExecutionContext(input: { gatewayBaseUrl: string }) {
   return {
     config: runtimeConfig,
     db: createDatabase(),
+    tables: getDataPlaneDatabaseSchema(createDatabase()),
     controlPlaneInternalClient: new ControlPlaneInternalClient({
       baseUrl: "http://127.0.0.1:5100",
       internalAuthServiceToken: InternalAuthServiceToken,
@@ -877,6 +879,7 @@ describe("sandbox instance deadlines integration", () => {
         {
           config: runtimeConfig,
           db: createDatabase(),
+          tables: getDataPlaneDatabaseSchema(createDatabase()),
           controlPlaneInternalClient: new ControlPlaneInternalClient({
             baseUrl: "http://127.0.0.1:5100",
             internalAuthServiceToken: InternalAuthServiceToken,
@@ -905,6 +908,7 @@ describe("sandbox instance deadlines integration", () => {
         {
           config: runtimeConfig,
           db: createDatabase(),
+          tables: getDataPlaneDatabaseSchema(createDatabase()),
           controlPlaneInternalClient: new ControlPlaneInternalClient({
             baseUrl: "http://127.0.0.1:5100",
             internalAuthServiceToken: InternalAuthServiceToken,
@@ -1040,6 +1044,7 @@ describe("sandbox instance deadlines integration", () => {
 
     await markSandboxInstanceStoppedDuringStop({
       db: createDatabase(),
+      tables: getDataPlaneDatabaseSchema(createDatabase()),
       sandboxInstanceId,
       stopReason: "idle",
     });
@@ -1064,6 +1069,7 @@ describe("sandbox instance deadlines integration", () => {
     await markSandboxInstanceFailedDuringStart(
       {
         db: createDatabase(),
+        tables: getDataPlaneDatabaseSchema(createDatabase()),
       },
       {
         sandboxInstanceId,
@@ -1091,6 +1097,7 @@ describe("sandbox instance deadlines integration", () => {
 
     await markSandboxInstanceStoppedDuringReconcile({
       db: createDatabase(),
+      tables: getDataPlaneDatabaseSchema(createDatabase()),
       sandboxInstanceId,
       currentStatus: "running",
     });
@@ -1114,6 +1121,7 @@ describe("sandbox instance deadlines integration", () => {
 
     await markSandboxInstanceFailedDuringReconcile({
       db: createDatabase(),
+      tables: getDataPlaneDatabaseSchema(createDatabase()),
       sandboxInstanceId,
       currentStatus: "running",
       failureCode: "provider_runtime_missing",

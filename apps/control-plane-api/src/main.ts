@@ -1,7 +1,7 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
 import { createApp } from "./app.js";
-import { createControlPlaneAuth } from "./auth/index.js";
+import type { ControlPlaneAuthConfig } from "./auth/index.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
 import type {
@@ -15,44 +15,40 @@ export async function createControlPlaneApiRuntime(
   runtimeConfig: ControlPlaneApiRuntimeConfig,
 ): Promise<ControlPlaneApiRuntime> {
   const resources = await createAppResources(runtimeConfig.app);
-  const dataPlaneClient = createDataPlaneSandboxInstancesClient({
-    baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
-    serviceToken: runtimeConfig.app.internalAuth.serviceToken,
-  });
   const { app: config } = runtimeConfig;
+  const dataPlaneClient = createDataPlaneClient({
+    config,
+  });
+  const authConfig = createAuthConfig(config);
   let app: ControlPlaneApp;
 
   try {
-    const auth = createControlPlaneAuth({
-      config: {
-        authBaseUrl: config.auth.baseUrl,
-        dashboardBaseUrl: config.dashboard.baseUrl,
-        authSecret: config.auth.secret,
-        authTrustedOrigins: config.auth.trustedOrigins,
-        authOTPLength: config.auth.otpLength,
-        authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
-        authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
-        authGoogleClientId: config.auth.google?.clientId ?? null,
-        authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
-        activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
-        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
-      },
-      db: resources.db,
-      openWorkflow: resources.openWorkflow,
+    const appContext = await resources.getAppContext({
+      authConfig,
     });
 
     app = createApp({
       config,
       sandboxConfig: config.sandbox,
       internalAuthServiceToken: config.internalAuth.serviceToken,
-      db: resources.db,
+      db: appContext.db,
       objectStore: resources.objectStore,
       integrationRegistry: resources.integrationRegistry,
       dataPlaneClient,
       connectionTokenConfig: config.connectionToken,
       portAccessConfig: config.portAccess,
-      openWorkflow: resources.openWorkflow,
-      auth,
+      openWorkflow: appContext.openWorkflow,
+      auth: appContext.auth,
+      resolveTestContext: async ({ testEnvironmentId }) => ({
+        ...(await resources.getAppContext({
+          authConfig,
+          testEnvironmentId,
+        })),
+        dataPlaneClient: createDataPlaneClient({
+          config,
+          testEnvironmentId,
+        }),
+      }),
     });
   } catch (error) {
     await stopAppResources(resources);
@@ -104,5 +100,48 @@ export async function createControlPlaneApiRuntime(
 
       await stopPromise;
     },
+  };
+}
+
+function createDataPlaneClient(input: {
+  config: ControlPlaneApiRuntimeConfig["app"];
+  testEnvironmentId?: string;
+}) {
+  const testIsolation = input.config.__dangerouslyEnableTestIsolation;
+
+  return createDataPlaneSandboxInstancesClient({
+    baseUrl: input.config.dataPlaneApi.baseUrl,
+    serviceToken: input.config.internalAuth.serviceToken,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : {
+          testEnvironmentId: input.testEnvironmentId,
+        }),
+    ...(testIsolation === undefined
+      ? {}
+      : {
+          testEnvironmentIdHeader: testIsolation.testEnvironmentIdHeader,
+        }),
+  });
+}
+
+function createAuthConfig(config: ControlPlaneApiRuntimeConfig["app"]): ControlPlaneAuthConfig {
+  return {
+    authBaseUrl: config.auth.baseUrl,
+    dashboardBaseUrl: config.dashboard.baseUrl,
+    authSecret: config.auth.secret,
+    authTrustedOrigins: config.auth.trustedOrigins,
+    authOTPLength: config.auth.otpLength,
+    authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
+    authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
+    authGoogleClientId: config.auth.google?.clientId ?? null,
+    authGoogleClientSecret: config.auth.google?.clientSecret ?? null,
+    ...(config.__dangerouslyEnableTestIsolation?.googleAuth === undefined
+      ? {}
+      : {
+          authGoogleProviderOverrides: config.__dangerouslyEnableTestIsolation.googleAuth,
+        }),
+    activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
+    masterEncryptionKeys: config.integrations.masterEncryptionKeys,
   };
 }

@@ -1,8 +1,8 @@
 import {
   SandboxInstanceStatuses,
   SandboxStopReasons,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
@@ -11,6 +11,7 @@ import { clearSandboxInstanceDeadlines } from "../sandbox-instance-deadlines/cle
 export async function markSandboxInstanceFailed(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines" | "sandboxInstances">;
   },
   input: {
     sandboxInstanceId: string;
@@ -20,6 +21,7 @@ export async function markSandboxInstanceFailed(
     allowRunningCurrentStatus?: boolean;
   },
 ): Promise<void> {
+  const { sandboxInstances } = ctx.tables;
   const updatedRows = await ctx.db.transaction(async (tx) => {
     const failedRows = await tx
       .update(sandboxInstances)
@@ -53,6 +55,7 @@ export async function markSandboxInstanceFailed(
     if (failedRows[0] !== undefined) {
       await clearSandboxInstanceDeadlines({
         db: tx,
+        tables: ctx.tables,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     }

@@ -42,6 +42,10 @@ describe("exportServiceConfigToEnv", () => {
       value: "postgresql://mistle:replace-with-password@db:5432/mistle",
     });
     expectEntry(entries, {
+      name: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
+      value: "postgresql://mistle:replace-with-password@db:5432/mistle",
+    });
+    expectEntry(entries, {
       name: "MISTLE_OBJECT_STORE_ASSETS_SECRET_ACCESS_KEY",
       value: "replace-with-object-store-secret-key",
     });
@@ -168,6 +172,10 @@ describe("exportServiceConfigToEnv", () => {
     expectEntry(entries, {
       name: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
       value: 4,
+    });
+    expectEntry(entries, {
+      name: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
+      value: "postgresql://mistle:replace-with-password@db:5432/mistle",
     });
     expectEntry(entries, {
       name: "MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL",

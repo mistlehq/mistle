@@ -10,7 +10,7 @@ import {
 import { Fragment } from "react";
 import { NavLink } from "react-router";
 
-import { useAppBreadcrumbs } from "./route-meta.js";
+import { useAppBreadcrumbs, useAppPageBreadcrumbModel } from "./route-meta.js";
 import type { AppBreadcrumb } from "./route-meta.js";
 
 export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.JSX.Element | null {
@@ -108,4 +108,18 @@ export function AppBreadcrumbs(input: { breadcrumbs?: AppBreadcrumb[] }): React.
       </BreadcrumbList>
     </Breadcrumb>
   );
+}
+
+export function useAppPageBreadcrumbs(): React.ReactNode | null {
+  const pageBreadcrumbModel = useAppPageBreadcrumbModel();
+
+  if (pageBreadcrumbModel.kind === "custom") {
+    return <>{pageBreadcrumbModel.content}</>;
+  }
+
+  if (pageBreadcrumbModel.kind === "breadcrumbs") {
+    return <AppBreadcrumbs breadcrumbs={pageBreadcrumbModel.breadcrumbs} />;
+  }
+
+  return null;
 }

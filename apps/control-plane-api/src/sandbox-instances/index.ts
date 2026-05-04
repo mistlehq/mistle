@@ -16,6 +16,7 @@ export { route as getSandboxInstanceRoute } from "./get-sandbox-instance/route.j
 export { route as getSandboxInstanceSessionLinkRoute } from "./get-sandbox-instance-session-link/route.js";
 export { route as patchSandboxInstanceTitleRoute } from "./patch-sandbox-instance-title/route.js";
 export { route as resumeSandboxInstanceRoute } from "./resume-sandbox-instance/route.js";
+export { route as stopSandboxInstanceRoute } from "./stop-sandbox-instance/route.js";
 export { badRequestResponseSchema as SandboxInstancesBadRequestResponseSchema } from "./list-sandbox-instances/schema.js";
 export { conflictResponseSchema as SandboxInstancesConflictResponseSchema } from "./create-sandbox-instance-connection-token/schema.js";
 export { SandboxInstancesConflictError, SandboxInstancesNotFoundError } from "./errors.js";

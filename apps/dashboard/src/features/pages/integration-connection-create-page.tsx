@@ -6,9 +6,10 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { IntegrationConnectionEditorPage } from "../integrations/integration-connection-editor.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
+import { useAppPageBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { FormPageSection } from "../shared/form-page.js";
-import { FormPageFrame, resolvePageFrameText } from "../shared/page-frame.js";
+import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import type { OpenIntegrationConnectionEditorInput } from "./integration-connection-editor-state-types.js";
 import { resolveDraftThenSetupConnectionPath } from "./integration-connection-post-create-navigation.js";
 import {
@@ -24,6 +25,7 @@ import { SETTINGS_INTEGRATIONS_QUERY_KEY } from "./use-integrations-directory-st
 
 export function IntegrationConnectionCreatePage(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
+  const breadcrumbs = useAppPageBreadcrumbs();
   const navigate = useNavigate();
   const params = useParams();
   const [searchParams] = useSearchParams();
@@ -43,7 +45,9 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
 
   if (integrationsQuery.isError) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
@@ -69,19 +73,21 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
             </div>
           </div>
         </FormPageSection>
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
   if (integrationsQuery.isPending || integrationsQuery.data === undefined) {
     return (
-      <FormPageFrame
+      <PageFrame
+        width="form"
+        breadcrumbs={breadcrumbs}
         description={description}
         headerIcon={pageMeta.headerIcon ?? undefined}
         title={title}
       >
         {null}
-      </FormPageFrame>
+      </PageFrame>
     );
   }
 
@@ -93,7 +99,9 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
   }
 
   return (
-    <FormPageFrame
+    <PageFrame
+      width="form"
+      breadcrumbs={breadcrumbs}
       description={description}
       headerIcon={pageMeta.headerIcon ?? undefined}
       title={title}
@@ -103,7 +111,7 @@ export function IntegrationConnectionCreatePage(): React.JSX.Element {
         initialEditorInput={buildOpenCreateIntegrationConnectionInput(card)}
         {...(returnPath === null ? {} : { returnPath })}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

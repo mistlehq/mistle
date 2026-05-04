@@ -1,7 +1,7 @@
 import {
   UserExternalPrincipalStatuses,
-  userExternalPrincipals,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -42,6 +42,8 @@ export async function updateGitHubLinkedAccountPreferredEmail(
     preferredEmail: string;
   },
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const githubLinkedAccount = (
     await listLinkedAccounts(ctx, {
       organizationId: input.organizationId,
@@ -97,7 +99,7 @@ export async function updateGitHubLinkedAccountPreferredEmail(
   }
 
   const [updatedPrincipal] = await ctx.db
-    .update(userExternalPrincipals)
+    .update(tables.userExternalPrincipals)
     .set({
       profile: {
         ...parsedProfile.data,
@@ -105,9 +107,9 @@ export async function updateGitHubLinkedAccountPreferredEmail(
       },
       updatedAt: sql`now()`,
     })
-    .where(eq(userExternalPrincipals.id, githubLinkedAccount.principal.id))
+    .where(eq(tables.userExternalPrincipals.id, githubLinkedAccount.principal.id))
     .returning({
-      id: userExternalPrincipals.id,
+      id: tables.userExternalPrincipals.id,
     });
 
   if (updatedPrincipal === undefined) {

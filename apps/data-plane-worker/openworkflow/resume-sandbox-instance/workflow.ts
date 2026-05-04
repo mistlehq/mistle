@@ -51,6 +51,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       async () => {
         return resolveResumableSandboxInstanceState({
           db: ctx.db,
+          tables: ctx.tables,
           sandboxInstanceId: input.sandboxInstanceId,
         });
       },
@@ -67,6 +68,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
       await markSandboxInstanceStarting({
         db: ctx.db,
+        tables: ctx.tables,
         sandboxInstanceId: input.sandboxInstanceId,
       });
     });
@@ -108,6 +110,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await attachSandboxStorage(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                   controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                   workerConfig: ctx.config.app,
                   configuredSandboxProvider: ctx.config.sandbox.provider,
@@ -137,6 +140,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await stopSandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -171,6 +175,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   await markSandboxInstanceFailed(
                     {
                       db: ctx.db,
+                      tables: ctx.tables,
                     },
                     {
                       sandboxInstanceId: input.sandboxInstanceId,
@@ -235,6 +240,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await stopSandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -269,6 +275,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   await markSandboxInstanceFailed(
                     {
                       db: ctx.db,
+                      tables: ctx.tables,
                     },
                     {
                       sandboxInstanceId: input.sandboxInstanceId,
@@ -324,6 +331,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await stopSandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -358,6 +366,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   await markSandboxInstanceFailed(
                     {
                       db: ctx.db,
+                      tables: ctx.tables,
                     },
                     {
                       sandboxInstanceId: input.sandboxInstanceId,
@@ -391,6 +400,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await stopSandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -425,6 +435,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   await markSandboxInstanceFailed(
                     {
                       db: ctx.db,
+                      tables: ctx.tables,
                     },
                     {
                       sandboxInstanceId: input.sandboxInstanceId,
@@ -454,6 +465,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceRunning(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -473,6 +485,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await stopSandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -507,6 +520,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   await markSandboxInstanceFailed(
                     {
                       db: ctx.db,
+                      tables: ctx.tables,
                     },
                     {
                       sandboxInstanceId: input.sandboxInstanceId,
@@ -564,6 +578,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await markSandboxInstanceFailed(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -609,6 +624,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await markSandboxInstanceFailed(
             {
               db: ctx.db,
+              tables: ctx.tables,
             },
             {
               sandboxInstanceId: input.sandboxInstanceId,
@@ -655,6 +671,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return prepareSandboxStorageForStart(
             {
               db: ctx.db,
+              tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
               configuredSandboxProvider: ctx.config.sandbox.provider,
@@ -699,6 +716,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return persistSandboxInstanceComputeReplacement(
             {
               db: ctx.db,
+              tables: ctx.tables,
             },
             {
               sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
@@ -715,6 +733,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await attachSandboxStorage(
             {
               db: ctx.db,
+              tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
               configuredSandboxProvider: ctx.config.sandbox.provider,
@@ -746,6 +765,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await revertSandboxInstanceComputeReplacement(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -771,6 +791,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -810,6 +831,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -868,6 +890,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await revertSandboxInstanceComputeReplacement(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -893,6 +916,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -932,6 +956,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -990,6 +1015,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await revertSandboxInstanceComputeReplacement(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1015,6 +1041,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -1054,6 +1081,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1090,6 +1118,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await revertSandboxInstanceComputeReplacement(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1115,6 +1144,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -1154,6 +1184,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1184,6 +1215,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await markSandboxInstanceRunning(
             {
               db: ctx.db,
+              tables: ctx.tables,
             },
             {
               sandboxInstanceId: input.sandboxInstanceId,
@@ -1205,6 +1237,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await revertSandboxInstanceComputeReplacement(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1230,6 +1263,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             await destroySandbox(
               {
                 db: ctx.db,
+                tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -1269,6 +1303,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,
@@ -1311,6 +1346,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await revertSandboxInstanceComputeReplacement(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -1342,6 +1378,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 await destroySandbox(
                   {
                     db: ctx.db,
+                    tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
                     sandboxAdapter: ctx.sandboxAdapter,
@@ -1383,6 +1420,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await markSandboxInstanceFailed(
                 {
                   db: ctx.db,
+                  tables: ctx.tables,
                 },
                 {
                   sandboxInstanceId: input.sandboxInstanceId,

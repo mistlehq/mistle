@@ -1,5 +1,4 @@
-import type { SandboxProfile } from "@mistle/db/control-plane";
-import { sandboxProfiles } from "@mistle/db/control-plane";
+import { type SandboxProfile, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   decodeKeysetCursorOrThrow,
@@ -121,12 +120,14 @@ export async function listProfiles(
           limit: limitPlusOne,
         }),
       countTotalResults: async () => {
+        const tables = getControlPlaneDatabaseSchema(db);
+
         const [result] = await db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
-          .from(sandboxProfiles)
-          .where(eq(sandboxProfiles.organizationId, input.organizationId));
+          .from(tables.sandboxProfiles)
+          .where(eq(tables.sandboxProfiles.organizationId, input.organizationId));
 
         return result?.totalResults ?? 0;
       },

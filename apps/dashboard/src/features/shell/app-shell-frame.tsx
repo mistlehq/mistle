@@ -48,6 +48,7 @@ function IntegrationsNavIcon(props: {
 export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
   | "contentInsetOwner"
+  | "showHeader"
   | "showHeaderLeadingContent"
   | "sidebarContent"
   | "sidebarFooterContent"
@@ -83,20 +84,13 @@ export function resolveAppShellFrame(input: {
   showSessionsSidebar: boolean;
   onShowSessionsSidebarChange: (checked: boolean) => void;
 }): AppShellFrame {
-  const showHeaderLeadingContent =
-    input.inSettings ||
-    input.inSandboxProfiles ||
-    input.inAutomations ||
-    input.inIntegrations ||
-    input.inDashboardRoot ||
-    input.inSessions;
-
   const showDedicatedSessionsSidebar = input.inSessions && input.showSessionsSidebar;
 
   if (input.inSettings) {
     return {
       contentInsetOwner: "child",
-      showHeaderLeadingContent,
+      showHeader: input.pageMeta.appShellHeaderVisible,
+      showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
       sidebarContent: <SettingsSectionNav />,
       sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
       sidebarHeaderClassName: "pb-0",
@@ -108,7 +102,8 @@ export function resolveAppShellFrame(input: {
 
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
-    showHeaderLeadingContent,
+    showHeader: input.pageMeta.appShellHeaderVisible,
+    showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader

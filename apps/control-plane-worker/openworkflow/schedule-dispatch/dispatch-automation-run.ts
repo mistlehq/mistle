@@ -1,8 +1,8 @@
 import {
-  automationRuns,
   AutomationRunStatuses,
   ControlPlaneConstraintIds,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
@@ -180,8 +180,9 @@ async function createOrResolveAutomationRun(
   },
 ): Promise<{ id: string }> {
   try {
+    const tables = getControlPlaneDatabaseSchema(ctx.db);
     const [automationRun] = await ctx.db
-      .insert(automationRuns)
+      .insert(tables.automationRuns)
       .values({
         automationId: input.automationId,
         automationTargetId: input.automationTargetId,
@@ -189,7 +190,7 @@ async function createOrResolveAutomationRun(
         status: AutomationRunStatuses.QUEUED,
       })
       .returning({
-        id: automationRuns.id,
+        id: tables.automationRuns.id,
       });
 
     if (automationRun === undefined) {

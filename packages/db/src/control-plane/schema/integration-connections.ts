@@ -1,4 +1,4 @@
-import { index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, jsonb, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { integrationTargets } from "./integration-targets.js";
@@ -14,50 +14,54 @@ export const IntegrationConnectionStatuses = {
 export type IntegrationConnectionStatus =
   (typeof IntegrationConnectionStatuses)[keyof typeof IntegrationConnectionStatuses];
 
-export const integrationConnections = controlPlaneSchema.table(
-  "integration_connections",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => typeid("icn").toString()),
-    organizationId: text("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    targetKey: text("target_key")
-      .notNull()
-      .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
-    displayName: text("display_name").notNull(),
-    status: text("status")
-      .notNull()
-      .$type<IntegrationConnectionStatus>()
-      .default(IntegrationConnectionStatuses.ACTIVE),
-    externalSubjectId: text("external_subject_id"),
-    config: jsonb("config").$type<Record<string, unknown>>(),
-    targetSnapshotConfig: jsonb("target_snapshot_config").$type<Record<string, unknown>>(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("integration_connections_org_target_id_uidx").on(
-      table.organizationId,
-      table.targetKey,
-      table.id,
-    ),
-    index("integration_connections_organization_id_idx").on(table.organizationId),
-    index("integration_connections_organization_id_target_key_idx").on(
-      table.organizationId,
-      table.targetKey,
-    ),
-    index("integration_connections_organization_id_status_idx").on(
-      table.organizationId,
-      table.status,
-    ),
-  ],
-);
+export function defineIntegrationConnections(schema: PgSchema) {
+  return schema.table(
+    "integration_connections",
+    {
+      id: text("id")
+        .primaryKey()
+        .$defaultFn(() => typeid("icn").toString()),
+      organizationId: text("organization_id")
+        .notNull()
+        .references(() => organizations.id, { onDelete: "cascade" }),
+      targetKey: text("target_key")
+        .notNull()
+        .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
+      displayName: text("display_name").notNull(),
+      status: text("status")
+        .notNull()
+        .$type<IntegrationConnectionStatus>()
+        .default(IntegrationConnectionStatuses.ACTIVE),
+      externalSubjectId: text("external_subject_id"),
+      config: jsonb("config").$type<Record<string, unknown>>(),
+      targetSnapshotConfig: jsonb("target_snapshot_config").$type<Record<string, unknown>>(),
+      createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+        .notNull()
+        .defaultNow(),
+      updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+        .notNull()
+        .defaultNow(),
+    },
+    (table) => [
+      uniqueIndex("integration_connections_org_target_id_uidx").on(
+        table.organizationId,
+        table.targetKey,
+        table.id,
+      ),
+      index("integration_connections_organization_id_idx").on(table.organizationId),
+      index("integration_connections_organization_id_target_key_idx").on(
+        table.organizationId,
+        table.targetKey,
+      ),
+      index("integration_connections_organization_id_status_idx").on(
+        table.organizationId,
+        table.status,
+      ),
+    ],
+  );
+}
+
+export const integrationConnections = defineIntegrationConnections(controlPlaneSchema);
 
 export type IntegrationConnection = typeof integrationConnections.$inferSelect;
 export type InsertIntegrationConnection = typeof integrationConnections.$inferInsert;

@@ -501,9 +501,126 @@ export type IntegrationFormConnectionMethodSetupManifestDraft = {
   ): Record<string, unknown>;
 };
 
+export type IntegrationFormConnectionMethodSetupStartFormAction = {
+  href: string;
+  label: string;
+  opensInNewWindow?: boolean | undefined;
+};
+
+export type IntegrationFormConnectionMethodSetupStartFormField = {
+  actions?: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormAction> | undefined;
+  description?: string | undefined;
+  inputType: "password" | "radio" | "text" | "textarea";
+  label: string;
+  name: string;
+  options?:
+    | ReadonlyArray<{
+        label: string;
+        value: string;
+      }>
+    | undefined;
+  placeholder?: string | undefined;
+  required?: boolean | undefined;
+  visibleWhen?:
+    | {
+        field: string;
+        value: string;
+      }
+    | undefined;
+};
+
+export type IntegrationFormConnectionMethodSetupStartForm = {
+  fields: ReadonlyArray<IntegrationFormConnectionMethodSetupStartFormField>;
+  submitLabel: string;
+};
+
+export type IntegrationFormConnectionMethodSetupPaneMetadata = {
+  kind: "provider-app";
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField = {
+  configKey: string;
+  label: string;
+  name: string;
+  required: boolean;
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField = {
+  inputType: "password" | "textarea";
+  label: string;
+  name: string;
+  placeholder?: string | undefined;
+  rows?: number | undefined;
+  required: boolean;
+  secretLabel: string;
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction = {
+  expectedResultKind: "redirect";
+  installedDetection?:
+    | {
+        configFields?: ReadonlyArray<string> | undefined;
+        externalSubject?: boolean | undefined;
+      }
+    | undefined;
+  installedLabel?: string | undefined;
+  installedOpensInNewWindow?: boolean | undefined;
+  pendingLabel?: string | undefined;
+  routeSegment: string;
+  startErrorMessage: string;
+  unexpectedResultMessage: string;
+};
+
+export type IntegrationFormConnectionMethodProviderAppSetup = {
+  description: string;
+  existingApp: {
+    configFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppConfigField>;
+    connectLabel: string;
+    description: string;
+    installedDetection: {
+      configFields: ReadonlyArray<string>;
+      secretFields: ReadonlyArray<string>;
+    };
+    saveErrorMessage: string;
+    secretFields: ReadonlyArray<IntegrationFormConnectionMethodProviderAppSetupExistingAppSecretField>;
+    startAction?: IntegrationFormConnectionMethodProviderAppSetupExistingAppStartAction | undefined;
+    title: string;
+  };
+  manifest: {
+    createErrorMessage: string;
+    description: string;
+    startAction: {
+      expectedResultKind: "form-post" | "redirect";
+      manifestBodyField: string;
+      unexpectedResultMessage: string;
+    };
+    title: string;
+  };
+  title: string;
+  urls: {
+    description: string;
+    setupCallback?:
+      | {
+          label: string;
+          path: string;
+        }
+      | undefined;
+    title: string;
+    webhookCallback: {
+      errorTitle: string;
+      label: string;
+      missingMessage: string;
+      missingTitle: string;
+    };
+  };
+};
+
 export type IntegrationFormConnectionMethodSetupFlowMetadata = {
   completionRequirements?: IntegrationFormConnectionMethodSetupCompletionRequirement | undefined;
+  providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup | undefined;
   routeSegment: string;
+  setupPane?: IntegrationFormConnectionMethodSetupPaneMetadata | undefined;
+  startForm?: IntegrationFormConnectionMethodSetupStartForm | undefined;
 };
 
 export type IntegrationFormConnectionMethodSetupFlow =

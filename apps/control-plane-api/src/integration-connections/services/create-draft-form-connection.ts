@@ -1,7 +1,7 @@
 import {
-  integrationConnections,
   type ControlPlaneDatabase,
   IntegrationConnectionStatuses,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
@@ -73,11 +73,13 @@ export async function createDraftFormConnection(
   }
 
   return await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const config = {
       connection_method: input.methodId,
     };
     const [createdConnection] = await tx
-      .insert(integrationConnections)
+      .insert(tables.integrationConnections)
       .values({
         organizationId: input.organizationId,
         targetKey: input.targetKey,

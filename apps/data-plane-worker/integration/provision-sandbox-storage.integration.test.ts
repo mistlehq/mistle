@@ -13,6 +13,7 @@ import {
   SandboxStorageConfigSources,
 } from "@mistle/db/control-plane";
 import {
+  getDataPlaneDatabaseSchema,
   SandboxStorageStatuses,
   createDataPlaneDatabase as createDataPlaneDataPlaneDatabase,
   sandboxInstanceStorages,
@@ -103,11 +104,13 @@ function readArchilIntegrationEnvironment(): ArchilIntegrationEnvironment | null
 
 function createArchilStorageBackendAdapter(input: {
   db: ReturnType<typeof createDataPlaneDataPlaneDatabase>;
+  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
 }) {
   return createSandboxStorageBackendAdapter({
     db: input.db,
+    tables: getDataPlaneDatabaseSchema(input.db),
     controlPlaneInternalClient: input.controlPlaneInternalClient,
     workerConfig: input.workerConfig,
     runtimeProvider: SandboxProvider.E2B,
@@ -117,6 +120,7 @@ function createArchilStorageBackendAdapter(input: {
 
 async function requireSandboxStorageRow(input: {
   db: ReturnType<typeof createDataPlaneDataPlaneDatabase>;
+  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
   sandboxInstanceId: string;
 }) {
   const sandboxStorage = await input.db.query.sandboxInstanceStorages.findFirst({
@@ -523,6 +527,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
+          tables: getDataPlaneDatabaseSchema(dataPlaneDb),
           runtimeProvider: "e2b",
         },
         {
@@ -542,6 +547,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
       });
@@ -558,6 +564,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const persistedStorage = await requireSandboxStorageRow({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         sandboxInstanceId,
       });
 
@@ -646,6 +653,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
+          tables: getDataPlaneDatabaseSchema(dataPlaneDb),
           runtimeProvider: "e2b",
         },
         {
@@ -665,6 +673,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         controlPlaneInternalClient,
         workerConfig,
       });
@@ -734,6 +743,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
+          tables: getDataPlaneDatabaseSchema(dataPlaneDb),
           runtimeProvider: "e2b",
         },
         {
@@ -753,6 +763,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         controlPlaneInternalClient,
         workerConfig,
       });
@@ -795,6 +806,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const persistedStorage = await requireSandboxStorageRow({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         sandboxInstanceId,
       });
       expect(persistedStorage.credentialCiphertext).not.toBeNull();
@@ -872,6 +884,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: dataPlaneDb,
+          tables: getDataPlaneDatabaseSchema(dataPlaneDb),
           runtimeProvider: "e2b",
         },
         {
@@ -891,6 +904,7 @@ describeIfArchilIntegration("provisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: dataPlaneDb,
+        tables: getDataPlaneDatabaseSchema(dataPlaneDb),
         controlPlaneInternalClient,
         workerConfig,
       });

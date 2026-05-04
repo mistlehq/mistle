@@ -1,13 +1,12 @@
 import {
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialSecretKinds,
   UserExternalPrincipalCredentialStatuses,
   type UserExternalPrincipalCredentialStatus,
   type UserExternalPrincipalStatus,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -122,6 +121,8 @@ export async function listLinkedAccounts(
     userId: string;
   },
 ): Promise<LinkedAccount[]> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const configuredProviders = (await listOrganizationIdentityLinkProviders(ctx, input)).filter(
     (provider) =>
       provider.configurationStatus !== IdentityLinkProviderConfigurationStatus.UNCONFIGURED,
@@ -204,34 +205,40 @@ export async function listLinkedAccounts(
       ? []
       : await ctx.db
           .select({
-            principalId: userExternalPrincipalCredentials.principalId,
-            credentialId: userExternalPrincipalCredentials.id,
-            metadata: userExternalPrincipalCredentialSecrets.metadata,
-            updatedAt: userExternalPrincipalCredentials.updatedAt,
+            principalId: tables.userExternalPrincipalCredentials.principalId,
+            credentialId: tables.userExternalPrincipalCredentials.id,
+            metadata: tables.userExternalPrincipalCredentialSecrets.metadata,
+            updatedAt: tables.userExternalPrincipalCredentials.updatedAt,
           })
-          .from(userExternalPrincipalCredentials)
+          .from(tables.userExternalPrincipalCredentials)
           .innerJoin(
-            userExternalPrincipalCredentialSecrets,
+            tables.userExternalPrincipalCredentialSecrets,
             and(
-              eq(userExternalPrincipalCredentialSecrets.organizationId, input.organizationId),
               eq(
-                userExternalPrincipalCredentialSecrets.credentialId,
-                userExternalPrincipalCredentials.id,
+                tables.userExternalPrincipalCredentialSecrets.organizationId,
+                input.organizationId,
               ),
               eq(
-                userExternalPrincipalCredentialSecrets.secretKind,
+                tables.userExternalPrincipalCredentialSecrets.credentialId,
+                tables.userExternalPrincipalCredentials.id,
+              ),
+              eq(
+                tables.userExternalPrincipalCredentialSecrets.secretKind,
                 UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
               ),
-              isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+              isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
             ),
           )
           .where(
             and(
-              eq(userExternalPrincipalCredentials.organizationId, input.organizationId),
-              inArray(userExternalPrincipalCredentials.principalId, selectedPrincipalIds),
-              eq(userExternalPrincipalCredentials.credentialKind, GitSshSigningCredentialKind),
+              eq(tables.userExternalPrincipalCredentials.organizationId, input.organizationId),
+              inArray(tables.userExternalPrincipalCredentials.principalId, selectedPrincipalIds),
               eq(
-                userExternalPrincipalCredentials.status,
+                tables.userExternalPrincipalCredentials.credentialKind,
+                GitSshSigningCredentialKind,
+              ),
+              eq(
+                tables.userExternalPrincipalCredentials.status,
                 UserExternalPrincipalCredentialStatuses.ACTIVE,
               ),
             ),

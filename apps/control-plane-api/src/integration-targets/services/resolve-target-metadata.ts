@@ -7,6 +7,9 @@ import type {
   IntegrationFormConnectionMethodPostCreateMetadata,
   IntegrationFormConnectionMethodSetupCompletionRequirement,
   IntegrationFormConnectionMethodSetupCompletionRequirementLeaf,
+  IntegrationFormConnectionMethodProviderAppSetup,
+  IntegrationFormConnectionMethodSetupPaneMetadata,
+  IntegrationFormConnectionMethodSetupStartForm,
   IntegrationWebhookEventDefinition,
   IntegrationWebhookEventParameterDefinition,
   IntegrationWebhookSourceLifecycle,
@@ -103,7 +106,10 @@ export type ResolvedIntegrationTargetMetadata = {
         postCreate?: IntegrationFormConnectionMethodPostCreateMetadata;
         setupFlow?: {
           completionRequirements?: ResolvedSetupCompletionRequirement;
+          providerAppSetup?: IntegrationFormConnectionMethodProviderAppSetup;
           routeSegment: string;
+          setupPane?: IntegrationFormConnectionMethodSetupPaneMetadata;
+          startForm?: IntegrationFormConnectionMethodSetupStartForm;
         };
         secretFields: {
           name: string;
@@ -187,7 +193,22 @@ function resolveConnectionMethod(
                       method.setupFlow.completionRequirements,
                     ),
                   }),
+              ...(method.setupFlow.providerAppSetup === undefined
+                ? {}
+                : {
+                    providerAppSetup: cloneProviderAppSetup(method.setupFlow.providerAppSetup),
+                  }),
               routeSegment: method.setupFlow.routeSegment,
+              ...(method.setupFlow.setupPane === undefined
+                ? {}
+                : {
+                    setupPane: cloneSetupPaneMetadata(method.setupFlow.setupPane),
+                  }),
+              ...(method.setupFlow.startForm === undefined
+                ? {}
+                : {
+                    startForm: cloneSetupStartForm(method.setupFlow.startForm),
+                  }),
             },
           }),
       secretFields: method.secretFields.map((field) => ({
@@ -222,6 +243,162 @@ function resolveConnectionMethod(
       ? {}
       : { connectionDetail: cloneConnectionMethodDetailMetadata(method.connectionDetail) }),
     ui: method.ui,
+  };
+}
+
+function cloneProviderAppSetup(
+  setup: IntegrationFormConnectionMethodProviderAppSetup,
+): IntegrationFormConnectionMethodProviderAppSetup {
+  return {
+    description: setup.description,
+    existingApp: {
+      configFields: setup.existingApp.configFields.map((field) => ({
+        configKey: field.configKey,
+        label: field.label,
+        name: field.name,
+        required: field.required,
+      })),
+      connectLabel: setup.existingApp.connectLabel,
+      description: setup.existingApp.description,
+      installedDetection: {
+        configFields: [...setup.existingApp.installedDetection.configFields],
+        secretFields: [...setup.existingApp.installedDetection.secretFields],
+      },
+      saveErrorMessage: setup.existingApp.saveErrorMessage,
+      secretFields: setup.existingApp.secretFields.map((field) => ({
+        inputType: field.inputType,
+        label: field.label,
+        name: field.name,
+        ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+        ...(field.rows === undefined ? {} : { rows: field.rows }),
+        required: field.required,
+        secretLabel: field.secretLabel,
+      })),
+      ...(setup.existingApp.startAction === undefined
+        ? {}
+        : {
+            startAction: {
+              expectedResultKind: setup.existingApp.startAction.expectedResultKind,
+              ...(setup.existingApp.startAction.installedDetection === undefined
+                ? {}
+                : {
+                    installedDetection: {
+                      ...(setup.existingApp.startAction.installedDetection.configFields ===
+                      undefined
+                        ? {}
+                        : {
+                            configFields: [
+                              ...setup.existingApp.startAction.installedDetection.configFields,
+                            ],
+                          }),
+                      ...(setup.existingApp.startAction.installedDetection.externalSubject ===
+                      undefined
+                        ? {}
+                        : {
+                            externalSubject:
+                              setup.existingApp.startAction.installedDetection.externalSubject,
+                          }),
+                    },
+                  }),
+              ...(setup.existingApp.startAction.installedLabel === undefined
+                ? {}
+                : { installedLabel: setup.existingApp.startAction.installedLabel }),
+              ...(setup.existingApp.startAction.installedOpensInNewWindow === undefined
+                ? {}
+                : {
+                    installedOpensInNewWindow:
+                      setup.existingApp.startAction.installedOpensInNewWindow,
+                  }),
+              ...(setup.existingApp.startAction.pendingLabel === undefined
+                ? {}
+                : { pendingLabel: setup.existingApp.startAction.pendingLabel }),
+              routeSegment: setup.existingApp.startAction.routeSegment,
+              startErrorMessage: setup.existingApp.startAction.startErrorMessage,
+              unexpectedResultMessage: setup.existingApp.startAction.unexpectedResultMessage,
+            },
+          }),
+      title: setup.existingApp.title,
+    },
+    manifest: {
+      createErrorMessage: setup.manifest.createErrorMessage,
+      description: setup.manifest.description,
+      startAction: {
+        expectedResultKind: setup.manifest.startAction.expectedResultKind,
+        manifestBodyField: setup.manifest.startAction.manifestBodyField,
+        unexpectedResultMessage: setup.manifest.startAction.unexpectedResultMessage,
+      },
+      title: setup.manifest.title,
+    },
+    title: setup.title,
+    urls: {
+      description: setup.urls.description,
+      ...(setup.urls.setupCallback === undefined
+        ? {}
+        : {
+            setupCallback: {
+              label: setup.urls.setupCallback.label,
+              path: setup.urls.setupCallback.path,
+            },
+          }),
+      title: setup.urls.title,
+      webhookCallback: {
+        errorTitle: setup.urls.webhookCallback.errorTitle,
+        label: setup.urls.webhookCallback.label,
+        missingMessage: setup.urls.webhookCallback.missingMessage,
+        missingTitle: setup.urls.webhookCallback.missingTitle,
+      },
+    },
+  };
+}
+
+function cloneSetupPaneMetadata(
+  metadata: IntegrationFormConnectionMethodSetupPaneMetadata,
+): IntegrationFormConnectionMethodSetupPaneMetadata {
+  return {
+    kind: metadata.kind,
+  };
+}
+
+function cloneSetupStartForm(
+  startForm: IntegrationFormConnectionMethodSetupStartForm,
+): IntegrationFormConnectionMethodSetupStartForm {
+  return {
+    submitLabel: startForm.submitLabel,
+    fields: startForm.fields.map((field) => ({
+      ...(field.actions === undefined
+        ? {}
+        : {
+            actions: field.actions.map((action) => ({
+              href: action.href,
+              label: action.label,
+              ...(action.opensInNewWindow === undefined
+                ? {}
+                : { opensInNewWindow: action.opensInNewWindow }),
+            })),
+          }),
+      ...(field.description === undefined ? {} : { description: field.description }),
+      inputType: field.inputType,
+      label: field.label,
+      name: field.name,
+      ...(field.options === undefined
+        ? {}
+        : {
+            options: field.options.map((option) => ({
+              label: option.label,
+              value: option.value,
+            })),
+          }),
+      ...(field.placeholder === undefined ? {} : { placeholder: field.placeholder }),
+      ...(field.required === undefined ? {} : { required: field.required }),
+      ...(field.visibleWhen === undefined
+        ? {}
+        : {
+            visibleWhen: {
+              field: field.visibleWhen.field,
+              value: field.visibleWhen.value,
+            },
+          }),
+    })),
   };
 }
 

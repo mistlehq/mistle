@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { resolveLatestPublishedSandboxBaseImageRef } from "@mistle/config";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceRuntimePlans,
   sandboxInstances,
@@ -319,6 +320,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       const runtimePlan = createRuntimePlan();
       const storageBackendAdapter = createSandboxStorageBackendAdapter({
         db,
+        tables: getDataPlaneDatabaseSchema(db),
         controlPlaneInternalClient,
         workerConfig: runtimeConfig.app,
         runtimeProvider: SandboxProvider.DOCKER,
@@ -390,6 +392,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       await sandboxAdapter.destroy({ id: initialSandbox.providerSandboxId });
       await markSandboxInstanceStarting({
         db,
+        tables: getDataPlaneDatabaseSchema(db),
         sandboxInstanceId,
       });
 
@@ -397,6 +400,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       const replacementStoragePreparation = await prepareSandboxStorageForStart(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           controlPlaneInternalClient,
           workerConfig: runtimeConfig.app,
           configuredSandboxProvider: runtimeConfig.sandbox.provider,
@@ -427,6 +431,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       await persistSandboxInstanceComputeReplacement(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,
@@ -438,6 +443,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       await attachSandboxStorage(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           controlPlaneInternalClient,
           workerConfig: runtimeConfig.app,
           configuredSandboxProvider: runtimeConfig.sandbox.provider,
@@ -525,6 +531,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       const organizationId = `org_pr15_fail_${randomUUID().replaceAll("-", "").slice(0, 12)}`;
       const storageBackendAdapter = createSandboxStorageBackendAdapter({
         db,
+        tables: getDataPlaneDatabaseSchema(db),
         controlPlaneInternalClient,
         workerConfig: runtimeConfig.app,
         runtimeProvider: SandboxProvider.DOCKER,
@@ -571,6 +578,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
       });
       await markSandboxInstanceStarting({
         db,
+        tables: getDataPlaneDatabaseSchema(db),
         sandboxInstanceId,
       });
 
@@ -579,6 +587,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         const replacementStoragePreparation = await prepareSandboxStorageForStart(
           {
             db,
+            tables: getDataPlaneDatabaseSchema(db),
             controlPlaneInternalClient,
             workerConfig: runtimeConfig.app,
             configuredSandboxProvider: runtimeConfig.sandbox.provider,
@@ -609,6 +618,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         const persistedReplacement = await persistSandboxInstanceComputeReplacement(
           {
             db,
+            tables: getDataPlaneDatabaseSchema(db),
           },
           {
             sandboxInstanceId,
@@ -620,6 +630,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         await attachSandboxStorage(
           {
             db,
+            tables: getDataPlaneDatabaseSchema(db),
             controlPlaneInternalClient,
             workerConfig: runtimeConfig.app,
             configuredSandboxProvider: runtimeConfig.sandbox.provider,
@@ -655,6 +666,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         await revertSandboxInstanceComputeReplacement(
           {
             db,
+            tables: getDataPlaneDatabaseSchema(db),
           },
           {
             sandboxInstanceId,
@@ -672,6 +684,7 @@ describeIfDockerReplacementIntegration("replace persistent sandbox compute integ
         await markSandboxInstanceFailed(
           {
             db,
+            tables: getDataPlaneDatabaseSchema(db),
           },
           {
             sandboxInstanceId,

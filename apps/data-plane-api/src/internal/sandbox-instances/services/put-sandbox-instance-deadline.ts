@@ -1,6 +1,6 @@
 import {
-  sandboxInstanceDeadlines,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstanceDeadlineKind,
 } from "@mistle/db/data-plane";
 import { HandleSandboxInstanceDeadlineWorkflowSpec } from "@mistle/workflow-registry/data-plane";
@@ -10,11 +10,13 @@ import type { AppRuntimeResources } from "../../../resources.js";
 
 type PutSandboxInstanceDeadlineContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
 };
 
 type DataPlaneTransaction = Parameters<Parameters<DataPlaneDatabase["transaction"]>[0]>[0];
 type DeadlineDatabase = DataPlaneDatabase | DataPlaneTransaction;
+type DeadlineTables = Pick<DataPlaneTables, "sandboxInstanceDeadlines">;
 
 export type PutSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
@@ -103,12 +105,15 @@ async function readCurrentSandboxInstanceDeadline(ctx: {
 
 async function persistSandboxInstanceDeadline(ctx: {
   db: DeadlineDatabase;
+  tables: DeadlineTables;
   sandboxInstanceId: string;
   kind: SandboxInstanceDeadlineKind;
   ownerLeaseId: string;
   dueAt: string;
   generation: number;
 }): Promise<void> {
+  const { sandboxInstanceDeadlines } = ctx.tables;
+
   await ctx.db
     .insert(sandboxInstanceDeadlines)
     .values({
@@ -170,6 +175,7 @@ export async function putSandboxInstanceDeadline(
 
     await persistSandboxInstanceDeadline({
       db: tx,
+      tables: ctx.tables,
       sandboxInstanceId: input.sandboxInstanceId,
       kind: input.kind,
       ownerLeaseId: input.ownerLeaseId,

@@ -1,4 +1,23 @@
-import { CopyableValue, Notice, Tabs, TabsContent, TabsList, TabsTrigger } from "@mistle/ui";
+import type { IntegrationFormConnectionMethodSetupStartForm } from "@mistle/integrations-core";
+import {
+  CopyableValue,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldHeader,
+  FieldLabel,
+  Input,
+  Notice,
+  RadioGroup,
+  RadioGroupItem,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+  TextLink,
+} from "@mistle/ui";
+import { useState } from "react";
 
 import {
   ManifestJsonEditor,
@@ -9,6 +28,58 @@ import { FormPageSection } from "../shared/form-page.js";
 import { SectionHeader } from "../shared/section-header.js";
 
 export type IntegrationConnectionSetupMode = "manifest" | "existing-app";
+
+type IntegrationConnectionSetupStartFormState = {
+  isFieldVisible: (fieldName: string) => boolean;
+  requiredFieldsComplete: boolean;
+  resolveRequiredValue: (fieldName: string) => string;
+  updateValue: (fieldName: string, value: string) => void;
+  values: Record<string, string>;
+};
+
+export function useIntegrationConnectionSetupStartForm(
+  form: IntegrationFormConnectionMethodSetupStartForm,
+): IntegrationConnectionSetupStartFormState {
+  const [values, setValues] = useState(() => createInitialSetupStartFormValues(form));
+
+  function updateValue(fieldName: string, value: string): void {
+    setValues((currentValues) => ({
+      ...currentValues,
+      [fieldName]: value,
+    }));
+  }
+
+  function resolveRequiredValue(fieldName: string): string {
+    return resolveRequiredSetupStartFormValue({
+      fieldName,
+      form,
+      values,
+    });
+  }
+
+  function isFieldVisible(fieldName: string): boolean {
+    const field = form.fields.find((candidate) => candidate.name === fieldName) ?? null;
+    if (field === null) {
+      throw new Error(`Setup start form does not define field '${fieldName}'.`);
+    }
+
+    return isSetupStartFormFieldVisible({
+      field,
+      values,
+    });
+  }
+
+  return {
+    requiredFieldsComplete: areRequiredSetupStartFormFieldsComplete({
+      form,
+      values,
+    }),
+    isFieldVisible,
+    resolveRequiredValue,
+    updateValue,
+    values,
+  };
+}
 
 export function IntegrationConnectionSetupModeTabs(input: {
   actionErrorMessage: string | null;
@@ -89,6 +160,40 @@ export function IntegrationConnectionSetupWebhookCallbackValue(input: {
   return <CopyableValue label={input.label} value={input.webhookCallbackState.value} />;
 }
 
+export function IntegrationConnectionSetupManifestPanel(input: {
+  editorId: string;
+  manifestCallbackState: ManifestWebhookCallbackState;
+  manifestDescription: string;
+  manifestTitle: string;
+  manifestValidation: ManifestJsonValidation;
+  manifestValue: string;
+  onManifestChange: (value: string) => void;
+  onSetupStartFormValueChange: (fieldName: string, value: string) => void;
+  setupStartForm: IntegrationFormConnectionMethodSetupStartForm;
+  setupStartFormValues: Record<string, string>;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-6">
+      <IntegrationConnectionSetupStartForm
+        form={input.setupStartForm}
+        onValueChange={input.onSetupStartFormValueChange}
+        values={input.setupStartFormValues}
+      />
+
+      <IntegrationConnectionSetupManifestEditorSection
+        description={input.manifestDescription}
+        editorId={input.editorId}
+        headingLevel="h3"
+        manifestCallbackState={input.manifestCallbackState}
+        manifestValidation={input.manifestValidation}
+        manifestValue={input.manifestValue}
+        onManifestChange={input.onManifestChange}
+        title={input.manifestTitle}
+      />
+    </div>
+  );
+}
+
 export function IntegrationConnectionSetupManifestEditorSection(input: {
   description: string;
   editorId: string;
@@ -129,4 +234,176 @@ export function IntegrationConnectionSetupManifestEditorSection(input: {
       )}
     </div>
   );
+}
+
+function createInitialSetupStartFormValues(
+  form: IntegrationFormConnectionMethodSetupStartForm,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  for (const field of form.fields) {
+    values[field.name] = "";
+  }
+
+  return values;
+}
+
+function normalizeSetupStartFormValue(value: string | undefined): string {
+  return value?.trim() ?? "";
+}
+
+function areRequiredSetupStartFormFieldsComplete(input: {
+  form: IntegrationFormConnectionMethodSetupStartForm;
+  values: Record<string, string>;
+}): boolean {
+  return input.form.fields.every(
+    (field) =>
+      !isSetupStartFormFieldVisible({ field, values: input.values }) ||
+      field.required !== true ||
+      normalizeSetupStartFormValue(input.values[field.name]).length > 0,
+  );
+}
+
+function resolveRequiredSetupStartFormValue(input: {
+  fieldName: string;
+  form: IntegrationFormConnectionMethodSetupStartForm;
+  values: Record<string, string>;
+}): string {
+  const field = input.form.fields.find((candidate) => candidate.name === input.fieldName) ?? null;
+
+  if (field === null) {
+    throw new Error(`Setup start form does not define required field '${input.fieldName}'.`);
+  }
+
+  const value = normalizeSetupStartFormValue(input.values[field.name]);
+  if (value.length === 0) {
+    throw new Error(`Setup start form field '${input.fieldName}' is required.`);
+  }
+
+  return value;
+}
+
+function isSetupStartFormFieldVisible(input: {
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number];
+  values: Record<string, string>;
+}): boolean {
+  if (input.field.visibleWhen === undefined) {
+    return true;
+  }
+
+  return input.values[input.field.visibleWhen.field] === input.field.visibleWhen.value;
+}
+
+function IntegrationConnectionSetupStartForm(input: {
+  form: IntegrationFormConnectionMethodSetupStartForm;
+  values: Record<string, string>;
+  onValueChange: (fieldName: string, value: string) => void;
+}): React.JSX.Element {
+  return (
+    <>
+      {input.form.fields
+        .filter((field) => isSetupStartFormFieldVisible({ field, values: input.values }))
+        .map((field) => (
+          <IntegrationConnectionSetupStartFormField
+            field={field}
+            key={field.name}
+            onValueChange={input.onValueChange}
+            value={input.values[field.name] ?? ""}
+          />
+        ))}
+    </>
+  );
+}
+
+function IntegrationConnectionSetupStartFormField(input: {
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number];
+  value: string;
+  onValueChange: (fieldName: string, value: string) => void;
+}): React.JSX.Element {
+  const inputId = `integration-setup-start-form-${input.field.name}`;
+  const fieldDescriptionId = `${inputId}-description`;
+  const hasDescription = input.field.description !== undefined || input.field.actions !== undefined;
+
+  return (
+    <Field>
+      <FieldHeader>
+        <FieldLabel htmlFor={inputId} required={input.field.required === true}>
+          {input.field.label}
+        </FieldLabel>
+        {hasDescription ? (
+          <FieldDescription id={fieldDescriptionId}>
+            {input.field.description === undefined ? null : <span>{input.field.description}</span>}
+            {input.field.actions === undefined
+              ? null
+              : input.field.actions.map((action) => (
+                  <span className="block" key={action.href}>
+                    <TextLink
+                      href={action.href}
+                      {...(action.opensInNewWindow === undefined
+                        ? {}
+                        : { opensInNewWindow: action.opensInNewWindow })}
+                    >
+                      {action.label}
+                    </TextLink>
+                  </span>
+                ))}
+          </FieldDescription>
+        ) : null}
+      </FieldHeader>
+      <FieldContent>
+        {input.field.inputType === "radio" ? (
+          <RadioGroup
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            aria-label={input.field.label}
+            onValueChange={(nextValue) => {
+              input.onValueChange(input.field.name, nextValue);
+            }}
+            value={input.value}
+          >
+            {resolveSetupStartFormRadioOptions(input.field).map((option) => (
+              <div className="flex items-start gap-3" key={option.value}>
+                <RadioGroupItem id={`${inputId}-${option.value}`} value={option.value} />
+                <label className="text-sm" htmlFor={`${inputId}-${option.value}`}>
+                  {option.label}
+                </label>
+              </div>
+            ))}
+          </RadioGroup>
+        ) : input.field.inputType === "textarea" ? (
+          <Textarea
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoComplete="off"
+            id={inputId}
+            onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
+            placeholder={input.field.placeholder}
+            value={input.value}
+          />
+        ) : (
+          <Input
+            aria-describedby={hasDescription ? fieldDescriptionId : undefined}
+            autoComplete="off"
+            id={inputId}
+            onChange={(event) => input.onValueChange(input.field.name, event.target.value)}
+            placeholder={input.field.placeholder}
+            type={input.field.inputType}
+            value={input.value}
+          />
+        )}
+      </FieldContent>
+    </Field>
+  );
+}
+
+function resolveSetupStartFormRadioOptions(
+  field: IntegrationFormConnectionMethodSetupStartForm["fields"][number],
+): readonly { label: string; value: string }[] {
+  if (field.inputType !== "radio") {
+    throw new Error(`Setup start form field '${field.name}' is not a radio field.`);
+  }
+
+  if (field.options === undefined) {
+    throw new Error(`Setup start form radio field '${field.name}' does not define options.`);
+  }
+
+  return field.options;
 }

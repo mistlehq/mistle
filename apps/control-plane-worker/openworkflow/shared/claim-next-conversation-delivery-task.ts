@@ -1,8 +1,8 @@
 import {
-  automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -18,6 +18,8 @@ export async function claimNextAutomationConversationDeliveryTask(
   input: ClaimNextConversationDeliveryTaskInput,
 ) {
   return ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const nextTask = await tx.query.automationConversationDeliveryTasks.findFirst({
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(
@@ -35,20 +37,20 @@ export async function claimNextAutomationConversationDeliveryTask(
     }
 
     const updatedRows = await tx
-      .update(automationConversationDeliveryTasks)
+      .update(tables.automationConversationDeliveryTasks)
       .set({
         status: AutomationConversationDeliveryTaskStatuses.CLAIMED,
         processorGeneration: input.generation,
-        attemptCount: sql`${automationConversationDeliveryTasks.attemptCount} + 1`,
+        attemptCount: sql`${tables.automationConversationDeliveryTasks.attemptCount} + 1`,
         claimedAt: sql`now()`,
         deliveryStartedAt: null,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(automationConversationDeliveryTasks.id, nextTask.id),
+          eq(tables.automationConversationDeliveryTasks.id, nextTask.id),
           eq(
-            automationConversationDeliveryTasks.status,
+            tables.automationConversationDeliveryTasks.status,
             AutomationConversationDeliveryTaskStatuses.QUEUED,
           ),
         ),

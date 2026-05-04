@@ -1,7 +1,7 @@
 import {
-  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -24,6 +24,8 @@ export async function putOrganizationIdentityLinkProvider(
     integrationConnectionId: string;
   },
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const providers = await listIdentityLinkProviderMetadata(ctx);
   const provider = providers.find((entry) => entry.providerFamily === input.providerFamily);
 
@@ -61,7 +63,7 @@ export async function putOrganizationIdentityLinkProvider(
     existingConfig?.status ?? OrganizationIdentityLinkProviderConfigStatus.DISABLED;
 
   await ctx.db
-    .insert(organizationIdentityLinkProviderConfigs)
+    .insert(tables.organizationIdentityLinkProviderConfigs)
     .values({
       organizationId: input.organizationId,
       providerFamily: provider.providerFamily,
@@ -73,8 +75,8 @@ export async function putOrganizationIdentityLinkProvider(
     })
     .onConflictDoUpdate({
       target: [
-        organizationIdentityLinkProviderConfigs.organizationId,
-        organizationIdentityLinkProviderConfigs.providerFamily,
+        tables.organizationIdentityLinkProviderConfigs.organizationId,
+        tables.organizationIdentityLinkProviderConfigs.providerFamily,
       ],
       set: {
         status: nextStatus,

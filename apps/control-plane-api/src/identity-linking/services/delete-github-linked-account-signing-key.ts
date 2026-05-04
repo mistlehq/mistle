@@ -1,8 +1,7 @@
 import {
-  userExternalPrincipalCredentialSecrets,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -46,15 +45,17 @@ export async function deleteGitHubLinkedAccountSigningKey(
   }
 
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [revokedCredential] = await tx
-      .update(userExternalPrincipalCredentials)
+      .update(tables.userExternalPrincipalCredentials)
       .set({
         status: UserExternalPrincipalCredentialStatuses.REVOKED,
         updatedAt: sql`now()`,
       })
-      .where(eq(userExternalPrincipalCredentials.id, existingCredential.id))
+      .where(eq(tables.userExternalPrincipalCredentials.id, existingCredential.id))
       .returning({
-        id: userExternalPrincipalCredentials.id,
+        id: tables.userExternalPrincipalCredentials.id,
       });
 
     if (revokedCredential === undefined) {
@@ -65,15 +66,15 @@ export async function deleteGitHubLinkedAccountSigningKey(
     }
 
     await tx
-      .update(userExternalPrincipalCredentialSecrets)
+      .update(tables.userExternalPrincipalCredentialSecrets)
       .set({
         revokedAt: sql`now()`,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(userExternalPrincipalCredentialSecrets.credentialId, existingCredential.id),
-          isNull(userExternalPrincipalCredentialSecrets.revokedAt),
+          eq(tables.userExternalPrincipalCredentialSecrets.credentialId, existingCredential.id),
+          isNull(tables.userExternalPrincipalCredentialSecrets.revokedAt),
         ),
       );
   });

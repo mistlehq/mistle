@@ -1,11 +1,9 @@
 import {
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialStatuses,
-  userExternalPrincipalKeys,
   UserExternalPrincipalKeyStatuses,
-  userExternalPrincipals,
   UserExternalPrincipalStatuses,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
@@ -20,8 +18,10 @@ export async function unlinkLinkedAccount(
   },
 ): Promise<void> {
   await ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const updatedPrincipals = await tx
-      .update(userExternalPrincipals)
+      .update(tables.userExternalPrincipals)
       .set({
         status: UserExternalPrincipalStatuses.UNLINKED,
         unlinkedAt: sql`now()`,
@@ -29,14 +29,14 @@ export async function unlinkLinkedAccount(
       })
       .where(
         and(
-          eq(userExternalPrincipals.organizationId, input.organizationId),
-          eq(userExternalPrincipals.userId, input.userId),
-          eq(userExternalPrincipals.providerFamily, input.providerFamily),
-          ne(userExternalPrincipals.status, UserExternalPrincipalStatuses.UNLINKED),
+          eq(tables.userExternalPrincipals.organizationId, input.organizationId),
+          eq(tables.userExternalPrincipals.userId, input.userId),
+          eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
+          ne(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.UNLINKED),
         ),
       )
       .returning({
-        id: userExternalPrincipals.id,
+        id: tables.userExternalPrincipals.id,
       });
 
     if (updatedPrincipals.length === 0) {
@@ -46,29 +46,29 @@ export async function unlinkLinkedAccount(
     const principalIds = updatedPrincipals.map((principal) => principal.id);
 
     await tx
-      .update(userExternalPrincipalKeys)
+      .update(tables.userExternalPrincipalKeys)
       .set({
         status: UserExternalPrincipalKeyStatuses.RETIRED,
         retiredAt: sql`now()`,
       })
       .where(
         and(
-          inArray(userExternalPrincipalKeys.principalId, principalIds),
-          eq(userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
+          inArray(tables.userExternalPrincipalKeys.principalId, principalIds),
+          eq(tables.userExternalPrincipalKeys.status, UserExternalPrincipalKeyStatuses.ACTIVE),
         ),
       );
 
     await tx
-      .update(userExternalPrincipalCredentials)
+      .update(tables.userExternalPrincipalCredentials)
       .set({
         status: UserExternalPrincipalCredentialStatuses.REVOKED,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          inArray(userExternalPrincipalCredentials.principalId, principalIds),
+          inArray(tables.userExternalPrincipalCredentials.principalId, principalIds),
           ne(
-            userExternalPrincipalCredentials.status,
+            tables.userExternalPrincipalCredentials.status,
             UserExternalPrincipalCredentialStatuses.REVOKED,
           ),
         ),

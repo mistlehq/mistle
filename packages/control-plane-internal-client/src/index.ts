@@ -18,6 +18,12 @@ export type CreateControlPlaneInternalClientInput = {
   baseUrl: string;
   internalAuthServiceToken: string;
   requestTimeoutMs?: number;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
+};
+
+export type ControlPlaneInternalClientRequestOptions = {
+  testEnvironmentId?: string;
 };
 
 export type ResolveIntegrationCredentialInput =
@@ -143,23 +149,28 @@ export class ControlPlaneInternalClientRequestError extends Error {
 
 export class ControlPlaneInternalClient {
   readonly #client: Client<paths>;
+  readonly #internalAuthServiceToken: string;
   readonly #requestTimeoutMs: number;
+  readonly #testEnvironmentId: string | undefined;
+  readonly #testEnvironmentIdHeader: string | undefined;
 
   constructor(input: CreateControlPlaneInternalClientInput) {
     this.#client = createClient<paths>({
       baseUrl: input.baseUrl,
-      headers: {
-        [ControlPlaneInternalAuthHeader]: input.internalAuthServiceToken,
-      },
     });
+    this.#internalAuthServiceToken = input.internalAuthServiceToken;
     this.#requestTimeoutMs = input.requestTimeoutMs ?? DefaultRequestTimeoutMs;
+    this.#testEnvironmentId = input.testEnvironmentId;
+    this.#testEnvironmentIdHeader = input.testEnvironmentIdHeader;
   }
 
   async resolveIntegrationCredential(
     input: ResolveIntegrationCredentialInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveIntegrationCredentialOutput> {
     const result = await this.#client.POST("/internal/integration-credentials/resolve", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -174,11 +185,13 @@ export class ControlPlaneInternalClient {
 
   async resolveIntegrationTargetSecrets(
     input: ResolveIntegrationTargetSecretsInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveIntegrationTargetSecretsOutput> {
     const result = await this.#client.POST(
       "/internal/integration-credentials/resolve-target-secrets",
       {
         body: input,
+        headers: this.#headers(options),
         signal: AbortSignal.timeout(this.#requestTimeoutMs),
       },
     );
@@ -194,11 +207,13 @@ export class ControlPlaneInternalClient {
 
   async resolveIdentityLinkPrincipalCredential(
     input: ResolveIdentityLinkPrincipalCredentialInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveIdentityLinkPrincipalCredentialOutput> {
     const result = await this.#client.POST(
       "/internal/identity-linking/resolve-principal-credential",
       {
         body: input,
+        headers: this.#headers(options),
         signal: AbortSignal.timeout(this.#requestTimeoutMs),
       },
     );
@@ -214,9 +229,11 @@ export class ControlPlaneInternalClient {
 
   async signIdentityLinkCommitPayload(
     input: SignIdentityLinkCommitPayloadInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<SignIdentityLinkCommitPayloadOutput> {
     const result = await this.#client.POST("/internal/identity-linking/sign-commit-payload", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -233,9 +250,11 @@ export class ControlPlaneInternalClient {
 
   async startSandboxProfileInstance(
     input: StartSandboxProfileInstanceInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<StartSandboxProfileInstanceOutput> {
     const result = await this.#client.POST("/internal/sandbox-runtime/start-profile-instance", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -250,9 +269,11 @@ export class ControlPlaneInternalClient {
 
   async compileSandboxProfileVersionRuntimePlan(
     input: CompileSandboxProfileVersionRuntimePlanInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<CompileSandboxProfileVersionRuntimePlanOutput> {
     const result = await this.#client.POST("/internal/sandbox-runtime/compile-plan", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -269,9 +290,11 @@ export class ControlPlaneInternalClient {
 
   async mintSandboxConnectionToken(
     input: MintSandboxConnectionTokenInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<MintSandboxConnectionTokenOutput> {
     const result = await this.#client.POST("/internal/sandbox-runtime/mint-connection-token", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -286,9 +309,11 @@ export class ControlPlaneInternalClient {
 
   async resumeSandboxInstanceForConnection(
     input: ResumeSandboxInstanceForConnectionInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResumeSandboxInstanceForConnectionOutput> {
     const result = await this.#client.POST("/internal/sandbox-runtime/resume-sandbox-instance", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -301,9 +326,13 @@ export class ControlPlaneInternalClient {
     );
   }
 
-  async getSandboxInstance(input: GetSandboxInstanceInput): Promise<GetSandboxInstanceOutput> {
+  async getSandboxInstance(
+    input: GetSandboxInstanceInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
+  ): Promise<GetSandboxInstanceOutput> {
     const result = await this.#client.POST("/internal/sandbox-runtime/get-sandbox-instance", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -318,9 +347,11 @@ export class ControlPlaneInternalClient {
 
   async resolveStoragePersistenceMode(
     input: ResolveStoragePersistenceModeInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveStoragePersistenceModeOutput> {
     const result = await this.#client.POST("/internal/sandbox-storage/resolve-persistence-mode", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -335,9 +366,11 @@ export class ControlPlaneInternalClient {
 
   async resolveStorageConfiguration(
     input: ResolveStorageConfigurationInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveStorageConfigurationOutput> {
     const result = await this.#client.POST("/internal/sandbox-storage/resolve-configuration", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -405,9 +438,11 @@ export class ControlPlaneInternalClient {
 
   async encryptStorageCredential(
     input: EncryptStorageCredentialInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<EncryptStorageCredentialOutput> {
     const result = await this.#client.POST("/internal/sandbox-storage/encrypt-credential", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -422,9 +457,11 @@ export class ControlPlaneInternalClient {
 
   async resolveStorageCredential(
     input: ResolveStorageCredentialInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ResolveStorageCredentialOutput> {
     const result = await this.#client.POST("/internal/sandbox-storage/resolve-credential", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -439,9 +476,11 @@ export class ControlPlaneInternalClient {
 
   async requestIntegrationConnectionResourceRefresh(
     input: RequestIntegrationConnectionResourceRefreshInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<RequestIntegrationConnectionResourceRefreshOutput> {
     const result = await this.#client.POST("/internal/integration-connections/refresh-resource", {
       body: input,
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -456,6 +495,7 @@ export class ControlPlaneInternalClient {
 
   async claimSandboxProfileVersionSnapshotJob(
     input: ClaimSandboxProfileVersionSnapshotJobInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<ClaimSandboxProfileVersionSnapshotJobOutput> {
     const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/claim", {
       params: {
@@ -466,6 +506,7 @@ export class ControlPlaneInternalClient {
       body: {
         workflowRunId: input.workflowRunId,
       },
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -482,6 +523,7 @@ export class ControlPlaneInternalClient {
 
   async markSandboxProfileVersionSnapshotJobSucceeded(
     input: MarkSandboxProfileVersionSnapshotJobSucceededInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<MarkSandboxProfileVersionSnapshotJobSucceededOutput> {
     const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/succeed", {
       params: {
@@ -493,6 +535,7 @@ export class ControlPlaneInternalClient {
         workflowRunId: input.workflowRunId,
         image: input.image,
       },
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -509,6 +552,7 @@ export class ControlPlaneInternalClient {
 
   async markSandboxProfileVersionSnapshotJobFailed(
     input: MarkSandboxProfileVersionSnapshotJobFailedInput,
+    options: ControlPlaneInternalClientRequestOptions = {},
   ): Promise<MarkSandboxProfileVersionSnapshotJobFailedOutput> {
     const result = await this.#client.POST("/internal/snapshot-jobs/{jobId}/fail", {
       params: {
@@ -521,6 +565,7 @@ export class ControlPlaneInternalClient {
         errorCode: input.errorCode,
         errorMessage: input.errorMessage,
       },
+      headers: this.#headers(options),
       signal: AbortSignal.timeout(this.#requestTimeoutMs),
     });
 
@@ -533,5 +578,24 @@ export class ControlPlaneInternalClient {
       code: extractErrorCode(result.error),
       message: `Control-plane internal snapshot job failure update failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     });
+  }
+
+  #headers(options: ControlPlaneInternalClientRequestOptions): Record<string, string> {
+    const headers: Record<string, string> = {
+      [ControlPlaneInternalAuthHeader]: this.#internalAuthServiceToken,
+    };
+    const testEnvironmentId = options.testEnvironmentId ?? this.#testEnvironmentId;
+    if (testEnvironmentId === undefined) {
+      return headers;
+    }
+
+    if (this.#testEnvironmentIdHeader === undefined) {
+      throw new Error(
+        "Control-plane internal client test environment id was provided without a header name.",
+      );
+    }
+
+    headers[this.#testEnvironmentIdHeader] = testEnvironmentId;
+    return headers;
   }
 }

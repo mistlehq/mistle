@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import { FormPageFrame } from "../shared/page-frame.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { AutomationTypeDisplayField, AutomationTypeSelectField } from "./automation-type-field.js";
 import { validateScheduledAutomationFormValues } from "./scheduled-automation-form-helpers.js";
 import { ScheduledAutomationConversationModes } from "./scheduled-automation-form-types.js";
@@ -89,7 +89,7 @@ function StoryHarness(input: {
   const pageTitle = input.mode === "create" ? "Create automation" : "";
 
   return (
-    <FormPageFrame title={pageTitle}>
+    <PageFrame title={pageTitle} width="form">
       <ScheduledAutomationForm
         fieldErrors={fieldErrors}
         formError={input.formError ?? null}
@@ -134,7 +134,7 @@ function StoryHarness(input: {
         sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
         values={values}
       />
-    </FormPageFrame>
+    </PageFrame>
   );
 }
 

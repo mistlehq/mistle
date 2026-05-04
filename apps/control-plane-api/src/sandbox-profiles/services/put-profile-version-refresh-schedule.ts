@@ -1,7 +1,7 @@
 import {
+  getControlPlaneDatabaseSchema,
+  type ControlPlaneTables,
   type ControlPlaneTransaction,
-  sandboxProfileSnapshotRefreshScheduleTargets,
-  schedules,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
 import { findNextScheduleOccurrence } from "@mistle/time";
@@ -48,19 +48,20 @@ export async function putProfileVersionRefreshSchedule(
   input: PutProfileVersionRefreshScheduleInput,
 ): Promise<ProfileVersionRefreshSchedule> {
   const occurrence = resolveInitialOccurrence(input);
+  const tables = getControlPlaneDatabaseSchema(db);
 
   return db.transaction(async (tx) => {
-    await lockProfileAndVersion(tx, input);
-    const existingSchedule = await findRefreshScheduleForProfileVersion(tx, input);
+    await lockProfileAndVersion(tx, tables, input);
+    const existingSchedule = await findRefreshScheduleForProfileVersion(tx, tables, input);
 
     if (existingSchedule === null) {
-      return createRefreshSchedule(tx, {
+      return createRefreshSchedule(tx, tables, {
         ...input,
         nextScheduledAt: occurrence.scheduledAt.toISOString(),
       });
     }
 
-    return updateRefreshSchedule(tx, {
+    return updateRefreshSchedule(tx, tables, {
       ...input,
       scheduleId: existingSchedule.scheduleId,
       nextScheduledAt: occurrence.scheduledAt.toISOString(),
@@ -94,6 +95,7 @@ function resolveInitialOccurrence(input: PutProfileVersionRefreshScheduleInput):
 
 async function lockProfileAndVersion(
   tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
   input: {
     organizationId: string;
     profileId: string;
@@ -120,6 +122,7 @@ async function lockProfileAndVersion(
 
   await lockProfileVersionForUpdateOrThrow({
     db: tx,
+    tables,
     profileId: input.profileId,
     profileVersion: input.profileVersion,
   });
@@ -127,23 +130,22 @@ async function lockProfileAndVersion(
 
 async function findRefreshScheduleForProfileVersion(
   tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
   input: {
     profileId: string;
     profileVersion: number;
   },
 ): Promise<ExistingRefreshSchedule | null> {
+  const scheduleTargets = tables.sandboxProfileSnapshotRefreshScheduleTargets;
   const [target] = await tx
     .select({
-      scheduleId: sandboxProfileSnapshotRefreshScheduleTargets.scheduleId,
+      scheduleId: scheduleTargets.scheduleId,
     })
-    .from(sandboxProfileSnapshotRefreshScheduleTargets)
+    .from(scheduleTargets)
     .where(
       and(
-        eq(sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileId, input.profileId),
-        eq(
-          sandboxProfileSnapshotRefreshScheduleTargets.sandboxProfileVersion,
-          input.profileVersion,
-        ),
+        eq(scheduleTargets.sandboxProfileId, input.profileId),
+        eq(scheduleTargets.sandboxProfileVersion, input.profileVersion),
       ),
     )
     .limit(1);
@@ -153,13 +155,15 @@ async function findRefreshScheduleForProfileVersion(
 
 async function createRefreshSchedule(
   tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
   input: PutProfileVersionRefreshScheduleInput & {
     nextScheduledAt: string;
   },
 ): Promise<ProfileVersionRefreshSchedule> {
   const name = input.name ?? DefaultRefreshScheduleName;
+  const scheduleTargets = tables.sandboxProfileSnapshotRefreshScheduleTargets;
   const [schedule] = await tx
-    .insert(schedules)
+    .insert(tables.schedules)
     .values({
       organizationId: input.organizationId,
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
@@ -170,19 +174,19 @@ async function createRefreshSchedule(
       nextScheduledAt: input.nextScheduledAt,
     })
     .returning({
-      id: schedules.id,
-      name: schedules.name,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      enabled: schedules.enabled,
-      nextScheduledAt: schedules.nextScheduledAt,
+      id: tables.schedules.id,
+      name: tables.schedules.name,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      enabled: tables.schedules.enabled,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
     });
 
   if (schedule === undefined) {
     throw new Error("Expected snapshot refresh schedule to be created.");
   }
 
-  await tx.insert(sandboxProfileSnapshotRefreshScheduleTargets).values({
+  await tx.insert(scheduleTargets).values({
     scheduleId: schedule.id,
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.profileVersion,
@@ -197,6 +201,7 @@ async function createRefreshSchedule(
 
 async function updateRefreshSchedule(
   tx: ControlPlaneTransaction,
+  tables: ControlPlaneTables,
   input: PutProfileVersionRefreshScheduleInput & {
     scheduleId: string;
     nextScheduledAt: string;
@@ -204,7 +209,7 @@ async function updateRefreshSchedule(
 ): Promise<ProfileVersionRefreshSchedule> {
   const name = input.name ?? DefaultRefreshScheduleName;
   const [schedule] = await tx
-    .update(schedules)
+    .update(tables.schedules)
     .set({
       name,
       cronExpression: input.cronExpression,
@@ -214,14 +219,14 @@ async function updateRefreshSchedule(
       deletedAt: null,
       updatedAt: sql`now()`,
     })
-    .where(eq(schedules.id, input.scheduleId))
+    .where(eq(tables.schedules.id, input.scheduleId))
     .returning({
-      id: schedules.id,
-      name: schedules.name,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      enabled: schedules.enabled,
-      nextScheduledAt: schedules.nextScheduledAt,
+      id: tables.schedules.id,
+      name: tables.schedules.name,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      enabled: tables.schedules.enabled,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
     });
 
   if (schedule === undefined) {

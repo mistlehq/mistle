@@ -3,4 +3,4 @@ set -eu
 
 cd /app
 
-node apps/control-plane-api/dist/scripts/run-integration-targets-sync.js
+node /app/node_modules/@mistle/control-plane-api/dist/scripts/run-integration-targets-sync.js

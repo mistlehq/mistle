@@ -405,17 +405,6 @@ export const StartedRedirectConnectionSchema = z
   })
   .strict();
 
-export const StartedGitHubAppManifestConnectionSchema = z
-  .object({
-    submissionUrl: z.url(),
-    fields: z
-      .object({
-        manifest: z.string().min(1),
-      })
-      .strict(),
-  })
-  .strict();
-
 export const StartedProviderAppSetupSchema = z.discriminatedUnion("kind", [
   z
     .object({
@@ -503,9 +492,6 @@ export type CreatedIntegrationWebhookSource = z.infer<typeof CreatedIntegrationW
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type DeletedIntegrationConnection = z.infer<typeof DeletedIntegrationConnectionSchema>;
 export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
-export type StartedGitHubAppManifestConnection = z.infer<
-  typeof StartedGitHubAppManifestConnectionSchema
->;
 export type StartedProviderAppSetup = z.infer<typeof StartedProviderAppSetupSchema>;
 export type StartedDeviceAuthorizationConnection = z.infer<
   typeof StartedDeviceAuthorizationConnectionSchema

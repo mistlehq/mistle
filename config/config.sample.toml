@@ -82,7 +82,8 @@ namespace_id = "production"
 
 # Each plane can point at separate Postgres instances. For local and simple
 # deployments, direct_url and pooled_url may still target the same database.
-# Use direct_url for migrations and pooled_url for app runtime traffic.
+# Use direct_url for migrations and OpenWorkflow backends. Use pooled_url for
+# normal app runtime queries.
 [postgres.control_plane]
 direct_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 pooled_url = "postgresql://mistle:replace-with-password@pgbouncer:6432/mistle"

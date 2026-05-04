@@ -3,11 +3,15 @@
   "env": {
     "builtin": true,
   },
-  "jsPlugins": ["./tools/oxlint-plugins/no-qualified-timer-globals.js"],
+  "jsPlugins": [
+    "./tools/oxlint-plugins/no-qualified-timer-globals.js",
+    "./tools/oxlint-plugins/no-static-db-tables-in-runtime.js",
+  ],
   "plugins": ["eslint", "typescript", "node", "vitest"],
   "rules": {
     "mistle/no-restricted-test-api-members": "error",
     "mistle/no-qualified-timer-globals": "error",
+    "mistle-db/no-static-db-tables-in-runtime": "error",
     "typescript/no-deprecated": "error",
     "eslint/no-restricted-imports": [
       "error",

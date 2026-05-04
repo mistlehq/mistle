@@ -25,6 +25,8 @@ const InternalErrorSchema = z
 export type CreateDataPlaneSandboxInstancesClientInput = {
   baseUrl: string;
   serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
   requestTimeoutMs?: number;
 };
 
@@ -89,6 +91,21 @@ export type StopSandboxInstanceInput = {
 };
 export type StopSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox/instances/:id/stop"]["post"]["responses"]["200"]["content"]["application/json"];
+export type StopUserRequestedSandboxInstanceInput = {
+  organizationId: string;
+  sandboxInstanceId: string;
+  idempotencyKey: string;
+};
+const StopUserRequestedSandboxInstanceResponseSchema = z
+  .object({
+    status: z.enum(["accepted", "already_stopped", "already_terminal"]),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1).nullable(),
+  })
+  .strict();
+export type StopUserRequestedSandboxInstanceResponse = z.infer<
+  typeof StopUserRequestedSandboxInstanceResponseSchema
+>;
 export type ReconcileSandboxInstanceInput = {
   sandboxInstanceId: string;
   reason: "disconnect_grace_elapsed";
@@ -102,6 +119,7 @@ export type PutSandboxInstanceDeadlineInput = {
   kind: "idle" | "disconnect";
   ownerLeaseId: string;
   dueAt: string;
+  testEnvironmentId?: string;
 };
 const PutSandboxInstanceDeadlineAcceptedResponseSchema = z
   .object({
@@ -119,6 +137,7 @@ export type DeleteSandboxInstanceDeadlineInput = {
   sandboxInstanceId: string;
   kind: "idle" | "disconnect";
   ownerLeaseId: string;
+  testEnvironmentId?: string;
 };
 const DeleteSandboxInstanceDeadlineOkResponseSchema = z
   .object({
@@ -196,6 +215,9 @@ export type DataPlaneSandboxInstancesClient = {
   stopSandboxInstance: (
     input: StopSandboxInstanceInput,
   ) => Promise<StopSandboxInstanceAcceptedResponse>;
+  stopUserRequestedSandboxInstance: (
+    input: StopUserRequestedSandboxInstanceInput,
+  ) => Promise<StopUserRequestedSandboxInstanceResponse>;
   reconcileSandboxInstance: (
     input: ReconcileSandboxInstanceInput,
   ) => Promise<ReconcileSandboxInstanceAcceptedResponse>;
@@ -277,26 +299,79 @@ function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput)
   baseUrl: string;
   client: Client<paths>;
   serviceToken: string;
+  testEnvironmentId: string | undefined;
+  testEnvironmentIdHeader: string | undefined;
   requestTimeoutMs: number;
 } {
+  const headers = createAuthedHeaders({
+    serviceToken: input.serviceToken,
+    ...(input.testEnvironmentId === undefined
+      ? {}
+      : { testEnvironmentId: input.testEnvironmentId }),
+    ...(input.testEnvironmentIdHeader === undefined
+      ? {}
+      : { testEnvironmentIdHeader: input.testEnvironmentIdHeader }),
+  });
+
   return {
     baseUrl: input.baseUrl,
     client: createClient<paths>({
       baseUrl: input.baseUrl,
-      headers: {
-        [DATA_PLANE_INTERNAL_AUTH_HEADER]: input.serviceToken,
-      },
+      headers,
     }),
     serviceToken: input.serviceToken,
+    testEnvironmentId: input.testEnvironmentId,
+    testEnvironmentIdHeader: input.testEnvironmentIdHeader,
     requestTimeoutMs: input.requestTimeoutMs ?? DefaultRequestTimeoutMs,
   };
 }
 
-function createAuthedJsonHeaders(serviceToken: string): Record<string, string> {
+function createAuthedHeaders(input: {
+  serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    [DATA_PLANE_INTERNAL_AUTH_HEADER]: input.serviceToken,
+  };
+
+  if (input.testEnvironmentId !== undefined && input.testEnvironmentIdHeader !== undefined) {
+    headers[input.testEnvironmentIdHeader] = input.testEnvironmentId;
+  } else if (input.testEnvironmentId !== undefined) {
+    throw new Error(
+      "Data-plane internal client test environment id was provided without a header name.",
+    );
+  }
+
+  return headers;
+}
+
+function createAuthedJsonHeaders(input: {
+  serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
+}): Record<string, string> {
   return {
     "content-type": "application/json",
-    [DATA_PLANE_INTERNAL_AUTH_HEADER]: serviceToken,
+    ...createAuthedHeaders(input),
   };
+}
+
+function createTestHeaders(input: {
+  serviceToken: string;
+  testEnvironmentId?: string;
+  testEnvironmentIdHeader?: string;
+  overrideTestEnvironmentId?: string;
+}): Record<string, string> {
+  const testEnvironmentId = input.overrideTestEnvironmentId ?? input.testEnvironmentId;
+
+  return createAuthedJsonHeaders({
+    serviceToken: input.serviceToken,
+    ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
+    ...(input.testEnvironmentIdHeader === undefined
+      ? {}
+      : { testEnvironmentIdHeader: input.testEnvironmentIdHeader }),
+  });
 }
 
 function createSandboxInstanceMemberUrl(input: {
@@ -341,7 +416,15 @@ export function createDataPlaneSandboxInstancesClient(
     async startSandboxInstance(startInput) {
       const response = await fetch(new URL("/internal/sandbox/instances", internalClient.baseUrl), {
         method: "POST",
-        headers: createAuthedJsonHeaders(internalClient.serviceToken),
+        headers: createTestHeaders({
+          serviceToken: internalClient.serviceToken,
+          ...(internalClient.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: internalClient.testEnvironmentId }),
+          ...(internalClient.testEnvironmentIdHeader === undefined
+            ? {}
+            : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+        }),
         body: JSON.stringify({
           ...startInput,
           ...(startInput.actingUserId === undefined
@@ -375,7 +458,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             organizationId: resumeInput.organizationId,
             ...(resumeInput.actingUserId === undefined
@@ -416,7 +507,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             stopReason: stopInput.stopReason,
             expectedOwnerLeaseId: stopInput.expectedOwnerLeaseId,
@@ -441,6 +540,45 @@ export function createDataPlaneSandboxInstancesClient(
       });
     },
 
+    async stopUserRequestedSandboxInstance(stopInput) {
+      const response = await fetch(
+        createSandboxInstanceMemberUrl({
+          baseUrl: internalClient.baseUrl,
+          instanceId: stopInput.sandboxInstanceId,
+          suffix: "/user-stop",
+        }),
+        {
+          method: "POST",
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
+          body: JSON.stringify({
+            organizationId: stopInput.organizationId,
+            idempotencyKey: stopInput.idempotencyKey,
+          }),
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (response.status === 200) {
+        return StopUserRequestedSandboxInstanceResponseSchema.parse(await response.json());
+      }
+
+      const errorBody = await readResponseBody(response);
+
+      throw createClientError({
+        status: response.status,
+        error: errorBody,
+        operation: "stop",
+      });
+    },
+
     async reconcileSandboxInstance(reconcileInput) {
       const response = await fetch(
         createSandboxInstanceMemberUrl({
@@ -450,7 +588,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             reason: reconcileInput.reason,
             expectedOwnerLeaseId: reconcileInput.expectedOwnerLeaseId,
@@ -484,7 +630,18 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "PUT",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+            ...(putDeadlineInput.testEnvironmentId === undefined
+              ? {}
+              : { overrideTestEnvironmentId: putDeadlineInput.testEnvironmentId }),
+          }),
           body: JSON.stringify({
             ownerLeaseId: putDeadlineInput.ownerLeaseId,
             dueAt: putDeadlineInput.dueAt,
@@ -519,7 +676,18 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "DELETE",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+            ...(deleteDeadlineInput.testEnvironmentId === undefined
+              ? {}
+              : { overrideTestEnvironmentId: deleteDeadlineInput.testEnvironmentId }),
+          }),
           body: JSON.stringify({
             ownerLeaseId: deleteDeadlineInput.ownerLeaseId,
           }),
@@ -552,7 +720,15 @@ export function createDataPlaneSandboxInstancesClient(
         }),
         {
           method: "PATCH",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify({
             ...(patchInput.onlyIfUnset === undefined
               ? {}
@@ -588,7 +764,15 @@ export function createDataPlaneSandboxInstancesClient(
         ),
         {
           method: "POST",
-          headers: createAuthedJsonHeaders(internalClient.serviceToken),
+          headers: createTestHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           body: JSON.stringify(materializeInput),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },
@@ -620,9 +804,15 @@ export function createDataPlaneSandboxInstancesClient(
           },
         }),
         {
-          headers: {
-            [DATA_PLANE_INTERNAL_AUTH_HEADER]: internalClient.serviceToken,
-          },
+          headers: createAuthedHeaders({
+            serviceToken: internalClient.serviceToken,
+            ...(internalClient.testEnvironmentId === undefined
+              ? {}
+              : { testEnvironmentId: internalClient.testEnvironmentId }),
+            ...(internalClient.testEnvironmentIdHeader === undefined
+              ? {}
+              : { testEnvironmentIdHeader: internalClient.testEnvironmentIdHeader }),
+          }),
           signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
         },
       );

@@ -200,14 +200,14 @@ export function OrganizationIdentityLinkingSettingsPage(): React.JSX.Element {
 
   if (membershipCapabilitiesQuery.isPending || (canManage && providersQuery.isPending)) {
     return (
-      <PageFrame description={description} maxWidthClassName="max-w-5xl" title={title}>
+      <PageFrame description={description} width="normal" title={title}>
         {null}
       </PageFrame>
     );
   }
 
   return (
-    <PageFrame description={description} maxWidthClassName="max-w-5xl" title={title}>
+    <PageFrame description={description} width="normal" title={title}>
       <OrganizationIdentityLinkingSettingsPageView
         loadErrorMessage={resolveLoadErrorMessage({
           canManage,

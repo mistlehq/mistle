@@ -1,11 +1,4 @@
-import {
-  integrationConnectionCredentials,
-  integrationConnectionRedirectSessions,
-  integrationConnections,
-  integrationCredentials,
-  integrationWebhookSources,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
+import { type ControlPlaneDatabase, getControlPlaneDatabaseSchema } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type {
   AnyIntegrationDefinition,
@@ -83,20 +76,22 @@ export async function persistProviderAppSetupResult(input: {
 
   try {
     return await input.db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       if (input.redirectSession !== undefined) {
         const consumedSessionRows = await tx
-          .update(integrationConnectionRedirectSessions)
+          .update(tables.integrationConnectionRedirectSessions)
           .set({
             usedAt: sql`now()`,
           })
           .where(
             and(
-              eq(integrationConnectionRedirectSessions.id, input.redirectSession.id),
-              isNull(integrationConnectionRedirectSessions.usedAt),
+              eq(tables.integrationConnectionRedirectSessions.id, input.redirectSession.id),
+              isNull(tables.integrationConnectionRedirectSessions.usedAt),
             ),
           )
           .returning({
-            id: integrationConnectionRedirectSessions.id,
+            id: tables.integrationConnectionRedirectSessions.id,
           });
 
         if (consumedSessionRows.length !== 1) {
@@ -121,7 +116,7 @@ export async function persistProviderAppSetupResult(input: {
         });
 
         const [createdCredential] = await tx
-          .insert(integrationCredentials)
+          .insert(tables.integrationCredentials)
           .values({
             organizationId: input.organizationId,
             secretKind: parsedSecret.persistedSecretRef.secretKind,
@@ -131,7 +126,7 @@ export async function persistProviderAppSetupResult(input: {
             intendedFamilyId: input.connection.target.familyId,
           })
           .returning({
-            id: integrationCredentials.id,
+            id: tables.integrationCredentials.id,
           });
 
         if (createdCredential === undefined) {
@@ -139,7 +134,7 @@ export async function persistProviderAppSetupResult(input: {
         }
 
         await tx
-          .insert(integrationConnectionCredentials)
+          .insert(tables.integrationConnectionCredentials)
           .values({
             connectionId: input.connection.id,
             credentialId: createdCredential.id,
@@ -147,8 +142,8 @@ export async function persistProviderAppSetupResult(input: {
           })
           .onConflictDoUpdate({
             target: [
-              integrationConnectionCredentials.connectionId,
-              integrationConnectionCredentials.slotKey,
+              tables.integrationConnectionCredentials.connectionId,
+              tables.integrationConnectionCredentials.slotKey,
             ],
             set: {
               credentialId: createdCredential.id,
@@ -158,7 +153,7 @@ export async function persistProviderAppSetupResult(input: {
 
       const connectionUpdate = input.connectionUpdate;
       const [updatedConnection] = await tx
-        .update(integrationConnections)
+        .update(tables.integrationConnections)
         .set({
           ...(connectionUpdate?.config === undefined ? {} : { config: connectionUpdate.config }),
           ...(connectionUpdate?.externalSubjectId === undefined
@@ -168,8 +163,8 @@ export async function persistProviderAppSetupResult(input: {
         })
         .where(
           and(
-            eq(integrationConnections.id, input.connection.id),
-            eq(integrationConnections.organizationId, input.organizationId),
+            eq(tables.integrationConnections.id, input.connection.id),
+            eq(tables.integrationConnections.organizationId, input.organizationId),
           ),
         )
         .returning();
@@ -211,16 +206,16 @@ export async function persistProviderAppSetupResult(input: {
         const providerMetadata = input.webhookSourceUpdate?.providerMetadata;
         if (providerMetadata !== undefined) {
           const updatedSources = await tx
-            .update(integrationWebhookSources)
+            .update(tables.integrationWebhookSources)
             .set({
               providerMetadata: {
                 ...webhookSource.providerMetadata,
                 ...providerMetadata,
               },
             })
-            .where(eq(integrationWebhookSources.id, webhookSource.id))
+            .where(eq(tables.integrationWebhookSources.id, webhookSource.id))
             .returning({
-              id: integrationWebhookSources.id,
+              id: tables.integrationWebhookSources.id,
             });
 
           if (updatedSources.length !== 1) {

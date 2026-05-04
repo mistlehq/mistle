@@ -1,4 +1,4 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import {
   ConnectionTokenError,
   type ConnectionTokenConfig,
@@ -71,6 +71,7 @@ export class SandboxTunnelWebSocketAdmission {
    */
   public async admitRequest(input: {
     db: DataPlaneDatabase;
+    tables: DataPlaneTables;
     requestUrl: string;
     requestedInstanceId: string;
   }): Promise<SandboxTunnelAdmissionResult> {
@@ -131,6 +132,7 @@ export class SandboxTunnelWebSocketAdmission {
     try {
       const inserted = await recordSandboxTunnelTokenRedemption({
         db: input.db,
+        tables: input.tables,
         tokenJti: verifiedToken.tokenJti,
       });
 

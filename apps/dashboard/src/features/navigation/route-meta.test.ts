@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   resolveAppBreadcrumbsFromMatches,
   resolveAppHeaderLeadingModelFromMatches,
+  resolveAppPageBreadcrumbModelFromMatches,
   resolveAppPageMetaFromMatches,
 } from "./route-meta.js";
 
@@ -165,6 +166,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
       title: "Integrations",
@@ -189,6 +192,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "app-shell",
       appShellViewportMode: "document",
       title: "Integration connection",
@@ -212,6 +217,8 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: "child",
       appShellViewportMode: "workspace",
       title: "Create automation",
@@ -220,7 +227,72 @@ describe("route breadcrumb metadata", () => {
     });
   });
 
-  it("resolves breadcrumb header-leading content when no custom override is present", () => {
+  it("defaults app shell header visibility to hidden unless a route opts in", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            breadcrumb: "Integrations",
+            title: "Integrations",
+          },
+          params: {},
+          pathname: "/integrations",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
+    });
+  });
+
+  it("resolves app shell header visibility from the deepest route opt-in", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            appShellHeaderVisible: false,
+            title: "Sessions",
+          },
+          params: {},
+          pathname: "/sessions",
+        },
+        {
+          handle: {
+            appShellHeaderLeadingVisible: true,
+            appShellHeaderVisible: true,
+            title: "Session",
+          },
+          params: {
+            sandboxInstanceId: "sbi_123",
+          },
+          pathname: "/sessions/sbi_123",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: true,
+      appShellHeaderVisible: true,
+    });
+  });
+
+  it("allows routes to opt into the app shell header without leading content", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            appShellHeaderVisible: true,
+            title: "Edit profile",
+          },
+          params: {},
+          pathname: "/sandbox-profiles/sbp_123/sandbox-profile",
+        },
+      ]),
+    ).toMatchObject({
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: true,
+    });
+  });
+
+  it("does not use breadcrumbs as app shell header-leading content", () => {
     expect(
       resolveAppHeaderLeadingModelFromMatches([
         {
@@ -239,19 +311,112 @@ describe("route breadcrumb metadata", () => {
         },
       ]),
     ).toEqual({
+      kind: "none",
+    });
+  });
+
+  it("defaults page breadcrumb rendering to hidden unless a route opts in", () => {
+    expect(
+      resolveAppPageBreadcrumbModelFromMatches([
+        {
+          handle: {
+            breadcrumb: "Integrations",
+          },
+          params: {},
+          pathname: "/integrations",
+        },
+      ]),
+    ).toEqual({
+      kind: "none",
+    });
+  });
+
+  it("inherits page breadcrumb visibility from parent routes", () => {
+    expect(
+      resolveAppPageBreadcrumbModelFromMatches([
+        {
+          handle: {
+            breadcrumb: "Integrations",
+          },
+          params: {},
+          pathname: "/integrations",
+        },
+        {
+          handle: {
+            breadcrumb: "GitHub",
+            pageBreadcrumbVisible: true,
+          },
+          params: {
+            targetKey: "github",
+          },
+          pathname: "/integrations/github",
+        },
+        {
+          handle: {
+            breadcrumb: "Add",
+          },
+          params: {
+            targetKey: "github",
+          },
+          pathname: "/integrations/github/add",
+        },
+      ]),
+    ).toEqual({
       kind: "breadcrumbs",
       breadcrumbs: [
         {
           isCurrent: false,
-          label: "Settings",
-          to: "/settings",
+          label: "Integrations",
+          to: "/integrations",
+        },
+        {
+          isCurrent: false,
+          label: "GitHub",
+          to: "/integrations/github",
         },
         {
           isCurrent: true,
-          label: "Members",
+          label: "Add",
           to: null,
         },
       ],
+    });
+  });
+
+  it("uses custom page breadcrumbs when the deepest matching route provides them", () => {
+    expect(
+      resolveAppPageBreadcrumbModelFromMatches([
+        {
+          handle: {
+            breadcrumb: "Sandbox Profiles",
+          },
+          params: {},
+          pathname: "/sandbox-profiles",
+        },
+        {
+          handle: {
+            breadcrumb: "Profile",
+            pageBreadcrumbVisible: true,
+          },
+          params: {
+            profileId: "sbp_123",
+          },
+          pathname: "/sandbox-profiles/sbp_123",
+        },
+        {
+          handle: {
+            breadcrumb: "Published",
+            pageBreadcrumb: () => "Profile breadcrumb",
+          },
+          params: {
+            profileId: "sbp_123",
+          },
+          pathname: "/sandbox-profiles/sbp_123/sandbox-profile/published",
+        },
+      ]),
+    ).toEqual({
+      kind: "custom",
+      content: "Profile breadcrumb",
     });
   });
 

@@ -1,7 +1,7 @@
 import {
-  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -26,6 +26,8 @@ export async function putOrganizationIdentityLinkProviderStatus(
       | typeof OrganizationIdentityLinkProviderConfigStatus.DISABLED;
   },
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const providers = await listIdentityLinkProviderMetadata(ctx);
   const provider = providers.find((entry) => entry.providerFamily === input.providerFamily);
 
@@ -70,7 +72,7 @@ export async function putOrganizationIdentityLinkProviderStatus(
   }
 
   await ctx.db
-    .update(organizationIdentityLinkProviderConfigs)
+    .update(tables.organizationIdentityLinkProviderConfigs)
     .set({
       status: input.status,
       updatedByUserId: input.actorUserId,
@@ -78,8 +80,8 @@ export async function putOrganizationIdentityLinkProviderStatus(
     })
     .where(
       and(
-        eq(organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
-        eq(organizationIdentityLinkProviderConfigs.providerFamily, input.providerFamily),
+        eq(tables.organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
+        eq(tables.organizationIdentityLinkProviderConfigs.providerFamily, input.providerFamily),
       ),
     );
 

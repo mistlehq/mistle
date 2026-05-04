@@ -16,6 +16,12 @@ import { resolveSlackBindingConfigForm } from "./binding-config-form.js";
 import { SlackBindingConfigSchema } from "./binding-config-schema.js";
 import { compileSlackBinding } from "./compile-binding.js";
 import { SlackConnectionConfigForm } from "./connection-config-form.js";
+import {
+  SlackProviderAppSetup,
+  SlackProviderAppSetupPane,
+  SlackProviderAppSetupRouteSegment,
+  SlackProviderAppSetupStartForm,
+} from "./provider-app-setup-metadata.js";
 import { SlackSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { SlackTargetConfigSchema } from "./target-config-schema.js";
 import { SlackTargetSecretSchema } from "./target-secret-schema.js";
@@ -64,7 +70,10 @@ export const SlackBaseDefinition: SlackBaseIntegrationDefinition = {
             },
           ],
         },
-        routeSegment: "slack-app",
+        providerAppSetup: SlackProviderAppSetup,
+        routeSegment: SlackProviderAppSetupRouteSegment,
+        setupPane: SlackProviderAppSetupPane,
+        startForm: SlackProviderAppSetupStartForm,
       },
       secretFields: [
         {

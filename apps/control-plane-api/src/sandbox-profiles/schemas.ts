@@ -305,6 +305,18 @@ export const startSandboxProfileInstanceBodySchema = z
   })
   .strict();
 
+export const startSandboxProfileSetupScriptTestRunBodySchema = z
+  .object({
+    setupScript: z
+      .string()
+      .min(1)
+      .refine((value) => value.trim().length > 0, {
+        message: "Setup script must not be blank.",
+      }),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
 export const sandboxProfileDeletionAcceptedResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -319,6 +331,9 @@ export const startSandboxProfileInstanceResponseSchema = z
     sandboxInstanceId: z.string().min(1),
   })
   .strict();
+
+export const startSandboxProfileSetupScriptTestRunResponseSchema =
+  startSandboxProfileInstanceResponseSchema;
 
 export const listSandboxProfilesQuerySchema = createKeysetPaginationQuerySchema({
   defaultLimit: 20,

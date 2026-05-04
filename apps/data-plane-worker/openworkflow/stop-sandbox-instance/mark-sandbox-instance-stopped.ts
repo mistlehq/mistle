@@ -1,8 +1,8 @@
 import {
   type SandboxStopReason,
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -12,15 +12,17 @@ type MarkSandboxInstanceStoppedOutcome = "already_stopped" | "fence_mismatch" | 
 
 export async function markSandboxInstanceStopped(ctx: {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceDeadlines" | "sandboxInstances">;
   sandboxInstanceId: string;
   stopReason: SandboxStopReason;
   stillPermitted?: () => Promise<boolean>;
 }): Promise<MarkSandboxInstanceStoppedOutcome> {
+  const { sandboxInstances } = ctx.tables;
   const outcome = await ctx.db.transaction(async (tx) => {
     const lockedRows = await tx.execute(
       sql<{ status: string }>`
         select status
-        from "data_plane"."sandbox_instances"
+        from ${sandboxInstances}
         where id = ${ctx.sandboxInstanceId}
         for update
       `,
@@ -34,6 +36,7 @@ export async function markSandboxInstanceStopped(ctx: {
     if (lockedRow.status === SandboxInstanceStatuses.STOPPED) {
       await clearSandboxInstanceDeadlines({
         db: tx,
+        tables: ctx.tables,
         sandboxInstanceId: ctx.sandboxInstanceId,
       });
       return "already_stopped";
@@ -71,6 +74,7 @@ export async function markSandboxInstanceStopped(ctx: {
 
     await clearSandboxInstanceDeadlines({
       db: tx,
+      tables: ctx.tables,
       sandboxInstanceId: ctx.sandboxInstanceId,
     });
 

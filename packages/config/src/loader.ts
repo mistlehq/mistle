@@ -441,7 +441,7 @@ const ControlPlaneApiEnvDescriptors = [
   },
   { envVar: "MISTLE_SERVICES_DASHBOARD_PUBLIC_URL", path: ["dashboard", "baseUrl"] },
   {
-    envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL",
+    envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL",
     path: ["workflow", "databaseUrl"],
   },
   {
@@ -514,7 +514,8 @@ const ControlPlaneApiEnvDescriptors = [
 ] satisfies readonly EnvDescriptor[];
 
 const ControlPlaneWorkerEnvDescriptors = [
-  { envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL", path: ["workflow", "databaseUrl"] },
+  { envVar: "MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL", path: ["database", "url"] },
+  { envVar: "MISTLE_POSTGRES_CONTROL_PLANE_DIRECT_URL", path: ["workflow", "databaseUrl"] },
   {
     envVar: "MISTLE_WORKFLOW_CONTROL_PLANE_NAMESPACE_ID",
     path: ["workflow", "namespaceId"],
@@ -553,7 +554,7 @@ const DataPlaneApiEnvDescriptors = [
   },
   { envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL", path: ["database", "url"] },
   { envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL", path: ["database", "migrationUrl"] },
-  { envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL", path: ["workflow", "databaseUrl"] },
+  { envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL", path: ["workflow", "databaseUrl"] },
   {
     envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL",
     path: ["workflow", "migrationUrl"],
@@ -596,7 +597,7 @@ const DataPlaneGatewayEnvDescriptors = [
 
 const DataPlaneWorkerEnvDescriptors = [
   { envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL", path: ["database", "url"] },
-  { envVar: "MISTLE_POSTGRES_DATA_PLANE_POOLED_URL", path: ["workflow", "databaseUrl"] },
+  { envVar: "MISTLE_POSTGRES_DATA_PLANE_DIRECT_URL", path: ["workflow", "databaseUrl"] },
   { envVar: "MISTLE_WORKFLOW_DATA_PLANE_NAMESPACE_ID", path: ["workflow", "namespaceId"] },
   {
     envVar: "MISTLE_SERVICES_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",

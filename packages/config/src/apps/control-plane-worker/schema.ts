@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const ControlPlaneWorkerDatabaseConfigSchema = z
+  .object({
+    url: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneWorkerWorkflowConfigSchema = z
   .object({
     databaseUrl: z.string().min(1),
@@ -47,6 +53,7 @@ export const ControlPlaneWorkerSandboxConfigSchema = z
 
 export const ControlPlaneWorkerConfigSchema = z
   .object({
+    database: ControlPlaneWorkerDatabaseConfigSchema,
     workflow: ControlPlaneWorkerWorkflowConfigSchema,
     email: ControlPlaneWorkerEmailConfigSchema,
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema,
@@ -58,6 +65,7 @@ export const ControlPlaneWorkerConfigSchema = z
 
 export const PartialControlPlaneWorkerConfigSchema = z
   .object({
+    database: ControlPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: ControlPlaneWorkerWorkflowConfigSchema.partial().optional(),
     email: ControlPlaneWorkerEmailConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),

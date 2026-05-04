@@ -1,8 +1,8 @@
 import {
-  automationConversationDeliveryProcessors,
   AutomationConversationDeliveryProcessorStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -17,8 +17,10 @@ export async function setAutomationConversationDeliveryProcessorIdle(
   },
   input: SetAutomationConversationDeliveryProcessorIdleInput,
 ): Promise<boolean> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const updatedRows = await ctx.db
-    .update(automationConversationDeliveryProcessors)
+    .update(tables.automationConversationDeliveryProcessors)
     .set({
       status: AutomationConversationDeliveryProcessorStatuses.IDLE,
       activeWorkflowRunId: null,
@@ -26,16 +28,16 @@ export async function setAutomationConversationDeliveryProcessorIdle(
     })
     .where(
       and(
-        eq(automationConversationDeliveryProcessors.conversationId, input.conversationId),
-        eq(automationConversationDeliveryProcessors.generation, input.generation),
+        eq(tables.automationConversationDeliveryProcessors.conversationId, input.conversationId),
+        eq(tables.automationConversationDeliveryProcessors.generation, input.generation),
         eq(
-          automationConversationDeliveryProcessors.status,
+          tables.automationConversationDeliveryProcessors.status,
           AutomationConversationDeliveryProcessorStatuses.RUNNING,
         ),
       ),
     )
     .returning({
-      conversationId: automationConversationDeliveryProcessors.conversationId,
+      conversationId: tables.automationConversationDeliveryProcessors.conversationId,
     });
 
   return updatedRows[0] !== undefined;

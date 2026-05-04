@@ -7,6 +7,7 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const db = ctx.get("resources").db;
+  const tables = ctx.get("resources").tables;
   const openWorkflow = ctx.get("resources").openWorkflow;
   const workflowDbPool = ctx.get("resources").workflowDbPool;
   const controlPlaneInternalClient = ctx.get("controlPlaneInternalClient");
@@ -18,6 +19,7 @@ const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx)
   const response = await startSandboxInstance(
     {
       db,
+      tables,
       openWorkflow,
       workflowDbPool,
       controlPlaneInternalClient,

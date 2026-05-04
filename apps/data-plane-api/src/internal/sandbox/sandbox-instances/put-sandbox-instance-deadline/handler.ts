@@ -12,6 +12,7 @@ export const handler: RouteHandler<typeof route, AppContextBindings> = async (ct
   const response = await putSandboxInstanceDeadline(
     {
       db: resources.db,
+      tables: resources.tables,
       openWorkflow: resources.openWorkflow,
     },
     {

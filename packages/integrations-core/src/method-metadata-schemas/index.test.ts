@@ -57,6 +57,81 @@ describe("integration method metadata schemas", () => {
     expect(
       IntegrationFormConnectionMethodSetupFlowMetadataSchema.parse({
         routeSegment: "provider-app",
+        setupPane: {
+          kind: "provider-app",
+        },
+        providerAppSetup: {
+          title: "Choose a setup method",
+          description: "Create or connect a provider app.",
+          manifest: {
+            title: "Provider app manifest",
+            description: "Create a provider app from a manifest.",
+            createErrorMessage: "Could not create provider app manifest.",
+            startAction: {
+              expectedResultKind: "redirect",
+              manifestBodyField: "manifest",
+              unexpectedResultMessage: "Provider app manifest setup did not return a redirect URL.",
+            },
+          },
+          existingApp: {
+            title: "Existing Provider App",
+            description: "Paste values from an existing provider app.",
+            connectLabel: "Connect provider app",
+            installedDetection: {
+              configFields: ["clientId"],
+              secretFields: ["apiSecret"],
+            },
+            saveErrorMessage: "Could not save provider app setup.",
+            configFields: [
+              {
+                configKey: "client_id",
+                name: "clientId",
+                label: "Client ID",
+                required: false,
+              },
+            ],
+            secretFields: [
+              {
+                inputType: "password",
+                name: "apiSecret",
+                label: "API secret",
+                placeholder: "secret-...",
+                required: true,
+                secretLabel: "API secret",
+              },
+            ],
+          },
+          urls: {
+            title: "Provider app URLs",
+            description: "Copy these URLs into the provider app.",
+            webhookCallback: {
+              label: "Webhook URL",
+              errorTitle: "Could not load webhook URL",
+              missingTitle: "Webhook URL is not available yet",
+              missingMessage: "Setup requires a webhook URL.",
+            },
+          },
+        },
+        startForm: {
+          submitLabel: "Create app",
+          fields: [
+            {
+              name: "appConfigToken",
+              label: "App configuration token",
+              inputType: "password",
+              required: true,
+              placeholder: "xoxe.xoxp-...",
+              description: "Generate a provider app configuration token.",
+              actions: [
+                {
+                  label: "Generate token",
+                  href: "https://api.slack.com/apps",
+                  opensInNewWindow: true,
+                },
+              ],
+            },
+          ],
+        },
         completionRequirements: {
           kind: "all-of",
           allOf: [
@@ -72,6 +147,81 @@ describe("integration method metadata schemas", () => {
       }),
     ).toEqual({
       routeSegment: "provider-app",
+      setupPane: {
+        kind: "provider-app",
+      },
+      providerAppSetup: {
+        title: "Choose a setup method",
+        description: "Create or connect a provider app.",
+        manifest: {
+          title: "Provider app manifest",
+          description: "Create a provider app from a manifest.",
+          createErrorMessage: "Could not create provider app manifest.",
+          startAction: {
+            expectedResultKind: "redirect",
+            manifestBodyField: "manifest",
+            unexpectedResultMessage: "Provider app manifest setup did not return a redirect URL.",
+          },
+        },
+        existingApp: {
+          title: "Existing Provider App",
+          description: "Paste values from an existing provider app.",
+          connectLabel: "Connect provider app",
+          installedDetection: {
+            configFields: ["clientId"],
+            secretFields: ["apiSecret"],
+          },
+          saveErrorMessage: "Could not save provider app setup.",
+          configFields: [
+            {
+              configKey: "client_id",
+              name: "clientId",
+              label: "Client ID",
+              required: false,
+            },
+          ],
+          secretFields: [
+            {
+              inputType: "password",
+              name: "apiSecret",
+              label: "API secret",
+              placeholder: "secret-...",
+              required: true,
+              secretLabel: "API secret",
+            },
+          ],
+        },
+        urls: {
+          title: "Provider app URLs",
+          description: "Copy these URLs into the provider app.",
+          webhookCallback: {
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage: "Setup requires a webhook URL.",
+          },
+        },
+      },
+      startForm: {
+        submitLabel: "Create app",
+        fields: [
+          {
+            name: "appConfigToken",
+            label: "App configuration token",
+            inputType: "password",
+            required: true,
+            placeholder: "xoxe.xoxp-...",
+            description: "Generate a provider app configuration token.",
+            actions: [
+              {
+                label: "Generate token",
+                href: "https://api.slack.com/apps",
+                opensInNewWindow: true,
+              },
+            ],
+          },
+        ],
+      },
       completionRequirements: {
         kind: "all-of",
         allOf: [
@@ -85,5 +235,75 @@ describe("integration method metadata schemas", () => {
         ],
       },
     });
+  });
+
+  it("rejects provider app setup installed detection fields that are not declared", () => {
+    const result = IntegrationFormConnectionMethodSetupFlowMetadataSchema.safeParse({
+      routeSegment: "provider-app",
+      setupPane: {
+        kind: "provider-app",
+      },
+      providerAppSetup: {
+        title: "Choose a setup method",
+        description: "Create or connect a provider app.",
+        manifest: {
+          title: "Provider app manifest",
+          description: "Create a provider app from a manifest.",
+          createErrorMessage: "Could not create provider app manifest.",
+          startAction: {
+            expectedResultKind: "redirect",
+            manifestBodyField: "manifest",
+            unexpectedResultMessage: "Provider app manifest setup did not return a redirect URL.",
+          },
+        },
+        existingApp: {
+          title: "Existing Provider App",
+          description: "Paste values from an existing provider app.",
+          connectLabel: "Connect provider app",
+          installedDetection: {
+            configFields: ["missingClientId"],
+            secretFields: ["missingSecret"],
+          },
+          saveErrorMessage: "Could not save provider app setup.",
+          configFields: [
+            {
+              configKey: "client_id",
+              name: "clientId",
+              label: "Client ID",
+              required: false,
+            },
+          ],
+          secretFields: [
+            {
+              inputType: "password",
+              name: "apiSecret",
+              label: "API secret",
+              required: true,
+              secretLabel: "API secret",
+            },
+          ],
+        },
+        urls: {
+          title: "Provider app URLs",
+          description: "Copy these URLs into the provider app.",
+          webhookCallback: {
+            label: "Webhook URL",
+            errorTitle: "Could not load webhook URL",
+            missingTitle: "Webhook URL is not available yet",
+            missingMessage: "Setup requires a webhook URL.",
+          },
+        },
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected invalid provider app setup metadata.");
+    }
+
+    expect(result.error.issues.map((issue) => issue.message)).toEqual([
+      "Installed detection config field 'missingClientId' is not declared in existing app config fields.",
+      "Installed detection secret field 'missingSecret' is not declared in existing app secret fields.",
+    ]);
   });
 });

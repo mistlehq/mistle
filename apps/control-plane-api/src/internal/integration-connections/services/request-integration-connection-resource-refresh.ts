@@ -1,8 +1,8 @@
 import {
-  integrationConnectionResourceStates,
   type ControlPlaneDatabase,
   type IntegrationConnectionResourceSyncState,
   IntegrationConnectionResourceSyncStates,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -174,8 +174,10 @@ async function acquireResourceSyncAttempt(input: {
   familyId: string;
   kind: string;
 }): Promise<AcquireResourceSyncAttemptResult> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const updatedStates = await input.db
-    .insert(integrationConnectionResourceStates)
+    .insert(tables.integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
       familyId: input.familyId,
@@ -188,8 +190,8 @@ async function acquireResourceSyncAttempt(input: {
     })
     .onConflictDoUpdate({
       target: [
-        integrationConnectionResourceStates.connectionId,
-        integrationConnectionResourceStates.kind,
+        tables.integrationConnectionResourceStates.connectionId,
+        tables.integrationConnectionResourceStates.kind,
       ],
       set: {
         familyId: input.familyId,
@@ -199,10 +201,10 @@ async function acquireResourceSyncAttempt(input: {
         lastErrorMessage: null,
         updatedAt: sql`now()`,
       },
-      setWhere: sql`${integrationConnectionResourceStates.syncState} <> ${IntegrationConnectionResourceSyncStates.SYNCING}`,
+      setWhere: sql`${tables.integrationConnectionResourceStates.syncState} <> ${IntegrationConnectionResourceSyncStates.SYNCING}`,
     })
     .returning({
-      lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
+      lastSyncStartedAt: tables.integrationConnectionResourceStates.lastSyncStartedAt,
     });
 
   const updatedState = updatedStates[0];
@@ -228,20 +230,22 @@ async function restoreResourceStateAfterEnqueueFailure(input: {
   kind: string;
   previousState: PersistedResourceStateSnapshot | undefined;
 }): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.previousState === undefined) {
     await input.db
-      .delete(integrationConnectionResourceStates)
+      .delete(tables.integrationConnectionResourceStates)
       .where(
         and(
-          eq(integrationConnectionResourceStates.connectionId, input.connectionId),
-          eq(integrationConnectionResourceStates.kind, input.kind),
+          eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
+          eq(tables.integrationConnectionResourceStates.kind, input.kind),
         ),
       );
     return;
   }
 
   await input.db
-    .update(integrationConnectionResourceStates)
+    .update(tables.integrationConnectionResourceStates)
     .set({
       familyId: input.previousState.familyId,
       syncState: input.previousState.syncState,
@@ -252,8 +256,8 @@ async function restoreResourceStateAfterEnqueueFailure(input: {
     })
     .where(
       and(
-        eq(integrationConnectionResourceStates.connectionId, input.connectionId),
-        eq(integrationConnectionResourceStates.kind, input.kind),
+        eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
+        eq(tables.integrationConnectionResourceStates.kind, input.kind),
       ),
     );
 }

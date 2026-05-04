@@ -151,7 +151,20 @@ export async function supportsIdentityLinkingConnection(input: {
     definition: input.definition,
     connection: input.connection,
   });
-  const parsedConnectionConfig = connectionMethod.configSchema?.parse(input.connection.config);
+  let parsedConnectionConfig: unknown;
+  try {
+    parsedConnectionConfig = connectionMethod.configSchema?.parse(input.connection.config);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new BadRequestError(
+        IdentityLinkingBadRequestCodes.INVALID_PROVIDER_CONFIG_INPUT,
+        `Integration connection '${input.connection.id}' has invalid connection config for identity linking.`,
+      );
+    }
+
+    throw error;
+  }
+
   const connectionConfig = toUnknownRecord(parsedConnectionConfig ?? input.connection.config);
 
   if (connectionConfig === null) {

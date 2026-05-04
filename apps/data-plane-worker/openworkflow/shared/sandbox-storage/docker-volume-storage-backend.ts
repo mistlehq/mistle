@@ -1,10 +1,10 @@
 import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   SandboxInstancePersistenceModes,
-  sandboxInstances,
   SandboxStorageProviders,
   SandboxStorageStatuses,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstanceStorage,
 } from "@mistle/db/data-plane";
 import {
@@ -124,6 +124,7 @@ async function tryDeleteDockerVolume(input: {
 
 type DockerVolumeSandboxStorageBackendAdapterContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
   runtimeProvider: "docker";
@@ -131,10 +132,12 @@ type DockerVolumeSandboxStorageBackendAdapterContext = {
 
 class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBackendAdapter {
   readonly #db: DataPlaneDatabase;
+  readonly #tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
   readonly #workerConfig: DataPlaneWorkerConfig;
 
   constructor(input: DockerVolumeSandboxStorageBackendAdapterContext) {
     this.#db = input.db;
+    this.#tables = input.tables;
     this.#workerConfig = input.workerConfig;
   }
 
@@ -143,6 +146,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
     sandboxInstanceId: string;
   }): Promise<SandboxStorageBackendRecord> {
     const compensationActions: CompensationAction[] = [];
+    const { sandboxInstances } = this.#tables;
     void input.organizationId;
 
     try {
@@ -241,6 +245,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
             insertSandboxInstanceStorage(
               {
                 db: tx,
+                tables: this.#tables,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -262,6 +267,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
             run: async () => {
               await tryDeleteSandboxInstanceStorageById({
                 db: this.#db,
+                tables: this.#tables,
                 sandboxInstanceStorageId: insertedStorage.id,
               });
             },
@@ -387,6 +393,7 @@ class DockerVolumeSandboxStorageBackendAdapterImpl implements SandboxStorageBack
       await deleteSandboxInstanceStorageBySandboxInstanceId(
         {
           db: this.#db,
+          tables: this.#tables,
         },
         {
           sandboxInstanceId: input.sandboxInstanceId,

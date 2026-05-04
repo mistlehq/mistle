@@ -51,11 +51,25 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
     sandboxStorageBackend,
   } = input;
 
+  app.get("/__healthz", (ctx) => {
+    return ctx.json({ ok: true });
+  });
+
   app.use("*", async (ctx, next) => {
-    ctx.set("config", config);
+    const testEnvironmentId = readTestEnvironmentId({
+      config,
+      readHeader: (name) => ctx.req.header(name),
+    });
+    const requestContext = await createRequestContext({
+      config,
+      resources,
+      testEnvironmentId,
+    });
+
+    ctx.set("config", requestContext.config);
     ctx.set("internalAuthServiceToken", internalAuthServiceToken);
-    ctx.set("resources", resources);
-    ctx.set("controlPlaneInternalClient", resources.controlPlaneInternalClient);
+    ctx.set("resources", requestContext.resources);
+    ctx.set("controlPlaneInternalClient", requestContext.resources.controlPlaneInternalClient);
     ctx.set("sandboxProvider", sandboxProvider);
     ctx.set("sandboxStorageBackend", sandboxStorageBackend);
     await next();
@@ -67,10 +81,6 @@ export function configureApp(input: CreateAppInput & { app: DataPlaneApp }): voi
   });
 
   registerApiRouteModules(app);
-
-  app.get("/__healthz", (ctx) => {
-    return ctx.json({ ok: true });
-  });
 }
 
 export function registerApiRouteModules(app: DataPlaneApp): void {
@@ -81,4 +91,71 @@ export function registerInternalApiRouteModules(app: DataPlaneApp): void {
   const internalSandboxRoutes = createInternalSandboxRoutes();
 
   app.route(internalSandboxRoutes.basePath, internalSandboxRoutes.routes);
+}
+
+async function createRequestContext(input: {
+  config: DataPlaneApiConfig;
+  resources: AppRuntimeResources;
+  testEnvironmentId: string | undefined;
+}): Promise<{
+  config: DataPlaneApiConfig;
+  resources: AppRuntimeResources;
+}> {
+  if (input.testEnvironmentId === undefined) {
+    return {
+      config: input.config,
+      resources: input.resources,
+    };
+  }
+
+  const workflowNamespaceId = input.resources.getWorkflowNamespaceId({
+    testEnvironmentId: input.testEnvironmentId,
+  });
+
+  return {
+    config: {
+      ...input.config,
+      workflow: {
+        ...input.config.workflow,
+        namespaceId: workflowNamespaceId,
+      },
+    },
+    resources: {
+      ...input.resources,
+      db: input.resources.getDb({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+      tables: input.resources.getTables({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+      openWorkflow: await input.resources.getOpenWorkflow({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+      runtimeStateReader: input.resources.getRuntimeStateReader({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+      controlPlaneInternalClient: input.resources.getControlPlaneInternalClient({
+        testEnvironmentId: input.testEnvironmentId,
+      }),
+    },
+  };
+}
+
+function readTestEnvironmentId(input: {
+  config: DataPlaneApiConfig;
+  readHeader: (name: string) => string | undefined;
+}): string | undefined {
+  const testIsolation = input.config.__dangerouslyEnableTestIsolation;
+  if (testIsolation === undefined) {
+    return undefined;
+  }
+
+  const testEnvironmentId = input.readHeader(testIsolation.testEnvironmentIdHeader);
+  if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
+    throw new Error(
+      `Expected '${testIsolation.testEnvironmentIdHeader}' header for isolated data-plane API request.`,
+    );
+  }
+
+  return testEnvironmentId;
 }

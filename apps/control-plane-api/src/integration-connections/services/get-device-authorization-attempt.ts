@@ -1,8 +1,8 @@
 import {
-  integrationConnectionDeviceAuthorizationAttempts,
   IntegrationDeviceAuthorizationAttemptStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
@@ -137,13 +137,18 @@ async function lockAttemptForUpdateOrThrow(input: {
   organizationId: string;
   attemptId: string;
 }) {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   const [lockedAttempt] = await input.db
     .select()
-    .from(integrationConnectionDeviceAuthorizationAttempts)
+    .from(tables.integrationConnectionDeviceAuthorizationAttempts)
     .where(
       and(
-        eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
-        eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+        eq(
+          tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+          input.organizationId,
+        ),
+        eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
       ),
     )
     .limit(1)
@@ -174,6 +179,8 @@ export async function getDeviceAuthorizationAttempt(
     attemptId: string;
   },
 ): Promise<DeviceAuthorizationAttemptResponse> {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const attempt = await ctx.db.query.integrationConnectionDeviceAuthorizationAttempts.findFirst({
     where: (table, { and, eq }) =>
       and(
@@ -224,7 +231,7 @@ export async function getDeviceAuthorizationAttempt(
     const errorMessage = "The device authorization attempt expired before approval completed.";
 
     const [updatedAttempt] = await ctx.db
-      .update(integrationConnectionDeviceAuthorizationAttempts)
+      .update(tables.integrationConnectionDeviceAuthorizationAttempts)
       .set({
         status: IntegrationDeviceAuthorizationAttemptStatuses.FAILED,
         errorCode: IntegrationDeviceAuthorizationAttemptErrorCodes.DEVICE_AUTH_EXPIRED,
@@ -233,12 +240,15 @@ export async function getDeviceAuthorizationAttempt(
       })
       .where(
         and(
-          eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
-          eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+            input.organizationId,
+          ),
+          eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
         ),
       )
       .returning({
-        id: integrationConnectionDeviceAuthorizationAttempts.id,
+        id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
       });
 
     if (updatedAttempt === undefined) {
@@ -294,6 +304,8 @@ export async function getDeviceAuthorizationAttempt(
 
   if (pollResult.status === "pending") {
     return ctx.db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const lockedAttempt = await lockAttemptForUpdateOrThrow({
         db: tx,
         organizationId: input.organizationId,
@@ -339,7 +351,7 @@ export async function getDeviceAuthorizationAttempt(
       });
 
       const [updatedAttempt] = await tx
-        .update(integrationConnectionDeviceAuthorizationAttempts)
+        .update(tables.integrationConnectionDeviceAuthorizationAttempts)
         .set({
           providerStateEncrypted,
           expiresAt,
@@ -349,14 +361,14 @@ export async function getDeviceAuthorizationAttempt(
         .where(
           and(
             eq(
-              integrationConnectionDeviceAuthorizationAttempts.organizationId,
+              tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
               input.organizationId,
             ),
-            eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+            eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
           ),
         )
         .returning({
-          id: integrationConnectionDeviceAuthorizationAttempts.id,
+          id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
         });
 
       if (updatedAttempt === undefined) {
@@ -378,6 +390,8 @@ export async function getDeviceAuthorizationAttempt(
 
   if (pollResult.status === "failed") {
     return ctx.db.transaction(async (tx) => {
+      const tables = getControlPlaneDatabaseSchema(tx);
+
       const lockedAttempt = await lockAttemptForUpdateOrThrow({
         db: tx,
         organizationId: input.organizationId,
@@ -414,7 +428,7 @@ export async function getDeviceAuthorizationAttempt(
       }
 
       const [updatedAttempt] = await tx
-        .update(integrationConnectionDeviceAuthorizationAttempts)
+        .update(tables.integrationConnectionDeviceAuthorizationAttempts)
         .set({
           status: IntegrationDeviceAuthorizationAttemptStatuses.FAILED,
           errorCode: pollResult.code,
@@ -424,14 +438,14 @@ export async function getDeviceAuthorizationAttempt(
         .where(
           and(
             eq(
-              integrationConnectionDeviceAuthorizationAttempts.organizationId,
+              tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
               input.organizationId,
             ),
-            eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+            eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
           ),
         )
         .returning({
-          id: integrationConnectionDeviceAuthorizationAttempts.id,
+          id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
         });
 
       if (updatedAttempt === undefined) {
@@ -452,6 +466,8 @@ export async function getDeviceAuthorizationAttempt(
   }
 
   return ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const lockedAttempt = await lockAttemptForUpdateOrThrow({
       db: tx,
       organizationId: input.organizationId,
@@ -520,7 +536,7 @@ export async function getDeviceAuthorizationAttempt(
     );
 
     const [updatedAttempt] = await tx
-      .update(integrationConnectionDeviceAuthorizationAttempts)
+      .update(tables.integrationConnectionDeviceAuthorizationAttempts)
       .set({
         status: IntegrationDeviceAuthorizationAttemptStatuses.COMPLETED,
         connectionId: createdConnection.id,
@@ -529,12 +545,15 @@ export async function getDeviceAuthorizationAttempt(
       })
       .where(
         and(
-          eq(integrationConnectionDeviceAuthorizationAttempts.organizationId, input.organizationId),
-          eq(integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
+          eq(
+            tables.integrationConnectionDeviceAuthorizationAttempts.organizationId,
+            input.organizationId,
+          ),
+          eq(tables.integrationConnectionDeviceAuthorizationAttempts.id, input.attemptId),
         ),
       )
       .returning({
-        id: integrationConnectionDeviceAuthorizationAttempts.id,
+        id: tables.integrationConnectionDeviceAuthorizationAttempts.id,
       });
 
     if (updatedAttempt === undefined) {

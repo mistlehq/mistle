@@ -2,6 +2,7 @@ import { type ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   SandboxInstancePersistenceModes,
   type DataPlaneDatabase,
+  type DataPlaneTables,
   type SandboxInstancePersistenceMode,
 } from "@mistle/db/data-plane";
 import {
@@ -31,6 +32,7 @@ function toSandboxImageHandle(input: {
 export async function prepareSandboxStorageForStart(
   ctx: {
     db: DataPlaneDatabase;
+    tables: Pick<DataPlaneTables, "sandboxInstanceStorages" | "sandboxInstances">;
     controlPlaneInternalClient: ControlPlaneInternalClient;
     workerConfig: DataPlaneWorkerConfig;
     configuredSandboxProvider: SandboxProvider;
@@ -67,6 +69,7 @@ export async function prepareSandboxStorageForStart(
 
   const storageBackendAdapter = createSandboxStorageBackendAdapter({
     db: ctx.db,
+    tables: ctx.tables,
     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
     workerConfig: ctx.workerConfig,
     runtimeProvider: input.runtimeProvider,

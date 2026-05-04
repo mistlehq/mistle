@@ -75,8 +75,19 @@ git push origin "v$(cat VERSION)"
 
 4. The tag-based release workflow publishes the release automatically.
 
+The release workflow publishes:
+
+- service images as `ghcr.io/mistlehq/<service>:v$(cat VERSION)`
+- the sandbox base image as `ghcr.io/mistlehq/sandbox-base:v$(cat VERSION)`
+- single-container images as `ghcr.io/mistlehq/mistle:docker-v$(cat VERSION)` and `ghcr.io/mistlehq/mistle:remote-v$(cat VERSION)`
+- a GitHub release with `dist/release-manifest.json` attached
+
+The `docker` single-container image includes the local Docker sandbox runtime. The `remote` single-container image is for deployments that use a remote sandbox provider and does not bundle the local Docker runtime.
+
 ## Notes
 
 - `latest` container tags are reserved for stable releases only.
+- Stable releases also publish `latest`, `docker-latest`, and `remote-latest` aliases.
+- Image jobs first publish commit-scoped tags, then a promotion job applies release and latest aliases by digest after all images build successfully. If a release workflow fails before promotion, rerun it; the remaining SHA tags are safe to leave in GHCR.
 - The first release note is intentionally short instead of trying to summarize the full pre-release history.
 - Stable releases get a generated GitHub release body. Alpha releases are published without a release body.

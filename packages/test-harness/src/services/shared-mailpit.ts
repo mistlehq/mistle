@@ -22,6 +22,8 @@ export async function acquireSharedMailpitInfra(
     key: input.key,
     postgres: undefined,
     mailpit: true,
+    seaweedfs: false,
+    valkey: false,
   });
 
   const mailpit = coordinatorLease.infra.mailpit;

@@ -1,9 +1,7 @@
 import {
-  members,
-  userExternalPrincipals,
   UserExternalPrincipalStatuses,
-  users,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, asc, eq, sql } from "drizzle-orm";
 
@@ -25,10 +23,10 @@ export type OrganizationIdentityLinkProviderLink = {
   updatedAt: string | null;
 };
 
-function buildDirectoryMemberSortName() {
+function buildDirectoryMemberSortName(tables: ReturnType<typeof getControlPlaneDatabaseSchema>) {
   return sql<string>`case
-    when trim(${users.name}) = '' or trim(${users.name}) = ${users.email} then ${users.email}
-    else trim(${users.name})
+    when trim(${tables.users.name}) = '' or trim(${tables.users.name}) = ${tables.users.email} then ${tables.users.email}
+    else trim(${tables.users.name})
   end`;
 }
 
@@ -54,29 +52,31 @@ export async function listOrganizationIdentityLinkProviderLinks(
     providerFamily: string;
   },
 ): Promise<OrganizationIdentityLinkProviderLink[]> {
-  const directoryMemberSortName = buildDirectoryMemberSortName();
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
+  const directoryMemberSortName = buildDirectoryMemberSortName(tables);
   const rows = await ctx.db
     .select({
-      userId: users.id,
-      name: users.name,
-      email: users.email,
-      providerSubjectId: userExternalPrincipals.providerSubjectId,
-      profile: userExternalPrincipals.profile,
-      principalUpdatedAt: userExternalPrincipals.updatedAt,
+      userId: tables.users.id,
+      name: tables.users.name,
+      email: tables.users.email,
+      providerSubjectId: tables.userExternalPrincipals.providerSubjectId,
+      profile: tables.userExternalPrincipals.profile,
+      principalUpdatedAt: tables.userExternalPrincipals.updatedAt,
     })
-    .from(members)
-    .innerJoin(users, eq(users.id, members.userId))
+    .from(tables.members)
+    .innerJoin(tables.users, eq(tables.users.id, tables.members.userId))
     .leftJoin(
-      userExternalPrincipals,
+      tables.userExternalPrincipals,
       and(
-        eq(userExternalPrincipals.organizationId, members.organizationId),
-        eq(userExternalPrincipals.userId, members.userId),
-        eq(userExternalPrincipals.providerFamily, input.providerFamily),
-        eq(userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
+        eq(tables.userExternalPrincipals.organizationId, tables.members.organizationId),
+        eq(tables.userExternalPrincipals.userId, tables.members.userId),
+        eq(tables.userExternalPrincipals.providerFamily, input.providerFamily),
+        eq(tables.userExternalPrincipals.status, UserExternalPrincipalStatuses.ACTIVE),
       ),
     )
-    .where(eq(members.organizationId, input.organizationId))
-    .orderBy(asc(directoryMemberSortName), asc(users.email), asc(members.createdAt));
+    .where(eq(tables.members.organizationId, input.organizationId))
+    .orderBy(asc(directoryMemberSortName), asc(tables.users.email), asc(tables.members.createdAt));
 
   return rows.map((row) => {
     const principalSummary =

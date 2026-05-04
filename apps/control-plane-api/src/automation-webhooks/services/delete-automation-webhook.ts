@@ -1,4 +1,8 @@
-import { automations, AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  AutomationKinds,
+  type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
+} from "@mistle/db/control-plane";
 import { NotFoundError } from "@mistle/http/errors.js";
 import { and, eq } from "drizzle-orm";
 
@@ -11,17 +15,19 @@ export async function deleteAutomationWebhook(
   ctx: { db: ControlPlaneDatabase },
   input: DeleteWebhookAutomationInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(ctx.db);
+
   const deletedRows = await ctx.db
-    .delete(automations)
+    .delete(tables.automations)
     .where(
       and(
-        eq(automations.id, input.automationId),
-        eq(automations.organizationId, input.organizationId),
-        eq(automations.kind, AutomationKinds.WEBHOOK),
+        eq(tables.automations.id, input.automationId),
+        eq(tables.automations.organizationId, input.organizationId),
+        eq(tables.automations.kind, AutomationKinds.WEBHOOK),
       ),
     )
     .returning({
-      id: automations.id,
+      id: tables.automations.id,
     });
 
   if (deletedRows[0] === undefined) {

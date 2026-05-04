@@ -10,6 +10,7 @@ import {
   SandboxStorageConfigSources,
 } from "@mistle/db/control-plane";
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   sandboxInstanceStorages,
   sandboxInstances,
@@ -146,11 +147,13 @@ function createWorkerConfig(input: ArchilIntegrationEnvironment): DataPlaneWorke
 
 function createArchilStorageBackendAdapter(input: {
   db: ReturnType<typeof createDataPlaneDatabase>;
+  tables?: ReturnType<typeof getDataPlaneDatabaseSchema>;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   workerConfig: DataPlaneWorkerConfig;
 }) {
   return createSandboxStorageBackendAdapter({
     db: input.db,
+    tables: getDataPlaneDatabaseSchema(input.db),
     controlPlaneInternalClient: input.controlPlaneInternalClient,
     workerConfig: input.workerConfig,
     runtimeProvider: SandboxProvider.E2B,
@@ -300,6 +303,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: "e2b",
         },
         {
@@ -319,6 +323,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
       });
@@ -342,6 +347,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
         getSandboxInstanceStorageBySandboxInstanceId(
           {
             db: createDataPlaneDb(),
+            tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           },
           {
             sandboxInstanceId,
@@ -389,6 +395,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
       await ensureSandboxInstance(
         {
           db: createDataPlaneDb(),
+          tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           runtimeProvider: "e2b",
         },
         {
@@ -408,6 +415,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
 
       const storageBackendAdapter = createArchilStorageBackendAdapter({
         db: createDataPlaneDb(),
+        tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
         controlPlaneInternalClient,
         workerConfig: createWorkerConfig(archilEnvironment),
       });
@@ -435,6 +443,7 @@ describeIfArchilIntegration("deprovisionSandboxStorage integration", () => {
         getSandboxInstanceStorageBySandboxInstanceId(
           {
             db: createDataPlaneDb(),
+            tables: getDataPlaneDatabaseSchema(createDataPlaneDb()),
           },
           {
             sandboxInstanceId,

@@ -1,14 +1,11 @@
 import {
-  integrationConnections,
-  integrationWebhookSources,
-  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
-  webhookAutomations,
   type ControlPlaneDatabase,
   type IntegrationConnection,
   type IntegrationConnectionResourceState,
   type IntegrationConnectionResourceSyncState,
   type IntegrationConnectionStatus,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
@@ -170,12 +167,14 @@ export async function listIntegrationConnections(
             },
           }),
         countTotalResults: async () => {
+          const tables = getControlPlaneDatabaseSchema(ctx.db);
+
           const [result] = await db
             .select({
               totalResults: sql<number>`count(*)::int`,
             })
-            .from(integrationConnections)
-            .where(eq(integrationConnections.organizationId, input.organizationId));
+            .from(tables.integrationConnections)
+            .where(eq(tables.integrationConnections.organizationId, input.organizationId));
 
           return result?.totalResults ?? 0;
         },
@@ -265,23 +264,25 @@ async function listIdentityLinkedConnectionIds(input: {
   connectionIds: readonly string[];
   organizationId: string;
 }): Promise<Set<string>> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.connectionIds.length === 0) {
     return new Set();
   }
 
   const rows = await input.db
     .select({
-      connectionId: organizationIdentityLinkProviderConfigs.integrationConnectionId,
+      connectionId: tables.organizationIdentityLinkProviderConfigs.integrationConnectionId,
     })
-    .from(organizationIdentityLinkProviderConfigs)
+    .from(tables.organizationIdentityLinkProviderConfigs)
     .where(
       and(
-        eq(organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
+        eq(tables.organizationIdentityLinkProviderConfigs.organizationId, input.organizationId),
         eq(
-          organizationIdentityLinkProviderConfigs.status,
+          tables.organizationIdentityLinkProviderConfigs.status,
           OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
         ),
-        inArray(organizationIdentityLinkProviderConfigs.integrationConnectionId, [
+        inArray(tables.organizationIdentityLinkProviderConfigs.integrationConnectionId, [
           ...input.connectionIds,
         ]),
       ),
@@ -294,26 +295,31 @@ async function listAutomationCountsByConnectionId(input: {
   db: ControlPlaneDatabase;
   connectionIds: readonly string[];
 }): Promise<Map<string, number>> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
+
   if (input.connectionIds.length === 0) {
     return new Map();
   }
 
   const automationCounts = await input.db
     .select({
-      resolvedConnectionId: integrationConnections.id,
+      resolvedConnectionId: tables.integrationConnections.id,
       automationCount: sql<number>`count(*)::int`,
     })
-    .from(webhookAutomations)
+    .from(tables.webhookAutomations)
     .innerJoin(
-      integrationWebhookSources,
-      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+      tables.integrationWebhookSources,
+      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
     )
     .innerJoin(
-      integrationConnections,
-      eq(integrationConnections.id, integrationWebhookSources.integrationConnectionId),
+      tables.integrationConnections,
+      eq(
+        tables.integrationConnections.id,
+        tables.integrationWebhookSources.integrationConnectionId,
+      ),
     )
-    .where(inArray(integrationConnections.id, [...input.connectionIds]))
-    .groupBy(integrationConnections.id);
+    .where(inArray(tables.integrationConnections.id, [...input.connectionIds]))
+    .groupBy(tables.integrationConnections.id);
 
   return new Map<string, number>(
     automationCounts.map((entry) => [entry.resolvedConnectionId, entry.automationCount]),

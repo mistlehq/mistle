@@ -3,9 +3,11 @@ import { randomUUID } from "node:crypto";
 import {
   SandboxInstancePersistenceModes,
   type SandboxInstancePersistenceMode,
+  SandboxInstancePurposes,
+  type SandboxInstancePurpose,
   SandboxInstanceStatuses,
-  sandboxInstances,
   type DataPlaneDatabase,
+  type DataPlaneTables,
 } from "@mistle/db/data-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
 import { SandboxProvider } from "@mistle/sandbox";
@@ -29,6 +31,7 @@ const WorkflowRunInputSchema = z
 
 type StartSandboxInstanceContext = {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxInstances">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
   controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
@@ -57,10 +60,15 @@ function createSandboxInstanceId(): string {
 
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
+  purpose: SandboxInstancePurpose;
   persistentSandboxesEnabled: boolean;
   sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
+  if (input.purpose === SandboxInstancePurposes.SETUP_CHECK) {
+    return SandboxInstancePersistenceModes.EPHEMERAL;
+  }
+
   if (!input.persistentSandboxesEnabled) {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
@@ -119,6 +127,7 @@ export async function startSandboxInstance(
   ctx: StartSandboxInstanceContext,
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
+  const { sandboxInstances } = ctx.tables;
   const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
     {
       organizationId: input.organizationId,
@@ -126,6 +135,7 @@ export async function startSandboxInstance(
   );
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
+    purpose: input.purpose,
     persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
     sandboxProvider: ctx.sandboxProvider,
     configuredStorageBackend: ctx.sandboxStorageBackend,

@@ -7,5 +7,6 @@ export const conflictResponseSchema = createCodeMessageErrorSchema(
   z.enum([
     SandboxInstancesConflictCodes.INSTANCE_FAILED,
     SandboxInstancesConflictCodes.INSTANCE_NOT_RESUMABLE,
+    SandboxInstancesConflictCodes.INSTANCE_STOP_NOT_SUPPORTED,
   ]),
 );

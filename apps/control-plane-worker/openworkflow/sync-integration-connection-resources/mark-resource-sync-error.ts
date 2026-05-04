@@ -1,7 +1,7 @@
 import {
-  integrationConnectionResourceStates,
   IntegrationConnectionResourceSyncStates,
   type ControlPlaneDatabase,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -17,16 +17,18 @@ export async function markResourceSyncError(input: {
   };
 }): Promise<boolean> {
   return input.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const [lockedState] = await tx
       .select({
-        lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
-        syncState: integrationConnectionResourceStates.syncState,
+        lastSyncStartedAt: tables.integrationConnectionResourceStates.lastSyncStartedAt,
+        syncState: tables.integrationConnectionResourceStates.syncState,
       })
-      .from(integrationConnectionResourceStates)
+      .from(tables.integrationConnectionResourceStates)
       .where(
         and(
-          eq(integrationConnectionResourceStates.connectionId, input.connectionId),
-          eq(integrationConnectionResourceStates.kind, input.kind),
+          eq(tables.integrationConnectionResourceStates.connectionId, input.connectionId),
+          eq(tables.integrationConnectionResourceStates.kind, input.kind),
         ),
       )
       .for("update");
@@ -39,7 +41,7 @@ export async function markResourceSyncError(input: {
     }
 
     await tx
-      .update(integrationConnectionResourceStates)
+      .update(tables.integrationConnectionResourceStates)
       .set({
         familyId: input.familyId,
         syncState: IntegrationConnectionResourceSyncStates.ERROR,
@@ -49,7 +51,7 @@ export async function markResourceSyncError(input: {
         updatedAt: sql`now()`,
       })
       .where(
-        sql`${integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${integrationConnectionResourceStates.kind} = ${input.kind}`,
+        sql`${tables.integrationConnectionResourceStates.connectionId} = ${input.connectionId} and ${tables.integrationConnectionResourceStates.kind} = ${input.kind}`,
       );
 
     return true;

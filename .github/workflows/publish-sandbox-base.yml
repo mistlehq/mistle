@@ -48,7 +48,7 @@ jobs:
         run: |
           tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
 
-          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
             tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
@@ -58,6 +58,10 @@ jobs:
             --file packages/sandboxd/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=Mistle Sandbox Base" \
+            --label "org.opencontainers.image.description=Sandbox base image for Mistle coding agent runtimes" \
+            --label "org.opencontainers.image.url=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.vendor=Mistle" \
             "${tags[@]}" \
             .
 
@@ -65,7 +69,7 @@ jobs:
         run: |
           docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 
-          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
             docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
           fi
 
@@ -81,7 +85,7 @@ jobs:
             echo "## Published image"
             echo
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
-            if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            if [ "${{ github.event_name }}" = "push" ] || [ "${{ inputs.publish_latest }}" = "true" ]; then
               echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             fi
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"

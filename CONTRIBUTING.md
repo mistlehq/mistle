@@ -197,15 +197,17 @@ Testing guidance:
 ## Contribution Process
 
 - For bug reports and feature requests, open an issue first.
-- After maintainers align on scope and approach in the issue, open a pull request.
-- Keep pull requests focused and include context for reviewers.
-- Add or update tests when behavior changes.
-- Pull requests must be passing CI before being considered ready for review.
+- We are not currently accepting general external pull requests.
+- If you want to propose work, open an issue first so maintainers can discuss scope and whether a pull request is invited.
+- For any invited pull request, keep the change focused, include context for reviewers, add or update tests when behavior changes, and ensure CI is passing before review.
 
 ## Contributor License Agreement (Individual)
 
-All contributors must accept the CLA when a pull request is opened.
+Contributors must accept the CLA for any invited pull request.
 
-1. Open your Pull Request.
-2. Follow the CLA Assistant prompt on the pull request to complete signing.
-3. The pull request can proceed after CLA status is satisfied.
+Read the agreement at [CLA.md](CLA.md).
+
+1. Confirm with maintainers that a pull request is invited.
+2. Open your Pull Request.
+3. Follow the CLA Assistant prompt on the pull request to complete signing.
+4. The pull request can proceed after CLA status is satisfied.

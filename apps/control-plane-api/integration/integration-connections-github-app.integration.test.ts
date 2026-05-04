@@ -278,10 +278,8 @@ describe("integration connections GitHub App integration", () => {
               pull_requests: "write",
             },
           },
-          owner: {
-            kind: "organization",
-            organizationSlug: "mistle-labs",
-          },
+          ownerKind: "organization",
+          organizationSlug: "mistle-labs",
         }),
       },
     );
@@ -392,9 +390,7 @@ describe("integration connections GitHub App integration", () => {
           manifest: {
             name: "Mistle GitHub App",
           },
-          owner: {
-            kind: "personal",
-          },
+          ownerKind: "personal",
         }),
       },
     );
@@ -535,9 +531,7 @@ describe("integration connections GitHub App integration", () => {
               issues: "read",
             },
           },
-          owner: {
-            kind: "personal",
-          },
+          ownerKind: "personal",
         }),
       },
     );
@@ -575,9 +569,7 @@ describe("integration connections GitHub App integration", () => {
               issues: "read",
             },
           },
-          owner: {
-            kind: "personal",
-          },
+          ownerKind: "personal",
         }),
       },
     );
@@ -632,9 +624,7 @@ describe("integration connections GitHub App integration", () => {
               issues: "read",
             },
           },
-          owner: {
-            kind: "personal",
-          },
+          ownerKind: "personal",
         }),
       },
     );
@@ -883,9 +873,7 @@ describe("integration connections GitHub App integration", () => {
               issues: "read",
             },
           },
-          owner: {
-            kind: "personal",
-          },
+          ownerKind: "personal",
         }),
       },
     );

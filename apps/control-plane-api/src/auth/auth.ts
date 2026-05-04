@@ -1,4 +1,4 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTables } from "@mistle/db/control-plane";
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -8,6 +8,7 @@ import type { OpenWorkflow } from "openworkflow";
 
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 import { createAuthProviders } from "./providers/index.js";
+import type { GoogleProviderConfig } from "./providers/types.js";
 import { applyActiveOrganizationToSession } from "./services/apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./services/create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./services/create-send-organization-invitation.js";
@@ -23,6 +24,7 @@ export type ControlPlaneAuthConfig = {
   authOTPAllowedAttempts: number;
   authGoogleClientId: string | null;
   authGoogleClientSecret: string | null;
+  authGoogleProviderOverrides?: Omit<GoogleProviderConfig, "clientId" | "clientSecret">;
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
 };
@@ -30,6 +32,7 @@ export type ControlPlaneAuthConfig = {
 type CreateControlPlaneAuthOptions = {
   config: ControlPlaneAuthConfig;
   db: ControlPlaneDatabase;
+  tables?: ControlPlaneTables;
   openWorkflow: OpenWorkflow;
 };
 
@@ -44,6 +47,7 @@ export function createAccountOptions(): NonNullable<Parameters<typeof betterAuth
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   const { config, db, openWorkflow } = options;
+  const tables = options.tables ?? ControlPlaneDbSchema;
   const sendVerificationOTP = createSendVerificationOTPService({
     openWorkflow,
     expiresInSeconds: config.authOTPExpiresInSeconds,
@@ -58,6 +62,9 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
       : {
           clientId: config.authGoogleClientId,
           clientSecret: config.authGoogleClientSecret,
+          ...(config.authGoogleProviderOverrides === undefined
+            ? {}
+            : config.authGoogleProviderOverrides),
         };
   const providers = createAuthProviders({
     config: {
@@ -83,7 +90,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
     trustedOrigins: config.authTrustedOrigins,
     database: drizzleAdapter(db, {
       provider: "pg",
-      schema: ControlPlaneDbSchema,
+      schema: tables,
     }),
     user: {
       modelName: "users",
@@ -134,11 +141,12 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
                 organizationId: organization.id,
                 activeMasterEncryptionKeyVersion: config.activeMasterEncryptionKeyVersion,
                 masterEncryptionKeys: config.masterEncryptionKeys,
+                table: tables.organizationCredentialKeys,
               });
             } catch (error) {
               await db
-                .delete(ControlPlaneDbSchema.organizations)
-                .where(eq(ControlPlaneDbSchema.organizations.id, organization.id));
+                .delete(tables.organizations)
+                .where(eq(tables.organizations.id, organization.id));
               throw new Error(
                 `Failed to initialize credential key for organization '${organization.id}'.`,
                 { cause: error },

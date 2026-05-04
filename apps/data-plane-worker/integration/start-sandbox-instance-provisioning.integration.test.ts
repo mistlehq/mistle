@@ -1,4 +1,5 @@
 import {
+  getDataPlaneDatabaseSchema,
   createDataPlaneDatabase,
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
@@ -102,6 +103,7 @@ describe("start sandbox instance provisioning integration", () => {
       await ensureSandboxInstance(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           runtimeProvider: "docker",
         },
         {
@@ -139,6 +141,7 @@ describe("start sandbox instance provisioning integration", () => {
       await persistSandboxInstanceProvisioning(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,
@@ -195,6 +198,7 @@ describe("start sandbox instance provisioning integration", () => {
       await ensureSandboxInstance(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
           runtimeProvider: "docker",
         },
         {
@@ -215,6 +219,7 @@ describe("start sandbox instance provisioning integration", () => {
       await insertSandboxInstanceStorage(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,
@@ -232,6 +237,7 @@ describe("start sandbox instance provisioning integration", () => {
       const insertedStorage = await getSandboxInstanceStorageBySandboxInstanceId(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,
@@ -253,6 +259,7 @@ describe("start sandbox instance provisioning integration", () => {
       await updateSandboxInstanceStorageCredential(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,
@@ -267,6 +274,7 @@ describe("start sandbox instance provisioning integration", () => {
       const updatedStorage = await getSandboxInstanceStorageBySandboxInstanceId(
         {
           db,
+          tables: getDataPlaneDatabaseSchema(db),
         },
         {
           sandboxInstanceId,

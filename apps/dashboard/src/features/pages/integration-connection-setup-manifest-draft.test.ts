@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 import {
   resolveIntegrationSetupAppManifestDraftBuilderOrThrow,
+  resolveIntegrationProviderAppSetupOrThrow,
+  resolveIntegrationSetupPaneOrThrow,
+  resolveIntegrationSetupStartFormOrThrow,
   resolveManifestDraftControlPlaneBaseUrl,
 } from "./integration-connection-setup-manifest-draft.js";
 
@@ -116,5 +119,163 @@ describe("resolveIntegrationSetupAppManifestDraftBuilderOrThrow", () => {
     ).toThrow(
       "Integration setup flow 'api-key/github-app' is not a browser form setup flow for target 'github-cloud'.",
     );
+  });
+});
+
+describe("resolveIntegrationSetupStartFormOrThrow", () => {
+  it("resolves the Slack setup start form from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupStartFormOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toEqual({
+      submitLabel: "Create and connect Slack app",
+      fields: [
+        {
+          name: "appConfigToken",
+          label: "App configuration token",
+          inputType: "password",
+          required: true,
+          placeholder: "xoxe.xoxp-...",
+          description:
+            "Generate a Slack app configuration token, then paste it here. Slack configuration tokens expire after 12 hours.",
+          actions: [
+            {
+              label: "Generate token in Slack",
+              href: "https://api.slack.com/apps",
+              opensInNewWindow: true,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("resolves the GitHub setup start form from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupStartFormOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toMatchObject({
+      submitLabel: "Create app in GitHub",
+      fields: [
+        {
+          name: "ownerKind",
+          inputType: "radio",
+          required: true,
+        },
+        {
+          name: "organizationSlug",
+          inputType: "text",
+          required: true,
+          visibleWhen: {
+            field: "ownerKind",
+            value: "organization",
+          },
+        },
+      ],
+    });
+  });
+});
+
+describe("resolveIntegrationProviderAppSetupOrThrow", () => {
+  it("resolves Slack provider app setup from the browser definition", () => {
+    expect(
+      resolveIntegrationProviderAppSetupOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toMatchObject({
+      title: "Choose a setup method",
+      description:
+        "Create a new Slack app with a manifest or connect an app you've already configured in Slack.",
+      manifest: {
+        title: "Slack app manifest",
+        description:
+          "Create a Slack app from a basic manifest. You can still change the settings later in Slack.",
+      },
+      existingApp: {
+        title: "Existing Slack App",
+        connectLabel: "Connect Slack to Mistle",
+      },
+      urls: {
+        title: "Slack app URLs",
+        webhookCallback: {
+          label: "Events API Request URL",
+          errorTitle: "Could not load Events API Request URL",
+        },
+      },
+    });
+  });
+
+  it("resolves GitHub provider app setup from the browser definition", () => {
+    expect(
+      resolveIntegrationProviderAppSetupOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toMatchObject({
+      title: "Choose a setup method",
+      manifest: {
+        startAction: {
+          expectedResultKind: "form-post",
+        },
+      },
+      existingApp: {
+        title: "Existing GitHub App",
+        connectLabel: "Install GitHub App",
+        startAction: {
+          routeSegment: "github-app-installation",
+          installedLabel: "Manage Installation",
+        },
+      },
+      urls: {
+        title: "Hook URLs",
+      },
+    });
+  });
+});
+
+describe("resolveIntegrationSetupPaneOrThrow", () => {
+  it("resolves Slack setup pane metadata from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupPaneOrThrow({
+        connection: SlackConnection,
+        setupRoute: {
+          methodId: "slack-bot-token",
+          routeSegment: "slack-app",
+        },
+      }),
+    ).toEqual({
+      kind: "provider-app",
+    });
+  });
+
+  it("resolves GitHub setup pane metadata from the browser definition", () => {
+    expect(
+      resolveIntegrationSetupPaneOrThrow({
+        connection: GitHubConnection,
+        setupRoute: {
+          methodId: "github-app-installation",
+          routeSegment: "github-app",
+        },
+      }),
+    ).toEqual({
+      kind: "provider-app",
+    });
   });
 });

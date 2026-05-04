@@ -1,7 +1,24 @@
 {
   "name": "@mistle/control-plane-api",
   "private": true,
+  "files": [
+    "dist/**"
+  ],
   "type": "module",
+  "exports": {
+    "./runtime": {
+      "types": "./src/main.ts",
+      "node": "./dist/main.js",
+      "import": "./src/main.ts",
+      "default": "./src/main.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "node": "./dist/types.js",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx scripts/run-dev.ts",
     "dev:schedules": "tsx scripts/run-schedule-dispatcher-dev.ts",
@@ -16,6 +33,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts",
     "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:integration:new": "vitest run -c vitest.integration-new.config.ts",
     "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
     "openapi:generate": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/generate-spec.ts",
     "openapi:check": "tsx --tsconfig tsconfig.scripts.json scripts/openapi/check-spec-drift.ts",
@@ -50,13 +68,17 @@
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "sharp": "0.34.5",
+    "smol-toml": "^1.6.1",
     "sshpk": "^1.18.0",
     "typeid-js": "^1.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.20.0",
-    "@types/sshpk": "^1.17.4"
+    "@types/sshpk": "^1.17.4",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.20.0"
   }
 }

@@ -1,10 +1,9 @@
 import {
-  automationConversations,
-  automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
   type AutomationConversationDeliveryTaskStatus,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
@@ -41,8 +40,10 @@ export async function finalizeAutomationConversationDeliveryTask(
   }
 
   return ctx.db.transaction(async (tx) => {
+    const tables = getControlPlaneDatabaseSchema(tx);
+
     const updatedRows = await tx
-      .update(automationConversationDeliveryTasks)
+      .update(tables.automationConversationDeliveryTasks)
       .set({
         status: input.status,
         failureCode: input.failureCode ?? null,
@@ -52,15 +53,15 @@ export async function finalizeAutomationConversationDeliveryTask(
       })
       .where(
         and(
-          eq(automationConversationDeliveryTasks.id, input.taskId),
-          eq(automationConversationDeliveryTasks.processorGeneration, input.generation),
+          eq(tables.automationConversationDeliveryTasks.id, input.taskId),
+          eq(tables.automationConversationDeliveryTasks.processorGeneration, input.generation),
           or(
             eq(
-              automationConversationDeliveryTasks.status,
+              tables.automationConversationDeliveryTasks.status,
               AutomationConversationDeliveryTaskStatuses.CLAIMED,
             ),
             eq(
-              automationConversationDeliveryTasks.status,
+              tables.automationConversationDeliveryTasks.status,
               AutomationConversationDeliveryTaskStatuses.DELIVERING,
             ),
           ),
@@ -71,14 +72,14 @@ export async function finalizeAutomationConversationDeliveryTask(
     if (updatedTask !== undefined) {
       if (input.status === AutomationConversationDeliveryTaskStatuses.COMPLETED) {
         await tx
-          .update(automationConversations)
+          .update(tables.automationConversations)
           .set({
             lastProcessedSourceOrderKey: updatedTask.sourceOrderKey,
             lastProcessedWebhookEventId: updatedTask.sourceWebhookEventId,
             updatedAt: sql`now()`,
             lastActivityAt: sql`now()`,
           })
-          .where(eq(automationConversations.id, updatedTask.conversationId));
+          .where(eq(tables.automationConversations.id, updatedTask.conversationId));
       }
 
       return updatedTask;

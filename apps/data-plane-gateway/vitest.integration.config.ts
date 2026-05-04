@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
 
-const WorkspaceAliases = [
+export const WorkspaceAliases = [
   {
     find: /^@mistle\/config$/,
     replacement: fileURLToPath(new URL("../../packages/config/src/index.ts", import.meta.url)),

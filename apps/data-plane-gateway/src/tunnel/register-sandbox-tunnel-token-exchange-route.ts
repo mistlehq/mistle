@@ -107,6 +107,7 @@ export function registerSandboxTunnelTokenExchangeRoute(
     try {
       const inserted = await recordSandboxTunnelTokenRedemption({
         db: ctx.get("db"),
+        tables: ctx.get("tables"),
         tokenJti: verifiedExchangeToken.jti,
       });
 

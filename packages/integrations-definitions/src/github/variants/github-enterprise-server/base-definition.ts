@@ -17,6 +17,12 @@ import {
   GitHubAppInstallationConnectionConfigForm,
 } from "../../shared/connection-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
+import {
+  createGitHubProviderAppSetupMetadata,
+  GitHubProviderAppSetupPane,
+  GitHubProviderAppSetupStartForm,
+} from "../../shared/provider-app-setup-metadata.js";
+import { GitHubAppInstallationSetupPath } from "../../shared/provider-app-setup-routes.js";
 import { GitHubCredentialSlotKeys } from "../../shared/slot-keys.js";
 import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
@@ -102,7 +108,7 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
             ],
             hideWebhookSourceSection: true,
             includeWebhookCallbackUrl: true,
-            postInstallationSetupPath: "/p/integration/callbacks/setup/github-app-installation",
+            postInstallationSetupPath: GitHubAppInstallationSetupPath,
           },
         },
         createBehavior: IntegrationFormConnectionMethodCreateBehaviors.DRAFT_THEN_SETUP,
@@ -122,7 +128,12 @@ export const GitHubEnterpriseServerBaseDefinition: GitHubEnterpriseServerBaseInt
               },
             ],
           },
+          providerAppSetup: createGitHubProviderAppSetupMetadata({
+            supportsClientSecret: false,
+          }),
           routeSegment: "github-app",
+          setupPane: GitHubProviderAppSetupPane,
+          startForm: GitHubProviderAppSetupStartForm,
         },
         secretFields: [
           {

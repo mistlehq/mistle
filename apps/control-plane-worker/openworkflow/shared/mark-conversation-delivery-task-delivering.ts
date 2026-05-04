@@ -1,8 +1,8 @@
 import {
-  automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -21,8 +21,10 @@ export async function markAutomationConversationDeliveryTaskDelivering(
   },
   input: MarkAutomationConversationDeliveryTaskDeliveringInput,
 ) {
+  const tables = getControlPlaneDatabaseSchema(deps.db);
+
   const updatedRows = await deps.db
-    .update(automationConversationDeliveryTasks)
+    .update(tables.automationConversationDeliveryTasks)
     .set({
       status: AutomationConversationDeliveryTaskStatuses.DELIVERING,
       deliveryStartedAt: sql`now()`,
@@ -30,10 +32,10 @@ export async function markAutomationConversationDeliveryTaskDelivering(
     })
     .where(
       and(
-        eq(automationConversationDeliveryTasks.id, input.taskId),
-        eq(automationConversationDeliveryTasks.processorGeneration, input.generation),
+        eq(tables.automationConversationDeliveryTasks.id, input.taskId),
+        eq(tables.automationConversationDeliveryTasks.processorGeneration, input.generation),
         eq(
-          automationConversationDeliveryTasks.status,
+          tables.automationConversationDeliveryTasks.status,
           AutomationConversationDeliveryTaskStatuses.CLAIMED,
         ),
       ),

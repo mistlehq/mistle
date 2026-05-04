@@ -1,9 +1,11 @@
-import { sandboxTunnelTokenRedemptions, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 
 export async function recordSandboxTunnelTokenRedemption(input: {
   db: DataPlaneDatabase;
+  tables: Pick<DataPlaneTables, "sandboxTunnelTokenRedemptions">;
   tokenJti: string;
 }): Promise<boolean> {
+  const { sandboxTunnelTokenRedemptions } = input.tables;
   const insertedRows = await input.db
     .insert(sandboxTunnelTokenRedemptions)
     .values({

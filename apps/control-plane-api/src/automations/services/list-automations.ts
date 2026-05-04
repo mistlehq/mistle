@@ -1,15 +1,7 @@
 import {
-  automations,
-  automationTargets,
   AutomationKinds,
-  integrationConnections,
-  integrationTargets,
-  integrationWebhookSources,
-  sandboxProfiles,
-  scheduleAutomations,
-  schedules,
   ScheduleTargetTypes,
-  webhookAutomations,
+  getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import type { AutomationKind, ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { BadRequestError } from "@mistle/http/errors.js";
@@ -112,6 +104,8 @@ type AutomationPageReference = {
   kind: AutomationKind;
   createdAt: string;
 };
+
+type ControlPlaneTables = ReturnType<typeof getControlPlaneDatabaseSchema>;
 
 function resolveAutomationListEvents(input: {
   eventTypes: string[] | null;
@@ -412,46 +406,59 @@ async function loadWebhookAutomationListPageItems(input: {
     return [];
   }
 
+  const tables = getControlPlaneDatabaseSchema(input.db);
   const rows = await input.db
     .select({
-      automationId: automations.id,
-      automationName: automations.name,
-      enabled: automations.enabled,
-      createdAt: automations.createdAt,
-      updatedAt: automations.updatedAt,
-      eventTypes: webhookAutomations.eventTypes,
-      integrationWebhookSourceId: webhookAutomations.integrationWebhookSourceId,
-      resolvedIntegrationWebhookSourceId: integrationWebhookSources.id,
-      resolvedIntegrationConnectionId: integrationConnections.id,
-      sandboxProfileId: automationTargets.sandboxProfileId,
-      sandboxProfileDisplayName: sandboxProfiles.displayName,
-      primaryRepositoryId: automationTargets.primaryRepositoryId,
-      integrationTargetFamilyId: integrationTargets.familyId,
-      integrationTargetVariantId: integrationTargets.variantId,
-      integrationTargetDisplayNameOverride: integrationTargets.displayNameOverride,
-      integrationTargetDescriptionOverride: integrationTargets.descriptionOverride,
+      automationId: tables.automations.id,
+      automationName: tables.automations.name,
+      enabled: tables.automations.enabled,
+      createdAt: tables.automations.createdAt,
+      updatedAt: tables.automations.updatedAt,
+      eventTypes: tables.webhookAutomations.eventTypes,
+      integrationWebhookSourceId: tables.webhookAutomations.integrationWebhookSourceId,
+      resolvedIntegrationWebhookSourceId: tables.integrationWebhookSources.id,
+      resolvedIntegrationConnectionId: tables.integrationConnections.id,
+      sandboxProfileId: tables.automationTargets.sandboxProfileId,
+      sandboxProfileDisplayName: tables.sandboxProfiles.displayName,
+      primaryRepositoryId: tables.automationTargets.primaryRepositoryId,
+      integrationTargetFamilyId: tables.integrationTargets.familyId,
+      integrationTargetVariantId: tables.integrationTargets.variantId,
+      integrationTargetDisplayNameOverride: tables.integrationTargets.displayNameOverride,
+      integrationTargetDescriptionOverride: tables.integrationTargets.descriptionOverride,
     })
-    .from(automations)
-    .innerJoin(webhookAutomations, eq(webhookAutomations.automationId, automations.id))
-    .leftJoin(
-      integrationWebhookSources,
-      eq(integrationWebhookSources.id, webhookAutomations.integrationWebhookSourceId),
+    .from(tables.automations)
+    .innerJoin(
+      tables.webhookAutomations,
+      eq(tables.webhookAutomations.automationId, tables.automations.id),
     )
     .leftJoin(
-      integrationConnections,
-      eq(integrationConnections.id, integrationWebhookSources.integrationConnectionId),
+      tables.integrationWebhookSources,
+      eq(tables.integrationWebhookSources.id, tables.webhookAutomations.integrationWebhookSourceId),
     )
     .leftJoin(
-      integrationTargets,
-      eq(integrationTargets.targetKey, integrationWebhookSources.targetKey),
+      tables.integrationConnections,
+      eq(
+        tables.integrationConnections.id,
+        tables.integrationWebhookSources.integrationConnectionId,
+      ),
     )
-    .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
-    .leftJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
+    .leftJoin(
+      tables.integrationTargets,
+      eq(tables.integrationTargets.targetKey, tables.integrationWebhookSources.targetKey),
+    )
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
+    .leftJoin(
+      tables.sandboxProfiles,
+      eq(tables.sandboxProfiles.id, tables.automationTargets.sandboxProfileId),
+    )
     .where(
       and(
-        eq(automations.organizationId, input.organizationId),
-        eq(automations.kind, AutomationKinds.WEBHOOK),
-        inArray(automations.id, input.automationIds),
+        eq(tables.automations.organizationId, input.organizationId),
+        eq(tables.automations.kind, AutomationKinds.WEBHOOK),
+        inArray(tables.automations.id, input.automationIds),
       ),
     );
 
@@ -521,33 +528,43 @@ async function loadScheduleAutomationListPageItems(input: {
     return [];
   }
 
+  const tables = getControlPlaneDatabaseSchema(input.db);
   const rows = await input.db
     .select({
-      automationId: automations.id,
-      automationName: automations.name,
-      enabled: automations.enabled,
-      createdAt: automations.createdAt,
-      updatedAt: automations.updatedAt,
-      sandboxProfileId: automationTargets.sandboxProfileId,
-      sandboxProfileDisplayName: sandboxProfiles.displayName,
-      primaryRepositoryId: automationTargets.primaryRepositoryId,
-      cronExpression: schedules.cronExpression,
-      timezone: schedules.timezone,
-      nextScheduledAt: schedules.nextScheduledAt,
+      automationId: tables.automations.id,
+      automationName: tables.automations.name,
+      enabled: tables.automations.enabled,
+      createdAt: tables.automations.createdAt,
+      updatedAt: tables.automations.updatedAt,
+      sandboxProfileId: tables.automationTargets.sandboxProfileId,
+      sandboxProfileDisplayName: tables.sandboxProfiles.displayName,
+      primaryRepositoryId: tables.automationTargets.primaryRepositoryId,
+      cronExpression: tables.schedules.cronExpression,
+      timezone: tables.schedules.timezone,
+      nextScheduledAt: tables.schedules.nextScheduledAt,
     })
-    .from(automations)
-    .innerJoin(scheduleAutomations, eq(scheduleAutomations.automationId, automations.id))
-    .innerJoin(schedules, eq(schedules.id, scheduleAutomations.scheduleId))
-    .innerJoin(automationTargets, eq(automationTargets.automationId, automations.id))
-    .leftJoin(sandboxProfiles, eq(sandboxProfiles.id, automationTargets.sandboxProfileId))
+    .from(tables.automations)
+    .innerJoin(
+      tables.scheduleAutomations,
+      eq(tables.scheduleAutomations.automationId, tables.automations.id),
+    )
+    .innerJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
+    .innerJoin(
+      tables.automationTargets,
+      eq(tables.automationTargets.automationId, tables.automations.id),
+    )
+    .leftJoin(
+      tables.sandboxProfiles,
+      eq(tables.sandboxProfiles.id, tables.automationTargets.sandboxProfileId),
+    )
     .where(
       and(
-        eq(automations.organizationId, input.organizationId),
-        eq(automations.kind, AutomationKinds.SCHEDULE),
-        eq(schedules.organizationId, input.organizationId),
-        eq(schedules.targetType, ScheduleTargetTypes.AUTOMATION_RUN),
-        isNull(schedules.deletedAt),
-        inArray(automations.id, input.automationIds),
+        eq(tables.automations.organizationId, input.organizationId),
+        eq(tables.automations.kind, AutomationKinds.SCHEDULE),
+        eq(tables.schedules.organizationId, input.organizationId),
+        eq(tables.schedules.targetType, ScheduleTargetTypes.AUTOMATION_RUN),
+        isNull(tables.schedules.deletedAt),
+        inArray(tables.automations.id, input.automationIds),
       ),
     );
 
@@ -634,21 +651,23 @@ async function loadAutomationListPageItems(input: {
 }
 
 function buildListableAutomationWhereClause(input: {
+  tables: ControlPlaneTables;
   organizationId: string;
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction?: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
 }) {
+  const { tables } = input;
   const organizationScope = and(
-    eq(automations.organizationId, input.organizationId),
+    eq(tables.automations.organizationId, input.organizationId),
     or(
-      eq(automations.kind, AutomationKinds.WEBHOOK),
+      eq(tables.automations.kind, AutomationKinds.WEBHOOK),
       and(
-        eq(automations.kind, AutomationKinds.SCHEDULE),
-        isNotNull(scheduleAutomations.scheduleId),
-        isNotNull(schedules.id),
-        eq(schedules.organizationId, input.organizationId),
-        eq(schedules.targetType, ScheduleTargetTypes.AUTOMATION_RUN),
-        isNull(schedules.deletedAt),
+        eq(tables.automations.kind, AutomationKinds.SCHEDULE),
+        isNotNull(tables.scheduleAutomations.scheduleId),
+        isNotNull(tables.schedules.id),
+        eq(tables.schedules.organizationId, input.organizationId),
+        eq(tables.schedules.targetType, ScheduleTargetTypes.AUTOMATION_RUN),
+        isNull(tables.schedules.deletedAt),
       ),
     ),
   );
@@ -661,8 +680,11 @@ function buildListableAutomationWhereClause(input: {
     return and(
       organizationScope,
       or(
-        lt(automations.createdAt, input.cursor.createdAt),
-        and(eq(automations.createdAt, input.cursor.createdAt), lt(automations.id, input.cursor.id)),
+        lt(tables.automations.createdAt, input.cursor.createdAt),
+        and(
+          eq(tables.automations.createdAt, input.cursor.createdAt),
+          lt(tables.automations.id, input.cursor.id),
+        ),
       ),
     );
   }
@@ -670,8 +692,11 @@ function buildListableAutomationWhereClause(input: {
   return and(
     organizationScope,
     or(
-      gt(automations.createdAt, input.cursor.createdAt),
-      and(eq(automations.createdAt, input.cursor.createdAt), gt(automations.id, input.cursor.id)),
+      gt(tables.automations.createdAt, input.cursor.createdAt),
+      and(
+        eq(tables.automations.createdAt, input.cursor.createdAt),
+        gt(tables.automations.id, input.cursor.id),
+      ),
     ),
   );
 }
@@ -683,17 +708,22 @@ async function listAutomationPageReferences(input: {
   cursor?: z.infer<typeof CursorSchema> | undefined;
   direction: (typeof KeysetPaginationDirections)[keyof typeof KeysetPaginationDirections];
 }): Promise<AutomationPageReference[]> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
   return input.db
     .select({
-      id: automations.id,
-      kind: automations.kind,
-      createdAt: automations.createdAt,
+      id: tables.automations.id,
+      kind: tables.automations.kind,
+      createdAt: tables.automations.createdAt,
     })
-    .from(automations)
-    .leftJoin(scheduleAutomations, eq(scheduleAutomations.automationId, automations.id))
-    .leftJoin(schedules, eq(schedules.id, scheduleAutomations.scheduleId))
+    .from(tables.automations)
+    .leftJoin(
+      tables.scheduleAutomations,
+      eq(tables.scheduleAutomations.automationId, tables.automations.id),
+    )
+    .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
     .where(
       buildListableAutomationWhereClause({
+        tables,
         organizationId: input.organizationId,
         cursor: input.cursor,
         direction: input.direction,
@@ -701,32 +731,41 @@ async function listAutomationPageReferences(input: {
     )
     .orderBy(
       ...(input.direction === KeysetPaginationDirections.BACKWARD
-        ? ascAutomationCreatedAt()
-        : descAutomationCreatedAt()),
+        ? ascAutomationCreatedAt(tables)
+        : descAutomationCreatedAt(tables)),
     )
     .limit(input.limitPlusOne);
 }
 
-function ascAutomationCreatedAt() {
-  return [sql`${automations.createdAt} asc`, sql`${automations.id} asc`];
+function ascAutomationCreatedAt(tables: ControlPlaneTables) {
+  return [sql`${tables.automations.createdAt} asc`, sql`${tables.automations.id} asc`];
 }
 
-function descAutomationCreatedAt() {
-  return [sql`${automations.createdAt} desc`, sql`${automations.id} desc`];
+function descAutomationCreatedAt(tables: ControlPlaneTables) {
+  return [sql`${tables.automations.createdAt} desc`, sql`${tables.automations.id} desc`];
 }
 
 async function countListableAutomations(input: {
   db: ControlPlaneDatabase;
   organizationId: string;
 }): Promise<number> {
+  const tables = getControlPlaneDatabaseSchema(input.db);
   const [result] = await input.db
     .select({
       totalResults: sql<number>`count(*)::int`,
     })
-    .from(automations)
-    .leftJoin(scheduleAutomations, eq(scheduleAutomations.automationId, automations.id))
-    .leftJoin(schedules, eq(schedules.id, scheduleAutomations.scheduleId))
-    .where(buildListableAutomationWhereClause({ organizationId: input.organizationId }));
+    .from(tables.automations)
+    .leftJoin(
+      tables.scheduleAutomations,
+      eq(tables.scheduleAutomations.automationId, tables.automations.id),
+    )
+    .leftJoin(tables.schedules, eq(tables.schedules.id, tables.scheduleAutomations.scheduleId))
+    .where(
+      buildListableAutomationWhereClause({
+        tables,
+        organizationId: input.organizationId,
+      }),
+    );
 
   return result?.totalResults ?? 0;
 }
