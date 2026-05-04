@@ -41,7 +41,11 @@
         "tab": "Self-Hosting",
         "groups": [
           {
-            "group": "Configuration",
+            "group": "Quickstart",
+            "pages": ["guides/self-hosted-local-compose-quickstart"]
+          },
+          {
+            "group": "Configuration Reference",
             "pages": ["guides/self-hosted-configuration"]
           },
           {

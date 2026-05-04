@@ -1,0 +1,108 @@
+---
+title: Local Compose Quickstart
+description: Run a local Mistle stack with the repository's single-node compose workflow
+---
+
+## Overview
+
+For local self-hosted setups, use the single-node compose workflow in `deploy/compose/local`.
+It starts the required infrastructure services and one Mistle container for local development and verification.
+
+## Prerequisites
+
+- Docker Desktop or Docker Engine
+- Docker Compose V2
+- Network access for image pulls
+
+## Quick Start
+
+Choose one of these two entry points:
+
+1. **Recommended: from remote installer (no repository checkout required):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mistlehq/mistle/main/deploy/compose/local/install.sh | sh
+cd ~/.mistle/local
+./up.sh
+```
+
+2. **Alternative: from a source checkout (recommended for contributors/workflow customization):**
+
+```bash
+cd deploy/compose/local
+./up.sh
+```
+
+The installer fetches compose assets into `~/.mistle/local`, preserves an existing `.env`,
+and starts the stack by executing `./up.sh`.
+
+If you use the source checkout path, keep local changes in `.env` and `.generated/runtime.env`.
+If you use the installer, keep your working files under `~/.mistle/local`.
+
+## What `./up.sh` does
+
+- creates `.env` from `.env.example` when missing
+- validates required values such as `MISTLE_DOCKER_IMAGE` and `MISTLE_SANDBOX_DEFAULT_BASE_IMAGE`
+- writes a per-run `./.generated/runtime.env` and starts Compose services
+- starts base infra (`postgres`, `valkey`, `seaweedfs`, `mailpit`) first
+- ensures the local object-store bucket exists
+- starts the `mistle` service
+- sets callback behavior:
+  - if `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL` is blank, it starts a Cloudflare tunnel for an ephemeral public callback URL
+  - if set, that static URL is used
+
+## Open the stack
+
+- Dashboard: `http://localhost:3000`
+- Control Plane API: `http://localhost:5100`
+- Data Plane Gateway: `http://localhost:5202`
+- Tokenizer Proxy: `http://localhost:5205`
+- Mailpit UI: `http://localhost:8025`
+
+## Verify your run
+
+1. Open the dashboard URL and complete authentication.
+2. Confirm health endpoints:
+
+```bash
+curl http://localhost:3000
+curl http://localhost:5100/__healthz
+curl http://localhost:5202/__healthz
+curl http://localhost:5205/__healthz
+```
+
+3. If you cloned the repository locally, run the local smoke test:
+
+```bash
+pnpm compose:local:smoke-test -- --restart-check
+```
+
+## Stop and cleanup
+
+When you want to stop the local stack:
+
+```bash
+cd ~/.mistle/local
+./down.sh
+```
+
+If you are running from source checkout, use `deploy/compose/local` instead of `~/.mistle/local`.
+
+To remove local data as well:
+
+```bash
+cd ~/.mistle/local
+./down.sh -v
+```
+
+## Public callback URLs
+
+Provider callbacks and webhooks need a publicly reachable control-plane URL.
+That value is `MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL` (or the generated quick-tunnel URL in local `.generated/runtime.env`).
+
+Use [Webhook and Callback URLs](/guides/self-hosted-webhook-callbacks) when configuring provider registrations.
+
+## Next steps
+
+- Confirm deployment settings in [Configuration Reference](/guides/self-hosted-configuration)
+- Enable provider targets in [Provision Integration Targets](/guides/self-hosted-integration-targets)
