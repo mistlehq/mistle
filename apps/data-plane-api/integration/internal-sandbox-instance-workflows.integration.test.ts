@@ -213,6 +213,18 @@ type WorkflowRunRow = {
   idempotency_key: string | null;
 };
 
+const WorkflowRunRowSchema = z
+  .object({
+    id: z.string(),
+    namespace_id: z.string(),
+    workflow_name: z.string(),
+    status: z.string(),
+    input: z.unknown(),
+    output: z.null(),
+    idempotency_key: z.string().nullable(),
+  })
+  .strict();
+
 async function waitForQueuedWorkflowRuns(input: {
   env: IntegrationTestEnvironment;
   sandboxInstanceId: string;
@@ -233,7 +245,7 @@ async function waitForQueuedWorkflowRuns(input: {
     `);
 
     if (result.rows.length > 0) {
-      return result.rows;
+      return result.rows.map((row) => WorkflowRunRowSchema.parse(row));
     }
 
     await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);

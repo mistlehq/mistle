@@ -48,6 +48,12 @@ const DeadlineWorkflowInputSchema = z
   })
   .strict();
 
+const LockWaiterCountRowSchema = z
+  .object({
+    waiters: z.number().int().min(0),
+  })
+  .strict();
+
 describe.concurrent("internal sandbox instance deadlines integration", () => {
   it("creates, schedules, and clears sandbox instance deadlines", async ({ env }) => {
     const sandboxInstanceId = "sbi_dp_api_deadline_put_delete";
@@ -377,7 +383,7 @@ function clientFor(
     serviceToken: InternalServiceToken,
     testEnvironmentId: env.id,
     testEnvironmentIdHeader: TestEnvironmentIdHeader,
-    requestTimeoutMs,
+    ...(requestTimeoutMs === undefined ? {} : { requestTimeoutMs }),
   });
 }
 
@@ -429,6 +435,19 @@ type WorkflowRunRow = {
   available_at: string;
 };
 
+const WorkflowRunRowSchema = z
+  .object({
+    id: z.string(),
+    namespace_id: z.string(),
+    workflow_name: z.string(),
+    status: z.string(),
+    input: z.unknown(),
+    output: z.null(),
+    idempotency_key: z.string().nullable(),
+    available_at: z.string(),
+  })
+  .strict();
+
 async function waitForDeadlineWorkflowRuns(
   env: IntegrationTestEnvironment,
   sandboxInstanceId: string,
@@ -470,10 +489,11 @@ async function waitForPendingDeadlineWriteLockWaiters(input: {
         and classid = ${SandboxInstanceDeadlineAdvisoryLockNamespace}
         and objid = hashtext(${resourceKey})
         and objsubid = 2
-        and granted = false
+      and granted = false
     `);
+    const waiterCount = LockWaiterCountRowSchema.parse(result.rows[0] ?? { waiters: 0 }).waiters;
 
-    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
+    if (waiterCount >= minimumCount) {
       return;
     }
 
@@ -500,7 +520,7 @@ async function listDeadlineWorkflowRuns(
     order by created_at asc
   `);
 
-  return result.rows;
+  return result.rows.map((row) => WorkflowRunRowSchema.parse(row));
 }
 
 function expectedDeadlineIdempotencyKey(input: {

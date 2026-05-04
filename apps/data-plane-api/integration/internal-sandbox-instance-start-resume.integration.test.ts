@@ -497,6 +497,17 @@ type WorkflowRunRow = {
   output: null;
 };
 
+const WorkflowRunRowSchema = z
+  .object({
+    id: z.string(),
+    namespace_id: z.string(),
+    workflow_name: z.string(),
+    status: z.string(),
+    input: z.unknown(),
+    output: z.null(),
+  })
+  .strict();
+
 async function waitForQueuedWorkflowRuns(input: {
   env: IntegrationTestEnvironment;
   workflowName: string;
@@ -540,5 +551,5 @@ async function listQueuedWorkflows(input: {
     order by created_at asc
   `);
 
-  return result.rows;
+  return result.rows.map((row) => WorkflowRunRowSchema.parse(row));
 }
