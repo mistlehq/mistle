@@ -30,6 +30,7 @@ import {
   connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
   sendWebSocketPingAndExpectPong,
+  waitForWebSocketClose,
   waitForNoWebSocketMessage,
   waitForWebSocketMessage,
 } from "../integration/websocket-test-helpers.js";
@@ -224,6 +225,167 @@ describe.concurrent("sandbox tunnel stream routing integration", () => {
           bootstrapSocket,
           Buffer.from("bootstrap-still-open-after-pty-detach", "utf8"),
         );
+      } finally {
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "resets unbound connection stream controls without forwarding them to bootstrap",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientReset = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.close",
+            streamId: 77,
+          }),
+        );
+
+        expect(parseStreamMessage((await clientReset).data)).toEqual({
+          type: "stream.reset",
+          streamId: 77,
+          code: "interactive_stream_not_found",
+          message: "Interactive stream is not bound on this tunnel session.",
+        });
+        await bootstrapNoMessage;
+      } finally {
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "closes connection peers that send bootstrap-only signing control messages",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosed = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "signing.request",
+            requestId: "sign_req_integration_new_guardrail",
+            organizationId: "org_integration_new_guardrail",
+            sandboxInstanceId,
+            actingUserId: "usr_integration_new_guardrail",
+            providerFamily: "github",
+            format: "ssh",
+            keyRef: "key::ssh-ed25519 AAAA",
+            grant: "grant-token",
+            payload: "c2lnbi1tZQ==",
+            encoding: "base64",
+          }),
+        );
+
+        await expect(clientClosed).resolves.toEqual({
+          code: 1008,
+          reason:
+            "Connection websocket cannot send signing control message type 'signing.request'.",
+        });
+        await bootstrapNoMessage;
+      } finally {
+        await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "closes connection peers that send opaque websocket payloads",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let textClientSocket: WebSocket | undefined;
+      let binaryClientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        textClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        const bootstrapNoTextMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const textClientClosed = waitForWebSocketClose(textClientSocket);
+        await sendWebSocketMessage(textClientSocket, "hello from client");
+        await expect(textClientClosed).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket text payloads must be valid stream control messages.",
+        });
+        await bootstrapNoTextMessage;
+
+        binaryClientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        const bootstrapNoBinaryMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const binaryClientClosed = waitForWebSocketClose(binaryClientSocket);
+        await sendWebSocketMessage(binaryClientSocket, Buffer.from([0x01, 0x7f, 0xa5]));
+        await expect(binaryClientClosed).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket binary payloads must be valid tunnel data frames.",
+        });
+        await bootstrapNoBinaryMessage;
+      } finally {
+        await Promise.all([
+          closeIfOpen(bootstrapSocket),
+          closeIfOpen(textClientSocket),
+          closeIfOpen(binaryClientSocket),
+        ]);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "closes connection peers that send bootstrap response control messages",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectBootstrapSocket({ env, sandboxInstanceId });
+        clientSocket = await connectConnectionSocket({ env, sandboxInstanceId });
+
+        const bootstrapNoMessage = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosed = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+
+        await expect(clientClosed).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket cannot send control message type 'stream.open.ok'.",
+        });
+        await bootstrapNoMessage;
       } finally {
         await Promise.all([closeIfOpen(bootstrapSocket), closeIfOpen(clientSocket)]);
       }
