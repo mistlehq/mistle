@@ -55,6 +55,11 @@ const OtlpInfraId = "otlp";
 const OtlpValues = {
   COLLECTOR_ID: "collectorId",
 };
+const ValkeyInfraId = "valkey";
+const ValkeyValues = {
+  HOST_URL: "host.url",
+  KEY_PREFIX: "keyPrefix",
+};
 const SeaweedfsValues = {
   BUCKET_NAME: "bucketName",
   HOST_ENDPOINT: "host.endpoint",
@@ -78,6 +83,11 @@ export type IntegrationObjectStore = {
   destroy: () => void;
 };
 
+export type IntegrationRuntimeStateStore = {
+  valkeyUrl: string;
+  keyPrefix: string;
+};
+
 export type IntegrationTestEnvironment = {
   id: string;
   auth: IntegrationAuth;
@@ -91,6 +101,7 @@ export type IntegrationTestEnvironment = {
   dataPlaneWorkflow: IntegrationWorkflowClient;
   dataPlaneApi: IntegrationHttpService;
   dataPlaneGateway: IntegrationHttpService;
+  dataPlaneGatewayRuntimeState: IntegrationRuntimeStateStore;
   dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
   objectStore: IntegrationObjectStore;
@@ -188,6 +199,17 @@ export function createIntegrationEnvironment(input: {
     },
     get dataPlaneGateway() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_GATEWAY));
+    },
+    get dataPlaneGatewayRuntimeState() {
+      const valkey = input.environment.infra.get(ValkeyInfraId);
+      if (valkey === undefined) {
+        throw new Error("Expected integration environment to include Valkey infra.");
+      }
+
+      return {
+        valkeyUrl: readInfraValue(valkey, ValkeyValues.HOST_URL),
+        keyPrefix: readInfraValue(valkey, ValkeyValues.KEY_PREFIX),
+      };
     },
     get dataPlaneWorker() {
       return processService(input.environment.services.get(ServiceIds.DATA_PLANE_WORKER));

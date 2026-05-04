@@ -159,6 +159,10 @@ Common `env` properties include:
   handles.
 - `env.controlPlaneTables`, `env.dataPlaneTables`: schema-bound Drizzle tables
   for inserts, updates, deletes, joins, and predicates.
+- `env.dataPlaneGatewayRuntimeState`: the data-plane gateway runtime-state
+  Valkey URL and logical key prefix. Use this only for gateway runtime-state
+  store integration tests that exercise the production Valkey store classes
+  directly.
 - `env.controlPlaneWorkflow`: workflow client for control-plane worker behavior.
 - `env.dataPlaneWorkflow`: workflow client for data-plane worker behavior.
 - `env.mailpit`, `env.objectStore`, `env.otlpCollector`: optional clients
