@@ -30,7 +30,7 @@ const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
 
-describe.concurrent("sandbox profile setup assistant integration", () => {
+describe.concurrent("sandbox profile Setup Assistant integration", () => {
   it("starts a separate setup-check sandbox without passing the setup script", async ({ env }) => {
     const session = await env.auth.createSession({
       email: "integration-new-sandbox-profile-setup-assistant@example.com",
@@ -158,7 +158,7 @@ async function createAssistantProfile(input: {
       id: input.connectionId,
       organizationId: input.organizationId,
       targetKey: input.targetKey,
-      displayName: "Setup assistant agent connection",
+      displayName: "Setup Assistant agent connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         connection_method: IntegrationConnectionMethodIds.API_KEY,

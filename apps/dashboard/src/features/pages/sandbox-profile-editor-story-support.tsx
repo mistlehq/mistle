@@ -378,7 +378,7 @@ function SetupScriptStoryControls(input: {
   const authoringTitle = !input.isDraft
     ? "Setup script authoring is only available while editing a draft."
     : input.authoringState === "disabled"
-      ? "Add an agent integration before using Setup assistant."
+      ? "Add an agent integration before using Setup Assistant."
       : "Open the right panel to write this setup script.";
   const authoringButton = (
     <Button
@@ -390,11 +390,11 @@ function SetupScriptStoryControls(input: {
       variant="outline"
     >
       {authoringIsStarting ? (
-        "Starting agent..."
+        "Starting Setup Assistant..."
       ) : (
         <>
           <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-          Setup assistant
+          Setup Assistant
         </>
       )}
     </Button>
@@ -467,7 +467,7 @@ function SetupScriptAuthoringPanel(input: {
   return (
     <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
       <Button
-        aria-label="Close setup script authoring panel"
+        aria-label="Close Setup Assistant panel"
         className="absolute top-3 left-1 size-8 px-0"
         onClick={input.onClose}
         title="Close right panel"
@@ -478,7 +478,7 @@ function SetupScriptAuthoringPanel(input: {
       </Button>
       <div className="flex min-h-14 items-center justify-between gap-3 border-b pr-5 pl-9">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="truncate text-sm font-semibold tracking-normal">Setup assistant</h2>
+          <h2 className="truncate text-sm font-semibold tracking-normal">Setup Assistant</h2>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span
@@ -500,7 +500,7 @@ function SetupScriptAuthoringPanel(input: {
             disabled={input.state === "starting"}
             onClick={() => {}}
             size="sm"
-            title="Open setup assistant TUI"
+            title="Open Setup Assistant TUI"
             type="button"
             variant="ghost"
           >
@@ -769,9 +769,7 @@ function SandboxProfileEditorPageStoryView(
               <SandboxProfilePanelSection>
                 <div className="flex flex-col gap-4">
                   {input.setupScriptAuthoringErrorMessage === undefined ? null : (
-                    <Notice title="Setup assistant unavailable" variant="alert">
-                      {input.setupScriptAuthoringErrorMessage}
-                    </Notice>
+                    <Notice variant="alert">{input.setupScriptAuthoringErrorMessage}</Notice>
                   )}
                   <SandboxProfileSetupScriptPanel
                     onBlur={handleSetupScriptBlur}

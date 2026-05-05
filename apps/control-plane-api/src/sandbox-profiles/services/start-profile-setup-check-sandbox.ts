@@ -56,7 +56,7 @@ export async function startProfileSetupCheckSandbox(
   if (input.requireAgentRuntime === true && compiledRuntimePlan.agentRuntimes.length === 0) {
     throw new SandboxProfilesCompileError(
       SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
-      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting the setup assistant.`,
+      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting the Setup Assistant.`,
     );
   }
   const { setupScript: _setupScript, ...runtimePlanWithoutSetupScript } = compiledRuntimePlan;

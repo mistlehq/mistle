@@ -28,7 +28,7 @@ export const route = createRoute({
   },
   responses: {
     201: {
-      description: "Start a setup assistant sandbox for the specified profile version.",
+      description: "Start a Setup Assistant sandbox for the specified profile version.",
       content: {
         "application/json": {
           schema: startSandboxProfileSetupAssistantResponseSchema,

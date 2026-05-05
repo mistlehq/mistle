@@ -190,7 +190,7 @@ function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSection
 
 const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
 const SetupAssistantAgentRuntimeRequiredMessage =
-  "Add an agent integration before using Setup assistant.";
+  "Add an agent integration before using Setup Assistant.";
 
 function hasConfiguredAgentRuntime(value: unknown): boolean {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -1173,7 +1173,7 @@ function ReadySandboxProfileEditorPage(input: {
           ? SetupAssistantAgentRuntimeRequiredMessage
           : resolveApiErrorMessage({
               error,
-              fallbackMessage: "Could not start setup assistant.",
+              fallbackMessage: "Could not start Setup Assistant.",
             }),
       );
     },
@@ -1186,9 +1186,9 @@ function ReadySandboxProfileEditorPage(input: {
         : !setupAssistantHasAgentRuntime
           ? SetupAssistantAgentRuntimeRequiredMessage
           : draftFieldsAreDisabled
-            ? "Setup assistant is unavailable while draft changes are saving."
+            ? "Setup Assistant is unavailable while draft changes are saving."
             : startSetupAssistantMutation.isPending
-              ? "Setup assistant is starting."
+              ? "Setup Assistant is starting."
               : null;
   const setupAssistantControl: SetupScriptAssistantControl = {
     disabled: setupAssistantDisabledReason !== null,
@@ -1412,9 +1412,9 @@ function SetupScriptAssistantPanel(input: {
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const cliButtonTitle = workbench.primaryPanelState.isCliToggleActive
     ? "Return to chat"
-    : (workbench.primaryPanelState.disabledReason ?? "Open setup assistant TUI");
+    : (workbench.primaryPanelState.disabledReason ?? "Open Setup Assistant TUI");
   const terminalButtonTitle = isTerminalOpenDisabled
-    ? (workbench.stoppedSessionMessage ?? "Terminal is available after the setup assistant starts.")
+    ? (workbench.stoppedSessionMessage ?? "Terminal is available after the Setup Assistant starts.")
     : workbench.terminalPanelState.isVisible
       ? "Terminal"
       : "Open terminal";
@@ -1448,7 +1448,7 @@ function SetupScriptAssistantPanel(input: {
   return (
     <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
       <Button
-        aria-label="Close setup assistant panel"
+        aria-label="Close Setup Assistant panel"
         className="absolute top-3 left-1 size-8 px-0"
         onClick={input.onClose}
         title="Close right panel"
@@ -1458,7 +1458,7 @@ function SetupScriptAssistantPanel(input: {
         <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
       </Button>
       <div className="flex min-h-14 items-center justify-between gap-3 border-b pr-5 pl-9">
-        <h2 className="truncate text-sm font-semibold tracking-normal">Setup assistant</h2>
+        <h2 className="truncate text-sm font-semibold tracking-normal">Setup Assistant</h2>
         <div className="flex shrink-0 items-center gap-2">
           <span
             aria-label={headerStatusLabel}
@@ -1534,7 +1534,7 @@ function SetupScriptAssistantPanel(input: {
         <ResizablePanel id="setup-assistant-conversation-panel" minSize="40%">
           <div className="flex h-full min-h-0 flex-col">
             <div
-              aria-label="Setup assistant conversation"
+              aria-label="Setup Assistant conversation"
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5"
               ref={conversationScrollContainerRef}
               role="region"
@@ -2335,9 +2335,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
   return (
     <div className="flex flex-col gap-4">
       {input.setupAssistantControl.errorMessage === null ? null : (
-        <Notice title="Setup assistant unavailable" variant="alert">
-          {input.setupAssistantControl.errorMessage}
-        </Notice>
+        <Notice variant="alert">{input.setupAssistantControl.errorMessage}</Notice>
       )}
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}

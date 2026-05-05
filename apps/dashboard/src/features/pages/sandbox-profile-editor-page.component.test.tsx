@@ -1592,7 +1592,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const writeWithAgentButton = screen.getByRole("button", {
-      name: "Setup assistant",
+      name: "Setup Assistant",
     });
     const failOnFirstErrorSwitch = screen.getByRole("switch", {
       name: "Fail on error",
@@ -1630,7 +1630,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const emptyDraftWriteButton = screen.getByRole("button", {
-      name: "Setup assistant",
+      name: "Setup Assistant",
     });
     expect(emptyDraftTestButton.hasAttribute("disabled")).toBe(true);
     expect(emptyDraftTestButton.getAttribute("title")).toBe("Add a setup script before testing.");
@@ -1648,7 +1648,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const publishedWriteButton = screen.getByRole("button", {
-      name: "Setup assistant",
+      name: "Setup Assistant",
     });
     expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
     expect(publishedTestButton.getAttribute("title")).toBe(
@@ -1657,7 +1657,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(publishedWriteButton.hasAttribute("disabled")).toBe(true);
   });
 
-  it("disables setup assistant when no agent runtime is configured", () => {
+  it("disables Setup Assistant when no agent runtime is configured", () => {
     renderSandboxProfileEditor({
       bindings: [
         {
@@ -1673,12 +1673,12 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     const setupAssistantButton = screen.getByRole("button", {
-      name: "Setup assistant",
+      name: "Setup Assistant",
     });
 
     expect(setupAssistantButton.hasAttribute("disabled")).toBe(true);
     expect(setupAssistantButton.getAttribute("title")).toBe(
-      "Add an agent integration before using Setup assistant.",
+      "Add an agent integration before using Setup Assistant.",
     );
   });
 

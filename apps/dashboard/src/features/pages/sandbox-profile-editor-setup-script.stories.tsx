@@ -29,14 +29,14 @@ export const EmptySetupScript: Story = {
   },
 };
 
-export const AuthoringEntry: Story = {
+export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScriptAuthoringState: "available",
   },
 };
 
-export const AuthoringStarting: Story = {
+export const SetupAssistantStarting: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScriptAuthoringPanelState: "starting",
@@ -44,22 +44,22 @@ export const AuthoringStarting: Story = {
   },
 };
 
-export const AuthoringRequiresAgent: Story = {
+export const SetupAssistantRequiresAgent: Story = {
   args: {
     initialBindings: [StoryBindings[1]],
     setupScriptAuthoringState: "disabled",
   },
 };
 
-export const AuthoringAgentRequiredNotice: Story = {
+export const SetupAssistantAgentRequiredNotice: Story = {
   args: {
     initialBindings: [StoryBindings[1]],
-    setupScriptAuthoringErrorMessage: "Add an agent integration before using Setup assistant.",
+    setupScriptAuthoringErrorMessage: "Add an agent integration before using Setup Assistant.",
     setupScriptAuthoringState: "disabled",
   },
 };
 
-export const AuthoringPanelReady: Story = {
+export const SetupAssistantPanelReady: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScriptAuthoringPanelState: "ready",
@@ -67,7 +67,7 @@ export const AuthoringPanelReady: Story = {
   },
 };
 
-export const AuthoringPanelWithDraft: Story = {
+export const SetupAssistantPanelWithDraft: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScriptAuthoringPanelState: "proposed-script",

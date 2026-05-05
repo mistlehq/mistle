@@ -9116,7 +9116,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Start a setup assistant sandbox for the specified profile version. */
+        /** @description Start a Setup Assistant sandbox for the specified profile version. */
         201: {
           headers: {
             [name: string]: unknown;

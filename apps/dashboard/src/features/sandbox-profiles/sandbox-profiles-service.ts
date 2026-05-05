@@ -1019,7 +1019,7 @@ export async function startSandboxProfileSetupAssistant(input: {
         ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      fallbackMessage: "Could not start setup assistant.",
+      fallbackMessage: "Could not start Setup Assistant.",
     });
 
     const responseBody = await response.json();
@@ -1029,7 +1029,7 @@ export async function startSandboxProfileSetupAssistant(input: {
         operation: "startSandboxProfileSetupAssistant",
         status: 500,
         body: responseBody,
-        message: "Setup assistant response payload is invalid.",
+        message: "Setup Assistant response payload is invalid.",
       });
     }
 
@@ -1039,7 +1039,7 @@ export async function startSandboxProfileSetupAssistant(input: {
       normalizeHttpApiError({
         operation: "startSandboxProfileSetupAssistant",
         error,
-        fallbackMessage: "Could not start setup assistant.",
+        fallbackMessage: "Could not start Setup Assistant.",
       }),
     );
   }

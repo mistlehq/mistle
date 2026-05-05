@@ -274,11 +274,11 @@ export function SandboxProfileSetupScriptTestButton(
         variant="outline"
       >
         {input.writeWithAgent.isStarting ? (
-          "Starting agent..."
+          "Starting Setup Assistant..."
         ) : (
           <>
             <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-            Setup assistant
+            Setup Assistant
           </>
         )}
       </Button>
