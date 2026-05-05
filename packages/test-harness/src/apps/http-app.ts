@@ -24,6 +24,7 @@ export type StartDockerHttpAppInput = {
   buildContextHostPath: string;
   configPathInContainer: string;
   startupTimeoutMs: number;
+  hostPort?: number;
   cacheBustKey?: string;
   prebuiltImageName?: string;
   environment: Record<string, string>;
@@ -163,6 +164,7 @@ export async function startDockerHttpApp(
     dockerTarget: definition.dockerTarget,
     startupTimeoutMs: input.startupTimeoutMs,
     containerPort: definition.containerPort,
+    ...(input.hostPort === undefined ? {} : { hostPort: input.hostPort }),
     networkAlias: definition.networkAlias,
     readiness: {
       kind: "command",

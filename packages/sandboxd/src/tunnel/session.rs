@@ -5121,7 +5121,6 @@ fn resolve_tunnel_exchange_url(gateway_ws_url: &str) -> Result<String, TunnelSes
             ));
         }
     }
-    parsed_url.set_query(None);
     let mut path = parsed_url.path().trim_end_matches('/').to_string();
     path.push_str("/token-exchange");
     parsed_url.set_path(&path);
@@ -5240,8 +5239,8 @@ mod tests {
         connect_bootstrap_websocket, handle_ports_transport_message, handle_tunnel_control_message,
         handle_tunnel_session_event, prioritize_ipv4_socket_addresses,
         publish_pty_input_latency_warning, publish_pty_session_summary,
-        resolve_bootstrap_tunnel_url, run_connected_tunnel_session_catching_panics,
-        sync_pty_scope_keepalive,
+        resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
+        run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -7798,6 +7797,19 @@ mod tests {
     }
 
     #[test]
+    fn tunnel_exchange_url_preserves_gateway_query_parameters() {
+        let exchange_url = resolve_tunnel_exchange_url(
+            "ws://127.0.0.1:5202/tunnel/sandbox/sbi_123?x-mistle-test-environment-id=test_env_123",
+        )
+        .expect("tunnel exchange URL should be derivable");
+
+        assert_eq!(
+            exchange_url,
+            "http://127.0.0.1:5202/tunnel/sandbox/sbi_123/token-exchange?x-mistle-test-environment-id=test_env_123"
+        );
+    }
+
+    #[test]
     fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
@@ -7805,8 +7817,9 @@ mod tests {
             .local_addr()
             .expect("bootstrap listener should expose an address")
             .port();
-        let bootstrap_url =
-            format!("ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{bootstrap_port}/tunnel/sandbox/sbi_tunnel_session?x-mistle-test-environment-id=test_env_reconnect"
+        );
         let (gateway_ready_sender, gateway_ready_receiver) = mpsc::channel();
         let gateway_thread = thread::spawn(move || {
             let (initial_stream, _) = bootstrap_listener
@@ -7818,6 +7831,10 @@ mod tests {
                 initial_request_uri.contains("bootstrap_token=bootstrap-token-initial"),
                 "initial bootstrap websocket should include the startup bootstrap token"
             );
+            assert!(
+                initial_request_uri.contains("x-mistle-test-environment-id=test_env_reconnect"),
+                "initial bootstrap websocket should preserve gateway query parameters"
+            );
             expect_tunnel_connected_publications(&mut initial_websocket);
             initial_websocket
                 .close(None)
@@ -7828,8 +7845,9 @@ mod tests {
                 .expect("gateway should accept the first token exchange request");
             let first_exchange_request = read_http_request(&mut first_exchange_stream);
             assert!(
-                first_exchange_request
-                    .starts_with("POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1")
+                first_exchange_request.starts_with(
+                    "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange?x-mistle-test-environment-id=test_env_reconnect HTTP/1.1",
+                )
             );
             assert_http_bearer_token(&first_exchange_request, "exchange-token-initial");
             assert_http_header(&first_exchange_request, "content-length", "0");
@@ -7851,6 +7869,11 @@ mod tests {
                 reconnect_request_uri_one.contains("bootstrap_token=bootstrap-token-reconnect-1"),
                 "first reconnect websocket should use the exchanged bootstrap token"
             );
+            assert!(
+                reconnect_request_uri_one
+                    .contains("x-mistle-test-environment-id=test_env_reconnect"),
+                "first reconnect websocket should preserve gateway query parameters"
+            );
             expect_tunnel_connected_publications(&mut reconnect_websocket_one);
             reconnect_websocket_one
                 .close(None)
@@ -7861,8 +7884,9 @@ mod tests {
                 .expect("gateway should accept the second token exchange request");
             let second_exchange_request = read_http_request(&mut second_exchange_stream);
             assert!(
-                second_exchange_request
-                    .starts_with("POST /tunnel/sandbox/sbi_tunnel_session/token-exchange HTTP/1.1")
+                second_exchange_request.starts_with(
+                    "POST /tunnel/sandbox/sbi_tunnel_session/token-exchange?x-mistle-test-environment-id=test_env_reconnect HTTP/1.1",
+                )
             );
             assert_http_bearer_token(&second_exchange_request, "exchange-token-reconnect-1");
             assert_http_header(&second_exchange_request, "content-length", "0");
@@ -7883,6 +7907,11 @@ mod tests {
             assert!(
                 reconnect_request_uri_two.contains("bootstrap_token=bootstrap-token-reconnect-2"),
                 "second reconnect websocket should use the rolled bootstrap token"
+            );
+            assert!(
+                reconnect_request_uri_two
+                    .contains("x-mistle-test-environment-id=test_env_reconnect"),
+                "second reconnect websocket should preserve gateway query parameters"
             );
             expect_tunnel_connected_publications(&mut reconnect_websocket_two);
             gateway_ready_sender

@@ -810,6 +810,7 @@ export async function runSandboxPtyCommand(input: {
   });
 
   try {
+    const timeoutMs = input.timeoutMs ?? 30_000;
     const ptyClient = new PtyStreamClient({
       transport,
     });
@@ -819,10 +820,14 @@ export async function runSandboxPtyCommand(input: {
       output += Buffer.from(chunk).toString("utf8");
     });
 
-    await ptyClient.connect();
+    await withOperationTimeout({
+      operation: ptyClient.connect(),
+      timeoutMs,
+      description: "connecting sandbox PTY stream",
+    });
     const waitForExit = (): Promise<{ exitCode: number }> =>
       new Promise<{ exitCode: number }>((resolve, reject) => {
-        const timeoutSignal = AbortSignal.timeout(input.timeoutMs ?? 30_000);
+        const timeoutSignal = AbortSignal.timeout(timeoutMs);
         const removeExitListener = ptyClient.onExit((exitInfo) => {
           cleanup();
           resolve({
@@ -840,11 +845,7 @@ export async function runSandboxPtyCommand(input: {
 
         const onTimeout = (): void => {
           cleanup();
-          reject(
-            new Error(
-              `Timed out after ${String(input.timeoutMs ?? 30_000)}ms waiting for PTY command exit.`,
-            ),
-          );
+          reject(new Error(`Timed out after ${String(timeoutMs)}ms waiting for PTY command exit.`));
         };
 
         const cleanup = (): void => {
@@ -859,13 +860,17 @@ export async function runSandboxPtyCommand(input: {
     let exit;
 
     try {
-      await ptyClient.open({
-        ptySessionId: "terminal",
-        cols: 120,
-        rows: 40,
-        cwd: input.cwd ?? "/root",
-        command: input.command,
-        ...(input.args === undefined ? {} : { args: input.args }),
+      await withOperationTimeout({
+        operation: ptyClient.open({
+          ptySessionId: "terminal",
+          cols: 120,
+          rows: 40,
+          cwd: input.cwd ?? "/root",
+          command: input.command,
+          ...(input.args === undefined ? {} : { args: input.args }),
+        }),
+        timeoutMs,
+        description: "opening sandbox PTY session",
       });
 
       exit = await waitForExit();
@@ -884,6 +889,34 @@ export async function runSandboxPtyCommand(input: {
   } finally {
     transport.disconnect(1000, "system test pty cleanup");
   }
+}
+
+async function withOperationTimeout<T>(input: {
+  operation: Promise<T>;
+  timeoutMs: number;
+  description: string;
+}): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    const timeoutSignal = AbortSignal.timeout(input.timeoutMs);
+    const onTimeout = (): void => {
+      reject(new Error(`Timed out after ${String(input.timeoutMs)}ms ${input.description}.`));
+    };
+    const cleanup = (): void => {
+      timeoutSignal.removeEventListener("abort", onTimeout);
+    };
+
+    timeoutSignal.addEventListener("abort", onTimeout, { once: true });
+    input.operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        reject(error);
+      },
+    );
+  });
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {

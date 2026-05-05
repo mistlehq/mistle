@@ -1166,6 +1166,11 @@ function createDataPlaneGatewayService(input: {
     id: "data-plane-gateway",
     infra: [input.postgres, input.valkey],
     serviceReferences: ["control-plane-api", "data-plane-api"],
+    endpoints: {
+      http: {
+        host: "127.0.0.1",
+      },
+    },
     supportedModes: ["docker"],
     healthCheck: async (service) => checkHttpServiceHealth(service, "data-plane-gateway"),
     start: async (startInput) =>
@@ -1189,6 +1194,10 @@ async function startDataPlaneGatewayDockerService(input: {
     configPathInContainer: input.context.configPathInContainer,
     startupTimeoutMs: input.context.startupTimeoutMs,
     prebuiltImageName: preparedRuntime.appImages.dataPlaneGateway,
+    hostPort: readPlannedHttpHostPort({
+      plannedEndpoints: input.startInput.plannedEndpoints,
+      serviceId: "data-plane-gateway",
+    }),
     environment: {
       MISTLE_POSTGRES_DATA_PLANE_POOLED_URL: readInfraValue(
         postgres,
@@ -1884,6 +1893,28 @@ function readOptionalServiceContainerBaseUrl(input: {
   }
 
   return createContainerReachableBaseUrl(service);
+}
+
+function readPlannedHttpHostPort(input: {
+  plannedEndpoints: ReadonlyMap<string, TestServiceEndpoints>;
+  serviceId: string;
+}): number {
+  const endpoint = input.plannedEndpoints.get(input.serviceId)?.http;
+  if (endpoint === undefined) {
+    throw new Error(
+      `Expected Mistle test service '${input.serviceId}' to have a planned HTTP endpoint.`,
+    );
+  }
+
+  const url = new URL(endpoint.hostBaseUrl);
+  const port = Number(url.port);
+  if (!Number.isInteger(port) || port < 1) {
+    throw new Error(
+      `Expected Mistle test service '${input.serviceId}' planned HTTP endpoint to include a concrete host port.`,
+    );
+  }
+
+  return port;
 }
 
 function createContainerReachableBaseUrl(service: TestServiceHandle): string {

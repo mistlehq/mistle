@@ -54,6 +54,7 @@ export type StartDockerTargetAppInput = {
   command?: readonly string[];
   environment: Record<string, string>;
   containerPort: number;
+  hostPort?: number;
   networkAlias: string;
   startupTimeoutMs: number;
   readiness: WorkspaceAppReadiness;
@@ -371,7 +372,7 @@ async function cleanupResources(input: {
         await stopContainerIgnoringMissing(input.container, {
           remove: true,
           removeVolumes: true,
-          timeout: 0,
+          timeout: 1,
         });
       }
     },
@@ -733,6 +734,9 @@ export async function startDockerTargetApp(
   validateNonEmpty(input.dockerTarget, "dockerTarget");
   validatePositiveInteger(input.containerPort, "containerPort");
   validatePositiveInteger(input.startupTimeoutMs, "startupTimeoutMs");
+  if (input.hostPort !== undefined) {
+    validatePositiveInteger(input.hostPort, "hostPort");
+  }
 
   await validateAbsoluteDirectoryPath(input.buildContextHostPath, "buildContextHostPath");
   await validateDockerfilePath({
@@ -793,7 +797,14 @@ export async function startDockerTargetApp(
       .withExtraHosts(HostGatewayExtraHosts)
       .withNetwork(network)
       .withNetworkAliases(input.networkAlias)
-      .withExposedPorts(input.containerPort)
+      .withExposedPorts(
+        input.hostPort === undefined
+          ? input.containerPort
+          : {
+              container: input.containerPort,
+              host: input.hostPort,
+            },
+      )
       .withWaitStrategy(waitStrategy)
       .withStartupTimeout(input.startupTimeoutMs);
 
