@@ -186,10 +186,15 @@ export type {
   SandboxProfile,
   SandboxProfileStatus,
 } from "./sandbox-profiles.js";
-export { sandboxProfileVersions, SandboxProfileVersionStates } from "./sandbox-profile-versions.js";
+export {
+  sandboxProfileVersions,
+  SandboxProfileVersionDefaultPersistenceModes,
+  SandboxProfileVersionStates,
+} from "./sandbox-profile-versions.js";
 export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
+  SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
 } from "./sandbox-profile-versions.js";
 export {

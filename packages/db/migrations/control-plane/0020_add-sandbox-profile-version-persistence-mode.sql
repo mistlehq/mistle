@@ -1,0 +1,2 @@
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD COLUMN "default_persistence_mode" text DEFAULT 'ephemeral' NOT NULL;--> statement-breakpoint
+ALTER TABLE "control_plane"."sandbox_profile_versions" ADD CONSTRAINT "sandbox_profile_versions_default_persistence_mode_check" CHECK ("control_plane"."sandbox_profile_versions"."default_persistence_mode" in ('ephemeral', 'persistent'));

@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -120,6 +121,7 @@ describe.concurrent("sandbox profile versions publish integration", () => {
         sandboxProfileId: "sbp_version_publish_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: false,
         usable: false,
         refreshSchedule: {

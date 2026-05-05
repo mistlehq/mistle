@@ -5,6 +5,7 @@
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
@@ -85,6 +86,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-03-10T00:02:00.000Z",
         setupScript: "echo latest-version-two",
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       }),
     ]);
     await env.controlPlaneDb
@@ -144,6 +146,7 @@ describe.concurrent("sandbox profile versions create integration", () => {
       sandboxProfileId: "sbp_version_create_001",
       version: 3,
       state: SandboxProfileVersionStates.DRAFT,
+      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       isActive: false,
       usable: false,
       refreshSchedule: null,
@@ -157,6 +160,9 @@ describe.concurrent("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.state).toBe(SandboxProfileVersionStates.DRAFT);
     expect(persistedDraftVersion?.publishedAt).toBeNull();
     expect(persistedDraftVersion?.setupScript).toBe("echo latest-version-two");
+    expect(persistedDraftVersion?.defaultPersistenceMode).toBe(
+      SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
+    );
 
     const persistedDraftBindings =
       await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({

@@ -141,6 +141,13 @@
       "when": 1777363914143,
       "tag": "0019_add-schedules",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1777946125926,
+      "tag": "0020_add-sandbox-profile-version-persistence-mode",
+      "breakpoints": true
     }
   ]
 }

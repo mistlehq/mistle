@@ -20,6 +20,14 @@ export const SandboxProfileVersionStates = {
 export type SandboxProfileVersionState =
   (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
 
+export const SandboxProfileVersionDefaultPersistenceModes = {
+  EPHEMERAL: "ephemeral",
+  PERSISTENT: "persistent",
+} as const;
+
+export type SandboxProfileVersionDefaultPersistenceMode =
+  (typeof SandboxProfileVersionDefaultPersistenceModes)[keyof typeof SandboxProfileVersionDefaultPersistenceModes];
+
 export function defineSandboxProfileVersions(schema: PgSchema) {
   return schema.table(
     "sandbox_profile_versions",
@@ -36,11 +44,19 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
       snapshotImageProvider: text("snapshot_image_provider"),
       snapshotImageId: text("snapshot_image_id"),
       setupScript: text("setup_script"),
+      defaultPersistenceMode: text("default_persistence_mode")
+        .notNull()
+        .$type<SandboxProfileVersionDefaultPersistenceMode>()
+        .default(SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL),
     },
     (table) => [
       primaryKey({
         columns: [table.sandboxProfileId, table.version],
       }),
+      check(
+        "sandbox_profile_versions_default_persistence_mode_check",
+        sql`${table.defaultPersistenceMode} in ('ephemeral', 'persistent')`,
+      ),
       check(
         "sandbox_profile_versions_snapshot_image_handle_check",
         sql`(${table.snapshotImageProvider} is null and ${table.snapshotImageId} is null) or (${table.snapshotImageProvider} is not null and ${table.snapshotImageId} is not null)`,

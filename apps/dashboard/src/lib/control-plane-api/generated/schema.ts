@@ -7384,6 +7384,8 @@ export interface paths {
           content: {
             "application/json": {
               versions: {
+                /** @enum {string} */
+                defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;
@@ -7496,6 +7498,8 @@ export interface paths {
           };
           content: {
             "application/json": {
+              /** @enum {string} */
+              defaultPersistenceMode: "ephemeral" | "persistent";
               isActive: boolean;
               latestSnapshotJob: {
                 createdAt: string;
@@ -8249,6 +8253,130 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            defaultPersistenceMode: "ephemeral" | "persistent";
+          };
+        };
+      };
+      responses: {
+        /** @description Replace the default persistence mode for the specified sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              defaultPersistenceMode: "ephemeral" | "persistent";
+              sandboxProfileId: string;
+              version: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "VALIDATION_ERROR";
+              message: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "FORBIDDEN";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile version is not editable. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_VERSION_NOT_DRAFT";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/publish": {
     parameters: {
       query?: never;
@@ -8291,6 +8419,8 @@ export interface paths {
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               };
               version: {
+                /** @enum {string} */
+                defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;
@@ -8559,6 +8689,8 @@ export interface paths {
                 trigger: "publish" | "manual_refresh" | "scheduled_refresh";
               };
               version: {
+                /** @enum {string} */
+                defaultPersistenceMode: "ephemeral" | "persistent";
                 isActive: boolean;
                 latestSnapshotJob: {
                   createdAt: string;

@@ -2,6 +2,7 @@ import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
+  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -33,6 +34,7 @@ type RefreshProfileVersionSnapshotOutput = {
     sandboxProfileId: string;
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -83,6 +85,7 @@ export async function refreshProfileVersionSnapshot(
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
+          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
           snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
           snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
         })
@@ -117,8 +120,12 @@ export async function refreshProfileVersionSnapshot(
 
       const resolvedSandboxProfileId = sandboxProfileVersion.sandboxProfileId;
       const resolvedSandboxProfileVersion = sandboxProfileVersion.version;
+      const resolvedDefaultPersistenceMode = sandboxProfileVersion.defaultPersistenceMode;
       if (resolvedSandboxProfileId === null || resolvedSandboxProfileVersion === null) {
         throw new Error("Expected joined sandbox profile version metadata to be present.");
+      }
+      if (resolvedDefaultPersistenceMode === null) {
+        throw new Error("Expected joined sandbox profile persistence mode to be present.");
       }
 
       if (sandboxProfileVersion.state !== SandboxProfileVersionStates.PUBLISHED) {
@@ -162,6 +169,7 @@ export async function refreshProfileVersionSnapshot(
           sandboxProfileId: resolvedSandboxProfileId,
           version: resolvedSandboxProfileVersion,
           state: sandboxProfileVersion.state,
+          defaultPersistenceMode: resolvedDefaultPersistenceMode,
           isActive: sandboxProfileVersion.activeVersion === input.profileVersion,
           usable:
             sandboxProfileVersion.snapshotImageProvider !== null &&

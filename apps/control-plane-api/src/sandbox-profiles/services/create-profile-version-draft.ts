@@ -2,6 +2,7 @@ import {
   ControlPlaneConstraintIds,
   getControlPlaneDatabaseSchema,
   isControlPlaneUniqueViolation,
+  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 
@@ -23,6 +24,7 @@ type CreateProfileVersionDraftOutput = {
   sandboxProfileId: string;
   version: number;
   state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
+  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   isActive: boolean;
   usable: boolean;
   refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -74,6 +76,7 @@ export async function createProfileVersionDraft(
         columns: {
           version: true,
           setupScript: true,
+          defaultPersistenceMode: true,
         },
         where: (table, { eq }) => eq(table.sandboxProfileId, input.profileId),
         orderBy: (table, { desc }) => [desc(table.version)],
@@ -108,11 +111,13 @@ export async function createProfileVersionDraft(
           version: nextVersionNumber,
           state: SandboxProfileVersionStates.DRAFT,
           setupScript: latestVersion.setupScript,
+          defaultPersistenceMode: latestVersion.defaultPersistenceMode,
         })
         .returning({
           sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
           version: tables.sandboxProfileVersions.version,
           state: tables.sandboxProfileVersions.state,
+          defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
         });
 
       if (createdDraftVersion === undefined) {

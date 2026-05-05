@@ -5,6 +5,7 @@
 import {
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
@@ -54,6 +55,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_001",
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
       }),
     ]);
     await env.controlPlaneDb
@@ -98,6 +100,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_001",
         version: 3,
         state: SandboxProfileVersionStates.DRAFT,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -107,6 +110,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: true,
         usable: true,
         refreshSchedule: null,
@@ -125,6 +129,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -180,6 +185,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_draft_only_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: false,
         usable: false,
         refreshSchedule: null,
@@ -242,6 +248,7 @@ describe.concurrent("sandbox profile versions list integration", () => {
         sandboxProfileId: "sbp_versions_list_failed_materialization_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: false,
         usable: false,
         refreshSchedule: null,

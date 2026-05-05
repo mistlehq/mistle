@@ -2,6 +2,7 @@ import type {
   SandboxProfileVersionSnapshotJobState,
   SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionState,
+  SandboxProfileVersionDefaultPersistenceMode,
 } from "@mistle/db/control-plane";
 import { SandboxProfileVersionStates } from "@mistle/db/control-plane";
 
@@ -22,6 +23,7 @@ type ListProfileVersionsOutput = {
     sandboxProfileId: string;
     version: number;
     state: SandboxProfileVersionState;
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -63,6 +65,7 @@ export async function listProfileVersions(
       sandboxProfileId: true,
       version: true,
       state: true,
+      defaultPersistenceMode: true,
       snapshotImageProvider: true,
       snapshotImageId: true,
     },
@@ -108,6 +111,7 @@ export async function listProfileVersions(
         sandboxProfileId: version.sandboxProfileId,
         version: version.version,
         state: version.state,
+        defaultPersistenceMode: version.defaultPersistenceMode,
         isActive: version.version === sandboxProfile.activeVersion,
         usable:
           version.state === SandboxProfileVersionStates.PUBLISHED &&

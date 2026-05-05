@@ -2,6 +2,7 @@ import { z } from "@hono/zod-openapi";
 import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -29,6 +30,10 @@ const integrationBindingKindSchema = z.enum([
 const sandboxProfileVersionStateSchema = z.enum([
   SandboxProfileVersionStates.DRAFT,
   SandboxProfileVersionStates.PUBLISHED,
+]);
+const sandboxProfileVersionDefaultPersistenceModeSchema = z.enum([
+  SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+  SandboxProfileVersionDefaultPersistenceModes.PERSISTENT,
 ]);
 const sandboxProfileVersionSnapshotJobTriggerSchema = z.enum([
   SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
@@ -106,6 +111,7 @@ export const sandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
 
 export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
   state: sandboxProfileVersionStateSchema,
+  defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   publishedAt: z.string().min(1).nullable(),
   version: z.number().int().min(1),
 })
@@ -113,6 +119,7 @@ export const sandboxProfileVersionSchema = createSelectSchema(sandboxProfileVers
     sandboxProfileId: true,
     version: true,
     state: true,
+    defaultPersistenceMode: true,
   })
   .extend({
     isActive: z.boolean(),
@@ -127,6 +134,14 @@ export const sandboxProfileVersionSetupScriptSchema = z
     sandboxProfileId: z.string().min(1),
     version: z.number().int().min(1),
     setupScript: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const sandboxProfileVersionPersistenceModeSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
   })
   .strict();
 
@@ -230,6 +245,15 @@ export const getSandboxProfileVersionSetupScriptResponseSchema =
 
 export const putSandboxProfileVersionSetupScriptResponseSchema =
   sandboxProfileVersionSetupScriptSchema;
+
+export const putSandboxProfileVersionPersistenceModeBodySchema = z
+  .object({
+    defaultPersistenceMode: sandboxProfileVersionDefaultPersistenceModeSchema,
+  })
+  .strict();
+
+export const putSandboxProfileVersionPersistenceModeResponseSchema =
+  sandboxProfileVersionPersistenceModeSchema;
 
 export const putSandboxProfileVersionRefreshScheduleBodySchema = z
   .object({
