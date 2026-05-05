@@ -1,4 +1,8 @@
-import type { CodexTurnInputLocalImageItem } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
+import type {
+  CodexTurnCollaborationModeSettings,
+  CodexTurnInputLocalImageItem,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ChatAttachment } from "../../chat/chat-types.js";
@@ -60,6 +64,7 @@ export type SessionTurnControl = {
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
+    collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
   }) => Promise<void>;
   steerTurn: (input: {
     submittedPrompt: string;
@@ -80,6 +85,7 @@ export type SessionComposerStateInput = {
     pullRequest: SessionPullRequestSummary | null;
   };
   contextUsage: CodexContextUsageViewModel | null;
+  collaborationModeSettings?: AgentConversationCollaborationModeSettings | undefined;
   sessionErrorMessage: string | null;
   turnControl: SessionTurnControl;
 };
@@ -123,6 +129,28 @@ export function useSessionComposerState(input: {
       composerStateInput.configControl.selectedModel,
     ],
   );
+
+  const turnCollaborationModeSettings = useMemo(():
+    | CodexTurnCollaborationModeSettings
+    | undefined => {
+    if (composerStateInput.collaborationModeSettings === undefined) {
+      return undefined;
+    }
+
+    if (activeComposerModel === null) {
+      return undefined;
+    }
+
+    return {
+      model: activeComposerModel.model,
+      reasoningEffort: composerStateInput.configControl.selectedReasoningEffort,
+      developerInstructions: composerStateInput.collaborationModeSettings.developerInstructions,
+    };
+  }, [
+    activeComposerModel,
+    composerStateInput.collaborationModeSettings,
+    composerStateInput.configControl.selectedReasoningEffort,
+  ]);
 
   const composerStatusMessage = resolveComposerStatusMessage({
     activeComposerModel,
@@ -333,6 +361,9 @@ export function useSessionComposerState(input: {
           submittedAttachments: preparedAttachments.submittedAttachments,
           displayAttachments: preparedAttachments.displayAttachments,
           transcriptPrompt: submittedPrompt,
+          ...(turnCollaborationModeSettings === undefined
+            ? {}
+            : { collaborationModeSettings: turnCollaborationModeSettings }),
         });
       } catch (error) {
         setComposerErrorMessage(
@@ -365,6 +396,7 @@ export function useSessionComposerState(input: {
       composerStateInput.bootstrap.phase,
       composerStateInput.configControl.selectedModel,
       composerStateInput.turnControl,
+      turnCollaborationModeSettings,
     ],
   );
 
@@ -427,6 +459,9 @@ export function useSessionComposerState(input: {
             submittedAttachments: preparedAttachments.submittedAttachments,
             displayAttachments: preparedAttachments.displayAttachments,
             transcriptPrompt: submittedPrompt,
+            ...(turnCollaborationModeSettings === undefined
+              ? {}
+              : { collaborationModeSettings: turnCollaborationModeSettings }),
           });
         }
       } catch (error) {
@@ -451,6 +486,7 @@ export function useSessionComposerState(input: {
     draftState,
     pendingComposerAttachments,
     submitAction,
+    turnCollaborationModeSettings,
   ]);
 
   const submitLabel = useMemo(() => {

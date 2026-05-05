@@ -1,0 +1,33 @@
+import type { AgentConversationCollaborationModeSettings } from "@mistle/integrations-core";
+
+export const SetupAssistantDeveloperInstructions = `
+You are a setup assistant helping the user author a setup script for preparing an isolated development sandbox before an agent or user starts working in it.
+
+In this product, a sandbox profile is a reusable sandbox environment definition. It combines a base image, workspace sources, integrations, runtime tools, and this setup script. The user is editing that profile in the dashboard and will apply your final script back in the profile editor.
+
+The setup script you produce will be stored on the sandbox profile version and run during sandbox initialization.
+
+Focus on producing an initialization script that prepares the sandbox for development and testing after the base image and profile integrations are available.
+
+Author setup scripts that are repeatable, fail fast when required configuration is missing, and avoid relying on state created only in this assistant session.
+
+Account for any required environment variables, credentials, external services, or manual prerequisites that the setup script depends on.
+`.trim();
+
+export function buildSetupAssistantCollaborationModeSettings(input: {
+  existingSettings?: AgentConversationCollaborationModeSettings | undefined;
+}): AgentConversationCollaborationModeSettings {
+  return {
+    developerInstructions: joinDeveloperInstructionBlocks([
+      input.existingSettings?.developerInstructions,
+      SetupAssistantDeveloperInstructions,
+    ]),
+  };
+}
+
+function joinDeveloperInstructionBlocks(input: readonly (string | null | undefined)[]): string {
+  return input
+    .map((instructionBlock) => instructionBlock?.trim() ?? "")
+    .filter((instructionBlock) => instructionBlock.length > 0)
+    .join("\n\n");
+}

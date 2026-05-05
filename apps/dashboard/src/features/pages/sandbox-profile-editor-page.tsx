@@ -147,6 +147,7 @@ import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
 } from "./session-terminal-workspace.js";
+import { buildSetupAssistantCollaborationModeSettings } from "./setup-assistant-instructions.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 type SandboxProfileEditorPageProps =
@@ -1569,7 +1570,13 @@ function SetupScriptAssistantPanel(input: {
               <div className="shrink-0 border-t bg-background px-5 py-4">
                 <SessionConversationBottomPanelController
                   chatEntries={conversationPane.chatState.entries}
-                  composerStateInput={conversationPane.composerStateInput}
+                  composerStateInput={{
+                    ...conversationPane.composerStateInput,
+                    collaborationModeSettings: buildSetupAssistantCollaborationModeSettings({
+                      existingSettings:
+                        conversationPane.composerStateInput.collaborationModeSettings,
+                    }),
+                  }}
                   draftState={{
                     composerText,
                     pendingDiffComments,

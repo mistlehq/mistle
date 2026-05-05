@@ -14,6 +14,7 @@ import {
   type CodexJsonRpcServerRequest,
   type AgentStreamClient,
   type CodexThreadSummary,
+  type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import type { SandboxSessionTransport } from "@mistle/sandbox-session-client";
@@ -101,6 +102,7 @@ type CodexSessionChatState = {
     submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
     transcriptPrompt?: string;
     displayAttachments?: readonly ChatAttachment[];
+    collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
   }) => Promise<void>;
   interruptTurn: () => void;
   dismissUserMessageAction: (actionId: string) => void;
