@@ -2,7 +2,6 @@ import { listBrowserIntegrationDefinitions } from "@mistle/integrations-definiti
 import { createElement } from "react";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
@@ -121,17 +120,6 @@ function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): Reac
   });
 }
 
-function resolveSessionDetailHeaderLeading(input: RouteTextResolverInput): React.ReactNode | null {
-  const sandboxInstanceId = input.params["sandboxInstanceId"];
-  if (sandboxInstanceId === undefined || sandboxInstanceId.trim().length === 0) {
-    return null;
-  }
-
-  return createElement(SessionHeaderTitle, {
-    sandboxInstanceId,
-  });
-}
-
 function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): string {
   return "Edit";
 }
@@ -195,12 +183,7 @@ export const ROUTE_HANDLES = {
     description: "Start a sandbox-backed session from a sandbox profile.",
   },
   sessionsDetail: {
-    appShellHeaderLeadingVisible: true,
-    appShellHeaderVisible: true,
     hideBreadcrumb: true,
-    header: {
-      leading: resolveSessionDetailHeaderLeading,
-    },
     title: "Session",
     description: "Interact with one sandbox-backed Codex session.",
   },

@@ -1,30 +1,19 @@
 // @vitest-environment jsdom
 
+import { SidebarProvider } from "@mistle/ui";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, type RenderResult, render, screen, within } from "@testing-library/react";
-import { useState } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
-import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { SessionWorkbenchPage } from "./session-workbench-page.js";
-
-function HeaderActionsHarness(input: React.PropsWithChildren): React.JSX.Element {
-  const [actions, setActions] = useState<React.ReactNode | null>(null);
-
-  return (
-    <AppShellHeaderActionsContext.Provider value={setActions}>
-      {input.children}
-      <div data-testid="header-actions-host">{actions}</div>
-    </AppShellHeaderActionsContext.Provider>
-  );
-}
 
 function renderSessionWorkbenchPage(input?: {
   queryClientOptions?: Parameters<typeof createTestQueryClient>[0];
   sandboxInstanceId?: string;
+  sidebarDefaultOpen?: boolean;
   seededStatus?: "pending" | "starting" | "running" | "stopped" | "failed";
 }): RenderResult & { queryClient: ReturnType<typeof createTestQueryClient> } {
   const sandboxInstanceId = input?.sandboxInstanceId ?? "sbi_test";
@@ -41,13 +30,14 @@ function renderSessionWorkbenchPage(input?: {
       failureMessage: null,
       id: sandboxInstanceId,
       status: input.seededStatus,
+      title: "Test session",
     });
   }
 
   return {
     queryClient,
     ...render(
-      <HeaderActionsHarness>
+      <SidebarProvider defaultOpen={input?.sidebarDefaultOpen ?? true}>
         <QueryClientProvider client={queryClient}>
           <MemoryRouter initialEntries={[`/sessions/${sandboxInstanceId}`]}>
             <Routes>
@@ -55,13 +45,31 @@ function renderSessionWorkbenchPage(input?: {
             </Routes>
           </MemoryRouter>
         </QueryClientProvider>
-      </HeaderActionsHarness>,
+      </SidebarProvider>,
     ),
   };
 }
 
+function installMatchMedia(): void {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
+}
+
 describe("SessionWorkbenchPage", () => {
   beforeAll(() => {
+    installMatchMedia();
+
     Object.defineProperty(globalThis, "ResizeObserver", {
       configurable: true,
       value: class ResizeObserver {
@@ -86,22 +94,34 @@ describe("SessionWorkbenchPage", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("registers the processes header action on the session workbench", async () => {
-    const view = renderSessionWorkbenchPage({
+  it("renders the processes header action in the session workspace header", async () => {
+    renderSessionWorkbenchPage({
       seededStatus: "running",
     });
-    const headerActionsHost = view.container.querySelector('[data-testid="header-actions-host"]');
-
-    expect(headerActionsHost).not.toBeNull();
+    const workspaceHeader = screen.getByRole("banner");
 
     expect(
-      await within(headerActionsHost as HTMLElement).findByRole("button", {
+      await within(workspaceHeader).findByRole("button", {
         name: "Open processes",
       }),
     ).toBeTruthy();
   });
 
-  it("shows a running header status indicator for running sessions", async () => {
+  it("renders the sidebar trigger in the session workspace header when the sidebar is collapsed", () => {
+    renderSessionWorkbenchPage({
+      seededStatus: "running",
+      sidebarDefaultOpen: false,
+    });
+    const workspaceHeader = screen.getByRole("banner");
+
+    expect(
+      within(workspaceHeader).getByRole("button", {
+        name: "Toggle Sidebar",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("shows a running status indicator in the session workspace header", async () => {
     const sandboxInstanceId = "sbi_test";
     const view = renderSessionWorkbenchPage({
       sandboxInstanceId,
@@ -110,17 +130,20 @@ describe("SessionWorkbenchPage", () => {
 
     await act(async () => {
       view.queryClient.setQueryData(sandboxInstanceStatusQueryKey(sandboxInstanceId), {
+        automationConversation: null,
+        connectable: false,
         failureCode: null,
         failureMessage: null,
         id: sandboxInstanceId,
+        runtimeContext: null,
         status: "running" as const,
+        title: "Test session",
       });
     });
-    const headerActionsHost = view.container.querySelector('[data-testid="header-actions-host"]');
 
-    expect(headerActionsHost).not.toBeNull();
+    const workspaceHeader = screen.getByRole("banner");
 
-    const status = await within(headerActionsHost as HTMLElement).findByRole("status", {
+    const status = await within(workspaceHeader).findByRole("status", {
       name: "Running",
     });
     expect(status.className).toContain("bg-emerald-600");
@@ -140,6 +163,7 @@ describe("SessionWorkbenchPage", () => {
         failureMessage: null,
         id: sandboxInstanceId,
         status: "pending" as const,
+        title: "Test session",
       });
     });
 
@@ -160,6 +184,7 @@ describe("SessionWorkbenchPage", () => {
         failureMessage: null,
         id: sandboxInstanceId,
         status: "starting" as const,
+        title: "Test session",
       });
     });
 
@@ -180,6 +205,7 @@ describe("SessionWorkbenchPage", () => {
         failureMessage: null,
         id: sandboxInstanceId,
         status: "running" as const,
+        title: "Test session",
       });
     });
 

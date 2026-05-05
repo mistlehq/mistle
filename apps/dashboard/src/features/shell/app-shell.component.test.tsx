@@ -64,6 +64,7 @@ describe("resolveAppShellFrame", () => {
     }
     expect(sessionsSidebarElement.type).toBe(SessionsShellSidebar);
     expect(frame.sidebarHeaderContent).toBeNull();
+    expect(frame.renderSidebarTrigger).toBe(false);
   });
 
   it("keeps the normal app sidebar when the sessions toggle is disabled", () => {
@@ -110,6 +111,7 @@ describe("resolveAppShellFrame", () => {
     }
     expect(frame.sidebarContent.type).not.toBe(SessionsShellSidebar);
     expect(frame.sidebarHeaderContent).not.toBeNull();
+    expect(frame.renderSidebarTrigger).toBe(false);
   });
 
   it("keeps the app shell header hidden when route metadata does not opt in", () => {
@@ -152,6 +154,7 @@ describe("resolveAppShellFrame", () => {
 
     expect(frame.showHeader).toBe(false);
     expect(frame.showHeaderLeadingContent).toBe(false);
+    expect(frame.renderSidebarTrigger).toBe(true);
   });
 });
 

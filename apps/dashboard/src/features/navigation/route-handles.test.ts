@@ -184,11 +184,11 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.sandboxProfileSnapshots).not.toHaveProperty("pageBreadcrumb");
   });
 
-  it("defines session detail header-leading content and hides breadcrumbs", () => {
-    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderLeadingVisible).toBe(true);
-    expect(ROUTE_HANDLES.sessionsDetail.appShellHeaderVisible).toBe(true);
+  it("keeps session detail out of the app shell header and hides breadcrumbs", () => {
+    expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("appShellHeaderLeadingVisible");
+    expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("appShellHeaderVisible");
     expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
-    expect(typeof ROUTE_HANDLES.sessionsDetail.header?.leading).toBe("function");
+    expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("header");
   });
 
   it("resolves automation detail breadcrumb with edit fallback", () => {

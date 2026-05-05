@@ -13,6 +13,7 @@ import {
   CodexFixtureSessionServerRequests,
 } from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
+import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import type { SandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
   SessionConversationBottomPanel,
@@ -178,6 +179,7 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
   children: React.ReactNode;
   headerActions?: React.ReactNode;
   headerStatusUi?: SandboxStatusBadgeUi;
+  title?: React.ReactNode;
 }): React.JSX.Element {
   const headerStatusUi = input.headerStatusUi ?? {
     label: "Connected",
@@ -186,9 +188,17 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
   };
 
   return (
-    <div className="from-background to-muted/20 flex h-screen min-h-0 flex-col overflow-hidden bg-linear-to-b">
-      <div className="bg-background/80 flex h-12 flex-none items-center justify-end border-b px-4 backdrop-blur-sm">
-        {input.headerActions ??
+    <div className="from-background to-muted/20 h-screen min-h-0 overflow-hidden bg-linear-to-b">
+      <ConversationWorkspaceFrame
+        title={
+          input.title ?? (
+            <span className="block truncate text-sm font-medium text-foreground">
+              Storybook session
+            </span>
+          )
+        }
+        actions={
+          input.headerActions ??
           (headerStatusUi.variant === "destructive" ? (
             <Badge
               aria-label={headerStatusUi.label}
@@ -210,9 +220,11 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
               role="status"
               title={headerStatusUi.label}
             />
-          ))}
-      </div>
-      <div className="min-h-0 flex-1">{input.children}</div>
+          ))
+        }
+      >
+        {input.children}
+      </ConversationWorkspaceFrame>
     </div>
   );
 }
@@ -221,6 +233,7 @@ export function SessionWorkbenchStoryChrome(input: {
   children: React.ReactNode;
   headerActions?: React.ReactNode;
   headerStatusUi?: SandboxStatusBadgeUi;
+  title?: React.ReactNode;
 }): React.JSX.Element {
   return renderSessionWorkbenchStoryWithChrome(input);
 }

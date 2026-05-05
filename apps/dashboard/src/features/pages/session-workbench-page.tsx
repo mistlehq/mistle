@@ -1,8 +1,10 @@
+import { SidebarTrigger, useSidebar } from "@mistle/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router";
 
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
-import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import { SessionHeaderTitle } from "../sessions/session-header-title.js";
+import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -240,8 +242,6 @@ function SessionWorkbenchPageContent(input: {
       workbench.terminalPanelState.openPanel,
     ],
   );
-  useAppShellHeaderActions(headerActions);
-
   const chatItemIds = new Set(
     conversationPane.chatState.entries.flatMap((entry) => {
       if (entry.kind === "semantic-group") {
@@ -330,136 +330,150 @@ function SessionWorkbenchPageContent(input: {
     !hasEnteredReadyWorkbench && alert === null ? workbench.initialEntryStartupState : null;
   if (input.sandboxInstanceId === null) {
     return (
-      <SessionWorkbenchPageView
-        alert={null}
-        bottomPanel={<></>}
-        isBottomPanelVisible={false}
-        isSecondaryPanelVisible={false}
-        primaryBottomPanel={
-          <SessionConversationBottomPanel
-            chatEntries={[]}
-            composerViewModel={createEmptyComposerViewModel()}
-            isRespondingToServerRequest={false}
-            onRespondToServerRequest={function onRespondToServerRequest() {}}
-            serverRequestPanelEntries={[]}
-            statusMessage={null}
-          />
-        }
-        secondaryPanel={<></>}
-        mainContent={
-          <SessionConversationMainContent
-            activeTurnId={null}
-            isTurnInProgress={false}
-            pendingTurnId={null}
-            scrollBehavior="follow-streaming-at-bottom"
-            chatEntries={[]}
-            isRespondingToServerRequest={false}
-            onRespondToServerRequest={function onRespondToServerRequest() {}}
-            scrollContainerRef={conversationScrollContainerRef}
-            serverRequestPanelEntries={[]}
-          />
-        }
-        mainContentScrollContainerRef={conversationScrollContainerRef}
-        sandboxInstanceId={null}
-      />
+      <ConversationWorkspaceFrame
+        title="Session"
+        actions={headerActions}
+        leadingControl={<SessionWorkspaceSidebarTrigger />}
+      >
+        <SessionWorkbenchPageView
+          alert={null}
+          bottomPanel={<></>}
+          isBottomPanelVisible={false}
+          isSecondaryPanelVisible={false}
+          primaryBottomPanel={
+            <SessionConversationBottomPanel
+              chatEntries={[]}
+              composerViewModel={createEmptyComposerViewModel()}
+              isRespondingToServerRequest={false}
+              onRespondToServerRequest={function onRespondToServerRequest() {}}
+              serverRequestPanelEntries={[]}
+              statusMessage={null}
+            />
+          }
+          secondaryPanel={<></>}
+          mainContent={
+            <SessionConversationMainContent
+              activeTurnId={null}
+              isTurnInProgress={false}
+              pendingTurnId={null}
+              scrollBehavior="follow-streaming-at-bottom"
+              chatEntries={[]}
+              isRespondingToServerRequest={false}
+              onRespondToServerRequest={function onRespondToServerRequest() {}}
+              scrollContainerRef={conversationScrollContainerRef}
+              serverRequestPanelEntries={[]}
+            />
+          }
+          mainContentScrollContainerRef={conversationScrollContainerRef}
+          sandboxInstanceId={null}
+        />
+      </ConversationWorkspaceFrame>
     );
   }
 
   return (
-    <SessionWorkbenchPageView
-      alert={alert}
-      isPrimaryPanelTransitioning={
-        workbench.primaryPanelState.transitionState === "switching_to_cli" ||
-        workbench.primaryPanelState.transitionState === "restoring_chat"
-      }
-      bottomPanel={
-        <SessionTerminalWorkspace
-          key={terminalPanelKey}
-          cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
-          ensureTransportConnected={workbench.ensureTransportConnected}
-          isConnectionReady={workbench.connectionReadiness.canConnect}
-          isVisible={workbench.terminalPanelState.isVisible}
-          onTerminalReset={workbench.handleTerminalWorkspaceReset}
-          onWorkspaceEmpty={() => {
-            workbench.terminalPanelState.closePanel();
-          }}
-          ref={terminalWorkspaceRef}
-          sandboxStatus={workbench.sandboxLifecycleStatus}
-          sandboxInstanceId={input.sandboxInstanceId}
-        />
-      }
-      isBottomPanelVisible={workbench.terminalPanelState.isVisible}
-      isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
-      mainContentLayout={
-        workbench.primaryPanelState.transitionState === "stable_cli" ||
-        initialEntryStartupState !== null
-          ? { scroll: "contained", width: "full" }
-          : { scroll: "page", width: "chat" }
-      }
-      mainContent={renderPrimaryPanelMainContent({
-        conversation: {
-          activeTurnId: conversationPane.chatState.activeTurnId,
-          isTurnInProgress: conversationPane.chatState.status === "inProgress",
-          pendingTurnId: conversationPane.chatState.pendingTurnId,
-          scrollBehavior: "follow-streaming-at-bottom",
-          chatEntries: conversationPane.chatState.entries,
-          onUserMessageAction: conversationPane.dismissUserMessageAction,
-          isRespondingToServerRequest:
-            conversationPane.serverRequestsState.isRespondingToServerRequest,
-          onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
-          scrollContainerRef: conversationScrollContainerRef,
-          serverRequestPanelEntries: unmatchedServerRequests,
-        },
-        cli: {
-          ptyState: workbench.cliPtyState,
-          refitKey: workbench.terminalPanelState.isVisible
-            ? "cli:terminal-open"
-            : "cli:terminal-closed",
-        },
-        initialEntryStartupState,
-        transitionState: workbench.primaryPanelState.transitionState,
-      })}
-      mainContentScrollContainerRef={conversationScrollContainerRef}
-      primaryBottomPanel={
-        workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
-          <SessionConversationBottomPanelController
-            chatEntries={conversationPane.chatState.entries}
-            composerStateInput={conversationPane.composerStateInput}
-            draftState={{
-              composerText,
-              pendingDiffComments,
-              clearPendingDiffComments: handleClearPendingDiffComments,
-              setComposerText,
+    <ConversationWorkspaceFrame
+      title={<SessionHeaderTitle sandboxInstanceId={input.sandboxInstanceId} />}
+      actions={headerActions}
+      leadingControl={<SessionWorkspaceSidebarTrigger />}
+    >
+      <SessionWorkbenchPageView
+        alert={alert}
+        isPrimaryPanelTransitioning={
+          workbench.primaryPanelState.transitionState === "switching_to_cli" ||
+          workbench.primaryPanelState.transitionState === "restoring_chat"
+        }
+        bottomPanel={
+          <SessionTerminalWorkspace
+            key={terminalPanelKey}
+            cwd={workbench.primaryRepositoryState.selectedRepositoryPath}
+            ensureTransportConnected={workbench.ensureTransportConnected}
+            isConnectionReady={workbench.connectionReadiness.canConnect}
+            isVisible={workbench.terminalPanelState.isVisible}
+            onTerminalReset={workbench.handleTerminalWorkspaceReset}
+            onWorkspaceEmpty={() => {
+              workbench.terminalPanelState.closePanel();
             }}
-            isRespondingToServerRequest={
-              conversationPane.serverRequestsState.isRespondingToServerRequest
-            }
-            onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
-            key={input.sandboxInstanceId ?? "missing-session"}
-            serverRequestPanelEntries={unmatchedServerRequests}
-            showWorkingIndicator={
-              conversationPane.chatState.activeTurnId !== null &&
-              conversationPane.chatState.status === "inProgress"
-            }
+            ref={terminalWorkspaceRef}
+            sandboxStatus={workbench.sandboxLifecycleStatus}
+            sandboxInstanceId={input.sandboxInstanceId}
           />
-        ) : null
-      }
-      secondaryPanel={
-        <SessionDiffPanel
-          errorNotice={diffPanelErrorNotice}
-          isLoading={workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading}
-          onAddComment={handleAddPendingDiffComment}
-          onDeleteComment={handleRemovePendingDiffComment}
-          onUpdateComment={handleUpdatePendingDiffComment}
-          pendingComments={pendingDiffComments}
-          patch={diffPanelPatch}
-          repositoryPath={primaryRepositoryPath}
-          summaryLabel={workbench.diffPanelState.compareLabel}
-          title="Current changes"
-        />
-      }
-      sandboxInstanceId={input.sandboxInstanceId}
-    />
+        }
+        isBottomPanelVisible={workbench.terminalPanelState.isVisible}
+        isSecondaryPanelVisible={workbench.diffPanelState.isVisible}
+        mainContentLayout={
+          workbench.primaryPanelState.transitionState === "stable_cli" ||
+          initialEntryStartupState !== null
+            ? { scroll: "contained", width: "full" }
+            : { scroll: "page", width: "chat" }
+        }
+        mainContent={renderPrimaryPanelMainContent({
+          conversation: {
+            activeTurnId: conversationPane.chatState.activeTurnId,
+            isTurnInProgress: conversationPane.chatState.status === "inProgress",
+            pendingTurnId: conversationPane.chatState.pendingTurnId,
+            scrollBehavior: "follow-streaming-at-bottom",
+            chatEntries: conversationPane.chatState.entries,
+            onUserMessageAction: conversationPane.dismissUserMessageAction,
+            isRespondingToServerRequest:
+              conversationPane.serverRequestsState.isRespondingToServerRequest,
+            onRespondToServerRequest: conversationPane.serverRequestsState.respondToServerRequest,
+            scrollContainerRef: conversationScrollContainerRef,
+            serverRequestPanelEntries: unmatchedServerRequests,
+          },
+          cli: {
+            ptyState: workbench.cliPtyState,
+            refitKey: workbench.terminalPanelState.isVisible
+              ? "cli:terminal-open"
+              : "cli:terminal-closed",
+          },
+          initialEntryStartupState,
+          transitionState: workbench.primaryPanelState.transitionState,
+        })}
+        mainContentScrollContainerRef={conversationScrollContainerRef}
+        primaryBottomPanel={
+          workbench.primaryPanelState.showsChatComposer && initialEntryStartupState === null ? (
+            <SessionConversationBottomPanelController
+              chatEntries={conversationPane.chatState.entries}
+              composerStateInput={conversationPane.composerStateInput}
+              draftState={{
+                composerText,
+                pendingDiffComments,
+                clearPendingDiffComments: handleClearPendingDiffComments,
+                setComposerText,
+              }}
+              isRespondingToServerRequest={
+                conversationPane.serverRequestsState.isRespondingToServerRequest
+              }
+              onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
+              key={input.sandboxInstanceId ?? "missing-session"}
+              serverRequestPanelEntries={unmatchedServerRequests}
+              showWorkingIndicator={
+                conversationPane.chatState.activeTurnId !== null &&
+                conversationPane.chatState.status === "inProgress"
+              }
+            />
+          ) : null
+        }
+        secondaryPanel={
+          <SessionDiffPanel
+            errorNotice={diffPanelErrorNotice}
+            isLoading={
+              workbench.connectionReadiness.canConnect && workbench.diffPanelState.isLoading
+            }
+            onAddComment={handleAddPendingDiffComment}
+            onDeleteComment={handleRemovePendingDiffComment}
+            onUpdateComment={handleUpdatePendingDiffComment}
+            pendingComments={pendingDiffComments}
+            patch={diffPanelPatch}
+            repositoryPath={primaryRepositoryPath}
+            summaryLabel={workbench.diffPanelState.compareLabel}
+            title="Current changes"
+          />
+        }
+        sandboxInstanceId={input.sandboxInstanceId}
+      />
+    </ConversationWorkspaceFrame>
   );
 }
 
@@ -514,6 +528,25 @@ function renderPrimaryPanelMainContent(input: {
     case "stable_chat":
       return <SessionConversationMainContent {...input.conversation} />;
   }
+}
+
+function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
+  const { isMobile, openMobile, state } = useSidebar();
+  const shouldRenderSidebarTrigger = shouldRenderSessionWorkspaceSidebarTrigger({
+    isMobile,
+    openMobile,
+    sidebarState: state,
+  });
+
+  return shouldRenderSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
+}
+
+function shouldRenderSessionWorkspaceSidebarTrigger(input: {
+  isMobile: boolean;
+  openMobile: boolean;
+  sidebarState: "expanded" | "collapsed";
+}): boolean {
+  return input.isMobile ? !input.openMobile : input.sidebarState === "collapsed";
 }
 
 function createEmptyComposerViewModel(): ChatComposerViewModel {

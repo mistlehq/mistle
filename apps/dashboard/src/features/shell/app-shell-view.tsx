@@ -25,6 +25,7 @@ export interface AppShellViewProps {
   autosaveIndicator: React.ReactNode | null;
   headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
+  renderSidebarTrigger: boolean;
   showHeader: boolean;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
@@ -75,17 +76,23 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
 function AppShellStickyHeader(
   input: Pick<
     AppShellViewProps,
-    "autosaveIndicator" | "headerLeadingContent" | "headerActions" | "showHeaderLeadingContent"
+    | "autosaveIndicator"
+    | "headerLeadingContent"
+    | "headerActions"
+    | "renderSidebarTrigger"
+    | "showHeaderLeadingContent"
   > & {
     showHeaderContent: boolean;
   },
 ): React.JSX.Element | null {
   const { isMobile, openMobile, state } = useSidebar();
-  const shouldRenderSidebarTrigger = shouldRenderAppShellSidebarTrigger({
-    isMobile,
-    openMobile,
-    sidebarState: state,
-  });
+  const shouldRenderSidebarTrigger =
+    input.renderSidebarTrigger &&
+    shouldRenderAppShellSidebarTrigger({
+      isMobile,
+      openMobile,
+      sidebarState: state,
+    });
   const hasHeaderTrailingContent = input.headerActions !== null || input.autosaveIndicator !== null;
 
   if (

@@ -48,6 +48,7 @@ function IntegrationsNavIcon(props: {
 export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
   | "contentInsetOwner"
+  | "renderSidebarTrigger"
   | "showHeader"
   | "showHeaderLeadingContent"
   | "sidebarContent"
@@ -89,6 +90,7 @@ export function resolveAppShellFrame(input: {
   if (input.inSettings) {
     return {
       contentInsetOwner: "child",
+      renderSidebarTrigger: true,
       showHeader: input.pageMeta.appShellHeaderVisible,
       showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
       sidebarContent: <SettingsSectionNav />,
@@ -102,6 +104,7 @@ export function resolveAppShellFrame(input: {
 
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
+    renderSidebarTrigger: !input.inSessionDetail,
     showHeader: input.pageMeta.appShellHeaderVisible,
     showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
     sidebarContent: showDedicatedSessionsSidebar ? (

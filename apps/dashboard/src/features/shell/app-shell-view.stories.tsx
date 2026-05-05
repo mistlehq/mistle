@@ -184,6 +184,11 @@ const meta = {
       control: false,
       description: "Primary page content rendered inside the shell content region.",
     },
+    renderSidebarTrigger: {
+      control: "boolean",
+      description:
+        "Allows the shell sticky header to render the sidebar trigger when navigation access is not owned by child content.",
+    },
     showHeaderLeadingContent: {
       control: "boolean",
       description: "Toggles whether the header-leading region is shown in the sticky header.",
@@ -233,6 +238,7 @@ const meta = {
         "headerActions",
         "autosaveIndicator",
         "mainContent",
+        "renderSidebarTrigger",
         "sidebarHeaderContent",
         "sidebarContent",
         "sidebarFooterContent",
@@ -259,6 +265,7 @@ const meta = {
         </p>
       </div>
     ),
+    renderSidebarTrigger: true,
     showHeader: true,
     showHeaderLeadingContent: true,
     showSessionsSidebar: false,

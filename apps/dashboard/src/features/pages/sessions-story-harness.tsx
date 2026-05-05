@@ -12,11 +12,9 @@ import {
 } from "react-router";
 
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
-import { useAppHeaderLeadingModel } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
-import { AppShellHeaderActionsContext } from "../shell/app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "../shell/app-shell-route-state.js";
 import {
   isExistingSandboxSessionPath,
@@ -129,8 +127,6 @@ export function SessionsStoryHarness(input: SessionsStoryHarnessProps): React.JS
 function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): React.JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
-  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
-  const headerLeadingModel = useAppHeaderLeadingModel();
   const previousSessionDetailUrlRef = useRef<string | null>(null);
   const previousSessionsSidebarToggleUrlRef = useRef<string | null>(null);
   const [showSessionsSidebar, setShowSessionsSidebar] = useState(
@@ -159,8 +155,8 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     activeOrganizationId: "org_123",
     organizationName: "Mistle Labs",
     pageMeta: {
-      appShellHeaderLeadingVisible: isExistingSandboxSessionPath(location.pathname),
-      appShellHeaderVisible: isExistingSandboxSessionPath(location.pathname),
+      appShellHeaderLeadingVisible: false,
+      appShellHeaderVisible: false,
       appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
       appShellViewportMode: "document",
       title: null,
@@ -211,17 +207,13 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
   });
 
   return (
-    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-      <AppShellView
-        {...appShellFrame}
-        autosaveIndicator={null}
-        headerLeadingContent={
-          headerLeadingModel.kind === "custom" ? <>{headerLeadingModel.content}</> : null
-        }
-        headerActions={headerActions}
-        mainContent={<Outlet />}
-      />
-    </AppShellHeaderActionsContext.Provider>
+    <AppShellView
+      {...appShellFrame}
+      autosaveIndicator={null}
+      headerLeadingContent={null}
+      headerActions={null}
+      mainContent={<Outlet />}
+    />
   );
 }
 

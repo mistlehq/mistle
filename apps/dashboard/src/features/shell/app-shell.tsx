@@ -14,7 +14,6 @@ import {
 } from "../shared/singleton-image.js";
 import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
-import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 import {
   isExistingSandboxSessionPath,
@@ -48,7 +47,6 @@ export function AppShell(): React.JSX.Element {
   const [isSwitchingOrganization, setIsSwitchingOrganization] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [switchOrganizationError, setSwitchOrganizationError] = useState<string | null>(null);
-  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const [sessionsSidebarModeEnabled, setSessionsSidebarModeEnabled] = useState(false);
   const routeState = resolveAppShellRouteState(location.pathname);
   const showSessionsSidebar = resolveSessionsSidebarModeEnabled({
@@ -232,16 +230,14 @@ export function AppShell(): React.JSX.Element {
   });
 
   return (
-    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-      <AppShellView
-        headerLeadingContent={
-          headerLeadingModel.kind === "custom" ? <>{headerLeadingModel.content}</> : null
-        }
-        headerActions={headerActions}
-        autosaveIndicator={autosaveIndicator}
-        mainContent={<Outlet />}
-        {...appShellFrame}
-      />
-    </AppShellHeaderActionsContext.Provider>
+    <AppShellView
+      headerLeadingContent={
+        headerLeadingModel.kind === "custom" ? <>{headerLeadingModel.content}</> : null
+      }
+      headerActions={null}
+      autosaveIndicator={autosaveIndicator}
+      mainContent={<Outlet />}
+      {...appShellFrame}
+    />
   );
 }
