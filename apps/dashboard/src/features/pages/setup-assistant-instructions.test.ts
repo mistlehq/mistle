@@ -37,9 +37,8 @@ describe("buildSetupAssistantStartingPrompt", () => {
       buildSetupAssistantStartingPrompt("#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install"),
     ).toBe(
       [
-        "Fix this setup script",
+        "Fix this script:",
         "",
-        "This is the current setup script:",
         "```sh",
         "#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install",
         "```",

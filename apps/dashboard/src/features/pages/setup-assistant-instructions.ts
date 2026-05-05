@@ -35,14 +35,7 @@ export function buildSetupAssistantStartingPrompt(setupScript: string): string {
     return prompt;
   }
 
-  return [
-    "Fix this setup script",
-    "",
-    "This is the current setup script:",
-    "```sh",
-    setupScript,
-    "```",
-  ].join("\n");
+  return ["Fix this script:", "", "```sh", setupScript, "```"].join("\n");
 }
 
 function joinDeveloperInstructionBlocks(input: readonly (string | null | undefined)[]): string {
