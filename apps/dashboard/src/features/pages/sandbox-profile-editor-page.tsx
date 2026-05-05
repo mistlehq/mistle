@@ -1547,7 +1547,7 @@ function SetupScriptAssistantPanel(input: {
             </div>
             {workbench.primaryPanelState.showsChatComposer &&
             workbench.initialEntryStartupState === null ? (
-              <div className="shrink-0 border-t bg-background px-5 py-4">
+              <div className="shrink-0 bg-background px-5 py-4">
                 <SessionConversationBottomPanelController
                   chatEntries={conversationPane.chatState.entries}
                   composerStateInput={{

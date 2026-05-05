@@ -498,7 +498,7 @@ function SetupAssistantPanel(input: {
             serverRequestPanelEntries={[]}
           />
         </div>
-        <div className="shrink-0 border-t bg-background px-5 py-4">
+        <div className="shrink-0 bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
             composerText={buildSetupAssistantInitialComposerText(input.setupScript)}
