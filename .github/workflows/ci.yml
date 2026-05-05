@@ -787,6 +787,11 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
+      - name: Build control-plane migration runner
+        run: >-
+          nix develop --command pnpm turbo run build --output-logs=errors-only
+          --filter=@mistle/control-plane-api
+
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
 
@@ -852,6 +857,11 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Build data-plane migration runner
+        run: >-
+          nix develop --command pnpm turbo run build --output-logs=errors-only
+          --filter=@mistle/data-plane-api
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
