@@ -4,6 +4,7 @@ import { SandboxInstancePurposes, type SandboxInstanceSource } from "@mistle/db/
 import { type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
+import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileSetupCheckSandboxInput = {
@@ -11,6 +12,7 @@ type StartProfileSetupCheckSandboxInput = {
   profileId: string;
   profileVersion: number;
   idempotencyKey?: string;
+  requireAgentRuntime?: boolean;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;
@@ -51,6 +53,12 @@ export async function startProfileSetupCheckSandbox(
       },
     },
   );
+  if (input.requireAgentRuntime === true && compiledRuntimePlan.agentRuntimes.length === 0) {
+    throw new SandboxProfilesCompileError(
+      SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
+      `Sandbox profile '${input.profileId}' version ${String(input.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting the setup assistant.`,
+    );
+  }
   const { setupScript: _setupScript, ...runtimePlanWithoutSetupScript } = compiledRuntimePlan;
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({

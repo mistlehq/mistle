@@ -1571,6 +1571,18 @@ describe("SandboxProfileEditorPage", () => {
 
   it("allows setup script testing for draft scripts with content", () => {
     renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {
+            runtime: {
+              runtimeId: "codex",
+            },
+          },
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
       versionState: "draft",
@@ -1597,6 +1609,18 @@ describe("SandboxProfileEditorPage", () => {
 
   it("disables setup script testing for empty and published scripts", () => {
     renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {
+            runtime: {
+              runtimeId: "codex",
+            },
+          },
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: null,
       versionState: "draft",
@@ -1631,6 +1655,31 @@ describe("SandboxProfileEditorPage", () => {
       "Setup script testing is only available while editing a draft.",
     );
     expect(publishedWriteButton.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("disables setup assistant when no agent runtime is configured", () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-git",
+          connectionId: "connection-git",
+          kind: "git",
+          config: {},
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install",
+      versionState: "draft",
+    });
+
+    const setupAssistantButton = screen.getByRole("button", {
+      name: "Setup assistant",
+    });
+
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(true);
+    expect(setupAssistantButton.getAttribute("title")).toBe(
+      "Add an agent integration before using Setup assistant.",
+    );
   });
 
   it("renders published profiles as read-only", () => {

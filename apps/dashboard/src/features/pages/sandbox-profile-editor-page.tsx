@@ -169,6 +169,7 @@ type SandboxProfileDraftSectionState = {
 };
 type SetupScriptAssistantControl = {
   disabled: boolean;
+  errorMessage: string | null;
   isStarting: boolean;
   onOpen: (input: { setupScript: string }) => void;
   title: string;
@@ -185,6 +186,34 @@ function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSection
     hasUnpersistedChanges: false,
     isSaving: false,
   };
+}
+
+const AgentRuntimeRequiredErrorCode = "AGENT_RUNTIME_REQUIRED";
+const SetupAssistantAgentRuntimeRequiredMessage =
+  "Add an agent integration before using Setup assistant.";
+
+function hasConfiguredAgentRuntime(value: unknown): boolean {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  if (!("runtimeId" in value)) {
+    return false;
+  }
+
+  return typeof value.runtimeId === "string" && value.runtimeId.trim().length > 0;
+}
+
+function hasSetupAssistantAgentRuntime(
+  integrationRows: readonly SandboxProfileBindingEditorRow[] | null,
+): boolean {
+  if (integrationRows === null) {
+    return false;
+  }
+
+  return integrationRows.some(
+    (row) => row.kind === "agent" && hasConfiguredAgentRuntime(row.config["runtime"]),
+  );
 }
 
 const SetupScriptPlaceholder = `#!/usr/bin/env bash
@@ -1088,6 +1117,12 @@ function ReadySandboxProfileEditorPage(input: {
   const editorSections = createSandboxProfileEditorSections({
     snapshotState: snapshotPanelState,
   });
+  const setupAssistantIntegrationRows = resolveSandboxProfileSetupScriptIntegrationRows(
+    integrationsLoader.initialRows,
+    integrationDraftState.integrationRows,
+  );
+  const setupAssistantHasAgentRuntime =
+    input.mode.kind === "draft" && hasSetupAssistantAgentRuntime(setupAssistantIntegrationRows);
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -1125,21 +1160,42 @@ function ReadySandboxProfileEditorPage(input: {
       });
     },
     onError: (error: unknown) => {
+      setSetupAssistantPanelState((currentState) =>
+        currentState === null
+          ? currentState
+          : {
+              ...currentState,
+              isOpen: false,
+            },
+      );
       setSetupAssistantError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not start setup assistant.",
-        }),
+        error instanceof SandboxProfilesApiError && error.code === AgentRuntimeRequiredErrorCode
+          ? SetupAssistantAgentRuntimeRequiredMessage
+          : resolveApiErrorMessage({
+              error,
+              fallbackMessage: "Could not start setup assistant.",
+            }),
       );
     },
   });
+  const setupAssistantDisabledReason =
+    input.mode.kind !== "draft"
+      ? "Setup script authoring is only available while editing a draft."
+      : setupAssistantIntegrationRows === null
+        ? "Integration bindings are still loading."
+        : !setupAssistantHasAgentRuntime
+          ? SetupAssistantAgentRuntimeRequiredMessage
+          : draftFieldsAreDisabled
+            ? "Setup assistant is unavailable while draft changes are saving."
+            : startSetupAssistantMutation.isPending
+              ? "Setup assistant is starting."
+              : null;
   const setupAssistantControl: SetupScriptAssistantControl = {
-    disabled:
-      input.mode.kind !== "draft" ||
-      draftFieldsAreDisabled ||
-      startSetupAssistantMutation.isPending,
+    disabled: setupAssistantDisabledReason !== null,
+    errorMessage: setupAssistantError,
     isStarting: startSetupAssistantMutation.isPending,
     onOpen: ({ setupScript }) => {
+      setSetupAssistantError(null);
       const initialPrompt = createSetupScriptAuthoringPrompt({
         profileName: metaState.formState.displayName ?? metaState.pageTitle,
         setupScript,
@@ -1162,10 +1218,7 @@ function ReadySandboxProfileEditorPage(input: {
 
       startSetupAssistantMutation.mutate();
     },
-    title:
-      input.mode.kind !== "draft"
-        ? "Setup script authoring is only available while editing a draft."
-        : "Open the right panel to write this setup script with an agent.",
+    title: setupAssistantDisabledReason ?? "Open the right panel to write this setup script.",
   };
 
   useEffect(() => {
@@ -1267,7 +1320,7 @@ function ReadySandboxProfileEditorPage(input: {
       profileName={metaState.formState.displayName}
       profileNameFallback={metaState.pageTitle}
       publishRequestIsPending={publishRequestIsPending}
-      versionActionError={publishFlushError ?? setupAssistantError ?? input.versionActionError}
+      versionActionError={publishFlushError ?? input.versionActionError}
       versionActionIsPending={input.versionActionIsPending}
       isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
       renderSectionPanel={(sectionId) => (
@@ -2280,32 +2333,39 @@ function ReadySandboxProfileSetupScriptSection(input: {
   ]);
 
   return (
-    <SandboxProfileSetupScriptPanel
-      errorMessage={setupScriptState.errorMessage}
-      isSaving={setupScriptState.isSaving}
-      onBlur={setupScriptState.onBlur}
-      onChange={setupScriptState.onChange}
-      saveStatus={setupScriptState.saveStatus}
-      testControl={
-        <SandboxProfileSetupScriptTestButton
-          {...setupScriptTest.buttonProps}
-          writeWithAgent={{
-            disabled: input.setupAssistantControl.disabled,
-            isStarting: input.setupAssistantControl.isStarting,
-            onClick: () => {
-              input.setupAssistantControl.onOpen({
-                setupScript: setupScriptState.draftValue,
-              });
-            },
-            title: input.setupAssistantControl.title,
-          }}
-        />
-      }
-      testPanel={<SandboxProfileSetupScriptTestPanel {...setupScriptTest.panelProps} />}
-      value={setupScriptState.draftValue}
-      disabled={input.disabled}
-      repositoryHandles={resolveSandboxBaseRepositoryHandles(input.integrationRows)}
-    />
+    <div className="flex flex-col gap-4">
+      {input.setupAssistantControl.errorMessage === null ? null : (
+        <Notice title="Setup assistant unavailable" variant="alert">
+          {input.setupAssistantControl.errorMessage}
+        </Notice>
+      )}
+      <SandboxProfileSetupScriptPanel
+        errorMessage={setupScriptState.errorMessage}
+        isSaving={setupScriptState.isSaving}
+        onBlur={setupScriptState.onBlur}
+        onChange={setupScriptState.onChange}
+        saveStatus={setupScriptState.saveStatus}
+        testControl={
+          <SandboxProfileSetupScriptTestButton
+            {...setupScriptTest.buttonProps}
+            writeWithAgent={{
+              disabled: input.setupAssistantControl.disabled,
+              isStarting: input.setupAssistantControl.isStarting,
+              onClick: () => {
+                input.setupAssistantControl.onOpen({
+                  setupScript: setupScriptState.draftValue,
+                });
+              },
+              title: input.setupAssistantControl.title,
+            }}
+          />
+        }
+        testPanel={<SandboxProfileSetupScriptTestPanel {...setupScriptTest.panelProps} />}
+        value={setupScriptState.draftValue}
+        disabled={input.disabled}
+        repositoryHandles={resolveSandboxBaseRepositoryHandles(input.integrationRows)}
+      />
+    </div>
   );
 }
 

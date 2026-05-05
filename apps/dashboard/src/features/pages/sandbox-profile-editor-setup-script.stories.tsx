@@ -44,6 +44,21 @@ export const AuthoringStarting: Story = {
   },
 };
 
+export const AuthoringRequiresAgent: Story = {
+  args: {
+    initialBindings: [StoryBindings[1]],
+    setupScriptAuthoringState: "disabled",
+  },
+};
+
+export const AuthoringAgentRequiredNotice: Story = {
+  args: {
+    initialBindings: [StoryBindings[1]],
+    setupScriptAuthoringErrorMessage: "Add an agent integration before using Setup assistant.",
+    setupScriptAuthoringState: "disabled",
+  },
+};
+
 export const AuthoringPanelReady: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],

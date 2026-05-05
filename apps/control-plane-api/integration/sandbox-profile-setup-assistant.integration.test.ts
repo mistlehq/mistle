@@ -16,6 +16,7 @@ import {
 import { describe, expect } from "vitest";
 
 import { StartSandboxProfileSetupAssistantResponseSchema } from "../src/sandbox-profiles/index.js";
+import { badRequestResponseSchema } from "../src/sandbox-profiles/start-sandbox-profile-instance/schema.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
   integrationConnectionRow,
@@ -75,6 +76,48 @@ describe.concurrent("sandbox profile setup assistant integration", () => {
     expect(queuedWorkflowInput.image).toMatchObject({
       kind: "base",
     });
+  });
+
+  it("returns 400 when the profile version has no agent binding", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-assistant-missing-agent@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_assistant_missing_agent",
+        organizationId: session.organizationId,
+        displayName: "Setup Assistant Missing Agent Profile",
+        activeVersion: null,
+        createdAt: "2026-05-04T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_assistant_missing_agent",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "pnpm install",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_assistant_missing_agent/versions/1/setup-script/assistant",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          idempotencyKey: "setup-assistant-missing-agent-test",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = badRequestResponseSchema.parse(await response.json());
+    expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
   });
 });
 

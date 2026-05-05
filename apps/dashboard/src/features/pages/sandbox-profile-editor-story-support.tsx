@@ -3,10 +3,14 @@ import {
   Button,
   ButtonGroup,
   Label,
+  Notice,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
   Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
 import {
   PlayIcon,
@@ -114,6 +118,7 @@ export type SandboxProfileEditorPageStoryArgs = {
   }[];
   setupScript: string | null;
   setupScriptAuthoringPanelState?: "closed" | "starting" | "ready" | "proposed-script";
+  setupScriptAuthoringErrorMessage?: string;
   setupScriptAuthoringState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
 };
@@ -370,6 +375,30 @@ function SetupScriptStoryControls(input: {
   const authoringIsDisabled =
     input.authoringState === "disabled" || !input.isDraft || authoringIsStarting;
   const failOnFirstErrorSwitchId = "story-setup-script-test-fail-on-first-error";
+  const authoringTitle = !input.isDraft
+    ? "Setup script authoring is only available while editing a draft."
+    : input.authoringState === "disabled"
+      ? "Add an agent integration before using Setup assistant."
+      : "Open the right panel to write this setup script.";
+  const authoringButton = (
+    <Button
+      disabled={authoringIsDisabled}
+      size="sm"
+      title={authoringTitle}
+      onClick={input.onWriteWithAgent}
+      type="button"
+      variant="outline"
+    >
+      {authoringIsStarting ? (
+        "Starting agent..."
+      ) : (
+        <>
+          <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
+          Setup assistant
+        </>
+      )}
+    </Button>
+  );
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
@@ -400,29 +429,18 @@ function SetupScriptStoryControls(input: {
           {testIsBusy ? "Running..." : "Test"}
         </Button>
         {showAuthoringAction ? (
-          <Button
-            disabled={authoringIsDisabled}
-            size="sm"
-            title={
-              !input.isDraft
-                ? "Setup script authoring is only available while editing a draft."
-                : input.authoringState === "disabled"
-                  ? "Setup script authoring is unavailable for this profile."
-                  : "Open the right panel to write this setup script with an agent."
-            }
-            onClick={input.onWriteWithAgent}
-            type="button"
-            variant="outline"
-          >
-            {authoringIsStarting ? (
-              "Starting agent..."
-            ) : (
-              <>
-                <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-                Setup assistant
-              </>
-            )}
-          </Button>
+          authoringIsDisabled ? (
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                {authoringButton}
+              </TooltipTrigger>
+              <TooltipContent className="max-w-64 text-left" side="top">
+                {authoringTitle}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            authoringButton
+          )
         ) : null}
       </ButtonGroup>
     </div>
@@ -749,28 +767,35 @@ function SandboxProfileEditorPageStoryView(
                 />
               </SandboxProfilePanelSection>
               <SandboxProfilePanelSection>
-                <SandboxProfileSetupScriptPanel
-                  onBlur={handleSetupScriptBlur}
-                  onChange={setSetupScriptDraft}
-                  disabled={!isEditable}
-                  repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
-                  saveStatus={setupScriptSaveStatus}
-                  testControl={
-                    <SetupScriptStoryControls
-                      authoringState={input.setupScriptAuthoringState}
-                      isDraft={mode.kind === "draft"}
-                      onWriteWithAgent={handleWriteWithAgent}
-                      testStatus={setupScriptTestStatus}
-                    />
-                  }
-                  testPanel={
-                    <SandboxProfileSetupScriptTestPanel
-                      isDraft={mode.kind === "draft"}
-                      status={setupScriptTestStatus}
-                    />
-                  }
-                  value={setupScriptDraft}
-                />
+                <div className="flex flex-col gap-4">
+                  {input.setupScriptAuthoringErrorMessage === undefined ? null : (
+                    <Notice title="Setup assistant unavailable" variant="alert">
+                      {input.setupScriptAuthoringErrorMessage}
+                    </Notice>
+                  )}
+                  <SandboxProfileSetupScriptPanel
+                    onBlur={handleSetupScriptBlur}
+                    onChange={setSetupScriptDraft}
+                    disabled={!isEditable}
+                    repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
+                    saveStatus={setupScriptSaveStatus}
+                    testControl={
+                      <SetupScriptStoryControls
+                        authoringState={input.setupScriptAuthoringState}
+                        isDraft={mode.kind === "draft"}
+                        onWriteWithAgent={handleWriteWithAgent}
+                        testStatus={setupScriptTestStatus}
+                      />
+                    }
+                    testPanel={
+                      <SandboxProfileSetupScriptTestPanel
+                        isDraft={mode.kind === "draft"}
+                        status={setupScriptTestStatus}
+                      />
+                    }
+                    value={setupScriptDraft}
+                  />
+                </div>
               </SandboxProfilePanelSection>
             </div>
           );

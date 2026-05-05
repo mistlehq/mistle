@@ -28,6 +28,7 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
+      requireAgentRuntime: true,
       startedBy: {
         kind: "user",
         id: user.id,

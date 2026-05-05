@@ -1,5 +1,15 @@
 import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-client";
-import { Button, ButtonGroup, InlineCode, Label, Notice, Switch } from "@mistle/ui";
+import {
+  Button,
+  ButtonGroup,
+  InlineCode,
+  Label,
+  Notice,
+  Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@mistle/ui";
 import {
   CheckCircleIcon,
   PlayIcon,
@@ -253,6 +263,26 @@ export function SandboxProfileSetupScriptTestButton(
     input.disabled === true || !input.isDraft || input.status === "blank" || isBusy;
 
   const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
+  const writeWithAgentButton =
+    input.writeWithAgent === undefined ? null : (
+      <Button
+        disabled={input.writeWithAgent.disabled}
+        onClick={input.writeWithAgent.onClick}
+        size="sm"
+        title={input.writeWithAgent.title}
+        type="button"
+        variant="outline"
+      >
+        {input.writeWithAgent.isStarting ? (
+          "Starting agent..."
+        ) : (
+          <>
+            <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
+            Setup assistant
+          </>
+        )}
+      </Button>
+    );
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
@@ -284,24 +314,17 @@ export function SandboxProfileSetupScriptTestButton(
           {resolveSetupScriptTestButtonIcon(input.status)}
           {resolveSetupScriptTestButtonLabel(input.status)}
         </Button>
-        {input.writeWithAgent === undefined ? null : (
-          <Button
-            disabled={input.writeWithAgent.disabled}
-            onClick={input.writeWithAgent.onClick}
-            size="sm"
-            title={input.writeWithAgent.title}
-            type="button"
-            variant="outline"
-          >
-            {input.writeWithAgent.isStarting ? (
-              "Starting agent..."
-            ) : (
-              <>
-                <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-                Setup assistant
-              </>
-            )}
-          </Button>
+        {input.writeWithAgent === undefined ? null : input.writeWithAgent.disabled ? (
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              {writeWithAgentButton}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64 text-left" side="top">
+              {input.writeWithAgent.title}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          writeWithAgentButton
         )}
       </ButtonGroup>
     </div>
