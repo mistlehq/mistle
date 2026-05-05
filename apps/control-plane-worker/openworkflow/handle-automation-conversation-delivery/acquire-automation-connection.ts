@@ -51,7 +51,7 @@ export async function acquireAutomationConnection(
     async (waitSpan) => {
       const waitStartedAt = Date.now();
       const deadline = waitStartedAt + SandboxStartTimeoutMs;
-      let isSandboxRunning = false;
+      let isSandboxConnectable = false;
       let didRequestResume = false;
       let pollCount = 0;
 
@@ -65,16 +65,17 @@ export async function acquireAutomationConnection(
         waitSpan.setAttributes({
           "mistle.sandbox.poll_count": pollCount,
           "mistle.sandbox.status": sandboxInstance.status,
+          "mistle.sandbox.connectable": sandboxInstance.connectable,
         });
 
-        if (sandboxInstance.status === "running") {
-          isSandboxRunning = true;
+        if (sandboxInstance.status === "running" && sandboxInstance.connectable) {
+          isSandboxConnectable = true;
           waitSpan.setAttributes({
             "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
           });
           logAutomationConversationDeliveryEvent({
-            eventName: "sandbox.running",
-            message: "Automation conversation sandbox is running",
+            eventName: "sandbox.connectable",
+            message: "Automation conversation sandbox is running and connectable",
             telemetryContext: {
               automationRunId: input.preparedAutomationRun.automationRunId,
               conversationId: input.preparedAutomationRun.conversationId,
@@ -85,6 +86,7 @@ export async function acquireAutomationConnection(
             },
             attributes: {
               "mistle.sandbox.poll_count": pollCount,
+              "mistle.sandbox.connectable": sandboxInstance.connectable,
               "mistle.sandbox.wait_phase": didRequestResume ? "resume" : "startup",
               "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
             },
@@ -92,7 +94,7 @@ export async function acquireAutomationConnection(
           if (didRequestResume) {
             logAutomationConversationDeliveryEvent({
               eventName: "sandbox.resume_running",
-              message: "Automation conversation sandbox resumed and became running",
+              message: "Automation conversation sandbox resumed and became connectable",
               telemetryContext: {
                 automationRunId: input.preparedAutomationRun.automationRunId,
                 conversationId: input.preparedAutomationRun.conversationId,
@@ -103,6 +105,7 @@ export async function acquireAutomationConnection(
               },
               attributes: {
                 "mistle.sandbox.poll_count": pollCount,
+                "mistle.sandbox.connectable": sandboxInstance.connectable,
                 "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,
               },
             });
@@ -183,10 +186,10 @@ export async function acquireAutomationConnection(
         await systemSleeper.sleep(SandboxStartPollIntervalMs);
       }
 
-      if (!isSandboxRunning) {
+      if (!isSandboxConnectable) {
         logAutomationConversationDeliveryEvent({
           eventName: didRequestResume ? "sandbox.resume_wait_timed_out" : "sandbox.wait_timed_out",
-          message: "Automation conversation sandbox did not become running before timeout",
+          message: "Automation conversation sandbox did not become connectable before timeout",
           telemetryContext: {
             automationRunId: input.preparedAutomationRun.automationRunId,
             conversationId: input.preparedAutomationRun.conversationId,
@@ -205,7 +208,7 @@ export async function acquireAutomationConnection(
         });
         throw createAutomationRunExecutionError({
           code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-          message: `Sandbox instance '${input.ensuredAutomationSandbox.sandboxInstanceId}' did not become ready before the automation timeout elapsed.`,
+          message: `Sandbox instance '${input.ensuredAutomationSandbox.sandboxInstanceId}' did not become connectable before the automation timeout elapsed.`,
         });
       }
 

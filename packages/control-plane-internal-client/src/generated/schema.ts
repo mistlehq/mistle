@@ -976,6 +976,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              connectable: boolean;
               failureCode: string | null;
               failureMessage: string | null;
               id: string;

@@ -32,6 +32,8 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 
 async function startInternalSandboxRuntimeServer(input: {
   initialSandboxStatus: SandboxStatus;
+  initialSandboxConnectable?: boolean;
+  connectableStatuses?: boolean[];
   resumeStatuses?: SandboxStatus[];
 }): Promise<{
   baseUrl: string;
@@ -43,6 +45,8 @@ async function startInternalSandboxRuntimeServer(input: {
   };
 }> {
   let sandboxStatus = input.initialSandboxStatus;
+  let sandboxConnectable = input.initialSandboxConnectable ?? sandboxStatus === "running";
+  const connectableStatuses = [...(input.connectableStatuses ?? [])];
   const resumeStatuses = [...(input.resumeStatuses ?? [])];
   const requests = {
     getSandboxInstance: [] as ControlPlaneRequestBody[],
@@ -72,6 +76,11 @@ async function startInternalSandboxRuntimeServer(input: {
           throw new Error("Expected next resume sandbox status.");
         }
         sandboxStatus = nextSandboxStatus;
+        sandboxConnectable = sandboxStatus === "running";
+      }
+      const nextConnectableStatus = connectableStatuses.shift();
+      if (nextConnectableStatus !== undefined) {
+        sandboxConnectable = nextConnectableStatus;
       }
       response.setHeader("content-type", "application/json");
       response.end(
@@ -79,7 +88,7 @@ async function startInternalSandboxRuntimeServer(input: {
           id: requestBody.instanceId,
           title: null,
           status: sandboxStatus,
-          connectable: sandboxStatus === "running",
+          connectable: sandboxConnectable,
           failureCode: null,
           failureMessage: null,
           runtimePlan: null,
@@ -92,6 +101,7 @@ async function startInternalSandboxRuntimeServer(input: {
       requests.resumeSandboxInstance.push(requestBody);
       const nextSandboxStatus = resumeStatuses.shift() ?? "starting";
       sandboxStatus = nextSandboxStatus;
+      sandboxConnectable = sandboxStatus === "running";
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -105,7 +115,7 @@ async function startInternalSandboxRuntimeServer(input: {
 
     if (request.url === "/internal/sandbox-runtime/mint-connection-token") {
       requests.mintConnectionToken.push(requestBody);
-      if (sandboxStatus !== "running") {
+      if (!sandboxConnectable) {
         response.writeHead(409, {
           "content-type": "application/json",
         });
@@ -119,6 +129,7 @@ async function startInternalSandboxRuntimeServer(input: {
       }
 
       sandboxStatus = "running";
+      sandboxConnectable = true;
       response.setHeader("content-type", "application/json");
       response.end(
         JSON.stringify({
@@ -238,7 +249,7 @@ describe("acquireAutomationConnection integration", () => {
             sourceWebhookEventId: "iwe_test_001",
             sourceScheduledActionId: undefined,
             integrationConnectionId: "icn_test_001",
-            targetKey: "openai-agent-test",
+            targetKey: undefined,
             webhookEventId: "iwe_test_001",
             webhookEventType: "slack:app_mention",
             webhookProviderEventType: "app_mention",
@@ -391,6 +402,96 @@ describe("acquireAutomationConnection integration", () => {
         },
       ]);
       expect(internalApiServer.requests.getSandboxInstance.length).toBeGreaterThan(1);
+    } finally {
+      await internalApiServer.stop();
+    }
+  });
+
+  it("waits for a scheduled automation sandbox to become connectable before minting a connection token", async ({
+    fixture,
+  }) => {
+    const internalApiServer = await startInternalSandboxRuntimeServer({
+      initialSandboxStatus: "running",
+      initialSandboxConnectable: false,
+      connectableStatuses: [false, true],
+    });
+
+    try {
+      const connection = await acquireAutomationConnection(
+        {
+          controlPlaneInternalClient: new ControlPlaneInternalClient({
+            baseUrl: internalApiServer.baseUrl,
+            internalAuthServiceToken: fixture.internalAuthServiceToken,
+          }),
+        },
+        {
+          deliveryTaskId: "cdt_test_001",
+          preparedAutomationRun: {
+            automationRunId: "aru_test_001",
+            automationRunCreatedAt: "2026-04-23T00:00:00.000Z",
+            automationId: "atm_test_001",
+            conversationId: "cnv_test_001",
+            automationTargetId: "atg_test_001",
+            organizationId: "org_test_001",
+            sandboxProfileId: "sbp_test_001",
+            sandboxProfileVersion: 1,
+            primaryRepositoryId: null,
+            sourceKind: "schedule",
+            sourceOrderKey: "2026-04-23T00:00:00Z#0001",
+            sourceWebhookEventId: undefined,
+            sourceScheduledActionId: "sca_test_001",
+            integrationConnectionId: undefined,
+            targetKey: "openai-agent-test",
+            webhookEventId: undefined,
+            webhookEventType: undefined,
+            webhookProviderEventType: undefined,
+            webhookExternalEventId: undefined,
+            webhookExternalDeliveryId: undefined,
+            webhookPayload: undefined,
+            scheduledActionId: "sca_test_001",
+            scheduledAt: "2026-04-23T00:00:00.000Z",
+            localScheduledDate: "2026-04-23",
+            localScheduledTime: "08:00",
+            renderedInput: "Tell me a short story",
+            renderedConversationKey: "scheduled-conversation-key",
+            renderedIdempotencyKey: "sca_test_001:2026-04-23T00:00:00.000Z",
+            instructions: null,
+            collaborationModeSettings: null,
+          },
+          ensuredAutomationSandbox: {
+            sandboxInstanceId: "sbi_test_001",
+            startupWorkflowRunId: "owfr_start_test_001",
+          },
+          workflowRunId: "owfr_test_001",
+        },
+      );
+
+      expect(connection).toEqual({
+        instanceId: "sbi_test_001",
+        url: "ws://127.0.0.1:8084/tunnel/sandbox/sbi_test_001?connect_token=test-token",
+        token: "test-token",
+        expiresAt: "2026-04-24T00:00:00.000Z",
+      });
+      expect(internalApiServer.requests.getSandboxInstance).toEqual([
+        {
+          organizationId: "org_test_001",
+          instanceId: "sbi_test_001",
+        },
+        {
+          organizationId: "org_test_001",
+          instanceId: "sbi_test_001",
+        },
+      ]);
+      expect(internalApiServer.requests.resumeSandboxInstance).toEqual([]);
+      expect(internalApiServer.requests.mintConnectionToken).toEqual([
+        {
+          organizationId: "org_test_001",
+          instanceId: "sbi_test_001",
+          deliveryTaskId: "cdt_test_001",
+          automationRunId: "aru_test_001",
+          conversationId: "cnv_test_001",
+        },
+      ]);
     } finally {
       await internalApiServer.stop();
     }
