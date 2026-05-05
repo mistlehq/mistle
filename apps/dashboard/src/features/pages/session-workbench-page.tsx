@@ -5,6 +5,7 @@ import { useLocation, useParams } from "react-router";
 import type { ChatComposerViewModel } from "../chat/components/chat-composer.js";
 import { SessionHeaderTitle } from "../sessions/session-header-title.js";
 import { ConversationWorkspaceFrame } from "../shared/conversation-workspace-frame.js";
+import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionCliPanel } from "./session-cli-panel.js";
 import {
@@ -532,21 +533,13 @@ function renderPrimaryPanelMainContent(input: {
 
 function SessionWorkspaceSidebarTrigger(): React.JSX.Element | null {
   const { isMobile, openMobile, state } = useSidebar();
-  const shouldRenderSidebarTrigger = shouldRenderSessionWorkspaceSidebarTrigger({
+  const shouldShowSidebarTrigger = shouldRenderSidebarTrigger({
     isMobile,
     openMobile,
     sidebarState: state,
   });
 
-  return shouldRenderSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
-}
-
-function shouldRenderSessionWorkspaceSidebarTrigger(input: {
-  isMobile: boolean;
-  openMobile: boolean;
-  sidebarState: "expanded" | "collapsed";
-}): boolean {
-  return input.isMobile ? !input.openMobile : input.sidebarState === "collapsed";
+  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null;
 }
 
 function createEmptyComposerViewModel(): ChatComposerViewModel {

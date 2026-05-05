@@ -14,15 +14,12 @@ type ConversationWorkspaceFrameProps = ConversationWorkspaceHeaderProps & {
 export function ConversationWorkspaceFrame(
   input: ConversationWorkspaceFrameProps,
 ): React.JSX.Element {
+  const { children, ...headerProps } = input;
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <ConversationWorkspaceHeader
-        {...(input.actions === undefined ? {} : { actions: input.actions })}
-        {...(input.className === undefined ? {} : { className: input.className })}
-        {...(input.leadingControl === undefined ? {} : { leadingControl: input.leadingControl })}
-        title={input.title}
-      />
-      <div className="min-h-0 flex-1">{input.children}</div>
+      <ConversationWorkspaceHeader {...headerProps} />
+      <div className="min-h-0 flex-1">{children}</div>
     </div>
   );
 }

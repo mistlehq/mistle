@@ -160,7 +160,8 @@ const meta = {
     },
     showHeader: {
       control: "boolean",
-      description: "Toggles whether the sticky app shell header is rendered.",
+      description:
+        "Toggles route-owned sticky header content. The sidebar trigger can still render shell chrome when enabled.",
     },
     contentInsetOwner: {
       control: "inline-radio",
