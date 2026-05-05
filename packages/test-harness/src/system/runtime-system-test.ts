@@ -112,7 +112,7 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
           },
         }),
     __internalInfra: createInternalInfra(input),
-    __serviceOptions: async () => createServiceOptions(input),
+    __serviceOptions: async () => createRuntimeSystemServiceOptions(input),
     __afterStart: async ({ environment, integrationEnvironment }) => {
       await syncControlPlaneIntegrationTargets({
         environment: integrationEnvironment,
@@ -155,7 +155,7 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
   }
 }
 
-async function createServiceOptions(input: CreateSystemTestInput): Promise<{
+export async function createRuntimeSystemServiceOptions(input: CreateSystemTestInput): Promise<{
   sandbox?: {
     provider: SystemTestSandboxProvider;
     defaultBaseImageRef?: string;
@@ -172,16 +172,15 @@ async function createServiceOptions(input: CreateSystemTestInput): Promise<{
     return {};
   }
 
-  const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
   if (input.sandbox.provider === "docker") {
     return {
       sandbox: {
         provider: "docker",
-        ...(publicServiceBaseUrls.size === 0 ? {} : { publicServiceBaseUrls }),
       },
     };
   }
 
+  const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
   return {
     sandbox: {
       provider: "e2b",

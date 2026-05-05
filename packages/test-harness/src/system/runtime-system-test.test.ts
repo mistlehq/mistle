@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import { ServiceIds } from "../integration/services/service-ids.js";
 import {
   DockerIntegrationConfigPathInContainer,
   E2BIntegrationConfigPathInContainer,
 } from "./integration-config-paths.js";
-import { resolveRuntimeSystemIntegrationConfigPathInContainer } from "./runtime-system-test.js";
+import {
+  createRuntimeSystemServiceOptions,
+  resolveRuntimeSystemIntegrationConfigPathInContainer,
+} from "./runtime-system-test.js";
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
   it("uses the Docker integration config for non-sandbox runtime system tests", () => {
@@ -31,5 +35,25 @@ describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
         },
       }),
     ).toBe(E2BIntegrationConfigPathInContainer);
+  });
+});
+
+describe("createRuntimeSystemServiceOptions", () => {
+  it("keeps Docker sandbox startup on private harness service URLs when public access is provisioned", async () => {
+    await expect(
+      createRuntimeSystemServiceOptions({
+        sandbox: {
+          provider: "docker",
+        },
+        publicAccess: {
+          provider: "cloudflare",
+          services: [ServiceIds.DATA_PLANE_GATEWAY, ServiceIds.TOKENIZER_PROXY],
+        },
+      }),
+    ).resolves.toEqual({
+      sandbox: {
+        provider: "docker",
+      },
+    });
   });
 });

@@ -27,15 +27,7 @@ export type CreateSandboxSystemTestInput = Omit<CreateSystemTestInput, "sandbox"
 export function createSandboxSystemTest(input: CreateSandboxSystemTestInput): SandboxSystemTest {
   const providerTests = input.sandboxProviders.map((sandboxProvider) => ({
     sandboxProvider,
-    it: createSystemTest({
-      ...input,
-      ...(sandboxProvider === "e2b" && input.publicAccess !== undefined
-        ? { publicAccess: input.publicAccess }
-        : {}),
-      sandbox: {
-        provider: sandboxProvider,
-      },
-    }),
+    it: createSystemTest(createProviderSystemTestInput(input, sandboxProvider)),
   }));
 
   return (name, callback, timeout) => {
@@ -51,5 +43,18 @@ export function createSandboxSystemTest(input: CreateSandboxSystemTestInput): Sa
         timeout,
       );
     }
+  };
+}
+
+export function createProviderSystemTestInput(
+  input: CreateSandboxSystemTestInput,
+  sandboxProvider: SandboxSystemTestProvider,
+): CreateSystemTestInput {
+  const { sandboxProviders: _sandboxProviders, ...systemInput } = input;
+  return {
+    ...systemInput,
+    sandbox: {
+      provider: sandboxProvider,
+    },
   };
 }
