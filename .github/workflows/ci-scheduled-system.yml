@@ -73,9 +73,6 @@ jobs:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Build runtime system test dependencies
-        run: nix develop --command pnpm turbo run build --output-logs=errors-only
-
       - name: Fetch Infisical secrets
         uses: Infisical/secrets-action@v1.0.16
         with:
@@ -85,13 +82,24 @@ jobs:
           env-slug: ci
           secret-path: /integration-tests
 
+      - name: Generate integration config
+        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b pnpm run config:init:integration"
+
+      - name: Build runtime system test dependencies
+        run: >-
+          nix develop --command pnpm turbo run build --output-logs=errors-only
+          --filter=@mistle/tests^...
+          --filter=@mistle/control-plane-api...
+          --filter=@mistle/control-plane-worker...
+          --filter=@mistle/data-plane-api...
+          --filter=@mistle/data-plane-gateway...
+          --filter=@mistle/data-plane-worker...
+          --filter=@mistle/tokenizer-proxy...
+
       - name: Login to GitHub Container Registry
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Generate integration config
-        run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker,e2b pnpm run config:init:integration"
 
       - name: Run runtime system tests
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
