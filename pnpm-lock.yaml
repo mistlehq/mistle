@@ -1354,6 +1354,9 @@ importers:
       pg:
         specifier: ^8.20.0
         version: 8.20.0
+      vite:
+        specifier: 8.0.10
+        version: 8.0.10(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
       ws:
         specifier: ^8.20.0
         version: 8.20.0

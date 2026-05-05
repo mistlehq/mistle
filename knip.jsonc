@@ -71,7 +71,16 @@
         "@mistle/tokenizer-proxy",
       ],
     },
-    "tests": {},
+    "tests": {
+      "entry": [
+        "*.config.{js,mjs,ts}",
+        "playwright.config.ts",
+        "scripts/**/*.{js,mjs,ts}",
+        "system/**/*.{js,mjs,ts,tsx}",
+        "system-runtime/**/*.{js,mjs,ts,tsx}",
+        "e2e/**/*.{js,mjs,ts,tsx}",
+      ],
+    },
   },
   "ignoreFiles": [
     ".git/**",
