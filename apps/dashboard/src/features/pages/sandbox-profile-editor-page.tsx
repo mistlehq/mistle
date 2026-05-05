@@ -172,11 +172,10 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onOpen: (input: { setupScript: string }) => void;
+  onOpen: () => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
-  initialPrompt: string;
   isOpen: boolean;
   sandboxInstanceId: string | null;
 };
@@ -233,33 +232,6 @@ const PublishSuccessNavigationState: SandboxProfileEditorNavigationState = {
 
 function createSandboxProfileDefaultPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/sandbox-profile`;
-}
-
-function createSetupAssistantPrompt(input: {
-  profileName: string;
-  setupScript: string;
-  version: number;
-}): string {
-  const trimmedSetupScript = input.setupScript.trim();
-  const currentDraft =
-    trimmedSetupScript.length === 0
-      ? "No setup script is currently configured."
-      : ["Current draft setup script:", "```sh", input.setupScript, "```"].join("\n");
-
-  return [
-    "Inspect this workspace and help write a setup script for this sandbox profile.",
-    "",
-    `Profile: ${input.profileName}`,
-    `Version: ${String(input.version)}`,
-    "",
-    currentDraft,
-    "",
-    "Do not run the setup script test yourself. Produce a script that I can paste into the profile editor and test there.",
-    "",
-    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this Setup Assistant session.",
-    "",
-    "When finished, provide the complete setup script in one shell code block and list any required environment variables.",
-  ].join("\n");
 }
 
 function createSandboxProfileEditorPath(input: {
@@ -1195,16 +1167,10 @@ function ReadySandboxProfileEditorPage(input: {
     disabled: setupAssistantDisabledReason !== null,
     errorMessage: setupAssistantError,
     isStarting: startSetupAssistantMutation.isPending,
-    onOpen: ({ setupScript }) => {
+    onOpen: () => {
       setSetupAssistantError(null);
-      const initialPrompt = createSetupAssistantPrompt({
-        profileName: metaState.formState.displayName ?? metaState.pageTitle,
-        setupScript,
-        version: input.mode.version,
-      });
 
       setSetupAssistantPanelState((currentState) => ({
-        initialPrompt,
         isOpen: true,
         sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
       }));
@@ -1375,7 +1341,6 @@ function ReadySandboxProfileEditorPage(input: {
           minSize="360px"
         >
           <SetupScriptAssistantPanel
-            initialPrompt={setupAssistantPanelState.initialPrompt}
             onClose={() => {
               setSetupAssistantPanelState((currentState) =>
                 currentState === null
@@ -1395,14 +1360,13 @@ function ReadySandboxProfileEditorPage(input: {
 }
 
 function SetupScriptAssistantPanel(input: {
-  initialPrompt: string;
   onClose: () => void;
   sandboxInstanceId: string | null;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [composerText, setComposerText] = useState(input.initialPrompt);
+  const [composerText, setComposerText] = useState("");
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -1437,10 +1401,6 @@ function SetupScriptAssistantPanel(input: {
       });
     },
   );
-
-  useEffect(() => {
-    setComposerText(input.initialPrompt);
-  }, [input.initialPrompt]);
 
   function handleClearPendingDiffComments(): void {
     setPendingDiffComments([]);
@@ -2357,9 +2317,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
               disabled: input.setupAssistantControl.disabled,
               isStarting: input.setupAssistantControl.isStarting,
               onClick: () => {
-                input.setupAssistantControl.onOpen({
-                  setupScript: setupScriptState.draftValue,
-                });
+                input.setupAssistantControl.onOpen();
               },
               title: input.setupAssistantControl.title,
             }}

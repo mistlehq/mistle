@@ -240,34 +240,6 @@ const SetupAssistantChatEntries: readonly ChatEntry[] = [
   },
 ];
 
-function createSetupAssistantPrompt(input: {
-  baseImage: string;
-  profileName: string;
-  setupScript: string;
-  version: number;
-}): string {
-  return [
-    "Inspect this workspace and help write a setup script for this sandbox profile.",
-    "",
-    `Profile: ${input.profileName}`,
-    `Version: ${String(input.version)}`,
-    `Base image: ${input.baseImage}`,
-    "",
-    "Current draft setup script:",
-    "```sh",
-    input.setupScript.trim().length === 0
-      ? "No setup script has been written yet."
-      : input.setupScript,
-    "```",
-    "",
-    "Do not run the setup script test yourself. Produce a script that I can paste into the profile editor and test there.",
-    "",
-    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this Setup Assistant session.",
-    "",
-    "When finished, provide the complete setup script in one shell code block and list any required environment variables.",
-  ].join("\n");
-}
-
 function resolveSnapshotStoryStatus(input: {
   lifecycleState: SandboxProfileEditorPageStoryArgs["lifecycleState"];
   snapshotState: SandboxProfileEditorPageStoryArgs["snapshotState"];
@@ -448,19 +420,9 @@ function SetupScriptStoryControls(input: {
 }
 
 function SetupAssistantPanel(input: {
-  baseImage: string;
   onClose: () => void;
-  profileName: string;
-  setupScript: string;
   state: Exclude<SandboxProfileEditorPageStoryArgs["setupAssistantPanelState"], undefined>;
-  version: number;
 }): React.JSX.Element {
-  const prompt = createSetupAssistantPrompt({
-    baseImage: input.baseImage,
-    profileName: input.profileName,
-    setupScript: input.setupScript,
-    version: input.version,
-  });
   const controlClassName =
     "bg-transparent text-foreground shadow-none hover:bg-stone-100 aria-pressed:bg-stone-200";
 
@@ -537,7 +499,7 @@ function SetupAssistantPanel(input: {
         <div className="shrink-0 border-t bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
-            composerText={prompt}
+            composerText=""
             gitBranchLabel={null}
             pullRequest={null}
           />
@@ -857,14 +819,10 @@ function SandboxProfileEditorPageStoryView(
             <ResizableHandle id="setup-assistant-page-resize-handle" />
             <ResizablePanel defaultSize="28%" id="setup-assistant-page-panel" minSize="360px">
               <SetupAssistantPanel
-                baseImage="ghcr.io/mistle/base-node:2026-05-03"
                 onClose={() => {
                   setSetupAssistantPanelOpen(false);
                 }}
-                profileName={profileName}
-                setupScript={setupScriptDraft}
                 state={setupAssistantPanelState}
-                version={mode.version}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
