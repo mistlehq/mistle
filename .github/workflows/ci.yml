@@ -154,6 +154,93 @@ jobs:
             data_plane_migrations:
               - 'packages/db/migrations/data-plane/**'
 
+  migration-sequence:
+    name: Migration Sequence
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 20
+    env:
+      CI: true
+
+    steps:
+      - name: Checkout PR head
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Checkout current ref
+        if: github.event_name != 'pull_request'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Fetch PR base branch
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base_ref="${GITHUB_BASE_REF:?GITHUB_BASE_REF is required for pull_request migration sequence validation}"
+          git remote add ci-base "${{ github.event.pull_request.base.repo.clone_url }}"
+          git fetch --no-tags --depth=1 ci-base "${base_ref}:refs/remotes/ci-base/${base_ref}"
+          echo "MISTLE_MIGRATION_BASE_REF=ci-base/${base_ref}" >> "$GITHUB_ENV"
+
+      - name: Fetch default base branch
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          base_ref="${GITHUB_BASE_REF:-main}"
+          git fetch --no-tags --depth=1 origin "${base_ref}:refs/remotes/origin/${base_ref}"
+          echo "MISTLE_MIGRATION_BASE_REF=origin/${base_ref}" >> "$GITHUB_ENV"
+
+      - name: Create Nix directories
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
+
+      - name: Mount Nix sticky disk
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-store-single-user-${{ runner.os }}-${{ github.job }}
+          path: /nix
+
+      - name: Prepare single-user Nix store
+        run: |
+          sudo mkdir -p /nix/store
+          sudo chown "$USER:$USER" /nix /nix/store
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          install_options: --no-daemon
+
+      - name: Restore pnpm store cache
+        id: migration-sequence-pnpm-store-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Materialize Nix shell
+        run: nix develop --command true
+
+      - name: Install pnpm dependencies
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Save pnpm store cache
+        if: steps.migration-sequence-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Validate migration sequence
+        run: >-
+          nix develop --command pnpm exec tsx ./scripts/db/check-migration-sequence.ts
+          --base "$MISTLE_MIGRATION_BASE_REF"
+
   static-ts:
     name: TS Static
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -226,6 +313,12 @@ jobs:
 
       - name: Generate integration config
         run: nix develop --command bash -c "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm run config:init:integration"
+
+      - name: Fetch migration comparison base branch
+        run: |
+          set -euo pipefail
+          base_ref="${GITHUB_BASE_REF:-main}"
+          git fetch --no-tags --depth=1 origin "${base_ref}:refs/remotes/origin/${base_ref}"
 
       - name: Run TS static checks in Nix shell
         run: >-
@@ -1144,6 +1237,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - changes
+      - migration-sequence
       - static-ts
       - static-rust
       - test-ts
@@ -1162,6 +1256,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ github.token }}
       CHANGES_RESULT: ${{ needs.changes.result }}
+      MIGRATION_SEQUENCE_RESULT: ${{ needs.migration-sequence.result }}
       TS_STATIC_RESULT: ${{ needs.static-ts.result }}
       RUST_STATIC_RESULT: ${{ needs.static-rust.result }}
       TS_TEST_RESULT: ${{ needs.test-ts.result }}
@@ -1195,6 +1290,7 @@ jobs:
 
           changes_result = os.environ["CHANGES_RESULT"]
           lane_results = [
+              os.environ["MIGRATION_SEQUENCE_RESULT"],
               os.environ["TS_STATIC_RESULT"],
               os.environ["RUST_STATIC_RESULT"],
               os.environ["TS_TEST_RESULT"],
