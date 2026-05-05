@@ -109,13 +109,40 @@ export function formatDate(isoDateTime: string): string {
   return DATE_FORMATTER.format(parsedDate);
 }
 
-export function formatDateTime(isoDateTime: string): string {
+export function formatDateTime(isoDateTime: string, timeZone?: string): string {
   const parsedDate = parseDate(isoDateTime);
   if (parsedDate === null) {
     return "Unknown";
   }
 
+  if (timeZone !== undefined) {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone,
+    }).format(parsedDate);
+  }
+
   return DATE_TIME_FORMATTER.format(parsedDate);
+}
+
+export function formatTimeZoneOffset(input: { isoDateTime: string; timeZone: string }): string {
+  const parsedDate = parseDate(input.isoDateTime);
+  if (parsedDate === null) {
+    return "Unknown";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: input.timeZone,
+    timeZoneName: "shortOffset",
+  }).formatToParts(parsedDate);
+  const timeZoneName = parts.find((part) => part.type === "timeZoneName");
+
+  if (timeZoneName === undefined) {
+    throw new Error(`Could not format timezone: ${input.timeZone}.`);
+  }
+
+  return timeZoneName.value;
 }
 
 export function formatRelativeOrDate(

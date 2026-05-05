@@ -24,6 +24,7 @@ const ScheduleAutomation: AutomationListItemViewModel = {
     cronExpression: "27 10 * * *",
     timezone: "Asia/Singapore",
     nextScheduledAtLabel: "May 4, 2026, 10:27 AM",
+    timezoneOffsetLabel: "GMT+8",
   },
   updatedAtLabel: "18 min ago",
 };

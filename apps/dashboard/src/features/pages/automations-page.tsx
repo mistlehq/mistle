@@ -3,13 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import type { AutomationListItemViewModel } from "../automations/automation-list-types.js";
+import type {
+  AutomationListItemViewModel,
+  AutomationListScheduleSourceViewModel,
+} from "../automations/automation-list-types.js";
 import { AutomationListView } from "../automations/automation-list-view.js";
 import { listAutomations } from "../automations/automations-service.js";
 import type { AutomationListItem } from "../automations/automations-types.js";
 import { formatAutomationUpdatedAt } from "../automations/webhook-automation-formatters.js";
 import { automationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
-import { formatDateTime } from "../shared/date-formatters.js";
+import { formatDateTime, formatTimeZoneOffset } from "../shared/date-formatters.js";
 import { PageFrame } from "../shared/page-frame.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
@@ -21,6 +24,26 @@ function parseCursor(rawValue: string | null): string | null {
 
   const normalized = rawValue.trim();
   return normalized.length === 0 ? null : normalized;
+}
+
+function toAutomationListScheduleSourceViewModel(
+  source: Extract<AutomationListItem["source"], { kind: "schedule" }>,
+): AutomationListScheduleSourceViewModel {
+  const offsetDateTime = source.nextScheduledAt ?? new Date().toISOString();
+
+  return {
+    kind: "schedule",
+    cronExpression: source.cronExpression,
+    timezone: source.timezone,
+    nextScheduledAtLabel:
+      source.nextScheduledAt === null
+        ? null
+        : formatDateTime(source.nextScheduledAt, source.timezone),
+    timezoneOffsetLabel: formatTimeZoneOffset({
+      isoDateTime: offsetDateTime,
+      timeZone: source.timezone,
+    }),
+  };
 }
 
 function toAutomationListItemViewModel(
@@ -36,15 +59,7 @@ function toAutomationListItemViewModel(
     source:
       automation.source.kind === "webhook"
         ? automation.source
-        : {
-            kind: "schedule",
-            cronExpression: automation.source.cronExpression,
-            timezone: automation.source.timezone,
-            nextScheduledAtLabel:
-              automation.source.nextScheduledAt === null
-                ? null
-                : formatDateTime(automation.source.nextScheduledAt),
-          },
+        : toAutomationListScheduleSourceViewModel(automation.source),
     updatedAtLabel: formatAutomationUpdatedAt(automation.updatedAt),
   };
 }

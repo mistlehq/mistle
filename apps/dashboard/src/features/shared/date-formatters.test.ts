@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   formatCompactRelativeOrDate,
   formatDate,
+  formatDateTime,
   formatRelativeOrDate,
+  formatTimeZoneOffset,
 } from "./date-formatters.js";
 
 describe("date formatters", () => {
@@ -35,6 +37,21 @@ describe("date formatters", () => {
 
   it("returns Unknown for invalid timestamps", () => {
     expect(formatRelativeOrDate("not-a-date")).toBe("Unknown");
+  });
+
+  it("formats timestamps in the provided timezone", () => {
+    expect(formatDateTime("2026-07-01T13:00:00.000Z", "America/New_York")).toBe(
+      "Jul 1, 2026, 9:00 AM",
+    );
+  });
+
+  it("formats timezone offsets for the provided timestamp", () => {
+    expect(
+      formatTimeZoneOffset({
+        isoDateTime: "2026-07-01T13:00:00.000Z",
+        timeZone: "America/New_York",
+      }),
+    ).toBe("GMT-4");
   });
 
   it("formats recent timestamps with compact relative labels", () => {

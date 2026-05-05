@@ -99,28 +99,13 @@ function EventSummaryCell(input: {
   );
 }
 
-function formatScheduleTimezone(timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    timeZoneName: "shortOffset",
-  }).formatToParts(new Date());
-  const timezoneName = parts.find((part) => part.type === "timeZoneName");
-
-  if (timezoneName === undefined) {
-    throw new Error(`Could not format timezone: ${timezone}.`);
-  }
-
-  return timezoneName.value;
-}
-
 function ScheduleSummaryCell(input: {
   item: Extract<AutomationListItemViewModel["source"], { kind: "schedule" }>;
 }): React.JSX.Element {
-  const timezoneOffset = formatScheduleTimezone(input.item.timezone);
   const scheduleTiming =
     input.item.nextScheduledAtLabel === null
-      ? `Not scheduled · ${timezoneOffset}`
-      : `Next ${input.item.nextScheduledAtLabel} ${timezoneOffset}`;
+      ? `Not scheduled · ${input.item.timezoneOffsetLabel}`
+      : `Next ${input.item.nextScheduledAtLabel} ${input.item.timezoneOffsetLabel}`;
 
   return (
     <div className="flex min-w-0 flex-col gap-1">

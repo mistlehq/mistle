@@ -181,6 +181,40 @@ describe("AutomationsPage", () => {
     expect(screen.getByText("Workspace root")).toBeDefined();
   });
 
+  it("formats scheduled next-run times in the schedule timezone", () => {
+    const queryClient = createTestQueryClient({
+      refetchOnMount: false,
+      staleTime: Number.POSITIVE_INFINITY,
+    });
+
+    seedAutomationsList(
+      queryClient,
+      createListResult([
+        createAutomationListItem({
+          id: "atm_schedule_new_york",
+          kind: "schedule",
+          name: "New York morning schedule",
+          source: {
+            kind: "schedule",
+            cronExpression: "0 9 * * *",
+            timezone: "America/New_York",
+            nextScheduledAt: "2026-07-01T13:00:00.000Z",
+          },
+        }),
+      ]),
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Next Jul 1, 2026, 9:00 AM GMT-4")).toBeDefined();
+  });
+
   it("does not render the result summary when the automation query is in error", () => {
     const queryClient = createTestQueryClient({
       refetchOnMount: false,

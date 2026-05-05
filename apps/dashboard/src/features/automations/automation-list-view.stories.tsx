@@ -52,6 +52,7 @@ const MixedItems: readonly AutomationListItemViewModel[] = [
       cronExpression: "0 9 * * 1-5",
       timezone: "Asia/Singapore",
       nextScheduledAtLabel: "May 4, 2026, 9:00 AM",
+      timezoneOffsetLabel: "GMT+8",
     },
     updatedAtLabel: "18 min ago",
   },
@@ -71,6 +72,7 @@ const MixedItems: readonly AutomationListItemViewModel[] = [
       cronExpression: "0 8 * * MON",
       timezone: "America/New_York",
       nextScheduledAtLabel: null,
+      timezoneOffsetLabel: "GMT-4",
     },
     updatedAtLabel: "1 day ago",
   },
@@ -142,6 +144,7 @@ const ScheduleWithoutNextRunItem: AutomationListItemViewModel = {
     cronExpression: "0 9 31 2 *",
     timezone: "Asia/Singapore",
     nextScheduledAtLabel: null,
+    timezoneOffsetLabel: "GMT+8",
   },
   updatedAtLabel: "5 days ago",
 };

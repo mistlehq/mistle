@@ -16,6 +16,7 @@ export type AutomationListScheduleSourceViewModel = {
   cronExpression: string;
   timezone: string;
   nextScheduledAtLabel: string | null;
+  timezoneOffsetLabel: string;
 };
 
 export type AutomationListWebhookSourceViewModel = {
