@@ -39,6 +39,7 @@ type DeliveryServerScenario =
   | "create_conversation"
   | "resume_not_loaded_conversation"
   | "no_default_model"
+  | "schedule_websocket_closes_before_stream_open"
   | "schedule_stream_reset_after_delivery_context";
 
 const ParentSpanContext = {
@@ -244,9 +245,16 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
 
   let activeStreamId: number | null = null;
   const methodSequence: string[] = [];
+  let connectionCount = 0;
   let didResetScheduleStream = false;
 
   wsServer.on("connection", (socket: WebSocket) => {
+    connectionCount += 1;
+    if (scenario === "schedule_websocket_closes_before_stream_open" && connectionCount === 1) {
+      socket.close();
+      return;
+    }
+
     let threadReadCount = 0;
 
     socket.on("message", (message: RawData) => {
@@ -399,6 +407,7 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
       if (methodPayload.method === "thread/start") {
         if (
           scenario !== "create_conversation" &&
+          scenario !== "schedule_websocket_closes_before_stream_open" &&
           scenario !== "schedule_stream_reset_after_delivery_context"
         ) {
           throw new Error("Unexpected thread/start request for this scenario.");
@@ -746,6 +755,42 @@ describe("executeConversationProviderDelivery", () => {
           sandboxInstanceId: "sbi_123",
           routeId: "acr_123",
         },
+      });
+      expect(await server.methodSequence).toContain("turn/start");
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("recovers scheduled delivery when the sandbox websocket closes before the agent stream opens", async () => {
+    const server = await startDeliveryServer("schedule_websocket_closes_before_stream_open");
+
+    try {
+      const result = await context.with(
+        trace.setSpan(context.active(), trace.wrapSpanContext(ParentSpanContext)),
+        async () =>
+          await executeConversationProviderDelivery({
+            conversationId: "acv_123",
+            runtimeId: "codex",
+            connectionUrl: server.url,
+            inputText: "Tell me a short story",
+            deliveryContext: {
+              source: "schedule",
+              scheduledActionId: "sca_123",
+              deliveryTaskId: "cdt_123",
+              automationRunId: "aru_123",
+              conversationId: "acv_123",
+              sandboxInstanceId: "sbi_123",
+              routeId: "acr_123",
+            },
+            providerConversationId: null,
+            providerExecutionId: null,
+          }),
+      );
+
+      expect(result).toEqual({
+        providerConversationId: "thread_123",
+        providerExecutionId: "turn_123",
       });
       expect(await server.methodSequence).toContain("turn/start");
     } finally {

@@ -90,7 +90,11 @@ function isSandboxAgentStreamUnavailableError(input: unknown): boolean {
     if (
       message !== null &&
       (message.includes("Sandbox session stream is not open.") ||
-        message.includes("Sandbox session stream reset"))
+        message.includes("Sandbox session stream reset") ||
+        message.includes("Sandbox session transport is not connected.") ||
+        message.includes("Sandbox websocket connection failed.") ||
+        message.includes("Sandbox websocket connection closed before it opened.") ||
+        message.includes("Sandbox websocket connection closed."))
     ) {
       return true;
     }
@@ -188,14 +192,15 @@ async function executeConversationProviderDeliveryAttempt(
   adapter: ConversationProviderAdapter,
   input: ExecuteConversationProviderDeliveryInput,
 ): Promise<ExecutedConversationProviderDelivery> {
-  const connection = await adapter.connect({
-    connectionUrl: input.connectionUrl,
-  });
-
+  let connection: ProviderConnection | null = null;
   let providerConversationId = input.providerConversationId;
   let didAttemptProviderExecution = false;
 
   try {
+    connection = await adapter.connect({
+      connectionUrl: input.connectionUrl,
+    });
+
     if (connection.notify === undefined) {
       throw new ConversationDeliveryExecutionError(
         `Agent runtime '${input.runtimeId}' does not support sending delivery context notifications before conversation delivery.`,
@@ -314,7 +319,7 @@ async function executeConversationProviderDeliveryAttempt(
     }
     throw error;
   } finally {
-    await connection.close();
+    await connection?.close();
   }
 }
 
