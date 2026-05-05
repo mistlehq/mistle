@@ -5,6 +5,7 @@ import type { ConnectionOpts } from "e2b";
 import { ensureE2BTemplateAlias } from "./template-build.js";
 
 const E2BTemplateAliasPrefix = "mistle-sandbox-base";
+export const E2BTemplateDefaultTag = "default";
 
 export type CreateE2BTemplateAliasInput = {
   baseRef: string;
@@ -24,6 +25,10 @@ export function createE2BTemplateAlias(input: CreateE2BTemplateAliasInput): stri
   });
   const hash = createHash("sha256").update(hashInput).digest("hex");
   return `${E2BTemplateAliasPrefix}-${hash.slice(0, 24)}`;
+}
+
+export function createE2BTemplateStartRef(alias: string): string {
+  return `${alias}:${E2BTemplateDefaultTag}`;
 }
 
 export class E2BApiTemplateRegistry implements E2BTemplateRegistry {

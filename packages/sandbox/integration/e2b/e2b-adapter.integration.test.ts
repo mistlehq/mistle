@@ -18,7 +18,10 @@ import {
   E2BDefaultTemplateCpuCount,
   E2BDefaultTemplateMemoryMb,
 } from "../../src/providers/e2b/schemas.js";
-import { createE2BTemplateAlias } from "../../src/providers/e2b/template-registry.js";
+import {
+  createE2BTemplateAlias,
+  createE2BTemplateStartRef,
+} from "../../src/providers/e2b/template-registry.js";
 import { e2bAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeE2BAdapterIntegration = e2bAdapterIntegrationEnabled ? describe : describe.skip;
@@ -74,11 +77,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
 
   it("starts a sandbox from the shared base image and injects env", async ({ fixture }) => {
     const injectedEnvValue = `mistle-e2b-env-${randomUUID()}`;
-    const expectedTemplateAlias = createE2BTemplateAlias({
-      baseRef: fixture.baseImage.imageId,
-      cpuCount: E2BDefaultTemplateCpuCount,
-      memoryMb: E2BDefaultTemplateMemoryMb,
-    });
+    const expectedTemplateAlias = expectedStartTemplateRef(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -125,11 +124,7 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     fixture,
   }) => {
     const marker = `mistle-e2b-state-${randomUUID()}`;
-    const expectedTemplateAlias = createE2BTemplateAlias({
-      baseRef: fixture.baseImage.imageId,
-      cpuCount: E2BDefaultTemplateCpuCount,
-      memoryMb: E2BDefaultTemplateMemoryMb,
-    });
+    const expectedTemplateAlias = expectedStartTemplateRef(fixture.baseImage.imageId);
     let id: string | undefined;
 
     try {
@@ -233,6 +228,16 @@ describeE2BAdapterIntegration("e2b adapter integration", () => {
     );
   }, 300_000);
 });
+
+function expectedStartTemplateRef(baseRef: string): string {
+  return createE2BTemplateStartRef(
+    createE2BTemplateAlias({
+      baseRef,
+      cpuCount: E2BDefaultTemplateCpuCount,
+      memoryMb: E2BDefaultTemplateMemoryMb,
+    }),
+  );
+}
 
 describeE2BArchilIntegration("e2b adapter Archil storage integration", () => {
   const archilEnvironmentValue = archilIntegrationEnvironment;

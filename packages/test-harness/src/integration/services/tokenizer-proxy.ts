@@ -8,13 +8,18 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
+import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import { assertMode, httpEndpoint, httpHealth } from "./shared.js";
 
 const Host = "127.0.0.1";
+const DockerSandboxReachableHost = "0.0.0.0";
 
-export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
+export function service(
+  infra: readonly TestInfraRequirement[],
+  options: IntegrationServiceOptions,
+): TestServiceDefinition {
   return {
     id: ServiceIds.TOKENIZER_PROXY,
     infra,
@@ -26,46 +31,57 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
     },
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.TOKENIZER_PROXY),
-    start,
-  };
-}
-
-async function start(startInput: TestServiceStartInput): Promise<TestService> {
-  assertMode(startInput.mode, "runtime", ServiceIds.TOKENIZER_PROXY);
-
-  const endpoint = httpEndpoint(startInput, ServiceIds.TOKENIZER_PROXY);
-  const peer = peers(startInput.services, startInput.plannedEndpoints);
-  const runtime = createTokenizerProxyRuntime({
-    app: config({
-      port: endpoint.port,
-      controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
+    start: start({
+      sandbox: options.sandbox,
     }),
-  });
-
-  try {
-    await runtime.start();
-  } catch (error) {
-    await runtime.stop();
-    throw error;
-  }
-
-  return {
-    id: ServiceIds.TOKENIZER_PROXY,
-    mode: startInput.mode,
-    endpoints: {
-      http: {
-        hostBaseUrl: endpoint.hostBaseUrl,
-        internalBaseUrl: endpoint.hostBaseUrl,
-      },
-    },
-    stop: runtime.stop,
   };
 }
 
-function config(input: { port: number; controlPlaneBaseUrl: string }): TokenizerProxyConfig {
+function start(input: {
+  sandbox: IntegrationSandboxOptions | undefined;
+}): (startInput: TestServiceStartInput) => Promise<TestService> {
+  return async (startInput) => {
+    assertMode(startInput.mode, "runtime", ServiceIds.TOKENIZER_PROXY);
+
+    const endpoint = httpEndpoint(startInput, ServiceIds.TOKENIZER_PROXY);
+    const peer = peers(startInput.services, startInput.plannedEndpoints);
+    const runtime = createTokenizerProxyRuntime({
+      app: config({
+        host: serverHostForSandbox(input.sandbox),
+        port: endpoint.port,
+        controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
+      }),
+    });
+
+    try {
+      await runtime.start();
+    } catch (error) {
+      await runtime.stop();
+      throw error;
+    }
+
+    return {
+      id: ServiceIds.TOKENIZER_PROXY,
+      mode: startInput.mode,
+      endpoints: {
+        http: {
+          hostBaseUrl: endpoint.hostBaseUrl,
+          internalBaseUrl: endpoint.hostBaseUrl,
+        },
+      },
+      stop: runtime.stop,
+    };
+  };
+}
+
+function config(input: {
+  host: string;
+  port: number;
+  controlPlaneBaseUrl: string;
+}): TokenizerProxyConfig {
   return {
     server: {
-      host: Host,
+      host: input.host,
       port: input.port,
     },
     controlPlaneApi: {
@@ -84,4 +100,12 @@ function config(input: { port: number; controlPlaneBaseUrl: string }): Tokenizer
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
+}
+
+function serverHostForSandbox(sandbox: IntegrationSandboxOptions | undefined): string {
+  if (sandbox?.provider === "docker") {
+    return DockerSandboxReachableHost;
+  }
+
+  return Host;
 }

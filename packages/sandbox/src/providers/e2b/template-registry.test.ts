@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createE2BTemplateAlias } from "./template-registry.js";
+import { createE2BTemplateAlias, createE2BTemplateStartRef } from "./template-registry.js";
 
 describe("createE2BTemplateAlias", () => {
   it("returns the same alias for the same base image ref", () => {
@@ -42,6 +42,14 @@ describe("createE2BTemplateAlias", () => {
         cpuCount: 6,
         memoryMb: 4096,
       }),
+    );
+  });
+});
+
+describe("createE2BTemplateStartRef", () => {
+  it("pins generated template starts to the default tag", () => {
+    expect(createE2BTemplateStartRef("mistle-sandbox-base-123")).toBe(
+      "mistle-sandbox-base-123:default",
     );
   });
 });

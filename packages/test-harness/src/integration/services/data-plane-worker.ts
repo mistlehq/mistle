@@ -22,7 +22,6 @@ import {
   TestEnvironmentIdHeader,
   createDataPlaneWorkflowNamespaceId,
 } from "../../environment/test-isolation.js";
-import { exposeHostPorts } from "../../network/expose-host-ports.js";
 import { startHostedOpenWorkflowWorker } from "./openworkflow-worker-host.js";
 import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
 import { peers } from "./peers.js";
@@ -316,10 +315,8 @@ async function createSandboxReachableEndpoints(input: {
 
   const sandboxGatewayWsUrl = createHostDockerInternalUrl(gatewayWsUrl);
   const sandboxTokenizerProxyEgressUrl = createHostDockerInternalUrl(tokenizerProxyEgressUrl);
-  await exposeHostPorts(
-    readUrlPort(sandboxGatewayWsUrl, "data-plane gateway sandbox websocket URL"),
-    readUrlPort(sandboxTokenizerProxyEgressUrl, "tokenizer proxy egress URL"),
-  );
+  readUrlPort(sandboxGatewayWsUrl, "data-plane gateway sandbox websocket URL");
+  readUrlPort(sandboxTokenizerProxyEgressUrl, "tokenizer proxy egress URL");
 
   return {
     gatewayWsUrl: sandboxGatewayWsUrl,

@@ -24,6 +24,7 @@ import {
 } from "./shared.js";
 
 const Host = "127.0.0.1";
+const DockerSandboxReachableHost = "0.0.0.0";
 
 const InfraIds = {
   OTLP: "otlp",
@@ -93,6 +94,7 @@ function start(input: {
     const endpoint = httpEndpoint(startInput, ServiceIds.DATA_PLANE_GATEWAY);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const appConfig = config({
+      host: serverHostForSandbox(input.sandbox),
       port: endpoint.port,
       postgres,
       otlp,
@@ -143,6 +145,7 @@ function start(input: {
 }
 
 function config(input: {
+  host: string;
   port: number;
   postgres: ResolvedTestInfra;
   otlp: ResolvedTestInfra | undefined;
@@ -155,7 +158,7 @@ function config(input: {
 }): DataPlaneGatewayConfig {
   return {
     server: {
-      host: Host,
+      host: input.host,
       port: input.port,
     },
     database: {
@@ -236,6 +239,14 @@ function config(input: {
             resourceAttributes: "deployment.environment=integration-new",
           },
   };
+}
+
+function serverHostForSandbox(sandbox: IntegrationSandboxOptions | undefined): string {
+  if (sandbox?.provider === "docker") {
+    return DockerSandboxReachableHost;
+  }
+
+  return Host;
 }
 
 function readSandboxBaseImageRef(input: {

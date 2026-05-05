@@ -2,7 +2,11 @@ import { Template, type BuildInfo, type ConnectionOpts, type LogEntry } from "e2
 
 import { E2BClientOperationIds, mapE2BClientError } from "./client-errors.js";
 import { E2BDefaultTemplateCpuCount, E2BDefaultTemplateMemoryMb } from "./schemas.js";
-import { createE2BTemplateAlias } from "./template-registry.js";
+import {
+  E2BTemplateDefaultTag,
+  createE2BTemplateAlias,
+  createE2BTemplateStartRef,
+} from "./template-registry.js";
 
 export type EnsureE2BTemplateAliasInput = {
   baseRef: string;
@@ -29,17 +33,25 @@ export async function ensureE2BTemplateAlias(
       cpuCount,
       memoryMb,
     });
+    const startRef = createE2BTemplateStartRef(alias);
     const templateExists = await Template.exists(alias, input.connectionOptions);
 
-    if (templateExists) {
-      return {
+    if (
+      templateExists &&
+      (await templateHasTag({
         alias,
+        connectionOptions: input.connectionOptions,
+        tag: E2BTemplateDefaultTag,
+      }))
+    ) {
+      return {
+        alias: startRef,
         templateExists,
       };
     }
 
     const template = Template().fromImage(input.baseRef);
-    const buildInfo = await Template.build(template, alias, {
+    const buildInfo = await Template.build(template, startRef, {
       ...input.connectionOptions,
       cpuCount,
       memoryMB: memoryMb,
@@ -47,11 +59,20 @@ export async function ensureE2BTemplateAlias(
     });
 
     return {
-      alias,
+      alias: startRef,
       templateExists,
       buildInfo,
     };
   } catch (error) {
     throw mapE2BClientError(E2BClientOperationIds.RESOLVE_TEMPLATE_ALIAS, error);
   }
+}
+
+async function templateHasTag(input: {
+  alias: string;
+  connectionOptions: ConnectionOpts;
+  tag: string;
+}): Promise<boolean> {
+  const tags = await Template.getTags(input.alias, input.connectionOptions);
+  return tags.some((tag) => tag.tag === input.tag);
 }
