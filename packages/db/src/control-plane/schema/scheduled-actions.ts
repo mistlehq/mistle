@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { jsonb, index, text, timestamp, uniqueIndex, type PgSchema } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
@@ -76,6 +77,12 @@ export function defineScheduledActions(schema: PgSchema) {
       index("scheduled_actions_organization_id_idx").on(table.organizationId),
       index("scheduled_actions_status_idx").on(table.status),
       index("scheduled_actions_scheduled_at_idx").on(table.scheduledAt),
+      index("scheduled_actions_pending_recovery_idx")
+        .on(table.scheduledAt, table.id)
+        .where(sql`${table.status} = 'pending'`),
+      index("scheduled_actions_dispatching_recovery_idx")
+        .on(table.scheduledAt, table.dispatchingAt, table.id)
+        .where(sql`${table.status} = 'dispatching'`),
     ],
   );
 }

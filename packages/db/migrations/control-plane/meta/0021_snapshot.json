@@ -1,5 +1,5 @@
 {
-  "id": "76f2a5e9-bda5-45c4-9067-d6e7fe2bc624",
+  "id": "4c2641ab-541b-42b6-962d-219efdeea2e9",
   "prevId": "b8ebeb79-f298-41eb-a64c-ec56d8770acb",
   "version": "7",
   "dialect": "postgresql",
@@ -1348,6 +1348,33 @@
             },
             {
               "expression": "enabled",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "automations_organization_id_created_at_id_idx": {
+          "name": "automations_organization_id_created_at_id_idx",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -5278,6 +5305,56 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "scheduled_actions_pending_recovery_idx": {
+          "name": "scheduled_actions_pending_recovery_idx",
+          "columns": [
+            {
+              "expression": "scheduled_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"control_plane\".\"scheduled_actions\".\"status\" = 'pending'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "scheduled_actions_dispatching_recovery_idx": {
+          "name": "scheduled_actions_dispatching_recovery_idx",
+          "columns": [
+            {
+              "expression": "scheduled_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dispatching_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"control_plane\".\"scheduled_actions\".\"status\" = 'dispatching'",
           "concurrently": false,
           "method": "btree",
           "with": {}
