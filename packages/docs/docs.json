@@ -41,8 +41,8 @@
         "tab": "Self-Hosting",
         "groups": [
           {
-            "group": "Configuration",
-            "pages": ["guides/self-hosted-configuration"]
+            "group": "Quickstart",
+            "pages": ["guides/self-hosted-docker-compose-quickstart"]
           },
           {
             "group": "Integrations",
@@ -51,6 +51,10 @@
               "guides/self-hosted-integration-targets",
               "guides/self-hosted-webhook-callbacks"
             ]
+          },
+          {
+            "group": "Configuration Reference",
+            "pages": ["guides/self-hosted-configuration"]
           }
         ]
       }

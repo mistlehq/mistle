@@ -1,8 +1,9 @@
-import {
-  members,
-  SandboxProfileStatuses,
-  SandboxProfileVersionStates,
-} from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -10,21 +11,24 @@ import {
   SandboxProfileSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import { it } from "./test-context.js";
 
-describe("sandbox profiles create integration", () => {
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profiles create integration", () => {
   it("creates a sandbox profile in the authenticated user's active organization", async ({
-    fixture,
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create@example.com",
     });
 
-    const response = await fixture.request("/v1/sandbox/profiles", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
       body: JSON.stringify({
         displayName: "Created Profile",
@@ -33,24 +37,24 @@ describe("sandbox profiles create integration", () => {
     expect(response.status).toBe(201);
 
     const body = SandboxProfileSchema.parse(await response.json());
-    expect(body.organizationId).toBe(authenticatedSession.organizationId);
+    expect(body.organizationId).toBe(session.organizationId);
     expect(body.displayName).toBe("Created Profile");
     expect(body.activeVersion).toBeNull();
     expect(body.status).toBe(SandboxProfileStatuses.ACTIVE);
 
-    const persistedProfile = await fixture.db.query.sandboxProfiles.findFirst({
+    const persistedProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
       where: (table, { eq }) => eq(table.id, body.id),
     });
     expect(persistedProfile).toBeDefined();
     if (persistedProfile === undefined) {
       throw new Error("Expected created sandbox profile to be persisted.");
     }
-    expect(persistedProfile.organizationId).toBe(authenticatedSession.organizationId);
+    expect(persistedProfile.organizationId).toBe(session.organizationId);
     expect(persistedProfile.displayName).toBe("Created Profile");
     expect(persistedProfile.status).toBe(SandboxProfileStatuses.ACTIVE);
     expect(persistedProfile.activeVersion).toBeNull();
 
-    const persistedVersions = await fixture.db.query.sandboxProfileVersions.findMany({
+    const persistedVersions = await env.controlPlaneDb.query.sandboxProfileVersions.findMany({
       where: (table, { eq }) => eq(table.sandboxProfileId, body.id),
     });
     expect(persistedVersions).toHaveLength(1);
@@ -65,16 +69,16 @@ describe("sandbox profiles create integration", () => {
     expect(initialVersion.publishedAt).toBeNull();
   });
 
-  it("rejects creation when status is provided", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-status-not-allowed@example.com",
+  it("rejects creation when status is provided", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-status-not-allowed@example.com",
     });
 
-    const response = await fixture.request("/v1/sandbox/profiles", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
       body: JSON.stringify({
         displayName: "Created Profile",
@@ -88,8 +92,8 @@ describe("sandbox profiles create integration", () => {
     expect(body.message).toBe("Invalid request.");
   });
 
-  it("rejects creation without an authenticated session", async ({ fixture }) => {
-    const response = await fixture.request("/v1/sandbox/profiles", {
+  it("rejects creation without an authenticated session", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -101,16 +105,16 @@ describe("sandbox profiles create integration", () => {
     expect(response.status).toBe(401);
   });
 
-  it("returns 400 for invalid create payload", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-validation@example.com",
+  it("returns 400 for invalid create payload", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-validation@example.com",
     });
 
-    const response = await fixture.request("/v1/sandbox/profiles", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
       body: JSON.stringify({
         displayName: "",
@@ -123,15 +127,15 @@ describe("sandbox profiles create integration", () => {
     expect(body.message).toBe("Invalid request.");
   });
 
-  it("does not create a profile in another organization", async ({ fixture }) => {
-    const firstOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-org-a@example.com",
+  it("does not create a profile in another organization", async ({ env }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-org-a@example.com",
     });
-    const secondOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-org-b@example.com",
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-org-b@example.com",
     });
 
-    const response = await fixture.request("/v1/sandbox/profiles", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -144,12 +148,12 @@ describe("sandbox profiles create integration", () => {
     expect(response.status).toBe(201);
     const createdProfile = SandboxProfileSchema.parse(await response.json());
 
-    const secondOrgProfiles = await fixture.db.query.sandboxProfiles.findMany({
+    const secondOrgProfiles = await env.controlPlaneDb.query.sandboxProfiles.findMany({
       where: (table, { eq }) => eq(table.organizationId, secondOrgSession.organizationId),
     });
     expect(secondOrgProfiles.map((profile) => profile.id)).not.toContain(createdProfile.id);
 
-    const firstOrgProfile = await fixture.db.query.sandboxProfiles.findFirst({
+    const firstOrgProfile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
       where: (table, { eq }) => eq(table.id, createdProfile.id),
     });
     expect(firstOrgProfile).toBeDefined();
@@ -159,27 +163,25 @@ describe("sandbox profiles create integration", () => {
     expect(firstOrgProfile.organizationId).toBe(firstOrgSession.organizationId);
   });
 
-  it("returns 403 when the active organization membership has been revoked", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-revoked-membership@example.com",
+  it("returns 403 when the active organization membership has been revoked", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profiles-create-revoked-membership@example.com",
     });
 
-    await fixture.db
-      .delete(members)
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
       .where(
         and(
-          eq(members.organizationId, authenticatedSession.organizationId),
-          eq(members.userId, authenticatedSession.userId),
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
         ),
       );
 
-    const response = await fixture.request("/v1/sandbox/profiles", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/sandbox/profiles", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
       body: JSON.stringify({
         displayName: "Should Fail",

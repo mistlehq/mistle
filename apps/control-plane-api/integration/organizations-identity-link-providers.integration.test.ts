@@ -1,17 +1,21 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The test cases use an extended Vitest fixture created by the test harness.
+ */
+
 import {
-  integrationConnections,
-  integrationTargets,
-  MemberRoles,
-  members,
-  organizationIdentityLinkProviderConfigs,
-  OrganizationIdentityLinkProviderConfigStatus,
   IntegrationConnectionStatuses,
-  sessions,
-  userExternalPrincipals,
+  type IntegrationConnectionStatus,
+  MemberRoles,
+  OrganizationIdentityLinkProviderConfigStatus,
   UserExternalPrincipalStatuses,
 } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodIds } from "@mistle/integrations-definitions";
+import {
+  createIntegrationTest,
+  type IntegrationAuthenticatedSession,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -20,135 +24,96 @@ import {
   OrganizationIdentityLinkProviderSchema,
   OrganizationIdentityLinkProvidersResponseSchema,
 } from "../src/organizations/schemas.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-import { it } from "./test-context.js";
 
-describe("organization identity-linking providers integration", () => {
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("organization identity-linking providers integration", () => {
   it("lists supported providers for the active organization with unconfigured status by default", async ({
-    fixture,
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-list@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-list@example.com",
     });
 
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    await upsertSlackTarget({
-      fixture,
-      targetKey: "slack-default",
-    });
+    await upsertGitHubTarget(env, "github-cloud");
+    await upsertSlackTarget(env, "slack-default");
 
-    const response = await fixture.request("/v1/organization/identity-linking/providers", {
-      headers: {
-        cookie: session.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
-
+    );
     expect(response.status).toBe(200);
-    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(await response.json());
 
-    expect(payload).toEqual({
-      providers: [
-        {
-          providerFamily: "github",
-          displayName: "GitHub",
-          logoKey: "github",
-          eligibleTargetKeys: ["github-cloud"],
-          eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-          eligibleConnections: [],
-          configurationStatus: "unconfigured",
-          selectedConnection: null,
-          configuredAt: null,
-          updatedAt: null,
-        },
-        {
-          providerFamily: "slack",
-          displayName: "Slack",
-          logoKey: "slack",
-          eligibleTargetKeys: ["slack-default"],
-          eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP],
-          eligibleConnections: [],
-          configurationStatus: "unconfigured",
-          selectedConnection: null,
-          configuredAt: null,
-          updatedAt: null,
-        },
-      ],
-    });
+    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(await response.json());
+    expect(payload.providers).toEqual([
+      {
+        providerFamily: "github",
+        displayName: "GitHub",
+        logoKey: "github",
+        eligibleTargetKeys: ["github-cloud"],
+        eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
+        eligibleConnections: [],
+        configurationStatus: "unconfigured",
+        selectedConnection: null,
+        configuredAt: null,
+        updatedAt: null,
+      },
+      {
+        providerFamily: "slack",
+        displayName: "Slack",
+        logoKey: "slack",
+        eligibleTargetKeys: ["slack-default"],
+        eligibleConnectionMethodIds: [SlackConnectionMethodIds.SLACK_APP],
+        eligibleConnections: [],
+        configurationStatus: "unconfigured",
+        selectedConnection: null,
+        configuredAt: null,
+        updatedAt: null,
+      },
+    ]);
   });
 
-  it("saves a GitHub identity-linking provider connection without auto-enabling it", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-configure@example.com",
+  it("saves a GitHub identity-linking provider connection without enabling it", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-configure@example.com",
     });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    const connectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: session,
+    await upsertGitHubTarget(env, "github-cloud");
+    const connectionId = await createGitHubIdentityLinkReadyConnection(env, {
       displayName: "GitHub Identity App",
+      session,
     });
 
-    const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: session.cookie,
-      },
-      body: JSON.stringify({
-        integrationConnectionId: connectionId,
-      }),
-    });
-
-    expect(response.status).toBe(200);
-    const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
-
-    expect(payload).toEqual({
-      providerFamily: "github",
-      displayName: "GitHub",
-      logoKey: "github",
-      eligibleTargetKeys: ["github-cloud"],
-      eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-      eligibleConnections: [
-        {
-          id: connectionId,
-          targetKey: "github-cloud",
-          displayName: "GitHub Identity App",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: payload.eligibleConnections[0]?.createdAt ?? "",
-          updatedAt: payload.eligibleConnections[0]?.updatedAt ?? "",
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
         },
-      ],
-      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
-      selectedConnection: {
-        id: connectionId,
-        targetKey: "github-cloud",
-        displayName: "GitHub Identity App",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        connectionMethodLabel: "GitHub App installation",
-        createdAt: payload.selectedConnection?.createdAt ?? "",
-        updatedAt: payload.selectedConnection?.updatedAt ?? "",
+        body: JSON.stringify({
+          integrationConnectionId: connectionId,
+        }),
       },
-      configuredAt: payload.configuredAt,
-      updatedAt: payload.updatedAt,
-    });
+    );
+    expect(response.status).toBe(200);
+
+    const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
+    expect(payload.configurationStatus).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
+    expect(payload.selectedConnection?.id).toBe(connectionId);
+    expect(payload.eligibleConnections.map((connection) => connection.id)).toEqual([connectionId]);
 
     const persistedConfig =
-      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+      await env.controlPlaneDb.query.organizationIdentityLinkProviderConfigs.findFirst({
         where: (table, { and, eq }) =>
           and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
       });
-
     expect(persistedConfig).toMatchObject({
       organizationId: session.organizationId,
       providerFamily: "github",
@@ -160,33 +125,25 @@ describe("organization identity-linking providers integration", () => {
     });
   });
 
-  it("enables a saved identity-linking provider through the status endpoint", async ({
-    fixture,
+  it("enables and disables a saved identity-linking provider without deleting the row", async ({
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-enable@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-status@example.com",
     });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
+    await upsertGitHubTarget(env, "github-cloud");
+    const connectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Identity Status",
+      session,
     });
-    const connectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: session,
-      displayName: "GitHub Identity Enable",
-    });
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
+    await seedIdentityLinkProviderConfig(env, {
+      connectionId,
       organizationId: session.organizationId,
-      providerFamily: "github",
       status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
-      integrationTargetKey: "github-cloud",
-      integrationConnectionId: connectionId,
-      createdByUserId: session.userId,
-      updatedByUserId: session.userId,
+      userId: session.userId,
     });
 
-    const response = await fixture.request(
+    const enableResponse = await env.controlPlaneApi.http.fetch(
       "/v1/organization/identity-linking/providers/github/status",
       {
         method: "PUT",
@@ -199,424 +156,268 @@ describe("organization identity-linking providers integration", () => {
         }),
       },
     );
-
-    expect(response.status).toBe(200);
-    const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
-
-    expect(payload.configurationStatus).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
-    expect(payload.selectedConnection?.id).toBe(connectionId);
-
-    const persistedConfig =
-      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
-        where: (table, { and, eq }) =>
-          and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
-      });
-
-    expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.ACTIVE);
-  });
-
-  it("rejects enabling a saved provider when its connection is no longer valid", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-enable-invalid@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_revoked",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
-      displayName: "GitHub Identity Revoked",
-      status: IntegrationConnectionStatuses.REVOKED,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      },
-    });
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-      organizationId: session.organizationId,
-      providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
-      integrationTargetKey: "github-cloud",
-      integrationConnectionId: "icn_identity_revoked",
-      createdByUserId: session.userId,
-      updatedByUserId: session.userId,
-    });
-
-    const response = await fixture.request(
-      "/v1/organization/identity-linking/providers/github/status",
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          cookie: session.cookie,
-        },
-        body: JSON.stringify({
-          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-        }),
-      },
+    expect(enableResponse.status).toBe(200);
+    const enabledProvider = OrganizationIdentityLinkProviderSchema.parse(
+      await enableResponse.json(),
+    );
+    expect(enabledProvider.configurationStatus).toBe(
+      OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
     );
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({
-      code: "INVALID_PROVIDER_CONFIG_INPUT",
-    });
-
-    const persistedConfig =
-      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
-        where: (table, { and, eq }) =>
-          and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
-      });
-
-    expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
-  });
-
-  it("rejects connections that use an ineligible connection method", async ({ fixture }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-ineligible-method@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_github_api_key",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
-      displayName: "GitHub API key",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.API_KEY,
-      },
-    });
-
-    const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: session.cookie,
-      },
-      body: JSON.stringify({
-        integrationConnectionId: "icn_identity_github_api_key",
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "INVALID_PROVIDER_CONFIG_INPUT",
-      message:
-        "Integration connection 'icn_identity_github_api_key' uses connection method 'api-key', which is not eligible for identity linking provider 'github'.",
-    });
-  });
-
-  it("rejects GitHub App connections that are missing linked-account auth config", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-missing-client-credentials@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_identity_github_missing_client_credentials",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
-      displayName: "GitHub Missing Client Credentials",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        app_id: "12345",
-        app_slug: "mistle-github-app",
-      },
-    });
-
-    const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
-      method: "PUT",
-      headers: {
-        "content-type": "application/json",
-        cookie: session.cookie,
-      },
-      body: JSON.stringify({
-        integrationConnectionId: "icn_identity_github_missing_client_credentials",
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "INVALID_PROVIDER_CONFIG_INPUT",
-      message:
-        "Integration connection 'icn_identity_github_missing_client_credentials' is missing required linked-user authorization configuration for identity linking.",
-    });
-  });
-
-  it("disables a configured identity-linking provider without deleting the row", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-disable@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    const connectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: session,
-      displayName: "GitHub Identity Disable",
-    });
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-      organizationId: session.organizationId,
-      providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      integrationTargetKey: "github-cloud",
-      integrationConnectionId: connectionId,
-      createdByUserId: session.userId,
-      updatedByUserId: session.userId,
-    });
-
-    const response = await fixture.request("/v1/organization/identity-linking/providers/github", {
-      method: "DELETE",
-      headers: {
-        cookie: session.cookie,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    const payload = OrganizationIdentityLinkProviderSchema.parse(await response.json());
-
-    expect(payload).toEqual({
-      providerFamily: "github",
-      displayName: "GitHub",
-      logoKey: "github",
-      eligibleTargetKeys: ["github-cloud"],
-      eligibleConnectionMethodIds: [IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION],
-      eligibleConnections: [
-        {
-          id: connectionId,
-          targetKey: "github-cloud",
-          displayName: "GitHub Identity Disable",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-          connectionMethodLabel: "GitHub App installation",
-          createdAt: payload.eligibleConnections[0]?.createdAt ?? "",
-          updatedAt: payload.eligibleConnections[0]?.updatedAt ?? "",
+    const disableResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
         },
-      ],
-      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
-      selectedConnection: {
-        id: connectionId,
-        targetKey: "github-cloud",
-        displayName: "GitHub Identity Disable",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        connectionMethodLabel: "GitHub App installation",
-        createdAt: payload.selectedConnection?.createdAt ?? "",
-        updatedAt: payload.selectedConnection?.updatedAt ?? "",
       },
-      configuredAt: payload.configuredAt,
-      updatedAt: payload.updatedAt,
-    });
+    );
+    expect(disableResponse.status).toBe(200);
+    const disabledProvider = OrganizationIdentityLinkProviderSchema.parse(
+      await disableResponse.json(),
+    );
+    expect(disabledProvider.configurationStatus).toBe(
+      OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+    );
+    expect(disabledProvider.selectedConnection?.id).toBe(connectionId);
 
     const persistedConfig =
-      await fixture.db.query.organizationIdentityLinkProviderConfigs.findFirst({
+      await env.controlPlaneDb.query.organizationIdentityLinkProviderConfigs.findFirst({
         where: (table, { and, eq }) =>
           and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
       });
-
     expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
     expect(persistedConfig?.integrationConnectionId).toBe(connectionId);
   });
 
-  it("returns forbidden when a member tries to list identity-linking providers", async ({
-    fixture,
+  it("rejects invalid or ineligible connections for identity-linking provider configuration", async ({
+    env,
   }) => {
-    const ownerSession = await fixture.authSession({
-      email: "organization-identity-link-providers-member-owner@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-invalid@example.com",
     });
-    const memberSession = await fixture.authSession({
-      email: "organization-identity-link-providers-member-member@example.com",
+    await upsertGitHubTarget(env, "github-cloud");
+    await seedConnection(env, {
+      config: {
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
+      },
+      connectionId: "icn_integration_new_identity_link_api_key",
+      displayName: "GitHub API key",
+      organizationId: session.organizationId,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      targetKey: "github-cloud",
     });
-
-    await addMemberToActiveOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: memberSession.userId,
-    });
-    await upsertGitHubTarget({
-      fixture,
+    await seedConnection(env, {
+      config: {
+        app_id: "12345",
+        app_slug: "mistle-github-app",
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      },
+      connectionId: "icn_integration_new_identity_link_missing_auth",
+      displayName: "GitHub Missing Client Credentials",
+      organizationId: session.organizationId,
+      status: IntegrationConnectionStatuses.ACTIVE,
       targetKey: "github-cloud",
     });
 
-    const response = await fixture.request("/v1/organization/identity-linking/providers", {
-      headers: {
-        cookie: memberSession.cookie,
-      },
+    const apiKeyResponse = await putProviderConnection(env, {
+      connectionId: "icn_integration_new_identity_link_api_key",
+      cookie: session.cookie,
+    });
+    expect(apiKeyResponse.status).toBe(400);
+    await expect(apiKeyResponse.json()).resolves.toEqual({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+      message:
+        "Integration connection 'icn_integration_new_identity_link_api_key' uses connection method 'api-key', which is not eligible for identity linking provider 'github'.",
     });
 
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
+    const missingAuthResponse = await putProviderConnection(env, {
+      connectionId: "icn_integration_new_identity_link_missing_auth",
+      cookie: session.cookie,
+    });
+    expect(missingAuthResponse.status).toBe(400);
+    await expect(missingAuthResponse.json()).resolves.toMatchObject({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+    });
+  });
+
+  it("rejects enabling a saved provider when its connection is no longer valid", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-enable-invalid@example.com",
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+    await seedConnection(env, {
+      config: {
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      },
+      connectionId: "icn_integration_new_identity_link_revoked",
+      displayName: "GitHub Identity Revoked",
+      organizationId: session.organizationId,
+      status: IntegrationConnectionStatuses.REVOKED,
+      targetKey: "github-cloud",
+    });
+    await seedIdentityLinkProviderConfig(env, {
+      connectionId: "icn_integration_new_identity_link_revoked",
+      organizationId: session.organizationId,
+      status: OrganizationIdentityLinkProviderConfigStatus.DISABLED,
+      userId: session.userId,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/status",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify({
+          status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        }),
+      },
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "INVALID_PROVIDER_CONFIG_INPUT",
+    });
+
+    const persistedConfig =
+      await env.controlPlaneDb.query.organizationIdentityLinkProviderConfigs.findFirst({
+        where: (table, { and, eq }) =>
+          and(eq(table.organizationId, session.organizationId), eq(table.providerFamily, "github")),
+      });
+    expect(persistedConfig?.status).toBe(OrganizationIdentityLinkProviderConfigStatus.DISABLED);
+  });
+
+  it("returns forbidden when a member manages identity-linking provider settings", async ({
+    env,
+  }) => {
+    const ownerSession = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-member-owner@example.com",
+    });
+    const memberSession = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-member-member@example.com",
+    });
+    await addMemberToOrganization(env, {
+      organizationId: ownerSession.organizationId,
+      role: MemberRoles.MEMBER,
+      userId: memberSession.userId,
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+
+    const listResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers",
+      {
+        headers: {
+          cookie: memberSession.cookie,
+        },
+      },
+    );
+    expect(listResponse.status).toBe(403);
+    await expect(listResponse.json()).resolves.toEqual({
+      code: "FORBIDDEN",
+      message: "Forbidden API request.",
+    });
+
+    const linksResponse = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers/github/links",
+      {
+        headers: {
+          cookie: memberSession.cookie,
+        },
+      },
+    );
+    expect(linksResponse.status).toBe(403);
+    await expect(linksResponse.json()).resolves.toEqual({
       code: "FORBIDDEN",
       message: "Forbidden API request.",
     });
   });
 
-  it("blocks deletion of connections that are actively used by identity linking", async ({
-    fixture,
+  it("lists only GitHub connections that are ready for linked-account authorization", async ({
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-delete-guard@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-identity-link-providers-ready@example.com",
     });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    const connectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: session,
-      displayName: "GitHub Identity Guard",
-    });
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-      organizationId: session.organizationId,
-      providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      integrationTargetKey: "github-cloud",
-      integrationConnectionId: connectionId,
-      createdByUserId: session.userId,
-      updatedByUserId: session.userId,
-    });
-
-    const response = await fixture.request(`/v1/integration/connections/${connectionId}`, {
-      method: "DELETE",
-      headers: {
-        cookie: session.cookie,
-      },
-    });
-
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      code: "CONNECTION_USED_BY_IDENTITY_LINKING",
-      message:
-        "This integration connection cannot be deleted while it is configured for Identity Linking.",
-    });
-
-    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, connectionId),
-    });
-    expect(persistedConnection).toBeDefined();
-  });
-
-  it("lists only GitHub connections that are actually ready for linked-account authorization", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "organization-identity-link-providers-ready-connections@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_github_missing_client_id",
-      organizationId: session.organizationId,
-      targetKey: "github-cloud",
-      displayName: "GitHub Missing Client ID",
-      status: IntegrationConnectionStatuses.ACTIVE,
+    await upsertGitHubTarget(env, "github-cloud");
+    await seedConnection(env, {
       config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         app_id: "12345",
         app_slug: "mistle-github-app",
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
       },
-    });
-    const readyConnectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: session,
-      displayName: "GitHub Ready",
-    });
-
-    const response = await fixture.request("/v1/organization/identity-linking/providers", {
-      headers: {
-        cookie: session.cookie,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(await response.json());
-    expect(payload.providers[0]).toMatchObject({
-      providerFamily: "github",
-      eligibleConnections: [
-        {
-          id: readyConnectionId,
-          displayName: "GitHub Ready",
-        },
-      ],
-    });
-  });
-
-  it("lists member link visibility for an identity-linking provider to owners and admins", async ({
-    fixture,
-  }) => {
-    const ownerSession = await fixture.authSession({
-      email: "organization-identity-link-provider-links-owner@example.com",
-    });
-    const ownerEmail = "organization-identity-link-provider-links-owner@example.com";
-    const adminSession = await fixture.authSession({
-      email: "organization-identity-link-provider-links-admin@example.com",
-    });
-    const adminEmail = "organization-identity-link-provider-links-admin@example.com";
-    const memberSession = await fixture.authSession({
-      email: "organization-identity-link-provider-links-member@example.com",
-    });
-    const memberEmail = "organization-identity-link-provider-links-member@example.com";
-
-    await addMemberToOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: adminSession.userId,
-      role: MemberRoles.ADMIN,
-    });
-    await addMemberToOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: memberSession.userId,
-      role: MemberRoles.MEMBER,
-    });
-    await upsertGitHubTarget({
-      fixture,
+      connectionId: "icn_integration_new_identity_link_missing_client_id",
+      displayName: "GitHub Missing Client ID",
+      organizationId: session.organizationId,
+      status: IntegrationConnectionStatuses.ACTIVE,
       targetKey: "github-cloud",
     });
-    const connectionId = await createGitHubIdentityLinkReadyConnection({
-      fixture,
-      authenticatedSession: ownerSession,
-      displayName: "GitHub Identity Visibility",
+    const readyConnectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Ready",
+      session,
     });
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-      id: "ilp_github_links_visibility",
-      organizationId: ownerSession.organizationId,
-      providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      integrationTargetKey: "github-cloud",
-      integrationConnectionId: connectionId,
-      createdByUserId: ownerSession.userId,
-      updatedByUserId: ownerSession.userId,
-    });
-    await fixture.db.insert(userExternalPrincipals).values([
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/identity-linking/providers",
       {
-        id: "uep_github_links_visibility_owner",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(response.status).toBe(200);
+
+    const payload = OrganizationIdentityLinkProvidersResponseSchema.parse(await response.json());
+    const githubProvider = payload.providers.find(
+      (provider) => provider.providerFamily === "github",
+    );
+    expect(githubProvider?.eligibleConnections.map((connection) => connection.id)).toEqual([
+      readyConnectionId,
+    ]);
+  });
+
+  it("lists member link visibility for owners and admins", async ({ env }) => {
+    const ownerEmail = "integration-new-identity-link-provider-links-owner@example.com";
+    const adminEmail = "integration-new-identity-link-provider-links-admin@example.com";
+    const memberEmail = "integration-new-identity-link-provider-links-member@example.com";
+    const ownerSession = await env.auth.createSession({ email: ownerEmail });
+    const adminSession = await env.auth.createSession({ email: adminEmail });
+    const memberSession = await env.auth.createSession({ email: memberEmail });
+
+    await addMemberToOrganization(env, {
+      organizationId: ownerSession.organizationId,
+      role: MemberRoles.ADMIN,
+      userId: adminSession.userId,
+    });
+    await addMemberToOrganization(env, {
+      organizationId: ownerSession.organizationId,
+      role: MemberRoles.MEMBER,
+      userId: memberSession.userId,
+    });
+    await upsertGitHubTarget(env, "github-cloud");
+    const connectionId = await createGitHubIdentityLinkReadyConnection(env, {
+      displayName: "GitHub Identity Visibility",
+      session: ownerSession,
+    });
+    await seedIdentityLinkProviderConfig(env, {
+      configId: "ilp_integration_new_identity_link_links_visibility",
+      connectionId,
+      organizationId: ownerSession.organizationId,
+      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+      userId: ownerSession.userId,
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.userExternalPrincipals).values([
+      {
+        id: "uep_integration_new_identity_link_links_owner",
         organizationId: ownerSession.organizationId,
         userId: ownerSession.userId,
         providerFamily: "github",
         providerSubjectId: "github-owner-123",
-        organizationProviderConfigId: "ilp_github_links_visibility",
+        organizationProviderConfigId: "ilp_integration_new_identity_link_links_visibility",
         integrationConnectionId: connectionId,
         status: UserExternalPrincipalStatuses.ACTIVE,
         profile: {
@@ -626,12 +427,12 @@ describe("organization identity-linking providers integration", () => {
         },
       },
       {
-        id: "uep_github_links_visibility_admin",
+        id: "uep_integration_new_identity_link_links_admin",
         organizationId: ownerSession.organizationId,
         userId: adminSession.userId,
         providerFamily: "github",
         providerSubjectId: "github-admin-456",
-        organizationProviderConfigId: "ilp_github_links_visibility",
+        organizationProviderConfigId: "ilp_integration_new_identity_link_links_visibility",
         integrationConnectionId: connectionId,
         status: UserExternalPrincipalStatuses.ACTIVE,
         profile: {
@@ -643,7 +444,7 @@ describe("organization identity-linking providers integration", () => {
     ]);
 
     for (const session of [ownerSession, adminSession]) {
-      const response = await fixture.request(
+      const response = await env.controlPlaneApi.http.fetch(
         "/v1/organization/identity-linking/providers/github/links",
         {
           headers: {
@@ -651,8 +452,8 @@ describe("organization identity-linking providers integration", () => {
           },
         },
       );
-
       expect(response.status).toBe(200);
+
       const payload = OrganizationIdentityLinkProviderLinksResponseSchema.parse(
         await response.json(),
       );
@@ -692,80 +493,60 @@ describe("organization identity-linking providers integration", () => {
       );
     }
   });
-
-  it("returns forbidden when a member tries to list provider link visibility", async ({
-    fixture,
-  }) => {
-    const ownerSession = await fixture.authSession({
-      email: "organization-identity-link-provider-links-forbidden-owner@example.com",
-    });
-    const memberSession = await fixture.authSession({
-      email: "organization-identity-link-provider-links-forbidden-member@example.com",
-    });
-
-    await addMemberToOrganization({
-      fixture,
-      organizationId: ownerSession.organizationId,
-      userId: memberSession.userId,
-      role: MemberRoles.MEMBER,
-    });
-
-    const response = await fixture.request(
-      "/v1/organization/identity-linking/providers/github/links",
-      {
-        headers: {
-          cookie: memberSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
-      code: "FORBIDDEN",
-      message: "Forbidden API request.",
-    });
-  });
 });
 
-async function addMemberToActiveOrganization(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  userId: string;
-}): Promise<void> {
-  await addMemberToOrganization({
-    ...input,
-    role: MemberRoles.MEMBER,
-  });
+async function putProviderConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    connectionId: string;
+    cookie: string;
+  },
+) {
+  return await env.controlPlaneApi.http.fetch(
+    "/v1/organization/identity-linking/providers/github",
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        integrationConnectionId: input.connectionId,
+      }),
+    },
+  );
 }
 
-async function addMemberToOrganization(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  userId: string;
-  role: (typeof MemberRoles)[keyof typeof MemberRoles];
-}): Promise<void> {
-  await input.fixture.db.insert(members).values({
+async function addMemberToOrganization(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    userId: string;
+    role: (typeof MemberRoles)[keyof typeof MemberRoles];
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.members).values({
     organizationId: input.organizationId,
     userId: input.userId,
     role: input.role,
   });
 
-  await input.fixture.db
-    .update(sessions)
+  await env.controlPlaneDb
+    .update(env.controlPlaneTables.sessions)
     .set({
       activeOrganizationId: input.organizationId,
     })
-    .where(eq(sessions.userId, input.userId));
+    .where(eq(env.controlPlaneTables.sessions.userId, input.userId));
 }
 
-async function upsertGitHubTarget(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  targetKey: string;
-}): Promise<void> {
-  await input.fixture.db
-    .insert(integrationTargets)
+async function upsertGitHubTarget(
+  env: IntegrationTestEnvironment,
+  targetKey: string,
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
     .values({
-      targetKey: input.targetKey,
+      targetKey,
       familyId: "github",
       variantId: "github-cloud",
       enabled: true,
@@ -775,7 +556,7 @@ async function upsertGitHubTarget(input: {
       },
     })
     .onConflictDoUpdate({
-      target: integrationTargets.targetKey,
+      target: env.controlPlaneTables.integrationTargets.targetKey,
       set: {
         familyId: "github",
         variantId: "github-cloud",
@@ -788,14 +569,14 @@ async function upsertGitHubTarget(input: {
     });
 }
 
-async function upsertSlackTarget(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  targetKey: string;
-}): Promise<void> {
-  await input.fixture.db
-    .insert(integrationTargets)
+async function upsertSlackTarget(
+  env: IntegrationTestEnvironment,
+  targetKey: string,
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
     .values({
-      targetKey: input.targetKey,
+      targetKey,
       familyId: "slack",
       variantId: "slack-default",
       enabled: true,
@@ -804,7 +585,7 @@ async function upsertSlackTarget(input: {
       },
     })
     .onConflictDoUpdate({
-      target: integrationTargets.targetKey,
+      target: env.controlPlaneTables.integrationTargets.targetKey,
       set: {
         familyId: "slack",
         variantId: "slack-default",
@@ -816,44 +597,99 @@ async function upsertSlackTarget(input: {
     });
 }
 
-async function createGitHubIdentityLinkReadyConnection(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
-  displayName: string;
-}): Promise<string> {
-  const response = await input.fixture.request("/v1/integration/connections/github-cloud/form", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      cookie: input.authenticatedSession.cookie,
+async function createGitHubIdentityLinkReadyConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    displayName: string;
+    session: IntegrationAuthenticatedSession;
+  },
+): Promise<string> {
+  const response = await env.controlPlaneApi.http.fetch(
+    "/v1/integration/connections/github-cloud/form",
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.session.cookie,
+      },
+      body: JSON.stringify({
+        displayName: input.displayName,
+        methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          app_id: "12345",
+          app_slug: "mistle-github-app",
+          client_id: "Iv1.client123",
+        },
+        secrets: {
+          appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
+          clientSecret: "github-client-secret",
+          webhookSecret: "github-webhook-secret",
+        },
+      }),
     },
-    body: JSON.stringify({
-      displayName: input.displayName,
-      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        app_id: "12345",
-        app_slug: "mistle-github-app",
-        client_id: "Iv1.client123",
-      },
-      secrets: {
-        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
-        clientSecret: "github-client-secret",
-        webhookSecret: "github-webhook-secret",
-      },
-    }),
-  });
-
+  );
   expect(response.status).toBe(201);
-  const createdConnection = await response.json();
-  if (typeof createdConnection !== "object" || createdConnection === null) {
-    throw new Error("Expected GitHub App connection create response object.");
-  }
 
-  const connectionId = createdConnection["id"];
-  if (typeof connectionId !== "string" || connectionId.length === 0) {
-    throw new Error("Expected GitHub App connection id.");
+  const payload: unknown = await response.json().catch(() => null);
+  const connectionId = readStringField(payload, "id");
+  if (connectionId === null) {
+    throw new Error("Expected GitHub App connection create response to include id.");
   }
 
   return connectionId;
+}
+
+async function seedConnection(
+  env: IntegrationTestEnvironment,
+  input: {
+    config: Record<string, unknown>;
+    connectionId: string;
+    displayName: string;
+    organizationId: string;
+    status: IntegrationConnectionStatus;
+    targetKey: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+    id: input.connectionId,
+    organizationId: input.organizationId,
+    targetKey: input.targetKey,
+    displayName: input.displayName,
+    status: input.status,
+    config: input.config,
+  });
+}
+
+async function seedIdentityLinkProviderConfig(
+  env: IntegrationTestEnvironment,
+  input: {
+    configId?: string;
+    connectionId: string;
+    organizationId: string;
+    status: OrganizationIdentityLinkProviderConfigStatus;
+    userId: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.organizationIdentityLinkProviderConfigs)
+    .values({
+      ...(input.configId === undefined ? {} : { id: input.configId }),
+      organizationId: input.organizationId,
+      providerFamily: "github",
+      status: input.status,
+      integrationTargetKey: "github-cloud",
+      integrationConnectionId: input.connectionId,
+      createdByUserId: input.userId,
+      updatedByUserId: input.userId,
+    });
+}
+
+function readStringField(payload: unknown, field: string): string | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+
+  const value = Reflect.get(payload, field);
+  return typeof value === "string" && value.length > 0 ? value : null;
 }

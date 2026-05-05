@@ -1,86 +1,96 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { getLocalPreparedRuntimeSandboxBaseImageRef } from "@mistle/config";
-import {
-  IntegrationBindingKinds,
-  integrationConnections,
-  IntegrationConnectionStatuses,
-  integrationTargets,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-} from "@mistle/db/control-plane";
+import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createDefinitionsBundle } from "@mistle/integrations-definitions";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
   compileSandboxRuntimePlan,
   SandboxRuntimePlanCompilerErrorCodes,
 } from "../src/sandbox-profiles/services/compile-sandbox-runtime-plan.js";
-import { it } from "./test-context.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
 const Definitions = createDefinitionsBundle();
 const LocalPreparedRuntimeSandboxBaseImageRef = getLocalPreparedRuntimeSandboxBaseImageRef();
 
-describe("sandbox profile internal runtime plan compiler integration", () => {
-  it("fails when the resolved target secrets omit an existing target entry", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-compile-internal-missing-target-secrets@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile internal runtime plan compiler integration", () => {
+  it("fails when resolved target secrets omit an existing target entry", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-compile-internal-missing-target-secrets@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_internal_missing_target_secrets_entry",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Missing Target Secrets Entry Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_internal_missing_target_secrets_entry",
-      version: 1,
-    });
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_compile_internal_missing_target_secrets_entry",
+        organizationId: session.organizationId,
+        displayName: "Missing Target Secrets Entry Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_compile_internal_missing_target_secrets_entry",
+        version: 1,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
         targetKey: "openai-default-internal-missing-target-secrets-entry",
-        familyId: "openai",
         variantId: "openai-default",
         enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_compile_internal_missing_target_secrets_entry",
+        organizationId: session.organizationId,
+        targetKey: "openai-default-internal-missing-target-secrets-entry",
+        displayName: "Missing Secrets Entry Connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
         config: {
-          api_base_url: "https://api.openai.com/v1",
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-      })
-      .onConflictDoNothing();
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_compile_internal_missing_target_secrets_entry",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "openai-default-internal-missing-target-secrets-entry",
-      displayName: "Missing Secrets Entry Connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.API_KEY,
-      },
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_internal_missing_target_secrets_entry",
-      sandboxProfileId: "sbp_compile_internal_missing_target_secrets_entry",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_compile_internal_missing_target_secrets_entry",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
-    });
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_compile_internal_missing_target_secrets_entry",
+          sandboxProfileId: "sbp_compile_internal_missing_target_secrets_entry",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_compile_internal_missing_target_secrets_entry",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
+          },
+        }),
+      );
 
     await expect(
       compileSandboxRuntimePlan({
-        db: fixture.db,
+        db: env.controlPlaneDb,
         integrationDefinitions: Definitions,
         resolveTargetSecrets: async () => [],
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         profileId: "sbp_compile_internal_missing_target_secrets_entry",
         profileVersion: 1,
         image: {

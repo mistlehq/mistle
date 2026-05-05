@@ -76,6 +76,56 @@ describe("compileSignozBinding", () => {
     expect(compiled.runtimeClients).toEqual([]);
   });
 
+  it("builds the MCP route from an explicit issuer base URL", () => {
+    const compiled = compileSignozBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "signoz-mcp",
+      target: {
+        familyId: "signoz",
+        variantId: "signoz-mcp",
+        enabled: true,
+        config: {
+          issuer_base_url: "https://observability.example.com",
+        },
+        secrets: {},
+      },
+      connection: {
+        id: "icn_signoz",
+        status: "active",
+        config: {
+          connection_method: "oauth2-authorization-code",
+          region: "self-hosted",
+          client_id: "signoz_client_123",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "connector",
+        config: {
+          tools: ["signoz-mcp"],
+        },
+      },
+      refs: {
+        sandboxPaths: SandboxPaths,
+        artifactBinPath,
+      },
+    });
+
+    expect(compiled.egressRoutes).toEqual([
+      expect.objectContaining({
+        match: {
+          hosts: ["observability.example.com"],
+          pathPrefixes: ["/mcp"],
+        },
+        upstream: {
+          baseUrl: "https://observability.example.com/mcp",
+        },
+      }),
+    ]);
+  });
+
   it("omits routes when the MCP tool is not selected", () => {
     const compiled = compileSignozBinding({
       organizationId: "org_123",

@@ -20,9 +20,9 @@ API key gives access to the GitHub resources available to that token, but it doe
 
 Create a GitHub personal access token or other API token with the scopes your workflows need, then create the Mistle connection with:
 
-| Field    | Value        |
-| -------- | ------------ |
-| `apiKey` | GitHub token |
+| Field   | Value        |
+| ------- | ------------ |
+| API key | GitHub token |
 
 ## Option 2: Connect With A GitHub App Installation
 
@@ -58,27 +58,27 @@ Open **Integrations** in the dashboard, choose the GitHub target, then select **
 
 Enter:
 
-| Field              | Value                                              |
-| ------------------ | -------------------------------------------------- |
-| `app_id`           | GitHub App ID                                      |
-| `app_slug`         | GitHub App slug                                    |
-| `appPrivateKeyPem` | GitHub App private key PEM                         |
-| `webhookSecret`    | Shared webhook secret configured on the GitHub App |
+| Field               | Value                                              |
+| ------------------- | -------------------------------------------------- |
+| App ID              | GitHub App ID                                      |
+| App slug            | GitHub App slug                                    |
+| App private key PEM | GitHub App private key PEM                         |
+| Webhook secret      | Shared webhook secret configured on the GitHub App |
 
-`installation_id` and `setup_action` are stored automatically after the installation flow completes. You do not enter those manually.
-`app_slug` must be the actual GitHub App slug from GitHub, not a display name guess.
+Installation ID and setup action are stored automatically after the installation flow completes. You do not enter those manually.
+App slug must be the actual GitHub App slug from GitHub, not a display name guess.
 
 ### Copy The URLs From Mistle Into GitHub
 
 After you create the GitHub App connection, open that connection's detail page in Mistle and copy:
 
-- `Webhook callback URL`
-- `Post-installation setup URL`
+- Webhook callback URL
+- Post-installation setup URL
 
 Copy those values directly into your GitHub App settings:
 
-1. Set the GitHub App's `Webhook URL` to Mistle's `Webhook callback URL`.
-2. Set the GitHub App's `Setup URL` to Mistle's `Post-installation setup URL`.
+1. Set the GitHub App's **Webhook URL** to Mistle's **Webhook callback URL**.
+2. Set the GitHub App's **Setup URL** to Mistle's **Post-installation setup URL**.
 3. Ensure the webhook is active in GitHub.
 
 Return to Mistle and click **Install GitHub App**.

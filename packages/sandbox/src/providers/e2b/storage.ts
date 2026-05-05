@@ -7,6 +7,8 @@ import {
 } from "../../types.js";
 
 const E2BArchilMountRoot = "/mnt/mistle/archil";
+const E2BArchilInitMarkerPath = `${E2BArchilMountRoot}/.mistle-init`;
+const E2BArchilInitMarkerTempPath = `${E2BArchilInitMarkerPath}.tmp`;
 
 function formatMountRootPath(sourcePath: string): string {
   return `${E2BArchilMountRoot}/${sourcePath}`;
@@ -59,6 +61,59 @@ function createBindMountDirectoriesCommand(input: {
   return `mkdir -p ${directories.map((directory) => quoteShell(directory)).join(" ")}`;
 }
 
+function createHydrateBindingCommand(input: {
+  storage: SandboxArchilStorageAttachment;
+  sourcePath: string;
+  source: string;
+  target: string;
+}): string {
+  return [
+    `if mountpoint -q ${quoteShell(input.target)}; then`,
+    `  current_source="$(findmnt -n -o SOURCE --target ${quoteShell(input.target)} 2>/dev/null || true)"`,
+    `  if [ "$current_source" != ${quoteShell(formatArchilBindMountSource({ storage: input.storage, sourcePath: input.sourcePath }))} ]; then`,
+    `    echo "Refusing to hydrate Archil bind mount source from ${input.target}: target already mounted from unexpected source: $current_source" >&2`,
+    "    exit 1",
+    "  fi",
+    `elif [ -e ${quoteShell(input.target)} ]; then`,
+    `  mkdir -p ${quoteShell(input.source)}`,
+    `  rsync -a --delete --exclude ${quoteShell(E2BArchilMountRoot)} ${quoteShell(`${input.target}/`)} ${quoteShell(`${input.source}/`)}`,
+    "else",
+    `  mkdir -p ${quoteShell(input.source)}`,
+    "fi",
+  ].join("\n");
+}
+
+function createHydrateStorageCommand(input: {
+  lifecycle: SandboxAttachStorageRequest["lifecycle"];
+  storage: SandboxArchilStorageAttachment;
+}): string | null {
+  if (input.lifecycle !== SandboxStorageAttachLifecycles.START) {
+    return null;
+  }
+
+  const hydrateBindingCommands = input.storage.layout.bindings.map((binding) =>
+    createHydrateBindingCommand({
+      storage: input.storage,
+      sourcePath: binding.sourcePath,
+      source: formatMountRootPath(binding.sourcePath),
+      target: binding.targetPath,
+    }),
+  );
+
+  return [
+    `if [ ! -e ${quoteShell(E2BArchilInitMarkerPath)} ]; then`,
+    ...hydrateBindingCommands.map((command) =>
+      command
+        .split("\n")
+        .map((line) => `  ${line}`)
+        .join("\n"),
+    ),
+    `  : > ${quoteShell(E2BArchilInitMarkerTempPath)}`,
+    `  mv ${quoteShell(E2BArchilInitMarkerTempPath)} ${quoteShell(E2BArchilInitMarkerPath)}`,
+    "fi",
+  ].join("\n");
+}
+
 function createEnsureBindMountCommand(input: {
   storage: SandboxArchilStorageAttachment;
   sourcePath: string;
@@ -94,6 +149,10 @@ export function createE2BAttachStorageCommand(input: {
       target: binding.targetPath,
     }),
   );
+  const hydrateStorageCommand = createHydrateStorageCommand({
+    lifecycle: input.lifecycle,
+    storage: input.storage,
+  });
 
   return [
     "set -eu",
@@ -114,6 +173,7 @@ export function createE2BAttachStorageCommand(input: {
       ...(input.lifecycle === SandboxStorageAttachLifecycles.START ? ["--force"] : []),
     ].join(" "),
     "fi",
+    ...(hydrateStorageCommand === null ? [] : [hydrateStorageCommand]),
     createBindMountDirectoriesCommand({
       storage: input.storage,
     }),

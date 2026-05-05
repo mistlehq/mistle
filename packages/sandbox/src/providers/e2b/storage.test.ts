@@ -40,10 +40,29 @@ describe("createE2BAttachStorageCommand", () => {
     expect(command).toContain(
       'echo "Refusing to attach Archil mount root onto /mnt/mistle/archil: target already mounted from unexpected source: $current_source" >&2',
     );
-    expect(command.indexOf("'/mnt/mistle/archil/root'")).toBeGreaterThan(
+    expect(command).toContain(archilMountCommand);
+    expect(command).toContain("if [ ! -e '/mnt/mistle/archil/.mistle-init' ]; then");
+    expect(command).toContain(
+      "rsync -a --delete --exclude '/mnt/mistle/archil' '/root/' '/mnt/mistle/archil/root/'",
+    );
+    expect(command).toContain(
+      "rsync -a --delete --exclude '/mnt/mistle/archil' '/etc/codex/' '/mnt/mistle/archil/etc/codex/'",
+    );
+    expect(command).toContain(": > '/mnt/mistle/archil/.mistle-init.tmp'");
+    expect(command).toContain(
+      "mv '/mnt/mistle/archil/.mistle-init.tmp' '/mnt/mistle/archil/.mistle-init'",
+    );
+    expect(command.indexOf("if [ ! -e '/mnt/mistle/archil/.mistle-init' ]; then")).toBeGreaterThan(
       command.indexOf(archilMountCommand),
     );
-    expect(command).toContain(archilMountCommand);
+    expect(command.indexOf(": > '/mnt/mistle/archil/.mistle-init.tmp'")).toBeGreaterThan(
+      command.indexOf(
+        "rsync -a --delete --exclude '/mnt/mistle/archil' '/etc/codex/' '/mnt/mistle/archil/etc/codex/'",
+      ),
+    );
+    expect(command.indexOf("mount --bind '/mnt/mistle/archil/root' '/root'")).toBeGreaterThan(
+      command.indexOf("mv '/mnt/mistle/archil/.mistle-init.tmp' '/mnt/mistle/archil/.mistle-init'"),
+    );
     expect(command).toContain("if mountpoint -q '/root'; then");
     expect(command).toContain(
       `current_source="$(findmnt -n -o SOURCE --target '/root' 2>/dev/null || true)"`,
@@ -57,6 +76,44 @@ describe("createE2BAttachStorageCommand", () => {
     expect(command).toContain("mount --bind '/mnt/mistle/archil/root' '/root'");
     expect(command).toContain("mount --bind '/mnt/mistle/archil/etc/codex' '/etc/codex'");
     expect(command).not.toContain("/usr/local/bin");
+  });
+
+  it("hydrates every configured layout binding before bind mounting", () => {
+    const command = createE2BAttachStorageCommand({
+      lifecycle: SandboxStorageAttachLifecycles.START,
+      storage: {
+        backend: SandboxStorageBackend.ARCHIL,
+        handle: "dsk-0123456789abcdef",
+        region: "aws-us-east-1",
+        credential: "token-value",
+        layout: {
+          bindings: [
+            {
+              sourcePath: "workspace",
+              targetPath: "/workspace",
+            },
+            {
+              sourcePath: "home/node",
+              targetPath: "/home/node",
+            },
+          ],
+        },
+      },
+    });
+
+    const workspaceHydration =
+      "rsync -a --delete --exclude '/mnt/mistle/archil' '/workspace/' '/mnt/mistle/archil/workspace/'";
+    const nodeHomeHydration =
+      "rsync -a --delete --exclude '/mnt/mistle/archil' '/home/node/' '/mnt/mistle/archil/home/node/'";
+    const workspaceBind = "mount --bind '/mnt/mistle/archil/workspace' '/workspace'";
+    const nodeHomeBind = "mount --bind '/mnt/mistle/archil/home/node' '/home/node'";
+
+    expect(command).toContain(workspaceHydration);
+    expect(command).toContain(nodeHomeHydration);
+    expect(command).toContain(workspaceBind);
+    expect(command).toContain(nodeHomeBind);
+    expect(command.indexOf(workspaceHydration)).toBeLessThan(command.indexOf(workspaceBind));
+    expect(command.indexOf(nodeHomeHydration)).toBeLessThan(command.indexOf(nodeHomeBind));
   });
 
   it("omits force when reattaching storage on provider-native resume", () => {
@@ -75,6 +132,8 @@ describe("createE2BAttachStorageCommand", () => {
       "/opt/mistle/bin/archil mount 'dsk-0123456789abcdef' '/mnt/mistle/archil' --region 'aws-us-east-1'",
     );
     expect(command).not.toContain("--force");
+    expect(command).not.toContain(".mistle-init");
+    expect(command).not.toContain("rsync -a --delete");
   });
 });
 

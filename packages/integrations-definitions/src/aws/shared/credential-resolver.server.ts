@@ -20,6 +20,7 @@ type ResolvedAwsAssumeRoleContext = {
   secretAccessKey: string;
   roleArn: string;
   roleSessionName: string;
+  stsEndpointUrl?: string;
   externalId?: string;
   durationSeconds?: number;
 };
@@ -29,6 +30,11 @@ const AwsCredentialResolverTracer = trace.getTracer("@mistle/integrations-defini
 const AwsConnectionSecretSchema = z
   .object({
     secretAccessKey: z.string().min(1).optional(),
+  })
+  .loose();
+const ResolvedAwsTargetConfigSchema = z
+  .object({
+    stsEndpointUrl: z.string().min(1).optional(),
   })
   .loose();
 
@@ -61,6 +67,7 @@ export function resolveAwsAssumeRoleContext(
   }
 
   const parsedBindingConfig = AwsBindingConfigSchema.parse(input.binding.config);
+  const parsedTargetConfig = ResolvedAwsTargetConfigSchema.parse(input.target.config);
   const parsedConnectionConfig = AwsAssumeRoleConnectionConfigSchema.parse(input.connection.config);
   if (parsedConnectionConfig.connection_method !== AwsConnectionMethodIds.AWS_ASSUME_ROLE) {
     throw new Error("AWS AssumeRole resolver requires an aws-assume-role connection config.");
@@ -81,6 +88,9 @@ export function resolveAwsAssumeRoleContext(
       connectionId: input.connectionId,
       bindingId: input.binding.id,
     }),
+    ...(parsedTargetConfig.stsEndpointUrl === undefined
+      ? {}
+      : { stsEndpointUrl: parsedTargetConfig.stsEndpointUrl }),
     ...(parsedConnectionConfig.externalId === undefined
       ? {}
       : { externalId: parsedConnectionConfig.externalId }),
@@ -125,11 +135,13 @@ async function createAwsSessionCredential(input: {
   secretAccessKey: string;
   roleArn: string;
   roleSessionName: string;
+  stsEndpointUrl?: string;
   externalId?: string;
   durationSeconds?: number;
 }) {
   const stsClient = new STSClient({
     region: input.defaultRegion,
+    ...(input.stsEndpointUrl === undefined ? {} : { endpoint: input.stsEndpointUrl }),
     credentials: {
       accessKeyId: input.accessKeyId,
       secretAccessKey: input.secretAccessKey,

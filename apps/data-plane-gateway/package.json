@@ -26,9 +26,7 @@
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
-    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
-    "test:integration:new": "vitest run -c vitest.integration-new.config.ts",
-    "test:stress": "tsx ./scripts/run-stress-tests.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
@@ -62,6 +60,7 @@
     "@fast-check/vitest": "^0.4.0",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.20.0",
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "drizzle-orm": "^0.45.2"
   }
 }

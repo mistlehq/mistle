@@ -1,43 +1,47 @@
-import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
   GetSandboxProfileVersionSetupScriptResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import {
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-} from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
+import { sandboxProfileRow, sandboxProfileVersionRow } from "./helpers/sandbox-profiles.js";
 
-describe("sandbox profile version setup script get integration", () => {
-  it("returns the persisted setup script for the selected profile version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-script-get@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile version setup script get integration", () => {
+  it("returns the persisted setup script for the selected profile version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-setup-script-get@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_setup_script_get_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Setup Script Get Profile",
         createdAt: "2026-03-01T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      ...createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_setup_script_get_001",
         version: 1,
         setupScript: "pnpm install\npnpm dev:bootstrap",
       }),
-    });
+    );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_setup_script_get_001/versions/1/setup-script",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -51,27 +55,27 @@ describe("sandbox profile version setup script get integration", () => {
       version: 1,
       setupScript: "pnpm install\npnpm dev:bootstrap",
     });
-  }, 60_000);
+  });
 
-  it("returns 404 when profile version is missing", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-setup-script-get-missing@example.com",
+  it("returns 404 when profile version is missing", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-setup-script-get-missing@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_setup_script_get_missing_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Missing Setup Script Version Profile",
         createdAt: "2026-03-01T00:00:00.000Z",
       }),
-    });
+    );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_setup_script_get_missing_001/versions/7/setup-script",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -79,5 +83,5 @@ describe("sandbox profile version setup script get integration", () => {
     expect(response.status).toBe(404);
     const responseBody = SandboxProfileVersionNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_FOUND");
-  }, 60_000);
+  });
 });

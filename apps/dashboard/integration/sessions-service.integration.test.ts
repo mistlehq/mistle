@@ -1,139 +1,71 @@
-// @vitest-environment jsdom
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
 
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-
-import { afterEach, describe, expect, it } from "vitest";
+import { SandboxInstancePersistenceModes, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { createIntegrationTest, TestEnvironmentIdHeader } from "@mistle/test-harness/integration";
+import { expect } from "vitest";
 
 import { resetDashboardConfigForTest } from "../src/config.js";
+import { setControlPlaneRequestHeadersForTest } from "../src/features/api/request-control-plane.js";
 import { createSandboxInstancePortAccess } from "../src/features/sessions/sessions-service.js";
-import { resetAuthClientForTest } from "../src/lib/auth/client.js";
+import { resetControlPlaneApiClientForTest } from "../src/lib/control-plane-api/client.js";
 
-type RequestRecord = {
-  method: string;
-  pathname: string;
-};
-
-async function startControlPlaneTestServer(input: {
-  handler: (request: RequestRecord) => {
-    status: number;
-    body: unknown;
-  };
-}): Promise<{
-  close: () => Promise<void>;
-  origin: string;
-  requests: RequestRecord[];
-}> {
-  const requests: RequestRecord[] = [];
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    const record: RequestRecord = {
-      method: request.method ?? "GET",
-      pathname: new URL(request.url ?? "/", "http://127.0.0.1").pathname,
-    };
-    requests.push(record);
-
-    const handled = input.handler(record);
-    response.statusCode = handled.status;
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify(handled.body));
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.listen(0, "127.0.0.1", (error?: Error) => {
-      if (error !== undefined) {
-        reject(error);
-        return;
-      }
-
-      resolve();
-    });
-  });
-
-  const address = server.address();
-  if (address === null || typeof address === "string") {
-    throw new Error("Expected a TCP server address.");
-  }
-
-  return {
-    close: async () => {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error?: Error) => {
-          if (error !== undefined) {
-            reject(error);
-            return;
-          }
-
-          resolve();
-        });
-      });
-    },
-    origin: `http://127.0.0.1:${String(address.port)}`,
-    requests,
-  };
-}
-
-function setControlPlaneOrigin(origin: string): void {
-  Object.assign(import.meta.env, {
-    VITE_CONTROL_PLANE_API_ORIGIN: origin,
-  });
-  resetDashboardConfigForTest();
-  resetAuthClientForTest();
-}
-
-afterEach(() => {
-  resetDashboardConfigForTest();
-  resetAuthClientForTest();
+const it = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-api"],
 });
 
-describe("sessions service", () => {
-  it("creates sandbox port access through the control plane route", async () => {
-    const server = await startControlPlaneTestServer({
-      handler: (request) => {
-        if (
-          request.method === "POST" &&
-          request.pathname === "/v1/sandbox/instances/sbi_123/ports/5173/access"
-        ) {
-          return {
-            status: 201,
-            body: {
-              bootstrapPath: "/_mistle/access/bootstrap",
-              bootstrapUrl:
-                "http://p-5173--sandbox.mistle.localhost:5202/_mistle/access/bootstrap?token=token_123",
-              expiresAt: "2026-04-12T05:00:00Z",
-              host: "p-5173--sandbox.mistle.localhost",
-              token: "token_123",
-            },
-          };
-        }
+it("creates sandbox port access through the real control-plane API", async ({ env }) => {
+  const session = await env.auth.createSession({
+    organizationName: "Dashboard Port Access Integration",
+  });
+  const sandboxInstanceId = "sbi_dashboard_port_access_001";
 
-        throw new Error(`Unhandled request ${request.method} ${request.pathname}`);
-      },
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
+    id: sandboxInstanceId,
+    organizationId: session.organizationId,
+    sandboxProfileId: "sbp_dashboard_port_access",
+    title: "Dashboard port access sandbox",
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: null,
+    persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
+    status: SandboxInstanceStatuses.STOPPED,
+    startedByKind: "user",
+    startedById: session.userId,
+    source: "dashboard",
+    failureCode: null,
+    failureMessage: null,
+  });
+
+  Object.assign(import.meta.env, {
+    VITE_CONTROL_PLANE_API_ORIGIN: env.controlPlaneApi.hostBaseUrl,
+  });
+  resetDashboardConfigForTest();
+  resetControlPlaneApiClientForTest();
+  setControlPlaneRequestHeadersForTest({
+    cookie: session.cookie,
+    [TestEnvironmentIdHeader]: env.id,
+  });
+
+  try {
+    const portAccess = await createSandboxInstancePortAccess({
+      instanceId: sandboxInstanceId,
+      port: 5173,
     });
 
-    try {
-      setControlPlaneOrigin(server.origin);
+    const bootstrapUrl = new URL(portAccess.bootstrapUrl);
 
-      await expect(
-        createSandboxInstancePortAccess({
-          instanceId: "sbi_123",
-          port: 5173,
-        }),
-      ).resolves.toEqual({
-        bootstrapPath: "/_mistle/access/bootstrap",
-        bootstrapUrl:
-          "http://p-5173--sandbox.mistle.localhost:5202/_mistle/access/bootstrap?token=token_123",
-        expiresAt: "2026-04-12T05:00:00Z",
-        host: "p-5173--sandbox.mistle.localhost",
-        token: "token_123",
-      });
-
-      expect(server.requests).toEqual([
-        {
-          method: "POST",
-          pathname: "/v1/sandbox/instances/sbi_123/ports/5173/access",
-        },
-      ]);
-    } finally {
-      await server.close();
-    }
-  });
+    expect(portAccess.bootstrapPath).toBe("/_mistle/access/bootstrap");
+    expect(portAccess.host).toMatch(/^p-5173--[a-z0-9]+\.mistle\.localhost$/);
+    expect(bootstrapUrl.hostname).toBe(portAccess.host);
+    expect(bootstrapUrl.pathname).toBe(portAccess.bootstrapPath);
+    expect(bootstrapUrl.searchParams.get("token")).toBe(portAccess.token);
+    expect(portAccess.token).not.toBe("");
+    expect(new Date(portAccess.expiresAt).getTime()).toBeGreaterThan(Date.now());
+  } finally {
+    setControlPlaneRequestHeadersForTest(undefined);
+    resetDashboardConfigForTest();
+    resetControlPlaneApiClientForTest();
+  }
 });

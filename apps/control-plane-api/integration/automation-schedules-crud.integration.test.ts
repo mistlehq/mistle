@@ -1,19 +1,14 @@
 import {
-  automations,
   AutomationKinds,
-  integrationConnections,
   IntegrationConnectionStatuses,
   IntegrationBindingKinds,
-  integrationTargets,
-  scheduleAutomations,
-  scheduledActions,
   ScheduledActionStatuses,
-  schedules,
   ScheduleTargetTypes,
-  sandboxProfiles,
-  sandboxProfileVersions,
-  sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -21,8 +16,33 @@ import { ScheduleActionFailureCodes } from "../src/automation-schedules/constant
 import { CreateAutomationScheduleBadRequestResponseSchema } from "../src/automation-schedules/create-automation-schedule/index.js";
 import { DeleteAutomationScheduleResponseSchema } from "../src/automation-schedules/delete-automation-schedule/index.js";
 import { AutomationScheduleSchema } from "../src/automation-schedules/schemas.js";
-import { it } from "./test-context.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+
+type ControlPlaneApiIntegrationFixture = Readonly<{
+  authSession: IntegrationTestEnvironment["auth"]["createSession"];
+  db: IntegrationTestEnvironment["controlPlaneDb"];
+  request: IntegrationTestEnvironment["controlPlaneApi"]["http"]["fetch"];
+  tables: IntegrationTestEnvironment["controlPlaneTables"];
+}>;
+
+const integrationIt = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+function it(
+  name: string,
+  test: (input: { fixture: ControlPlaneApiIntegrationFixture }) => Promise<void>,
+): void {
+  integrationIt(name, async ({ env }) => {
+    await test({
+      fixture: {
+        authSession: env.auth.createSession,
+        db: env.controlPlaneDb,
+        request: env.controlPlaneApi.http.fetch,
+        tables: env.controlPlaneTables,
+      },
+    });
+  });
+}
 
 const GitHubTarget = {
   targetKey: "github_cloud",
@@ -128,7 +148,7 @@ describe("automation schedules CRUD integration", () => {
       profileId: "sbp_schedule_active_version_001",
       version: 2,
     });
-    await fixture.db.insert(sandboxProfileVersions).values({
+    await fixture.db.insert(fixture.tables.sandboxProfileVersions).values({
       sandboxProfileId: "sbp_schedule_active_version_001",
       version: 5,
     });
@@ -174,11 +194,11 @@ describe("automation schedules CRUD integration", () => {
     });
 
     await fixture.db
-      .update(schedules)
+      .update(fixture.tables.schedules)
       .set({
         lastScheduledAt: "2099-01-01T00:00:00.000Z",
       })
-      .where(eq(schedules.id, created.schedule.id));
+      .where(eq(fixture.tables.schedules.id, created.schedule.id));
 
     const updateResponse = await fixture.request(`/v1/automations/schedules/${created.id}`, {
       method: "PATCH",
@@ -236,7 +256,7 @@ describe("automation schedules CRUD integration", () => {
     const created = await createScheduleAutomation(fixture, authenticatedSession.cookie, {
       profileId: "sbp_schedule_enable_disable_001",
     });
-    await fixture.db.insert(scheduledActions).values({
+    await fixture.db.insert(fixture.tables.scheduledActions).values({
       id: "sca_schedule_disable_pending_001",
       scheduleId: created.schedule.id,
       organizationId: authenticatedSession.organizationId,
@@ -304,7 +324,7 @@ describe("automation schedules CRUD integration", () => {
     const created = await createScheduleAutomation(fixture, authenticatedSession.cookie, {
       profileId: "sbp_schedule_delete_001",
     });
-    await fixture.db.insert(scheduledActions).values({
+    await fixture.db.insert(fixture.tables.scheduledActions).values({
       id: "sca_schedule_delete_pending_001",
       scheduleId: created.schedule.id,
       organizationId: authenticatedSession.organizationId,
@@ -427,7 +447,7 @@ describe("automation schedules CRUD integration", () => {
     });
 
     await insertIntegrationTargets(fixture);
-    await fixture.db.insert(integrationConnections).values({
+    await fixture.db.insert(fixture.tables.integrationConnections).values({
       id: "icn_schedule_primary_repo_001",
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
@@ -442,7 +462,7 @@ describe("automation schedules CRUD integration", () => {
       profileId: "sbp_schedule_primary_repo_001",
       version: 1,
     });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    await fixture.db.insert(fixture.tables.sandboxProfileVersionIntegrationBindings).values({
       id: "spvib_schedule_primary_repo_001",
       sandboxProfileId: "sbp_schedule_primary_repo_001",
       sandboxProfileVersion: 1,
@@ -486,7 +506,7 @@ describe("automation schedules CRUD integration", () => {
     });
 
     await insertIntegrationTargets(fixture);
-    await fixture.db.insert(integrationConnections).values({
+    await fixture.db.insert(fixture.tables.integrationConnections).values({
       id: "icn_schedule_pinned_repo_update_001",
       organizationId: authenticatedSession.organizationId,
       targetKey: GitHubTarget.targetKey,
@@ -501,7 +521,7 @@ describe("automation schedules CRUD integration", () => {
       profileId: "sbp_schedule_pinned_repo_update_001",
       version: 1,
     });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+    await fixture.db.insert(fixture.tables.sandboxProfileVersionIntegrationBindings).values([
       {
         id: "spvib_schedule_pinned_repo_update_v1_001",
         sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
@@ -538,17 +558,17 @@ describe("automation schedules CRUD integration", () => {
     const created = AutomationScheduleSchema.parse(await createdResponse.json());
     expect(created.target.sandboxProfileVersion).toBe(1);
 
-    await fixture.db.insert(sandboxProfileVersions).values({
+    await fixture.db.insert(fixture.tables.sandboxProfileVersions).values({
       sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
       version: 2,
     });
     await fixture.db
-      .update(sandboxProfiles)
+      .update(fixture.tables.sandboxProfiles)
       .set({
         activeVersion: 2,
       })
-      .where(eq(sandboxProfiles.id, "sbp_schedule_pinned_repo_update_001"));
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      .where(eq(fixture.tables.sandboxProfiles.id, "sbp_schedule_pinned_repo_update_001"));
+    await fixture.db.insert(fixture.tables.sandboxProfileVersionIntegrationBindings).values({
       id: "spvib_schedule_pinned_repo_update_v2_001",
       sandboxProfileId: "sbp_schedule_pinned_repo_update_001",
       sandboxProfileVersion: 2,
@@ -595,14 +615,14 @@ describe("automation schedules CRUD integration", () => {
       profileId: "sbp_schedule_malformed_001",
       version: 1,
     });
-    await fixture.db.insert(automations).values({
+    await fixture.db.insert(fixture.tables.automations).values({
       id: "atm_schedule_malformed_001",
       organizationId: authenticatedSession.organizationId,
       kind: AutomationKinds.SCHEDULE,
       name: "Malformed schedule",
       enabled: true,
     });
-    await fixture.db.insert(schedules).values({
+    await fixture.db.insert(fixture.tables.schedules).values({
       id: "sch_schedule_malformed_001",
       organizationId: authenticatedSession.organizationId,
       targetType: ScheduleTargetTypes.AUTOMATION_RUN,
@@ -612,7 +632,7 @@ describe("automation schedules CRUD integration", () => {
       enabled: true,
       nextScheduledAt: "2026-05-01T01:00:00.000Z",
     });
-    await fixture.db.insert(scheduleAutomations).values({
+    await fixture.db.insert(fixture.tables.scheduleAutomations).values({
       scheduleId: "sch_schedule_malformed_001",
       automationId: "atm_schedule_malformed_001",
       inputTemplate: "Run",
@@ -668,13 +688,13 @@ async function insertSandboxProfileWithVersion(
     version: number;
   },
 ): Promise<void> {
-  await fixture.db.insert(sandboxProfiles).values({
+  await fixture.db.insert(fixture.tables.sandboxProfiles).values({
     id: input.profileId,
     organizationId: input.organizationId,
     displayName: input.profileId,
     activeVersion: input.version,
   });
-  await fixture.db.insert(sandboxProfileVersions).values({
+  await fixture.db.insert(fixture.tables.sandboxProfileVersions).values({
     sandboxProfileId: input.profileId,
     version: input.version,
   });
@@ -682,7 +702,7 @@ async function insertSandboxProfileWithVersion(
 
 async function insertIntegrationTargets(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
   await fixture.db
-    .insert(integrationTargets)
+    .insert(fixture.tables.integrationTargets)
     .values({
       ...GitHubTarget,
       displayNameOverride: null,

@@ -21,11 +21,11 @@ Personal API token gives access to Jira as that Atlassian user and is the only J
 
 Create an Atlassian API token for that user at [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens), then connect in Mistle with:
 
-| Field      | Value                                                      |
-| ---------- | ---------------------------------------------------------- |
-| `site_url` | Jira Cloud site URL like `https://your-site.atlassian.net` |
-| `email`    | Atlassian account email                                    |
-| `apiKey`   | Atlassian API token                                        |
+| Field              | Value                                                      |
+| ------------------ | ---------------------------------------------------------- |
+| Site URL           | Jira Cloud site URL like `https://your-site.atlassian.net` |
+| Email              | Atlassian account email                                    |
+| Personal API token | Atlassian API token                                        |
 
 ## Option 2: Service Account API Token
 
@@ -33,12 +33,12 @@ Service account API token gives access to Jira as a service account by using a s
 
 Create a service account and a scoped API token, then connect in Mistle with:
 
-| Field      | Value                     |
-| ---------- | ------------------------- |
-| `cloud_id` | Jira Cloud ID             |
-| `apiKey`   | Service account API token |
+| Field                     | Value                     |
+| ------------------------- | ------------------------- |
+| Cloud ID                  | Jira Cloud ID             |
+| Service account API token | Service account API token |
 
-This option uses `cloud_id`, not a site URL. Atlassian's scoped service-account tokens use the `api.atlassian.com/ex/jira/<cloudId>/...` API shape, so make sure you collect the cloud ID before connecting.
+This option uses Cloud ID, not a site URL. Atlassian's scoped service-account tokens use the `api.atlassian.com/ex/jira/<cloudId>/...` API shape, so make sure you collect the cloud ID before connecting.
 
 ## Option 3: Service Account OAuth Client Credentials
 
@@ -46,11 +46,11 @@ Service account OAuth client credentials gives access to Jira as a service accou
 
 Create Atlassian OAuth 2.0 credentials for the service account, then connect in Mistle with:
 
-| Field          | Value                         |
-| -------------- | ----------------------------- |
-| `cloud_id`     | Jira Cloud ID                 |
-| `client_id`    | Atlassian OAuth client ID     |
-| `clientSecret` | Atlassian OAuth client secret |
+| Field         | Value                         |
+| ------------- | ----------------------------- |
+| Cloud ID      | Jira Cloud ID                 |
+| Client ID     | Atlassian OAuth client ID     |
+| Client secret | Atlassian OAuth client secret |
 
 ## Webhooks
 
@@ -61,7 +61,7 @@ After the connection exists, use the **Webhooks** section on that connection. Th
 ## Jira Cloud
 
 The current Jira integration is Jira Cloud only.
-The connection schemas require Atlassian Cloud values such as `*.atlassian.net` site URLs and `cloud_id`.
+The connection schemas require Atlassian Cloud values such as `*.atlassian.net` site URLs and Cloud ID.
 
 ## Official References
 

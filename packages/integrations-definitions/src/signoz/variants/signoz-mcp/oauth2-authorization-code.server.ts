@@ -13,6 +13,7 @@ import {
   SignozRegionSchema,
   resolveSignozIssuerUrl,
 } from "./auth.js";
+import { SignozTargetConfigSchema } from "./target-config-schema.js";
 
 const SignozClientName = "Mistle SigNoz MCP";
 
@@ -41,16 +42,25 @@ const SignozProviderStateSchema = z
 
 type SignozTokenResponse = z.output<typeof SignozTokenResponseSchema>;
 
-function resolveSignozRegistrationEndpoint(region: string): string {
-  return `${resolveSignozIssuerUrl(region)}/oauth/register`;
+function resolveSignozRegistrationEndpoint(input: {
+  region: string;
+  issuerBaseUrl?: string | undefined;
+}): string {
+  return `${resolveSignozIssuerUrl(input)}/oauth/register`;
 }
 
-function resolveSignozAuthorizationEndpoint(region: string): string {
-  return `${resolveSignozIssuerUrl(region)}/oauth/authorize`;
+function resolveSignozAuthorizationEndpoint(input: {
+  region: string;
+  issuerBaseUrl?: string | undefined;
+}): string {
+  return `${resolveSignozIssuerUrl(input)}/oauth/authorize`;
 }
 
-function resolveSignozTokenEndpoint(region: string): string {
-  return `${resolveSignozIssuerUrl(region)}/oauth/token`;
+function resolveSignozTokenEndpoint(input: {
+  region: string;
+  issuerBaseUrl?: string | undefined;
+}): string {
+  return `${resolveSignozIssuerUrl(input)}/oauth/token`;
 }
 
 export function buildSignozDynamicClientRegistrationRequestBody(input: {
@@ -67,12 +77,13 @@ export function buildSignozDynamicClientRegistrationRequestBody(input: {
 
 export function buildSignozAuthorizationUrl(input: {
   region: string;
+  issuerBaseUrl?: string | undefined;
   clientId: string;
   redirectUrl: string;
   state: string;
   pkceChallenge: string;
 }): string {
-  const authorizationUrl = new URL(resolveSignozAuthorizationEndpoint(input.region));
+  const authorizationUrl = new URL(resolveSignozAuthorizationEndpoint(input));
   authorizationUrl.searchParams.set("response_type", "code");
   authorizationUrl.searchParams.set("client_id", input.clientId);
   authorizationUrl.searchParams.set("redirect_uri", input.redirectUrl);
@@ -238,10 +249,11 @@ export function createSignozRefreshTransportFailure(input: {
 
 async function exchangeSignozToken(input: {
   region: string;
+  issuerBaseUrl?: string | undefined;
   requestBody: URLSearchParams;
   failureContext: string;
 }): Promise<SignozTokenResponse> {
-  const response = await fetch(resolveSignozTokenEndpoint(input.region), {
+  const response = await fetch(resolveSignozTokenEndpoint(input), {
     method: "POST",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
@@ -270,11 +282,15 @@ export const SignozMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     }
 
     const connectionConfig = SignozConnectionStartConfigSchema.parse(input.connectionConfig);
+    const targetConfig = SignozTargetConfigSchema.parse(input.target.config);
     const registrationRequestBody = buildSignozDynamicClientRegistrationRequestBody({
       redirectUrl: input.redirectUrl,
     });
     const registrationResponse = await fetch(
-      resolveSignozRegistrationEndpoint(connectionConfig.region),
+      resolveSignozRegistrationEndpoint({
+        region: connectionConfig.region,
+        issuerBaseUrl: targetConfig.issuer_base_url,
+      }),
       {
         method: "POST",
         headers: {
@@ -297,6 +313,7 @@ export const SignozMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     return {
       authorizationUrl: buildSignozAuthorizationUrl({
         region: connectionConfig.region,
+        issuerBaseUrl: targetConfig.issuer_base_url,
         clientId: registration.clientId,
         redirectUrl: input.redirectUrl,
         state: input.state,
@@ -315,9 +332,11 @@ export const SignozMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     }
 
     const providerState = SignozProviderStateSchema.parse(input.providerState);
+    const targetConfig = SignozTargetConfigSchema.parse(input.target.config);
     const code = resolveSignozAuthorizationCodeOrThrow(input.query);
     const response = await exchangeSignozToken({
       region: providerState.region,
+      issuerBaseUrl: targetConfig.issuer_base_url,
       requestBody: buildSignozAuthorizationCodeExchangeRequestBody({
         code,
         redirectUrl: input.redirectUrl,
@@ -340,16 +359,19 @@ export const SignozMcpOAuth2AuthorizationCodeCapability: IntegrationOAuth2Author
     let response: Response;
 
     try {
-      response = await fetch(resolveSignozTokenEndpoint(parsedConnectionConfig.region), {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
+      response = await fetch(
+        resolveSignozTokenEndpoint({ region: parsedConnectionConfig.region }),
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: buildSignozRefreshRequestBody({
+            refreshToken: input.refreshToken,
+            clientId: parsedConnectionConfig.client_id,
+          }),
         },
-        body: buildSignozRefreshRequestBody({
-          refreshToken: input.refreshToken,
-          clientId: parsedConnectionConfig.client_id,
-        }),
-      });
+      );
     } catch (error) {
       throw createSignozRefreshTransportFailure({ error });
     }

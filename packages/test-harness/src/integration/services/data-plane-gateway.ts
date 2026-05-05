@@ -1,6 +1,7 @@
 import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
 import { createDataPlaneGatewayRuntime } from "@mistle/data-plane-gateway/runtime";
 import type { DataPlaneGatewayConfig } from "@mistle/data-plane-gateway/types";
+import { initializeTelemetryFromConfig } from "@mistle/telemetry";
 
 import type {
   ResolvedTestInfra,
@@ -24,6 +25,7 @@ import {
 const Host = "127.0.0.1";
 
 const InfraIds = {
+  OTLP: "otlp",
   POSTGRES: "postgres.data-plane",
   VALKEY: "valkey",
 };
@@ -37,6 +39,12 @@ const ValkeyValues = {
   KEY_PREFIX: "keyPrefix",
 };
 
+const OtlpValues = {
+  TRACES_ENDPOINT: "traces.endpoint",
+  LOGS_ENDPOINT: "logs.endpoint",
+  METRICS_ENDPOINT: "metrics.endpoint",
+};
+
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
   return {
     id: ServiceIds.DATA_PLANE_GATEWAY,
@@ -47,6 +55,11 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
         host: Host,
       },
     },
+    ...(infra.some((requirement) => requirement.id === InfraIds.OTLP)
+      ? {
+          poolScope: "environment",
+        }
+      : {}),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.DATA_PLANE_GATEWAY),
     start: start({
@@ -64,24 +77,35 @@ function start(input: {
     assertMode(startInput.mode, "runtime", ServiceIds.DATA_PLANE_GATEWAY);
 
     const postgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
+    const otlp = startInput.infra.get(InfraIds.OTLP);
     const valkey = resolvedInfra(startInput.infra, input.valkeyInfra.id);
     const endpoint = httpEndpoint(startInput, ServiceIds.DATA_PLANE_GATEWAY);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
+    const appConfig = config({
+      port: endpoint.port,
+      postgres,
+      otlp,
+      valkey,
+      dataPlaneApiBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
+      controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
+      gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+    });
+    const telemetry =
+      otlp === undefined
+        ? undefined
+        : initializeTelemetryFromConfig({
+            serviceName: "@mistle/data-plane-gateway",
+            config: appConfig.telemetry,
+          });
     const runtime = createDataPlaneGatewayRuntime({
-      app: config({
-        port: endpoint.port,
-        postgres,
-        valkey,
-        dataPlaneApiBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-        controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
-        gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
-      }),
+      app: appConfig,
     });
 
     try {
       await runtime.start();
     } catch (error) {
       await runtime.stop();
+      await telemetry?.shutdown();
       throw error;
     }
 
@@ -94,7 +118,10 @@ function start(input: {
           internalBaseUrl: endpoint.hostBaseUrl,
         },
       },
-      stop: runtime.stop,
+      stop: async () => {
+        await runtime.stop();
+        await telemetry?.shutdown();
+      },
     };
   };
 }
@@ -102,6 +129,7 @@ function start(input: {
 function config(input: {
   port: number;
   postgres: ResolvedTestInfra;
+  otlp: ResolvedTestInfra | undefined;
   valkey: ResolvedTestInfra;
   dataPlaneApiBaseUrl: string;
   controlPlaneBaseUrl: string;
@@ -166,9 +194,25 @@ function config(input: {
         },
       },
     },
-    telemetry: {
-      enabled: false,
-      debug: false,
-    },
+    telemetry:
+      input.otlp === undefined
+        ? {
+            enabled: false,
+            debug: false,
+          }
+        : {
+            enabled: true,
+            debug: false,
+            traces: {
+              endpoint: infraValue(input.otlp, OtlpValues.TRACES_ENDPOINT),
+            },
+            logs: {
+              endpoint: infraValue(input.otlp, OtlpValues.LOGS_ENDPOINT),
+            },
+            metrics: {
+              endpoint: infraValue(input.otlp, OtlpValues.METRICS_ENDPOINT),
+            },
+            resourceAttributes: "deployment.environment=integration-new",
+          },
   };
 }

@@ -41,10 +41,16 @@ export const SignozConnectionConfigSchema = z
 export type SignozConnectionStartConfig = z.output<typeof SignozConnectionStartConfigSchema>;
 export type SignozConnectionConfig = z.output<typeof SignozConnectionConfigSchema>;
 
-export function resolveSignozIssuerUrl(region: string): string {
-  return `https://mcp.${region}.signoz.cloud`;
+export function resolveSignozIssuerUrl(input: {
+  region: string;
+  issuerBaseUrl?: string | undefined;
+}): string {
+  return input.issuerBaseUrl ?? `https://mcp.${input.region}.signoz.cloud`;
 }
 
-export function resolveSignozMcpUrl(region: string): string {
-  return `${resolveSignozIssuerUrl(region)}/mcp`;
+export function resolveSignozMcpUrl(input: {
+  region: string;
+  issuerBaseUrl?: string | undefined;
+}): string {
+  return `${resolveSignozIssuerUrl(input)}/mcp`;
 }

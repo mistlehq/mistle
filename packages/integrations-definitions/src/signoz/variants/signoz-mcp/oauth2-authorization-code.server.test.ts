@@ -53,6 +53,23 @@ describe("SigNoz OAuth 2.0 authorization code", () => {
     expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
   });
 
+  it("builds the authorization URL from an explicit issuer base URL", () => {
+    const authorizationUrl = new URL(
+      buildSignozAuthorizationUrl({
+        region: "self-hosted",
+        issuerBaseUrl: "https://observability.example.com",
+        clientId: "signoz_client_123",
+        redirectUrl: "https://mistle.example.com/callback",
+        state: "state_123",
+        pkceChallenge: "challenge_123",
+      }),
+    );
+
+    expect(authorizationUrl.origin + authorizationUrl.pathname).toBe(
+      "https://observability.example.com/oauth/authorize",
+    );
+  });
+
   it("builds the expected authorization code exchange body", () => {
     expect(
       buildSignozAuthorizationCodeExchangeRequestBody({

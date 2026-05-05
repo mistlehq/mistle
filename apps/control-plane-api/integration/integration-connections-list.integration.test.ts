@@ -1,54 +1,65 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  automations,
   AutomationKinds,
-  integrationConnectionCredentials,
-  integrationConnectionResourceStates,
-  integrationConnections,
-  IntegrationConnectionStatuses,
+  IntegrationBindingKinds,
   IntegrationConnectionResourceSyncStates,
-  integrationCredentials,
-  IntegrationCredentialSecretKinds,
-  organizationIdentityLinkProviderConfigs,
+  IntegrationConnectionStatuses,
   OrganizationIdentityLinkProviderConfigStatus,
-  integrationTargets,
-  integrationWebhookSources,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-  type SandboxProfileVersionState,
   SandboxProfileVersionStates,
-  webhookAutomations,
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-import { it } from "./test-context.js";
 
-describe("integration connections list integration", () => {
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("integration connections list integration", () => {
   it("returns keyset paginated integration connections scoped to active organization", async ({
-    fixture,
+    env,
   }) => {
-    const firstOrgSession = await fixture.authSession({
-      email: "integration-connections-list-org-a@example.com",
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-connections-list-org-a@example.com",
     });
-    const secondOrgSession = await fixture.authSession({
-      email: "integration-connections-list-org-b@example.com",
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-connections-list-org-b@example.com",
     });
 
-    await ensureListTargets(fixture);
+    await seedTarget(env, {
+      targetKey: "github_cloud_connections_list",
+      familyId: "github",
+      variantId: "github-cloud",
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    });
+    await seedTarget(env, {
+      targetKey: "openai_connections_list",
+      familyId: "openai",
+      variantId: "openai-default",
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    });
 
-    const firstConnectionCreatedAt = new Date("2026-01-01T00:00:00.000Z");
-    const secondConnectionCreatedAt = new Date("2026-01-02T00:00:00.000Z");
-    const thirdConnectionCreatedAt = new Date("2026-01-03T00:00:00.000Z");
+    const firstConnectionCreatedAt = "2026-01-01T00:00:00.000Z";
+    const secondConnectionCreatedAt = "2026-01-02T00:00:00.000Z";
+    const thirdConnectionCreatedAt = "2026-01-03T00:00:00.000Z";
 
-    await fixture.db.insert(integrationConnections).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
       {
-        id: "icn_001",
+        id: "icn_integration_new_list_001",
         organizationId: firstOrgSession.organizationId,
-        targetKey: "github_cloud",
+        targetKey: "github_cloud_connections_list",
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         externalSubjectId: "github-user-1",
@@ -59,76 +70,78 @@ describe("integration connections list integration", () => {
           api_base_url: "https://api.github.com",
           web_base_url: "https://github.com",
         },
-        createdAt: firstConnectionCreatedAt.toISOString(),
-        updatedAt: firstConnectionCreatedAt.toISOString(),
+        createdAt: firstConnectionCreatedAt,
+        updatedAt: firstConnectionCreatedAt,
       },
       {
-        id: "icn_002",
+        id: "icn_integration_new_list_002",
         organizationId: firstOrgSession.organizationId,
-        targetKey: "openai-default",
+        targetKey: "openai_connections_list",
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
-        createdAt: secondConnectionCreatedAt.toISOString(),
-        updatedAt: secondConnectionCreatedAt.toISOString(),
+        createdAt: secondConnectionCreatedAt,
+        updatedAt: secondConnectionCreatedAt,
       },
       {
-        id: "icn_003",
+        id: "icn_integration_new_list_003",
         organizationId: firstOrgSession.organizationId,
-        targetKey: "github_cloud",
+        targetKey: "github_cloud_connections_list",
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
-        createdAt: thirdConnectionCreatedAt.toISOString(),
-        updatedAt: thirdConnectionCreatedAt.toISOString(),
+        createdAt: thirdConnectionCreatedAt,
+        updatedAt: thirdConnectionCreatedAt,
       },
       {
-        id: "icn_004",
+        id: "icn_integration_new_list_other_org",
         organizationId: secondOrgSession.organizationId,
-        targetKey: "github_cloud",
+        targetKey: "github_cloud_connections_list",
         displayName: "Other Org",
         status: IntegrationConnectionStatuses.ACTIVE,
-        createdAt: thirdConnectionCreatedAt.toISOString(),
-        updatedAt: thirdConnectionCreatedAt.toISOString(),
+        createdAt: thirdConnectionCreatedAt,
+        updatedAt: thirdConnectionCreatedAt,
       },
     ]);
 
-    await fixture.db.insert(integrationConnectionResourceStates).values({
-      connectionId: "icn_001",
-      familyId: "github",
-      kind: "repository",
-      syncState: IntegrationConnectionResourceSyncStates.READY,
-      totalCount: 7,
-      lastSyncedAt: "2026-01-04T00:00:00.000Z",
-      lastSyncStartedAt: "2026-01-04T00:00:00.000Z",
-      lastSyncFinishedAt: "2026-01-04T00:00:00.000Z",
-      lastErrorCode: null,
-      lastErrorMessage: null,
-    });
-
-    await fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-      id: "ilp_001",
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.integrationConnectionResourceStates)
+      .values({
+        connectionId: "icn_integration_new_list_001",
+        familyId: "github",
+        kind: "repository",
+        syncState: IntegrationConnectionResourceSyncStates.READY,
+        totalCount: 7,
+        lastSyncedAt: "2026-01-04T00:00:00.000Z",
+        lastSyncStartedAt: "2026-01-04T00:00:00.000Z",
+        lastSyncFinishedAt: "2026-01-04T00:00:00.000Z",
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.organizationIdentityLinkProviderConfigs)
+      .values({
+        id: "ilp_integration_new_list_001",
+        organizationId: firstOrgSession.organizationId,
+        providerFamily: "github",
+        status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+        integrationTargetKey: "github_cloud_connections_list",
+        integrationConnectionId: "icn_integration_new_list_001",
+        createdByUserId: firstOrgSession.userId,
+        updatedByUserId: firstOrgSession.userId,
+      });
+    await seedBindingUsage(env, {
       organizationId: firstOrgSession.organizationId,
-      providerFamily: "github",
-      status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      integrationTargetKey: "github_cloud",
-      integrationConnectionId: "icn_001",
-      createdByUserId: firstOrgSession.userId,
-      updatedByUserId: firstOrgSession.userId,
-    });
-
-    await insertBindingUsage(fixture, {
-      organizationId: firstOrgSession.organizationId,
-      profileId: "spf_001",
+      profileId: "spf_integration_new_list_001",
       profileDisplayName: "Profile 1",
-      bindingId: "ibd_001",
-      connectionId: "icn_001",
+      bindingId: "ibd_integration_new_list_001",
+      connectionId: "icn_integration_new_list_001",
       activeVersion: 1,
     });
-    await insertWebhookAutomationUsage(fixture, {
+    await seedWebhookAutomationUsage(env, {
       organizationId: firstOrgSession.organizationId,
-      automationId: "atm_001",
+      automationId: "atm_integration_new_list_001",
       automationName: "GitHub webhook automation",
-      connectionId: "icn_002",
-      targetKey: "openai-default",
+      connectionId: "icn_integration_new_list_002",
+      targetKey: "openai_connections_list",
       eventTypes: ["response.created"],
       payloadFilter: {
         "response.created": {
@@ -139,26 +152,17 @@ describe("integration connections list integration", () => {
       },
     });
 
-    const firstPageResponse = await fixture.request("/v1/integration/connections?limit=2", {
-      headers: {
-        cookie: firstOrgSession.cookie,
-      },
+    const firstPage = await listConnections({
+      cookie: firstOrgSession.cookie,
+      env,
+      query: "limit=2",
     });
-    expect(firstPageResponse.status).toBe(200);
-    const firstPage = ListIntegrationConnectionsResponseSchema.parse(
-      await firstPageResponse.json(),
-    );
-    const normalizedFirstPageItems = firstPage.items.map((item) => ({
-      ...item,
-      createdAt: new Date(item.createdAt).toISOString(),
-      updatedAt: new Date(item.updatedAt).toISOString(),
-    }));
 
     expect(firstPage.totalResults).toBe(3);
-    expect(normalizedFirstPageItems).toEqual([
+    expect(normalizeConnectionTimestamps(firstPage.items)).toEqual([
       {
-        id: "icn_001",
-        targetKey: "github_cloud",
+        id: "icn_integration_new_list_001",
+        targetKey: "github_cloud_connections_list",
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         bindingCount: 1,
@@ -194,50 +198,36 @@ describe("integration connections list integration", () => {
           },
         ],
         supportsWebhookSources: false,
-        createdAt: firstConnectionCreatedAt.toISOString(),
-        updatedAt: firstConnectionCreatedAt.toISOString(),
+        createdAt: firstConnectionCreatedAt,
+        updatedAt: firstConnectionCreatedAt,
       },
       {
-        id: "icn_002",
-        targetKey: "openai-default",
+        id: "icn_integration_new_list_002",
+        targetKey: "openai_connections_list",
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
         bindingCount: 0,
         automationCount: 1,
-        createdAt: secondConnectionCreatedAt.toISOString(),
-        updatedAt: secondConnectionCreatedAt.toISOString(),
+        createdAt: secondConnectionCreatedAt,
+        updatedAt: secondConnectionCreatedAt,
       },
     ]);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
-
     if (firstPage.nextPage === null) {
       throw new Error("Expected next page cursor.");
     }
 
-    const secondPageResponse = await fixture.request(
-      `/v1/integration/connections?limit=2&after=${encodeURIComponent(firstPage.nextPage.after)}`,
-      {
-        headers: {
-          cookie: firstOrgSession.cookie,
-        },
-      },
-    );
-    expect(secondPageResponse.status).toBe(200);
-    const secondPage = ListIntegrationConnectionsResponseSchema.parse(
-      await secondPageResponse.json(),
-    );
-    const normalizedSecondPageItems = secondPage.items.map((item) => ({
-      ...item,
-      createdAt: new Date(item.createdAt).toISOString(),
-      updatedAt: new Date(item.updatedAt).toISOString(),
-    }));
-
+    const secondPage = await listConnections({
+      cookie: firstOrgSession.cookie,
+      env,
+      query: `limit=2&after=${encodeURIComponent(firstPage.nextPage.after)}`,
+    });
     expect(secondPage.totalResults).toBe(3);
-    expect(normalizedSecondPageItems).toEqual([
+    expect(normalizeConnectionTimestamps(secondPage.items)).toEqual([
       {
-        id: "icn_003",
-        targetKey: "github_cloud",
+        id: "icn_integration_new_list_003",
+        targetKey: "github_cloud_connections_list",
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
         bindingCount: 0,
@@ -262,73 +252,65 @@ describe("integration connections list integration", () => {
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
           },
         ],
-        createdAt: thirdConnectionCreatedAt.toISOString(),
-        updatedAt: thirdConnectionCreatedAt.toISOString(),
+        createdAt: thirdConnectionCreatedAt,
+        updatedAt: thirdConnectionCreatedAt,
       },
     ]);
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
-
     if (secondPage.previousPage === null) {
       throw new Error("Expected previous page cursor.");
     }
 
-    const previousPageResponse = await fixture.request(
-      `/v1/integration/connections?limit=2&before=${encodeURIComponent(secondPage.previousPage.before)}`,
+    const previousPage = await listConnections({
+      cookie: firstOrgSession.cookie,
+      env,
+      query: `limit=2&before=${encodeURIComponent(secondPage.previousPage.before)}`,
+    });
+    expect(previousPage.items.map((connection) => connection.id)).toEqual([
+      "icn_integration_new_list_001",
+      "icn_integration_new_list_002",
+    ]);
+  });
+
+  it("returns 400 for invalid pagination cursor", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-invalid-cursor@example.com",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/integration/connections?after=invalid-cursor",
       {
         headers: {
-          cookie: firstOrgSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
-    expect(previousPageResponse.status).toBe(200);
-    const previousPage = ListIntegrationConnectionsResponseSchema.parse(
-      await previousPageResponse.json(),
-    );
-
-    expect(previousPage.totalResults).toBe(3);
-    expect(previousPage.items.map((connection) => connection.id)).toEqual(["icn_001", "icn_002"]);
-  });
-
-  it("returns 400 for invalid pagination cursor", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-list-invalid-cursor@example.com",
-    });
-
-    const response = await fixture.request("/v1/integration/connections?after=invalid-cursor", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
-    });
     expect(response.status).toBe(400);
-
-    const bodyText = await response.text();
-    expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
+    await expect(response.text()).resolves.toContain('"code":"INVALID_PAGINATION_CURSOR"');
   });
 
   it("reports webhook-source support per connection for mixed GitHub auth methods", async ({
-    fixture,
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-list-github-webhook-support@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-github-webhook-support@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud-webhook-support",
+    await seedTarget(env, {
+      targetKey: "github_cloud_webhook_support_integration_new",
       familyId: "github",
       variantId: "github-cloud",
-      enabled: true,
       config: {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
     });
-
-    await fixture.db.insert(integrationConnections).values([
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
       {
-        id: "icn_github_app_support",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-cloud-webhook-support",
+        id: "icn_integration_new_github_app_support",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud_webhook_support_integration_new",
         displayName: "GitHub App",
         status: IntegrationConnectionStatuses.ACTIVE,
         config: {
@@ -338,9 +320,9 @@ describe("integration connections list integration", () => {
         },
       },
       {
-        id: "icn_github_api_key_no_support",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-cloud-webhook-support",
+        id: "icn_integration_new_github_api_key_no_support",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud_webhook_support_integration_new",
         displayName: "GitHub API key",
         status: IntegrationConnectionStatuses.ACTIVE,
         config: {
@@ -349,25 +331,22 @@ describe("integration connections list integration", () => {
       },
     ]);
 
-    const response = await fixture.request("/v1/integration/connections", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
+    const body = await listConnections({
+      cookie: session.cookie,
+      env,
+      query: "",
     });
-
-    expect(response.status).toBe(200);
-    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
 
     expect(body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "icn_github_app_support",
+          id: "icn_integration_new_github_app_support",
           connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           connectionMethodLabel: "GitHub App installation",
           supportsWebhookSources: true,
         }),
         expect.objectContaining({
-          id: "icn_github_api_key_no_support",
+          id: "icn_integration_new_github_api_key_no_support",
           connectionMethodId: IntegrationConnectionMethodIds.API_KEY,
           connectionMethodLabel: "API key",
           supportsWebhookSources: false,
@@ -376,28 +355,24 @@ describe("integration connections list integration", () => {
     );
   });
 
-  it("returns auth method metadata resolved from the integration definition", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-list-jira-auth-method@example.com",
+  it("returns auth method metadata resolved from the integration definition", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-jira-auth-method@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "jira-default-auth-method",
+    await seedTarget(env, {
+      targetKey: "jira_default_auth_method_integration_new",
       familyId: "jira",
       variantId: "jira-default",
-      enabled: true,
       config: {
         site_url: "https://mistle.atlassian.net",
         cloud_id: "cloud_123",
       },
     });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_jira_service_account",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "jira-default-auth-method",
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_integration_new_jira_service_account",
+      organizationId: session.organizationId,
+      targetKey: "jira_default_auth_method_integration_new",
       displayName: "Jira service account",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
@@ -405,19 +380,16 @@ describe("integration connections list integration", () => {
       },
     });
 
-    const response = await fixture.request("/v1/integration/connections", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
+    const body = await listConnections({
+      cookie: session.cookie,
+      env,
+      query: "",
     });
-
-    expect(response.status).toBe(200);
-    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
 
     expect(body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "icn_jira_service_account",
+          id: "icn_integration_new_jira_service_account",
           connectionMethodId: "jira-service-account-api-token",
           connectionMethodLabel: "Service account API token",
         }),
@@ -425,30 +397,23 @@ describe("integration connections list integration", () => {
     );
   });
 
-  it("reports webhook-source support for Slack implicit webhook connections", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-list-slack-webhook-support@example.com",
+  it("reports webhook-source support for Slack implicit webhook connections", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-slack-webhook-support@example.com",
     });
 
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey: "slack-default",
-        familyId: "slack",
-        variantId: "slack-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://slack.com/api",
-        },
-      })
-      .onConflictDoNothing();
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_slack_support",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "slack-default",
+    await seedTarget(env, {
+      targetKey: "slack_default_integration_new",
+      familyId: "slack",
+      variantId: "slack-default",
+      config: {
+        api_base_url: "https://slack.com/api",
+      },
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_integration_new_slack_support",
+      organizationId: session.organizationId,
+      targetKey: "slack_default_integration_new",
       displayName: "Slack webhook connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
@@ -456,35 +421,35 @@ describe("integration connections list integration", () => {
       },
     });
 
-    const response = await fixture.request("/v1/integration/connections", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
+    const body = await listConnections({
+      cookie: session.cookie,
+      env,
+      query: "",
     });
-
-    expect(response.status).toBe(200);
-    const body = ListIntegrationConnectionsResponseSchema.parse(await response.json());
 
     expect(body.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "icn_slack_support",
+          id: "icn_integration_new_slack_support",
           supportsWebhookSources: true,
         }),
       ]),
     );
   });
 
-  it("returns 400 for invalid list query payload", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-list-validation@example.com",
+  it("returns 400 for invalid list query payload", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-connections-list-validation@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections?after=abc&before=def", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/integration/connections?after=abc&before=def",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
@@ -494,398 +459,114 @@ describe("integration connections list integration", () => {
     });
   });
 
-  it("deletes inactive binding connections and blocks active bindings or automations", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "integration-connections-delete@example.com",
-    });
-
-    await ensureGitHubCloudTarget(fixture);
-
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_delete_free",
-        organizationId: session.organizationId,
-        targetKey: "github_cloud",
-        displayName: "Free connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      },
-      {
-        id: "icn_delete_draft_binding",
-        organizationId: session.organizationId,
-        targetKey: "github_cloud",
-        displayName: "Draft binding connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      },
-      {
-        id: "icn_delete_automation",
-        organizationId: session.organizationId,
-        targetKey: "github_cloud",
-        displayName: "Automation connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      },
-      {
-        id: "icn_delete_inactive_published_binding",
-        organizationId: session.organizationId,
-        targetKey: "github_cloud",
-        displayName: "Inactive published binding connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      },
-      {
-        id: "icn_delete_active_version_binding",
-        organizationId: session.organizationId,
-        targetKey: "github_cloud",
-        displayName: "Active version binding connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-      },
-    ]);
-
-    await insertBindingUsage(fixture, {
-      organizationId: session.organizationId,
-      profileId: "spf_delete_draft_binding",
-      profileDisplayName: "Draft binding test profile",
-      bindingId: "ibd_delete_draft_binding",
-      connectionId: "icn_delete_draft_binding",
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await insertBindingUsage(fixture, {
-      organizationId: session.organizationId,
-      profileId: "spf_delete_published",
-      profileDisplayName: "Delete published test profile",
-      bindingId: "ibd_delete_published_binding",
-      connectionId: "icn_delete_inactive_published_binding",
-      state: SandboxProfileVersionStates.PUBLISHED,
-    });
-    await insertBindingUsage(fixture, {
-      organizationId: session.organizationId,
-      profileId: "spf_delete_active_version",
-      profileDisplayName: "Delete active version test profile",
-      bindingId: "ibd_delete_active_version_binding",
-      connectionId: "icn_delete_active_version_binding",
-      state: SandboxProfileVersionStates.PUBLISHED,
-      activeVersion: 1,
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { and, eq }) =>
-        and(eq(table.organizationId, session.organizationId), eq(table.version, 1)),
-    });
-
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key for delete integration test.");
-    }
-
-    await fixture.db.insert(integrationCredentials).values({
-      id: "icr_delete_free",
-      organizationId: session.organizationId,
-      secretKind: IntegrationCredentialSecretKinds.API_KEY,
-      ciphertext: "ciphertext-delete-free",
-      nonce: "nonce-delete-free",
-      organizationCredentialKeyVersion: organizationCredentialKey.version,
-      intendedFamilyId: "github",
-    });
-
-    await fixture.db.insert(integrationConnectionCredentials).values({
-      connectionId: "icn_delete_free",
-      credentialId: "icr_delete_free",
-      slotKey: "github.github-cloud.api-key.api-key",
-    });
-    await fixture.db.insert(integrationCredentials).values({
-      id: "icr_delete_free_webhook_secret",
-      organizationId: session.organizationId,
-      secretKind: IntegrationCredentialSecretKinds.WEBHOOK_SECRET,
-      ciphertext: "ciphertext",
-      nonce: "nonce",
-      organizationCredentialKeyVersion: 1,
-      intendedFamilyId: "github",
-    });
-    await fixture.db.insert(integrationWebhookSources).values({
-      id: "iws_delete_free",
-      organizationId: session.organizationId,
-      integrationConnectionId: "icn_delete_free",
-      targetKey: "github_cloud",
-      endpointKey: "ep_delete_free",
-      webhookSecretCredentialId: "icr_delete_free_webhook_secret",
-      status: "active",
-    });
-
-    await insertWebhookAutomationUsage(fixture, {
-      organizationId: session.organizationId,
-      automationId: "atm_delete_automation",
-      automationName: "Delete guard automation",
-      connectionId: "icn_delete_automation",
-      targetKey: "github_cloud",
-      eventTypes: ["issue_comment.created"],
-      payloadFilter: {
-        "issue_comment.created": {
-          op: "eq",
-          path: ["action"],
-          value: "created",
-        },
-      },
-    });
-
-    const listUsageResponse = await fixture.request("/v1/integration/connections", {
-      headers: {
-        cookie: session.cookie,
-      },
-    });
-    expect(listUsageResponse.status).toBe(200);
-    const listUsagePage = ListIntegrationConnectionsResponseSchema.parse(
-      await listUsageResponse.json(),
-    );
-    function expectListedBindingCount(connectionId: string, bindingCount: number): void {
-      const listedConnection = listUsagePage.items.find(
-        (connection) => connection.id === connectionId,
-      );
-
-      expect(listedConnection).toBeDefined();
-      expect(listedConnection?.bindingCount).toBe(bindingCount);
-    }
-
-    expectListedBindingCount("icn_delete_draft_binding", 0);
-    expectListedBindingCount("icn_delete_inactive_published_binding", 0);
-    expectListedBindingCount("icn_delete_active_version_binding", 1);
-
-    const deleteFreeResponse = await fixture.request(
-      "/v1/integration/connections/icn_delete_free",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(deleteFreeResponse.status).toBe(200);
-    expect(await deleteFreeResponse.json()).toEqual({
-      connectionId: "icn_delete_free",
-    });
-
-    const deletedConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_delete_free"),
-    });
-    expect(deletedConnection).toBeUndefined();
-
-    const deletedCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst(
-      {
-        where: (table, { and, eq }) =>
-          and(eq(table.connectionId, "icn_delete_free"), eq(table.credentialId, "icr_delete_free")),
-      },
-    );
-    expect(deletedCredentialLink).toBeUndefined();
-
-    const deletedCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, "icr_delete_free"),
-    });
-    expect(deletedCredential).toBeUndefined();
-
-    const deletedWebhookSource = await fixture.db.query.integrationWebhookSources.findFirst({
-      where: (table, { eq }) => eq(table.id, "iws_delete_free"),
-    });
-    expect(deletedWebhookSource).toBeUndefined();
-
-    const deletedWebhookSecretCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, "icr_delete_free_webhook_secret"),
-    });
-    expect(deletedWebhookSecretCredential).toBeUndefined();
-
-    const deleteDraftBindingResponse = await fixture.request(
-      "/v1/integration/connections/icn_delete_draft_binding",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(deleteDraftBindingResponse.status).toBe(200);
-    expect(await deleteDraftBindingResponse.json()).toEqual({
-      connectionId: "icn_delete_draft_binding",
-    });
-
-    const deletedDraftBinding =
-      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
-        where: (table, { eq }) => eq(table.id, "ibd_delete_draft_binding"),
-      });
-    expect(deletedDraftBinding).toBeUndefined();
-
-    const deletedDraftBindingConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_delete_draft_binding"),
-    });
-    expect(deletedDraftBindingConnection).toBeUndefined();
-
-    const deleteAutomationResponse = await fixture.request(
-      "/v1/integration/connections/icn_delete_automation",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(deleteAutomationResponse.status).toBe(409);
-    expect(await deleteAutomationResponse.json()).toEqual({
-      code: "CONNECTION_HAS_AUTOMATIONS",
-      message:
-        "This integration connection cannot be deleted while it is still used by one or more webhook automations.",
-    });
-
-    const automationConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_delete_automation"),
-    });
-    expect(automationConnection).toBeDefined();
-
-    const persistedWebhookAutomation = await fixture.db.query.webhookAutomations.findFirst({
-      where: (table, { eq }) => eq(table.automationId, "atm_delete_automation"),
-    });
-    expect(persistedWebhookAutomation).toBeDefined();
-
-    const deleteActiveVersionBindingResponse = await fixture.request(
-      "/v1/integration/connections/icn_delete_active_version_binding",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(deleteActiveVersionBindingResponse.status).toBe(409);
-    expect(await deleteActiveVersionBindingResponse.json()).toEqual({
-      code: "CONNECTION_HAS_BINDINGS",
-      message:
-        "This integration connection cannot be deleted while it is still used by one or more active sandbox profile versions.",
-    });
-
-    const activeVersionBindingConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_delete_active_version_binding"),
-    });
-    expect(activeVersionBindingConnection).toBeDefined();
-
-    const persistedActiveVersionBinding =
-      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
-        where: (table, { eq }) => eq(table.id, "ibd_delete_active_version_binding"),
-      });
-    expect(persistedActiveVersionBinding).toBeDefined();
-
-    const deleteInactivePublishedBindingResponse = await fixture.request(
-      "/v1/integration/connections/icn_delete_inactive_published_binding",
-      {
-        method: "DELETE",
-        headers: {
-          cookie: session.cookie,
-        },
-      },
-    );
-    expect(deleteInactivePublishedBindingResponse.status).toBe(200);
-    expect(await deleteInactivePublishedBindingResponse.json()).toEqual({
-      connectionId: "icn_delete_inactive_published_binding",
-    });
-
-    const deletedInactivePublishedBinding =
-      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
-        where: (table, { eq }) => eq(table.id, "ibd_delete_published_binding"),
-      });
-    expect(deletedInactivePublishedBinding).toBeUndefined();
-
-    const deletedInactivePublishedConnection =
-      await fixture.db.query.integrationConnections.findFirst({
-        where: (table, { eq }) => eq(table.id, "icn_delete_inactive_published_binding"),
-      });
-    expect(deletedInactivePublishedConnection).toBeUndefined();
-  });
-
-  it("returns 401 when the request is unauthenticated", async ({ fixture }) => {
-    const response = await fixture.request("/v1/integration/connections");
+  it("returns 401 when the request is unauthenticated", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/v1/integration/connections");
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({
+    await expect(response.json()).resolves.toEqual({
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
   });
 });
 
-async function ensureListTargets(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
-  await fixture.db
-    .insert(integrationTargets)
-    .values([
-      {
-        targetKey: "github_cloud",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-      },
-      {
-        targetKey: "openai-default",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com",
-        },
-      },
-    ])
-    .onConflictDoNothing();
-}
+type IntegrationConnectionsPage = ReturnType<typeof ListIntegrationConnectionsResponseSchema.parse>;
 
-async function ensureGitHubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
-  await fixture.db
-    .insert(integrationTargets)
+async function seedTarget(
+  env: IntegrationTestEnvironment,
+  input: {
+    targetKey: string;
+    familyId: string;
+    variantId: string;
+    config: Record<string, unknown>;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
     .values({
-      targetKey: "github_cloud",
-      familyId: "github",
-      variantId: "github-cloud",
+      targetKey: input.targetKey,
+      familyId: input.familyId,
+      variantId: input.variantId,
       enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-      },
+      config: input.config,
     })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: input.familyId,
+        variantId: input.variantId,
+        enabled: true,
+        config: input.config,
+      },
+    });
 }
 
-async function insertBindingUsage(
-  fixture: ControlPlaneApiIntegrationFixture,
+async function listConnections(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  query: string;
+}): Promise<IntegrationConnectionsPage> {
+  const querySuffix = input.query.length === 0 ? "" : `?${input.query}`;
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections${querySuffix}`,
+    {
+      headers: {
+        cookie: input.cookie,
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+
+  return ListIntegrationConnectionsResponseSchema.parse(await response.json());
+}
+
+function normalizeConnectionTimestamps(
+  items: IntegrationConnectionsPage["items"],
+): Array<IntegrationConnectionsPage["items"][number] & { createdAt: string; updatedAt: string }> {
+  return items.map((item) => ({
+    ...item,
+    createdAt: new Date(item.createdAt).toISOString(),
+    updatedAt: new Date(item.updatedAt).toISOString(),
+  }));
+}
+
+async function seedBindingUsage(
+  env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
     profileId: string;
     profileDisplayName: string;
     bindingId: string;
     connectionId: string;
-    state?: SandboxProfileVersionState;
     activeVersion?: number | null;
   },
 ): Promise<void> {
-  await fixture.db.insert(sandboxProfiles).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
     id: input.profileId,
     organizationId: input.organizationId,
     displayName: input.profileDisplayName,
-    ...(input.activeVersion === undefined ? {} : { activeVersion: input.activeVersion }),
+    activeVersion: input.activeVersion,
   });
-  await fixture.db.insert(sandboxProfileVersions).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
     sandboxProfileId: input.profileId,
     version: 1,
-    state: input.state ?? SandboxProfileVersionStates.PUBLISHED,
-    publishedAt:
-      input.state === SandboxProfileVersionStates.DRAFT ? null : "2026-03-01T00:00:00.000Z",
+    state: SandboxProfileVersionStates.PUBLISHED,
+    publishedAt: "2026-03-01T00:00:00.000Z",
   });
-  await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-    id: input.bindingId,
-    sandboxProfileId: input.profileId,
-    sandboxProfileVersion: 1,
-    connectionId: input.connectionId,
-    kind: "git",
-    config: {},
-  });
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: input.bindingId,
+      sandboxProfileId: input.profileId,
+      sandboxProfileVersion: 1,
+      connectionId: input.connectionId,
+      kind: IntegrationBindingKinds.GIT,
+      config: {},
+    });
 }
 
-async function insertWebhookAutomationUsage(
-  fixture: ControlPlaneApiIntegrationFixture,
+async function seedWebhookAutomationUsage(
+  env: IntegrationTestEnvironment,
   input: {
     organizationId: string;
     automationId: string;
@@ -896,14 +577,14 @@ async function insertWebhookAutomationUsage(
     payloadFilter: Record<string, unknown>;
   },
 ): Promise<void> {
-  await fixture.db.insert(automations).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
     id: input.automationId,
     organizationId: input.organizationId,
     kind: AutomationKinds.WEBHOOK,
     name: input.automationName,
     enabled: true,
   });
-  await fixture.db.insert(integrationWebhookSources).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.integrationWebhookSources).values({
     id: `iws_${input.automationId}`,
     organizationId: input.organizationId,
     integrationConnectionId: input.connectionId,
@@ -911,7 +592,7 @@ async function insertWebhookAutomationUsage(
     endpointKey: `ep_${input.automationId}`,
     status: "active",
   });
-  await fixture.db.insert(webhookAutomations).values({
+  await env.controlPlaneDb.insert(env.controlPlaneTables.webhookAutomations).values({
     automationId: input.automationId,
     integrationWebhookSourceId: `iws_${input.automationId}`,
     eventTypes: input.eventTypes,

@@ -1,462 +1,194 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
 
 import {
-  integrationTargets,
-  organizationIdentityLinkProviderConfigs,
   OrganizationIdentityLinkProviderConfigStatus,
-  userExternalPrincipalCredentialSecrets,
   UserExternalPrincipalCredentialSecretKinds,
-  type UserExternalPrincipalCredentialSecretKind,
-  userExternalPrincipalCredentials,
   UserExternalPrincipalCredentialStatuses,
-  userExternalPrincipalKeys,
-  UserExternalPrincipalKeyStatuses,
-  userExternalPrincipals,
-  UserExternalPrincipalStatuses,
-  IntegrationConnectionStatuses,
-  integrationConnections,
 } from "@mistle/db/control-plane";
-import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { reserveAvailablePort } from "@mistle/test-harness";
+import {
+  createIntegrationTest,
+  type IntegrationAuthenticatedSession,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH,
 } from "../src/internal/identity-linking/index.js";
+import { ResolvePrincipalCredentialResponseSchema } from "../src/internal/identity-linking/resolve-principal-credential/schema.js";
 import { InternalIdentityLinkingErrorCodes } from "../src/internal/identity-linking/services/errors.js";
 import {
-  decryptCredentialUtf8,
-  encryptCredentialUtf8,
-  resolveMasterEncryptionKeyMaterial,
-  unwrapOrganizationCredentialKey,
-} from "../src/lib/crypto.js";
-import { it } from "./test-context.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+  createGitHubIdentityConnection,
+  decryptPrincipalCredentialSecretByKind,
+  insertPrincipalCredentialSecret,
+  seedGitHubLinkedPrincipal,
+  seedIdentityProviderConfig,
+  seedPrincipalCredential,
+  upsertGitHubIdentityTarget,
+} from "./helpers/identity-linking.js";
+import { startSimulatedGitHubIdentityProvider } from "./helpers/simulated-identity-providers.js";
 
-type StartedGitHubTokenServer = {
-  baseUrl: string;
-  requests: Array<{
-    method: string;
-    pathname: string;
-    search: string;
-  }>;
-  stop: () => Promise<void>;
-};
+const InternalServiceToken = "integration-new-internal-service-token";
 
-async function startGitHubTokenServer(input: {
-  statusCode?: number;
-  responseBody: unknown;
-}): Promise<StartedGitHubTokenServer> {
-  const host = "127.0.0.1";
-  const port = await reserveAvailablePort({ host });
-  const requests: StartedGitHubTokenServer["requests"] = [];
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
-    if (request.url === undefined) {
-      response.writeHead(500);
-      response.end("Missing request URL.");
-      return;
-    }
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
-    const requestUrl = new URL(request.url, `http://${host}:${String(port)}`);
-    requests.push({
-      method: request.method ?? "GET",
-      pathname: requestUrl.pathname,
-      search: requestUrl.search,
+describe.concurrent("internal identity-linking principal credential resolution", () => {
+  it("resolves an active linked-principal access token", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-resolve-active@example.com",
     });
-    response.statusCode = input.statusCode ?? 200;
-    response.setHeader("content-type", "application/json");
-    response.end(JSON.stringify(input.responseBody));
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, host, () => {
-      server.off("error", reject);
-      resolve();
-    });
-  });
-
-  return {
-    baseUrl: `http://${host}:${String(port)}`,
-    requests,
-    stop: async () => {
-      await new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          if (error === undefined) {
-            resolve();
-            return;
-          }
-
-          reject(error);
-        });
-      });
-    },
-  };
-}
-
-describe("internal identity-linking principal credential resolution", () => {
-  it("resolves an active linked-principal access token", async ({ fixture }) => {
-    const session = await fixture.authSession({
-      email: "internal-identity-linking-resolve-active@example.com",
-    });
-
-    await upsertGitHubTarget({
-      fixture,
-      targetKey: "github-cloud",
-    });
-    const connectionId = await createGitHubAppConnection({
-      fixture,
-      authenticatedSession: session,
-      displayName: "GitHub Identity",
-    });
-    await insertIdentityLinkProviderConfig({
-      fixture,
-      organizationId: session.organizationId,
-      userId: session.userId,
-      configId: "ilp_github_active_resolve",
-      providerFamily: "github",
-      targetKey: "github-cloud",
-      connectionId,
-      connectionDisplayName: "GitHub Identity",
-      connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-      createConnection: false,
-    });
-
-    await fixture.db.insert(userExternalPrincipals).values({
-      id: "uep_github_active_resolve",
-      organizationId: session.organizationId,
-      userId: session.userId,
-      providerFamily: "github",
-      providerSubjectId: "12345",
-      organizationProviderConfigId: "ilp_github_active_resolve",
-      integrationConnectionId: connectionId,
-      status: UserExternalPrincipalStatuses.ACTIVE,
-      profile: {
-        login: "mistle-user",
-      },
-    });
-    await fixture.db.insert(userExternalPrincipalKeys).values({
-      organizationId: session.organizationId,
-      principalId: "uep_github_active_resolve",
-      providerFamily: "github",
-      keyType: "account_id",
-      keyValue: "12345",
-      status: UserExternalPrincipalKeyStatuses.ACTIVE,
-    });
-    await fixture.db.insert(userExternalPrincipalCredentials).values({
-      id: "upc_github_active_resolve",
-      organizationId: session.organizationId,
-      principalId: "uep_github_active_resolve",
-      providerFamily: "github",
-      credentialKind: "github_app_user_access_token",
-      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+    await seedGitHubPrincipalCredential(env, {
+      accessToken: "ghu_active_token",
       accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+      credentialId: "upc_internal_identity_linking_resolve_active",
+      providerConfigId: "ilp_internal_identity_linking_resolve_active",
+      principalId: "uep_internal_identity_linking_resolve_active",
+      refreshToken: "ghr_active_refresh_token",
       refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
-    });
-    await insertPrincipalCredentialSecret({
-      fixture,
-      organizationId: session.organizationId,
-      credentialId: "upc_github_active_resolve",
-      secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-      plaintext: "ghu_active_token",
-    });
-    await insertPrincipalCredentialSecret({
-      fixture,
-      organizationId: session.organizationId,
-      credentialId: "upc_github_active_resolve",
-      secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-      plaintext: "ghr_active_refresh_token",
+      session,
+      targetKey: "github-internal-identity-linking-resolve-active",
     });
 
-    const response = await fixture.request(
-      `${INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH}/resolve-principal-credential`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          organizationId: session.organizationId,
-          actingUserId: session.userId,
-          providerFamily: "github",
-        }),
-      },
-    );
+    const response = await resolvePrincipalCredential(env, {
+      organizationId: session.organizationId,
+      actingUserId: session.userId,
+      providerFamily: "github",
+    });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
+    expect(ResolvePrincipalCredentialResponseSchema.parse(await response.json())).toMatchObject({
       kind: "value",
       value: "ghu_active_token",
-      expiresAt: "2030-01-01 00:00:00+00",
+      expiresAt: "2030-01-01T00:00:00.000Z",
     });
   });
 
-  it("refreshes an expired linked-principal GitHub credential and persists updated secrets", async ({
-    fixture,
-  }) => {
-    const session = await fixture.authSession({
-      email: "internal-identity-linking-refresh-success@example.com",
+  it("refreshes an expired GitHub credential and persists updated secrets", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-refresh-success@example.com",
     });
-    const refreshServer = await startGitHubTokenServer({
-      responseBody: {
+    const simulatedGitHub = await startSimulatedGitHubIdentityProvider({
+      tokenResponse: {
         access_token: "ghu_refreshed_token",
-        expires_in: 3600,
+        expires_in: 3_600,
         refresh_token: "ghr_refreshed_token",
-        refresh_token_expires_in: 7200,
+        refresh_token_expires_in: 7_200,
         scope: "",
         token_type: "bearer",
       },
     });
 
     try {
-      await upsertGitHubTarget({
-        fixture,
-        targetKey: "github-cloud",
-        apiBaseUrl: refreshServer.baseUrl,
-        webBaseUrl: refreshServer.baseUrl,
-      });
-      const connectionId = await createGitHubAppConnection({
-        fixture,
-        authenticatedSession: session,
-        displayName: "GitHub Identity",
-      });
-      await insertIdentityLinkProviderConfig({
-        fixture,
-        organizationId: session.organizationId,
-        userId: session.userId,
-        configId: "ilp_github_refresh_success",
-        providerFamily: "github",
-        targetKey: "github-cloud",
-        connectionId,
-        connectionDisplayName: "GitHub Identity",
-        connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-        createConnection: false,
-      });
-
-      await fixture.db.insert(userExternalPrincipals).values({
-        id: "uep_github_refresh_success",
-        organizationId: session.organizationId,
-        userId: session.userId,
-        providerFamily: "github",
-        providerSubjectId: "12345",
-        organizationProviderConfigId: "ilp_github_refresh_success",
-        integrationConnectionId: connectionId,
-        status: UserExternalPrincipalStatuses.ACTIVE,
-        profile: {
-          login: "mistle-user",
-        },
-      });
-      await fixture.db.insert(userExternalPrincipalKeys).values({
-        organizationId: session.organizationId,
-        principalId: "uep_github_refresh_success",
-        providerFamily: "github",
-        keyType: "account_id",
-        keyValue: "12345",
-        status: UserExternalPrincipalKeyStatuses.ACTIVE,
-      });
-      await fixture.db.insert(userExternalPrincipalCredentials).values({
-        id: "upc_github_refresh_success",
-        organizationId: session.organizationId,
-        principalId: "uep_github_refresh_success",
-        providerFamily: "github",
-        credentialKind: "github_app_user_access_token",
-        status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+      await seedGitHubPrincipalCredential(env, {
+        accessToken: "ghu_expired_token",
         accessTokenExpiresAt: "2020-01-01T00:00:00.000Z",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        credentialId: "upc_internal_identity_linking_refresh_success",
+        providerConfigId: "ilp_internal_identity_linking_refresh_success",
+        principalId: "uep_internal_identity_linking_refresh_success",
+        refreshToken: "ghr_existing_refresh_token",
         refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
-      });
-      await insertPrincipalCredentialSecret({
-        fixture,
-        organizationId: session.organizationId,
-        credentialId: "upc_github_refresh_success",
-        secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        plaintext: "ghu_expired_token",
-      });
-      await insertPrincipalCredentialSecret({
-        fixture,
-        organizationId: session.organizationId,
-        credentialId: "upc_github_refresh_success",
-        secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-        plaintext: "ghr_existing_refresh_token",
+        session,
+        targetKey: "github-internal-identity-linking-refresh-success",
+        webBaseUrl: simulatedGitHub.baseUrl,
       });
 
-      const response = await fixture.request(
-        `${INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH}/resolve-principal-credential`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-          },
-          body: JSON.stringify({
-            organizationId: session.organizationId,
-            actingUserId: session.userId,
-            providerFamily: "github",
-          }),
-        },
-      );
+      const response = await resolvePrincipalCredential(env, {
+        organizationId: session.organizationId,
+        actingUserId: session.userId,
+        providerFamily: "github",
+      });
 
       expect(response.status).toBe(200);
-      const payload = await response.json();
-      expect(payload).toMatchObject({
+      expect(ResolvePrincipalCredentialResponseSchema.parse(await response.json())).toMatchObject({
         kind: "value",
         value: "ghu_refreshed_token",
       });
-      expect(typeof payload["expiresAt"]).toBe("string");
-      expect(refreshServer.requests).toEqual([
-        {
-          method: "POST",
-          pathname: "/login/oauth/access_token",
-          search:
-            "?client_id=Iv1.client123&client_secret=github-client-secret&grant_type=refresh_token&refresh_token=ghr_existing_refresh_token",
-        },
-      ]);
 
-      const persistedCredential = await fixture.db.query.userExternalPrincipalCredentials.findFirst(
-        {
-          where: (table, { eq }) => eq(table.id, "upc_github_refresh_success"),
-        },
+      const refreshRequest = simulatedGitHub.requests.find(
+        (request) => request.pathname === "/login/oauth/access_token",
       );
+      if (refreshRequest === undefined) {
+        throw new Error("Expected simulated GitHub token refresh request.");
+      }
+      const refreshUrl = new URL(
+        `http://provider.test${refreshRequest.pathname}${refreshRequest.search}`,
+      );
+      expect(refreshRequest.method).toBe("POST");
+      expect(refreshUrl.searchParams.get("client_id")).toBe("Iv1.client123");
+      expect(refreshUrl.searchParams.get("client_secret")).toBe("github-client-secret");
+      expect(refreshUrl.searchParams.get("grant_type")).toBe("refresh_token");
+      expect(refreshUrl.searchParams.get("refresh_token")).toBe("ghr_existing_refresh_token");
+
+      const persistedCredential =
+        await env.controlPlaneDb.query.userExternalPrincipalCredentials.findFirst({
+          where: (table, { eq }) => eq(table.id, "upc_internal_identity_linking_refresh_success"),
+        });
       expect(persistedCredential?.status).toBe(UserExternalPrincipalCredentialStatuses.ACTIVE);
-      expect(persistedCredential?.accessTokenExpiresAt).not.toBeNull();
-      expect(persistedCredential?.refreshTokenExpiresAt).not.toBeNull();
+      expect(persistedCredential?.lastValidatedAt).toBeTruthy();
       expect(Date.parse(persistedCredential?.accessTokenExpiresAt ?? "")).toBeGreaterThan(
         Date.now(),
       );
       expect(Date.parse(persistedCredential?.refreshTokenExpiresAt ?? "")).toBeGreaterThan(
         Date.now(),
       );
-      expect(persistedCredential?.lastValidatedAt).not.toBeNull();
-
-      const refreshedSecrets =
-        await fixture.db.query.userExternalPrincipalCredentialSecrets.findMany({
-          where: (table, { eq }) => eq(table.credentialId, "upc_github_refresh_success"),
-        });
-      expect(refreshedSecrets).toHaveLength(2);
-      expect(
-        await decryptUserExternalPrincipalCredentialSecret({
-          fixture,
+      await expect(
+        decryptPrincipalCredentialSecretByKind(env, {
           organizationId: session.organizationId,
-          credentialId: "upc_github_refresh_success",
+          credentialId: "upc_internal_identity_linking_refresh_success",
           secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
         }),
-      ).toBe("ghu_refreshed_token");
-      expect(
-        await decryptUserExternalPrincipalCredentialSecret({
-          fixture,
+      ).resolves.toBe("ghu_refreshed_token");
+      await expect(
+        decryptPrincipalCredentialSecretByKind(env, {
           organizationId: session.organizationId,
-          credentialId: "upc_github_refresh_success",
+          credentialId: "upc_internal_identity_linking_refresh_success",
           secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
         }),
-      ).toBe("ghr_refreshed_token");
+      ).resolves.toBe("ghr_refreshed_token");
     } finally {
-      await refreshServer.stop();
+      await simulatedGitHub.stop();
     }
   });
 
   it("marks the credential as reauthorization required when GitHub refresh fails", async ({
-    fixture,
+    env,
   }) => {
-    const session = await fixture.authSession({
-      email: "internal-identity-linking-refresh-failure@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-identity-linking-refresh-failure@example.com",
     });
-    const refreshServer = await startGitHubTokenServer({
-      statusCode: 401,
-      responseBody: {
+    const simulatedGitHub = await startSimulatedGitHubIdentityProvider({
+      tokenStatusCode: 401,
+      tokenResponse: {
         error: "bad_credentials",
       },
     });
 
     try {
-      await upsertGitHubTarget({
-        fixture,
-        targetKey: "github-cloud",
-        apiBaseUrl: refreshServer.baseUrl,
-        webBaseUrl: refreshServer.baseUrl,
-      });
-      const connectionId = await createGitHubAppConnection({
-        fixture,
-        authenticatedSession: session,
-        displayName: "GitHub Identity",
-      });
-      await insertIdentityLinkProviderConfig({
-        fixture,
-        organizationId: session.organizationId,
-        userId: session.userId,
-        configId: "ilp_github_refresh_failure",
-        providerFamily: "github",
-        targetKey: "github-cloud",
-        connectionId,
-        connectionDisplayName: "GitHub Identity",
-        connectionMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        configurationStatus: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
-        createConnection: false,
-      });
-
-      await fixture.db.insert(userExternalPrincipals).values({
-        id: "uep_github_refresh_failure",
-        organizationId: session.organizationId,
-        userId: session.userId,
-        providerFamily: "github",
-        providerSubjectId: "12345",
-        organizationProviderConfigId: "ilp_github_refresh_failure",
-        integrationConnectionId: connectionId,
-        status: UserExternalPrincipalStatuses.ACTIVE,
-        profile: {
-          login: "mistle-user",
-        },
-      });
-      await fixture.db.insert(userExternalPrincipalKeys).values({
-        organizationId: session.organizationId,
-        principalId: "uep_github_refresh_failure",
-        providerFamily: "github",
-        keyType: "account_id",
-        keyValue: "12345",
-        status: UserExternalPrincipalKeyStatuses.ACTIVE,
-      });
-      await fixture.db.insert(userExternalPrincipalCredentials).values({
-        id: "upc_github_refresh_failure",
-        organizationId: session.organizationId,
-        principalId: "uep_github_refresh_failure",
-        providerFamily: "github",
-        credentialKind: "github_app_user_access_token",
-        status: UserExternalPrincipalCredentialStatuses.ACTIVE,
+      await seedGitHubPrincipalCredential(env, {
+        accessToken: "ghu_expired_token",
         accessTokenExpiresAt: "2020-01-01T00:00:00.000Z",
+        apiBaseUrl: simulatedGitHub.baseUrl,
+        credentialId: "upc_internal_identity_linking_refresh_failure",
+        providerConfigId: "ilp_internal_identity_linking_refresh_failure",
+        principalId: "uep_internal_identity_linking_refresh_failure",
+        refreshToken: "ghr_existing_refresh_token",
         refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
-      });
-      await insertPrincipalCredentialSecret({
-        fixture,
-        organizationId: session.organizationId,
-        credentialId: "upc_github_refresh_failure",
-        secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        plaintext: "ghu_expired_token",
-      });
-      await insertPrincipalCredentialSecret({
-        fixture,
-        organizationId: session.organizationId,
-        credentialId: "upc_github_refresh_failure",
-        secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-        plaintext: "ghr_existing_refresh_token",
+        session,
+        targetKey: "github-internal-identity-linking-refresh-failure",
+        webBaseUrl: simulatedGitHub.baseUrl,
       });
 
-      const response = await fixture.request(
-        `${INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH}/resolve-principal-credential`,
-        {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-          },
-          body: JSON.stringify({
-            organizationId: session.organizationId,
-            actingUserId: session.userId,
-            providerFamily: "github",
-          }),
-        },
-      );
+      const response = await resolvePrincipalCredential(env, {
+        organizationId: session.organizationId,
+        actingUserId: session.userId,
+        providerFamily: "github",
+      });
 
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toEqual({
@@ -465,228 +197,105 @@ describe("internal identity-linking principal credential resolution", () => {
           'GitHub refresh token exchange failed (401 Unauthorized): {"error":"bad_credentials"}',
       });
 
-      const persistedCredential = await fixture.db.query.userExternalPrincipalCredentials.findFirst(
-        {
-          where: (table, { eq }) => eq(table.id, "upc_github_refresh_failure"),
-        },
-      );
+      const persistedCredential =
+        await env.controlPlaneDb.query.userExternalPrincipalCredentials.findFirst({
+          where: (table, { eq }) => eq(table.id, "upc_internal_identity_linking_refresh_failure"),
+        });
       expect(persistedCredential?.status).toBe(
         UserExternalPrincipalCredentialStatuses.REAUTHORIZATION_REQUIRED,
       );
     } finally {
-      await refreshServer.stop();
+      await simulatedGitHub.stop();
     }
   });
 });
 
-async function upsertGitHubTarget(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  targetKey: string;
-  apiBaseUrl?: string;
-  webBaseUrl?: string;
-}): Promise<void> {
-  const apiBaseUrl = input.apiBaseUrl ?? "https://api.github.com";
-  const webBaseUrl = input.webBaseUrl ?? "https://github.com";
-
-  await input.fixture.db
-    .insert(integrationTargets)
-    .values({
-      targetKey: input.targetKey,
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: apiBaseUrl,
-        web_base_url: webBaseUrl,
-      },
-    })
-    .onConflictDoUpdate({
-      target: integrationTargets.targetKey,
-      set: {
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: apiBaseUrl,
-          web_base_url: webBaseUrl,
-        },
-      },
-    });
-}
-
-async function insertIdentityLinkProviderConfig(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  userId: string;
-  configId: string;
-  providerFamily: string;
-  targetKey: string;
-  connectionId: string;
-  connectionDisplayName: string;
-  connectionMethodId: string;
-  configurationStatus: "active" | "disabled";
-  connectionConfig?: Record<string, unknown>;
-  createConnection?: boolean;
-}): Promise<void> {
-  if (input.createConnection !== false) {
-    await input.fixture.db.insert(integrationConnections).values({
-      id: input.connectionId,
-      organizationId: input.organizationId,
-      targetKey: input.targetKey,
-      displayName: input.connectionDisplayName,
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: input.connectionMethodId,
-        ...input.connectionConfig,
-      },
-    });
-  }
-
-  await input.fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-    id: input.configId,
-    organizationId: input.organizationId,
-    providerFamily: input.providerFamily,
-    status: input.configurationStatus,
-    integrationTargetKey: input.targetKey,
-    integrationConnectionId: input.connectionId,
-    createdByUserId: input.userId,
-    updatedByUserId: input.userId,
+async function seedGitHubPrincipalCredential(
+  env: IntegrationTestEnvironment,
+  input: {
+    session: IntegrationAuthenticatedSession;
+    targetKey: string;
+    providerConfigId: string;
+    principalId: string;
+    credentialId: string;
+    accessToken: string;
+    accessTokenExpiresAt: string;
+    refreshToken: string;
+    refreshTokenExpiresAt: string;
+    apiBaseUrl?: string;
+    webBaseUrl?: string;
+  },
+): Promise<void> {
+  await upsertGitHubIdentityTarget(env, {
+    targetKey: input.targetKey,
+    ...(input.apiBaseUrl === undefined ? {} : { apiBaseUrl: input.apiBaseUrl }),
+    ...(input.webBaseUrl === undefined ? {} : { webBaseUrl: input.webBaseUrl }),
   });
-}
-
-async function createGitHubAppConnection(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  authenticatedSession: Awaited<ReturnType<ControlPlaneApiIntegrationFixture["authSession"]>>;
-  displayName: string;
-}): Promise<string> {
-  const response = await input.fixture.request("/v1/integration/connections/github-cloud/form", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      cookie: input.authenticatedSession.cookie,
+  const connectionId = await createGitHubIdentityConnection(env, {
+    displayName: "GitHub Identity",
+    session: input.session,
+    targetKey: input.targetKey,
+  });
+  await seedIdentityProviderConfig(env, {
+    configId: input.providerConfigId,
+    connectionId,
+    organizationId: input.session.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    targetKey: input.targetKey,
+    userId: input.session.userId,
+  });
+  await seedGitHubLinkedPrincipal(env, {
+    organizationId: input.session.organizationId,
+    userId: input.session.userId,
+    principalId: input.principalId,
+    providerConfigId: input.providerConfigId,
+    connectionId,
+    providerSubjectId: "12345",
+    profile: {
+      login: "mistle-user",
     },
-    body: JSON.stringify({
-      displayName: input.displayName,
-      methodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-        app_id: "123",
-        app_slug: "mistle-github-app",
-        client_id: "Iv1.client123",
-      },
-      secrets: {
-        appPrivateKeyPem: "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----",
-        clientSecret: "github-client-secret",
-        webhookSecret: "github-webhook-secret",
-      },
-    }),
   });
-
-  expect(response.status).toBe(201);
-  const createdConnection = await response.json();
-  if (typeof createdConnection !== "object" || createdConnection === null) {
-    throw new Error("Expected GitHub App connection create response object.");
-  }
-
-  const connectionId = createdConnection["id"];
-  if (typeof connectionId !== "string" || connectionId.length === 0) {
-    throw new Error("Expected GitHub App connection id.");
-  }
-
-  return connectionId;
+  await seedPrincipalCredential(env, {
+    credentialId: input.credentialId,
+    organizationId: input.session.organizationId,
+    principalId: input.principalId,
+    providerFamily: "github",
+    credentialKind: "github_app_user_access_token",
+    accessTokenExpiresAt: input.accessTokenExpiresAt,
+    refreshTokenExpiresAt: input.refreshTokenExpiresAt,
+  });
+  await insertPrincipalCredentialSecret(env, {
+    organizationId: input.session.organizationId,
+    credentialId: input.credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    plaintext: input.accessToken,
+  });
+  await insertPrincipalCredentialSecret(env, {
+    organizationId: input.session.organizationId,
+    credentialId: input.credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+    plaintext: input.refreshToken,
+  });
 }
 
-async function insertPrincipalCredentialSecret(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  credentialId: string;
-  secretKind: UserExternalPrincipalCredentialSecretKind;
-  plaintext: string;
-}): Promise<void> {
-  const organizationCredentialKey =
-    await input.fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
-    });
-  if (organizationCredentialKey === undefined) {
-    throw new Error("Expected organization credential key.");
-  }
-
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
-  });
-  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: organizationCredentialKey.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
-
-  try {
-    const encryptedSecret = encryptCredentialUtf8({
-      plaintext: input.plaintext,
-      organizationCredentialKey: organizationCredentialKeyMaterial,
-    });
-
-    await input.fixture.db.insert(userExternalPrincipalCredentialSecrets).values({
-      organizationId: input.organizationId,
-      credentialId: input.credentialId,
-      secretKind: input.secretKind,
-      ciphertext: encryptedSecret.ciphertext,
-      nonce: encryptedSecret.nonce,
-      organizationCredentialKeyVersion: organizationCredentialKey.version,
-    });
-  } finally {
-    organizationCredentialKeyMaterial.fill(0);
-  }
-}
-
-async function decryptUserExternalPrincipalCredentialSecret(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  credentialId: string;
-  secretKind: UserExternalPrincipalCredentialSecretKind;
-}): Promise<string> {
-  const encryptedSecret =
-    await input.fixture.db.query.userExternalPrincipalCredentialSecrets.findFirst({
-      where: (table, { and, eq, isNull }) =>
-        and(
-          eq(table.organizationId, input.organizationId),
-          eq(table.credentialId, input.credentialId),
-          eq(table.secretKind, input.secretKind),
-          isNull(table.revokedAt),
-        ),
-    });
-  if (encryptedSecret === undefined) {
-    throw new Error("Expected encrypted linked-principal credential secret.");
-  }
-
-  const organizationCredentialKey =
-    await input.fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.organizationId, input.organizationId),
-          eq(table.version, encryptedSecret.organizationCredentialKeyVersion),
-        ),
-    });
-  if (organizationCredentialKey === undefined) {
-    throw new Error("Expected organization credential key.");
-  }
-
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
-  });
-  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: organizationCredentialKey.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
-
-  try {
-    return decryptCredentialUtf8({
-      nonce: encryptedSecret.nonce,
-      ciphertext: encryptedSecret.ciphertext,
-      organizationCredentialKey: organizationCredentialKeyMaterial,
-    });
-  } finally {
-    organizationCredentialKeyMaterial.fill(0);
-  }
+async function resolvePrincipalCredential(
+  env: IntegrationTestEnvironment,
+  body: {
+    organizationId: string;
+    actingUserId: string;
+    providerFamily: string;
+  },
+) {
+  return await env.controlPlaneApi.http.fetch(
+    `${INTERNAL_IDENTITY_LINKING_ROUTE_BASE_PATH}/resolve-principal-credential`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: InternalServiceToken,
+      },
+      body: JSON.stringify(body),
+    },
+  );
 }

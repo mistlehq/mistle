@@ -1,16 +1,14 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  integrationConnections,
-  integrationTargets,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  sandboxProfileSnapshotRefreshScheduleTargets,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
-  schedules,
   ScheduleTargetTypes,
 } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -18,74 +16,77 @@ import {
   DiscardSandboxProfileVersionDraftResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import {
-  createIntegrationConnectionFixture,
-  createIntegrationTargetFixture,
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-  createSandboxProfileVersionIntegrationBindingFixture,
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
 } from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
 
-describe("sandbox profile versions discard integration", () => {
-  it("atomically deletes the draft version and reports that no draft remains", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-discard@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile versions discard integration", () => {
+  it("atomically deletes the draft version and reports that no draft remains", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-discard@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values(
-      createIntegrationTargetFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
         targetKey: "openai-version-discard",
         variantId: "openai-default",
         enabled: true,
       }),
     );
-    await fixture.db.insert(integrationConnections).values(
-      createIntegrationConnectionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
         id: "icn_version_discard_agent",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-version-discard",
         displayName: "Discard Agent Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
     );
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_discard_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Discard Draft Profile",
         activeVersion: 1,
         createdAt: "2026-04-24T00:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values([
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_discard_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-04-24T00:01:00.000Z",
         setupScript: "echo published",
       }),
-      createSandboxProfileVersionFixture({
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_discard_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
         setupScript: "echo draft",
       }),
     ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values(
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_version_discard_draft_agent",
-        sandboxProfileId: "sbp_version_discard_001",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_version_discard_agent",
-        kind: IntegrationBindingKinds.AGENT,
-      }),
-    );
-    await fixture.db.insert(schedules).values({
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_version_discard_draft_agent",
+          sandboxProfileId: "sbp_version_discard_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_version_discard_agent",
+          kind: IntegrationBindingKinds.AGENT,
+        }),
+      );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.schedules).values({
       id: "sch_version_discard_refresh",
-      organizationId: authenticatedSession.organizationId,
+      organizationId: session.organizationId,
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
       name: "Discard refresh",
       cronExpression: "0 9 * * *",
@@ -93,18 +94,20 @@ describe("sandbox profile versions discard integration", () => {
       enabled: true,
       nextScheduledAt: "2026-04-28T01:00:00.000Z",
     });
-    await fixture.db.insert(sandboxProfileSnapshotRefreshScheduleTargets).values({
-      scheduleId: "sch_version_discard_refresh",
-      sandboxProfileId: "sbp_version_discard_001",
-      sandboxProfileVersion: 2,
-    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileSnapshotRefreshScheduleTargets)
+      .values({
+        scheduleId: "sch_version_discard_refresh",
+        sandboxProfileId: "sbp_version_discard_001",
+        sandboxProfileVersion: 2,
+      });
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_discard_001/versions/2/discard",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -116,22 +119,23 @@ describe("sandbox profile versions discard integration", () => {
       hasDraft: false,
     });
 
-    const discardedVersion = await fixture.db.query.sandboxProfileVersions.findFirst({
+    const discardedVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_version_discard_001"), eq(table.version, 2)),
     });
-    const activeVersion = await fixture.db.query.sandboxProfileVersions.findFirst({
+    const activeVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_version_discard_001"), eq(table.version, 1)),
     });
-    const draftBindings = await fixture.db.query.sandboxProfileVersionIntegrationBindings.findMany({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.sandboxProfileId, "sbp_version_discard_001"),
-          eq(table.sandboxProfileVersion, 2),
-        ),
-    });
-    const refreshSchedule = await fixture.db.query.schedules.findFirst({
+    const draftBindings =
+      await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.sandboxProfileId, "sbp_version_discard_001"),
+            eq(table.sandboxProfileVersion, 2),
+          ),
+      });
+    const refreshSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, "sch_version_discard_refresh"),
     });
 
@@ -147,22 +151,22 @@ describe("sandbox profile versions discard integration", () => {
     expect(refreshSchedule?.deletedAt).not.toBeNull();
   });
 
-  it("rejects discarding a published version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-discard-published@example.com",
+  it("rejects discarding a published version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-discard-published@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_discard_published_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Discard Published Profile",
         activeVersion: 1,
         createdAt: "2026-04-24T01:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_discard_published_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
@@ -170,12 +174,12 @@ describe("sandbox profile versions discard integration", () => {
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_discard_published_001/versions/1/discard",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -187,34 +191,34 @@ describe("sandbox profile versions discard integration", () => {
     expect(body.code).toBe("PROFILE_VERSION_ACTIVE");
   });
 
-  it("rejects discarding the only draft version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-discard-only-draft@example.com",
+  it("rejects discarding the only draft version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-discard-only-draft@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values(
-      createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_discard_only_draft_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Discard Only Draft Profile",
         activeVersion: null,
         createdAt: "2026-04-24T02:00:00.000Z",
       }),
     );
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_discard_only_draft_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_discard_only_draft_001/versions/1/discard",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -225,10 +229,10 @@ describe("sandbox profile versions discard integration", () => {
     );
     expect(body.code).toBe("DRAFT_ONLY_PROFILE_VERSION_CANNOT_BE_DISCARDED");
 
-    const profile = await fixture.db.query.sandboxProfiles.findFirst({
+    const profile = await env.controlPlaneDb.query.sandboxProfiles.findFirst({
       where: (table, { eq }) => eq(table.id, "sbp_version_discard_only_draft_001"),
     });
-    const version = await fixture.db.query.sandboxProfileVersions.findFirst({
+    const version = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_version_discard_only_draft_001"), eq(table.version, 1)),
     });

@@ -31,11 +31,13 @@ export type DispatchScheduledActionResult = Readonly<{
   status: "dispatched" | "failed" | "skipped";
 }>;
 
+type WorkflowRunClient = Pick<OpenWorkflow, "runWorkflow">;
+
 type DispatchScheduledActionContext = Readonly<{
   db: ControlPlaneDatabase;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   defaultBaseImage: string;
-  openWorkflow?: OpenWorkflow;
+  openWorkflow?: WorkflowRunClient;
 }>;
 
 export async function dispatchScheduledAction(

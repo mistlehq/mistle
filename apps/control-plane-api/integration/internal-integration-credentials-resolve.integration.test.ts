@@ -1,447 +1,115 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { generateKeyPairSync } from "node:crypto";
 
 import {
   IntegrationBindingKinds,
-  integrationConnectionCredentials,
   IntegrationConnectionStatuses,
-  integrationConnections,
   IntegrationCredentialSecretKinds,
-  integrationCredentials,
-  integrationTargets,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
+  type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
-import {
-  createOAuth2AuthorizationCodeCredentialSlotKeys,
-  IntegrationConnectionMethodIds,
-  IntegrationRegistry,
-  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError,
-  IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications,
-  type IntegrationDefinition,
-} from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackCredentialSlotKeys } from "@mistle/integrations-definitions";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
-import { z } from "zod";
+import type { z } from "zod";
 
+import { CreatedFormIntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
 } from "../src/internal/integration-credentials/index.js";
-import { InternalIntegrationCredentialsErrorCodes } from "../src/internal/integration-credentials/services/errors.js";
-import { resolveIntegrationCredential } from "../src/internal/integration-credentials/services/resolve-credential.js";
 import {
-  decryptCredentialUtf8,
+  ResolveIntegrationCredentialResponseSchema,
+  type ResolveIntegrationCredentialRequestSchema,
+} from "../src/internal/integration-credentials/resolve-integration-credential/schema.js";
+import { ResolveIntegrationTargetSecretsResponseSchema } from "../src/internal/integration-credentials/resolve-integration-target-secrets/schema.js";
+import {
   encryptCredentialUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../src/lib/crypto.js";
-import { it } from "./test-context.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+import {
+  createFormConnection,
+  IntegrationIntegrationsConfig,
+  seedIntegrationTarget,
+} from "./helpers/integration-connections.js";
 
-type ConnectionResponse = {
-  id: string;
-};
+const InternalServiceToken = "integration-new-internal-service-token";
 
-const EmptyConfigSchema = z.object({});
-const ClientCredentialsConnectionMethodId = "oauth2-client-credentials-test";
-const ClientCredentialsClientSecretSlotKey =
-  "oauth2.client-credentials-test.oauth2-client-credentials-test.client-secret";
-const ClientCredentialsAccessTokenSlotKey =
-  "oauth2.client-credentials-test.oauth2-client-credentials-test.access-token";
-const DeviceAuthorizationRefreshFamilyId = "device-auth";
-const DeviceAuthorizationRefreshVariantId = "refresh-test";
-const DeviceAuthorizationRefreshConnectionMethodId = "chatgpt-device-code";
-const DeviceAuthorizationRefreshSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
-  familyId: DeviceAuthorizationRefreshFamilyId,
-  variantId: DeviceAuthorizationRefreshVariantId,
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
 });
-const AwsAssumeRoleSecretSlotKey = "aws.aws-cli-default.aws-assume-role.secret-access-key";
-const AwsAssumeRoleResolverKey = "assume-role-session";
 
-function createClientCredentialsRegistry(): IntegrationRegistry {
-  const registry = new IntegrationRegistry();
-  const definition: IntegrationDefinition<
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema
-  > = {
-    familyId: "oauth2",
-    variantId: "client-credentials-test",
-    kind: "connector",
-    displayName: "OAuth2 Client Credentials Test",
-    logoKey: "oauth2",
-    targetConfigSchema: EmptyConfigSchema,
-    targetSecretSchema: EmptyConfigSchema,
-    bindingConfigSchema: EmptyConfigSchema,
-    connectionMethods: [
-      {
-        id: ClientCredentialsConnectionMethodId,
-        label: "OAuth2 client credentials",
-        kind: "form",
-        secretFields: [
-          {
-            name: "clientSecret",
-            label: "Client secret",
-            inputType: "password",
-            secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-            slotKey: ClientCredentialsClientSecretSlotKey,
-          },
-        ],
-        configSchema: z
-          .object({
-            connection_method: z.literal(ClientCredentialsConnectionMethodId),
-          })
-          .strict(),
-      },
-    ],
-    oauth2ClientCredentials: {
-      exchangeClientCredentials: async (input) => ({
-        accessToken: `access-token-for:${input.clientSecret}`,
-        accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
-      }),
-    },
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-    }),
-  };
-
-  registry.register(definition);
-
-  return registry;
-}
-
-function createDeviceAuthorizationRefreshRegistry(input: {
-  refreshAccessToken: NonNullable<
-    IntegrationDefinition<
-      typeof EmptyConfigSchema,
-      typeof EmptyConfigSchema,
-      typeof EmptyConfigSchema,
-      {
-        connection_method: "chatgpt-device-code";
-        auth_mode: "chatgpt";
-        chatgpt_account_id: string;
-      }
-    >["oauth2AuthorizationCode"]
-  >["refreshAccessToken"];
-}): IntegrationRegistry {
-  const registry = new IntegrationRegistry();
-  const definition: IntegrationDefinition<
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    {
-      connection_method: "chatgpt-device-code";
-      auth_mode: "chatgpt";
-      chatgpt_account_id: string;
-    }
-  > = {
-    familyId: DeviceAuthorizationRefreshFamilyId,
-    variantId: DeviceAuthorizationRefreshVariantId,
-    kind: "agent",
-    displayName: "Device Authorization Refresh Test",
-    logoKey: "openai",
-    targetConfigSchema: EmptyConfigSchema,
-    targetSecretSchema: EmptyConfigSchema,
-    bindingConfigSchema: EmptyConfigSchema,
-    connectionMethods: [
-      {
-        id: DeviceAuthorizationRefreshConnectionMethodId,
-        label: "ChatGPT subscription",
-        kind: "device-authorization",
-        ui: {
-          create: {
-            submitLabel: "Connect",
-          },
-        },
-      },
-    ],
-    deviceAuthorization: {
-      startDeviceAuthorization: async () => {
-        throw new Error("Not used in internal credential refresh tests.");
-      },
-      pollDeviceAuthorization: async () => {
-        throw new Error("Not used in internal credential refresh tests.");
-      },
-    },
-    oauth2AuthorizationCode: {
-      startAuthorization: async () => {
-        throw new Error("Not used in internal credential refresh tests.");
-      },
-      completeAuthorizationCodeGrant: async () => {
-        throw new Error("Not used in internal credential refresh tests.");
-      },
-      refreshAccessToken: input.refreshAccessToken,
-    },
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-    }),
-  };
-
-  registry.register(definition);
-
-  return registry;
-}
-
-function createAwsSessionRegistry(): IntegrationRegistry {
-  const registry = new IntegrationRegistry();
-  const definition: IntegrationDefinition<
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    z.ZodObject<{
-      defaultRegion: z.ZodString;
-    }>
-  > = {
-    familyId: "aws",
-    variantId: "aws-cli-default",
-    kind: "connector",
-    displayName: "AWS",
-    logoKey: "aws",
-    targetConfigSchema: EmptyConfigSchema,
-    targetSecretSchema: EmptyConfigSchema,
-    bindingConfigSchema: z
-      .object({
-        defaultRegion: z.string().min(1),
-      })
-      .strict(),
-    connectionMethods: [
-      {
-        id: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
-        label: "Access key + AssumeRole",
-        kind: "form",
-        secretFields: [
-          {
-            name: "secretAccessKey",
-            label: "Secret access key",
-            inputType: "password",
-            secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
-            slotKey: AwsAssumeRoleSecretSlotKey,
-          },
-        ],
-        configSchema: z
-          .object({
-            connection_method: z.literal(IntegrationConnectionMethodIds.AWS_ASSUME_ROLE),
-            accessKeyId: z.string().min(1),
-            roleArn: z.string().min(1),
-          })
-          .strict(),
-      },
-    ],
-    credentialResolvers: {
-      custom: {
-        [AwsAssumeRoleResolverKey]: {
-          async resolve(input) {
-            if (input.binding === undefined) {
-              throw new Error("Expected binding context.");
-            }
-
-            const defaultRegion = input.binding.config["defaultRegion"];
-            if (typeof defaultRegion !== "string" || defaultRegion.length === 0) {
-              throw new Error("Expected binding defaultRegion.");
-            }
-
-            const accessKeyId = input.connection.config["accessKeyId"];
-            if (typeof accessKeyId !== "string" || accessKeyId.length === 0) {
-              throw new Error("Expected bootstrap accessKeyId.");
-            }
-
-            const secretAccessKey = input.connection.secrets?.["secretAccessKey"];
-            if (typeof secretAccessKey !== "string" || secretAccessKey.length === 0) {
-              throw new Error("Expected hydrated secretAccessKey.");
-            }
-
-            return {
-              kind: "aws_session",
-              accessKeyId,
-              secretAccessKey,
-              sessionToken: `session-token-for:${defaultRegion}`,
-              expiresAt: "2030-01-01T00:00:00.000Z",
-            };
-          },
-        },
-      },
-    },
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-    }),
-  };
-
-  registry.register(definition);
-
-  return registry;
-}
-
-async function insertGitHubBindingFixture(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  targetKey: string;
-  bindingId: string;
-}) {
-  const authSession = await input.fixture.authSession();
-  const { privateKey } = generateKeyPairSync("rsa", {
-    modulusLength: 2048,
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-    },
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem",
-    },
-  });
-  await input.fixture.db.insert(integrationTargets).values({
-    targetKey: input.targetKey,
-    familyId: "github",
-    variantId: "github-cloud",
-    enabled: true,
-    config: {
-      api_base_url: "https://api.github.com",
-      web_base_url: "https://github.com",
-    },
-  });
-  const createConnectionResponse = await input.fixture.request(
-    `/v1/integration/connections/${input.targetKey}/form`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: authSession.cookie,
-      },
-      body: JSON.stringify({
-        displayName: "GitHub binding-aware connection",
-        methodId: "github-app-installation",
-        config: {
-          connection_method: "github-app-installation",
-          app_id: "123",
-          app_slug: "mistle-github-app",
-          client_id: "Iv1.client123",
-          installation_id: "12345",
-        },
-        secrets: {
-          appPrivateKeyPem: privateKey,
-          clientSecret: "github-client-secret",
-          webhookSecret: "github-webhook-secret",
-        },
-      }),
-    },
-  );
-  expect(createConnectionResponse.status).toBe(201);
-  const connection = (await createConnectionResponse.json()) as ConnectionResponse;
-
-  await input.fixture.db.insert(sandboxProfiles).values({
-    id: "sbp_github_binding_aware",
-    organizationId: authSession.organizationId,
-    displayName: "GitHub binding-aware profile",
-  });
-
-  await input.fixture.db.insert(sandboxProfileVersions).values({
-    sandboxProfileId: "sbp_github_binding_aware",
-    version: 1,
-  });
-
-  await input.fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-    id: input.bindingId,
-    sandboxProfileId: "sbp_github_binding_aware",
-    sandboxProfileVersion: 1,
-    connectionId: connection.id,
-    kind: IntegrationBindingKinds.GIT,
-    config: {
-      repositories: ["mistlehq/mistle", "mistlehq/platform", "mistlehq/mistle"],
-    },
-  });
-
-  return {
-    organizationId: authSession.organizationId,
-    connectionId: connection.id,
-    bindingId: input.bindingId,
-  };
-}
-
-describe("internal integration credentials resolve", () => {
-  it("resolves persisted integration credentials for an active connection", async ({ fixture }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default",
+describe.concurrent("internal integration credential resolution", () => {
+  it("resolves persisted API-key credentials for an active connection", async ({ env }) => {
+    await seedIntegrationTarget(env, {
+      targetKey: "openai-internal-credential-resolve",
       familyId: "openai",
       variantId: "openai-default",
-      enabled: true,
       config: {
-        base_url: "https://api.openai.com/v1",
+        api_base_url: "https://api.openai.com",
       },
     });
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-resolve-openai@example.com",
+    });
 
-    const createConnectionResponse = await fixture.request(
-      "/v1/integration/connections/openai_default/form",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authSession.cookie,
+    const createResponse = await createFormConnection({
+      env,
+      targetKey: "openai-internal-credential-resolve",
+      cookie: session.cookie,
+      body: {
+        displayName: "OpenAI internal credential test",
+        methodId: IntegrationConnectionMethodIds.API_KEY,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-        body: JSON.stringify({
-          displayName: "OpenAI internal credential test",
-          methodId: "api-key",
-          config: {
-            connection_method: "api-key",
-          },
-          secrets: {
-            apiKey: "sk-integration-test",
-          },
-        }),
-      },
-    );
-    expect(createConnectionResponse.status).toBe(201);
-    const connection = (await createConnectionResponse.json()) as ConnectionResponse;
-
-    const resolveResponse = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        secrets: {
+          apiKey: "sk-integration-internal-test",
         },
-        body: JSON.stringify({
-          connectionId: connection.id,
-          secretType: "api_key",
-          slotKey: "openai.openai-default.api-key.api-key",
-        }),
       },
-    );
+    });
+    expect(createResponse.status).toBe(201);
+    const connection = CreatedFormIntegrationConnectionSchema.parse(await createResponse.json());
 
-    expect(resolveResponse.status).toBe(200);
-    await expect(resolveResponse.json()).resolves.toEqual({
+    const response = await resolveCredential(env, {
+      connectionId: connection.id,
+      secretType: IntegrationCredentialSecretKinds.API_KEY,
+      slotKey: "openai.openai-default.api-key.api-key",
+    });
+
+    expect(response.status).toBe(200);
+    expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
       kind: "value",
-      value: "sk-integration-test",
+      value: "sk-integration-internal-test",
     });
   });
 
-  it("resolves a persisted setup credential when another required form secret is not configured yet", async ({
-    fixture,
+  it("resolves setup credentials even when another required form secret is not configured yet", async ({
+    env,
   }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "slack_manifest_setup_partial",
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-resolve-slack@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "slack-internal-credential-setup-partial",
       familyId: "slack",
       variantId: "slack-default",
-      enabled: true,
       config: {
         api_base_url: "https://slack.com/api",
       },
     });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_slack_manifest_setup_partial",
-      organizationId: authSession.organizationId,
-      targetKey: "slack_manifest_setup_partial",
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_internal_credential_slack_partial",
+      organizationId: session.organizationId,
+      targetKey: "slack-internal-credential-setup-partial",
       displayName: "Slack manifest setup partial",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
@@ -450,910 +118,146 @@ describe("internal integration credentials resolve", () => {
       },
     });
 
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial: masterKeyMaterial,
+    await insertEncryptedCredential({
+      env,
+      organizationId: session.organizationId,
+      id: "icr_internal_slack_partial_client_secret",
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      plaintext: "slack-client-secret",
+      intendedFamilyId: "slack",
+      connectionId: "icn_internal_credential_slack_partial",
+      slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
     });
 
-    try {
-      const encryptedClientSecret = encryptCredentialUtf8({
-        plaintext: "slack-client-secret",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-      const encryptedSigningSecret = encryptCredentialUtf8({
-        plaintext: "slack-signing-secret",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
+    const response = await resolveCredential(env, {
+      connectionId: "icn_internal_credential_slack_partial",
+      secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
+      slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
+    });
 
-      await fixture.db.insert(integrationCredentials).values([
-        {
-          id: "icr_slack_manifest_setup_client_secret",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-          ciphertext: encryptedClientSecret.ciphertext,
-          nonce: encryptedClientSecret.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: "slack",
-        },
-        {
-          id: "icr_slack_manifest_setup_signing_secret",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.API_KEY,
-          ciphertext: encryptedSigningSecret.ciphertext,
-          nonce: encryptedSigningSecret.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: "slack",
-        },
-      ]);
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values([
-      {
-        connectionId: "icn_slack_manifest_setup_partial",
-        credentialId: "icr_slack_manifest_setup_client_secret",
-        slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
-      },
-      {
-        connectionId: "icn_slack_manifest_setup_partial",
-        credentialId: "icr_slack_manifest_setup_signing_secret",
-        slotKey: SlackCredentialSlotKeys.SIGNING_SECRET,
-      },
-    ]);
-
-    const resolveResponse = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          connectionId: "icn_slack_manifest_setup_partial",
-          secretType: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-          slotKey: SlackCredentialSlotKeys.CLIENT_SECRET,
-        }),
-      },
-    );
-
-    expect(resolveResponse.status).toBe(200);
-    await expect(resolveResponse.json()).resolves.toEqual({
+    expect(response.status).toBe(200);
+    expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
       kind: "value",
       value: "slack-client-secret",
     });
   });
 
-  it("resolves persisted aws secret access keys for an active connection", async ({ fixture }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_aws_secret_default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        base_url: "https://api.openai.com/v1",
-      },
+  it("resolves persisted AWS secret access keys for active connections", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-resolve-aws@example.com",
     });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_aws_secret_access_key",
-      organizationId: authSession.organizationId,
-      targetKey: "openai_aws_secret_default",
+    await seedIntegrationTarget(env, {
+      targetKey: "aws-internal-credential-secret-key",
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      config: {},
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_internal_credential_aws_secret_key",
+      organizationId: session.organizationId,
+      targetKey: "aws-internal-credential-secret-key",
       displayName: "Stored AWS secret access key",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        connection_method: "aws-assume-role",
+        connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
       },
     });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedAwsSecretAccessKey = encryptCredentialUtf8({
-        plaintext: "aws-secret-access-key-value",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values({
-        id: "icr_aws_secret_access_key",
-        organizationId: authSession.organizationId,
-        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
-        ciphertext: encryptedAwsSecretAccessKey.ciphertext,
-        nonce: encryptedAwsSecretAccessKey.nonce,
-        organizationCredentialKeyVersion: organizationCredentialKey.version,
-        intendedFamilyId: "openai",
-      });
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values({
-      connectionId: "icn_aws_secret_access_key",
-      credentialId: "icr_aws_secret_access_key",
+    await insertEncryptedCredential({
+      env,
+      organizationId: session.organizationId,
+      id: "icr_internal_credential_aws_secret_key",
+      secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+      plaintext: "aws-secret-access-key-value",
+      intendedFamilyId: "aws",
+      connectionId: "icn_internal_credential_aws_secret_key",
       slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
     });
 
-    const resolveResponse = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          connectionId: "icn_aws_secret_access_key",
-          secretType: "aws_secret_access_key",
-          slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
-        }),
-      },
-    );
+    const response = await resolveCredential(env, {
+      connectionId: "icn_internal_credential_aws_secret_key",
+      secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
+      slotKey: "aws.aws-cli-default.aws-assume-role.secret-access-key",
+    });
 
-    expect(resolveResponse.status).toBe(200);
-    await expect(resolveResponse.json()).resolves.toEqual({
+    expect(response.status).toBe(200);
+    expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
       kind: "value",
       value: "aws-secret-access-key-value",
     });
   });
 
-  it("resolves persisted OAuth2 access tokens with structural expiry", async ({ fixture }) => {
-    const authSession = await fixture.authSession();
-    const oauth2AuthorizationCodeSlotKeys = createOAuth2AuthorizationCodeCredentialSlotKeys({
-      familyId: "openai",
-      variantId: "openai-default",
+  it("resolves persisted OAuth access tokens with structural expiry", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-resolve-oauth@example.com",
     });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_oauth2_default",
+    await seedIntegrationTarget(env, {
+      targetKey: "openai-internal-credential-oauth",
       familyId: "openai",
       variantId: "openai-default",
-      enabled: true,
       config: {
-        api_base_url: "https://api.openai.com/v1",
+        api_base_url: "https://api.openai.com",
       },
     });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_oauth2_access",
-      organizationId: authSession.organizationId,
-      targetKey: "openai_oauth2_default",
-      displayName: "Stored OAuth2 token",
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_internal_credential_oauth_access",
+      organizationId: session.organizationId,
+      targetKey: "openai-internal-credential-oauth",
+      displayName: "Stored OAuth access token",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        connection_method: "oauth2-authorization-code",
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
       },
     });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
+    await insertEncryptedCredential({
+      env,
+      organizationId: session.organizationId,
+      id: "icr_internal_credential_oauth_access",
+      secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      plaintext: "oauth2-access-token-value",
+      intendedFamilyId: "openai",
+      connectionId: "icn_internal_credential_oauth_access",
+      slotKey: "openai.openai-default.oauth2-authorization-code.access-token",
+      expiresAt: "2030-01-01T00:00:00.000Z",
     });
 
-    try {
-      const encryptedAccessToken = encryptCredentialUtf8({
-        plaintext: "oauth2-access-token-value",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values({
-        id: "icr_oauth2_access",
-        organizationId: authSession.organizationId,
-        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        ciphertext: encryptedAccessToken.ciphertext,
-        nonce: encryptedAccessToken.nonce,
-        organizationCredentialKeyVersion: organizationCredentialKey.version,
-        intendedFamilyId: "openai",
-        expiresAt: "2030-01-01T00:00:00.000Z",
-      });
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values({
-      connectionId: "icn_oauth2_access",
-      credentialId: "icr_oauth2_access",
-      slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
+    const response = await resolveCredential(env, {
+      connectionId: "icn_internal_credential_oauth_access",
+      secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+      slotKey: "openai.openai-default.oauth2-authorization-code.access-token",
     });
 
-    const resolveResponse = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          connectionId: "icn_oauth2_access",
-          secretType: "oauth2_access_token",
-          slotKey: oauth2AuthorizationCodeSlotKeys.accessToken,
-        }),
-      },
-    );
-
-    expect(resolveResponse.status).toBe(200);
-    await expect(resolveResponse.json()).resolves.toEqual({
+    expect(response.status).toBe(200);
+    expect(ResolveIntegrationCredentialResponseSchema.parse(await response.json())).toEqual({
       kind: "value",
       value: "oauth2-access-token-value",
       expiresAt: "2030-01-01T00:00:00.000Z",
     });
   });
 
-  it("refreshes expired device-authorization access tokens through the managed path", async ({
-    fixture,
-  }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "device_auth_refresh_target",
-      familyId: DeviceAuthorizationRefreshFamilyId,
-      variantId: DeviceAuthorizationRefreshVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_device_auth_refresh",
-      organizationId: authSession.organizationId,
-      targetKey: "device_auth_refresh_target",
-      displayName: "Device auth refresh",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
-        auth_mode: "chatgpt",
-        chatgpt_account_id: "acct_123",
-      },
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedExpiredAccessToken = encryptCredentialUtf8({
-        plaintext: "expired-access-token",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-      const encryptedRefreshToken = encryptCredentialUtf8({
-        plaintext: "valid-refresh-token",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values([
-        {
-          id: "icr_device_auth_access_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-          ciphertext: encryptedExpiredAccessToken.ciphertext,
-          nonce: encryptedExpiredAccessToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2000-01-01T00:00:00.000Z",
+  it("rejects credential resolution without the internal service token", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
         },
-        {
-          id: "icr_device_auth_refresh_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-          ciphertext: encryptedRefreshToken.ciphertext,
-          nonce: encryptedRefreshToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2030-01-01T00:00:00.000Z",
-        },
-      ]);
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values([
-      {
-        connectionId: "icn_device_auth_refresh",
-        credentialId: "icr_device_auth_access_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
-      },
-      {
-        connectionId: "icn_device_auth_refresh",
-        credentialId: "icr_device_auth_refresh_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
-      },
-    ]);
-
-    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
-      refreshAccessToken: async (input) => {
-        expect(input.refreshToken).toBe("valid-refresh-token");
-        return {
-          accessToken: "rotated-access-token",
-          accessTokenExpiresAt: "2030-01-02T00:00:00.000Z",
-          refreshToken: "rotated-refresh-token",
-          refreshTokenExpiresAt: "2030-01-03T00:00:00.000Z",
-          credentialMetadata: {
-            provider: "openai",
-          },
-        };
-      },
-    });
-
-    const resolvedCredential = await resolveIntegrationCredential(
-      {
-        db: fixture.db,
-        integrationRegistry,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        connectionId: "icn_device_auth_refresh",
-        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
+        body: JSON.stringify({
+          connectionId: "icn_missing",
+          secretType: IntegrationCredentialSecretKinds.API_KEY,
+        }),
       },
     );
 
-    expect(resolvedCredential).toEqual({
-      kind: "value",
-      value: "rotated-access-token",
-      expiresAt: "2030-01-02T00:00:00.000Z",
-    });
-
-    const activeConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_device_auth_refresh"),
-    });
-    expect(activeConnection?.status).toBe(IntegrationConnectionStatuses.ACTIVE);
-
-    const accessCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.connectionId, "icn_device_auth_refresh"),
-          eq(table.slotKey, DeviceAuthorizationRefreshSlotKeys.accessToken),
-        ),
-    });
-    const refreshCredentialLink = await fixture.db.query.integrationConnectionCredentials.findFirst(
-      {
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.connectionId, "icn_device_auth_refresh"),
-            eq(table.slotKey, DeviceAuthorizationRefreshSlotKeys.refreshToken),
-          ),
-      },
-    );
-
-    if (accessCredentialLink === undefined || refreshCredentialLink === undefined) {
-      throw new Error("Expected refreshed credential links.");
-    }
-
-    expect(accessCredentialLink.credentialId).not.toBe("icr_device_auth_access_old");
-    expect(refreshCredentialLink.credentialId).not.toBe("icr_device_auth_refresh_old");
-
-    const activeAccessCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, accessCredentialLink.credentialId),
-    });
-    const activeRefreshCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, refreshCredentialLink.credentialId),
-    });
-    const revokedAccessCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, "icr_device_auth_access_old"),
-    });
-    const revokedRefreshCredential = await fixture.db.query.integrationCredentials.findFirst({
-      where: (table, { eq }) => eq(table.id, "icr_device_auth_refresh_old"),
-    });
-
-    if (activeAccessCredential === undefined || activeRefreshCredential === undefined) {
-      throw new Error("Expected active refreshed credentials.");
-    }
-
-    expect(revokedAccessCredential?.revokedAt).not.toBeNull();
-    expect(revokedRefreshCredential?.revokedAt).not.toBeNull();
-    expect(activeAccessCredential.secretKind).toBe(
-      IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-    );
-    expect(activeRefreshCredential.secretKind).toBe(
-      IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-    );
-
-    expect(
-      decryptStoredCredential({
-        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
-        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-        nonce: activeAccessCredential.nonce,
-        ciphertext: activeAccessCredential.ciphertext,
-      }),
-    ).toBe("rotated-access-token");
-    expect(
-      decryptStoredCredential({
-        wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
-        masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-        nonce: activeRefreshCredential.nonce,
-        ciphertext: activeRefreshCredential.ciphertext,
-      }),
-    ).toBe("rotated-refresh-token");
-  });
-
-  it("forwards an optional OAuth 2.0 client secret during managed refresh", async ({ fixture }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "device_auth_refresh_client_secret_target",
-      familyId: DeviceAuthorizationRefreshFamilyId,
-      variantId: DeviceAuthorizationRefreshVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_device_auth_refresh_client_secret",
-      organizationId: authSession.organizationId,
-      targetKey: "device_auth_refresh_client_secret_target",
-      displayName: "Device auth refresh client secret",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
-        auth_mode: "chatgpt",
-        chatgpt_account_id: "acct_789",
-      },
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedExpiredAccessToken = encryptCredentialUtf8({
-        plaintext: "expired-access-token-client-secret",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-      const encryptedRefreshToken = encryptCredentialUtf8({
-        plaintext: "valid-refresh-token-client-secret",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-      const encryptedClientSecret = encryptCredentialUtf8({
-        plaintext: "oauth-client-secret-value",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values([
-        {
-          id: "icr_device_auth_access_client_secret_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-          ciphertext: encryptedExpiredAccessToken.ciphertext,
-          nonce: encryptedExpiredAccessToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2000-01-01T00:00:00.000Z",
-        },
-        {
-          id: "icr_device_auth_refresh_client_secret_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-          ciphertext: encryptedRefreshToken.ciphertext,
-          nonce: encryptedRefreshToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2030-01-01T00:00:00.000Z",
-        },
-        {
-          id: "icr_device_auth_client_secret_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-          ciphertext: encryptedClientSecret.ciphertext,
-          nonce: encryptedClientSecret.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-        },
-      ]);
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values([
-      {
-        connectionId: "icn_device_auth_refresh_client_secret",
-        credentialId: "icr_device_auth_access_client_secret_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
-      },
-      {
-        connectionId: "icn_device_auth_refresh_client_secret",
-        credentialId: "icr_device_auth_refresh_client_secret_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
-      },
-      {
-        connectionId: "icn_device_auth_refresh_client_secret",
-        credentialId: "icr_device_auth_client_secret_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.clientSecret,
-      },
-    ]);
-
-    let observedClientSecret: string | undefined;
-    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
-      refreshAccessToken: async (input) => {
-        observedClientSecret = input.clientSecret;
-        expect(input.refreshToken).toBe("valid-refresh-token-client-secret");
-
-        return {
-          accessToken: "rotated-access-token-client-secret",
-          accessTokenExpiresAt: "2030-01-04T00:00:00.000Z",
-        };
-      },
-    });
-
-    const resolvedCredential = await resolveIntegrationCredential(
-      {
-        db: fixture.db,
-        integrationRegistry,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        connectionId: "icn_device_auth_refresh_client_secret",
-        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
-      },
-    );
-
-    expect(resolvedCredential).toEqual({
-      kind: "value",
-      value: "rotated-access-token-client-secret",
-      expiresAt: "2030-01-04T00:00:00.000Z",
-    });
-    expect(observedClientSecret).toBe("oauth-client-secret-value");
-  });
-
-  it("marks the connection errored when device-authorization refresh fails permanently", async ({
-    fixture,
-  }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "device_auth_refresh_failure_target",
-      familyId: DeviceAuthorizationRefreshFamilyId,
-      variantId: DeviceAuthorizationRefreshVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_device_auth_refresh_failure",
-      organizationId: authSession.organizationId,
-      targetKey: "device_auth_refresh_failure_target",
-      displayName: "Device auth refresh failure",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: DeviceAuthorizationRefreshConnectionMethodId,
-        auth_mode: "chatgpt",
-        chatgpt_account_id: "acct_456",
-      },
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedExpiredAccessToken = encryptCredentialUtf8({
-        plaintext: "expired-access-token",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-      const encryptedRefreshToken = encryptCredentialUtf8({
-        plaintext: "revoked-refresh-token",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values([
-        {
-          id: "icr_device_auth_access_failure_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-          ciphertext: encryptedExpiredAccessToken.ciphertext,
-          nonce: encryptedExpiredAccessToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2000-01-01T00:00:00.000Z",
-        },
-        {
-          id: "icr_device_auth_refresh_failure_old",
-          organizationId: authSession.organizationId,
-          secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
-          ciphertext: encryptedRefreshToken.ciphertext,
-          nonce: encryptedRefreshToken.nonce,
-          organizationCredentialKeyVersion: organizationCredentialKey.version,
-          intendedFamilyId: DeviceAuthorizationRefreshFamilyId,
-          expiresAt: "2030-01-01T00:00:00.000Z",
-        },
-      ]);
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values([
-      {
-        connectionId: "icn_device_auth_refresh_failure",
-        credentialId: "icr_device_auth_access_failure_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
-      },
-      {
-        connectionId: "icn_device_auth_refresh_failure",
-        credentialId: "icr_device_auth_refresh_failure_old",
-        slotKey: DeviceAuthorizationRefreshSlotKeys.refreshToken,
-      },
-    ]);
-
-    const integrationRegistry = createDeviceAuthorizationRefreshRegistry({
-      refreshAccessToken: async () => {
-        throw new IntegrationOAuth2AuthorizationCodeRefreshAccessTokenError({
-          message: "refresh token expired",
-          classification:
-            IntegrationOAuth2AuthorizationCodeRefreshAccessTokenErrorClassifications.PERMANENT,
-          code: "refresh_token_expired",
-        });
-      },
-    });
-
-    await expect(
-      resolveIntegrationCredential(
-        {
-          db: fixture.db,
-          integrationRegistry,
-          integrationsConfig: fixture.config.integrations,
-        },
-        {
-          connectionId: "icn_device_auth_refresh_failure",
-          secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-          slotKey: DeviceAuthorizationRefreshSlotKeys.accessToken,
-        },
-      ),
-    ).rejects.toMatchObject({
-      code: InternalIntegrationCredentialsErrorCodes.OAUTH2_REFRESH_FAILED,
-      status: 400,
-      message: "refresh token expired",
-    });
-
-    const erroredConnection = await fixture.db.query.integrationConnections.findFirst({
-      where: (table, { eq }) => eq(table.id, "icn_device_auth_refresh_failure"),
-    });
-    expect(erroredConnection?.status).toBe(IntegrationConnectionStatuses.ERROR);
-  });
-
-  it("mints and reuses OAuth2 client-credentials access tokens", async ({ fixture }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "oauth2_client_credentials_target",
-      familyId: "oauth2",
-      variantId: "client-credentials-test",
-      enabled: true,
-      config: {},
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_oauth2_client_credentials",
-      organizationId: authSession.organizationId,
-      targetKey: "oauth2_client_credentials_target",
-      displayName: "OAuth2 client credentials connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: ClientCredentialsConnectionMethodId,
-      },
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial,
-    });
-
-    try {
-      const encryptedClientSecret = encryptCredentialUtf8({
-        plaintext: "client-secret-value",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values({
-        id: "icr_oauth2_client_secret",
-        organizationId: authSession.organizationId,
-        secretKind: IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-        ciphertext: encryptedClientSecret.ciphertext,
-        nonce: encryptedClientSecret.nonce,
-        organizationCredentialKeyVersion: organizationCredentialKey.version,
-        intendedFamilyId: "oauth2",
-      });
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values({
-      connectionId: "icn_oauth2_client_credentials",
-      credentialId: "icr_oauth2_client_secret",
-      slotKey: ClientCredentialsClientSecretSlotKey,
-    });
-
-    const integrationRegistry = createClientCredentialsRegistry();
-
-    const firstResolution = await resolveIntegrationCredential(
-      {
-        db: fixture.db,
-        integrationRegistry,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        connectionId: "icn_oauth2_client_credentials",
-        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        slotKey: ClientCredentialsAccessTokenSlotKey,
-      },
-    );
-
-    expect(firstResolution).toEqual({
-      kind: "value",
-      value: "access-token-for:client-secret-value",
-      expiresAt: "2030-01-01T00:00:00.000Z",
-    });
-
-    const accessCredentialsAfterFirstResolution =
-      await fixture.db.query.integrationCredentials.findMany({
-        columns: {
-          id: true,
-          secretKind: true,
-          revokedAt: true,
-        },
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, authSession.organizationId),
-            eq(table.secretKind, IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN),
-          ),
-      });
-
-    expect(accessCredentialsAfterFirstResolution).toHaveLength(1);
-    const firstAccessCredential = accessCredentialsAfterFirstResolution[0];
-    if (firstAccessCredential === undefined) {
-      throw new Error("Expected one stored access token credential.");
-    }
-    expect(firstAccessCredential.secretKind).toBe(
-      IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-    );
-    expect(firstAccessCredential.revokedAt).toBeNull();
-
-    const secondResolution = await resolveIntegrationCredential(
-      {
-        db: fixture.db,
-        integrationRegistry,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        connectionId: "icn_oauth2_client_credentials",
-        secretType: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
-        slotKey: ClientCredentialsAccessTokenSlotKey,
-      },
-    );
-
-    expect(secondResolution).toEqual(firstResolution);
-
-    const accessCredentialsAfterSecondResolution =
-      await fixture.db.query.integrationCredentials.findMany({
-        columns: {
-          id: true,
-        },
-        where: (table, { and, eq, isNull }) =>
-          and(
-            eq(table.organizationId, authSession.organizationId),
-            eq(table.secretKind, IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN),
-            isNull(table.revokedAt),
-          ),
-      });
-
-    expect(accessCredentialsAfterSecondResolution).toHaveLength(1);
-
-    const linkedAccessCredential =
-      await fixture.db.query.integrationConnectionCredentials.findFirst({
-        columns: {
-          credentialId: true,
-        },
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.connectionId, "icn_oauth2_client_credentials"),
-            eq(table.slotKey, ClientCredentialsAccessTokenSlotKey),
-          ),
-      });
-
-    const activeAccessCredential = accessCredentialsAfterSecondResolution[0];
-    if (activeAccessCredential === undefined) {
-      throw new Error("Expected one active access token credential.");
-    }
-    expect(linkedAccessCredential).toEqual({
-      credentialId: activeAccessCredential.id,
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "Internal service authentication failed.",
     });
   });
 
-  it("rejects requests with invalid internal service token", async ({ fixture }) => {
-    const response = await fixture.request(
+  it("rejects credential resolution with an invalid internal service token", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch(
       `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
       {
         method: "POST",
@@ -1363,7 +267,7 @@ describe("internal integration credentials resolve", () => {
         },
         body: JSON.stringify({
           connectionId: "icn_missing",
-          secretType: "api_key",
+          secretType: IntegrationCredentialSecretKinds.API_KEY,
         }),
       },
     );
@@ -1375,45 +279,28 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
-  it("rejects requests without internal service token", async ({ fixture }) => {
-    const response = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({
-          connectionId: "icn_missing",
-          secretType: "api_key",
-        }),
-      },
-    );
+  it("resolves encrypted integration target secrets for trusted callers", async ({ env }) => {
+    const masterEncryptionKeyMaterial = IntegrationIntegrationsConfig.masterEncryptionKeys[1];
+    if (masterEncryptionKeyMaterial === undefined) {
+      throw new Error("Expected integration master encryption key material.");
+    }
 
-    expect(response.status).toBe(401);
-    await expect(response.json()).resolves.toEqual({
-      code: "UNAUTHORIZED",
-      message: "Internal service authentication failed.",
-    });
-  });
-
-  it("resolves encrypted integration target secrets", async ({ fixture }) => {
     const encryptedSecrets = encryptIntegrationTargetSecrets({
       secrets: {
         webhook_secret: "super-secret",
         app_private_key: "private-key",
       },
       masterKeyVersion: 1,
-      masterEncryptionKeyMaterial: "integration-master-key-testing",
+      masterEncryptionKeyMaterial,
     });
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve-target-secrets`,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: InternalServiceToken,
         },
         body: JSON.stringify({
           targets: [
@@ -1427,7 +314,7 @@ describe("internal integration credentials resolve", () => {
     );
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    expect(ResolveIntegrationTargetSecretsResponseSchema.parse(await response.json())).toEqual({
       targets: [
         {
           targetKey: "github-cloud",
@@ -1440,14 +327,14 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
-  it("rejects malformed encrypted integration target secrets", async ({ fixture }) => {
-    const response = await fixture.request(
+  it("rejects malformed encrypted integration target secrets", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch(
       `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve-target-secrets`,
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: InternalServiceToken,
         },
         body: JSON.stringify({
           targets: [
@@ -1471,19 +358,43 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
-  it("rejects custom credential resolution when binding belongs to a different connection", async ({
-    fixture,
+  it("rejects custom credential resolution when the binding belongs to another connection", async ({
+    env,
   }) => {
-    const githubFixture = await insertGitHubBindingFixture({
-      fixture,
-      targetKey: "github-cloud-binding-aware-mismatch",
-      bindingId: "ibd_github_binding_aware_mismatch",
+    const session = await env.auth.createSession({
+      email: "integration-internal-credential-binding-mismatch@example.com",
     });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_github_other_connection",
-      organizationId: githubFixture.organizationId,
-      targetKey: "github-cloud-binding-aware-mismatch",
+    await seedGitHubTarget(env, "github-cloud-internal-credential-binding-mismatch");
+    const githubConnection = await createGitHubConnection({
+      env,
+      cookie: session.cookie,
+      targetKey: "github-cloud-internal-credential-binding-mismatch",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
+      id: "sbp_internal_credential_binding_mismatch",
+      organizationId: session.organizationId,
+      displayName: "Binding mismatch profile",
+    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_internal_credential_binding_mismatch",
+      version: 1,
+    });
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values({
+        id: "ibd_internal_credential_binding_mismatch",
+        sandboxProfileId: "sbp_internal_credential_binding_mismatch",
+        sandboxProfileVersion: 1,
+        connectionId: githubConnection.id,
+        kind: IntegrationBindingKinds.GIT,
+        config: {
+          repositories: ["mistlehq/mistle"],
+        },
+      });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_internal_credential_other_github_connection",
+      organizationId: session.organizationId,
+      targetKey: "github-cloud-internal-credential-binding-mismatch",
       displayName: "Other GitHub connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
@@ -1494,172 +405,153 @@ describe("internal integration credentials resolve", () => {
       },
     });
 
-    const response = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          connectionId: "icn_github_other_connection",
-          bindingId: githubFixture.bindingId,
-          secretType: "github_app_installation_token",
-          resolverKey: "github_app_installation_token",
-        }),
-      },
-    );
+    const response = await resolveCredential(env, {
+      connectionId: "icn_internal_credential_other_github_connection",
+      bindingId: "ibd_internal_credential_binding_mismatch",
+      secretType: "github_app_installation_token",
+      resolverKey: "github_app_installation_token",
+    });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
       code: "BINDING_CONNECTION_MISMATCH",
       message:
-        "Integration binding 'ibd_github_binding_aware_mismatch' does not belong to connection 'icn_github_other_connection'.",
-    });
-  });
-
-  it("hydrates form secrets for custom resolvers and returns aws session credentials", async ({
-    fixture,
-  }) => {
-    const authSession = await fixture.authSession();
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "aws_cli_default",
-      familyId: "aws",
-      variantId: "aws-cli-default",
-      enabled: true,
-      config: {},
-    });
-
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_aws_assume_role",
-      organizationId: authSession.organizationId,
-      targetKey: "aws_cli_default",
-      displayName: "AWS assume-role connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.AWS_ASSUME_ROLE,
-        accessKeyId: "AKIAEXAMPLE",
-        roleArn: "arn:aws:iam::123456789012:role/mistle-dev",
-      },
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_aws_assume_role",
-      organizationId: authSession.organizationId,
-      displayName: "AWS assume-role profile",
-    });
-
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_aws_assume_role",
-      version: 1,
-    });
-
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_aws_assume_role",
-      sandboxProfileId: "sbp_aws_assume_role",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_aws_assume_role",
-      kind: IntegrationBindingKinds.CONNECTOR,
-      config: {
-        defaultRegion: "us-east-1",
-      },
-    });
-
-    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
-      orderBy: (table, { desc }) => [desc(table.version)],
-    });
-
-    if (organizationCredentialKey === undefined) {
-      throw new Error("Expected organization credential key.");
-    }
-
-    const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
-      wrappedCiphertext: organizationCredentialKey.ciphertext,
-      masterEncryptionKeyMaterial: masterKeyMaterial,
-    });
-
-    try {
-      const encryptedSecretAccessKey = encryptCredentialUtf8({
-        plaintext: "aws-secret-access-key-value",
-        organizationCredentialKey: unwrappedOrganizationCredentialKey,
-      });
-
-      await fixture.db.insert(integrationCredentials).values({
-        id: "icr_aws_secret_access_key_session",
-        organizationId: authSession.organizationId,
-        secretKind: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
-        ciphertext: encryptedSecretAccessKey.ciphertext,
-        nonce: encryptedSecretAccessKey.nonce,
-        organizationCredentialKeyVersion: organizationCredentialKey.version,
-        intendedFamilyId: "aws",
-      });
-    } finally {
-      unwrappedOrganizationCredentialKey.fill(0);
-    }
-
-    await fixture.db.insert(integrationConnectionCredentials).values({
-      connectionId: "icn_aws_assume_role",
-      credentialId: "icr_aws_secret_access_key_session",
-      slotKey: AwsAssumeRoleSecretSlotKey,
-    });
-
-    const integrationRegistry = createAwsSessionRegistry();
-
-    const resolvedCredential = await resolveIntegrationCredential(
-      {
-        db: fixture.db,
-        integrationRegistry,
-        integrationsConfig: fixture.config.integrations,
-      },
-      {
-        connectionId: "icn_aws_assume_role",
-        bindingId: "ibd_aws_assume_role",
-        secretType: IntegrationCredentialSecretKinds.AWS_SECRET_ACCESS_KEY,
-        slotKey: AwsAssumeRoleSecretSlotKey,
-        resolverKey: AwsAssumeRoleResolverKey,
-      },
-    );
-
-    expect(resolvedCredential).toEqual({
-      kind: "aws_session",
-      accessKeyId: "AKIAEXAMPLE",
-      secretAccessKey: "aws-secret-access-key-value",
-      sessionToken: "session-token-for:us-east-1",
-      expiresAt: "2030-01-01T00:00:00.000Z",
+        "Integration binding 'ibd_internal_credential_binding_mismatch' does not belong to connection 'icn_internal_credential_other_github_connection'.",
     });
   });
 });
 
-function decryptStoredCredential(input: {
-  wrappedOrganizationKeyCiphertext: string;
-  masterKeyVersion: number;
-  masterEncryptionKeys: Record<string, string>;
-  nonce: string;
-  ciphertext: string;
-}): string {
+async function resolveCredential(
+  env: IntegrationTestEnvironment,
+  body: z.input<typeof ResolveIntegrationCredentialRequestSchema>,
+) {
+  return env.controlPlaneApi.http.fetch(
+    `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: InternalServiceToken,
+      },
+      body: JSON.stringify(body),
+    },
+  );
+}
+
+async function insertEncryptedCredential(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  id: string;
+  secretKind: IntegrationCredentialSecretKind;
+  plaintext: string;
+  intendedFamilyId: string;
+  connectionId: string;
+  slotKey: string;
+  expiresAt?: string;
+}): Promise<void> {
+  const organizationCredentialKey =
+    await input.env.controlPlaneDb.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+  if (organizationCredentialKey === undefined) {
+    throw new Error("Expected organization credential key.");
+  }
+
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: input.masterKeyVersion,
-    masterEncryptionKeys: input.masterEncryptionKeys,
+    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+    masterEncryptionKeys: IntegrationIntegrationsConfig.masterEncryptionKeys,
   });
-  const organizationCredentialKey = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: input.wrappedOrganizationKeyCiphertext,
+  const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+    wrappedCiphertext: organizationCredentialKey.ciphertext,
     masterEncryptionKeyMaterial,
   });
 
   try {
-    return decryptCredentialUtf8({
-      nonce: input.nonce,
-      ciphertext: input.ciphertext,
-      organizationCredentialKey,
+    const encryptedCredential = encryptCredentialUtf8({
+      plaintext: input.plaintext,
+      organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
+
+    await input.env.controlPlaneDb
+      .insert(input.env.controlPlaneTables.integrationCredentials)
+      .values({
+        id: input.id,
+        organizationId: input.organizationId,
+        secretKind: input.secretKind,
+        ciphertext: encryptedCredential.ciphertext,
+        nonce: encryptedCredential.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: input.intendedFamilyId,
+        expiresAt: input.expiresAt,
+      });
   } finally {
-    organizationCredentialKey.fill(0);
+    unwrappedOrganizationCredentialKey.fill(0);
   }
+
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnectionCredentials)
+    .values({
+      connectionId: input.connectionId,
+      credentialId: input.id,
+      slotKey: input.slotKey,
+    });
+}
+
+async function seedGitHubTarget(env: IntegrationTestEnvironment, targetKey: string): Promise<void> {
+  await seedIntegrationTarget(env, {
+    targetKey,
+    familyId: "github",
+    variantId: "github-cloud",
+    config: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
+  });
+}
+
+async function createGitHubConnection(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  targetKey: string;
+}): Promise<{ id: string }> {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: {
+      type: "pkcs8",
+      format: "pem",
+    },
+    publicKeyEncoding: {
+      type: "spki",
+      format: "pem",
+    },
+  });
+
+  const response = await createFormConnection({
+    env: input.env,
+    targetKey: input.targetKey,
+    cookie: input.cookie,
+    body: {
+      displayName: "GitHub binding-aware connection",
+      methodId: "github-app-installation",
+      config: {
+        connection_method: "github-app-installation",
+        app_id: "123",
+        app_slug: "mistle-github-app",
+        client_id: "Iv1.client123",
+        installation_id: "12345",
+      },
+      secrets: {
+        appPrivateKeyPem: privateKey,
+        clientSecret: "github-client-secret",
+        webhookSecret: "github-webhook-secret",
+      },
+    },
+  });
+
+  expect(response.status).toBe(201);
+  const connection = CreatedFormIntegrationConnectionSchema.parse(await response.json());
+  return {
+    id: connection.id,
+  };
 }

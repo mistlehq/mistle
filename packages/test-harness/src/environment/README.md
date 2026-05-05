@@ -6,19 +6,19 @@ pooling, clients, logical isolation, and cleanup so application developers can
 write behavior-focused tests without juggling containers, ports, databases, or
 service lifecycle details.
 
-This document is the practical guide for writing tests in the temporary
-`integration-new/` lane. Harness implementation details are covered near the end
-for contributors who are adding service support.
+This document is the practical guide for writing harness-backed app integration
+tests. Harness implementation details are covered near the end for contributors
+who are adding service support.
 
 ## Mental Model
 
-An `integration-new` test has one primary subject: the app, service, worker, or
+An `integration` test has one primary subject: the app, service, worker, or
 production entrypoint whose behavior is being verified. The test may compose any
 other real Mistle services required to exercise that behavior.
 
 The harness layers are:
 
-1. The root runner (`pnpm test:integration:new`) creates one run session and
+1. The root runner (`pnpm test:integration`) creates one run session and
    prewarms shared physical infrastructure when possible.
 2. `createIntegrationTest(...)` declares the services and optional extra
    infrastructure needed by a test file.
@@ -131,7 +131,7 @@ expect(await handle.result({ timeoutMs: 15_000 })).toEqual({
 });
 ```
 
-`integration-new` is not limited to HTTP tests. It is the lane for
+`integration` is not limited to HTTP tests. It is the lane for
 dependency-bearing app/service behavior, whether the entrypoint is HTTP, a
 worker workflow, a production service/module function, or another real code
 path.
@@ -159,9 +159,15 @@ Common `env` properties include:
   handles.
 - `env.controlPlaneTables`, `env.dataPlaneTables`: schema-bound Drizzle tables
   for inserts, updates, deletes, joins, and predicates.
+- `env.dataPlaneGatewayRuntimeState`: the data-plane gateway runtime-state
+  Valkey URL and logical key prefix. Use this only for gateway runtime-state
+  store integration tests that exercise the production Valkey store classes
+  directly.
+- `env.controlPlaneWorkflow`: workflow client for control-plane worker behavior.
 - `env.dataPlaneWorkflow`: workflow client for data-plane worker behavior.
-- `env.mailpit`, `env.objectStore`: optional clients available only when the
-  matching `extraInfra` was requested and attached to a selected service.
+- `env.mailpit`, `env.objectStore`, `env.otlpCollector`: optional clients
+  available only when the matching `extraInfra` was requested and attached to a
+  selected service.
 
 ## Authentication
 
@@ -170,7 +176,7 @@ control-plane user and organization.
 
 ```ts
 const session = await env.auth.createSession({
-  email: "integration-new-example@example.com",
+  email: "integration-example@example.com",
   organizationName: "Integration Example",
 });
 
@@ -240,12 +246,15 @@ Supported extra infra ids are:
 
 - `mailpit`: email delivery assertions, such as auth OTP flows through the
   control-plane worker.
+- `otlp`: telemetry assertions through services that emit or forward OTLP
+  requests, such as data-plane gateway sandbox tunnel telemetry.
 - `seaweedfs`: object-store behavior, such as avatar or organization logo
   uploads through the control-plane API.
 
-`extraInfra` is environment-scoped and should be rare. The harness still pools
-the physical containers across the runner and gives each logical environment its
-own scoped wiring, such as a SeaweedFS bucket.
+`extraInfra` is environment-scoped and should be rare. When an extra dependency
+has a shareable physical backing resource, the harness pools it across the
+runner and gives each logical environment its own scoped wiring, such as a
+SeaweedFS bucket.
 
 Optional clients fail fast if the matching infrastructure was not requested.
 That is intentional; request `extraInfra` only when the scenario exercises that
@@ -320,7 +329,7 @@ Good integration tests should read like behavior:
 ```ts
 it("deletes an uploaded organization logo and removes the stored object", async ({ env }) => {
   const session = await env.auth.createSession({
-    email: "integration-new-logo-delete@example.com",
+    email: "integration-logo-delete@example.com",
   });
   const objectKey = await seedOrganizationLogo({ env, organizationId: session.organizationId });
 
@@ -343,7 +352,7 @@ verified.
 
 ## Reviewability Checklist
 
-An `integration-new` test should make the behavior under review obvious without
+An `integration` test should make the behavior under review obvious without
 requiring the reviewer to mentally execute harness setup.
 
 Use this checklist when writing or reviewing a test:
@@ -385,7 +394,7 @@ const it = createIntegrationTest({
 describe.concurrent("sandbox profiles create integration", () => {
   it("creates a sandbox profile in the authenticated user's organization", async ({ env }) => {
     const session = await env.auth.createSession({
-      email: "integration-new-profile-create@example.com",
+      email: "integration-profile-create@example.com",
       organizationName: "Profile Create Integration",
     });
 
@@ -449,17 +458,17 @@ state assertion.
 
 ## Files And Commands
 
-New and migrated integration tests live in `apps/*/integration-new/`.
+App integration tests live in `apps/*/integration/`.
 
-Each package with migrated tests should expose:
+Each app package with integration tests should expose:
 
-- `vitest.integration-new.config.ts`
-- `test:integration:new`
+- `vitest.integration.config.ts`
+- `test:integration`
 
-Run all currently migrated new-lane integration tests from the repo root:
+Run app and package integration tests from the repo root:
 
 ```bash
-pnpm test:integration:new
+pnpm test:integration
 ```
 
 The root command uses one integration runner session across all selected
@@ -468,46 +477,45 @@ projects, so pooled physical infrastructure and pooled services can be reused.
 Run one package through the same root runner:
 
 ```bash
-pnpm test:integration:new -- --project @mistle/data-plane-gateway
+pnpm test:integration -- --project @mistle/data-plane-gateway
 ```
 
 Run one file through the same root runner when pooling or timing behavior
 matters:
 
 ```bash
-pnpm test:integration:new -- --project @mistle/data-plane-gateway integration-new/gateway-restart.integration.test.ts
+pnpm test:integration -- --project @mistle/data-plane-gateway integration/gateway-restart.integration.test.ts
 ```
 
 Detailed setup timing is opt-in:
 
 ```bash
-MISTLE_TEST_TIMING=1 pnpm test:integration:new
+MISTLE_TEST_TIMING=1 pnpm test:integration
 ```
 
 For targeted single-file debugging, use direct package Vitest execution:
 
 ```bash
-pnpm --filter @mistle/data-plane-gateway exec vitest run -c vitest.integration-new.config.ts integration-new/gateway-restart.integration.test.ts
+pnpm --filter @mistle/data-plane-gateway exec vitest run -c vitest.integration.config.ts integration/gateway-restart.integration.test.ts
 ```
 
 Direct package Vitest execution is useful for tight local debugging, but it is
 not the canonical way to measure full-suite pooling or timing behavior.
 
-The old `apps/*/integration/` lane is legacy. Keep it working while migrating,
-but do not add new coverage there.
+## Migrating Legacy Patterns
 
-## Migrating Legacy Integration Tests
+Do not revive old per-file fixtures, bespoke Testcontainers setup, or direct
+in-process app runtimes. First identify the behavior being asserted, then choose
+the production entrypoint that best exercises that behavior.
 
-Do not blindly port legacy tests. First identify the behavior being asserted,
-then choose the production entrypoint that best exercises that behavior.
+When replacing old scaffolding:
 
-When migrating:
-
-- Preserve observable behavior, not old scaffolding.
+- Preserve observable behavior, not old setup mechanics.
 - Use `createIntegrationTest(...)`; do not copy legacy per-file containers,
   bespoke registries, or direct service bootstrapping.
 - Select only the services the scenario intentionally exercises.
-- Use `extraInfra` for optional dependencies such as `mailpit` or `seaweedfs`.
+- Use `extraInfra` for optional dependencies such as `mailpit`, `otlp`, or
+  `seaweedfs`.
 - Use `env.auth`, `env.*Db`, `env.*Tables`, service handles, and reusable
   clients instead of app-local setup wrappers.
 - Prefer `describe.concurrent(...)` and make data unique enough for concurrent
@@ -617,7 +625,7 @@ service definition.
 
 ## What Not To Do
 
-- Do not add new tests to the legacy `integration/` lane.
+- Do not reintroduce legacy per-file fixtures or bespoke app launchers.
 - Do not make app developers define registries, provisioners, or service
   launchers in ordinary test files.
 - Do not expose many fixture fields when one `env` object is enough.

@@ -12,7 +12,7 @@
     "lint": "oxlint --type-aware --deny-warnings .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
-    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
@@ -42,8 +42,6 @@
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.20.0",
-    "@types/ws": "^8.18.1",
-    "ws": "^8.20.0"
+    "@types/pg": "^8.20.0"
   }
 }

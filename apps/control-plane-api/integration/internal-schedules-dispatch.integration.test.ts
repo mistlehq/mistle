@@ -1,15 +1,22 @@
-import { organizations, schedules, ScheduleTargetTypes } from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { ScheduleTargetTypes } from "@mistle/db/control-plane";
+import { createControlPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
+import {
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
 import { ScheduleDispatchWorkflowName } from "@mistle/workflow-registry/control-plane";
-import { Pool } from "pg";
+import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal/index.js";
 import { InternalDispatchSchedulesResponseSchema } from "../src/internal/schedules/dispatch-schedules/index.js";
 import { INTERNAL_SCHEDULES_ROUTE_BASE_PATH } from "../src/internal/schedules/index.js";
-import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow.js";
-import { it } from "./test-context.js";
 
 type PersistedScheduleDispatchWorkflowRun = Readonly<{
   id: string;
@@ -18,81 +25,33 @@ type PersistedScheduleDispatchWorkflowRun = Readonly<{
   input: unknown;
 }>;
 
+const PersistedScheduleDispatchWorkflowRunRowSchema = z
+  .object({
+    id: z.string(),
+    workflow_name: z.string(),
+    idempotency_key: z.string().nullable(),
+    input: z.unknown(),
+  })
+  .strict();
+
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
 const ScheduleDispatchWorkflowInputSchema = z
   .object({
     cutoffMinute: z.string().min(1),
   })
   .strict();
 
-async function listScheduleDispatchWorkflowRuns(input: {
-  databaseUrl: string;
-  namespaceId: string;
-}): Promise<ReadonlyArray<PersistedScheduleDispatchWorkflowRun>> {
-  const pool = new Pool({
-    connectionString: input.databaseUrl,
-  });
-
-  try {
-    const result = await pool.query<{
-      id: string;
-      workflow_name: string;
-      idempotency_key: string | null;
-      input: unknown;
-    }>(
-      `
-        select
-          wr.id,
-          wr.workflow_name,
-          wr.idempotency_key,
-          wr.input
-        from ${ControlPlaneOpenWorkflowSchema}.workflow_runs wr
-        where wr.namespace_id = $1
-          and wr.workflow_name = $2
-        order by wr.created_at asc
-      `,
-      [input.namespaceId, ScheduleDispatchWorkflowName],
+describe("internal schedules dispatch integration", () => {
+  it("rejects requests without the internal service token", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch(
+      `${INTERNAL_SCHEDULES_ROUTE_BASE_PATH}/dispatch`,
+      {
+        method: "POST",
+      },
     );
-
-    return result.rows.map((row) => ({
-      id: row.id,
-      workflowName: row.workflow_name,
-      idempotencyKey: row.idempotency_key,
-      input: row.input,
-    }));
-  } finally {
-    await pool.end();
-  }
-}
-
-function expectScheduleDispatchWorkflowInput(input: unknown): { cutoffMinute: string } {
-  return ScheduleDispatchWorkflowInputSchema.parse(input);
-}
-
-async function waitForStableMinuteWindow(): Promise<void> {
-  while (new Date().getUTCSeconds() > 55) {
-    await systemSleeper.sleep(100);
-  }
-}
-
-async function requestScheduleDispatch(input: {
-  fixture: {
-    internalAuthServiceToken: string;
-    request: (path: string, init?: RequestInit) => Response | Promise<Response>;
-  };
-}): Promise<Response> {
-  return input.fixture.request(`${INTERNAL_SCHEDULES_ROUTE_BASE_PATH}/dispatch`, {
-    method: "POST",
-    headers: {
-      [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: input.fixture.internalAuthServiceToken,
-    },
-  });
-}
-
-describe("internal schedules dispatch", () => {
-  it("rejects requests without the internal service token", async ({ fixture }) => {
-    const response = await fixture.request(`${INTERNAL_SCHEDULES_ROUTE_BASE_PATH}/dispatch`, {
-      method: "POST",
-    });
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
@@ -102,9 +61,9 @@ describe("internal schedules dispatch", () => {
   });
 
   it("enqueues the top-level schedule dispatch workflow for authenticated callers", async ({
-    fixture,
+    env,
   }) => {
-    const response = await requestScheduleDispatch({ fixture });
+    const response = await requestScheduleDispatch(env);
 
     expect(response.status).toBe(202);
     const body = InternalDispatchSchedulesResponseSchema.parse(await response.json());
@@ -112,30 +71,26 @@ describe("internal schedules dispatch", () => {
     expect(body.idempotencyKey).toBe(`schedule-dispatch:${body.cutoffMinute}`);
     expect(body.cutoffMinute).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$/u);
 
-    const workflowRuns = await listScheduleDispatchWorkflowRuns({
-      databaseUrl: fixture.databaseStack.directUrl,
-      namespaceId: fixture.config.workflow.namespaceId,
+    const workflowRuns = await listScheduleDispatchWorkflowRuns(env, {
+      idempotencyKey: body.idempotencyKey,
     });
     expect(workflowRuns).toHaveLength(1);
-    const workflowRun = workflowRuns[0];
-    if (workflowRun === undefined) {
-      throw new Error("Expected schedule dispatch workflow run.");
-    }
+    const workflowRun = readOnlyWorkflowRun(workflowRuns);
 
     expect(workflowRun.workflowName).toBe(ScheduleDispatchWorkflowName);
     expect(workflowRun.idempotencyKey).toBe(body.idempotencyKey);
-    expect(expectScheduleDispatchWorkflowInput(workflowRun.input)).toEqual({
+    expect(ScheduleDispatchWorkflowInputSchema.parse(workflowRun.input)).toEqual({
       cutoffMinute: body.cutoffMinute,
     });
   });
 
   it("uses the same workflow idempotency key for duplicate calls in the same minute", async ({
-    fixture,
+    env,
   }) => {
     await waitForStableMinuteWindow();
 
-    const firstResponse = await requestScheduleDispatch({ fixture });
-    const secondResponse = await requestScheduleDispatch({ fixture });
+    const firstResponse = await requestScheduleDispatch(env);
+    const secondResponse = await requestScheduleDispatch(env);
 
     expect(firstResponse.status).toBe(202);
     expect(secondResponse.status).toBe(202);
@@ -145,24 +100,20 @@ describe("internal schedules dispatch", () => {
     expect(secondBody.cutoffMinute).toBe(firstBody.cutoffMinute);
     expect(secondBody.idempotencyKey).toBe(firstBody.idempotencyKey);
 
-    const workflowRuns = await listScheduleDispatchWorkflowRuns({
-      databaseUrl: fixture.databaseStack.directUrl,
-      namespaceId: fixture.config.workflow.namespaceId,
-    });
-    expect(workflowRuns).toHaveLength(1);
-    const workflowRun = workflowRuns[0];
-    if (workflowRun === undefined) {
-      throw new Error("Expected schedule dispatch workflow run.");
-    }
+    const workflowRun = readOnlyWorkflowRun(
+      await listScheduleDispatchWorkflowRuns(env, {
+        idempotencyKey: firstBody.idempotencyKey,
+      }),
+    );
     expect(workflowRun.idempotencyKey).toBe(firstBody.idempotencyKey);
   });
 
-  it("deduplicates concurrent dispatch requests for the same minute", async ({ fixture }) => {
+  it("deduplicates concurrent dispatch requests for the same minute", async ({ env }) => {
     await waitForStableMinuteWindow();
 
     const [firstResponse, secondResponse] = await Promise.all([
-      requestScheduleDispatch({ fixture }),
-      requestScheduleDispatch({ fixture }),
+      requestScheduleDispatch(env),
+      requestScheduleDispatch(env),
     ]);
 
     expect(firstResponse.status).toBe(202);
@@ -173,27 +124,23 @@ describe("internal schedules dispatch", () => {
     expect(secondBody.cutoffMinute).toBe(firstBody.cutoffMinute);
     expect(secondBody.idempotencyKey).toBe(firstBody.idempotencyKey);
 
-    const workflowRuns = await listScheduleDispatchWorkflowRuns({
-      databaseUrl: fixture.databaseStack.directUrl,
-      namespaceId: fixture.config.workflow.namespaceId,
-    });
-    expect(workflowRuns).toHaveLength(1);
-    const workflowRun = workflowRuns[0];
-    if (workflowRun === undefined) {
-      throw new Error("Expected schedule dispatch workflow run.");
-    }
+    const workflowRun = readOnlyWorkflowRun(
+      await listScheduleDispatchWorkflowRuns(env, {
+        idempotencyKey: firstBody.idempotencyKey,
+      }),
+    );
     expect(workflowRun.idempotencyKey).toBe(firstBody.idempotencyKey);
   });
 
   it("does not mutate schedules or create scheduled actions in the HTTP request", async ({
-    fixture,
+    env,
   }) => {
-    await fixture.db.insert(organizations).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.organizations).values({
       id: "org_internal_schedules_dispatch_no_inline",
       name: "Internal Schedules Dispatch No Inline",
       slug: "internal-schedules-dispatch-no-inline",
     });
-    await fixture.db.insert(schedules).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.schedules).values({
       id: "sch_internal_schedules_dispatch_no_inline",
       organizationId: "org_internal_schedules_dispatch_no_inline",
       targetType: ScheduleTargetTypes.SNAPSHOT_REFRESH,
@@ -203,21 +150,82 @@ describe("internal schedules dispatch", () => {
       nextScheduledAt: "2026-04-28T10:15:00.000Z",
     });
 
-    const beforeSchedule = await fixture.db.query.schedules.findFirst({
+    const beforeSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, "sch_internal_schedules_dispatch_no_inline"),
     });
 
-    const response = await requestScheduleDispatch({ fixture });
+    const response = await requestScheduleDispatch(env);
     expect(response.status).toBe(202);
 
-    const afterSchedule = await fixture.db.query.schedules.findFirst({
+    const afterSchedule = await env.controlPlaneDb.query.schedules.findFirst({
       where: (table, { eq }) => eq(table.id, "sch_internal_schedules_dispatch_no_inline"),
     });
     expect(afterSchedule).toEqual(beforeSchedule);
 
-    const persistedActions = await fixture.db.query.scheduledActions.findMany({
+    const persistedActions = await env.controlPlaneDb.query.scheduledActions.findMany({
       where: (table, { eq }) => eq(table.scheduleId, "sch_internal_schedules_dispatch_no_inline"),
     });
     expect(persistedActions).toHaveLength(0);
   });
 });
+
+async function requestScheduleDispatch(env: IntegrationTestEnvironment) {
+  return await env.controlPlaneApi.http.fetch(`${INTERNAL_SCHEDULES_ROUTE_BASE_PATH}/dispatch`, {
+    method: "POST",
+    headers: {
+      [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: "integration-new-internal-service-token",
+    },
+  });
+}
+
+async function listScheduleDispatchWorkflowRuns(
+  env: IntegrationTestEnvironment,
+  input: { idempotencyKey: string },
+): Promise<ReadonlyArray<PersistedScheduleDispatchWorkflowRun>> {
+  const namespaceId = createControlPlaneWorkflowNamespaceId(env.id);
+  const result = await env.controlPlaneDb.execute(sql<{
+    id: string;
+    workflow_name: string;
+    idempotency_key: string | null;
+    input: unknown;
+  }>`
+    select
+      wr.id,
+      wr.workflow_name,
+      wr.idempotency_key,
+      wr.input
+    from control_plane_openworkflow.workflow_runs wr
+    where wr.namespace_id = ${namespaceId}
+      and wr.workflow_name = ${ScheduleDispatchWorkflowName}
+      and wr.idempotency_key = ${input.idempotencyKey}
+    order by wr.created_at asc
+  `);
+
+  return result.rows.map((row) => {
+    const parsed = PersistedScheduleDispatchWorkflowRunRowSchema.parse(row);
+    return {
+      id: parsed.id,
+      workflowName: parsed.workflow_name,
+      idempotencyKey: parsed.idempotency_key,
+      input: parsed.input,
+    };
+  });
+}
+
+function readOnlyWorkflowRun(
+  workflowRuns: ReadonlyArray<PersistedScheduleDispatchWorkflowRun>,
+): PersistedScheduleDispatchWorkflowRun {
+  expect(workflowRuns).toHaveLength(1);
+  const workflowRun = workflowRuns[0];
+  if (workflowRun === undefined) {
+    throw new Error("Expected schedule dispatch workflow run.");
+  }
+
+  return workflowRun;
+}
+
+async function waitForStableMinuteWindow(): Promise<void> {
+  while (new Date().getUTCSeconds() > 55) {
+    await systemSleeper.sleep(100);
+  }
+}

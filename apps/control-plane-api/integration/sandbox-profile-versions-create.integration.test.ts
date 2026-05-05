@@ -1,13 +1,13 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  integrationConnections,
-  integrationTargets,
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -16,69 +16,70 @@ import {
   CreateSandboxProfileVersionResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import {
-  createIntegrationConnectionFixture,
-  createIntegrationTargetFixture,
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-  createSandboxProfileVersionIntegrationBindingFixture,
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
 } from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
 
-describe("sandbox profile versions create integration", () => {
-  it("creates the next draft version by cloning the latest version content", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-create@example.com",
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile versions create integration", () => {
+  it("creates the next draft version by cloning the latest version content", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values([
-      createIntegrationTargetFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
+      integrationTargetRow({
         targetKey: "openai-version-create-latest",
         variantId: "openai-default",
         enabled: true,
       }),
-      createIntegrationTargetFixture({
+      integrationTargetRow({
         targetKey: "github-version-create-latest",
         variantId: "github-cloud",
         enabled: true,
       }),
     ]);
-    await fixture.db.insert(integrationConnections).values([
-      createIntegrationConnectionFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
         id: "icn_version_create_latest_agent",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-version-create-latest",
         displayName: "Latest Agent Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
-      createIntegrationConnectionFixture({
+      integrationConnectionRow({
         id: "icn_version_create_latest_git",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "github-version-create-latest",
         displayName: "Latest Git Connection",
         status: IntegrationConnectionStatuses.ACTIVE,
       }),
     ]);
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_create_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Create Draft Profile",
         activeVersion: 1,
         createdAt: "2026-03-10T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values([
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_create_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-03-10T00:01:00.000Z",
         setupScript: "echo active-version-one",
       }),
-      createSandboxProfileVersionFixture({
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_create_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
@@ -86,51 +87,56 @@ describe("sandbox profile versions create integration", () => {
         setupScript: "echo latest-version-two",
       }),
     ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_version_create_v1_agent",
-        sandboxProfileId: "sbp_version_create_001",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_version_create_latest_agent",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_version_create_v1_agent",
+          sandboxProfileId: "sbp_version_create_001",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_version_create_latest_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
           },
-        },
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_version_create_v2_agent",
-        sandboxProfileId: "sbp_version_create_001",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_version_create_latest_agent",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_version_create_v2_agent",
+          sandboxProfileId: "sbp_version_create_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_version_create_latest_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
           },
-        },
-      }),
-      createSandboxProfileVersionIntegrationBindingFixture({
-        id: "ibd_version_create_v2_git",
-        sandboxProfileId: "sbp_version_create_001",
-        sandboxProfileVersion: 2,
-        connectionId: "icn_version_create_latest_git",
-        kind: IntegrationBindingKinds.GIT,
-        config: {
-          repositories: ["mistlehq/mistle"],
-        },
-      }),
-    ]);
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_version_create_v2_git",
+          sandboxProfileId: "sbp_version_create_001",
+          sandboxProfileVersion: 2,
+          connectionId: "icn_version_create_latest_git",
+          kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["mistlehq/mistle"],
+          },
+        }),
+      ]);
 
-    const response = await fixture.request("/v1/sandbox/profiles/sbp_version_create_001/versions", {
-      method: "POST",
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_version_create_001/versions",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(201);
     const responseBody = CreateSandboxProfileVersionResponseSchema.parse(await response.json());
@@ -140,10 +146,11 @@ describe("sandbox profile versions create integration", () => {
       state: SandboxProfileVersionStates.DRAFT,
       isActive: false,
       usable: false,
+      refreshSchedule: null,
       latestSnapshotJob: null,
     });
 
-    const persistedDraftVersion = await fixture.db.query.sandboxProfileVersions.findFirst({
+    const persistedDraftVersion = await env.controlPlaneDb.query.sandboxProfileVersions.findFirst({
       where: (table, { and, eq }) =>
         and(eq(table.sandboxProfileId, "sbp_version_create_001"), eq(table.version, 3)),
     });
@@ -152,7 +159,7 @@ describe("sandbox profile versions create integration", () => {
     expect(persistedDraftVersion?.setupScript).toBe("echo latest-version-two");
 
     const persistedDraftBindings =
-      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findMany({
+      await env.controlPlaneDb.query.sandboxProfileVersionIntegrationBindings.findMany({
         columns: {
           id: true,
           connectionId: true,
@@ -199,42 +206,42 @@ describe("sandbox profile versions create integration", () => {
           binding.id === "ibd_version_create_v2_git",
       ),
     ).toBe(false);
-  }, 60_000);
+  });
 
-  it("returns 409 when the profile already has a draft version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-create-draft-conflict@example.com",
+  it("returns 409 when the profile already has a draft version", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create-draft-conflict@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_create_conflict_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Draft Conflict Profile",
         activeVersion: 1,
         createdAt: "2026-03-11T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values([
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values([
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_create_conflict_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
         publishedAt: "2026-03-11T00:01:00.000Z",
       }),
-      createSandboxProfileVersionFixture({
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_create_conflict_001",
         version: 2,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     ]);
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_create_conflict_001/versions",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
@@ -244,36 +251,34 @@ describe("sandbox profile versions create integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("DRAFT_ALREADY_EXISTS");
-  }, 60_000);
+  });
 
-  it("returns 404 when the profile is outside the authenticated organization", async ({
-    fixture,
-  }) => {
-    const firstOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-create-org-a@example.com",
+  it("returns 404 when the profile is outside the authenticated organization", async ({ env }) => {
+    const firstOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create-org-a@example.com",
     });
-    const secondOrgSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-create-org-b@example.com",
+    const secondOrgSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-create-org-b@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_version_create_org_b_001",
         organizationId: secondOrgSession.organizationId,
         displayName: "Other Org Profile",
         activeVersion: null,
         createdAt: "2026-03-12T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values(
-      createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_version_create_org_b_001",
         version: 1,
         state: SandboxProfileVersionStates.DRAFT,
       }),
     );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_version_create_org_b_001/versions",
       {
         method: "POST",
@@ -288,5 +293,5 @@ describe("sandbox profile versions create integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("PROFILE_NOT_FOUND");
-  }, 60_000);
+  });
 });

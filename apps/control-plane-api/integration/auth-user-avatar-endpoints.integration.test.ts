@@ -1,449 +1,357 @@
-import { users } from "@mistle/db/control-plane";
-import { startSeaweedfsS3 } from "@mistle/test-harness";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { describe, expect } from "vitest";
 
-import { createRuntimeWithObjectStore } from "./helpers/control-plane-runtime-with-object-store.js";
-import { readImageMetadata } from "./helpers/image-metadata.js";
-import { createTestObjectStore, getStoredWebpFixtureBytes } from "./helpers/test-object-store.js";
-import { it } from "./test-context.js";
+import { ProfileImageMetadataResponseSchema } from "../src/me/index.js";
 
-describe("user avatar endpoints integration", () => {
-  it("returns null from the authenticated read endpoint when no profile image is stored", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-read-empty@example.com",
-    });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
-    });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+  extraInfra: ["seaweedfs"],
+});
+
+describe.concurrent("user avatar endpoints integration", () => {
+  it("returns empty profile image metadata when no avatar is stored", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-read-empty@example.com",
     });
 
-    try {
-      const response = await runtime.request("/v1/me/profile-image", {
-        method: "GET",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      });
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/profile-image", {
+      method: "GET",
+      headers: {
+        cookie: session.cookie,
+      },
+    });
 
-      expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({
-        hasImage: false,
-        imageVersion: null,
-      });
-    } finally {
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      hasImage: false,
+      imageVersion: null,
+    });
   });
 
-  it("uploads a profile image through the authenticated endpoint and returns image metadata", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-upload@example.com",
+  it("uploads a profile image and serves the normalized avatar content", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-upload@example.com",
     });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
-    });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
-    });
-
-    try {
-      const sourceImage = await sharp({
-        create: {
-          width: 960,
-          height: 640,
-          channels: 3,
-          background: {
-            r: 24,
-            g: 96,
-            b: 220,
-          },
-        },
+    await env.controlPlaneDb
+      .update(env.controlPlaneTables.users)
+      .set({
+        image: "https://example.com/existing-avatar.png",
       })
-        .jpeg()
-        .toBuffer();
-      const formData = new FormData();
+      .where(eq(env.controlPlaneTables.users.id, session.userId));
 
-      formData.set(
-        "file",
-        new File([new Uint8Array(sourceImage)], "avatar.jpg", { type: "image/jpeg" }),
-      );
+    const uploadPayload = await uploadProfileImage({
+      cookie: session.cookie,
+      env,
+      filename: "avatar.jpg",
+      image: await createSourceJpeg(),
+    });
 
-      const response = await runtime.request("/v1/me/profile-image", {
-        method: "PUT",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-        body: formData,
-      });
+    expect(uploadPayload.hasImage).toBe(true);
+    expect(uploadPayload.imageVersion).toMatch(
+      new RegExp(`^avatars/users/${session.userId}/img_[^/]+\\.webp$`, "u"),
+    );
 
-      expect(response.status).toBe(200);
-
-      const payload = readImageMetadata(await response.json());
-      expect(payload.hasImage).toBe(true);
-      expect(payload.imageVersion).not.toBeNull();
-
-      const persistedUser = await runtime.db.query.users.findFirst({
-        columns: {
-          imageObjectKey: true,
-        },
-        where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
-      });
-
-      expect(persistedUser?.imageObjectKey).toMatch(
-        new RegExp(`^avatars/users/${authenticatedSession.userId}/img_[^/]+\\.webp$`, "u"),
-      );
-
-      if (payload.imageVersion === null) {
-        throw new Error("Expected profile image response to include imageVersion.");
-      }
-
-      expect(payload.imageVersion).toBe(persistedUser?.imageObjectKey ?? null);
-
-      const contentResponse = await runtime.request(
-        `/v1/me/profile-image/content?v=${encodeURIComponent(payload.imageVersion)}`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          redirect: "manual",
-        },
-      );
-
-      expect(contentResponse.status).toBe(302);
-      const imageUrl = contentResponse.headers.get("location");
-      expect(imageUrl).not.toBeNull();
-      if (imageUrl === null) {
-        throw new Error("Expected profile image content response to include location.");
-      }
-
-      const imageResponse = await fetch(imageUrl);
-
-      expect(imageResponse.status).toBe(200);
-      expect(imageResponse.headers.get("content-type")).toBe("image/webp");
-
-      const imageMetadata = await sharp(await imageResponse.bytes()).metadata();
-
-      expect(imageMetadata.format).toBe("webp");
-      expect(imageMetadata.width).toBe(512);
-      expect(imageMetadata.height).toBe(512);
-    } finally {
-      await runtime.stop();
-      await seaweedfs.stop();
+    if (uploadPayload.imageVersion === null) {
+      throw new Error("Expected profile image upload response to include imageVersion.");
     }
+
+    const persistedUser = await env.controlPlaneDb.query.users.findFirst({
+      columns: {
+        image: true,
+        imageObjectKey: true,
+      },
+      where: (table, { eq }) => eq(table.id, session.userId),
+    });
+    expect(persistedUser).toEqual({
+      image: "https://example.com/existing-avatar.png",
+      imageObjectKey: uploadPayload.imageVersion,
+    });
+
+    const storedObject = await env.objectStore.headObject(uploadPayload.imageVersion);
+    expect(storedObject.ContentType).toBe("image/webp");
+
+    const imageResponse = await fetchProfileImageContent({
+      cookie: session.cookie,
+      env,
+      imageVersion: uploadPayload.imageVersion,
+    });
+
+    expect(imageResponse.status).toBe(200);
+    expect(imageResponse.headers.get("content-type")).toBe("image/webp");
+
+    const imageMetadata = await sharp(Buffer.from(await imageResponse.arrayBuffer())).metadata();
+    expect(imageMetadata.format).toBe("webp");
+    expect(imageMetadata.width).toBe(512);
+    expect(imageMetadata.height).toBe(512);
   });
 
-  it("returns not found from the authenticated content endpoint when no profile image is stored", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-content-missing@example.com",
-    });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
-    });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
+  it("returns not found from the content endpoint when no avatar is stored", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-content-missing@example.com",
     });
 
-    try {
-      const response = await runtime.request("/v1/me/profile-image/content", {
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/profile-image/content", {
+      method: "GET",
+      headers: {
+        cookie: session.cookie,
+      },
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      code: "NOT_FOUND",
+      message: "Profile image was not found.",
+    });
+  });
+
+  it("returns not found when the requested avatar version is missing or stale", async ({ env }) => {
+    const missingSession = await env.auth.createSession({
+      email: "integration-new-avatar-content-version-missing@example.com",
+    });
+    const missingObjectKey = `avatars/users/${missingSession.userId}/img_existing.webp`;
+    await putStoredAvatar(env, {
+      objectKey: missingObjectKey,
+      userId: missingSession.userId,
+    });
+    await env.objectStore.deleteObject(missingObjectKey);
+
+    const missingResponse = await env.controlPlaneApi.http.fetch("/v1/me/profile-image/content", {
+      method: "GET",
+      headers: {
+        cookie: missingSession.cookie,
+      },
+      redirect: "manual",
+    });
+    expect(missingResponse.status).toBe(404);
+    await expect(missingResponse.json()).resolves.toEqual({
+      code: "NOT_FOUND",
+      message: "Profile image was not found.",
+    });
+
+    const staleSession = await env.auth.createSession({
+      email: "integration-new-avatar-content-version-stale@example.com",
+    });
+    const currentObjectKey = `avatars/users/${staleSession.userId}/img_current.webp`;
+    const staleObjectKey = `avatars/users/${staleSession.userId}/img_stale.webp`;
+    await putStoredAvatar(env, {
+      objectKey: currentObjectKey,
+      userId: staleSession.userId,
+    });
+
+    const staleResponse = await env.controlPlaneApi.http.fetch(
+      `/v1/me/profile-image/content?v=${encodeURIComponent(staleObjectKey)}`,
+      {
         method: "GET",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: staleSession.cookie,
         },
         redirect: "manual",
-      });
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({
-        code: "NOT_FOUND",
-        message: "Profile image was not found.",
-      });
-    } finally {
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
+      },
+    );
+    expect(staleResponse.status).toBe(404);
+    await expect(staleResponse.json()).resolves.toEqual({
+      code: "NOT_FOUND",
+      message: "Profile image was not found.",
+    });
   });
 
-  it("returns not found from the authenticated content endpoint when the requested profile image version is missing", async ({
-    fixture,
+  it("rejects profile image uploads when the multipart body is missing the file field", async ({
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-content-version-missing@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-validation@example.com",
     });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/profile-image", {
+      method: "PUT",
+      headers: {
+        cookie: session.cookie,
+      },
+      body: new FormData(),
     });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
     });
-    const objectStore = createTestObjectStore(seaweedfs);
-    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
-
-    try {
-      await objectStore.putObject({
-        Body: await getStoredWebpFixtureBytes(),
-        ContentType: "image/webp",
-        objectKey,
-      });
-      await runtime.db
-        .update(users)
-        .set({
-          imageObjectKey: objectKey,
-        })
-        .where(eq(users.id, authenticatedSession.userId));
-
-      const response = await runtime.request("/v1/me/profile-image/content", {
-        method: "GET",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-        redirect: "manual",
-      });
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({
-        code: "NOT_FOUND",
-        message: "Profile image was not found.",
-      });
-    } finally {
-      objectStore.destroy();
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
   });
 
-  it("returns not found from the authenticated content endpoint when the requested profile image version is stale", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-content-version-stale@example.com",
+  it("deletes the stored profile image and removes the object", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-delete@example.com",
     });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
+    const objectKey = `avatars/users/${session.userId}/img_previous.webp`;
+    await putStoredAvatar(env, {
+      objectKey,
+      userId: session.userId,
     });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/profile-image", {
+      method: "DELETE",
+      headers: {
+        cookie: session.cookie,
+      },
     });
-    const objectStore = createTestObjectStore(seaweedfs);
-    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
 
-    try {
-      await objectStore.putObject({
-        Body: await getStoredWebpFixtureBytes(),
-        ContentType: "image/webp",
-        objectKey,
-      });
-      await runtime.db
-        .update(users)
-        .set({
-          imageObjectKey: objectKey,
-        })
-        .where(eq(users.id, authenticatedSession.userId));
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
 
-      const response = await runtime.request(
-        `/v1/me/profile-image/content?v=${encodeURIComponent(`avatars/users/${authenticatedSession.userId}/img_stale.webp`)}`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          redirect: "manual",
-        },
-      );
-
-      expect(response.status).toBe(404);
-      await expect(response.json()).resolves.toEqual({
-        code: "NOT_FOUND",
-        message: "Profile image was not found.",
-      });
-    } finally {
-      objectStore.destroy();
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
+    const persistedUser = await env.controlPlaneDb.query.users.findFirst({
+      columns: {
+        imageObjectKey: true,
+      },
+      where: (table, { eq }) => eq(table.id, session.userId),
+    });
+    expect(persistedUser).toEqual({
+      imageObjectKey: null,
+    });
+    await expect(env.objectStore.headObject(objectKey)).rejects.toMatchObject({
+      name: "NotFound",
+    });
   });
 
-  it("returns a validation error when the multipart body is missing the file field", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-validation@example.com",
+  it("returns profile image metadata when an avatar exists", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-avatar-read-existing@example.com",
     });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
-    });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
+    const objectKey = `avatars/users/${session.userId}/img_existing.webp`;
+    await putStoredAvatar(env, {
+      objectKey,
+      userId: session.userId,
     });
 
-    try {
-      const response = await runtime.request("/v1/me/profile-image", {
-        method: "PUT",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-        body: new FormData(),
-      });
-
-      expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({
-        code: "VALIDATION_ERROR",
-        message: "Invalid request.",
-      });
-    } finally {
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
-  });
-
-  it("deletes the uploaded profile image through the authenticated endpoint", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-delete@example.com",
+    const response = await env.controlPlaneApi.http.fetch("/v1/me/profile-image", {
+      method: "GET",
+      headers: {
+        cookie: session.cookie,
+      },
     });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      hasImage: true,
+      imageVersion: objectKey,
     });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
-    });
-    const objectStore = createTestObjectStore(seaweedfs);
-    const previousObjectKey = `avatars/users/${authenticatedSession.userId}/img_previous.webp`;
-
-    try {
-      await objectStore.putObject({
-        Body: await getStoredWebpFixtureBytes(),
-        ContentType: "image/webp",
-        objectKey: previousObjectKey,
-      });
-      await runtime.db
-        .update(users)
-        .set({
-          imageObjectKey: previousObjectKey,
-        })
-        .where(eq(users.id, authenticatedSession.userId));
-
-      const response = await runtime.request("/v1/me/profile-image", {
-        method: "DELETE",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      });
-
-      expect(response.status).toBe(204);
-      expect(await response.text()).toBe("");
-
-      const persistedUser = await runtime.db.query.users.findFirst({
-        columns: {
-          imageObjectKey: true,
-        },
-        where: (table, { eq }) => eq(table.id, authenticatedSession.userId),
-      });
-
-      expect(persistedUser).toEqual({
-        imageObjectKey: null,
-      });
-
-      await expect(objectStore.headObject(previousObjectKey)).rejects.toMatchObject({
-        name: "NotFound",
-      });
-    } finally {
-      objectStore.destroy();
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
-  });
-
-  it("returns image metadata from the authenticated read endpoint when a profile image exists", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-user-avatar-endpoint-read-existing@example.com",
-    });
-    const seaweedfs = await startSeaweedfsS3({
-      bucketName: "mistle-assets",
-    });
-    const runtime = await createRuntimeWithObjectStore({
-      config: fixture.config,
-      seaweedfs,
-    });
-    const objectStore = createTestObjectStore(seaweedfs);
-    const objectKey = `avatars/users/${authenticatedSession.userId}/img_existing.webp`;
-
-    try {
-      await objectStore.putObject({
-        Body: await getStoredWebpFixtureBytes(),
-        ContentType: "image/webp",
-        objectKey,
-      });
-      await runtime.db
-        .update(users)
-        .set({
-          imageObjectKey: objectKey,
-        })
-        .where(eq(users.id, authenticatedSession.userId));
-
-      const response = await runtime.request("/v1/me/profile-image", {
-        method: "GET",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      });
-
-      expect(response.status).toBe(200);
-
-      const payload = readImageMetadata(await response.json());
-
-      expect(payload).toEqual({
-        hasImage: true,
-        imageVersion: objectKey,
-      });
-
-      const contentResponse = await runtime.request(
-        `/v1/me/profile-image/content?v=${encodeURIComponent(objectKey)}`,
-        {
-          method: "GET",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-          redirect: "manual",
-        },
-      );
-
-      expect(contentResponse.status).toBe(302);
-      const imageUrl = contentResponse.headers.get("location");
-      expect(imageUrl).not.toBeNull();
-      if (imageUrl === null) {
-        throw new Error("Expected profile image content response to include location.");
-      }
-
-      const imageResponse = await fetch(imageUrl);
-
-      expect(imageResponse.status).toBe(200);
-      expect(imageResponse.headers.get("content-type")).toBe("image/webp");
-    } finally {
-      objectStore.destroy();
-      await runtime.stop();
-      await seaweedfs.stop();
-    }
   });
 });
+
+type ProfileImageMetadata = ReturnType<typeof ProfileImageMetadataResponseSchema.parse>;
+
+async function uploadProfileImage(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  filename: string;
+  image: Buffer;
+}): Promise<ProfileImageMetadata> {
+  const formData = new FormData();
+  formData.set(
+    "file",
+    new File([new Uint8Array(input.image)], input.filename, {
+      type: "image/jpeg",
+    }),
+  );
+
+  const response = await input.env.controlPlaneApi.http.fetch("/v1/me/profile-image", {
+    method: "PUT",
+    headers: {
+      cookie: input.cookie,
+    },
+    body: formData,
+  });
+
+  if (response.status !== 200) {
+    throw new Error(
+      `Expected profile image upload response status 200, got ${String(response.status)}: ${await response.text()}`,
+    );
+  }
+
+  return ProfileImageMetadataResponseSchema.parse(await response.json());
+}
+
+async function fetchProfileImageContent(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  imageVersion: string;
+}) {
+  const redirectResponse = await input.env.controlPlaneApi.http.fetch(
+    `/v1/me/profile-image/content?v=${encodeURIComponent(input.imageVersion)}`,
+    {
+      method: "GET",
+      headers: {
+        cookie: input.cookie,
+      },
+      redirect: "manual",
+    },
+  );
+
+  expect(redirectResponse.status).toBe(302);
+  const imageUrl = redirectResponse.headers.get("location");
+  if (imageUrl === null) {
+    throw new Error("Expected profile image content response to include location.");
+  }
+
+  return await fetch(imageUrl);
+}
+
+async function createSourceJpeg(): Promise<Buffer> {
+  return await sharp({
+    create: {
+      width: 960,
+      height: 640,
+      channels: 3,
+      background: {
+        r: 24,
+        g: 96,
+        b: 220,
+      },
+    },
+  })
+    .jpeg()
+    .toBuffer();
+}
+
+async function createStoredWebp(): Promise<Buffer> {
+  return await sharp({
+    create: {
+      width: 512,
+      height: 512,
+      channels: 3,
+      background: {
+        r: 255,
+        g: 255,
+        b: 255,
+      },
+    },
+  })
+    .webp()
+    .toBuffer();
+}
+
+async function putStoredAvatar(
+  env: IntegrationTestEnvironment,
+  input: {
+    objectKey: string;
+    userId: string;
+  },
+): Promise<void> {
+  await env.objectStore.putObject({
+    objectKey: input.objectKey,
+    Body: await createStoredWebp(),
+    ContentType: "image/webp",
+  });
+  await env.controlPlaneDb
+    .update(env.controlPlaneTables.users)
+    .set({
+      imageObjectKey: input.objectKey,
+    })
+    .where(eq(env.controlPlaneTables.users.id, input.userId));
+}

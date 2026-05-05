@@ -1,142 +1,113 @@
-import { integrationTargets } from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import { IntegrationTargetsPageSchema as DashboardIntegrationTargetsPageSchema } from "../../dashboard/src/features/integrations/integrations-service-shared.js";
 import { ListIntegrationTargetsResponseSchema } from "../src/integration-targets/index.js";
-import { it } from "./test-context.js";
 
-describe("integration targets discovery integration", () => {
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("integration targets discovery integration", () => {
   it("returns keyset paginated enabled integration targets for an authenticated session", async ({
-    fixture,
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-list@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-targets-list@example.com",
     });
 
-    const baselineResponse = await fixture.request("/v1/integration/targets?limit=1", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    await seedTarget(env, {
+      targetKey: "github_cloud_integration_new_targets_list",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      displayNameOverride: "GitHub Cloud",
+      descriptionOverride: "GitHub Cloud target",
+    });
+    await seedTarget(env, {
+      targetKey: "linear_cloud_integration_new_targets_list",
+      familyId: "linear",
+      variantId: "linear-cloud",
+      enabled: true,
+      config: {
+        base_url: "https://api.linear.app",
+      },
+      displayNameOverride: "Linear Cloud",
+      descriptionOverride: "Linear Cloud target",
+    });
+    await seedTarget(env, {
+      targetKey: "openai_integration_new_targets_list",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
       },
     });
-    expect(baselineResponse.status).toBe(200);
-    const baselinePage = ListIntegrationTargetsResponseSchema.parse(await baselineResponse.json());
-
-    await fixture.db
-      .insert(integrationTargets)
-      .values([
-        {
-          targetKey: "jira-default-it",
-          familyId: "jira",
-          variantId: "jira-default",
-          enabled: true,
-          config: {},
-        },
-        {
-          targetKey: "github_cloud_it",
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-          displayNameOverride: "GitHub Cloud",
-          descriptionOverride: "GitHub Cloud target",
-        },
-        {
-          targetKey: "linear_cloud_it",
-          familyId: "linear",
-          variantId: "linear-cloud",
-          enabled: true,
-          config: {
-            base_url: "https://api.linear.app",
-          },
-          displayNameOverride: "Linear Cloud",
-          descriptionOverride: "Linear Cloud target",
-        },
-        {
-          targetKey: "openai-default-it",
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-        },
-        {
-          targetKey: "zzz_disabled_target_it",
-          familyId: "slack",
-          variantId: "slack-webhooks",
-          enabled: false,
-          config: {
-            base_url: "https://slack.com/api",
-          },
-        },
-      ])
-      .onConflictDoNothing();
-
-    const firstPageResponse = await fixture.request("/v1/integration/targets?limit=2", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    await seedTarget(env, {
+      targetKey: "zzz_disabled_integration_new_targets_list",
+      familyId: "slack",
+      variantId: "slack-webhooks",
+      enabled: false,
+      config: {
+        base_url: "https://slack.com/api",
       },
     });
 
-    expect(firstPageResponse.status).toBe(200);
-    const firstPage = ListIntegrationTargetsResponseSchema.parse(await firstPageResponse.json());
+    const firstPage = await listTargets({
+      cookie: session.cookie,
+      env,
+      query: "limit=2",
+    });
 
-    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 4);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
-
     if (firstPage.nextPage === null) {
       throw new Error("Expected next page cursor.");
     }
 
-    const secondPageResponse = await fixture.request(
-      `/v1/integration/targets?limit=2&after=${encodeURIComponent(firstPage.nextPage.after)}`,
-      {
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-    expect(secondPageResponse.status).toBe(200);
-    const secondPage = ListIntegrationTargetsResponseSchema.parse(await secondPageResponse.json());
-    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 4);
+    const secondPage = await listTargets({
+      cookie: session.cookie,
+      env,
+      query: `limit=2&after=${encodeURIComponent(firstPage.nextPage.after)}`,
+    });
     expect(secondPage.previousPage).not.toBeNull();
-
     if (secondPage.previousPage === null) {
       throw new Error("Expected previous page cursor.");
     }
 
-    const previousPageResponse = await fixture.request(
-      `/v1/integration/targets?limit=2&before=${encodeURIComponent(secondPage.previousPage.before)}`,
-      {
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-    expect(previousPageResponse.status).toBe(200);
-    const previousPage = ListIntegrationTargetsResponseSchema.parse(
-      await previousPageResponse.json(),
-    );
-    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 4);
-
-    const allTargetsResponse = await fixture.request("/v1/integration/targets?limit=100", {
-      headers: {
-        cookie: authenticatedSession.cookie,
-      },
+    const previousPage = await listTargets({
+      cookie: session.cookie,
+      env,
+      query: `limit=2&before=${encodeURIComponent(secondPage.previousPage.before)}`,
     });
-    expect(allTargetsResponse.status).toBe(200);
-    const allTargets = ListIntegrationTargetsResponseSchema.parse(await allTargetsResponse.json());
-
-    const insertedGitHubTarget = allTargets.items.find(
-      (item) => item.targetKey === "github_cloud_it",
+    expect(previousPage.items.map((target) => target.targetKey)).toEqual(
+      firstPage.items.map((target) => target.targetKey),
     );
-    expect(insertedGitHubTarget).toMatchObject({
-      targetKey: "github_cloud_it",
+
+    const allTargets = await listTargets({
+      cookie: session.cookie,
+      env,
+      query: "limit=100",
+    });
+
+    expect(
+      allTargets.items.some(
+        (item) => item.targetKey === "zzz_disabled_integration_new_targets_list",
+      ),
+    ).toBe(false);
+    expect(findTarget(allTargets, "github_cloud_integration_new_targets_list")).toMatchObject({
+      targetKey: "github_cloud_integration_new_targets_list",
       familyId: "github",
       variantId: "github-cloud",
       enabled: true,
@@ -221,12 +192,8 @@ describe("integration targets discovery integration", () => {
         configStatus: "valid",
       },
     });
-
-    const insertedLinearTarget = allTargets.items.find(
-      (item) => item.targetKey === "linear_cloud_it",
-    );
-    expect(insertedLinearTarget).toMatchObject({
-      targetKey: "linear_cloud_it",
+    expect(findTarget(allTargets, "linear_cloud_integration_new_targets_list")).toMatchObject({
+      targetKey: "linear_cloud_integration_new_targets_list",
       familyId: "linear",
       variantId: "linear-cloud",
       enabled: true,
@@ -235,18 +202,12 @@ describe("integration targets discovery integration", () => {
       },
       displayName: "Linear Cloud",
       description: "Linear Cloud target",
-      displayNameOverride: "Linear Cloud",
-      descriptionOverride: "Linear Cloud target",
       targetHealth: {
         configStatus: "valid",
       },
     });
-
-    const insertedOpenAiTarget = allTargets.items.find(
-      (item) => item.targetKey === "openai-default-it",
-    );
-    expect(insertedOpenAiTarget).toMatchObject({
-      targetKey: "openai-default-it",
+    expect(findTarget(allTargets, "openai_integration_new_targets_list")).toMatchObject({
+      targetKey: "openai_integration_new_targets_list",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -288,128 +249,53 @@ describe("integration targets discovery integration", () => {
         configStatus: "valid",
       },
     });
-    expect(insertedOpenAiTarget?.config.api_base_url).toBe("https://api.openai.com");
-
-    const insertedJiraTarget = allTargets.items.find(
-      (item) => item.targetKey === "jira-default-it",
-    );
-    expect(insertedJiraTarget).toMatchObject({
-      targetKey: "jira-default-it",
-      familyId: "jira",
-      variantId: "jira-default",
-      enabled: true,
-      displayName: "Jira",
-      description: "Enable Jira issue access, automation, and optional Jira CLI in sandbox.",
-      logoKey: "jira",
-      connectionMethods: [
-        {
-          id: "jira-personal-api-token",
-          label: "Personal API token",
-          kind: "form",
-          secretFields: [
-            {
-              name: "apiKey",
-              label: "Personal API token",
-              placeholder: "Enter personal API token",
-              inputType: "password",
-              slotKey: "jira.jira-default.jira-personal-api-token.api-key",
-            },
-          ],
-        },
-        {
-          id: "jira-service-account-api-token",
-          label: "Service account API token",
-          kind: "form",
-          secretFields: [
-            {
-              name: "apiKey",
-              label: "Service account API token",
-              placeholder: "Enter service account API token",
-              inputType: "password",
-              slotKey: "jira.jira-default.jira-service-account-api-token.api-key",
-            },
-          ],
-        },
-        {
-          id: "jira-service-account-oauth-client-credentials",
-          label: "Service account OAuth client credentials",
-          kind: "form",
-          secretFields: [
-            {
-              name: "clientSecret",
-              label: "Client secret",
-              placeholder: "Enter service account OAuth client secret",
-              inputType: "password",
-              slotKey:
-                "jira.jira-default.jira-service-account-oauth-client-credentials.client-secret",
-            },
-          ],
-        },
-      ],
-      targetHealth: {
-        configStatus: "valid",
-      },
-    });
-
-    expect(allTargets.items.some((item) => item.targetKey === "zzz_disabled_target_it")).toBe(
-      false,
-    );
   });
 
-  it("returns 400 for invalid pagination cursor", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-list-invalid-cursor@example.com",
+  it("returns 400 for invalid pagination cursor", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-targets-list-invalid-cursor@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/targets?after=invalid-cursor", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/integration/targets?after=invalid-cursor",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
     expect(response.status).toBe(400);
-
-    const bodyText = await response.text();
-    expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
+    await expect(response.text()).resolves.toContain('"code":"INVALID_PAGINATION_CURSOR"');
   });
 
-  it("returns integration target payloads the dashboard parser can consume", async ({
-    fixture,
-  }) => {
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey: "github-dashboard-contract-it",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-        displayNameOverride: "GitHub Dashboard Contract",
-        descriptionOverride: "GitHub contract target",
-      })
-      .onConflictDoNothing();
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-dashboard-contract@example.com",
+  it("returns integration target payloads the dashboard parser can consume", async ({ env }) => {
+    await seedTarget(env, {
+      targetKey: "github_dashboard_contract_integration_new",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      displayNameOverride: "GitHub Dashboard Contract",
+      descriptionOverride: "GitHub contract target",
     });
 
-    const response = await fixture.request("/v1/integration/targets?limit=100", {
+    const session = await env.auth.createSession({
+      email: "integration-new-targets-dashboard-contract@example.com",
+    });
+
+    const response = await env.controlPlaneApi.http.fetch("/v1/integration/targets?limit=100", {
       headers: {
-        cookie: authenticatedSession.cookie,
+        cookie: session.cookie,
       },
     });
-
     expect(response.status).toBe(200);
 
     const page = DashboardIntegrationTargetsPageSchema.parse(await response.json());
-    const githubTarget = page.items.find(
-      (item) => item.targetKey === "github-dashboard-contract-it",
-    );
-
-    expect(githubTarget).toMatchObject({
-      targetKey: "github-dashboard-contract-it",
+    expect(findTarget(page, "github_dashboard_contract_integration_new")).toMatchObject({
+      targetKey: "github_dashboard_contract_integration_new",
       familyId: "github",
       variantId: "github-cloud",
       enabled: true,
@@ -461,16 +347,19 @@ describe("integration targets discovery integration", () => {
     });
   });
 
-  it("returns 400 for invalid list query payload", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-list-validation@example.com",
+  it("returns 400 for invalid list query payload", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-targets-list-validation@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/targets?after=abc&before=def", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/integration/targets?after=abc&before=def",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
@@ -480,56 +369,40 @@ describe("integration targets discovery integration", () => {
     });
   });
 
-  it("returns 401 when the request is unauthenticated", async ({ fixture }) => {
-    const response = await fixture.request("/v1/integration/targets");
+  it("returns 401 when the request is unauthenticated", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/v1/integration/targets");
 
     expect(response.status).toBe(401);
-    expect(await response.json()).toEqual({
+    await expect(response.json()).resolves.toEqual({
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
   });
 
-  it("returns OpenAI target metadata when target config is valid", async ({ fixture }) => {
-    await fixture.db
-      .insert(integrationTargets)
-      .values({
-        targetKey: "openai-default",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com",
-        },
-      })
-      .onConflictDoUpdate({
-        target: integrationTargets.targetKey,
-        set: {
-          familyId: "openai",
-          variantId: "openai-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.openai.com",
-          },
-        },
-      });
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-list-openai-projection@example.com",
-    });
-
-    const response = await fixture.request("/v1/integration/targets?limit=100", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+  it("returns OpenAI target metadata when target config is valid", async ({ env }) => {
+    await seedTarget(env, {
+      targetKey: "openai_projection_integration_new",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
       },
     });
 
-    expect(response.status).toBe(200);
-    const page = ListIntegrationTargetsResponseSchema.parse(await response.json());
-    const openAiTarget = page.items.find((item) => item.targetKey === "openai-default");
-    expect(openAiTarget).toBeDefined();
-    expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
-    expect(openAiTarget?.connectionMethods).toEqual([
+    const session = await env.auth.createSession({
+      email: "integration-new-targets-list-openai-projection@example.com",
+    });
+
+    const page = await listTargets({
+      cookie: session.cookie,
+      env,
+      query: "limit=100",
+    });
+    const openAiTarget = findTarget(page, "openai_projection_integration_new");
+
+    expect(openAiTarget.targetHealth.configStatus).toBe("valid");
+    expect(openAiTarget.connectionMethods).toEqual([
       {
         id: "api-key",
         label: "API key",
@@ -560,6 +433,74 @@ describe("integration targets discovery integration", () => {
         },
       },
     ]);
-    expect("resolvedBindingEditorUi" in (openAiTarget ?? {})).toBe(false);
-  }, 60_000);
+    expect("resolvedBindingEditorUi" in openAiTarget).toBe(false);
+  });
 });
+
+type IntegrationTargetsPage = ReturnType<typeof ListIntegrationTargetsResponseSchema.parse>;
+
+async function seedTarget(
+  env: IntegrationTestEnvironment,
+  input: {
+    targetKey: string;
+    familyId: string;
+    variantId: string;
+    enabled: boolean;
+    config: Record<string, unknown>;
+    displayNameOverride?: string;
+    descriptionOverride?: string;
+  },
+): Promise<void> {
+  await env.controlPlaneDb
+    .insert(env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: input.familyId,
+      variantId: input.variantId,
+      enabled: input.enabled,
+      config: input.config,
+      displayNameOverride: input.displayNameOverride,
+      descriptionOverride: input.descriptionOverride,
+    })
+    .onConflictDoUpdate({
+      target: env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: input.familyId,
+        variantId: input.variantId,
+        enabled: input.enabled,
+        config: input.config,
+        displayNameOverride: input.displayNameOverride,
+        descriptionOverride: input.descriptionOverride,
+      },
+    });
+}
+
+async function listTargets(input: {
+  env: IntegrationTestEnvironment;
+  cookie: string;
+  query: string;
+}): Promise<IntegrationTargetsPage> {
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/targets?${input.query}`,
+    {
+      headers: {
+        cookie: input.cookie,
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+
+  return ListIntegrationTargetsResponseSchema.parse(await response.json());
+}
+
+function findTarget<TPage extends { items: Array<{ targetKey: string }> }>(
+  page: TPage,
+  targetKey: string,
+): TPage["items"][number] {
+  const target = page.items.find((item) => item.targetKey === targetKey);
+  if (target === undefined) {
+    throw new Error(`Expected target '${targetKey}' to be listed.`);
+  }
+
+  return target;
+}

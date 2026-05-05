@@ -13,8 +13,8 @@ Ordinary app integration tests should use the new environment harness:
 
 - API: `createIntegrationTest(...)` from `@mistle/test-harness/integration`
 - Guide: [Test Environment Harness](./src/environment/README.md)
-- Test location: `apps/*/integration-new/`
-- Suite command: `pnpm test:integration:new`
+- Test location: `apps/*/integration/`
+- Suite command: `pnpm test:integration`
 
 Most app tests should not call low-level container or app launchers directly.
 Use the environment harness so tests share pooled infrastructure, get isolated
@@ -59,9 +59,8 @@ Exported from [`src/index.ts`](./src/index.ts):
   `createTestRegistry(...)`, and `createServiceRegistry(...)`;
 - system environment helpers such as `startFullSystemEnvironment`.
 
-These APIs are for harness implementation, system/e2e orchestration, and legacy
-tests that have not yet moved to `integration-new`. Do not use them as the
-normal public API for new app integration tests.
+These APIs are for harness implementation and system/e2e orchestration. Do not
+use them as the normal public API for app integration tests.
 
 ## Service Modules
 

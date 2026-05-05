@@ -1,1395 +1,456 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import {
-  automationTargets,
-  automations,
   AutomationKinds,
-  createControlPlaneDatabase,
-  integrationConnections,
-  IntegrationConnectionStatuses,
+  AutomationRunStatuses,
   IntegrationBindingKinds,
-  integrationTargets,
-  integrationWebhookEvents,
-  integrationWebhookSources,
+  IntegrationConnectionStatuses,
   IntegrationWebhookEventStatuses,
-  organizations,
-  sandboxProfiles,
-  sandboxProfileVersions,
-  sandboxProfileVersionIntegrationBindings,
-  CONTROL_PLANE_SCHEMA_NAME,
-  webhookAutomations,
 } from "@mistle/db/control-plane";
-import {
-  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-  MigrationTracking,
-  runControlPlaneMigrations,
-} from "@mistle/db/migrator";
 import {
   createIntegrationRegistry,
   OpenAiApiKeyDefinition,
 } from "@mistle/integrations-definitions/server";
-import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
-import { systemSleeper } from "@mistle/time";
 import {
-  HandleAutomationRunWorkflowSpec,
-  HandleIntegrationWebhookEventWorkflowSpec,
-  type HandleAutomationRunWorkflowInput,
-} from "@mistle/workflow-registry/control-plane";
-import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-import { beforeEach, describe, expect } from "vitest";
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
+import { describe, expect } from "vitest";
 
-import { transitionAutomationRunToRunning } from "../openworkflow/handle-automation-run/transition-automation-run-to-running.js";
-import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run/workflow.js";
-import { markIntegrationWebhookEventFailed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-failed.js";
-import { markIntegrationWebhookEventProcessed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-processed.js";
 import { prepareIntegrationWebhookEvent } from "../openworkflow/handle-integration-webhook-event/prepare-integration-webhook-event.js";
-import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-integration-webhook-event/workflow.js";
-import {
-  markAutomationRunCompleted,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-} from "../openworkflow/shared/automation-run.js";
-import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
-import { it } from "./test-context.js";
 
-const TestTimeoutMs = 120_000;
+const it = createIntegrationTest({
+  services: ["control-plane-worker"],
+});
+
 const OpenAiAgentTargetConfig = {
   api_base_url: "https://api.openai.com/v1",
 };
-const tracing = installInMemoryTracing();
 
-function findWorkerSpan(input: { name: string }) {
-  return tracing.getFinishedSpans().find((span) => span.name === input.name);
-}
+describe.concurrent("control-plane worker integration webhook event handling", () => {
+  it("queues automation runs for matching webhook automations", async ({ env }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("queue"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        installation: {
+          id: 12345,
+        },
+        delivery: {
+          id: "delivery_queue_payload",
+        },
+        comment: {
+          body: "please run @mistlebot",
+        },
+      },
+      externalEventId: "evt_queue",
+      externalDeliveryId: "delivery_queue",
+    });
 
-function requireDefined<T>(value: T | undefined, message: string): T {
-  if (value === undefined) {
-    throw new Error(message);
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      externalDeliveryId: "delivery_queue",
+      integrationConnectionId: scope.connectionId,
+      targetKey: scope.targetKey,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      finalized: false,
+      resourceSyncRequests: [],
+    });
+    expect(preparedEvent.automationRunIds).toHaveLength(1);
+
+    const queuedRuns = await env.controlPlaneDb.query.automationRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(1);
+    expect(queuedRuns[0]).toMatchObject({
+      automationId: scope.automationId,
+      automationTargetId: scope.automationTargetId,
+      status: AutomationRunStatuses.QUEUED,
+    });
+  });
+
+  it("marks webhook events ignored when no automation targets or sync triggers match", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("ignore"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.issue_comment.created",
+      providerEventType: "issue_comment",
+      payloadFilter: {
+        "github.issue_comment.created": {
+          op: "contains_token",
+          path: ["comment", "body"],
+          value: "@mistlebot",
+        },
+      },
+      payload: {
+        comment: {
+          body: "nothing to match",
+        },
+      },
+      externalEventId: "evt_ignore",
+      externalDeliveryId: "delivery_ignore",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toEqual({
+      webhookEventId: scope.webhookEventId,
+      externalDeliveryId: "delivery_ignore",
+      integrationConnectionId: scope.connectionId,
+      targetKey: scope.targetKey,
+      webhookEventStatus: IntegrationWebhookEventStatuses.IGNORED,
+      automationRunIds: [],
+      resourceSyncRequests: [],
+      finalized: true,
+    });
+
+    const persistedEvent = await env.controlPlaneDb.query.integrationWebhookEvents.findFirst({
+      where: (table, { eq }) => eq(table.id, scope.webhookEventId),
+    });
+    expect(persistedEvent).toMatchObject({
+      status: IntegrationWebhookEventStatuses.IGNORED,
+    });
+    expect(persistedEvent?.finalizedAt).not.toBeNull();
+  });
+
+  it("ignores Slack message subtypes when the automation listens for plain messages", async ({
+    env,
+  }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("slack_subtype"),
+      familyId: "slack",
+      variantId: "slack-default",
+      targetConfig: {
+        api_base_url: "https://slack.com/api",
+      },
+      connectionConfig: {
+        connection_method: "slack-bot-token",
+      },
+      eventType: "slack:message_deleted",
+      providerEventType: "message_deleted",
+      automationEventTypes: ["slack:message"],
+      payloadFilter: null,
+      payload: {
+        event: {
+          channel: "C123",
+          text: "deleted",
+          subtype: "message_deleted",
+        },
+      },
+      externalEventId: "evt_slack_message_deleted",
+      externalDeliveryId: null,
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent.automationRunIds).toEqual([]);
+    expect(preparedEvent.webhookEventStatus).toBe(IntegrationWebhookEventStatuses.IGNORED);
+
+    const queuedRuns = await env.controlPlaneDb.query.automationRuns.findMany({
+      where: (table, { eq }) => eq(table.sourceWebhookEventId, scope.webhookEventId),
+    });
+    expect(queuedRuns).toHaveLength(0);
+  });
+
+  it("returns resource sync requests for webhook-triggered provider resources", async ({ env }) => {
+    const scope = await seedWebhookEventScope({
+      env,
+      suffix: createSuffix("resource_sync"),
+      familyId: "github",
+      variantId: "github-cloud",
+      targetConfig: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+      connectionConfig: {},
+      eventType: "github.installation_repositories.added",
+      providerEventType: "installation_repositories",
+      createAutomation: false,
+      payload: {
+        installation: {
+          id: 12345,
+        },
+      },
+      externalEventId: "evt_resource_sync",
+      externalDeliveryId: "delivery_resource_sync",
+    });
+
+    const preparedEvent = await prepareIntegrationWebhookEvent(
+      {
+        db: env.controlPlaneDb,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: scope.webhookEventId,
+      },
+    );
+
+    expect(preparedEvent).toMatchObject({
+      webhookEventId: scope.webhookEventId,
+      webhookEventStatus: IntegrationWebhookEventStatuses.PROCESSING,
+      automationRunIds: [],
+      finalized: false,
+    });
+    expect(preparedEvent.resourceSyncRequests).toEqual([
+      {
+        organizationId: scope.organizationId,
+        connectionId: scope.connectionId,
+        kind: "repository",
+      },
+    ]);
+  });
+});
+
+type SeedWebhookEventScopeInput = {
+  env: IntegrationTestEnvironment;
+  suffix: string;
+  familyId: string;
+  variantId: string;
+  targetConfig: Record<string, unknown>;
+  connectionConfig: Record<string, unknown>;
+  eventType: string;
+  providerEventType: string;
+  automationEventTypes?: ReadonlyArray<string>;
+  payloadFilter?: Record<string, unknown> | null;
+  payload: Record<string, unknown>;
+  externalEventId: string;
+  externalDeliveryId: string | null;
+  createAutomation?: boolean;
+};
+
+type SeededWebhookEventScope = {
+  organizationId: string;
+  sandboxProfileId: string;
+  automationId: string;
+  automationTargetId: string;
+  webhookEventId: string;
+  connectionId: string;
+  webhookSourceId: string;
+  targetKey: string;
+};
+
+async function seedWebhookEventScope(
+  input: SeedWebhookEventScopeInput,
+): Promise<SeededWebhookEventScope> {
+  const organizationId = `org_${input.suffix}`;
+  const sandboxProfileId = `sbp_${input.suffix}`;
+  const automationId = `atm_${input.suffix}`;
+  const automationTargetId = `atg_${input.suffix}`;
+  const webhookEventId = `iwe_${input.suffix}`;
+  const connectionId = `icn_${input.suffix}`;
+  const webhookSourceId = `iws_${input.suffix}`;
+  const targetKey = `${input.variantId}-${input.suffix}`;
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.organizations).values({
+    id: organizationId,
+    name: `Worker Webhook ${input.suffix}`,
+    slug: `worker-webhook-${input.suffix}`,
+  });
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
+    targetKey,
+    familyId: input.familyId,
+    variantId: input.variantId,
+    enabled: true,
+    config: input.targetConfig,
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId,
+      targetKey,
+      displayName: `Worker webhook ${input.suffix} connection`,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: `${input.suffix}-subject`,
+      config: input.connectionConfig,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationWebhookSources)
+    .values({
+      id: webhookSourceId,
+      organizationId,
+      integrationConnectionId: connectionId,
+      targetKey,
+      endpointKey: `${webhookSourceId}-endpoint`,
+      status: "active",
+    });
+
+  if (input.createAutomation !== false) {
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+      id: sandboxProfileId,
+      organizationId,
+      displayName: `Worker Webhook ${input.suffix} Profile`,
+      status: "active",
+    });
+    await seedOpenAiAgentBinding({
+      env: input.env,
+      organizationId,
+      sandboxProfileId,
+      sandboxProfileVersion: 2,
+      suffix: input.suffix,
+    });
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automations).values({
+      id: automationId,
+      organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: `Worker Webhook ${input.suffix} Automation`,
+      enabled: true,
+    });
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.webhookAutomations).values({
+      automationId,
+      integrationWebhookSourceId: webhookSourceId,
+      eventTypes: [...(input.automationEventTypes ?? [input.eventType])],
+      payloadFilter: input.payloadFilter ?? null,
+      inputTemplate: "Handle webhook event",
+      conversationKeyTemplate: "github/{{payload.installation.id}}",
+      idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+    });
+    await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.automationTargets).values({
+      id: automationTargetId,
+      automationId,
+      sandboxProfileId,
+      sandboxProfileVersion: 2,
+    });
   }
 
-  return value;
-}
-
-async function createTestDatabase(input: { databaseUrl: string }) {
-  await runControlPlaneMigrations({
-    connectionString: input.databaseUrl,
-    schemaName: CONTROL_PLANE_SCHEMA_NAME,
-    migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-    migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
-    migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
-  });
-
-  const pool = new Pool({
-    connectionString: input.databaseUrl,
-  });
-  const db = createControlPlaneDatabase(pool);
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationWebhookEvents)
+    .values({
+      id: webhookEventId,
+      organizationId,
+      integrationConnectionId: connectionId,
+      integrationWebhookSourceId: webhookSourceId,
+      targetKey,
+      externalEventId: input.externalEventId,
+      externalDeliveryId: input.externalDeliveryId,
+      providerEventType: input.providerEventType,
+      eventType: input.eventType,
+      payload: input.payload,
+      sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+      sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      status: IntegrationWebhookEventStatuses.RECEIVED,
+    });
 
   return {
-    db,
-    pool,
-    stop: async () => {
-      await pool.end();
-    },
+    organizationId,
+    sandboxProfileId,
+    automationId,
+    automationTargetId,
+    webhookEventId,
+    connectionId,
+    webhookSourceId,
+    targetKey,
   };
 }
 
 async function seedOpenAiAgentBinding(input: {
-  db: ReturnType<typeof createControlPlaneDatabase>;
+  env: IntegrationTestEnvironment;
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
   suffix: string;
-}) {
+}): Promise<void> {
   const targetKey = `openai-agent-${input.suffix}`;
   const connectionId = `icn_openai_agent_${input.suffix}`;
   const bindingId = `ibd_openai_agent_${input.suffix}`;
 
-  await input.db.insert(integrationTargets).values({
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values({
     targetKey,
     familyId: OpenAiApiKeyDefinition.familyId,
     variantId: OpenAiApiKeyDefinition.variantId,
     enabled: true,
     config: OpenAiAgentTargetConfig,
   });
-  await input.db.insert(integrationConnections).values({
-    id: connectionId,
-    organizationId: input.organizationId,
-    targetKey,
-    displayName: "OpenAI agent connection",
-    status: IntegrationConnectionStatuses.ACTIVE,
-    externalSubjectId: "openai-agent-subject",
-    config: {
-      connection_method: "api-key",
-    },
-  });
-  await input.db.insert(sandboxProfileVersions).values({
-    sandboxProfileId: input.sandboxProfileId,
-    version: input.sandboxProfileVersion,
-  });
-  await input.db.insert(sandboxProfileVersionIntegrationBindings).values({
-    id: bindingId,
-    sandboxProfileId: input.sandboxProfileId,
-    sandboxProfileVersion: input.sandboxProfileVersion,
-    connectionId,
-    kind: IntegrationBindingKinds.AGENT,
-    config: {
-      runtime: {
-        runtimeId: "codex",
-        config: {},
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values({
+      id: connectionId,
+      organizationId: input.organizationId,
+      targetKey,
+      displayName: "OpenAI agent connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: "openai-agent-subject",
+      config: {
+        connection_method: "api-key",
       },
-    },
-  });
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.sandboxProfileVersion,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: {
+          runtimeId: "codex",
+          config: {},
+        },
+      },
+    });
 }
 
-async function seedWebhookSource(input: {
-  db: ReturnType<typeof createControlPlaneDatabase>;
-  sourceId: string;
-  organizationId: string;
-  connectionId: string;
-  targetKey: string;
-}) {
-  await input.db.insert(integrationWebhookSources).values({
-    id: input.sourceId,
-    organizationId: input.organizationId,
-    integrationConnectionId: input.connectionId,
-    targetKey: input.targetKey,
-    endpointKey: `${input.sourceId}-endpoint`,
-    status: "active",
-  });
+function createSuffix(label: string): string {
+  return `integration_new_webhook_${label}`;
 }
-
-async function waitForBlockedWebhookEventMutation(input: {
-  pool: Pool;
-  minimumCount?: number;
-}): Promise<void> {
-  const minimumCount = input.minimumCount ?? 1;
-  const deadlineMs = Date.now() + 10_000;
-
-  while (Date.now() < deadlineMs) {
-    const result = await input.pool.query<{ waiters: number }>(
-      `
-        select count(*)::int as waiters
-        from pg_stat_activity
-        where
-          datname = current_database()
-          and wait_event_type = 'Lock'
-          and state = 'active'
-          and query ilike '%integration_webhook_events%'
-      `,
-    );
-
-    if ((result.rows[0]?.waiters ?? 0) >= minimumCount) {
-      return;
-    }
-
-    await systemSleeper.sleep(50);
-  }
-
-  throw new Error(
-    `Timed out waiting for ${String(minimumCount)} blocked webhook event mutation(s).`,
-  );
-}
-
-describe("handleIntegrationWebhookEvent integration", () => {
-  beforeEach(() => {
-    tracing.reset();
-  });
-
-  async function executeHandleIntegrationWebhookEvent(input: {
-    db: ReturnType<typeof createControlPlaneDatabase>;
-    webhookEventId: string;
-    enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
-    enqueueResourceSync: (input: {
-      organizationId: string;
-      connectionId: string;
-      kind: string;
-    }) => Promise<void>;
-  }) {
-    const preparedWebhookEvent = await prepareIntegrationWebhookEvent(
-      {
-        db: input.db,
-        integrationRegistry: createIntegrationRegistry(),
-      },
-      {
-        webhookEventId: input.webhookEventId,
-      },
-    );
-    if (preparedWebhookEvent.finalized) {
-      return {
-        webhookEventId: input.webhookEventId,
-      };
-    }
-
-    try {
-      for (const resourceSyncRequest of preparedWebhookEvent.resourceSyncRequests) {
-        await input.enqueueResourceSync(resourceSyncRequest);
-      }
-      if (preparedWebhookEvent.automationRunIds.length > 0) {
-        await input.enqueueAutomationRuns({
-          automationRunIds: preparedWebhookEvent.automationRunIds,
-        });
-      }
-      await markIntegrationWebhookEventProcessed(
-        {
-          db: input.db,
-        },
-        {
-          webhookEventId: input.webhookEventId,
-        },
-      );
-    } catch (error) {
-      await markIntegrationWebhookEventFailed(
-        {
-          db: input.db,
-        },
-        {
-          webhookEventId: input.webhookEventId,
-        },
-      );
-      throw error;
-    }
-
-    return {
-      webhookEventId: input.webhookEventId,
-    };
-  }
-
-  async function executeHandleAutomationRunSteps(input: {
-    db: ReturnType<typeof createControlPlaneDatabase>;
-    automationRunId: string;
-  }) {
-    const workflowInput: HandleAutomationRunWorkflowInput = {
-      automationRunId: input.automationRunId,
-    };
-    const deps = {
-      db: input.db,
-    };
-
-    const transitionResult = await transitionAutomationRunToRunning(deps, workflowInput);
-    if (!transitionResult.shouldProcess) {
-      return;
-    }
-
-    try {
-      await prepareAutomationRun(deps, workflowInput);
-      await markAutomationRunCompleted(deps, workflowInput);
-    } catch (error) {
-      const failure = resolveAutomationRunFailure(error);
-      await markAutomationRunFailed(deps, {
-        automationRunId: workflowInput.automationRunId,
-        failureCode: failure.code,
-        failureMessage: failure.message,
-      });
-      throw error;
-    }
-  }
-
-  it(
-    "runs the workflow entrypoint and schedules automation-run workflows",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_webhook_workflow";
-        const targetKey = "github-cloud-worker-webhook-workflow";
-        const connectionId = "icn_worker_webhook_workflow";
-        const webhookSourceId = "iws_worker_webhook_workflow";
-        const sandboxProfileId = "sbp_worker_webhook_workflow";
-        const automationId = "atm_worker_webhook_workflow";
-        const automationTargetId = "atg_worker_webhook_workflow";
-        const webhookEventId = "iwe_worker_webhook_workflow";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Webhook Workflow",
-          slug: "worker-webhook-workflow",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook workflow connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "999999",
-          config: {},
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(sandboxProfiles).values({
-          id: sandboxProfileId,
-          organizationId,
-          displayName: "Worker Webhook Workflow Profile",
-          status: "active",
-        });
-        await seedOpenAiAgentBinding({
-          db: database.db,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-          suffix: "worker_webhook_workflow",
-        });
-        await database.db.insert(automations).values({
-          id: automationId,
-          organizationId,
-          kind: AutomationKinds.WEBHOOK,
-          name: "Worker Webhook Workflow Automation",
-          enabled: true,
-        });
-        await database.db.insert(webhookAutomations).values({
-          automationId,
-          integrationWebhookSourceId: webhookSourceId,
-          eventTypes: ["github.issue_comment.created"],
-          payloadFilter: null,
-          inputTemplate: "Respond to {{payload.comment.body}}",
-          conversationKeyTemplate: "issue-{{payload.issue.number}}",
-          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
-        });
-        await database.db.insert(automationTargets).values({
-          id: automationTargetId,
-          automationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          eventType: "github.issue_comment.created",
-          providerEventType: "issue_comment",
-          externalEventId: "evt_webhook_workflow",
-          externalDeliveryId: "delivery_webhook_workflow",
-          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
-          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
-          payload: {
-            issue: {
-              number: 14,
-            },
-            comment: {
-              body: "launch",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        await withOpenWorkflowRuntime({
-          fixture,
-          run: async ({ runtime, workflowContext }) => {
-            workflowContext.openWorkflow.implementWorkflow(
-              HandleIntegrationWebhookEventWorkflow.spec,
-              HandleIntegrationWebhookEventWorkflow.fn,
-            );
-            const worker = workflowContext.openWorkflow.newWorker({
-              concurrency: 1,
-            });
-
-            const handle = await workflowContext.openWorkflow.runWorkflow(
-              HandleIntegrationWebhookEventWorkflowSpec,
-              {
-                webhookEventId,
-              },
-              {
-                idempotencyKey: `handle-webhook:${webhookEventId}`,
-              },
-            );
-
-            try {
-              expect(await worker.tick()).toBe(1);
-              await expect(handle.result({ timeoutMs: TestTimeoutMs })).resolves.toEqual({
-                webhookEventId,
-              });
-
-              const queuedAutomationRun = await database.db.query.automationRuns.findFirst({
-                where: (table, { eq: whereEq }) =>
-                  whereEq(table.sourceWebhookEventId, webhookEventId),
-              });
-              expect(queuedAutomationRun?.id).toBeTruthy();
-
-              const workflowRuns = await runtime.backend.listWorkflowRuns({
-                limit: 20,
-              });
-              const automationRunWorkflow = workflowRuns.data.find(
-                (workflowRun) =>
-                  workflowRun.workflowName === HandleAutomationRunWorkflowSpec.name &&
-                  workflowRun.idempotencyKey === queuedAutomationRun?.id,
-              );
-
-              expect(automationRunWorkflow).toBeDefined();
-              expect(automationRunWorkflow?.status).toBe("pending");
-            } finally {
-              await worker.stop();
-            }
-          },
-        });
-
-        const persistedWebhookEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq: whereEq }) => whereEq(table.id, webhookEventId),
-        });
-        expect(persistedWebhookEvent?.status).toBe(IntegrationWebhookEventStatuses.PROCESSED);
-        expect(persistedWebhookEvent?.finalizedAt).not.toBeNull();
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "emits correlated webhook and delivery handoff spans across workflow boundaries",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_webhook_observability";
-        const targetKey = "github-cloud-worker-webhook-observability";
-        const connectionId = "icn_worker_webhook_observability";
-        const webhookSourceId = "iws_worker_webhook_observability";
-        const sandboxProfileId = "sbp_worker_webhook_observability";
-        const automationId = "atm_worker_webhook_observability";
-        const automationTargetId = "atg_worker_webhook_observability";
-        const webhookEventId = "iwe_worker_webhook_observability";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Webhook Observability",
-          slug: "worker-webhook-observability",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook observability connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "github-installation-789",
-          config: {
-            connection_method: "github-app-installation",
-            installation_id: "789",
-          },
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db
-          .update(integrationWebhookSources)
-          .set({ endpointKey: "worker-webhook-observability-endpoint" })
-          .where(eq(integrationWebhookSources.id, webhookSourceId));
-        await database.db.insert(sandboxProfiles).values({
-          id: sandboxProfileId,
-          organizationId,
-          displayName: "Worker Webhook Observability Profile",
-          status: "active",
-        });
-        await seedOpenAiAgentBinding({
-          db: database.db,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-          suffix: "worker-webhook-observability",
-        });
-        await database.db.insert(automations).values({
-          id: automationId,
-          organizationId,
-          kind: AutomationKinds.WEBHOOK,
-          name: "Worker Webhook Observability Automation",
-          enabled: true,
-        });
-        await database.db.insert(webhookAutomations).values({
-          automationId,
-          integrationWebhookSourceId: webhookSourceId,
-          eventTypes: ["github.issue_comment.created"],
-          payloadFilter: null,
-          inputTemplate: "Respond to {{payload.comment.body}}",
-          conversationKeyTemplate: "issue-{{payload.issue.number}}",
-          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
-        });
-        await database.db.insert(automationTargets).values({
-          id: automationTargetId,
-          automationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          eventType: "github.issue_comment.created",
-          providerEventType: "issue_comment",
-          externalEventId: "evt_webhook_observability",
-          externalDeliveryId: "delivery_webhook_observability",
-          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
-          sourceOrderKey: "2026-03-09T00:00:00Z#0002",
-          payload: {
-            issue: {
-              number: 21,
-            },
-            comment: {
-              body: "launch observability",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        await withOpenWorkflowRuntime({
-          fixture,
-          run: async ({ workflowContext }) => {
-            workflowContext.openWorkflow.implementWorkflow(
-              HandleIntegrationWebhookEventWorkflow.spec,
-              HandleIntegrationWebhookEventWorkflow.fn,
-            );
-            workflowContext.openWorkflow.implementWorkflow(
-              HandleAutomationRunWorkflow.spec,
-              HandleAutomationRunWorkflow.fn,
-            );
-            const worker = workflowContext.openWorkflow.newWorker({
-              concurrency: 1,
-            });
-
-            const webhookHandle = await workflowContext.openWorkflow.runWorkflow(
-              HandleIntegrationWebhookEventWorkflowSpec,
-              {
-                webhookEventId,
-              },
-              {
-                idempotencyKey: `handle-webhook-observability:${webhookEventId}`,
-              },
-            );
-
-            try {
-              expect(await worker.tick()).toBe(1);
-              await expect(webhookHandle.result({ timeoutMs: TestTimeoutMs })).resolves.toEqual({
-                webhookEventId,
-              });
-
-              expect(await worker.tick()).toBe(1);
-            } finally {
-              await worker.stop();
-            }
-          },
-        });
-
-        const queuedAutomationRun = await database.db.query.automationRuns.findFirst({
-          where: (table, { eq: whereEq }) => whereEq(table.sourceWebhookEventId, webhookEventId),
-        });
-        const persistedTask = await database.db.query.automationConversationDeliveryTasks.findFirst(
-          {
-            where: (table, { eq: whereEq }) => whereEq(table.sourceWebhookEventId, webhookEventId),
-          },
-        );
-
-        expect(queuedAutomationRun).toBeDefined();
-        expect(persistedTask).toBeDefined();
-        if (queuedAutomationRun === undefined || persistedTask === undefined) {
-          throw new Error("Expected queued automation run and delivery task.");
-        }
-
-        await tracing.forceFlush();
-
-        const webhookWorkflowSpan = findWorkerSpan({
-          name: HandleIntegrationWebhookEventWorkflowSpec.name,
-        });
-        const prepareSpan = findWorkerSpan({ name: "webhook_event.prepare" });
-        const automationScheduleSpan = findWorkerSpan({
-          name: "webhook_event.automation_run.schedule",
-        });
-        const markProcessedSpan = findWorkerSpan({ name: "webhook_event.mark_processed" });
-        const automationRunWorkflowSpan = findWorkerSpan({
-          name: HandleAutomationRunWorkflowSpec.name,
-        });
-
-        expect(webhookWorkflowSpan).toBeDefined();
-        expect(webhookWorkflowSpan?.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(webhookWorkflowSpan?.attributes["mistle.integration.connection_id"]).toBe(
-          connectionId,
-        );
-        expect(webhookWorkflowSpan?.attributes["mistle.integration.target_key"]).toBe(targetKey);
-        expect(webhookWorkflowSpan?.attributes["mistle.automation.run.count"]).toBe(1);
-        expect(webhookWorkflowSpan?.attributes["mistle.webhook.event_status"]).toBe(
-          IntegrationWebhookEventStatuses.PROCESSING,
-        );
-        expect(webhookWorkflowSpan?.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
-        expect(webhookWorkflowSpan?.attributes["mistle.webhook.final_status"]).toBe("processed");
-        expect(
-          webhookWorkflowSpan?.events.some((event) => event.name === "automation_run.schedule"),
-        ).toBe(true);
-
-        const requiredPrepareSpan = requireDefined(prepareSpan, "Expected webhook prepare span.");
-        expect(requiredPrepareSpan.attributes["mistle.webhook.event_id"]).toBe(webhookEventId);
-        expect(requiredPrepareSpan.attributes["mistle.integration.connection_id"]).toBe(
-          connectionId,
-        );
-        expect(requiredPrepareSpan.attributes["mistle.integration.target_key"]).toBe(targetKey);
-        expect(requiredPrepareSpan.attributes["mistle.automation.run.count"]).toBe(1);
-        expect(requiredPrepareSpan.attributes["mistle.webhook.event_status"]).toBe(
-          IntegrationWebhookEventStatuses.PROCESSING,
-        );
-        expect(requiredPrepareSpan.attributes["mistle.webhook.resource_sync.count"]).toBe(0);
-        expect(requiredPrepareSpan.attributes["mistle.webhook.finalized"]).toBe(false);
-
-        const requiredAutomationScheduleSpan = requireDefined(
-          automationScheduleSpan,
-          "Expected automation run scheduling span.",
-        );
-        expect(requiredAutomationScheduleSpan.attributes["mistle.webhook.event_id"]).toBe(
-          webhookEventId,
-        );
-        expect(requiredAutomationScheduleSpan.attributes["mistle.automation.run_id"]).toBe(
-          queuedAutomationRun.id,
-        );
-        expect(
-          requiredAutomationScheduleSpan.events.some(
-            (event) => event.name === "automation_run.queued",
-          ),
-        ).toBe(true);
-
-        const requiredMarkProcessedSpan = requireDefined(
-          markProcessedSpan,
-          "Expected webhook processed status span.",
-        );
-        expect(requiredMarkProcessedSpan.attributes["mistle.webhook.event_id"]).toBe(
-          webhookEventId,
-        );
-        expect(requiredMarkProcessedSpan.attributes["mistle.webhook.final_status"]).toBe(
-          "processed",
-        );
-
-        expect(automationRunWorkflowSpan).toBeDefined();
-        expect(automationRunWorkflowSpan?.attributes["mistle.webhook.event_id"]).toBe(
-          webhookEventId,
-        );
-        expect(automationRunWorkflowSpan?.attributes["mistle.automation.run_id"]).toBe(
-          queuedAutomationRun.id,
-        );
-        expect(automationRunWorkflowSpan?.attributes["mistle.integration.connection_id"]).toBe(
-          connectionId,
-        );
-        expect(automationRunWorkflowSpan?.attributes["mistle.integration.target_key"]).toBe(
-          targetKey,
-        );
-        expect(automationRunWorkflowSpan?.attributes["mistle.delivery.task_id"]).toBe(
-          persistedTask.id,
-        );
-        expect(
-          automationRunWorkflowSpan?.events.some((event) => event.name === "delivery_task.queued"),
-        ).toBe(true);
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "resolves matching webhook automations and queues automation runs",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_webhook_queue";
-        const targetKey = "github-cloud-worker-webhook-queue";
-        const connectionId = "icn_worker_webhook_queue";
-        const webhookSourceId = "iws_worker_webhook_queue";
-        const sandboxProfileId = "sbp_worker_webhook_queue";
-        const automationId = "atm_worker_webhook_queue";
-        const automationTargetId = "atg_worker_webhook_queue";
-        const webhookEventId = "iwe_worker_webhook_queue";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Queue Org",
-          slug: "worker-queue-org",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "123456",
-          config: {},
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(sandboxProfiles).values({
-          id: sandboxProfileId,
-          organizationId,
-          displayName: "Worker Queue Profile",
-          status: "active",
-        });
-        await seedOpenAiAgentBinding({
-          db: database.db,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 2,
-          suffix: "worker_webhook_queue",
-        });
-        await database.db.insert(automations).values({
-          id: automationId,
-          organizationId,
-          kind: AutomationKinds.WEBHOOK,
-          name: "Queue Automation",
-          enabled: true,
-        });
-        await database.db.insert(webhookAutomations).values({
-          automationId,
-          integrationWebhookSourceId: webhookSourceId,
-          eventTypes: ["github.issue_comment.created"],
-          payloadFilter: {
-            "github.issue_comment.created": {
-              op: "contains_token",
-              path: ["comment", "body"],
-              value: "@mistlebot",
-            },
-          },
-          inputTemplate: "Handle issue comment webhook",
-          conversationKeyTemplate: "github/{{payload.installation.id}}",
-          idempotencyKeyTemplate: "{{payload.delivery.id}}",
-        });
-        await database.db.insert(automationTargets).values({
-          id: automationTargetId,
-          automationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 2,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          externalEventId: "evt_queue",
-          externalDeliveryId: "delivery_queue",
-          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
-          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
-          providerEventType: "issue_comment",
-          eventType: "github.issue_comment.created",
-          payload: {
-            installation: {
-              id: 12345,
-            },
-            delivery: {
-              id: "delivery_queue_payload",
-            },
-            comment: {
-              body: "please run @mistlebot",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        const workflowOutput = await executeHandleIntegrationWebhookEvent({
-          db: database.db,
-          webhookEventId,
-          enqueueAutomationRuns: async ({ automationRunIds }) => {
-            for (const automationRunId of automationRunIds) {
-              await executeHandleAutomationRunSteps({
-                db: database.db,
-                automationRunId,
-              });
-            }
-          },
-          enqueueResourceSync: async () => {},
-        });
-
-        expect(workflowOutput).toEqual({
-          webhookEventId,
-        });
-
-        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq }) => eq(table.id, webhookEventId),
-        });
-        expect(persistedEvent).toBeDefined();
-        if (persistedEvent === undefined) {
-          throw new Error("Expected persisted webhook event.");
-        }
-
-        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.PROCESSED);
-        expect(persistedEvent.finalizedAt).toBeDefined();
-
-        const queuedRuns = await database.db.query.automationRuns.findMany({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
-        });
-        expect(queuedRuns).toHaveLength(1);
-        const [queuedRun] = queuedRuns;
-        if (queuedRun === undefined) {
-          throw new Error("Expected queued automation run.");
-        }
-
-        expect(queuedRun.automationId).toBe(automationId);
-        expect(queuedRun.automationTargetId).toBe(automationTargetId);
-        expect(queuedRun.status).toBe("completed");
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "marks webhook event ignored when no automation targets resolve",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_webhook_ignore";
-        const targetKey = "github-cloud-worker-webhook-ignore";
-        const connectionId = "icn_worker_webhook_ignore";
-        const webhookSourceId = "iws_worker_webhook_ignore";
-        const webhookEventId = "iwe_worker_webhook_ignore";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Ignore Org",
-          slug: "worker-ignore-org",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "123456",
-          config: {},
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          externalEventId: "evt_ignore",
-          externalDeliveryId: "delivery_ignore",
-          providerEventType: "issue_comment",
-          eventType: "github.issue_comment.created",
-          payload: {
-            comment: {
-              body: "nothing to match",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        const workflowOutput = await executeHandleIntegrationWebhookEvent({
-          db: database.db,
-          webhookEventId,
-          enqueueAutomationRuns: async () => {},
-          enqueueResourceSync: async () => {},
-        });
-
-        expect(workflowOutput).toEqual({
-          webhookEventId,
-        });
-
-        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq }) => eq(table.id, webhookEventId),
-        });
-        expect(persistedEvent).toBeDefined();
-        if (persistedEvent === undefined) {
-          throw new Error("Expected persisted webhook event.");
-        }
-
-        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.IGNORED);
-        expect(persistedEvent.finalizedAt).toBeDefined();
-
-        const queuedRuns = await database.db.query.automationRuns.findMany({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
-        });
-        expect(queuedRuns).toHaveLength(0);
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "ignores Slack message subtypes when an automation only listens for slack:message",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_slack_message_subtype_ignore";
-        const targetKey = "slack-default-worker-message-subtype-ignore";
-        const connectionId = "icn_worker_slack_message_subtype_ignore";
-        const webhookSourceId = "iws_worker_slack_message_subtype_ignore";
-        const webhookEventId = "iwe_worker_slack_message_subtype_ignore";
-        const sandboxProfileId = "sbp_worker_slack_message_subtype_ignore";
-        const automationId = "atm_worker_slack_message_subtype_ignore";
-        const automationTargetId = "atg_worker_slack_message_subtype_ignore";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Slack Ignore Org",
-          slug: "worker-slack-ignore-org",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "slack",
-          variantId: "slack-default",
-          enabled: true,
-          config: {
-            api_base_url: "https://slack.com/api",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker Slack webhook connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "123456",
-          config: {
-            connection_method: "slack-bot-token",
-          },
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(sandboxProfiles).values({
-          id: sandboxProfileId,
-          organizationId,
-          displayName: "Worker Slack Ignore Profile",
-          status: "active",
-        });
-        await seedOpenAiAgentBinding({
-          db: database.db,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-          suffix: "worker_slack_message_subtype_ignore",
-        });
-        await database.db.insert(automations).values({
-          id: automationId,
-          organizationId,
-          kind: AutomationKinds.WEBHOOK,
-          name: "Worker Slack message automation",
-          enabled: true,
-        });
-        await database.db.insert(webhookAutomations).values({
-          automationId,
-          integrationWebhookSourceId: webhookSourceId,
-          eventTypes: ["slack:message"],
-          payloadFilter: null,
-          inputTemplate: "Respond to {{payload.event.text}}",
-          conversationKeyTemplate: "channel-{{payload.event.channel}}",
-          idempotencyKeyTemplate: "{{webhookEvent.externalEventId}}",
-        });
-        await database.db.insert(automationTargets).values({
-          id: automationTargetId,
-          automationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 3,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          externalEventId: "evt_slack_message_deleted",
-          providerEventType: "message_deleted",
-          eventType: "slack:message_deleted",
-          payload: {
-            event: {
-              channel: "C123",
-              text: "deleted",
-              subtype: "message_deleted",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        const workflowOutput = await executeHandleIntegrationWebhookEvent({
-          db: database.db,
-          webhookEventId,
-          enqueueAutomationRuns: async () => {},
-          enqueueResourceSync: async () => {},
-        });
-
-        expect(workflowOutput).toEqual({
-          webhookEventId,
-        });
-
-        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq }) => eq(table.id, webhookEventId),
-        });
-        expect(persistedEvent).toBeDefined();
-        if (persistedEvent === undefined) {
-          throw new Error("Expected persisted webhook event.");
-        }
-
-        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.IGNORED);
-        expect(persistedEvent.finalizedAt).toBeDefined();
-
-        const queuedRuns = await database.db.query.automationRuns.findMany({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
-        });
-        expect(queuedRuns).toHaveLength(0);
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "marks webhook event processed when a resource sync trigger matches without automation targets",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      try {
-        const organizationId = "org_worker_webhook_resource_sync";
-        const targetKey = "github-cloud-worker-webhook-resource-sync";
-        const connectionId = "icn_worker_webhook_resource_sync";
-        const webhookSourceId = "iws_worker_webhook_resource_sync";
-        const webhookEventId = "iwe_worker_webhook_resource_sync";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Resource Sync Org",
-          slug: "worker-resource-sync-org",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "123456",
-          config: {},
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          externalEventId: "evt_resource_sync",
-          externalDeliveryId: "delivery_resource_sync",
-          providerEventType: "installation_repositories",
-          eventType: "github.installation_repositories.added",
-          payload: {
-            installation: {
-              id: 12345,
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        const workflowOutput = await executeHandleIntegrationWebhookEvent({
-          db: database.db,
-          webhookEventId,
-          enqueueAutomationRuns: async () => {},
-          enqueueResourceSync: async () => {},
-        });
-
-        expect(workflowOutput).toEqual({
-          webhookEventId,
-        });
-
-        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq }) => eq(table.id, webhookEventId),
-        });
-        expect(persistedEvent).toBeDefined();
-        if (persistedEvent === undefined) {
-          throw new Error("Expected persisted webhook event.");
-        }
-
-        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.PROCESSED);
-        expect(persistedEvent.finalizedAt).toBeDefined();
-
-        const queuedRuns = await database.db.query.automationRuns.findMany({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
-        });
-        expect(queuedRuns).toHaveLength(0);
-      } finally {
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "only allows one worker to prepare the same webhook event concurrently",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      const lockClient = database.pool.connect();
-
-      try {
-        const organizationId = "org_worker_webhook_prepare_race";
-        const targetKey = "github-cloud-worker-webhook-prepare-race";
-        const connectionId = "icn_worker_webhook_prepare_race";
-        const webhookSourceId = "iws_worker_webhook_prepare_race";
-        const sandboxProfileId = "sbp_worker_webhook_prepare_race";
-        const automationId = "atm_worker_webhook_prepare_race";
-        const automationTargetId = "atg_worker_webhook_prepare_race";
-        const webhookEventId = "iwe_worker_webhook_prepare_race";
-
-        await database.db.insert(organizations).values({
-          id: organizationId,
-          name: "Worker Webhook Prepare Race",
-          slug: "worker-webhook-prepare-race",
-        });
-        await database.db.insert(integrationTargets).values({
-          targetKey,
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {
-            api_base_url: "https://api.github.com",
-            web_base_url: "https://github.com",
-          },
-        });
-        await database.db.insert(integrationConnections).values({
-          id: connectionId,
-          organizationId,
-          targetKey,
-          displayName: "Worker webhook prepare race connection",
-          status: IntegrationConnectionStatuses.ACTIVE,
-          externalSubjectId: "123456",
-          config: {},
-        });
-        await seedWebhookSource({
-          db: database.db,
-          sourceId: webhookSourceId,
-          organizationId,
-          connectionId,
-          targetKey,
-        });
-        await database.db.insert(sandboxProfiles).values({
-          id: sandboxProfileId,
-          organizationId,
-          displayName: "Worker Prepare Race Profile",
-          status: "active",
-        });
-        await seedOpenAiAgentBinding({
-          db: database.db,
-          organizationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 2,
-          suffix: "worker_webhook_prepare_race",
-        });
-        await database.db.insert(automations).values({
-          id: automationId,
-          organizationId,
-          kind: AutomationKinds.WEBHOOK,
-          name: "Prepare Race Automation",
-          enabled: true,
-        });
-        await database.db.insert(webhookAutomations).values({
-          automationId,
-          integrationWebhookSourceId: webhookSourceId,
-          eventTypes: ["github.issue_comment.created"],
-          payloadFilter: null,
-          inputTemplate: "Handle issue comment webhook",
-          conversationKeyTemplate: "github/{{payload.installation.id}}",
-          idempotencyKeyTemplate: "{{payload.delivery.id}}",
-        });
-        await database.db.insert(automationTargets).values({
-          id: automationTargetId,
-          automationId,
-          sandboxProfileId,
-          sandboxProfileVersion: 2,
-        });
-        await database.db.insert(integrationWebhookEvents).values({
-          id: webhookEventId,
-          organizationId,
-          integrationConnectionId: connectionId,
-          integrationWebhookSourceId: webhookSourceId,
-          targetKey,
-          externalEventId: "evt_prepare_race",
-          externalDeliveryId: "delivery_prepare_race",
-          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
-          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
-          providerEventType: "issue_comment",
-          eventType: "github.issue_comment.created",
-          payload: {
-            installation: {
-              id: 12345,
-            },
-            delivery: {
-              id: "delivery_prepare_race_payload",
-            },
-            comment: {
-              body: "please run @mistlebot",
-            },
-          },
-          status: IntegrationWebhookEventStatuses.RECEIVED,
-        });
-
-        const acquiredLockClient = await lockClient;
-        await acquiredLockClient.query("BEGIN");
-        await acquiredLockClient.query(
-          `
-            select 1
-            from "control_plane"."integration_webhook_events"
-            where id = $1
-            for update
-          `,
-          [webhookEventId],
-        );
-
-        const firstPreparePromise = prepareIntegrationWebhookEvent(
-          {
-            db: database.db,
-            integrationRegistry: createIntegrationRegistry(),
-          },
-          {
-            webhookEventId,
-          },
-        );
-        const secondPreparePromise = prepareIntegrationWebhookEvent(
-          {
-            db: database.db,
-            integrationRegistry: createIntegrationRegistry(),
-          },
-          {
-            webhookEventId,
-          },
-        );
-
-        await waitForBlockedWebhookEventMutation({
-          pool: database.pool,
-          minimumCount: 2,
-        });
-
-        await acquiredLockClient.query("COMMIT");
-
-        const prepareResults = await Promise.all([firstPreparePromise, secondPreparePromise]);
-        const finalizedResults = prepareResults.filter((result) => result.finalized);
-        const activeResults = prepareResults.filter((result) => !result.finalized);
-
-        expect(finalizedResults).toHaveLength(1);
-        expect(finalizedResults[0]).toMatchObject({
-          automationRunIds: [],
-          externalDeliveryId: "delivery_prepare_race",
-          finalized: true,
-          integrationConnectionId: connectionId,
-          resourceSyncRequests: [],
-          targetKey,
-          webhookEventId,
-        });
-        expect(activeResults).toHaveLength(1);
-        expect(activeResults[0]?.automationRunIds).toHaveLength(1);
-        expect(activeResults[0]?.resourceSyncRequests).toEqual([]);
-
-        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
-          where: (table, { eq }) => eq(table.id, webhookEventId),
-        });
-        expect(persistedEvent?.status).toBe(IntegrationWebhookEventStatuses.PROCESSING);
-
-        const queuedRuns = await database.db.query.automationRuns.findMany({
-          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
-        });
-        expect(queuedRuns).toHaveLength(1);
-      } finally {
-        const acquiredLockClient = await lockClient;
-        try {
-          await acquiredLockClient.query("ROLLBACK");
-        } catch {}
-        acquiredLockClient.release();
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-});

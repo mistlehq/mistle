@@ -1,11 +1,9 @@
-import {
-  integrationConnections,
-  integrationTargets,
-  IntegrationBindingKinds,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-} from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { IntegrationBindingKinds, IntegrationConnectionStatuses } from "@mistle/db/control-plane";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
 import {
@@ -13,122 +11,119 @@ import {
   SandboxProfileVersionNotFoundResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import {
-  createIntegrationTargetFixture,
-  createSandboxProfileFixture,
-  createSandboxProfileVersionFixture,
-  createSandboxProfileVersionIntegrationBindingFixture,
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
 } from "./helpers/sandbox-profiles.js";
-import { it } from "./test-context.js";
 
-describe("sandbox profile version automation config get integration", () => {
-  it("returns bindings and repository options for the specified profile version", async ({
-    fixture,
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("sandbox profile version automation config get integration", () => {
+  it("returns agent bindings and git repository options for the selected profile version", async ({
+    env,
   }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-automation-config-get@example.com",
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-automation-config-get@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values([
-      createIntegrationTargetFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values([
+      integrationTargetRow({
         targetKey: "openai-automation-config-get",
         variantId: "openai-default",
         enabled: true,
       }),
       {
-        ...createIntegrationTargetFixture({
-          targetKey: "github-automation-config-get",
-          variantId: "github-cloud",
-          enabled: true,
-        }),
+        targetKey: "github-automation-config-get",
         familyId: "git",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
       },
     ]);
-    const [agentConnection] = await fixture.db
-      .insert(integrationConnections)
-      .values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values([
+      integrationConnectionRow({
         id: "icn_automation_config_agent_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "openai-automation-config-get",
         displayName: "Automation Config Agent Connection",
-      })
-      .returning();
-    const [gitConnection] = await fixture.db
-      .insert(integrationConnections)
-      .values({
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+      integrationConnectionRow({
         id: "icn_automation_config_git_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         targetKey: "github-automation-config-get",
         displayName: "Automation Config Git Connection",
-      })
-      .returning();
+        status: IntegrationConnectionStatuses.ACTIVE,
+      }),
+    ]);
 
-    if (agentConnection === undefined || gitConnection === undefined) {
-      throw new Error("Expected integration connections to be inserted.");
-    }
-
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_automation_config_get_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Automation Config Profile",
         createdAt: "2026-03-01T00:00:00.000Z",
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      ...createSandboxProfileVersionFixture({
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
         sandboxProfileId: "sbp_automation_config_get_001",
         version: 1,
       }),
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        ...createSandboxProfileVersionIntegrationBindingFixture({
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values([
+        sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_automation_config_agent_001",
           sandboxProfileId: "sbp_automation_config_get_001",
           sandboxProfileVersion: 1,
-          connectionId: agentConnection.id,
+          connectionId: "icn_automation_config_agent_001",
           kind: IntegrationBindingKinds.AGENT,
-        }),
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
           },
-        },
-      },
-      {
-        ...createSandboxProfileVersionIntegrationBindingFixture({
+        }),
+        sandboxProfileVersionIntegrationBindingRow({
           id: "ibd_automation_config_git_001",
           sandboxProfileId: "sbp_automation_config_get_001",
           sandboxProfileVersion: 1,
-          connectionId: gitConnection.id,
+          connectionId: "icn_automation_config_git_001",
           kind: IntegrationBindingKinds.GIT,
+          config: {
+            repositories: ["mistlehq/platform", "mistlehq/mistle"],
+          },
         }),
-        config: {
-          repositories: ["mistlehq/platform", "mistlehq/mistle"],
-        },
-      },
-    ]);
+      ]);
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_automation_config_get_001/versions/1/automation-config",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
 
     expect(response.status).toBe(200);
-    const responseBody = GetSandboxProfileVersionAutomationConfigResponseSchema.parse(
+    const body = GetSandboxProfileVersionAutomationConfigResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.bindings).toHaveLength(2);
-    expect(responseBody.bindings.map((binding) => binding.id)).toEqual([
+    expect(body.bindings.map((binding) => binding.id)).toEqual([
       "ibd_automation_config_agent_001",
       "ibd_automation_config_git_001",
     ]);
-    expect(responseBody.repositoryOptions).toEqual([
+    expect(body.repositoryOptions).toEqual([
       {
         id: "mistlehq/mistle",
         label: "mistlehq/mistle",
@@ -140,33 +135,33 @@ describe("sandbox profile version automation config get integration", () => {
         path: "/root/mistlehq/platform",
       },
     ]);
-  }, 60_000);
+  });
 
-  it("returns 404 when profile version is missing", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-version-automation-config-missing-version@example.com",
+  it("returns 404 when the selected profile version does not exist", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-version-automation-config-missing@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      ...createSandboxProfileFixture({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
         id: "sbp_automation_config_missing_version_001",
-        organizationId: authenticatedSession.organizationId,
+        organizationId: session.organizationId,
         displayName: "Automation Config Missing Version Profile",
         createdAt: "2026-03-01T00:00:00.000Z",
       }),
-    });
+    );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_automation_config_missing_version_001/versions/10/automation-config",
       {
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
 
     expect(response.status).toBe(404);
-    const responseBody = SandboxProfileVersionNotFoundResponseSchema.parse(await response.json());
-    expect(responseBody.code).toBe("PROFILE_VERSION_NOT_FOUND");
-  }, 60_000);
+    const body = SandboxProfileVersionNotFoundResponseSchema.parse(await response.json());
+    expect(body.code).toBe("PROFILE_VERSION_NOT_FOUND");
+  });
 });

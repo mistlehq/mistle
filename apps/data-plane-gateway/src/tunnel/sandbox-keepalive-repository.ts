@@ -20,6 +20,7 @@ export class SandboxKeepaliveRepository {
     message: KeepaliveControlMessage;
     sandboxInstanceId: string;
     ownerLeaseId: string;
+    testEnvironmentId?: string;
   }): Promise<void> {
     await this.sandboxDeadlineLifecycleCoordinator.enqueue({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -49,6 +50,9 @@ export class SandboxKeepaliveRepository {
         await this.sandboxInstanceDeadlineService.touchIdleDeadline({
           sandboxInstanceId: input.sandboxInstanceId,
           ownerLeaseId: activeSession.ownerLeaseId,
+          ...(input.testEnvironmentId === undefined
+            ? {}
+            : { testEnvironmentId: input.testEnvironmentId }),
         });
       },
     });

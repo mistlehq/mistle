@@ -1,928 +1,288 @@
-import {
-  IntegrationBindingKinds,
-  integrationConnections,
-  IntegrationConnectionStatuses,
-  integrationTargets,
-  organizationIdentityLinkProviderConfigs,
-  sandboxProfiles,
-  sandboxProfileVersionIntegrationBindings,
-  sandboxProfileVersions,
-  SandboxProfileVersionStates,
-  userExternalPrincipalCredentialSecrets,
-  UserExternalPrincipalCredentialSecretKinds,
-  userExternalPrincipalCredentials,
-  UserExternalPrincipalCredentialStatuses,
-  UserExternalPrincipalStatuses,
-  userExternalPrincipals,
-} from "@mistle/db/control-plane";
-import {
-  CompiledRuntimePlanSchema,
-  IntegrationConnectionMethodIds,
-} from "@mistle/integrations-core";
-import { systemSleeper } from "@mistle/time";
-import { describe, expect } from "vitest";
-import { z } from "zod";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
 
 import {
-  encryptCredentialUtf8,
-  resolveMasterEncryptionKeyMaterial,
-  unwrapOrganizationCredentialKey,
-} from "../src/lib/crypto.js";
+  IntegrationBindingKinds,
+  IntegrationConnectionStatuses,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
+import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
+import { describe, expect } from "vitest";
+
 import {
   StartSandboxProfileInstanceBadRequestResponseSchema,
   StartSandboxProfileInstanceConflictResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
   StartSandboxProfileInstanceResponseSchema,
 } from "../src/sandbox-profiles/index.js";
-import { createDisposableDataPlaneRuntime } from "./helpers/disposable-data-plane-runtime.js";
-import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
+import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
+import {
+  integrationConnectionRow,
+  integrationTargetRow,
+  sandboxProfileRow,
+  sandboxProfileVersionIntegrationBindingRow,
+  sandboxProfileVersionRow,
+} from "./helpers/sandbox-profiles.js";
 
-const WorkflowRunPersistTimeoutMs = 30_000;
-const WorkflowRunPersistPollIntervalMs = 100;
-const StartWorkflowName = "data-plane.sandbox-instances.start";
-
-const WorkflowRunInputSchema = z.looseObject({
-  sandboxInstanceId: z.string().min(1),
-  actingUserId: z.string().min(1).optional(),
-  image: z
-    .object({
-      imageId: z.string().min(1),
-      createdAt: z.iso.datetime().optional(),
-      kind: z.enum(["base", "snapshot"]),
-      provider: z.enum(["docker", "e2b"]).optional(),
-    })
-    .strict()
-    .optional(),
-  runtimePlan: CompiledRuntimePlanSchema,
-  gitIdentity: z
-    .object({
-      name: z.string().min(1),
-      email: z.email(),
-      signing: z
-        .object({
-          format: z.literal("ssh"),
-          program: z.string().min(1),
-          keyRef: z.string().min(1),
-          organizationId: z.string().min(1),
-          providerFamily: z.string().min(1),
-          actingUserId: z.string().min(1),
-        })
-        .optional(),
-    })
-    .optional(),
+const it = createIntegrationTest({
+  services: ["control-plane-api", "data-plane-api"],
 });
 
-async function waitForQueuedStartWorkflowInput(input: {
-  dataPlaneDbPool: Awaited<ReturnType<typeof createDisposableDataPlaneRuntime>>["dbPool"];
-  workflowNamespaceId: string;
-  sandboxInstanceId: string;
-}) {
-  const deadline = Date.now() + WorkflowRunPersistTimeoutMs;
+describe.concurrent("sandbox profile version start instance integration", () => {
+  it("returns 404 when the selected profile version does not exist", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-missing-version@example.com",
+    });
 
-  while (Date.now() < deadline) {
-    const result = await input.dataPlaneDbPool.query<{ input: unknown }>(
-      `
-        select input
-        from data_plane_openworkflow.workflow_runs
-        where
-          namespace_id = $1
-          and workflow_name = $2
-          and input->>'sandboxInstanceId' = $3
-        order by created_at desc
-        limit 1
-      `,
-      [input.workflowNamespaceId, StartWorkflowName, input.sandboxInstanceId],
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_start_instance_missing_version",
+        organizationId: session.organizationId,
+        displayName: "Missing Version Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
     );
-    const row = result.rows[0];
-    if (row !== undefined) {
-      return WorkflowRunInputSchema.parse(row.input);
-    }
 
-    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for queued start workflow input for sandbox '${input.sandboxInstanceId}'.`,
-  );
-}
-
-async function insertIdentityLinkProviderConfig(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  userId: string;
-  configId: string;
-  providerFamily: string;
-  targetKey: string;
-  connectionId: string;
-  policy?: Record<string, unknown>;
-}): Promise<void> {
-  await input.fixture.db.insert(organizationIdentityLinkProviderConfigs).values({
-    id: input.configId,
-    organizationId: input.organizationId,
-    providerFamily: input.providerFamily,
-    status: "active",
-    integrationTargetKey: input.targetKey,
-    integrationConnectionId: input.connectionId,
-    createdByUserId: input.userId,
-    updatedByUserId: input.userId,
-    ...(input.policy === undefined ? {} : { policy: input.policy }),
-  });
-}
-
-async function insertPrincipalCredentialSecret(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  organizationId: string;
-  credentialId: string;
-  secretKind: (typeof UserExternalPrincipalCredentialSecretKinds)[keyof typeof UserExternalPrincipalCredentialSecretKinds];
-  plaintext: string;
-  metadata?: Record<string, unknown>;
-}): Promise<void> {
-  const organizationCredentialKey =
-    await input.fixture.db.query.organizationCredentialKeys.findFirst({
-      where: (table, { eq }) => eq(table.organizationId, input.organizationId),
-    });
-  if (organizationCredentialKey === undefined) {
-    throw new Error("Expected organization credential key.");
-  }
-
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-    masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
-  });
-  const organizationCredentialKeyMaterial = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: organizationCredentialKey.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
-
-  try {
-    const encryptedSecret = encryptCredentialUtf8({
-      plaintext: input.plaintext,
-      organizationCredentialKey: organizationCredentialKeyMaterial,
-    });
-
-    await input.fixture.db.insert(userExternalPrincipalCredentialSecrets).values({
-      organizationId: input.organizationId,
-      credentialId: input.credentialId,
-      secretKind: input.secretKind,
-      ciphertext: encryptedSecret.ciphertext,
-      nonce: encryptedSecret.nonce,
-      organizationCredentialKeyVersion: organizationCredentialKey.version,
-      ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
-    });
-  } finally {
-    organizationCredentialKeyMaterial.fill(0);
-  }
-}
-
-describe("sandbox profile version start instance integration", () => {
-  it("returns 404 when the sandbox profile version does not exist", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-missing-version@example.com",
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_missing_version",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Missing Version Profile",
-      status: "active",
-    });
-
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_start_instance_missing_version/versions/9/instances",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
-    expect(response.status).toBe(404);
 
+    expect(response.status).toBe(404);
     const body = StartSandboxProfileInstanceNotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_VERSION_NOT_FOUND");
   });
 
-  it("returns 409 when a published version does not yet have a usable snapshot", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-not-usable@example.com",
+  it("returns 409 when a published version has no usable snapshot", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-not-usable@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_not_usable",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Not Usable Profile",
-      status: "active",
-      activeVersion: null,
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_not_usable",
-      version: 1,
-      state: SandboxProfileVersionStates.PUBLISHED,
-      publishedAt: "2026-04-24T00:00:00.000Z",
-    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_start_instance_not_usable",
+        organizationId: session.organizationId,
+        displayName: "Not Usable Profile",
+        activeVersion: null,
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_start_instance_not_usable",
+        version: 1,
+        state: SandboxProfileVersionStates.PUBLISHED,
+        publishedAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_start_instance_not_usable/versions/1/instances",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
-    expect(response.status).toBe(409);
 
+    expect(response.status).toBe(409);
     const body = StartSandboxProfileInstanceConflictResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_VERSION_NOT_USABLE");
   });
 
-  it("returns 400 when compile preflight fails", async ({ fixture }) => {
-    const targetKey = "openai-start-instance-preflight";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-compile-error@example.com",
+  it("returns 400 when compile preflight fails", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-compile-error@example.com",
     });
-    const otherOrganizationSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-compile-error-other-org@example.com",
+    const otherSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-compile-error-other@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_compile_error",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Error Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_compile_error",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_missing_connection",
-      organizationId: otherOrganizationSession.organizationId,
-      targetKey,
-      displayName: "Foreign connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_start_instance_compile_error",
-      sandboxProfileId: "sbp_start_instance_compile_error",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_missing_connection",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_start_instance_compile_error",
+        organizationId: session.organizationId,
+        displayName: "Compile Error Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_start_instance_compile_error",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationTargets).values(
+      integrationTargetRow({
+        targetKey: "openai-start-instance-preflight",
+        variantId: "openai-default",
+        enabled: true,
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values(
+      integrationConnectionRow({
+        id: "icn_missing_connection",
+        organizationId: otherSession.organizationId,
+        targetKey: "openai-start-instance-preflight",
+        displayName: "Foreign connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
         },
-      },
-    });
+      }),
+    );
+    await env.controlPlaneDb
+      .insert(env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+      .values(
+        sandboxProfileVersionIntegrationBindingRow({
+          id: "ibd_start_instance_compile_error",
+          sandboxProfileId: "sbp_start_instance_compile_error",
+          sandboxProfileVersion: 1,
+          connectionId: "icn_missing_connection",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            runtime: {
+              runtimeId: "codex",
+              config: {},
+            },
+          },
+        }),
+      );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_start_instance_compile_error/versions/1/instances",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
-    expect(response.status).toBe(400);
 
+    expect(response.status).toBe(400);
     const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
-    if (!("code" in body)) {
-      throw new Error("Expected sandbox profile compile error response.");
-    }
     expect(body.code).toBe("INVALID_BINDING_CONNECTION_REFERENCE");
   });
 
-  it("returns 400 when the sandbox profile version has no agent binding", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-missing-agent-binding@example.com",
+  it("returns 400 when the profile version has no agent binding", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-missing-agent@example.com",
     });
 
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_missing_agent_binding",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Missing Agent Binding Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_missing_agent_binding",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_start_instance_missing_agent_binding",
+        organizationId: session.organizationId,
+        displayName: "Missing Agent Binding Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_start_instance_missing_agent_binding",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
 
-    const response = await fixture.request(
+    const response = await env.controlPlaneApi.http.fetch(
       "/v1/sandbox/profiles/sbp_start_instance_missing_agent_binding/versions/1/instances",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
         },
       },
     );
-    expect(response.status).toBe(400);
 
+    expect(response.status).toBe(400);
     const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
-    if (!("code" in body)) {
-      throw new Error("Expected sandbox profile compile error response.");
-    }
     expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
   });
 
   it("queues launches for usable published versions from the stored snapshot image", async ({
-    fixture,
+    env,
   }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_start_instance_snapshot_launch",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-snapshot-launch@example.com",
     });
 
-    try {
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-sandbox-profile-start-instance-snapshot-launch@example.com",
-      });
-
-      await fixture.db.insert(sandboxProfiles).values({
-        id: "sbp_start_instance_snapshot_launch",
-        organizationId: authenticatedSession.organizationId,
-        displayName: "Snapshot Launch Profile",
-        status: "active",
-        activeVersion: 1,
-      });
-      await fixture.db.insert(sandboxProfileVersions).values({
-        sandboxProfileId: "sbp_start_instance_snapshot_launch",
-        version: 1,
-        state: SandboxProfileVersionStates.PUBLISHED,
-        publishedAt: "2026-04-24T00:00:00.000Z",
-        snapshotImageProvider: "docker",
-        snapshotImageId: "sha256:snapshot-launch-image",
-      });
-      await fixture.db.insert(integrationTargets).values({
-        targetKey: "openai-start-instance-snapshot-launch",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      });
-      await fixture.db.insert(integrationConnections).values({
-        id: "icn_start_instance_snapshot_launch",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-start-instance-snapshot-launch",
-        displayName: "Snapshot Launch Agent Connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      });
-      await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-        id: "ibd_start_instance_snapshot_launch",
-        sandboxProfileId: "sbp_start_instance_snapshot_launch",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_start_instance_snapshot_launch",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      });
-
-      const response = await fixture.request(
-        "/v1/sandbox/profiles/sbp_start_instance_snapshot_launch/versions/1/instances",
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-        },
-      );
-      expect(response.status).toBe(201);
-
-      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-        dataPlaneDbPool: dataPlaneFixture.dbPool,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: body.sandboxInstanceId,
-      });
-
-      expect(queuedWorkflowInput.image).toEqual({
-        imageId: "sha256:snapshot-launch-image",
-        kind: "snapshot",
-        provider: "docker",
-      });
-      expect(queuedWorkflowInput.runtimePlan.image).toEqual({
-        source: "snapshot",
-        imageRef: "sha256:snapshot-launch-image",
-      });
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("starts the session in the selected primary repository", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_start_instance_repository",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_snapshot_launch",
+      targetKey: "openai-start-instance-snapshot-launch",
+      connectionId: "icn_start_instance_snapshot_launch",
+      bindingId: "ibd_start_instance_snapshot_launch",
+      versionState: SandboxProfileVersionStates.PUBLISHED,
+      snapshotImageId: "sha256:snapshot-launch-image",
     });
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-primary-repository@example.com",
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_primary_repository",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Primary Repository Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_primary_repository",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await fixture.db.insert(integrationTargets).values([
-      {
-        targetKey: "openai-start-instance-primary-repository",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      },
-      {
-        targetKey: "github-start-instance-primary-repository",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-      },
-    ]);
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_start_instance_primary_repository_agent",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-start-instance-primary-repository",
-        displayName: "Primary repository agent connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_start_instance_primary_repository_git",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-start-instance-primary-repository",
-        displayName: "Primary repository git connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_start_instance_primary_repository_agent",
-        sandboxProfileId: "sbp_start_instance_primary_repository",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_start_instance_primary_repository_agent",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      },
-      {
-        id: "ibd_start_instance_primary_repository_git",
-        sandboxProfileId: "sbp_start_instance_primary_repository",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_start_instance_primary_repository_git",
-        kind: IntegrationBindingKinds.GIT,
-        config: {
-          repositories: ["mistlehq/mistle", "mistlehq/platform"],
-          tools: [],
-        },
-      },
-    ]);
-
-    try {
-      const response = await fixture.request(
-        "/v1/sandbox/profiles/sbp_start_instance_primary_repository/versions/1/instances",
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            primaryRepositoryId: "mistlehq/platform",
-          }),
-        },
-      );
-      expect(response.status).toBe(201);
-
-      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-        dataPlaneDbPool: dataPlaneFixture.dbPool,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: body.sandboxInstanceId,
-      });
-
-      expect(queuedWorkflowInput.runtimePlan?.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
-        "/root/mistlehq/platform",
-      );
-      expect(queuedWorkflowInput.runtimePlan?.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
-        "/root/mistlehq/platform",
-      );
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("starts the session at the workspace root when no primary repository is selected", async ({
-    fixture,
-  }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_start_instance_workspace_root",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-workspace-root@example.com",
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_workspace_root",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Workspace Root Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_workspace_root",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-start-instance-workspace-root",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
-    await fixture.db.insert(integrationConnections).values({
-      id: "icn_start_instance_workspace_root_agent",
-      organizationId: authenticatedSession.organizationId,
-      targetKey: "openai-start-instance-workspace-root",
-      displayName: "Workspace root agent connection",
-      status: IntegrationConnectionStatuses.ACTIVE,
-      config: {
-        connection_method: IntegrationConnectionMethodIds.API_KEY,
-      },
-    });
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_start_instance_workspace_root_agent",
-      sandboxProfileId: "sbp_start_instance_workspace_root",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_start_instance_workspace_root_agent",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
-    });
-
-    try {
-      const response = await fixture.request(
-        "/v1/sandbox/profiles/sbp_start_instance_workspace_root/versions/1/instances",
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            primaryRepositoryId: null,
-          }),
-        },
-      );
-      expect(response.status).toBe(201);
-
-      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-        dataPlaneDbPool: dataPlaneFixture.dbPool,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: body.sandboxInstanceId,
-      });
-
-      expect(queuedWorkflowInput.runtimePlan?.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
-        undefined,
-      );
-      expect(queuedWorkflowInput.runtimePlan?.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
-        undefined,
-      );
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("queues linked GitHub git identity for the acting dashboard user", async ({ fixture }) => {
-    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
-      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
-      internalAuthServiceToken: fixture.internalAuthServiceToken,
-      controlPlaneBaseUrl: `http://${fixture.config.server.host}:${String(fixture.config.server.port)}`,
-      workflowNamespaceId: fixture.config.workflow.namespaceId,
-      databaseNamePrefix: "mistle_cp_start_instance_git_identity",
-      baseUrl: fixture.config.dataPlaneApi.baseUrl,
-    });
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-git-identity@example.com",
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_git_identity",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Git Identity Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_git_identity",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await fixture.db.insert(integrationTargets).values([
-      {
-        targetKey: "openai-start-instance-git-identity",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      },
-      {
-        targetKey: "github-start-instance-git-identity",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-      },
-    ]);
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_start_instance_git_identity_agent",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-start-instance-git-identity",
-        displayName: "Git identity agent connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_start_instance_git_identity_provider",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-start-instance-git-identity",
-        displayName: "Git identity provider connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
-          app_id: "123",
-          app_slug: "mistle-github-app",
-          client_id: "Iv1.mistleGitIdentity",
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_start_instance_git_identity_agent",
-      sandboxProfileId: "sbp_start_instance_git_identity",
-      sandboxProfileVersion: 1,
-      connectionId: "icn_start_instance_git_identity_agent",
-      kind: IntegrationBindingKinds.AGENT,
-      config: {
-        runtime: {
-          runtimeId: "codex",
-          config: {},
-        },
-      },
-    });
-    await insertIdentityLinkProviderConfig({
-      fixture,
-      organizationId: authenticatedSession.organizationId,
-      userId: authenticatedSession.userId,
-      configId: "ilp_start_instance_git_identity",
-      providerFamily: "github",
-      targetKey: "github-start-instance-git-identity",
-      connectionId: "icn_start_instance_git_identity_provider",
-      policy: {
-        gitCommitSigningMode: "allowed",
-      },
-    });
-    await fixture.db.insert(userExternalPrincipals).values({
-      id: "uep_start_instance_git_identity",
-      organizationId: authenticatedSession.organizationId,
-      userId: authenticatedSession.userId,
-      providerFamily: "github",
-      providerSubjectId: "12345",
-      organizationProviderConfigId: "ilp_start_instance_git_identity",
-      integrationConnectionId: "icn_start_instance_git_identity_provider",
-      status: UserExternalPrincipalStatuses.ACTIVE,
-      profile: {
-        login: "mistle-user",
-        displayName: "Mistle User",
-        preferredEmail: "mistle-user@example.com",
-        avatarUrl: "https://avatars.example.com/u/12345",
-      },
-    });
-    await fixture.db.insert(userExternalPrincipalCredentials).values({
-      id: "upc_start_instance_git_identity_signing",
-      organizationId: authenticatedSession.organizationId,
-      principalId: "uep_start_instance_git_identity",
-      providerFamily: "github",
-      credentialKind: "git_ssh_signing_key",
-      status: UserExternalPrincipalCredentialStatuses.ACTIVE,
-    });
-    await insertPrincipalCredentialSecret({
-      fixture,
-      organizationId: authenticatedSession.organizationId,
-      credentialId: "upc_start_instance_git_identity_signing",
-      secretKind: UserExternalPrincipalCredentialSecretKinds.GIT_SSH_PRIVATE_KEY,
-      plaintext: "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----",
-      metadata: {
-        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
-        publicKeyFingerprint: "SHA256:test-start-instance-signing-key",
-      },
-    });
-
-    try {
-      const response = await fixture.request(
-        "/v1/sandbox/profiles/sbp_start_instance_git_identity/versions/1/instances",
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-          },
-        },
-      );
-
-      expect(response.status).toBe(201);
-      const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-
-      const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
-        dataPlaneDbPool: dataPlaneFixture.dbPool,
-        workflowNamespaceId: fixture.config.workflow.namespaceId,
-        sandboxInstanceId: body.sandboxInstanceId,
-      });
-      expect(queuedWorkflowInput.gitIdentity).toEqual({
-        name: "Mistle User",
-        email: "mistle-user@example.com",
-        signing: {
-          format: "ssh",
-          program: "/opt/mistle/bin/mistle-ssh-sign",
-          keyRef:
-            "key::ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestSigningKey mistle-user@example.com",
-          organizationId: authenticatedSession.organizationId,
-          providerFamily: "github",
-          actingUserId: authenticatedSession.userId,
-        },
-      });
-      expect(queuedWorkflowInput.actingUserId).toBe(authenticatedSession.userId);
-    } finally {
-      await dataPlaneFixture.stop();
-    }
-  }, 60_000);
-
-  it("returns 400 when the selected primary repository is not available", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-invalid-primary-repository@example.com",
-    });
-
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_invalid_primary_repository",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Invalid Primary Repository Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_invalid_primary_repository",
-      version: 1,
-      state: SandboxProfileVersionStates.DRAFT,
-    });
-    await fixture.db.insert(integrationTargets).values([
-      {
-        targetKey: "openai-start-instance-invalid-primary-repository",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com/v1",
-        },
-      },
-      {
-        targetKey: "github-start-instance-invalid-primary-repository",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.github.com",
-          web_base_url: "https://github.com",
-        },
-      },
-    ]);
-    await fixture.db.insert(integrationConnections).values([
-      {
-        id: "icn_start_instance_invalid_primary_repository_agent",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-start-instance-invalid-primary-repository",
-        displayName: "Invalid primary repository agent connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-      {
-        id: "icn_start_instance_invalid_primary_repository_git",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "github-start-instance-invalid-primary-repository",
-        displayName: "Invalid primary repository git connection",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        config: {
-          connection_method: IntegrationConnectionMethodIds.API_KEY,
-        },
-      },
-    ]);
-    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
-      {
-        id: "ibd_start_instance_invalid_primary_repository_agent",
-        sandboxProfileId: "sbp_start_instance_invalid_primary_repository",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_start_instance_invalid_primary_repository_agent",
-        kind: IntegrationBindingKinds.AGENT,
-        config: {
-          runtime: {
-            runtimeId: "codex",
-            config: {},
-          },
-        },
-      },
-      {
-        id: "ibd_start_instance_invalid_primary_repository_git",
-        sandboxProfileId: "sbp_start_instance_invalid_primary_repository",
-        sandboxProfileVersion: 1,
-        connectionId: "icn_start_instance_invalid_primary_repository_git",
-        kind: IntegrationBindingKinds.GIT,
-        config: {
-          repositories: ["mistlehq/mistle"],
-          tools: [],
-        },
-      },
-    ]);
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_start_instance_invalid_primary_repository/versions/1/instances",
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_snapshot_launch/versions/1/instances",
       {
         method: "POST",
         headers: {
-          cookie: authenticatedSession.cookie,
+          cookie: session.cookie,
+        },
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.image).toEqual({
+      imageId: "sha256:snapshot-launch-image",
+      kind: "snapshot",
+      provider: "docker",
+    });
+    expect(queuedWorkflowInput.runtimePlan.image).toEqual({
+      source: "snapshot",
+      imageRef: "sha256:snapshot-launch-image",
+    });
+  });
+
+  it("starts the session in the selected primary repository", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-primary-repository@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_primary_repository",
+      targetKey: "openai-start-instance-primary-repository",
+      connectionId: "icn_start_instance_primary_repository_agent",
+      bindingId: "ibd_start_instance_primary_repository_agent",
+      versionState: SandboxProfileVersionStates.DRAFT,
+      git: {
+        targetKey: "github-start-instance-primary-repository",
+        connectionId: "icn_start_instance_primary_repository_git",
+        bindingId: "ibd_start_instance_primary_repository_git",
+        repositories: ["mistlehq/mistle", "mistlehq/platform"],
+      },
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_primary_repository/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
           "content-type": "application/json",
         },
         body: JSON.stringify({
@@ -930,12 +290,236 @@ describe("sandbox profile version start instance integration", () => {
         }),
       },
     );
-    expect(response.status).toBe(400);
 
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
+      "/root/mistlehq/platform",
+    );
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
+      "/root/mistlehq/platform",
+    );
+  });
+
+  it("starts the session at the workspace root when no primary repository is selected", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-start-instance-workspace-root@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_workspace_root",
+      targetKey: "openai-start-instance-workspace-root",
+      connectionId: "icn_start_instance_workspace_root_agent",
+      bindingId: "ibd_start_instance_workspace_root_agent",
+      versionState: SandboxProfileVersionStates.DRAFT,
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_workspace_root/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          primaryRepositoryId: null,
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.newLaunch.cwd).toBe(
+      undefined,
+    );
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes[0]?.ptyLaunch.resumeLaunch.cwd).toBe(
+      undefined,
+    );
+  });
+
+  it("returns 400 when the selected primary repository is not available", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email:
+        "integration-new-sandbox-profile-start-instance-invalid-primary-repository@example.com",
+    });
+
+    await createStartableProfile({
+      env,
+      organizationId: session.organizationId,
+      profileId: "sbp_start_instance_invalid_primary_repository",
+      targetKey: "openai-start-instance-invalid-primary-repository",
+      connectionId: "icn_start_instance_invalid_primary_repository_agent",
+      bindingId: "ibd_start_instance_invalid_primary_repository_agent",
+      versionState: SandboxProfileVersionStates.DRAFT,
+      git: {
+        targetKey: "github-start-instance-invalid-primary-repository",
+        connectionId: "icn_start_instance_invalid_primary_repository_git",
+        bindingId: "ibd_start_instance_invalid_primary_repository_git",
+        repositories: ["mistlehq/mistle"],
+      },
+    });
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_start_instance_invalid_primary_repository/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          primaryRepositoryId: "mistlehq/platform",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
     const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
-    if (!("code" in body)) {
-      throw new Error("Expected invalid primary repository response.");
-    }
     expect(body.code).toBe("INVALID_PRIMARY_REPOSITORY");
   });
 });
+
+async function createStartableProfile(input: {
+  env: IntegrationTestEnvironment;
+  organizationId: string;
+  profileId: string;
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+  versionState:
+    | typeof SandboxProfileVersionStates.DRAFT
+    | typeof SandboxProfileVersionStates.PUBLISHED;
+  snapshotImageId?: string;
+  git?: {
+    targetKey: string;
+    connectionId: string;
+    bindingId: string;
+    repositories: string[];
+  };
+}) {
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values(
+    sandboxProfileRow({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "Startable Profile",
+      activeVersion: input.versionState === SandboxProfileVersionStates.PUBLISHED ? 1 : null,
+      createdAt: "2026-04-24T00:00:00.000Z",
+    }),
+  );
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      ...sandboxProfileVersionRow({
+        sandboxProfileId: input.profileId,
+        version: 1,
+        state: input.versionState,
+        publishedAt:
+          input.versionState === SandboxProfileVersionStates.PUBLISHED
+            ? "2026-04-24T00:00:00.000Z"
+            : null,
+      }),
+      ...(input.snapshotImageId === undefined
+        ? {}
+        : {
+            snapshotImageProvider: "docker",
+            snapshotImageId: input.snapshotImageId,
+          }),
+    });
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.integrationTargets).values([
+    integrationTargetRow({
+      targetKey: input.targetKey,
+      variantId: "openai-default",
+      enabled: true,
+    }),
+    ...(input.git === undefined
+      ? []
+      : [
+          {
+            targetKey: input.git.targetKey,
+            familyId: "github",
+            variantId: "github-cloud",
+            enabled: true,
+            config: {
+              api_base_url: "https://api.github.com",
+              web_base_url: "https://github.com",
+            },
+          },
+        ]),
+  ]);
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationConnections)
+    .values([
+      integrationConnectionRow({
+        id: input.connectionId,
+        organizationId: input.organizationId,
+        targetKey: input.targetKey,
+        displayName: "Start instance agent connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+        config: {
+          connection_method: IntegrationConnectionMethodIds.API_KEY,
+        },
+      }),
+      ...(input.git === undefined
+        ? []
+        : [
+            integrationConnectionRow({
+              id: input.git.connectionId,
+              organizationId: input.organizationId,
+              targetKey: input.git.targetKey,
+              displayName: "Start instance git connection",
+              status: IntegrationConnectionStatuses.ACTIVE,
+              config: {
+                connection_method: IntegrationConnectionMethodIds.API_KEY,
+              },
+            }),
+          ]),
+    ]);
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values([
+      sandboxProfileVersionIntegrationBindingRow({
+        id: input.bindingId,
+        sandboxProfileId: input.profileId,
+        sandboxProfileVersion: 1,
+        connectionId: input.connectionId,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: {
+            runtimeId: "codex",
+            config: {},
+          },
+        },
+      }),
+      ...(input.git === undefined
+        ? []
+        : [
+            sandboxProfileVersionIntegrationBindingRow({
+              id: input.git.bindingId,
+              sandboxProfileId: input.profileId,
+              sandboxProfileVersion: 1,
+              connectionId: input.git.connectionId,
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: input.git.repositories,
+                tools: [],
+              },
+            }),
+          ]),
+    ]);
+}

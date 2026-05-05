@@ -13,6 +13,11 @@ Operators define those targets in `integration-targets.json`, then sync them int
 pnpm --filter @mistle/control-plane-api integration-targets:sync
 ```
 
+<Note>
+  If you are running this via the Docker Compose stack, this is automatically done as part of the
+  start up script.
+</Note>
+
 ## Start From The Example File
 
 Use the repository example file as the starting point:

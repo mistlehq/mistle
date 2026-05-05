@@ -1,656 +1,147 @@
-import { getLocalDevDockerRegistrySandboxBaseImageRef } from "@mistle/config";
-import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+
 import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
-  integrationConnections,
-  integrationTargets,
 } from "@mistle/db/control-plane";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
-  IntegrationConnectionMethodIds,
-  IntegrationRegistry,
-  type IntegrationDefinition,
-  type IntegrationOAuth2AuthorizationCodeCapability,
-} from "@mistle/integrations-core";
+  SignozCredentialSlotKeys,
+  SignozFamilyId,
+  SignozMcpVariantId,
+} from "@mistle/integrations-definitions/server";
+import { releaseReservedPort, reserveAvailablePort } from "@mistle/test-harness";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
-import { createApp } from "../src/app.js";
-import { createControlPlaneAuth } from "../src/auth/index.js";
 import { CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/complete-oauth2-authorization-code-connection/schema.js";
 import { IntegrationConnectionSchema } from "../src/integration-connections/schemas.js";
-import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
+import { StartOAuth2AuthorizationCodeConnectionResponseSchema } from "../src/integration-connections/start-oauth2-authorization-code-connection/schema.js";
 import { UpdateIntegrationConnectionBodySchema } from "../src/integration-connections/update-integration-connection/schema.js";
-import {
-  decryptCredentialUtf8,
-  decryptRedirectSessionSecretUtf8,
-  resolveMasterEncryptionKeyMaterial,
-  unwrapOrganizationCredentialKey,
-} from "../src/lib/crypto.js";
-import { createAppResources, stopAppResources } from "../src/resources.js";
-import { IntegrationPortAccessConfig } from "./helpers/port-access-config.js";
-import { it } from "./test-context.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+import { expectCredentialSlots, seedIntegrationTarget } from "./helpers/integration-connections.js";
 
-const EmptyConfigSchema = z.object({}).strict();
-const LocalDevDockerRegistrySandboxBaseImageRef = getLocalDevDockerRegistrySandboxBaseImageRef();
-const OAuth2AuthorizationCodeTestConnectionConfigSchema = z
-  .object({
-    region: z.string().min(1),
-  })
-  .strict();
-const OAuth2AuthorizationCodeTestFamilyId = "oauth2-auth-code-test";
-const OAuth2AuthorizationCodeTestVariantId = "oauth2-auth-code-default";
+const SimulatedProviderHost = "0.0.0.0";
+const SimulatedProviderRequestHost = "127.0.0.1";
+const TestRegion = "local";
 
-type OAuth2AuthorizationCodeTestCapability<
-  TConnectionConfig extends Record<string, unknown> = Record<string, unknown>,
-> = IntegrationOAuth2AuthorizationCodeCapability<
-  Record<string, unknown>,
-  Record<string, string>,
-  TConnectionConfig
->;
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
-function createOAuth2AuthorizationCodeTestRegistry<
-  TConnectionConfig extends Record<string, unknown> = Record<string, unknown>,
->(input: {
-  startAuthorization: OAuth2AuthorizationCodeTestCapability<TConnectionConfig>["startAuthorization"];
-  completeAuthorizationCodeGrant: OAuth2AuthorizationCodeTestCapability<TConnectionConfig>["completeAuthorizationCodeGrant"];
-  startConfigSchema?: z.ZodType<TConnectionConfig>;
-}): IntegrationRegistry {
-  const registry = new IntegrationRegistry();
-  const definition: IntegrationDefinition<
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    typeof EmptyConfigSchema,
-    TConnectionConfig
-  > = {
-    familyId: OAuth2AuthorizationCodeTestFamilyId,
-    variantId: OAuth2AuthorizationCodeTestVariantId,
-    kind: "connector",
-    displayName: "OAuth2 Authorization Code Test",
-    logoKey: "oauth2",
-    targetConfigSchema: EmptyConfigSchema,
-    targetSecretSchema: EmptyConfigSchema,
-    bindingConfigSchema: EmptyConfigSchema,
-    connectionMethods: [
-      {
-        id: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-        label: "OAuth 2.0 Authorization Code",
-        kind: "redirect",
-        ...(input.startConfigSchema === undefined
-          ? {}
-          : { startConfigSchema: input.startConfigSchema }),
-        ui: {
-          create: {
-            submitLabel: "Connect",
-            helperText: "Connect with OAuth 2.0 Authorization Code.",
-          },
-        },
-      },
-    ],
-    oauth2AuthorizationCode: {
-      startAuthorization: input.startAuthorization,
-      completeAuthorizationCodeGrant: input.completeAuthorizationCodeGrant,
-      refreshAccessToken: async () => {
-        throw new Error("Not used in OAuth 2.0 (Authorization Code) start/complete tests.");
-      },
-    },
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-    }),
-  };
-
-  registry.register(definition);
-
-  return registry;
-}
-
-async function createOAuth2AuthorizationCodeTestApp(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  registry: IntegrationRegistry;
-}) {
-  const resources = await createAppResources(input.fixture.config);
-  for (const definition of input.registry.listDefinitions()) {
-    resources.integrationRegistry.register(definition);
-  }
-
-  const auth = createControlPlaneAuth({
-    config: {
-      authBaseUrl: input.fixture.config.auth.baseUrl,
-      dashboardBaseUrl: input.fixture.config.dashboard.baseUrl,
-      authSecret: input.fixture.config.auth.secret,
-      authTrustedOrigins: input.fixture.config.auth.trustedOrigins,
-      authOTPLength: input.fixture.config.auth.otpLength,
-      authOTPExpiresInSeconds: input.fixture.config.auth.otpExpiresInSeconds,
-      authOTPAllowedAttempts: input.fixture.config.auth.otpAllowedAttempts,
-      authGoogleClientId: input.fixture.config.auth.google?.clientId ?? null,
-      authGoogleClientSecret: input.fixture.config.auth.google?.clientSecret ?? null,
-      activeMasterEncryptionKeyVersion:
-        input.fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: input.fixture.config.integrations.masterEncryptionKeys,
-    },
-    db: resources.db,
-    openWorkflow: resources.openWorkflow,
-  });
-  const app = createApp({
-    config: input.fixture.config,
-    sandboxConfig: {
-      defaultBaseImage: LocalDevDockerRegistrySandboxBaseImageRef,
-      gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-    },
-    internalAuthServiceToken: input.fixture.internalAuthServiceToken,
-    db: resources.db,
-    objectStore: resources.objectStore,
-    integrationRegistry: resources.integrationRegistry,
-    dataPlaneClient: createDataPlaneSandboxInstancesClient({
-      baseUrl: input.fixture.config.dataPlaneApi.baseUrl,
-      serviceToken: input.fixture.internalAuthServiceToken,
-    }),
-    connectionTokenConfig: {
-      secret: "integration-connection-secret",
-      issuer: "integration-issuer",
-      audience: "integration-audience",
-    },
-    portAccessConfig: IntegrationPortAccessConfig,
-    openWorkflow: resources.openWorkflow,
-    auth,
-  });
-
-  return {
-    app,
-    resources,
-  };
-}
-
-function decryptRedirectProviderState(input: {
-  ciphertext: string;
-  masterEncryptionKeys: Record<string, string>;
-}): Record<string, unknown> {
-  const plaintext = decryptRedirectSessionSecretUtf8({
-    ciphertext: input.ciphertext,
-    masterEncryptionKeys: input.masterEncryptionKeys,
-  });
-  const parsed = JSON.parse(plaintext);
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error("Expected redirect provider state to decode to an object.");
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(parsed)) {
-    record[key] = value;
-  }
-
-  return record;
-}
-
-function decryptStoredCredential(input: {
-  wrappedOrganizationKeyCiphertext: string;
-  masterKeyVersion: number;
-  masterEncryptionKeys: Record<string, string>;
-  nonce: string;
-  ciphertext: string;
-}): string {
-  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-    masterKeyVersion: input.masterKeyVersion,
-    masterEncryptionKeys: input.masterEncryptionKeys,
-  });
-  const organizationCredentialKey = unwrapOrganizationCredentialKey({
-    wrappedCiphertext: input.wrappedOrganizationKeyCiphertext,
-    masterEncryptionKeyMaterial,
-  });
-
-  try {
-    return decryptCredentialUtf8({
-      nonce: input.nonce,
-      ciphertext: input.ciphertext,
-      organizationCredentialKey,
-    });
-  } finally {
-    organizationCredentialKey.fill(0);
-  }
-}
-
-describe("integration connections OAuth 2.0 authorization-code integration", () => {
-  it("updates redirect connection config without touching the connection method", async ({
-    fixture,
-  }) => {
-    const targetKey = "oauth2-update-default";
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startAuthorization: async () => ({
-        authorizationUrl: "https://provider.example.test/authorize",
-        providerState: {},
-      }),
-      completeAuthorizationCodeGrant: async () => ({
-        externalSubjectId: "oauth-subject-001",
-        connectionConfig: {
-          region: "us",
-        },
-        accessToken: "oauth-access-token",
-        refreshToken: "oauth-refresh-token",
-        expiresAt: "2026-04-15T00:30:00.000Z",
-      }),
-      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
-    });
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
+describe.concurrent("integration connections OAuth 2.0 authorization-code integration", () => {
+  it("starts a SigNoz OAuth connection and persists encrypted redirect state", async ({ env }) => {
+    const simulatedSignoz = await startSimulatedSignozOAuthProvider();
+    const targetKey = "signoz-oauth-start";
 
     try {
-      await fixture.db.insert(integrationTargets).values({
+      await seedSignozTarget({
+        env,
         targetKey,
-        familyId: OAuth2AuthorizationCodeTestFamilyId,
-        variantId: OAuth2AuthorizationCodeTestVariantId,
-        enabled: true,
-        config: {},
+        issuerBaseUrl: simulatedSignoz.baseUrl,
+      });
+      const session = await env.auth.createSession({
+        email: "integration-new-oauth2-start@example.com",
       });
 
-      const authenticatedSession = await fixture.authSession({
-        email: "integration-connections-update-redirect@example.com",
-      });
-
-      await fixture.db.insert(integrationConnections).values({
-        id: "icn_oauth_update_001",
-        organizationId: authenticatedSession.organizationId,
+      const response = await startOAuth2AuthorizationCodeConnection({
+        env,
         targetKey,
-        displayName: "SigNoz Hosted",
-        status: IntegrationConnectionStatuses.ACTIVE,
-        externalSubjectId: "oauth-subject-001",
-        config: {
-          connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-          client_id: "signoz-client-id",
-          region: "us",
+        cookie: session.cookie,
+        body: {
+          displayName: "SigNoz local MCP",
+          config: {
+            region: TestRegion,
+          },
         },
-        createdAt: "2026-04-15T00:00:00.000Z",
-        updatedAt: "2026-04-15T00:00:00.000Z",
-      });
-
-      const response = await app.request("/v1/integration/connections/icn_oauth_update_001", {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify(
-          UpdateIntegrationConnectionBodySchema.parse({
-            displayName: "SigNoz EU",
-            config: {
-              region: "eu",
-            },
-          }),
-        ),
       });
 
       expect(response.status).toBe(200);
-      const updatedConnection = IntegrationConnectionSchema.parse(await response.json());
-      expect(updatedConnection.displayName).toBe("SigNoz EU");
-      expect(updatedConnection.config).toEqual({
-        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-        client_id: "signoz-client-id",
-        region: "eu",
-      });
-
-      const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.id, "icn_oauth_update_001"),
-            eq(table.organizationId, authenticatedSession.organizationId),
-          ),
-      });
-      expect(persistedConnection?.config).toEqual({
-        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
-        client_id: "signoz-client-id",
-        region: "eu",
-      });
-    } finally {
-      await stopAppResources(resources);
-    }
-  });
-
-  it("returns 400 when a target does not support OAuth 2.0 (Authorization Code) start", async ({
-    fixture,
-  }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-oauth2-start",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
-
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-start@example.com",
-    });
-
-    const response = await fixture.request(
-      "/v1/integration/connections/openai-default-oauth2-start/oauth2-authorization-code/start",
-      {
-        method: "POST",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(
-      StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
-        code: "OAUTH2_NOT_SUPPORTED",
-        message:
-          "Integration target 'openai-default-oauth2-start' does not support OAuth 2.0 (Authorization Code).",
-      }),
-    );
-  });
-
-  it("returns a route error instead of auth middleware for OAuth 2.0 (Authorization Code) completion without a session", async ({
-    fixture,
-  }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-oauth2-complete",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
-
-    const response = await fixture.request(
-      "/p/integration/callbacks/openai-default-oauth2-complete/oauth2-authorization-code?state=missing",
-      {
-        method: "GET",
-      },
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(
-      CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
-        code: "OAUTH2_NOT_SUPPORTED",
-        message:
-          "Integration target 'openai-default-oauth2-complete' does not support OAuth 2.0 (Authorization Code).",
-      }),
-    );
-  });
-
-  it("starts an OAuth 2.0 (Authorization Code) connection and persists encrypted provider state", async ({
-    fixture,
-  }) => {
-    const targetKey = "oauth2-auth-code-provider-state-start";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-provider-state-start@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startAuthorization: async (input) => ({
-        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
-        providerState: {
-          client_id: "client_123",
-          client_secret: "secret_456",
-        },
-      }),
-      completeAuthorizationCodeGrant: async () => {
-        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
-      },
-    });
-
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
-
-    try {
-      const response = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            displayName: "PlanetScale Hosted MCP",
-          }),
-        },
+      const started = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+        await response.json(),
       );
-
-      expect(response.status).toBe(200);
-      const startedConnectionBody = await response.json();
-      expect(startedConnectionBody).toEqual({
-        authorizationUrl: expect.any(String),
-      });
-      const startedConnection =
-        StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(startedConnectionBody);
-      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      const authorizationUrl = new URL(started.authorizationUrl);
+      const state = authorizationUrl.searchParams.get("state");
       if (state === null || state.length === 0) {
         throw new Error("Expected authorization URL to include redirect state.");
       }
 
+      expect(authorizationUrl.origin).toBe(simulatedSignoz.baseUrl);
+      expect(authorizationUrl.pathname).toBe("/oauth/authorize");
+      expect(authorizationUrl.searchParams.get("response_type")).toBe("code");
+      expect(authorizationUrl.searchParams.get("client_id")).toBe("sig_client_local");
+      expect(authorizationUrl.searchParams.get("code_challenge_method")).toBe("S256");
+      expect(authorizationUrl.searchParams.get("code_challenge")).toBeTruthy();
+
+      const registrationRequest = readProviderRequest(simulatedSignoz.requests, "/oauth/register");
+      expect(registrationRequest.method).toBe("POST");
+      expect(JSON.parse(registrationRequest.body)).toEqual({
+        client_name: "Mistle SigNoz MCP",
+        redirect_uris: [
+          `${env.controlPlaneApi.hostBaseUrl}/p/integration/callbacks/signoz-oauth-start/oauth2-authorization-code`,
+        ],
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+      });
+
       const redirectSession =
-        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
+        await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findFirst({
           where: (table, { eq }) => eq(table.state, state),
         });
 
-      expect(redirectSession?.organizationId).toBe(authenticatedSession.organizationId);
+      expect(redirectSession?.organizationId).toBe(session.organizationId);
       expect(redirectSession?.targetKey).toBe(targetKey);
       expect(redirectSession?.pkceVerifierEncrypted).toBeTruthy();
       expect(redirectSession?.providerStateEncrypted).toBeTruthy();
-      expect(redirectSession?.providerStateEncrypted).not.toContain("client_123");
-      expect(redirectSession?.providerStateEncrypted).not.toContain("secret_456");
-
-      const decryptedProviderState = decryptRedirectProviderState({
-        ciphertext: redirectSession?.providerStateEncrypted ?? "",
-        masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-      });
-
-      expect(decryptedProviderState).toEqual({
-        client_id: "client_123",
-        client_secret: "secret_456",
-      });
+      expect(redirectSession?.providerStateEncrypted).not.toContain("sig_client_local");
     } finally {
-      await stopAppResources(resources);
+      await simulatedSignoz.stop();
     }
   });
 
-  it("passes validated redirect connection config into OAuth 2.0 start authorization", async ({
-    fixture,
+  it("completes a SigNoz OAuth callback and persists the connection credentials", async ({
+    env,
   }) => {
-    const targetKey = "oauth2-auth-code-start-config";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-start-config@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    let startedConnectionConfig: Record<string, unknown> | undefined;
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
-      startAuthorization: async (input) => {
-        startedConnectionConfig = input.connectionConfig;
-
-        return {
-          authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
-        };
-      },
-      completeAuthorizationCodeGrant: async () => {
-        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
-      },
-    });
-
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
+    const simulatedSignoz = await startSimulatedSignozOAuthProvider();
+    const targetKey = "signoz-oauth-complete";
 
     try {
-      const response = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            config: {
-              region: "us",
-            },
-          }),
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(startedConnectionConfig).toEqual({
-        region: "us",
+      await seedSignozTarget({
+        env,
+        targetKey,
+        issuerBaseUrl: simulatedSignoz.baseUrl,
       });
-    } finally {
-      await stopAppResources(resources);
-    }
-  });
+      const session = await env.auth.createSession({
+        email: "integration-new-oauth2-complete@example.com",
+      });
 
-  it("returns 400 when OAuth 2.0 start config is invalid", async ({ fixture }) => {
-    const targetKey = "oauth2-auth-code-start-config-invalid";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-start-config-invalid@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startConfigSchema: OAuth2AuthorizationCodeTestConnectionConfigSchema,
-      startAuthorization: async () => ({
-        authorizationUrl: "https://auth.example.com/authorize",
-      }),
-      completeAuthorizationCodeGrant: async () => {
-        throw new Error("Not used in OAuth 2.0 (Authorization Code) start test.");
-      },
-    });
-
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
-
-    try {
-      const response = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
+      const startResponse = await startOAuth2AuthorizationCodeConnection({
+        env,
+        targetKey,
+        cookie: session.cookie,
+        body: {
+          displayName: "SigNoz completed MCP",
+          config: {
+            region: TestRegion,
           },
-          body: JSON.stringify({
-            config: {},
-          }),
         },
-      );
-
-      expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual(
-        StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
-          code: "INVALID_OAUTH2_START_INPUT",
-          message: `Integration target '${targetKey}' received invalid OAuth 2.0 (Authorization Code) connection config.`,
-        }),
-      );
-    } finally {
-      await stopAppResources(resources);
-    }
-  });
-
-  it("completes an OAuth 2.0 (Authorization Code) connection with decrypted provider state", async ({
-    fixture,
-  }) => {
-    const targetKey = "oauth2-auth-code-provider-state-complete";
-    const authenticatedSession = await fixture.authSession({
-      email:
-        "integration-connections-oauth2-authorization-code-provider-state-complete@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    let completedProviderState: Record<string, unknown> | undefined;
-    let completedPkceVerifier: string | undefined;
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startAuthorization: async (input) => ({
-        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
-        providerState: {
-          client_id: "client_complete_123",
-          client_secret: "secret_complete_456",
-        },
-      }),
-      completeAuthorizationCodeGrant: async (input) => {
-        completedProviderState = input.providerState;
-        completedPkceVerifier = input.pkceVerifier;
-
-        return {
-          connectionConfig: {
-            account_id: "acct_123",
-          },
-          accessToken: "access-token-123",
-        };
-      },
-    });
-
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
-
-    try {
-      const startResponse = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({}),
-        },
-      );
-
+      });
       expect(startResponse.status).toBe(200);
-      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
+      const started = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
         await startResponse.json(),
       );
-      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
+      const state = new URL(started.authorizationUrl).searchParams.get("state");
       if (state === null || state.length === 0) {
         throw new Error("Expected authorization URL to include redirect state.");
       }
 
-      const completeResponse = await app.request(
-        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_123`,
+      const completeResponse = await env.controlPlaneApi.http.fetch(
+        `/p/integration/callbacks/${encodeURIComponent(targetKey)}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=signoz_code_123`,
         {
           method: "GET",
           redirect: "manual",
@@ -661,245 +152,347 @@ describe("integration connections OAuth 2.0 authorization-code integration", () 
       expect(completeResponse.headers.get("location")).toBe(
         `http://localhost:5173/integrations/${encodeURIComponent(targetKey)}`,
       );
-      expect(completedProviderState).toEqual({
-        client_id: "client_complete_123",
-        client_secret: "secret_complete_456",
-      });
-      expect(typeof completedPkceVerifier).toBe("string");
-      expect(completedPkceVerifier?.length).toBeGreaterThan(0);
 
-      const createdConnection = await resources.db.query.integrationConnections.findFirst({
+      const tokenRequest = readProviderRequest(simulatedSignoz.requests, "/oauth/token");
+      const tokenRequestBody = new URLSearchParams(tokenRequest.body);
+      expect(tokenRequestBody.get("grant_type")).toBe("authorization_code");
+      expect(tokenRequestBody.get("code")).toBe("signoz_code_123");
+      expect(tokenRequestBody.get("client_id")).toBe("sig_client_local");
+      expect(tokenRequestBody.get("code_verifier")).toBeTruthy();
+      expect(tokenRequestBody.get("redirect_uri")).toBe(
+        `${env.controlPlaneApi.hostBaseUrl}/p/integration/callbacks/${targetKey}/oauth2-authorization-code`,
+      );
+
+      const connection = await env.controlPlaneDb.query.integrationConnections.findFirst({
         where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, authenticatedSession.organizationId),
-            eq(table.targetKey, targetKey),
-          ),
+          and(eq(table.organizationId, session.organizationId), eq(table.targetKey, targetKey)),
       });
-      expect(createdConnection?.displayName).toBe(targetKey);
-      expect(createdConnection?.status).toBe("active");
-      expect(createdConnection?.config).toMatchObject({
-        connection_method: "oauth2-authorization-code",
-        account_id: "acct_123",
+      if (connection === undefined) {
+        throw new Error("Expected completed OAuth connection.");
+      }
+
+      expect(connection.displayName).toBe("SigNoz completed MCP");
+      expect(connection.status).toBe(IntegrationConnectionStatuses.ACTIVE);
+      expect(connection.config).toEqual({
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        region: TestRegion,
+        client_id: "sig_client_local",
+      });
+
+      await expectCredentialSlots({
+        env,
+        connectionId: connection.id,
+        organizationId: session.organizationId,
+        expected: [
+          {
+            slotKey: SignozCredentialSlotKeys.accessToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+            intendedFamilyId: SignozFamilyId,
+            plaintext: "sig_access_token_123",
+          },
+          {
+            slotKey: SignozCredentialSlotKeys.refreshToken,
+            secretKind: IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+            intendedFamilyId: SignozFamilyId,
+            plaintext: "sig_refresh_token_123",
+          },
+        ],
       });
 
       const redirectSession =
-        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
+        await env.controlPlaneDb.query.integrationConnectionRedirectSessions.findFirst({
           where: (table, { eq }) => eq(table.state, state),
         });
       expect(redirectSession?.usedAt).toBeTruthy();
     } finally {
-      await stopAppResources(resources);
+      await simulatedSignoz.stop();
     }
   });
 
-  it("persists an optional OAuth 2.0 client secret returned during completion", async ({
-    fixture,
+  it("updates redirect connection config without changing the OAuth connection method", async ({
+    env,
   }) => {
-    const targetKey = "oauth2-auth-code-client-secret-complete";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-client-secret-complete@example.com",
-    });
+    const targetKey = "signoz-oauth-update";
 
-    await fixture.db.insert(integrationTargets).values({
+    await seedSignozTarget({
+      env,
       targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
+      issuerBaseUrl: "https://mcp.us.signoz.cloud",
     });
-
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startAuthorization: async (input) => ({
-        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
-      }),
-      completeAuthorizationCodeGrant: async () => ({
-        connectionConfig: {
-          account_id: "acct_client_secret_123",
-        },
-        accessToken: "access-token-client-secret-123",
-        clientSecret: "oauth-client-secret-123",
-      }),
+    const session = await env.auth.createSession({
+      email: "integration-new-oauth2-update@example.com",
     });
-
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
-    });
-
-    try {
-      const startResponse = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({}),
-        },
-      );
-
-      expect(startResponse.status).toBe(200);
-      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
-        await startResponse.json(),
-      );
-      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
-      if (state === null || state.length === 0) {
-        throw new Error("Expected authorization URL to include redirect state.");
-      }
-
-      const completeResponse = await app.request(
-        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_client_secret_123`,
-        {
-          method: "GET",
-          redirect: "manual",
-        },
-      );
-
-      expect(completeResponse.status).toBe(302);
-
-      const createdConnection = await resources.db.query.integrationConnections.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, authenticatedSession.organizationId),
-            eq(table.targetKey, targetKey),
-          ),
-      });
-      if (createdConnection === undefined) {
-        throw new Error("Expected completed OAuth 2.0 connection.");
-      }
-
-      const linkedCredentials = await resources.db.query.integrationConnectionCredentials.findMany({
-        where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
-      });
-      expect(linkedCredentials).toHaveLength(2);
-
-      const credentialIds = linkedCredentials.map((link) => link.credentialId);
-      const storedCredentials = await resources.db.query.integrationCredentials.findMany({
-        where: (table, { inArray }) => inArray(table.id, credentialIds),
-      });
-
-      const clientSecretCredential = storedCredentials.find(
-        (credential) =>
-          credential.secretKind === IntegrationCredentialSecretKinds.OAUTH2_CLIENT_SECRET,
-      );
-      if (clientSecretCredential === undefined) {
-        throw new Error("Expected OAuth 2.0 client secret credential to be stored.");
-      }
-
-      const organizationCredentialKey =
-        await resources.db.query.organizationCredentialKeys.findFirst({
-          where: (table, { eq }) => eq(table.organizationId, authenticatedSession.organizationId),
-          orderBy: (table, { desc }) => [desc(table.version)],
-        });
-      if (organizationCredentialKey === undefined) {
-        throw new Error("Expected organization credential key.");
-      }
-
-      expect(
-        decryptStoredCredential({
-          wrappedOrganizationKeyCiphertext: organizationCredentialKey.ciphertext,
-          masterKeyVersion: organizationCredentialKey.masterKeyVersion,
-          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-          nonce: clientSecretCredential.nonce,
-          ciphertext: clientSecretCredential.ciphertext,
-        }),
-      ).toBe("oauth-client-secret-123");
-    } finally {
-      await stopAppResources(resources);
-    }
-  });
-
-  it("keeps existing OAuth 2.0 (Authorization Code) flows working when provider state is omitted", async ({
-    fixture,
-  }) => {
-    const targetKey = "oauth2-auth-code-provider-state-omitted";
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth2-authorization-code-provider-state-omitted@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
+    await env.controlPlaneDb.insert(env.controlPlaneTables.integrationConnections).values({
+      id: "icn_integration_new_oauth_update",
+      organizationId: session.organizationId,
       targetKey,
-      familyId: OAuth2AuthorizationCodeTestFamilyId,
-      variantId: OAuth2AuthorizationCodeTestVariantId,
-      enabled: true,
-      config: {},
-    });
-
-    let completedProviderState: Record<string, unknown> | undefined;
-    const registry = createOAuth2AuthorizationCodeTestRegistry({
-      startAuthorization: async (input) => ({
-        authorizationUrl: `https://auth.example.com/authorize?state=${encodeURIComponent(input.state)}`,
-      }),
-      completeAuthorizationCodeGrant: async (input) => {
-        completedProviderState = input.providerState;
-
-        return {
-          connectionConfig: {
-            account_id: "acct_omit_123",
-          },
-          accessToken: "access-token-omit-123",
-        };
+      displayName: "SigNoz US",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+        client_id: "sig_client_existing",
+        region: "us",
       },
     });
 
-    const { app, resources } = await createOAuth2AuthorizationCodeTestApp({
-      fixture,
-      registry,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/integration/connections/icn_integration_new_oauth_update",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: session.cookie,
+        },
+        body: JSON.stringify(
+          UpdateIntegrationConnectionBodySchema.parse({
+            displayName: "SigNoz EU",
+            config: {
+              region: "eu",
+            },
+          }),
+        ),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await response.json());
+    expect(updatedConnection.displayName).toBe("SigNoz EU");
+    expect(updatedConnection.config).toEqual({
+      connection_method: IntegrationConnectionMethodIds.OAUTH2_AUTHORIZATION_CODE,
+      client_id: "sig_client_existing",
+      region: "eu",
+    });
+  });
+
+  it("returns route errors for unsupported or invalid OAuth start and complete requests", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-oauth2-errors@example.com",
+    });
+    await seedIntegrationTarget(env, {
+      targetKey: "openai-no-oauth",
+      familyId: "openai",
+      variantId: "openai-default",
+      config: {
+        api_base_url: "https://api.openai.com/v1",
+      },
+    });
+    await seedSignozTarget({
+      env,
+      targetKey: "signoz-oauth-invalid-start",
+      issuerBaseUrl: "https://mcp.us.signoz.cloud",
     });
 
-    try {
-      const startResponse = await app.request(
-        `/v1/integration/connections/${targetKey}/oauth2-authorization-code/start`,
-        {
-          method: "POST",
-          headers: {
-            cookie: authenticatedSession.cookie,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({}),
-        },
-      );
+    const unsupportedStartResponse = await startOAuth2AuthorizationCodeConnection({
+      env,
+      targetKey: "openai-no-oauth",
+      cookie: session.cookie,
+      body: {},
+    });
+    expect(unsupportedStartResponse.status).toBe(400);
+    await expect(unsupportedStartResponse.json()).resolves.toEqual(
+      StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
+        code: "OAUTH2_NOT_SUPPORTED",
+        message:
+          "Integration target 'openai-no-oauth' does not support OAuth 2.0 (Authorization Code).",
+      }),
+    );
 
-      expect(startResponse.status).toBe(200);
-      const startedConnection = StartOAuth2AuthorizationCodeConnectionResponseSchema.parse(
-        await startResponse.json(),
-      );
-      const state = new URL(startedConnection.authorizationUrl).searchParams.get("state");
-      if (state === null || state.length === 0) {
-        throw new Error("Expected authorization URL to include redirect state.");
-      }
+    const unsupportedCompleteResponse = await env.controlPlaneApi.http.fetch(
+      "/p/integration/callbacks/openai-no-oauth/oauth2-authorization-code?state=missing",
+    );
+    expect(unsupportedCompleteResponse.status).toBe(400);
+    await expect(unsupportedCompleteResponse.json()).resolves.toEqual(
+      CompleteOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
+        code: "OAUTH2_NOT_SUPPORTED",
+        message:
+          "Integration target 'openai-no-oauth' does not support OAuth 2.0 (Authorization Code).",
+      }),
+    );
 
-      const redirectSession =
-        await resources.db.query.integrationConnectionRedirectSessions.findFirst({
-          where: (table, { eq }) => eq(table.state, state),
-        });
-      expect(redirectSession?.providerStateEncrypted).toBeNull();
-
-      const completeResponse = await app.request(
-        `/p/integration/callbacks/${targetKey}/oauth2-authorization-code?state=${encodeURIComponent(state)}&code=code_omit_123`,
-        {
-          method: "GET",
-          redirect: "manual",
-        },
-      );
-
-      expect(completeResponse.status).toBe(302);
-      expect(completedProviderState).toBeUndefined();
-
-      const createdConnection = await resources.db.query.integrationConnections.findFirst({
-        where: (table, { and, eq }) =>
-          and(
-            eq(table.organizationId, authenticatedSession.organizationId),
-            eq(table.targetKey, targetKey),
-          ),
-      });
-      expect(createdConnection?.config).toMatchObject({
-        connection_method: "oauth2-authorization-code",
-        account_id: "acct_omit_123",
-      });
-    } finally {
-      await stopAppResources(resources);
-    }
+    const invalidStartResponse = await startOAuth2AuthorizationCodeConnection({
+      env,
+      targetKey: "signoz-oauth-invalid-start",
+      cookie: session.cookie,
+      body: {
+        config: {},
+      },
+    });
+    expect(invalidStartResponse.status).toBe(400);
+    await expect(invalidStartResponse.json()).resolves.toEqual(
+      StartOAuth2AuthorizationCodeConnectionBadRequestResponseSchema.parse({
+        code: "INVALID_OAUTH2_START_INPUT",
+        message:
+          "Integration target 'signoz-oauth-invalid-start' received invalid OAuth 2.0 (Authorization Code) connection config.",
+      }),
+    );
   });
 });
+
+type SimulatedProviderRequest = {
+  method: string;
+  pathname: string;
+  body: string;
+};
+
+type SimulatedSignozOAuthProvider = {
+  baseUrl: string;
+  requests: SimulatedProviderRequest[];
+  stop: () => Promise<void>;
+};
+
+async function startSimulatedSignozOAuthProvider(): Promise<SimulatedSignozOAuthProvider> {
+  const port = await reserveAvailablePort({ host: SimulatedProviderHost });
+  const requests: SimulatedProviderRequest[] = [];
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
+    const requestUrl = new URL(
+      request.url ?? "/",
+      `http://${SimulatedProviderRequestHost}:${port.toString()}`,
+    );
+    const body = await readRequestBody(request);
+    requests.push({
+      method: request.method ?? "GET",
+      pathname: requestUrl.pathname,
+      body,
+    });
+
+    response.setHeader("content-type", "application/json");
+
+    // Simulates the SigNoz OAuth boundary used by
+    // packages/integrations-definitions/src/signoz/variants/signoz-mcp/oauth2-authorization-code.server.ts.
+    // The request/response shapes are grounded in the production SigNoz OAuth
+    // capability, RFC 7591 dynamic client registration, and the OAuth 2.0
+    // authorization-code flow with PKCE.
+    // Sources:
+    // https://www.rfc-editor.org/rfc/rfc7591
+    // https://www.rfc-editor.org/rfc/rfc7636
+    if (requestUrl.pathname === "/oauth/register") {
+      response.statusCode = 201;
+      response.end(
+        JSON.stringify({
+          client_id: "sig_client_local",
+        }),
+      );
+      return;
+    }
+
+    if (requestUrl.pathname === "/oauth/token") {
+      response.end(
+        JSON.stringify({
+          access_token: "sig_access_token_123",
+          token_type: "Bearer",
+          expires_in: 3600,
+          refresh_token: "sig_refresh_token_123",
+        }),
+      );
+      return;
+    }
+
+    response.statusCode = 404;
+    response.end(JSON.stringify({ message: "Not found." }));
+  });
+
+  await listen(server, {
+    host: SimulatedProviderHost,
+    port,
+  });
+
+  return {
+    baseUrl: `http://${SimulatedProviderRequestHost}:${port.toString()}`,
+    requests,
+    stop: async () => {
+      await close(server);
+      await releaseReservedPort({
+        host: SimulatedProviderHost,
+        port,
+      });
+    },
+  };
+}
+
+async function seedSignozTarget(input: {
+  env: Parameters<typeof seedIntegrationTarget>[0];
+  targetKey: string;
+  issuerBaseUrl: string;
+}): Promise<void> {
+  await seedIntegrationTarget(input.env, {
+    targetKey: input.targetKey,
+    familyId: SignozFamilyId,
+    variantId: SignozMcpVariantId,
+    config: {
+      issuer_base_url: input.issuerBaseUrl,
+    },
+  });
+}
+
+async function startOAuth2AuthorizationCodeConnection(input: {
+  env: Parameters<typeof seedIntegrationTarget>[0];
+  targetKey: string;
+  cookie: string;
+  body: unknown;
+}) {
+  return input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(
+      input.targetKey,
+    )}/oauth2-authorization-code/start`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify(input.body),
+    },
+  );
+}
+
+function readProviderRequest(
+  requests: readonly SimulatedProviderRequest[],
+  pathname: string,
+): SimulatedProviderRequest {
+  const request = requests.find((candidate) => candidate.pathname === pathname);
+  if (request === undefined) {
+    throw new Error(`Expected simulated provider request to '${pathname}'.`);
+  }
+
+  return request;
+}
+
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  request.setEncoding("utf8");
+  let body = "";
+
+  for await (const chunk of request) {
+    if (typeof chunk !== "string") {
+      throw new Error("Expected simulated provider request body to be decoded as UTF-8.");
+    }
+
+    body += chunk;
+  }
+
+  return body;
+}
+
+async function listen(server: Server, input: { host: string; port: number }): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(input.port, input.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
+
+async function close(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close((error) => {
+      if (error === undefined) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+}

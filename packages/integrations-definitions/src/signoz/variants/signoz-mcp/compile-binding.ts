@@ -7,7 +7,7 @@ import {
   resolveSignozMcpUrl,
 } from "./auth.js";
 import type { SignozBindingConfig } from "./binding-config-schema.js";
-import type { SignozTargetConfig } from "./target-config-schema.js";
+import { SignozTargetConfigSchema, type SignozTargetConfig } from "./target-config-schema.js";
 import { SignozToolIds } from "./tool-ids.js";
 
 export type SignozCompileBindingInput = CompileBindingInput<
@@ -18,14 +18,22 @@ export type SignozCompileBindingInput = CompileBindingInput<
 function createSignozMcpRoute(input: {
   connectionId: string;
   region: string;
+  issuerBaseUrl?: string | undefined;
 }): CompileBindingResult["egressRoutes"][number] {
+  const upstreamUrl = new URL(
+    resolveSignozMcpUrl({
+      region: input.region,
+      issuerBaseUrl: input.issuerBaseUrl,
+    }),
+  );
+
   return {
     match: {
-      hosts: [`mcp.${input.region}.signoz.cloud`],
+      hosts: [upstreamUrl.host],
       pathPrefixes: ["/mcp"],
     },
     upstream: {
-      baseUrl: resolveSignozMcpUrl(input.region),
+      baseUrl: upstreamUrl.toString(),
     },
     authInjection: {
       type: "bearer",
@@ -43,6 +51,7 @@ function createSignozMcpRoute(input: {
 export function compileSignozBinding(input: SignozCompileBindingInput): CompileBindingResult {
   const includesSignozMcp = input.binding.config.tools.includes(SignozToolIds.SIGNOZ_MCP);
   const connectionConfig = SignozConnectionConfigSchema.parse(input.connection.config);
+  const targetConfig = SignozTargetConfigSchema.parse(input.target.config);
 
   return {
     egressRoutes: includesSignozMcp
@@ -50,6 +59,7 @@ export function compileSignozBinding(input: SignozCompileBindingInput): CompileB
           createSignozMcpRoute({
             connectionId: input.connection.id,
             region: connectionConfig.region,
+            issuerBaseUrl: targetConfig.issuer_base_url,
           }),
         ]
       : [],

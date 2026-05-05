@@ -68,7 +68,7 @@ function writeEnvironmentTimingSummary(input: {
   );
 
   writeIntegrationTimingLine(
-    `[integration-new] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
+    `[integration] env ${input.environmentId} ${input.phase} phases: ${parts.join(", ")}.`,
   );
 }
 

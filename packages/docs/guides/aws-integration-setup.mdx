@@ -15,7 +15,7 @@ Before creating the connection, make sure:
 1. You have an IAM user or IAM principal that can call `sts:AssumeRole`.
 2. You have an IAM role with the permissions you want to use.
 3. That role's trust policy allows that principal to assume it.
-4. If you use third-party-style cross-account protection, you have the `ExternalId` value ready for the connection.
+4. If you use third-party-style cross-account protection, you have the external ID value ready for the connection.
 
 ## Connect In Mistle
 
@@ -25,11 +25,11 @@ Enter:
 
 | Field             | Value                                                   |
 | ----------------- | ------------------------------------------------------- |
-| `accessKeyId`     | IAM user access key ID                                  |
-| `secretAccessKey` | IAM user secret access key                              |
-| `roleArn`         | Role ARN that Mistle should assume                      |
-| `externalId`      | Optional external ID if your trust policy requires one  |
-| `durationSeconds` | Optional STS session duration between `900` and `43200` |
+| Access key ID     | IAM user access key ID                                  |
+| Secret access key | IAM user secret access key                              |
+| Role ARN          | Role ARN that Mistle should assume                      |
+| External ID       | Optional external ID if your trust policy requires one  |
+| Duration seconds  | Optional STS session duration between `900` and `43200` |
 
 ## Official References
 

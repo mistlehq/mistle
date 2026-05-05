@@ -15,6 +15,8 @@ import {
 } from "./batches.js";
 import { recordChildWorkflowsStarted, recordRecoveredScheduledActions } from "./telemetry.js";
 
+type ScheduleDispatchWorkflowRunner = Pick<OpenWorkflow, "runWorkflow">;
+
 type RecoverableScheduledActionRow = Readonly<{
   id: string;
   status: typeof ScheduledActionStatuses.PENDING | typeof ScheduledActionStatuses.DISPATCHING;
@@ -30,7 +32,7 @@ export type StartScheduleDispatchChildBatchesResult = Readonly<{
 export async function startScheduleDispatchChildBatches(
   ctx: {
     db: ControlPlaneDatabase;
-    openWorkflow: OpenWorkflow;
+    openWorkflow: ScheduleDispatchWorkflowRunner;
   },
   input: {
     cutoffMinute: Date;

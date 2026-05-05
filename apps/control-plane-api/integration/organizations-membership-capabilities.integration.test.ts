@@ -1,28 +1,38 @@
-import { members, organizations } from "@mistle/db/control-plane";
+/* eslint-disable jest/no-standalone-expect --
+ * The integration harness returns a Vitest fixture-bound `it` function.
+ */
+
 import { ForbiddenResponseSchema, NotFoundResponseSchema } from "@mistle/http/errors.js";
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { MembershipCapabilitiesSchema } from "../src/organizations/index.js";
-import { it } from "./test-context.js";
 
-describe("organization membership capabilities integration", () => {
-  it("returns capabilities for an authenticated organization member", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
+
+describe.concurrent("organization membership capabilities integration", () => {
+  it("returns capabilities for an authenticated organization member", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-membership-capabilities-owner@example.com",
     });
 
-    const response = await fixture.request("/v1/organization/membership-capabilities", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/membership-capabilities",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(200);
     const body = MembershipCapabilitiesSchema.parse(await response.json());
 
     expect(body).toEqual({
-      organizationId: authenticatedSession.organizationId,
+      organizationId: session.organizationId,
       actorRole: "owner",
       invite: {
         canExecute: true,
@@ -39,27 +49,28 @@ describe("organization membership capabilities integration", () => {
     });
   });
 
-  it("returns 403 when the active organization membership has been revoked", async ({
-    fixture,
-  }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("returns 403 when the active organization membership has been revoked", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-membership-capabilities-forbidden@example.com",
     });
 
-    await fixture.db
-      .delete(members)
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.members)
       .where(
         and(
-          eq(members.organizationId, authenticatedSession.organizationId),
-          eq(members.userId, authenticatedSession.userId),
+          eq(env.controlPlaneTables.members.organizationId, session.organizationId),
+          eq(env.controlPlaneTables.members.userId, session.userId),
         ),
       );
 
-    const response = await fixture.request("/v1/organization/membership-capabilities", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/membership-capabilities",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(403);
     const body = ForbiddenResponseSchema.parse(await response.json());
@@ -70,20 +81,23 @@ describe("organization membership capabilities integration", () => {
     });
   });
 
-  it("returns 404 when the active organization no longer exists", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
+  it("returns 404 when the active organization no longer exists", async ({ env }) => {
+    const session = await env.auth.createSession({
       email: "integration-membership-capabilities-not-found@example.com",
     });
 
-    await fixture.db
-      .delete(organizations)
-      .where(eq(organizations.id, authenticatedSession.organizationId));
+    await env.controlPlaneDb
+      .delete(env.controlPlaneTables.organizations)
+      .where(eq(env.controlPlaneTables.organizations.id, session.organizationId));
 
-    const response = await fixture.request("/v1/organization/membership-capabilities", {
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/membership-capabilities",
+      {
+        headers: {
+          cookie: session.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(404);
     const body = NotFoundResponseSchema.parse(await response.json());
@@ -94,8 +108,10 @@ describe("organization membership capabilities integration", () => {
     });
   });
 
-  it("returns 401 when the actor is unauthenticated", async ({ fixture }) => {
-    const response = await fixture.request("/v1/organization/membership-capabilities");
+  it("returns 401 when the actor is unauthenticated", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/organization/membership-capabilities",
+    );
 
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({

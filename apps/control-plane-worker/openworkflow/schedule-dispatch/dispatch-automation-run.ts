@@ -22,6 +22,8 @@ const AutomationRunTargetPayloadSchema = z
   })
   .strict();
 
+type WorkflowRunClient = Pick<OpenWorkflow, "runWorkflow">;
+
 type AutomationRunHandoffAggregate = Readonly<{
   automationId: string;
   automationTargetId: string;
@@ -30,7 +32,7 @@ type AutomationRunHandoffAggregate = Readonly<{
 export async function dispatchAutomationRunScheduledAction(
   ctx: {
     db: ControlPlaneDatabase;
-    openWorkflow: OpenWorkflow;
+    openWorkflow: WorkflowRunClient;
   },
   input: ScheduleDispatchTargetHandlerInput,
 ): Promise<ScheduleDispatchTargetHandlerResult> {

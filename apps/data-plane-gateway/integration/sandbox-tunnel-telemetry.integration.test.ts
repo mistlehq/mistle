@@ -1,10 +1,10 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended integration `it` fixture imported from test context.
+ * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
@@ -12,128 +12,72 @@ import {
   encodeDataFrame,
   PayloadKindRawBytes,
 } from "@mistle/sandbox-session-protocol";
+import {
+  TestEnvironmentIdHeader,
+  createIntegrationTest,
+  type IntegrationTestEnvironment,
+} from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
+import WebSocket from "ws";
 
-import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
   waitForWebSocketMessage,
-} from "./websocket-test-helpers.js";
+} from "../integration/websocket-test-helpers.js";
 
-const IntegrationTestTimeoutMs = 60_000;
+const TestTimeoutMs = 60_000;
+const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
+const BootstrapTokenIssuer = "integration-new-data-plane-worker";
+const GatewayTokenAudience = "integration-new-data-plane-gateway";
+const ConnectionTokenSecret = "integration-new-connection-secret";
+const ConnectionTokenIssuer = "integration-new-control-plane-api";
 
-async function insertSandboxInstanceRow(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-}): Promise<void> {
-  await input.fixture.db.insert(sandboxInstances).values({
-    id: input.sandboxInstanceId,
-    organizationId: "org_data_plane_gateway_integration",
-    sandboxProfileId: "sbp_data_plane_gateway_integration",
-    sandboxProfileVersion: 1,
-    runtimeProvider: input.fixture.config.app.sandbox.provider,
-    providerSandboxId: `provider-${input.sandboxInstanceId}`,
-    status: SandboxInstanceStatuses.STARTING,
-    startedByKind: "system",
-    startedById: "workflow_data_plane_gateway_integration",
-    source: "webhook",
-  });
-}
+const it = createIntegrationTest({
+  services: ["data-plane-api", "data-plane-gateway"],
+  extraInfra: ["otlp"],
+});
 
-async function connectBootstrapSocket(input: {
-  fixture: DataPlaneGatewayIntegrationFixture;
-  sandboxInstanceId: string;
-}) {
-  const token = await mintBootstrapToken({
-    config: {
-      bootstrapTokenSecret: input.fixture.config.app.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.fixture.config.app.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.fixture.config.app.sandbox.bootstrap.tokenAudience,
-    },
-    jti: randomUUID(),
-    sandboxInstanceId: input.sandboxInstanceId,
-    ttlSeconds: 120,
-  });
-
-  return connectSandboxTunnelWebSocket({
-    websocketBaseUrl: input.fixture.websocketBaseUrl,
-    sandboxInstanceId: input.sandboxInstanceId,
-    tokenKind: "bootstrap",
-    token,
-  });
-}
-
-async function waitForCondition(
-  predicate: () => boolean,
-  timeoutMs: number,
-  failureMessage: string,
-): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if (predicate()) {
-      return;
-    }
-
-    await systemSleeper.sleep(10);
-  }
-
-  throw new Error(failureMessage);
-}
-
-describe("sandbox tunnel telemetry ingress integration", () => {
+describe("sandbox tunnel telemetry integration", () => {
   it(
     "exports gateway tunnel spans with connection token and relay-session correlation keys",
-    async ({ fixture }) => {
-      fixture.otlpRequests.length = 0;
+    async ({ env }) => {
+      env.otlpCollector.clear();
       const sandboxInstanceId = typeid("sbi").toString();
       const connectionTokenJti = `conn-${randomUUID()}`;
       await insertSandboxInstanceRow({
-        fixture,
+        env,
         sandboxInstanceId,
+        testId: "gateway_telemetry_span",
       });
       const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
+        env,
         sandboxInstanceId,
       });
-      const connectionToken = await mintConnectionToken({
-        config: {
-          connectionTokenSecret: fixture.config.app.sandbox.connect.tokenSecret,
-          tokenIssuer: fixture.config.app.sandbox.connect.tokenIssuer,
-          tokenAudience: fixture.config.app.sandbox.connect.tokenAudience,
-        },
-        jti: connectionTokenJti,
+      const connectionSocket = await connectConnectionSocket({
+        env,
+        connectionTokenJti,
         sandboxInstanceId,
-        ttlSeconds: 120,
-      });
-
-      const connectionSocket = await connectSandboxTunnelWebSocket({
-        websocketBaseUrl: fixture.websocketBaseUrl,
-        sandboxInstanceId,
-        tokenKind: "connect",
-        token: connectionToken,
       });
 
       await closeWebSocket(connectionSocket);
 
       await waitForCondition(
         () =>
-          fixture.otlpRequests.some(
+          env.otlpCollector.requests.some(
             (request) =>
               request.path === "/v1/traces" &&
               request.body.includes("data_plane_gateway.sandbox_tunnel.connection_session") &&
               request.body.includes(connectionTokenJti) &&
               request.body.includes("mistle.tunnel.relay_session_id"),
           ),
-        10_000,
         "Expected a gateway tunnel span export with token and relay-session correlation fields.",
       );
 
-      const otlpRequest = fixture.otlpRequests.find(
+      const otlpRequest = env.otlpCollector.requests.find(
         (request) =>
           request.path === "/v1/traces" &&
           request.body.includes("data_plane_gateway.sandbox_tunnel.connection_session") &&
@@ -148,21 +92,22 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await closeWebSocket(bootstrapSocket);
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 
   it(
     "forwards sandbox OTLP trace exports to the gateway traces endpoint",
-    async ({ fixture }) => {
-      fixture.otlpRequests.length = 0;
+    async ({ env }) => {
+      env.otlpCollector.clear();
       const sandboxInstanceId = typeid("sbi").toString();
       const sandboxTraceId = "0123456789abcdef0123456789abcdef";
       await insertSandboxInstanceRow({
-        fixture,
+        env,
         sandboxInstanceId,
+        testId: "gateway_telemetry_trace",
       });
       const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
+        env,
         sandboxInstanceId,
       });
 
@@ -200,14 +145,13 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await waitForCondition(
         () =>
-          fixture.otlpRequests.some(
+          env.otlpCollector.requests.some(
             (request) => request.path === "/v1/traces" && request.body.includes(sandboxTraceId),
           ),
-        10_000,
         "Expected a forwarded OTLP trace export request.",
       );
 
-      const otlpRequest = fixture.otlpRequests.find(
+      const otlpRequest = env.otlpCollector.requests.find(
         (request) => request.path === "/v1/traces" && request.body.includes(sandboxTraceId),
       );
 
@@ -218,20 +162,21 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await closeWebSocket(bootstrapSocket);
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 
   it(
     "forwards sandbox telemetry log lines to OTLP through the gateway sink",
-    async ({ fixture }) => {
-      fixture.otlpRequests.length = 0;
+    async ({ env }) => {
+      env.otlpCollector.clear();
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
-        fixture,
+        env,
         sandboxInstanceId,
+        testId: "gateway_telemetry_logs",
       });
       const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
+        env,
         sandboxInstanceId,
       });
 
@@ -269,21 +214,16 @@ describe("sandbox tunnel telemetry ingress integration", () => {
       );
 
       await waitForCondition(
-        () => fixture.otlpRequests.length === 1,
-        10_000,
+        () => env.otlpCollector.requests.some((request) => request.path === "/v1/logs"),
         "Expected a forwarded OTLP log export request.",
       );
 
-      const otlpRequest = fixture.otlpRequests[0];
+      const otlpRequest = env.otlpCollector.requests.find((request) => request.path === "/v1/logs");
 
-      expect(otlpRequest).toEqual({
-        body: otlpRequest?.body,
-        path: "/v1/logs",
-      });
       expect(otlpRequest?.body).toContain("@mistle/sandboxd");
       expect(otlpRequest?.body).toContain('"service.name"');
       expect(otlpRequest?.body).toContain('"deployment.environment"');
-      expect(otlpRequest?.body).toContain('"integration"');
+      expect(otlpRequest?.body).toContain('"integration-new"');
       expect(otlpRequest?.body).toContain('"mistle.telemetry.ingest"');
       expect(otlpRequest?.body).toContain('"gateway-tunnel"');
       expect(otlpRequest?.body).toContain('"severityNumber":13');
@@ -308,19 +248,20 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await closeWebSocket(bootstrapSocket);
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 
   it(
     "resets unknown bootstrap telemetry data streams",
-    async ({ fixture }) => {
+    async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
-        fixture,
+        env,
         sandboxInstanceId,
+        testId: "gateway_telemetry_reset",
       });
       const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
+        env,
         sandboxInstanceId,
       });
 
@@ -347,6 +288,94 @@ describe("sandbox tunnel telemetry ingress integration", () => {
 
       await closeWebSocket(bootstrapSocket);
     },
-    IntegrationTestTimeoutMs,
+    TestTimeoutMs,
   );
 });
+
+async function insertSandboxInstanceRow(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+  testId: string;
+}): Promise<void> {
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: `org_${input.testId}`,
+    sandboxProfileId: `sbp_${input.testId}`,
+    sandboxProfileVersion: 1,
+    runtimeProvider: "docker",
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: `workflow_${input.testId}`,
+    source: "webhook",
+  });
+}
+
+async function connectBootstrapSocket(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceId: string;
+}): Promise<WebSocket> {
+  return connectSandboxTunnelWebSocket({
+    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: "bootstrap",
+    token: await mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: BootstrapTokenSecret,
+        tokenIssuer: BootstrapTokenIssuer,
+        tokenAudience: GatewayTokenAudience,
+      },
+      jti: randomUUID(),
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: 120,
+    }),
+    headers: {
+      [TestEnvironmentIdHeader]: input.env.id,
+    },
+  });
+}
+
+async function connectConnectionSocket(input: {
+  env: IntegrationTestEnvironment;
+  connectionTokenJti: string;
+  sandboxInstanceId: string;
+}): Promise<WebSocket> {
+  return connectSandboxTunnelWebSocket({
+    websocketBaseUrl: createWebSocketBaseUrl(input.env.dataPlaneGateway.hostBaseUrl),
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: "connect",
+    token: await mintConnectionToken({
+      config: {
+        connectionTokenSecret: ConnectionTokenSecret,
+        tokenIssuer: ConnectionTokenIssuer,
+        tokenAudience: GatewayTokenAudience,
+      },
+      jti: input.connectionTokenJti,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: 120,
+    }),
+    headers: {
+      [TestEnvironmentIdHeader]: input.env.id,
+    },
+  });
+}
+
+async function waitForCondition(predicate: () => boolean, failureMessage: string): Promise<void> {
+  const deadline = Date.now() + 10_000;
+
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+
+    await systemSleeper.sleep(10);
+  }
+
+  throw new Error(failureMessage);
+}
+
+function createWebSocketBaseUrl(httpBaseUrl: string): string {
+  const url = new URL(httpBaseUrl);
+  url.protocol = "ws:";
+  return url.toString().replace(/\/$/u, "");
+}

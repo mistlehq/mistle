@@ -19,6 +19,7 @@ const ControlPlaneUniqueConstraintNamesById: Record<
     "sandbox_profile_versions_pkey",
   ],
   [ControlPlaneConstraintIds.AUTOMATION_RUN_SOURCE_SCHEDULED_ACTION]: [
+    "automation_runs_source_scheduled_action_id_idx",
     "automation_runs_source_scheduled_action_id_uidx",
   ],
   [ControlPlaneConstraintIds.SNAPSHOT_JOB_ACTIVE_PER_VERSION]: [

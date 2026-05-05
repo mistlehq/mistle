@@ -1,22 +1,18 @@
+/* eslint-disable jest/no-standalone-expect --
+ * The test cases use an extended Vitest fixture created by the test harness.
+ */
+
+import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { describe, expect } from "vitest";
 
-import { it } from "./test-context.js";
+const it = createIntegrationTest({
+  services: ["control-plane-api"],
+});
 
-function getTrustedOrigin(trustedOrigins: readonly string[]): string {
-  const trustedOrigin = trustedOrigins[0];
-
-  if (trustedOrigin === undefined) {
-    throw new Error("Expected at least one trusted origin in test fixture config.");
-  }
-
-  return trustedOrigin;
-}
-
-describe("cors integration", () => {
-  it("adds CORS headers for trusted origins on standard requests", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
-
-    const response = await fixture.request("/__healthz", {
+describe.concurrent("cors integration", () => {
+  it("adds CORS headers for trusted origins on standard requests", async ({ env }) => {
+    const trustedOrigin = env.controlPlaneApi.hostBaseUrl;
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: trustedOrigin,
@@ -27,8 +23,8 @@ describe("cors integration", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
-  it("does not allow untrusted origins on standard requests", async ({ fixture }) => {
-    const response = await fixture.request("/__healthz", {
+  it("does not allow untrusted origins on standard requests", async ({ env }) => {
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "GET",
       headers: {
         origin: "http://malicious.example",
@@ -40,10 +36,9 @@ describe("cors integration", () => {
     expect(allowOrigin === null || allowOrigin === "").toBe(true);
   });
 
-  it("handles preflight requests for trusted origins", async ({ fixture }) => {
-    const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
-
-    const response = await fixture.request("/__healthz", {
+  it("handles preflight requests for trusted origins", async ({ env }) => {
+    const trustedOrigin = env.controlPlaneApi.hostBaseUrl;
+    const response = await env.controlPlaneApi.http.fetch("/__healthz", {
       method: "OPTIONS",
       headers: {
         origin: trustedOrigin,

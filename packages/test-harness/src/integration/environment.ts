@@ -20,18 +20,24 @@ import {
   getDataPlaneDatabaseSchema,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
+import { injectActiveTraceContextIntoWorkflowRunContext } from "@mistle/telemetry";
 import { OpenWorkflow } from "openworkflow";
 import { BackendPostgres } from "openworkflow/postgres";
 import { Pool, type PoolConfig } from "pg";
 
-import type { TestEnvironment, TestServiceHandle } from "../environment/index.js";
-import { createDataPlaneWorkflowNamespaceId } from "../environment/test-isolation.js";
+import {
+  createControlPlaneWorkflowNamespaceId,
+  createDataPlaneWorkflowNamespaceId,
+} from "../environment/test-isolation.js";
+import type { TestEnvironment, TestServiceHandle } from "../environment/types.js";
 import { createMailpitInbox, type MailpitInbox } from "../services/mailpit/index.js";
+import { readOtlpTestCollector, type OtlpTestCollector } from "../services/otlp-test-collector.js";
 import { createIntegrationAuth, type IntegrationAuth } from "./auth.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import { httpService, type IntegrationHttpService } from "./services/shared.js";
 
 const DefaultDatabasePoolMax = 4;
+const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
 const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
@@ -45,6 +51,15 @@ const PostgresInfraIds = {
 };
 
 const SeaweedfsInfraId = "seaweedfs";
+const OtlpInfraId = "otlp";
+const OtlpValues = {
+  COLLECTOR_ID: "collectorId",
+};
+const ValkeyInfraId = "valkey";
+const ValkeyValues = {
+  HOST_URL: "host.url",
+  KEY_PREFIX: "keyPrefix",
+};
 const SeaweedfsValues = {
   BUCKET_NAME: "bucketName",
   HOST_ENDPOINT: "host.endpoint",
@@ -68,11 +83,17 @@ export type IntegrationObjectStore = {
   destroy: () => void;
 };
 
+export type IntegrationRuntimeStateStore = {
+  valkeyUrl: string;
+  keyPrefix: string;
+};
+
 export type IntegrationTestEnvironment = {
   id: string;
   auth: IntegrationAuth;
   controlPlaneDb: ControlPlaneDatabase;
   controlPlaneTables: ReturnType<typeof getControlPlaneDatabaseSchema>;
+  controlPlaneWorkflow: IntegrationWorkflowClient;
   controlPlaneApi: IntegrationHttpService;
   controlPlaneWorker: IntegrationProcessService;
   dataPlaneDb: DataPlaneDatabase;
@@ -80,9 +101,11 @@ export type IntegrationTestEnvironment = {
   dataPlaneWorkflow: IntegrationWorkflowClient;
   dataPlaneApi: IntegrationHttpService;
   dataPlaneGateway: IntegrationHttpService;
+  dataPlaneGatewayRuntimeState: IntegrationRuntimeStateStore;
   dataPlaneWorker: IntegrationProcessService;
   mailpit: MailpitInbox;
   objectStore: IntegrationObjectStore;
+  otlpCollector: OtlpTestCollector;
   tokenizerProxy: IntegrationHttpService;
 };
 
@@ -103,6 +126,7 @@ export function createIntegrationEnvironment(input: {
   let stopped = false;
   let auth: IntegrationAuth | undefined;
   let controlPlaneDb: ControlPlaneDatabase | undefined;
+  let controlPlaneWorkflowResources: IntegrationWorkflowResources | undefined;
   let dataPlaneDb: DataPlaneDatabase | undefined;
   let dataPlaneWorkflowResources: IntegrationWorkflowResources | undefined;
   let objectStore: IntegrationObjectStore | undefined;
@@ -133,6 +157,11 @@ export function createIntegrationEnvironment(input: {
     },
     get controlPlaneTables() {
       return getControlPlaneDatabaseSchema(this.controlPlaneDb);
+    },
+    get controlPlaneWorkflow() {
+      controlPlaneWorkflowResources ??= createControlPlaneWorkflowResources(input.environment);
+
+      return controlPlaneWorkflowResources.client;
     },
     get controlPlaneApi() {
       return httpService(input.environment.services.get(ServiceIds.CONTROL_PLANE_API));
@@ -171,6 +200,17 @@ export function createIntegrationEnvironment(input: {
     get dataPlaneGateway() {
       return httpService(input.environment.services.get(ServiceIds.DATA_PLANE_GATEWAY));
     },
+    get dataPlaneGatewayRuntimeState() {
+      const valkey = input.environment.infra.get(ValkeyInfraId);
+      if (valkey === undefined) {
+        throw new Error("Expected integration environment to include Valkey infra.");
+      }
+
+      return {
+        valkeyUrl: readInfraValue(valkey, ValkeyValues.HOST_URL),
+        keyPrefix: readInfraValue(valkey, ValkeyValues.KEY_PREFIX),
+      };
+    },
     get dataPlaneWorker() {
       return processService(input.environment.services.get(ServiceIds.DATA_PLANE_WORKER));
     },
@@ -190,6 +230,15 @@ export function createIntegrationEnvironment(input: {
 
       return objectStore;
     },
+    get otlpCollector() {
+      const otlp = input.environment.infra.get(OtlpInfraId);
+      const collectorId = otlp?.values.get(OtlpValues.COLLECTOR_ID);
+      if (collectorId === undefined) {
+        throw new Error("Expected integration environment to include OTLP collector infra.");
+      }
+
+      return readOtlpTestCollector(collectorId);
+    },
     get tokenizerProxy() {
       return httpService(input.environment.services.get(ServiceIds.TOKENIZER_PROXY));
     },
@@ -199,9 +248,11 @@ export function createIntegrationEnvironment(input: {
       }
 
       stopped = true;
+      const controlPlaneWorkflowBackend = await controlPlaneWorkflowResources?.backend;
       const workflowBackend = await dataPlaneWorkflowResources?.backend;
       await Promise.all([
         ...pools.map((pool) => pool.end()),
+        controlPlaneWorkflowBackend?.stop() ?? Promise.resolve(),
         workflowBackend?.stop() ?? Promise.resolve(),
       ]);
       objectStore?.destroy();
@@ -271,6 +322,24 @@ type IntegrationWorkflowResources = {
 
 export type IntegrationWorkflowClient = Pick<OpenWorkflow, "runWorkflow" | "sendSignal">;
 
+function createControlPlaneWorkflowResources(
+  environment: TestEnvironment<ServiceId>,
+): IntegrationWorkflowResources {
+  const backend = BackendPostgres.connect(
+    readPostgresDirectUrl({
+      environment,
+      infraId: PostgresInfraIds.CONTROL_PLANE,
+    }),
+    {
+      namespaceId: createControlPlaneWorkflowNamespaceId(environment.id),
+      runMigrations: false,
+      schema: ControlPlaneOpenWorkflowSchema,
+    },
+  );
+
+  return createIntegrationWorkflowResources(backend);
+}
+
 function createDataPlaneWorkflowResources(
   environment: TestEnvironment<ServiceId>,
 ): IntegrationWorkflowResources {
@@ -286,13 +355,19 @@ function createDataPlaneWorkflowResources(
     },
   );
 
+  return createIntegrationWorkflowResources(backend);
+}
+
+function createIntegrationWorkflowResources(
+  backend: Promise<BackendPostgres>,
+): IntegrationWorkflowResources {
   return {
     backend,
     client: {
       runWorkflow: async (spec, workflowInput, options) => {
         const resolvedBackend = await backend;
         const openWorkflow = new OpenWorkflow({
-          backend: resolvedBackend,
+          backend: createTracingWorkflowBackend(resolvedBackend),
         });
 
         return openWorkflow.runWorkflow(spec, workflowInput, options);
@@ -300,13 +375,37 @@ function createDataPlaneWorkflowResources(
       sendSignal: async (options) => {
         const resolvedBackend = await backend;
         const openWorkflow = new OpenWorkflow({
-          backend: resolvedBackend,
+          backend: createTracingWorkflowBackend(resolvedBackend),
         });
 
         return openWorkflow.sendSignal(options);
       },
     },
   };
+}
+
+function createTracingWorkflowBackend(backend: BackendPostgres): BackendPostgres {
+  return new Proxy(backend, {
+    get(target, property, receiver) {
+      if (property === "createWorkflowRun") {
+        return async (...args: Parameters<BackendPostgres["createWorkflowRun"]>) => {
+          const [params] = args;
+
+          return target.createWorkflowRun({
+            ...params,
+            context: injectActiveTraceContextIntoWorkflowRunContext(params.context),
+          });
+        };
+      }
+
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value === "function") {
+        return value.bind(target);
+      }
+
+      return value;
+    },
+  });
 }
 
 function processService(service: TestServiceHandle): IntegrationProcessService {
