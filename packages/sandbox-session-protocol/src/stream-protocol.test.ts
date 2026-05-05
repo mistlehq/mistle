@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   parseBootstrapControlMessage,
+  parseEgressTransportMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseProcessesStreamMessage,
@@ -1164,6 +1165,273 @@ describe("ports transport message parser", () => {
               upgrade: ["websocket"],
             },
           },
+        }),
+      ),
+    ).toBeUndefined();
+  });
+});
+
+describe("egress transport message parser", () => {
+  it("parses egress.http lifecycle messages", () => {
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.open",
+          requestId: "req_egress_1",
+          streamId: 71,
+          request: {
+            method: "POST",
+            scheme: "https",
+            authority: "chatgpt.com",
+            path: "/backend-api/codex/models",
+            query: "client=codex",
+            headers: {
+              accept: ["application/json"],
+            },
+            originalDestination: {
+              host: "34.120.5.48",
+              port: 443,
+            },
+            runtimePlanRevision: "rpr_123",
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.open",
+      requestId: "req_egress_1",
+      streamId: 71,
+      request: {
+        method: "POST",
+        scheme: "https",
+        authority: "chatgpt.com",
+        path: "/backend-api/codex/models",
+        query: "client=codex",
+        headers: {
+          accept: ["application/json"],
+        },
+        originalDestination: {
+          host: "34.120.5.48",
+          port: 443,
+        },
+        runtimePlanRevision: "rpr_123",
+      },
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.request.body.chunk",
+          streamId: 71,
+          bytes: "eyJwcm9tcHQiOiJoaSJ9",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.request.body.chunk",
+      streamId: 71,
+      bytes: "eyJwcm9tcHQiOiJoaSJ9",
+      encoding: "base64",
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.request.body.end",
+          streamId: 71,
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.request.body.end",
+      streamId: 71,
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.response.start",
+          streamId: 71,
+          status: 200,
+          headers: {
+            "content-type": ["application/json"],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.response.start",
+      streamId: 71,
+      status: 200,
+      headers: {
+        "content-type": ["application/json"],
+      },
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.response.body.chunk",
+          streamId: 71,
+          bytes: "e30=",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.response.body.chunk",
+      streamId: 71,
+      bytes: "e30=",
+      encoding: "base64",
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.response.body.end",
+          streamId: 71,
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.response.body.end",
+      streamId: 71,
+    });
+  });
+
+  it("parses websocket upgrades as http upgrade plus raw stream data", () => {
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.open",
+          requestId: "req_ws_1",
+          streamId: 81,
+          request: {
+            method: "GET",
+            scheme: "https",
+            authority: "stream.example.test",
+            path: "/socket",
+            headers: {
+              upgrade: ["websocket"],
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.open",
+      requestId: "req_ws_1",
+      streamId: 81,
+      request: {
+        method: "GET",
+        scheme: "https",
+        authority: "stream.example.test",
+        path: "/socket",
+        headers: {
+          upgrade: ["websocket"],
+        },
+      },
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.http.response.start",
+          streamId: 81,
+          status: 101,
+          headers: {
+            upgrade: ["websocket"],
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "egress.http.response.start",
+      streamId: 81,
+      status: 101,
+      headers: {
+        upgrade: ["websocket"],
+      },
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.tcp.data",
+          streamId: 81,
+          direction: "request",
+          bytes: "aGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.tcp.data",
+      streamId: 81,
+      direction: "request",
+      bytes: "aGVsbG8=",
+      encoding: "base64",
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.tcp.close",
+          streamId: 81,
+          direction: "response",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.tcp.close",
+      streamId: 81,
+      direction: "response",
+    });
+  });
+
+  it("parses shared egress stream messages", () => {
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.stream.error",
+          streamId: 71,
+          code: "upstream_connect_failed",
+          message: "upstream refused connection",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.stream.error",
+      streamId: 71,
+      code: "upstream_connect_failed",
+      message: "upstream refused connection",
+    });
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.stream.cancel",
+          streamId: 71,
+          reason: "client closed request",
+        }),
+      ),
+    ).toEqual({
+      type: "egress.stream.cancel",
+      streamId: 71,
+      reason: "client closed request",
+    });
+  });
+
+  it("rejects malformed egress messages", () => {
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.tcp.data",
+          streamId: 81,
+          direction: "both",
+          bytes: "aGVsbG8=",
+          encoding: "base64",
+        }),
+      ),
+    ).toBeUndefined();
+
+    expect(
+      parseEgressTransportMessage(
+        JSON.stringify({
+          type: "egress.stream.error",
+          streamId: 71,
+          code: "credential_resolution_failed",
+          message: "not part of transport contract",
         }),
       ),
     ).toBeUndefined();

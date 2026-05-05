@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const PositiveIntegerSchema = z.int().positive();
 const HttpResponseStatusSchema = z.int().min(200).max(599);
+const EgressHttpResponseStatusSchema = z.union([z.literal(101), HttpResponseStatusSchema]);
 const NonEmptyStringSchema = z.string().min(1);
 
 export const FileUploadResetCodes = {
@@ -245,6 +246,111 @@ const PortsTransportMessageSchema = z.union([
   PortsStreamErrorSchema,
 ]);
 
+const EgressHttpSchemeSchema = z.enum(["http", "https"]);
+const EgressStreamDirectionSchema = z.enum(["request", "response"]);
+const EgressStreamErrorCodeSchema = z.enum([
+  "malformed_frame",
+  "upstream_connect_failed",
+  "upstream_handshake_failed",
+  "upstream_io_error",
+  "tunnel_cancelled",
+  "forbidden_tunnel_state",
+]);
+
+const EgressOriginalDestinationSchema = z.object({
+  host: NonEmptyStringSchema,
+  port: PositiveIntegerSchema,
+});
+
+const EgressHttpRequestSchema = z.object({
+  method: NonEmptyStringSchema,
+  scheme: EgressHttpSchemeSchema,
+  authority: NonEmptyStringSchema,
+  path: NonEmptyStringSchema,
+  query: NonEmptyStringSchema.optional(),
+  headers: RepeatedHeaderValuesSchema,
+  originalDestination: EgressOriginalDestinationSchema.optional(),
+  runtimePlanRevision: NonEmptyStringSchema.optional(),
+});
+
+const EgressHttpOpenSchema = z.object({
+  type: z.literal("egress.http.open"),
+  requestId: NonEmptyStringSchema,
+  streamId: PositiveIntegerSchema,
+  request: EgressHttpRequestSchema,
+});
+
+const EgressHttpRequestBodyChunkSchema = z.object({
+  type: z.literal("egress.http.request.body.chunk"),
+  streamId: PositiveIntegerSchema,
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const EgressHttpRequestBodyEndSchema = z.object({
+  type: z.literal("egress.http.request.body.end"),
+  streamId: PositiveIntegerSchema,
+});
+
+const EgressHttpResponseStartSchema = z.object({
+  type: z.literal("egress.http.response.start"),
+  streamId: PositiveIntegerSchema,
+  status: EgressHttpResponseStatusSchema,
+  headers: RepeatedHeaderValuesSchema,
+});
+
+const EgressHttpResponseBodyChunkSchema = z.object({
+  type: z.literal("egress.http.response.body.chunk"),
+  streamId: PositiveIntegerSchema,
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const EgressHttpResponseBodyEndSchema = z.object({
+  type: z.literal("egress.http.response.body.end"),
+  streamId: PositiveIntegerSchema,
+});
+
+const EgressStreamErrorSchema = z.object({
+  type: z.literal("egress.stream.error"),
+  streamId: PositiveIntegerSchema,
+  code: EgressStreamErrorCodeSchema,
+  message: NonEmptyStringSchema,
+});
+
+const EgressTcpDataSchema = z.object({
+  type: z.literal("egress.tcp.data"),
+  streamId: PositiveIntegerSchema,
+  direction: EgressStreamDirectionSchema,
+  bytes: z.string(),
+  encoding: z.literal("base64"),
+});
+
+const EgressTcpCloseSchema = z.object({
+  type: z.literal("egress.tcp.close"),
+  streamId: PositiveIntegerSchema,
+  direction: EgressStreamDirectionSchema,
+});
+
+const EgressStreamCancelSchema = z.object({
+  type: z.literal("egress.stream.cancel"),
+  streamId: PositiveIntegerSchema,
+  reason: NonEmptyStringSchema.optional(),
+});
+
+const EgressTransportMessageSchema = z.union([
+  EgressHttpOpenSchema,
+  EgressHttpRequestBodyChunkSchema,
+  EgressHttpRequestBodyEndSchema,
+  EgressHttpResponseStartSchema,
+  EgressHttpResponseBodyChunkSchema,
+  EgressHttpResponseBodyEndSchema,
+  EgressStreamErrorSchema,
+  EgressTcpDataSchema,
+  EgressTcpCloseSchema,
+  EgressStreamCancelSchema,
+]);
+
 const StreamOpenSchema = z.object({
   type: z.literal("stream.open"),
   streamId: PositiveIntegerSchema,
@@ -464,6 +570,19 @@ export type PortsHttpBodyEnd = z.infer<typeof PortsHttpBodyEndSchema>;
 export type PortsStreamClose = z.infer<typeof PortsStreamCloseSchema>;
 export type PortsStreamError = z.infer<typeof PortsStreamErrorSchema>;
 export type PortsTransportMessage = z.infer<typeof PortsTransportMessageSchema>;
+export type EgressOriginalDestination = z.infer<typeof EgressOriginalDestinationSchema>;
+export type EgressHttpRequest = z.infer<typeof EgressHttpRequestSchema>;
+export type EgressHttpOpen = z.infer<typeof EgressHttpOpenSchema>;
+export type EgressHttpRequestBodyChunk = z.infer<typeof EgressHttpRequestBodyChunkSchema>;
+export type EgressHttpRequestBodyEnd = z.infer<typeof EgressHttpRequestBodyEndSchema>;
+export type EgressHttpResponseStart = z.infer<typeof EgressHttpResponseStartSchema>;
+export type EgressHttpResponseBodyChunk = z.infer<typeof EgressHttpResponseBodyChunkSchema>;
+export type EgressHttpResponseBodyEnd = z.infer<typeof EgressHttpResponseBodyEndSchema>;
+export type EgressStreamError = z.infer<typeof EgressStreamErrorSchema>;
+export type EgressTcpData = z.infer<typeof EgressTcpDataSchema>;
+export type EgressTcpClose = z.infer<typeof EgressTcpCloseSchema>;
+export type EgressStreamCancel = z.infer<typeof EgressStreamCancelSchema>;
+export type EgressTransportMessage = z.infer<typeof EgressTransportMessageSchema>;
 
 export type StreamOpen = z.infer<typeof StreamOpenSchema>;
 export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
@@ -573,6 +692,16 @@ export function parsePortsTransportMessage(payload: string): PortsTransportMessa
   }
 
   const result = PortsTransportMessageSchema.safeParse(parsedPayload);
+  return result.success ? result.data : undefined;
+}
+
+export function parseEgressTransportMessage(payload: string): EgressTransportMessage | undefined {
+  const parsedPayload = parseJSON(payload);
+  if (parsedPayload === undefined) {
+    return undefined;
+  }
+
+  const result = EgressTransportMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
 export type SandboxSessionControlMessage =

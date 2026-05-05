@@ -484,6 +484,148 @@ pub enum PortsTransportMessage {
     StreamError(PortsStreamError),
 }
 
+/// Original destination metadata recovered by sandboxd for egress forwarding.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressOriginalDestination {
+    pub host: String,
+    pub port: u16,
+}
+
+/// Request metadata carried by `egress.http.open`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpRequest {
+    pub method: String,
+    pub scheme: String,
+    pub authority: String,
+    pub path: String,
+    pub query: Option<String>,
+    pub headers: RepeatedHeaderValues,
+    pub original_destination: Option<EgressOriginalDestination>,
+    pub runtime_plan_revision: Option<String>,
+}
+
+/// Outbound `egress.http.open` sent from sandboxd to the gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpOpen {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub request_id: String,
+    pub stream_id: u32,
+    pub request: EgressHttpRequest,
+}
+
+/// One outbound request body chunk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpRequestBodyChunk {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub bytes: String,
+    pub encoding: String,
+}
+
+/// Request body completion signal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpRequestBodyEnd {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+}
+
+/// Inbound `egress.http.response.start` from gateway.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpResponseStart {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub status: u16,
+    pub headers: RepeatedHeaderValues,
+}
+
+/// One inbound response body chunk.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpResponseBodyChunk {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub bytes: String,
+    pub encoding: String,
+}
+
+/// Response body completion signal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressHttpResponseBodyEnd {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+}
+
+/// Opaque bytes for an upgraded egress stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressTcpData {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub direction: String,
+    pub bytes: String,
+    pub encoding: String,
+}
+
+/// Half-close signal for an upgraded egress stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressTcpClose {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub direction: String,
+}
+
+/// Shared egress stream error.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressStreamError {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub code: String,
+    pub message: String,
+}
+
+/// Shared egress stream cancellation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EgressStreamCancel {
+    #[serde(rename = "type")]
+    pub message_type: String,
+    pub stream_id: u32,
+    pub reason: Option<String>,
+}
+
+/// `egress.*` transport messages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EgressTransportMessage {
+    HttpOpen(EgressHttpOpen),
+    HttpRequestBodyChunk(EgressHttpRequestBodyChunk),
+    HttpRequestBodyEnd(EgressHttpRequestBodyEnd),
+    HttpResponseStart(EgressHttpResponseStart),
+    HttpResponseBodyChunk(EgressHttpResponseBodyChunk),
+    HttpResponseBodyEnd(EgressHttpResponseBodyEnd),
+    TcpData(EgressTcpData),
+    TcpClose(EgressTcpClose),
+    StreamError(EgressStreamError),
+    StreamCancel(EgressStreamCancel),
+}
+
 /// PTY-specific control messages consumed by the PTY relay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PtyControlMessage {
@@ -1003,6 +1145,87 @@ pub fn parse_ports_transport_message(
                 .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
             validate_ports_stream_error(&message)?;
             Ok(Some(PortsTransportMessage::StreamError(message)))
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Parses one inbound or outbound `egress.*` transport message.
+pub fn parse_egress_transport_message(
+    payload: &str,
+) -> Result<Option<EgressTransportMessage>, TunnelProtocolError> {
+    let parsed_payload: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
+        TunnelProtocolError::new(format!(
+            "egress transport message must be valid json: {error}"
+        ))
+    })?;
+    let Some(message_type) = parsed_payload
+        .get("type")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Ok(None);
+    };
+
+    match message_type {
+        "egress.http.open" => {
+            let message: EgressHttpOpen = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_open(&message)?;
+            Ok(Some(EgressTransportMessage::HttpOpen(message)))
+        }
+        "egress.http.request.body.chunk" => {
+            let message: EgressHttpRequestBodyChunk = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_request_body_chunk(&message)?;
+            Ok(Some(EgressTransportMessage::HttpRequestBodyChunk(message)))
+        }
+        "egress.http.request.body.end" => {
+            let message: EgressHttpRequestBodyEnd = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_request_body_end(&message)?;
+            Ok(Some(EgressTransportMessage::HttpRequestBodyEnd(message)))
+        }
+        "egress.http.response.start" => {
+            let message: EgressHttpResponseStart = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_response_start(&message)?;
+            Ok(Some(EgressTransportMessage::HttpResponseStart(message)))
+        }
+        "egress.http.response.body.chunk" => {
+            let message: EgressHttpResponseBodyChunk = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_response_body_chunk(&message)?;
+            Ok(Some(EgressTransportMessage::HttpResponseBodyChunk(message)))
+        }
+        "egress.http.response.body.end" => {
+            let message: EgressHttpResponseBodyEnd = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_http_response_body_end(&message)?;
+            Ok(Some(EgressTransportMessage::HttpResponseBodyEnd(message)))
+        }
+        "egress.stream.error" => {
+            let message: EgressStreamError = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_stream_error(&message)?;
+            Ok(Some(EgressTransportMessage::StreamError(message)))
+        }
+        "egress.tcp.data" => {
+            let message: EgressTcpData = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_tcp_data(&message)?;
+            Ok(Some(EgressTransportMessage::TcpData(message)))
+        }
+        "egress.tcp.close" => {
+            let message: EgressTcpClose = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_tcp_close(&message)?;
+            Ok(Some(EgressTransportMessage::TcpClose(message)))
+        }
+        "egress.stream.cancel" => {
+            let message: EgressStreamCancel = serde_json::from_value(parsed_payload)
+                .map_err(|error| TunnelProtocolError::new(error.to_string()))?;
+            validate_egress_stream_cancel(&message)?;
+            Ok(Some(EgressTransportMessage::StreamCancel(message)))
         }
         _ => Ok(None),
     }
@@ -1766,6 +1989,266 @@ fn validate_ports_stream_error(message: &PortsStreamError) -> Result<(), TunnelP
     Ok(())
 }
 
+fn validate_egress_request_id(
+    message_type: &str,
+    request_id: &str,
+) -> Result<(), TunnelProtocolError> {
+    if request_id.trim().is_empty() {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} requestId is required",
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_original_destination(
+    destination: &EgressOriginalDestination,
+    field_name: &str,
+) -> Result<(), TunnelProtocolError> {
+    if destination.host.trim().is_empty() {
+        return Err(TunnelProtocolError::new(format!(
+            "{field_name} host is required",
+        )));
+    }
+    if destination.port == 0 {
+        return Err(TunnelProtocolError::new(format!(
+            "{field_name} port must be greater than zero",
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_optional_non_empty(
+    value: &Option<String>,
+    field_name: &str,
+) -> Result<(), TunnelProtocolError> {
+    if value.as_ref().is_some_and(|inner| inner.trim().is_empty()) {
+        return Err(TunnelProtocolError::new(format!(
+            "{field_name} must be non-empty when present",
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_http_scheme(
+    message_type: &str,
+    scheme: &str,
+) -> Result<(), TunnelProtocolError> {
+    if scheme != "http" && scheme != "https" {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} request scheme must be 'http' or 'https', got '{scheme}'"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_direction(
+    message_type: &str,
+    direction: &str,
+) -> Result<(), TunnelProtocolError> {
+    if direction != "request" && direction != "response" {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} direction must be 'request' or 'response', got '{direction}'",
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_base64_encoding(
+    message_type: &str,
+    encoding: &str,
+) -> Result<(), TunnelProtocolError> {
+    if encoding != "base64" {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} encoding must be 'base64', got '{encoding}'",
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_http_request(
+    message_type: &str,
+    request: &EgressHttpRequest,
+) -> Result<(), TunnelProtocolError> {
+    if request.method.trim().is_empty() {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} request method is required",
+        )));
+    }
+    validate_egress_http_scheme(message_type, &request.scheme)?;
+    if request.authority.trim().is_empty() {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} request authority is required",
+        )));
+    }
+    if request.path.trim().is_empty() {
+        return Err(TunnelProtocolError::new(format!(
+            "{message_type} request path is required",
+        )));
+    }
+    validate_optional_non_empty(&request.query, &format!("{message_type} request query"))?;
+    validate_repeated_header_values(&request.headers, &format!("{message_type} request"))?;
+    if let Some(destination) = &request.original_destination {
+        validate_egress_original_destination(
+            destination,
+            &format!("{message_type} request originalDestination"),
+        )?;
+    }
+    validate_optional_non_empty(
+        &request.runtime_plan_revision,
+        &format!("{message_type} request runtimePlanRevision"),
+    )
+}
+
+fn validate_egress_http_open(message: &EgressHttpOpen) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.open" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.open message type must be 'egress.http.open', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_egress_request_id("egress.http.open", &message.request_id)?;
+    validate_stream_id(message.stream_id)?;
+    validate_egress_http_request("egress.http.open", &message.request)
+}
+
+fn validate_egress_http_request_body_chunk(
+    message: &EgressHttpRequestBodyChunk,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.request.body.chunk" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.request.body.chunk message type must be 'egress.http.request.body.chunk', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_egress_base64_encoding("egress.http.request.body.chunk", &message.encoding)
+}
+
+fn validate_egress_http_request_body_end(
+    message: &EgressHttpRequestBodyEnd,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.request.body.end" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.request.body.end message type must be 'egress.http.request.body.end', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)
+}
+
+fn validate_egress_http_response_start(
+    message: &EgressHttpResponseStart,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.response.start" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.response.start message type must be 'egress.http.response.start', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.status != 101 && !(200..=599).contains(&message.status) {
+        return Err(TunnelProtocolError::new(
+            "egress.http.response.start status must be 101 or between 200 and 599",
+        ));
+    }
+    validate_repeated_header_values(&message.headers, "egress.http.response.start")
+}
+
+fn validate_egress_http_response_body_chunk(
+    message: &EgressHttpResponseBodyChunk,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.response.body.chunk" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.response.body.chunk message type must be 'egress.http.response.body.chunk', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_egress_base64_encoding("egress.http.response.body.chunk", &message.encoding)
+}
+
+fn validate_egress_http_response_body_end(
+    message: &EgressHttpResponseBodyEnd,
+) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.http.response.body.end" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.http.response.body.end message type must be 'egress.http.response.body.end', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)
+}
+
+fn validate_egress_tcp_data(message: &EgressTcpData) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.tcp.data" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.tcp.data message type must be 'egress.tcp.data', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_egress_direction("egress.tcp.data", &message.direction)?;
+    validate_egress_base64_encoding("egress.tcp.data", &message.encoding)
+}
+
+fn validate_egress_tcp_close(message: &EgressTcpClose) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.tcp.close" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.tcp.close message type must be 'egress.tcp.close', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_egress_direction("egress.tcp.close", &message.direction)
+}
+
+fn validate_egress_stream_error(message: &EgressStreamError) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.stream.error" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.stream.error message type must be 'egress.stream.error', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    if message.code != "malformed_frame"
+        && message.code != "upstream_connect_failed"
+        && message.code != "upstream_handshake_failed"
+        && message.code != "upstream_io_error"
+        && message.code != "tunnel_cancelled"
+        && message.code != "forbidden_tunnel_state"
+    {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.stream.error code is invalid: '{}'",
+            message.code
+        )));
+    }
+    if message.message.trim().is_empty() {
+        return Err(TunnelProtocolError::new(
+            "egress.stream.error message is required",
+        ));
+    }
+
+    Ok(())
+}
+
+fn validate_egress_stream_cancel(message: &EgressStreamCancel) -> Result<(), TunnelProtocolError> {
+    if message.message_type != "egress.stream.cancel" {
+        return Err(TunnelProtocolError::new(format!(
+            "egress.stream.cancel message type must be 'egress.stream.cancel', got '{}'",
+            message.message_type
+        )));
+    }
+    validate_stream_id(message.stream_id)?;
+    validate_optional_non_empty(&message.reason, "egress.stream.cancel reason")
+}
+
 fn validate_telemetry_open_ok(message: &TelemetryOpenOk) -> Result<(), TunnelProtocolError> {
     if message.message_type != "telemetry.open.ok" {
         return Err(TunnelProtocolError::new(
@@ -1951,11 +2434,12 @@ mod tests {
         SigningControlMessage, SigningRequest, StreamControlMessage, StreamSendWindow,
         decode_stream_data_frame, encode_stream_data_frame, exec_result_event,
         file_upload_completed_event, parse_bootstrap_telemetry_control_message,
-        parse_ports_control_message, parse_ports_transport_message, parse_processes_stream_message,
-        parse_pty_control_message, parse_signing_control_message, parse_stream_control_message,
-        ports_target_authorize_failure_result, ports_target_authorize_success_result,
-        pty_exit_event, signing_request, stream_complete, stream_open_error, stream_open_ok,
-        stream_reset, stream_window, telemetry_close, telemetry_open,
+        parse_egress_transport_message, parse_ports_control_message, parse_ports_transport_message,
+        parse_processes_stream_message, parse_pty_control_message, parse_signing_control_message,
+        parse_stream_control_message, ports_target_authorize_failure_result,
+        ports_target_authorize_success_result, pty_exit_event, signing_request, stream_complete,
+        stream_open_error, stream_open_ok, stream_reset, stream_window, telemetry_close,
+        telemetry_open,
     };
 
     #[test]
@@ -2167,6 +2651,146 @@ mod tests {
                 _
             ))
         ));
+    }
+
+    #[test]
+    fn parses_valid_egress_http_transport_messages() {
+        let http_open = parse_egress_transport_message(
+            r#"{"type":"egress.http.open","requestId":"req_egress_1","streamId":71,"request":{"method":"POST","scheme":"https","authority":"chatgpt.com","path":"/backend-api/codex/models","query":"client=codex","headers":{"accept":["application/json"]},"originalDestination":{"host":"34.120.5.48","port":443},"runtimePlanRevision":"rpr_123"}}"#,
+        )
+        .expect("egress.http.open should parse");
+        assert!(matches!(
+            http_open,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpOpen(_))
+        ));
+
+        let request_chunk = parse_egress_transport_message(
+            r#"{"type":"egress.http.request.body.chunk","streamId":71,"bytes":"eyJwcm9tcHQiOiJoaSJ9","encoding":"base64"}"#,
+        )
+        .expect("egress.http.request.body.chunk should parse");
+        assert!(matches!(
+            request_chunk,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpRequestBodyChunk(_))
+        ));
+
+        let request_end = parse_egress_transport_message(
+            r#"{"type":"egress.http.request.body.end","streamId":71}"#,
+        )
+        .expect("egress.http.request.body.end should parse");
+        assert!(matches!(
+            request_end,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpRequestBodyEnd(_))
+        ));
+
+        let response_start = parse_egress_transport_message(
+            r#"{"type":"egress.http.response.start","streamId":71,"status":200,"headers":{"content-type":["application/json"]}}"#,
+        )
+        .expect("egress.http.response.start should parse");
+        assert!(matches!(
+            response_start,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseStart(_))
+        ));
+
+        let response_chunk = parse_egress_transport_message(
+            r#"{"type":"egress.http.response.body.chunk","streamId":71,"bytes":"e30=","encoding":"base64"}"#,
+        )
+        .expect("egress.http.response.body.chunk should parse");
+        assert!(matches!(
+            response_chunk,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseBodyChunk(_))
+        ));
+
+        let response_end = parse_egress_transport_message(
+            r#"{"type":"egress.http.response.body.end","streamId":71}"#,
+        )
+        .expect("egress.http.response.body.end should parse");
+        assert!(matches!(
+            response_end,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseBodyEnd(_))
+        ));
+    }
+
+    #[test]
+    fn parses_valid_websocket_upgrade_as_http_plus_stream_data() {
+        let open = parse_egress_transport_message(
+            r#"{"type":"egress.http.open","requestId":"req_ws_1","streamId":81,"request":{"method":"GET","scheme":"https","authority":"stream.example.test","path":"/socket","headers":{"upgrade":["websocket"]}}}"#,
+        )
+        .expect("egress.http.open should parse");
+        assert!(matches!(
+            open,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpOpen(_))
+        ));
+
+        let accepted = parse_egress_transport_message(
+            r#"{"type":"egress.http.response.start","streamId":81,"status":101,"headers":{"upgrade":["websocket"]}}"#,
+        )
+        .expect("egress.http.response.start should parse");
+        assert!(matches!(
+            accepted,
+            Some(crate::tunnel::protocol::EgressTransportMessage::HttpResponseStart(_))
+        ));
+
+        let data = parse_egress_transport_message(
+            r#"{"type":"egress.tcp.data","streamId":81,"direction":"request","bytes":"aGVsbG8=","encoding":"base64"}"#,
+        )
+        .expect("egress.tcp.data should parse");
+        assert!(matches!(
+            data,
+            Some(crate::tunnel::protocol::EgressTransportMessage::TcpData(_))
+        ));
+
+        let close = parse_egress_transport_message(
+            r#"{"type":"egress.tcp.close","streamId":81,"direction":"response"}"#,
+        )
+        .expect("egress.tcp.close should parse");
+        assert!(matches!(
+            close,
+            Some(crate::tunnel::protocol::EgressTransportMessage::TcpClose(_))
+        ));
+    }
+
+    #[test]
+    fn parses_valid_shared_egress_stream_messages() {
+        let error = parse_egress_transport_message(
+            r#"{"type":"egress.stream.error","streamId":71,"code":"upstream_connect_failed","message":"upstream refused connection"}"#,
+        )
+        .expect("egress.stream.error should parse");
+        assert!(matches!(
+            error,
+            Some(crate::tunnel::protocol::EgressTransportMessage::StreamError(_))
+        ));
+
+        let cancel = parse_egress_transport_message(
+            r#"{"type":"egress.stream.cancel","streamId":71,"reason":"client closed request"}"#,
+        )
+        .expect("egress.stream.cancel should parse");
+        assert!(matches!(
+            cancel,
+            Some(crate::tunnel::protocol::EgressTransportMessage::StreamCancel(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_egress_transport_messages() {
+        let invalid_direction = parse_egress_transport_message(
+            r#"{"type":"egress.tcp.data","streamId":81,"direction":"both","bytes":"aGVsbG8=","encoding":"base64"}"#,
+        );
+        assert!(
+            invalid_direction
+                .expect_err("invalid direction should fail validation")
+                .to_string()
+                .contains("egress.tcp.data direction must be 'request' or 'response'")
+        );
+
+        let invalid_error_code = parse_egress_transport_message(
+            r#"{"type":"egress.stream.error","streamId":71,"code":"credential_resolution_failed","message":"not part of transport contract"}"#,
+        );
+        assert!(
+            invalid_error_code
+                .expect_err("invalid error code should fail validation")
+                .to_string()
+                .contains("egress.stream.error code is invalid")
+        );
     }
 
     #[test]
