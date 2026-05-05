@@ -147,7 +147,10 @@ import {
   SessionTerminalWorkspace,
   type SessionTerminalWorkspaceHandle,
 } from "./session-terminal-workspace.js";
-import { buildSetupAssistantCollaborationModeSettings } from "./setup-assistant-instructions.js";
+import {
+  buildSetupAssistantCollaborationModeSettings,
+  buildSetupAssistantStartingPrompt,
+} from "./setup-assistant-instructions.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
 type SandboxProfileEditorPageProps =
@@ -172,10 +175,11 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onOpen: () => void;
+  onOpen: (input: { setupScript: string }) => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
+  startingPrompt: string;
   isOpen: boolean;
   sandboxInstanceId: string | null;
 };
@@ -1167,10 +1171,12 @@ function ReadySandboxProfileEditorPage(input: {
     disabled: setupAssistantDisabledReason !== null,
     errorMessage: setupAssistantError,
     isStarting: startSetupAssistantMutation.isPending,
-    onOpen: () => {
+    onOpen: ({ setupScript }) => {
       setSetupAssistantError(null);
+      const startingPrompt = buildSetupAssistantStartingPrompt({ setupScript });
 
       setSetupAssistantPanelState((currentState) => ({
+        startingPrompt,
         isOpen: true,
         sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
       }));
@@ -1352,6 +1358,7 @@ function ReadySandboxProfileEditorPage(input: {
               );
             }}
             sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
+            startingPrompt={setupAssistantPanelState.startingPrompt}
           />
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -1362,11 +1369,12 @@ function ReadySandboxProfileEditorPage(input: {
 function SetupScriptAssistantPanel(input: {
   onClose: () => void;
   sandboxInstanceId: string | null;
+  startingPrompt: string;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [composerText, setComposerText] = useState("");
+  const [composerText, setComposerText] = useState(input.startingPrompt);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -1401,6 +1409,10 @@ function SetupScriptAssistantPanel(input: {
       });
     },
   );
+
+  useEffect(() => {
+    setComposerText(input.startingPrompt);
+  }, [input.startingPrompt]);
 
   function handleClearPendingDiffComments(): void {
     setPendingDiffComments([]);
@@ -2317,7 +2329,9 @@ function ReadySandboxProfileSetupScriptSection(input: {
               disabled: input.setupAssistantControl.disabled,
               isStarting: input.setupAssistantControl.isStarting,
               onClick: () => {
-                input.setupAssistantControl.onOpen();
+                input.setupAssistantControl.onOpen({
+                  setupScript: setupScriptState.draftValue,
+                });
               },
               title: input.setupAssistantControl.title,
             }}

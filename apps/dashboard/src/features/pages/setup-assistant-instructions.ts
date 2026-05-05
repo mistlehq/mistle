@@ -12,6 +12,8 @@ Focus on producing an initialization script that prepares the sandbox for develo
 Author setup scripts that are repeatable, fail fast when required configuration is missing, and avoid relying on state created only in this assistant session.
 
 Account for any required environment variables, credentials, external services, or manual prerequisites that the setup script depends on.
+
+When the right setup approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
 `.trim();
 
 export function buildSetupAssistantCollaborationModeSettings(input: {
@@ -23,6 +25,24 @@ export function buildSetupAssistantCollaborationModeSettings(input: {
       SetupAssistantDeveloperInstructions,
     ]),
   };
+}
+
+export function buildSetupAssistantStartingPrompt(input: { setupScript: string }): string {
+  const trimmedSetupScript = input.setupScript.trim();
+  const prompt = "Write a setup script";
+
+  if (trimmedSetupScript.length === 0) {
+    return prompt;
+  }
+
+  return [
+    "Fix this setup script",
+    "",
+    "This is the current setup script:",
+    "```sh",
+    input.setupScript,
+    "```",
+  ].join("\n");
 }
 
 function joinDeveloperInstructionBlocks(input: readonly (string | null | undefined)[]): string {

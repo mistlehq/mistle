@@ -72,6 +72,7 @@ import {
   type SnapshotRefreshSchedule,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
+import { buildSetupAssistantStartingPrompt } from "./setup-assistant-instructions.js";
 
 export {
   StoryGithubConnection,
@@ -421,6 +422,7 @@ function SetupScriptStoryControls(input: {
 
 function SetupAssistantPanel(input: {
   onClose: () => void;
+  setupScript: string;
   state: Exclude<SandboxProfileEditorPageStoryArgs["setupAssistantPanelState"], undefined>;
 }): React.JSX.Element {
   const controlClassName =
@@ -499,7 +501,7 @@ function SetupAssistantPanel(input: {
         <div className="shrink-0 border-t bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
-            composerText=""
+            composerText={buildSetupAssistantStartingPrompt({ setupScript: input.setupScript })}
             gitBranchLabel={null}
             pullRequest={null}
           />
@@ -822,6 +824,7 @@ function SandboxProfileEditorPageStoryView(
                 onClose={() => {
                   setSetupAssistantPanelOpen(false);
                 }}
+                setupScript={setupScriptDraft}
                 state={setupAssistantPanelState}
               />
             </ResizablePanel>
