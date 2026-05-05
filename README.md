@@ -2,6 +2,8 @@
 
 Mistle is an open-source platform for running and automating sandboxed coding agents.
 
+![Mistle session showing session list, conversation, and code diff](assets/readme/session.webp)
+
 ## Features
 
 - **Integrations** connect external systems and models such as GitHub, Slack, and OpenAI.
