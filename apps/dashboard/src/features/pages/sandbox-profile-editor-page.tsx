@@ -1393,7 +1393,7 @@ function SetupScriptAssistantPanel(input: {
   }
 
   return (
-    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain pl-5">
+    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
       <Button
         aria-label="Close setup assistant panel"
         className="absolute top-3 left-1 size-8 px-0"
@@ -1404,7 +1404,7 @@ function SetupScriptAssistantPanel(input: {
       >
         <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
       </Button>
-      <div className="flex min-h-14 items-center justify-between gap-3 border-b pl-9">
+      <div className="flex min-h-14 items-center justify-between gap-3 border-b pr-5 pl-9">
         <h2 className="truncate text-sm font-semibold tracking-normal">Setup assistant</h2>
         <div className="flex shrink-0 items-center gap-2">
           <span
@@ -1482,7 +1482,7 @@ function SetupScriptAssistantPanel(input: {
           <div className="flex h-full min-h-0 flex-col">
             <div
               aria-label="Setup assistant conversation"
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5"
               ref={conversationScrollContainerRef}
               role="region"
             >
@@ -1513,7 +1513,7 @@ function SetupScriptAssistantPanel(input: {
             </div>
             {workbench.primaryPanelState.showsChatComposer &&
             workbench.initialEntryStartupState === null ? (
-              <div className="shrink-0 border-t bg-background px-3 py-4">
+              <div className="shrink-0 border-t bg-background px-5 py-4">
                 <SessionConversationBottomPanelController
                   chatEntries={conversationPane.chatState.entries}
                   composerStateInput={conversationPane.composerStateInput}

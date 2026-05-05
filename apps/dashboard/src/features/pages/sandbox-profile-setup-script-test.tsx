@@ -265,7 +265,7 @@ export function SandboxProfileSetupScriptTestButton(
           size="sm"
         />
         <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
-          Fail on first command error
+          Fail on error
         </Label>
       </div>
       <ButtonGroup>
@@ -298,7 +298,7 @@ export function SandboxProfileSetupScriptTestButton(
             ) : (
               <>
                 <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-                Write with agent
+                Setup assistant
               </>
             )}
           </Button>

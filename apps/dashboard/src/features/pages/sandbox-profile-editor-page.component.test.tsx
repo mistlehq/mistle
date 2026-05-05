@@ -1580,10 +1580,10 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const writeWithAgentButton = screen.getByRole("button", {
-      name: "Write with agent",
+      name: "Setup assistant",
     });
     const failOnFirstErrorSwitch = screen.getByRole("switch", {
-      name: "Fail on first command error",
+      name: "Fail on error",
     });
 
     expect(testButton.hasAttribute("disabled")).toBe(false);
@@ -1606,7 +1606,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const emptyDraftWriteButton = screen.getByRole("button", {
-      name: "Write with agent",
+      name: "Setup assistant",
     });
     expect(emptyDraftTestButton.hasAttribute("disabled")).toBe(true);
     expect(emptyDraftTestButton.getAttribute("title")).toBe("Add a setup script before testing.");
@@ -1624,7 +1624,7 @@ describe("SandboxProfileEditorPage", () => {
       name: "Test",
     });
     const publishedWriteButton = screen.getByRole("button", {
-      name: "Write with agent",
+      name: "Setup assistant",
     });
     expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
     expect(publishedTestButton.getAttribute("title")).toBe(

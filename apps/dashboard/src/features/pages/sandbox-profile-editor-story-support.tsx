@@ -381,7 +381,7 @@ function SetupScriptStoryControls(input: {
           size="sm"
         />
         <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
-          Fail on first command error
+          Fail on error
         </Label>
       </div>
       <ButtonGroup>
@@ -419,7 +419,7 @@ function SetupScriptStoryControls(input: {
             ) : (
               <>
                 <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
-                Write with agent
+                Setup assistant
               </>
             )}
           </Button>
@@ -447,7 +447,7 @@ function SetupScriptAuthoringPanel(input: {
     "bg-transparent text-foreground shadow-none hover:bg-stone-100 aria-pressed:bg-stone-200";
 
   return (
-    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain pl-5">
+    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain">
       <Button
         aria-label="Close setup script authoring panel"
         className="absolute top-3 left-1 size-8 px-0"
@@ -458,7 +458,7 @@ function SetupScriptAuthoringPanel(input: {
       >
         <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
       </Button>
-      <div className="flex min-h-14 items-center justify-between gap-3 border-b pl-9">
+      <div className="flex min-h-14 items-center justify-between gap-3 border-b pr-5 pl-9">
         <div className="flex min-w-0 flex-col gap-1">
           <h2 className="truncate text-sm font-semibold tracking-normal">Setup assistant</h2>
         </div>
@@ -504,7 +504,7 @@ function SetupScriptAuthoringPanel(input: {
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
           <SessionConversationMainContent
             activeTurnId={null}
             chatEntries={SetupAssistantChatEntries}
@@ -516,7 +516,7 @@ function SetupScriptAuthoringPanel(input: {
             serverRequestPanelEntries={[]}
           />
         </div>
-        <div className="shrink-0 border-t bg-background py-4">
+        <div className="shrink-0 border-t bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
             composerText={prompt}
