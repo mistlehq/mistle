@@ -15,6 +15,7 @@ export default defineConfig({
       "system-runtime/*.runtime-system.test.ts",
       "system-runtime/**/*.runtime-system.test.ts",
     ],
+    globalSetup: "./system-runtime/global-setup.ts",
     setupFiles: [TimingSetupFilePath],
     testTimeout: 180_000,
     hookTimeout: 180_000,

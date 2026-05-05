@@ -1,24 +1,19 @@
-import { execFile } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
 import { systemSleeper } from "@mistle/time";
 
-import {
-  buildCloudflaredTunnelConfig,
-  parseCloudflaredTunnelCredentialsJson,
-} from "./cloudflared-config.js";
-
-const execFileAsync = promisify(execFile);
+import { resolveRunnerPoolSession } from "../environment/runner-pool-session.js";
+import { acquireRunnerServicePoolLease } from "../environment/runner-service-pool.js";
+import type { TestServiceRuntime } from "../environment/types.js";
+import { parseCloudflaredTunnelCredentialsJson } from "./cloudflared-config.js";
 
 const CloudflaredImageReference = "cloudflare/cloudflared:latest";
 const CloudflaredTunnelPollIntervalMs = 500;
 const CloudflaredTunnelStartupTimeoutMs = 60_000;
-const DockerHostGatewayName = "host.docker.internal";
 const RuntimePublicAccessTunnelLabel = "mistle.runtime-public-access.tunnel-id";
+const RuntimePublicAccessProxyReadyTimeoutMs = 30_000;
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
@@ -26,6 +21,7 @@ export type RuntimePublicAccessTunnel = {
 };
 
 export async function startRuntimeCloudflaredTunnel(input: {
+  environmentId: string;
   tunnelId: string;
   tunnelCredentialsJson: string;
   ingressRules: ReadonlyArray<{
@@ -33,10 +29,6 @@ export async function startRuntimeCloudflaredTunnel(input: {
     localBaseUrl: string;
   }>;
 }): Promise<RuntimePublicAccessTunnel> {
-  const configDirectory = await mkdtemp(join(tmpdir(), "mistle-runtime-cloudflared-"));
-  const configPath = join(configDirectory, "config.yml");
-  const credentialsPath = join(configDirectory, "credentials.json");
-  const containerName = `mistle-runtime-cloudflared-${randomUUID().replaceAll("-", "")}`;
   if (input.ingressRules.length === 0) {
     throw new Error("Runtime Cloudflare public access requires at least one ingress rule.");
   }
@@ -48,120 +40,478 @@ export async function startRuntimeCloudflaredTunnel(input: {
     tunnelId: input.tunnelId,
     credentialsJson: input.tunnelCredentialsJson,
   });
-  const configContent = buildCloudflaredTunnelConfig({
+  const proxy = await acquireRuntimePublicAccessProxy({
     tunnelId: input.tunnelId,
-    credentialsFilePath: "/etc/cloudflared/credentials.json",
-    ingressRules: input.ingressRules.map((rule) => ({
-      publicHostname: rule.publicHostname,
-      serviceUrl: createDockerReachableServiceUrl(rule.localBaseUrl),
-    })),
+    tunnelCredentialsJson: input.tunnelCredentialsJson,
+    publicHostnames: input.ingressRules.map((rule) => rule.publicHostname),
+  });
+  const registered = await registerRuntimePublicAccessRoutes({
+    proxy,
+    environmentId: input.environmentId,
+    ingressRules: input.ingressRules,
   });
 
-  await writeFile(credentialsPath, input.tunnelCredentialsJson, "utf8");
-  await writeFile(configPath, configContent, "utf8");
+  return {
+    publicBaseUrls,
+    stop: async () => {
+      if (registered) {
+        await unregisterRuntimePublicAccessRoutes({
+          proxy,
+          environmentId: input.environmentId,
+        });
+      }
+      await proxy.release();
+    },
+  };
+}
 
-  let started = false;
+type RuntimePublicAccessProxy = TestServiceRuntime & {
+  release: () => Promise<void>;
+};
+
+async function acquireRuntimePublicAccessProxy(input: {
+  tunnelId: string;
+  tunnelCredentialsJson: string;
+  publicHostnames: readonly string[];
+}): Promise<RuntimePublicAccessProxy> {
+  const runnerPoolSession = resolveRunnerPoolSession(process.env);
+  const publicHostnames = [...new Set(input.publicHostnames)].sort();
+  const proxy = await acquireRunnerServicePoolLease({
+    runId: runnerPoolSession.runId,
+    coordinatorDir: runnerPoolSession.coordinatorDir,
+    key: `runtime-public-access:${input.tunnelId}:${publicHostnames.join(",")}`,
+    start: async () =>
+      startRuntimePublicAccessProxy({
+        tunnelId: input.tunnelId,
+        tunnelCredentialsJson: input.tunnelCredentialsJson,
+        publicHostnames,
+        coordinatorDir: runnerPoolSession.coordinatorDir,
+      }),
+    healthCheck: async (service) => {
+      const endpoint = service.endpoints.http;
+      if (endpoint === undefined) {
+        throw new Error("Runtime public access proxy did not expose an HTTP endpoint.");
+      }
+
+      const response = await fetch(new URL("/__healthz", endpoint.hostBaseUrl));
+      if (!response.ok) {
+        throw new Error(
+          `Runtime public access proxy health check failed with status ${String(response.status)}.`,
+        );
+      }
+
+      for (const publicHostname of publicHostnames) {
+        await waitForCloudflaredHealth({
+          publicBaseUrl: `https://${publicHostname}`,
+          timeoutMs: CloudflaredTunnelStartupTimeoutMs,
+        });
+      }
+    },
+  });
+
+  return proxy;
+}
+
+async function startRuntimePublicAccessProxy(input: {
+  tunnelId: string;
+  tunnelCredentialsJson: string;
+  publicHostnames: readonly string[];
+  coordinatorDir: string;
+}): Promise<{
+  endpoints: {
+    http: {
+      hostBaseUrl: string;
+    };
+  };
+  pid: number;
+  stop: () => Promise<void>;
+}> {
+  const workDirectoryPath = await mkdtemp(
+    join(input.coordinatorDir, "runtime-public-access-proxy-"),
+  );
+  await mkdir(workDirectoryPath, { recursive: true });
+  const scriptPath = join(workDirectoryPath, "proxy.mjs");
+  const readyPath = join(workDirectoryPath, "ready.json");
+  const logPath = join(workDirectoryPath, "proxy.log");
+  await writeFile(scriptPath, createRuntimePublicAccessProxyScript(), "utf8");
+
+  const child = spawn(process.execPath, [scriptPath], {
+    detached: false,
+    stdio: ["ignore", "ignore", "ignore"],
+    env: {
+      ...process.env,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID: input.tunnelId,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON: input.tunnelCredentialsJson,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_PUBLIC_HOSTNAMES: JSON.stringify(input.publicHostnames),
+      MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH: readyPath,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH: logPath,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE: CloudflaredImageReference,
+      MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_LABEL: RuntimePublicAccessTunnelLabel,
+    },
+  });
+  if (child.pid === undefined) {
+    throw new Error("Failed to start runtime public access proxy process.");
+  }
+
   try {
-    await removeExistingRuntimeCloudflaredTunnel(input.tunnelId);
-    await execFileAsync(
-      "docker",
-      [
-        "run",
-        "--detach",
-        "--rm",
-        "--name",
-        containerName,
-        "--label",
-        `${RuntimePublicAccessTunnelLabel}=${input.tunnelId}`,
-        "--add-host",
-        `${DockerHostGatewayName}:host-gateway`,
-        "--volume",
-        `${configPath}:/etc/cloudflared/config.yml:ro`,
-        "--volume",
-        `${credentialsPath}:/etc/cloudflared/credentials.json:ro`,
-        CloudflaredImageReference,
-        "tunnel",
-        "--config",
-        "/etc/cloudflared/config.yml",
-        "run",
-        input.tunnelId,
-      ],
-      {
-        timeout: 30_000,
-        maxBuffer: 1_000_000,
-      },
-    );
-    started = true;
+    const ready = await waitForRuntimePublicAccessProxyReady({
+      readyPath,
+      timeoutMs: RuntimePublicAccessProxyReadyTimeoutMs,
+    });
 
-    for (const publicBaseUrl of publicBaseUrls.values()) {
+    for (const publicHostname of input.publicHostnames) {
       await waitForCloudflaredHealth({
-        publicBaseUrl,
+        publicBaseUrl: `https://${publicHostname}`,
         timeoutMs: CloudflaredTunnelStartupTimeoutMs,
       });
     }
 
     return {
-      publicBaseUrls,
+      endpoints: {
+        http: {
+          hostBaseUrl: ready.baseUrl,
+        },
+      },
+      pid: child.pid,
       stop: async () => {
-        if (started) {
-          await execFileAsync("docker", ["stop", containerName], {
-            timeout: 30_000,
-            maxBuffer: 1_000_000,
-          }).catch(() => undefined);
-        }
-
-        await rm(configDirectory, { recursive: true, force: true });
+        child.kill("SIGTERM");
+        await rm(workDirectoryPath, { recursive: true, force: true });
       },
     };
   } catch (error) {
-    const writtenConfig = await readFile(configPath, "utf8").catch(() => "");
-    const writtenCredentials = await readFile(credentialsPath, "utf8").catch(() => "");
-    const logs = started ? await readCloudflaredLogs(containerName) : "";
-
-    if (started) {
-      await execFileAsync("docker", ["stop", containerName], {
-        timeout: 30_000,
-        maxBuffer: 1_000_000,
-      }).catch(() => undefined);
-    }
-    await rm(configDirectory, { recursive: true, force: true });
-
+    child.kill("SIGTERM");
+    const logs = await readFile(logPath, "utf8").catch(() => "");
+    await rm(workDirectoryPath, { recursive: true, force: true });
     throw new Error(
-      `Failed to start runtime Cloudflare public access for ${input.ingressRules
-        .map((rule) => rule.publicHostname)
-        .join(
-          ", ",
-        )}. ${error instanceof Error ? error.message : String(error)} Config: ${writtenConfig} Credentials: ${writtenCredentials} Logs: ${logs}`,
+      `Failed to start runtime public access proxy. ${
+        error instanceof Error ? error.message : String(error)
+      } Logs: ${logs}`,
     );
   }
 }
 
-async function removeExistingRuntimeCloudflaredTunnel(tunnelId: string): Promise<void> {
-  const result = await execFileAsync("docker", [
-    "ps",
-    "--all",
-    "--quiet",
-    "--filter",
-    `label=${RuntimePublicAccessTunnelLabel}=${tunnelId}`,
-  ]);
-  const containerIds = result.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-  if (containerIds.length === 0) {
+async function waitForRuntimePublicAccessProxyReady(input: {
+  readyPath: string;
+  timeoutMs: number;
+}): Promise<{ baseUrl: string }> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < input.timeoutMs) {
+    const ready = await readRuntimePublicAccessProxyReady(input.readyPath);
+    if (ready !== undefined) {
+      return ready;
+    }
+    await systemSleeper.sleep(CloudflaredTunnelPollIntervalMs);
+  }
+
+  throw new Error(
+    `Timed out waiting for runtime public access proxy ready file '${input.readyPath}'.`,
+  );
+}
+
+async function readRuntimePublicAccessProxyReady(
+  readyPath: string,
+): Promise<{ baseUrl: string } | undefined> {
+  let raw: string;
+  try {
+    raw = await readFile(readyPath, "utf8");
+  } catch {
+    return undefined;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid runtime public access proxy ready file '${readyPath}'.`, {
+      cause: error,
+    });
+  }
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error(`Invalid runtime public access proxy ready file '${readyPath}'.`);
+  }
+
+  const baseUrl = Reflect.get(parsed, "baseUrl");
+  if (typeof baseUrl !== "string" || baseUrl.length === 0) {
+    throw new Error(`Invalid runtime public access proxy ready file '${readyPath}'.`);
+  }
+
+  return { baseUrl };
+}
+
+async function registerRuntimePublicAccessRoutes(input: {
+  proxy: RuntimePublicAccessProxy;
+  environmentId: string;
+  ingressRules: ReadonlyArray<{
+    publicHostname: string;
+    localBaseUrl: string;
+  }>;
+}): Promise<boolean> {
+  const endpoint = input.proxy.endpoints.http;
+  if (endpoint === undefined) {
+    throw new Error("Runtime public access proxy did not expose an HTTP endpoint.");
+  }
+
+  const response = await fetch(new URL("/__mistle/register", endpoint.hostBaseUrl), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      environmentId: input.environmentId,
+      routes: input.ingressRules,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Runtime public access proxy route registration failed with status ${String(response.status)}.`,
+    );
+  }
+
+  return true;
+}
+
+async function unregisterRuntimePublicAccessRoutes(input: {
+  proxy: RuntimePublicAccessProxy;
+  environmentId: string;
+}): Promise<void> {
+  const endpoint = input.proxy.endpoints.http;
+  if (endpoint === undefined) {
+    throw new Error("Runtime public access proxy did not expose an HTTP endpoint.");
+  }
+
+  await fetch(new URL("/__mistle/unregister", endpoint.hostBaseUrl), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      environmentId: input.environmentId,
+    }),
+  }).catch(() => undefined);
+}
+
+function createRuntimePublicAccessProxyScript(): string {
+  return String.raw`
+import { spawn, spawnSync } from "node:child_process";
+import http from "node:http";
+import net from "node:net";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+
+const DockerHostGatewayName = "host.docker.internal";
+const tunnelId = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID");
+const tunnelCredentialsJson = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON");
+const readyPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH");
+const logPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH");
+const cloudflaredImage = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE");
+const tunnelLabel = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_LABEL");
+const publicHostnames = JSON.parse(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_PUBLIC_HOSTNAMES"));
+if (!Array.isArray(publicHostnames) || publicHostnames.some((value) => typeof value !== "string" || value.length === 0)) {
+  throw new Error("Runtime public access proxy requires public hostnames.");
+}
+
+const routes = new Map();
+const server = http.createServer(handleRequest);
+server.on("upgrade", handleUpgrade);
+server.listen(0, "127.0.0.1", async () => {
+  const address = server.address();
+  if (address === null || typeof address === "string") {
+    throw new Error("Runtime public access proxy did not listen on a TCP port.");
+  }
+
+  const proxyBaseUrl = "http://127.0.0.1:" + String(address.port);
+  await startCloudflared(proxyBaseUrl);
+  await writeFile(readyPath, JSON.stringify({ baseUrl: proxyBaseUrl }), "utf8");
+});
+
+let cloudflared;
+let cloudflaredContainerName;
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
+
+async function handleRequest(request, response) {
+  if (request.url === "/__healthz") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({ ok: true }));
     return;
   }
 
-  await execFileAsync("docker", ["rm", "--force", ...containerIds], {
-    timeout: 30_000,
-    maxBuffer: 1_000_000,
+  if (request.url === "/__mistle/register" && request.method === "POST") {
+    const body = await readBody(request);
+    const parsed = JSON.parse(body);
+    if (typeof parsed !== "object" || parsed === null || typeof parsed.environmentId !== "string" || !Array.isArray(parsed.routes)) {
+      response.writeHead(400);
+      response.end("Invalid registration payload.");
+      return;
+    }
+
+    for (const route of parsed.routes) {
+      if (typeof route !== "object" || route === null || typeof route.publicHostname !== "string" || typeof route.localBaseUrl !== "string") {
+        response.writeHead(400);
+        response.end("Invalid route payload.");
+        return;
+      }
+      routes.set(createRouteKey(route.publicHostname, parsed.environmentId), route.localBaseUrl);
+    }
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  if (request.url === "/__mistle/unregister" && request.method === "POST") {
+    const body = await readBody(request);
+    const parsed = JSON.parse(body);
+    if (typeof parsed === "object" && parsed !== null && typeof parsed.environmentId === "string") {
+      for (const key of routes.keys()) {
+        if (key.endsWith(":" + parsed.environmentId)) {
+          routes.delete(key);
+        }
+      }
+    }
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
+  const target = resolveTarget(request);
+  if (target === undefined) {
+    response.writeHead(404);
+    response.end("No runtime public access route registered.");
+    return;
+  }
+
+  const targetUrl = new URL(request.url ?? "/", target);
+  const proxyRequest = http.request(targetUrl, {
+    method: request.method,
+    headers: {
+      ...request.headers,
+      host: targetUrl.host,
+    },
+  }, (proxyResponse) => {
+    response.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
+    proxyResponse.pipe(response);
+  });
+  proxyRequest.on("error", (error) => {
+    response.writeHead(502);
+    response.end(error.message);
+  });
+  request.pipe(proxyRequest);
+}
+
+function handleUpgrade(request, socket, head) {
+  const target = resolveTarget(request);
+  if (target === undefined) {
+    socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+    return;
+  }
+
+  const targetUrl = new URL(request.url ?? "/", target);
+  const targetSocket = net.connect({
+    host: targetUrl.hostname,
+    port: Number(targetUrl.port),
+  });
+  targetSocket.once("connect", () => {
+    const headers = Object.entries(request.headers)
+      .map(([name, value]) => name + ": " + (Array.isArray(value) ? value.join(", ") : value ?? ""))
+      .join("\r\n");
+    targetSocket.write((request.method ?? "GET") + " " + targetUrl.pathname + targetUrl.search + " HTTP/" + request.httpVersion + "\r\n" + headers + "\r\n\r\n");
+    if (head.length > 0) {
+      targetSocket.write(head);
+    }
+    socket.pipe(targetSocket);
+    targetSocket.pipe(socket);
+  });
+  targetSocket.on("error", () => {
+    socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
   });
 }
 
-function createDockerReachableServiceUrl(localBaseUrl: string): string {
-  const url = new URL(localBaseUrl);
-  url.hostname = DockerHostGatewayName;
-  return url.toString().replace(/\/$/u, "");
+function resolveTarget(request) {
+  const host = String(request.headers.host ?? "").split(":")[0];
+  const requestUrl = new URL(request.url ?? "/", "http://" + host);
+  const environmentId = String(request.headers["x-mistle-test-environment-id"] ?? requestUrl.searchParams.get("x-mistle-test-environment-id") ?? "");
+  if (host.length === 0 || environmentId.length === 0) {
+    return undefined;
+  }
+  return routes.get(createRouteKey(host, environmentId));
+}
+
+function createRouteKey(hostname, environmentId) {
+  return hostname + ":" + environmentId;
+}
+
+function readBody(request) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    request.on("error", reject);
+  });
+}
+
+async function startCloudflared(proxyBaseUrl) {
+  const configDirectory = await mkdtemp(join(tmpdir(), "mistle-runtime-cloudflared-proxy-"));
+  const configPath = join(configDirectory, "config.yml");
+  const credentialsPath = join(configDirectory, "credentials.json");
+  const containerName = "mistle-runtime-cloudflared-" + randomUUID().replaceAll("-", "");
+  cloudflaredContainerName = containerName;
+  const config = [
+    "tunnel: " + tunnelId,
+    "credentials-file: /etc/cloudflared/credentials.json",
+    "ingress:",
+    ...publicHostnames.flatMap((hostname) => [
+      "  - hostname: " + hostname,
+      "    service: " + proxyBaseUrl.replace("127.0.0.1", DockerHostGatewayName),
+    ]),
+    "  - service: http_status:404",
+    "",
+  ].join("\n");
+  await writeFile(credentialsPath, tunnelCredentialsJson, "utf8");
+  await writeFile(configPath, config, "utf8");
+  cloudflared = spawn("docker", [
+    "run",
+    "--rm",
+    "--name",
+    containerName,
+    "--label",
+    tunnelLabel + "=" + tunnelId,
+    "--add-host",
+    DockerHostGatewayName + ":host-gateway",
+    "--volume",
+    configPath + ":/etc/cloudflared/config.yml:ro",
+    "--volume",
+    credentialsPath + ":/etc/cloudflared/credentials.json:ro",
+    cloudflaredImage,
+    "tunnel",
+    "--config",
+    "/etc/cloudflared/config.yml",
+    "run",
+    tunnelId,
+  ], { stdio: "ignore" });
+}
+
+function shutdown() {
+  server.close();
+  if (cloudflared !== undefined) {
+    cloudflared.kill("SIGTERM");
+  }
+  if (cloudflaredContainerName !== undefined) {
+    spawnSync("docker", ["rm", "--force", cloudflaredContainerName], { stdio: "ignore" });
+  }
+  process.exit(0);
+}
+
+function readRequiredEnv(name) {
+  const value = process.env[name];
+  if (value === undefined || value.length === 0) {
+    throw new Error("Missing required environment variable " + name + ".");
+  }
+  return value;
+}
+`;
 }
 
 async function waitForCloudflaredHealth(input: {
@@ -185,35 +535,4 @@ async function waitForCloudflaredHealth(input: {
   throw new Error(
     `Timed out waiting for runtime Cloudflare public access at ${input.publicBaseUrl}/__healthz after ${String(input.timeoutMs)}ms.`,
   );
-}
-
-async function readCloudflaredLogs(containerName: string): Promise<string> {
-  try {
-    const result = await execFileAsync("docker", ["logs", containerName], {
-      timeout: 30_000,
-      maxBuffer: 1_000_000,
-    });
-
-    return result.stderr.trim().length > 0 ? result.stderr : result.stdout;
-  } catch (error) {
-    return readErrorString(error, "stderr") || readErrorString(error, "stdout");
-  }
-}
-
-function readErrorString(error: unknown, property: "stderr" | "stdout"): string {
-  if (typeof error !== "object" || error === null) {
-    return "";
-  }
-
-  const descriptor = Object.getOwnPropertyDescriptor(error, property);
-  const output = descriptor?.value;
-  if (typeof output === "string") {
-    return output;
-  }
-
-  if (Buffer.isBuffer(output)) {
-    return output.toString("utf8");
-  }
-
-  return "";
 }

@@ -47,6 +47,7 @@ import {
 import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
 import { createServiceRegistry } from "./registry.js";
 import { ensureRunnerPoolSession } from "./runner-pool-session.js";
+import { acquireRunnerServicePoolLease } from "./runner-service-pool.js";
 import {
   createControlPlaneTestSchemaName,
   createControlPlaneWorkflowNamespaceId,
@@ -389,36 +390,84 @@ function createSandboxBaseImageRequirement(): TestInfraRequirement {
     provisioner: {
       kind: InfraKinds.SANDBOX_BASE_IMAGE,
       provision: async (provisionInput) => {
-        const registryContainer = await new GenericContainer(RegistryImageReference)
-          .withEnvironment({
-            REGISTRY_STORAGE_DELETE_ENABLED: "true",
-          })
-          .withExposedPorts(RegistryInternalPort)
-          .start();
-        const registryAuthority = `${registryContainer.getHost()}:${String(
-          registryContainer.getMappedPort(RegistryInternalPort),
-        )}`;
+        const registry = await acquireSandboxBaseImageRegistry();
+        const registryHttpEndpoint = registry.endpoints.http;
+        if (registryHttpEndpoint === undefined) {
+          throw new Error("Sandbox base image registry did not expose an HTTP endpoint.");
+        }
+
+        const registryAuthority = new URL(registryHttpEndpoint.hostBaseUrl).host;
         const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
-        await execFileAsync("docker", [
-          "tag",
-          DefaultSandboxBaseImageBuild.localReference,
-          sandboxBaseImageRef,
-        ]);
-        await execFileAsync("docker", ["push", sandboxBaseImageRef]);
 
         return provisionInput.requirements.map((requirement) => ({
           id: requirement.id,
           kind: requirement.kind,
           values: new Map([[SandboxBaseImageValues.IMAGE_REF, sandboxBaseImageRef]]),
-          stop: async () => {
-            await registryContainer.stop({
-              remove: true,
-              removeVolumes: true,
-              timeout: 0,
-            });
-          },
+          stop: registry.release,
         }));
       },
+    },
+  };
+}
+
+async function acquireSandboxBaseImageRegistry(): Promise<
+  TestServiceRuntime & { release: () => Promise<void> }
+> {
+  const session = ensureRunnerPoolSession(process.env);
+  return acquireRunnerServicePoolLease({
+    runId: session.runId,
+    coordinatorDir: session.coordinatorDir,
+    key: `sandbox-base-image-registry:${DefaultSandboxBaseImageBuild.localReference}:${DefaultSandboxBaseImageBuild.repositoryPath}`,
+    start: startSandboxBaseImageRegistry,
+    healthCheck: async (service) => {
+      const httpEndpoint = service.endpoints.http;
+      if (httpEndpoint === undefined) {
+        throw new Error("Sandbox base image registry did not expose an HTTP endpoint.");
+      }
+
+      const response = await fetch(new URL("/v2/", httpEndpoint.hostBaseUrl));
+      if (!response.ok) {
+        throw new Error(
+          `Sandbox base image registry health check failed with status ${String(response.status)}.`,
+        );
+      }
+    },
+  });
+}
+
+async function startSandboxBaseImageRegistry(): Promise<
+  TestServiceRuntime & { stop: () => Promise<void> }
+> {
+  const registryContainer = await new GenericContainer(RegistryImageReference)
+    .withEnvironment({
+      REGISTRY_STORAGE_DELETE_ENABLED: "true",
+    })
+    .withExposedPorts(RegistryInternalPort)
+    .start();
+  const registryAuthority = `${registryContainer.getHost()}:${String(
+    registryContainer.getMappedPort(RegistryInternalPort),
+  )}`;
+  const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
+  await execFileAsync("docker", [
+    "tag",
+    DefaultSandboxBaseImageBuild.localReference,
+    sandboxBaseImageRef,
+  ]);
+  await execFileAsync("docker", ["push", sandboxBaseImageRef]);
+
+  return {
+    endpoints: {
+      http: {
+        hostBaseUrl: `http://${registryAuthority}`,
+      },
+    },
+    containerId: registryContainer.getId(),
+    stop: async () => {
+      await registryContainer.stop({
+        remove: true,
+        removeVolumes: true,
+        timeout: 0,
+      });
     },
   };
 }

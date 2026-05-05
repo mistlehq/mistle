@@ -156,6 +156,7 @@ export type CodexSandboxFixture = {
   authSession: (input?: { email?: string }) => Promise<CodexSandboxAuthenticatedSession>;
   request: (path: string, init?: CodexSandboxRequestInit) => Promise<CodexSandboxHttpResponse>;
   dataPlaneApiBaseUrl: string;
+  dataPlaneApiHeaders?: Record<string, string>;
   dataPlaneGatewayBaseUrl: string;
   internalAuthServiceToken: string;
   createSessionRuntime?: () => SandboxSessionRuntime;
@@ -510,6 +511,7 @@ export async function stopSandboxInstance(input: {
       headers: {
         "content-type": "application/json",
         [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+        ...input.fixture.dataPlaneApiHeaders,
       },
       body: JSON.stringify({
         stopReason: "idle",
@@ -536,6 +538,7 @@ export async function resumeSandboxInstance(input: {
       headers: {
         "content-type": "application/json",
         [InternalAuthServiceTokenHeader]: input.fixture.internalAuthServiceToken,
+        ...input.fixture.dataPlaneApiHeaders,
       },
       body: JSON.stringify({
         organizationId: input.authenticatedSession.organizationId,

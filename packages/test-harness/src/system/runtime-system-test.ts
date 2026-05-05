@@ -97,6 +97,15 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
     services: input.services ?? DefaultSystemServices,
     extraInfra: input.extraInfra ?? DefaultSystemExtraInfra,
     ...(input.auth === undefined ? {} : { auth: input.auth }),
+    ...(input.sandbox === undefined
+      ? {}
+      : {
+          __dangerouslyIsolatedServices: {
+            reason:
+              "Sandbox runtime system tests keep long-lived bootstrap websockets attached to the data-plane gateway. The gateway must stop and drain per environment before isolated database schemas are dropped.",
+            services: [ServiceIds.DATA_PLANE_GATEWAY],
+          },
+        }),
     __internalInfra: createInternalInfra(input),
     __serviceOptions: async () => createServiceOptions(input),
     __afterStart: async ({ environment, integrationEnvironment }) => {
@@ -247,6 +256,7 @@ async function startPublicAccess(input: {
   }
 
   return startRuntimeCloudflaredTunnel({
+    environmentId: input.environment.id,
     tunnelId: readRequiredEnv("CLOUDFLARE_TUNNEL_ID"),
     tunnelCredentialsJson: readRequiredEnv("CLOUDFLARE_TUNNEL_CREDENTIALS_JSON"),
     ingressRules: input.input.publicAccess.services.map((serviceId) => {
