@@ -182,7 +182,7 @@ type SetupScriptAssistantControl = {
   disabled: boolean;
   errorMessage: string | null;
   isStarting: boolean;
-  onOpen: (input: { setupScript: string }) => void;
+  onToggle: (input: { setupScript: string }) => void;
   title: string;
 };
 type SetupScriptAssistantPanelState = {
@@ -1174,11 +1174,24 @@ function ReadySandboxProfileEditorPage(input: {
             : startSetupAssistantMutation.isPending
               ? "Setup Assistant is starting."
               : null;
+  const setupAssistantPanelIsOpen = setupAssistantPanelState?.isOpen === true;
   const setupAssistantControl: SetupScriptAssistantControl = {
-    disabled: setupAssistantDisabledReason !== null,
+    disabled: !setupAssistantPanelIsOpen && setupAssistantDisabledReason !== null,
     errorMessage: setupAssistantError,
-    isStarting: startSetupAssistantMutation.isPending,
-    onOpen: ({ setupScript }) => {
+    isStarting: !setupAssistantPanelIsOpen && startSetupAssistantMutation.isPending,
+    onToggle: ({ setupScript }) => {
+      if (setupAssistantPanelState?.isOpen === true) {
+        setSetupAssistantPanelState((currentState) =>
+          currentState === null
+            ? currentState
+            : {
+                ...currentState,
+                isOpen: false,
+              },
+        );
+        return;
+      }
+
       setSetupAssistantError(null);
       const initialComposerText = buildSetupAssistantInitialComposerText(setupScript);
 
@@ -1198,7 +1211,9 @@ function ReadySandboxProfileEditorPage(input: {
 
       startSetupAssistantMutation.mutate();
     },
-    title: setupAssistantDisabledReason ?? "Open the right panel to write this setup script.",
+    title: setupAssistantPanelIsOpen
+      ? "Close the Setup Assistant panel."
+      : (setupAssistantDisabledReason ?? "Open the right panel to write this setup script."),
   };
 
   useEffect(() => {
@@ -2436,7 +2451,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
               disabled: input.setupAssistantControl.disabled,
               isStarting: input.setupAssistantControl.isStarting,
               onClick: () => {
-                input.setupAssistantControl.onOpen({
+                input.setupAssistantControl.onToggle({
                   setupScript: setupScriptState.draftValue,
                 });
               },

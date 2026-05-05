@@ -11,7 +11,7 @@ import {
   Route,
   RouterProvider,
 } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
@@ -42,6 +42,18 @@ import {
   SandboxProfileEditorShell,
   SandboxProfileEditorView,
 } from "./sandbox-profile-editor-page.js";
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    configurable: true,
+    value: class ResizeObserver {
+      disconnect(): void {}
+      observe(): void {}
+      unobserve(): void {}
+    },
+    writable: true,
+  });
+});
 
 afterEach(() => {
   cleanup();
@@ -1626,6 +1638,52 @@ describe("SandboxProfileEditorPage", () => {
 
     fireEvent.click(failOnFirstErrorSwitch);
     expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("toggles the Setup Assistant panel from the setup script action", async () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {
+            runtime: {
+              runtimeId: "codex",
+            },
+          },
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install\npnpm dev:bootstrap",
+      versionState: "draft",
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Setup Assistant",
+      }),
+    );
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Close Setup Assistant panel",
+      }),
+    ).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Setup Assistant",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", {
+          name: "Close Setup Assistant panel",
+        }),
+      ).toBeNull();
+    });
   });
 
   it("disables setup script testing for empty and published scripts", () => {
