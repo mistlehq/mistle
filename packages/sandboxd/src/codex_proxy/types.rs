@@ -68,12 +68,30 @@ pub enum ProxyClientKind {
     Other,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DeliveryContextSource {
+    Schedule,
+    Webhook,
+}
+
+impl DeliveryContextSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Schedule => "schedule",
+            Self::Webhook => "webhook",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeliveryContext {
     pub traceparent: String,
     pub tracestate: Option<String>,
     pub baggage: Option<String>,
-    pub webhook_event_id: String,
+    pub source: DeliveryContextSource,
+    pub webhook_event_id: Option<String>,
+    pub scheduled_action_id: Option<String>,
     pub delivery_task_id: String,
     pub external_delivery_id: Option<String>,
     pub automation_run_id: String,
@@ -88,7 +106,9 @@ pub struct DeliveryContextPayload {
     pub traceparent: String,
     pub tracestate: Option<String>,
     pub baggage: Option<String>,
-    pub webhook_event_id: String,
+    pub source: DeliveryContextSource,
+    pub webhook_event_id: Option<String>,
+    pub scheduled_action_id: Option<String>,
     pub delivery_task_id: String,
     pub external_delivery_id: Option<String>,
     pub automation_run_id: String,
@@ -97,20 +117,47 @@ pub struct DeliveryContextPayload {
     pub route_id: Option<String>,
 }
 
-impl From<DeliveryContextPayload> for DeliveryContext {
-    fn from(value: DeliveryContextPayload) -> Self {
-        Self {
+impl TryFrom<DeliveryContextPayload> for DeliveryContext {
+    type Error = String;
+
+    fn try_from(value: DeliveryContextPayload) -> Result<Self, Self::Error> {
+        match value.source {
+            DeliveryContextSource::Schedule => {
+                if value.scheduled_action_id.is_none() {
+                    return Err("schedule delivery context requires scheduledActionId".to_string());
+                }
+                if value.webhook_event_id.is_some() {
+                    return Err(
+                        "schedule delivery context must not include webhookEventId".to_string()
+                    );
+                }
+            }
+            DeliveryContextSource::Webhook => {
+                if value.webhook_event_id.is_none() {
+                    return Err("webhook delivery context requires webhookEventId".to_string());
+                }
+                if value.scheduled_action_id.is_some() {
+                    return Err(
+                        "webhook delivery context must not include scheduledActionId".to_string(),
+                    );
+                }
+            }
+        }
+
+        Ok(Self {
             traceparent: value.traceparent,
             tracestate: value.tracestate,
             baggage: value.baggage,
+            source: value.source,
             webhook_event_id: value.webhook_event_id,
+            scheduled_action_id: value.scheduled_action_id,
             delivery_task_id: value.delivery_task_id,
             external_delivery_id: value.external_delivery_id,
             automation_run_id: value.automation_run_id,
             conversation_id: value.conversation_id,
             sandbox_instance_id: value.sandbox_instance_id,
             route_id: value.route_id,
-        }
+        })
     }
 }
 

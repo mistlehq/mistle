@@ -121,6 +121,33 @@ fn delivery_trace_id(delivery_context: &DeliveryContext) -> &str {
     read_trace_id(delivery_context.traceparent.as_str()).unwrap_or("unknown")
 }
 
+fn delivery_source(delivery_context: &DeliveryContext) -> &str {
+    delivery_context.source.as_str()
+}
+
+fn delivery_webhook_event_id(delivery_context: &DeliveryContext) -> &str {
+    delivery_context.webhook_event_id.as_deref().unwrap_or("")
+}
+
+fn delivery_scheduled_action_id(delivery_context: &DeliveryContext) -> &str {
+    delivery_context
+        .scheduled_action_id
+        .as_deref()
+        .unwrap_or("")
+}
+
+fn optional_delivery_webhook_event_id(delivery_context: Option<&DeliveryContext>) -> &str {
+    delivery_context
+        .and_then(|context| context.webhook_event_id.as_deref())
+        .unwrap_or("")
+}
+
+fn optional_delivery_scheduled_action_id(delivery_context: Option<&DeliveryContext>) -> &str {
+    delivery_context
+        .and_then(|context| context.scheduled_action_id.as_deref())
+        .unwrap_or("")
+}
+
 fn start_delivery_proxy_span(
     method: &str,
     delivery_context: &DeliveryContext,
@@ -130,7 +157,9 @@ fn start_delivery_proxy_span(
         "sandboxd.codex_proxy.delivery_request",
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         "mistle.traceparent" = %delivery_context.traceparent,
-        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery.source" = %delivery_source(delivery_context),
+        "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
+        "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
         "mistle.automation_run_id" = %delivery_context.automation_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
@@ -148,7 +177,9 @@ fn log_delivery_context_received(delivery_context: &DeliveryContext) {
         event = "codex_proxy.delivery_context.received",
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         "mistle.traceparent" = %delivery_context.traceparent,
-        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery.source" = %delivery_source(delivery_context),
+        "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
+        "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
         "mistle.automation_run_id" = %delivery_context.automation_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
@@ -172,7 +203,9 @@ fn log_delivery_context_mapping(
         event = "codex_proxy.delivery_context.mapped",
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         "mistle.traceparent" = %delivery_context.traceparent,
-        "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+        "mistle.delivery.source" = %delivery_source(delivery_context),
+        "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
+        "mistle.scheduled_action_id" = %delivery_scheduled_action_id(delivery_context),
         "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
         "mistle.automation_run_id" = %delivery_context.automation_run_id,
         "mistle.conversation_id" = %delivery_context.conversation_id,
@@ -282,7 +315,7 @@ fn start_turn_lifecycle_span(
             "codex_proxy.turn_start",
             "otel.trace_id" = %delivery_trace_id(delivery_context),
             "mistle.traceparent" = %delivery_context.traceparent,
-            "mistle.webhook.event_id" = %delivery_context.webhook_event_id,
+            "mistle.webhook.event_id" = %delivery_webhook_event_id(delivery_context),
             "mistle.delivery.task_id" = %delivery_context.delivery_task_id,
             "mistle.conversation.id" = %delivery_context.conversation_id,
             "mistle.sandbox.instance_id" = %delivery_context.sandbox_instance_id,
@@ -300,7 +333,7 @@ fn start_turn_lifecycle_span(
             "codex_proxy.turn_steer",
             "otel.trace_id" = %delivery_trace_id(delivery_context),
             "mistle.traceparent" = %delivery_context.traceparent,
-            "mistle.webhook.event_id" = %delivery_context.webhook_event_id,
+            "mistle.webhook.event_id" = %delivery_webhook_event_id(delivery_context),
             "mistle.delivery.task_id" = %delivery_context.delivery_task_id,
             "mistle.conversation.id" = %delivery_context.conversation_id,
             "mistle.sandbox.instance_id" = %delivery_context.sandbox_instance_id,
@@ -334,7 +367,7 @@ fn start_turn_interrupt_span(
         "codex_proxy.turn_interrupt",
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         "mistle.traceparent" = %delivery_context.traceparent,
-        "mistle.webhook.event_id" = %delivery_context.webhook_event_id,
+        "mistle.webhook.event_id" = %delivery_webhook_event_id(delivery_context),
         "mistle.delivery.task_id" = %delivery_context.delivery_task_id,
         "mistle.provider.conversation_id" = %thread_id,
         "mistle.turn.id" = %turn_id,
@@ -361,7 +394,9 @@ fn start_thread_compaction_span(
         "mistle.traceparent" =
             field::display(delivery_context.map_or("", |context| context.traceparent.as_str())),
         "mistle.webhook.event_id" =
-            field::display(delivery_context.map_or("", |context| context.webhook_event_id.as_str())),
+            field::display(optional_delivery_webhook_event_id(delivery_context)),
+        "mistle.scheduled_action.id" =
+            field::display(optional_delivery_scheduled_action_id(delivery_context)),
         "mistle.delivery.task_id" =
             field::display(delivery_context.map_or("", |context| context.delivery_task_id.as_str())),
         "mistle.provider.conversation_id" = %thread_id,
@@ -395,7 +430,7 @@ fn log_turn_lifecycle_event(
         "otel.trace_id" = %delivery_trace_id(&active_turn.delivery_context),
         traceId = %delivery_trace_id(&active_turn.delivery_context),
         spanId = %span_id_for(&active_turn.span),
-        webhookEventId = %active_turn.delivery_context.webhook_event_id,
+        webhookEventId = %delivery_webhook_event_id(&active_turn.delivery_context),
         deliveryTaskId = %active_turn.delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(active_turn.delivery_context.external_delivery_id.as_deref().unwrap_or("")),
@@ -451,7 +486,7 @@ fn log_turn_request_failure(
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         traceId = %delivery_trace_id(delivery_context),
         spanId = %span_id_for(&delivery_span),
-        webhookEventId = %delivery_context.webhook_event_id,
+        webhookEventId = %delivery_webhook_event_id(delivery_context),
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
@@ -494,7 +529,7 @@ fn log_turn_interrupt_requested(
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         traceId = %delivery_trace_id(delivery_context),
         spanId = %span_id_for(&interrupt_span),
-        webhookEventId = %delivery_context.webhook_event_id,
+        webhookEventId = %delivery_webhook_event_id(delivery_context),
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
@@ -539,7 +574,7 @@ fn log_turn_interrupt_request_failed(
         "otel.trace_id" = %delivery_trace_id(delivery_context),
         traceId = %delivery_trace_id(delivery_context),
         spanId = %span_id_for(&interrupt_span),
-        webhookEventId = %delivery_context.webhook_event_id,
+        webhookEventId = %delivery_webhook_event_id(delivery_context),
         deliveryTaskId = %delivery_context.delivery_task_id,
         externalDeliveryId =
             field::display(delivery_context.external_delivery_id.as_deref().unwrap_or("")),
@@ -580,10 +615,10 @@ fn log_thread_compaction_event(
             field::display(active_compaction.delivery_context.as_ref().map_or("unknown", delivery_trace_id)),
         spanId = %span_id_for(&active_compaction.span),
         webhookEventId = field::display(
-            active_compaction
-                .delivery_context
-                .as_ref()
-                .map_or("", |context| context.webhook_event_id.as_str())
+            optional_delivery_webhook_event_id(active_compaction.delivery_context.as_ref())
+        ),
+        scheduledActionId = field::display(
+            optional_delivery_scheduled_action_id(active_compaction.delivery_context.as_ref())
         ),
         deliveryTaskId = field::display(
             active_compaction
@@ -650,7 +685,9 @@ fn log_thread_compaction_requested(
         traceId = field::display(delivery_context.map_or("unknown", delivery_trace_id)),
         spanId = %span_id_for(&compaction_span),
         webhookEventId =
-            field::display(delivery_context.map_or("", |context| context.webhook_event_id.as_str())),
+            field::display(optional_delivery_webhook_event_id(delivery_context)),
+        scheduledActionId =
+            field::display(optional_delivery_scheduled_action_id(delivery_context)),
         deliveryTaskId =
             field::display(delivery_context.map_or("", |context| context.delivery_task_id.as_str())),
         externalDeliveryId = field::display(
@@ -696,7 +733,9 @@ fn log_thread_compaction_request_failed(
         traceId = field::display(delivery_context.map_or("unknown", delivery_trace_id)),
         spanId = %span_id_for(&compaction_span),
         webhookEventId =
-            field::display(delivery_context.map_or("", |context| context.webhook_event_id.as_str())),
+            field::display(optional_delivery_webhook_event_id(delivery_context)),
+        scheduledActionId =
+            field::display(optional_delivery_scheduled_action_id(delivery_context)),
         deliveryTaskId =
             field::display(delivery_context.map_or("", |context| context.delivery_task_id.as_str())),
         externalDeliveryId = field::display(
@@ -747,7 +786,9 @@ fn log_pending_thread_compaction_unknown_terminal_outcome(
         traceId = field::display(delivery_context.map_or("unknown", delivery_trace_id)),
         spanId = %span_id_for(&compaction_span),
         webhookEventId =
-            field::display(delivery_context.map_or("", |context| context.webhook_event_id.as_str())),
+            field::display(optional_delivery_webhook_event_id(delivery_context)),
+        scheduledActionId =
+            field::display(optional_delivery_scheduled_action_id(delivery_context)),
         deliveryTaskId =
             field::display(delivery_context.map_or("", |context| context.delivery_task_id.as_str())),
         externalDeliveryId = field::display(
@@ -1540,7 +1581,7 @@ fn should_forward_client_message(
             event = "codex_proxy.delivery_request.forwarded",
             "otel.trace_id" = %delivery_trace_id(delivery_context),
             "mistle.delivery_task_id" = %delivery_context.delivery_task_id,
-            "mistle.webhook_event_id" = %delivery_context.webhook_event_id,
+            "mistle.webhook_event_id" = %delivery_webhook_event_id(delivery_context),
             "rpc.method" = %method,
             "thread.id" = field::display(thread_id.as_deref().unwrap_or("")),
         );
@@ -1695,7 +1736,12 @@ fn parse_delivery_context_payload(value: &Value) -> Result<DeliveryContext, Code
         value.get("params").cloned().unwrap_or(Value::Null),
     )
     .map_err(CodexProxyError::InvalidJson)?;
-    Ok(payload.into())
+    DeliveryContext::try_from(payload).map_err(|message| {
+        CodexProxyError::InvalidJson(serde_json::Error::io(std::io::Error::new(
+            ErrorKind::InvalidData,
+            message,
+        )))
+    })
 }
 
 fn record_retention_result(
@@ -1843,6 +1889,8 @@ mod tests {
     use tracing_subscriber::layer::SubscriberExt;
     use tungstenite::Message;
 
+    use crate::codex_proxy::types::DeliveryContextSource;
+
     use crate::codex_proxy::CodexSessionManagerError;
     use crate::codex_proxy::types::{
         BufferedSuccessResponse, DeliveryContext, PendingClientRequest, ProxyClientKind,
@@ -1937,7 +1985,9 @@ mod tests {
             traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
             tracestate: Some("vendor=value".to_string()),
             baggage: Some("automation=webhook".to_string()),
-            webhook_event_id: "iwe_123".to_string(),
+            source: DeliveryContextSource::Webhook,
+            webhook_event_id: Some("iwe_123".to_string()),
+            scheduled_action_id: None,
             delivery_task_id: "cdt_123".to_string(),
             external_delivery_id: Some("slack_delivery_123".to_string()),
             automation_run_id: "aru_123".to_string(),
@@ -2001,6 +2051,7 @@ mod tests {
                     "method": "mistle/setDeliveryContext",
                     "params": {
                         "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+                        "source": "webhook",
                         "webhookEventId": "iwe_123",
                         "deliveryTaskId": "cdt_123",
                         "automationRunId": "aru_123",
@@ -2031,7 +2082,67 @@ mod tests {
                 traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
                 tracestate: None,
                 baggage: None,
-                webhook_event_id: "iwe_123".to_string(),
+                source: DeliveryContextSource::Webhook,
+                webhook_event_id: Some("iwe_123".to_string()),
+                scheduled_action_id: None,
+                delivery_task_id: "cdt_123".to_string(),
+                external_delivery_id: None,
+                automation_run_id: "aru_123".to_string(),
+                conversation_id: "acv_123".to_string(),
+                sandbox_instance_id: "sbi_123".to_string(),
+                route_id: None,
+            })
+        );
+    }
+
+    #[test]
+    fn intercepts_schedule_delivery_context_notifications_and_stores_context() {
+        let mut client_kind = ProxyClientKind::MistleAgentClient;
+        let mut current_delivery_context = None;
+        let mut pending_compaction_requests = std::collections::BTreeMap::new();
+        let mut pending_requests = std::collections::BTreeMap::new();
+        let mut active_turns = std::collections::BTreeMap::new();
+
+        let should_forward = should_forward_client_message(
+            &Message::Text(
+                json!({
+                    "method": "mistle/setDeliveryContext",
+                    "params": {
+                        "traceparent": "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01",
+                        "source": "schedule",
+                        "scheduledActionId": "sca_123",
+                        "deliveryTaskId": "cdt_123",
+                        "automationRunId": "aru_123",
+                        "conversationId": "acv_123",
+                        "sandboxInstanceId": "sbi_123"
+                    }
+                })
+                .to_string()
+                .into(),
+            ),
+            &mut client_kind,
+            &mut current_delivery_context,
+            &mut ClientForwardContext {
+                thread_delivery_contexts: &std::collections::BTreeMap::new(),
+                turn_delivery_contexts: &std::collections::BTreeMap::new(),
+                active_turns: &mut active_turns,
+                pending_compaction_requests: &mut pending_compaction_requests,
+                pending_requests: &mut pending_requests,
+            },
+        )
+        .expect("schedule delivery context notification should parse");
+
+        assert!(!should_forward);
+        assert!(pending_requests.is_empty());
+        assert_eq!(
+            current_delivery_context,
+            Some(DeliveryContext {
+                traceparent: "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01".to_string(),
+                tracestate: None,
+                baggage: None,
+                source: DeliveryContextSource::Schedule,
+                webhook_event_id: None,
+                scheduled_action_id: Some("sca_123".to_string()),
                 delivery_task_id: "cdt_123".to_string(),
                 external_delivery_id: None,
                 automation_run_id: "aru_123".to_string(),
