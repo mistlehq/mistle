@@ -18,6 +18,11 @@ import { createDockerSandboxProviderInfra } from "../environment/service-catalog
 import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
+import {
+  DockerIntegrationConfigPathInContainer,
+  E2BIntegrationConfigPathInContainer,
+} from "./integration-config-paths.js";
+import { resolveHostPathFromContainerPath } from "./provision-system-integration-targets.js";
 import type { RuntimePublicAccessTunnel } from "./runtime-public-access.js";
 import { startRuntimeCloudflaredTunnel } from "./runtime-public-access.js";
 
@@ -109,7 +114,10 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
     __internalInfra: createInternalInfra(input),
     __serviceOptions: async () => createServiceOptions(input),
     __afterStart: async ({ environment, integrationEnvironment }) => {
-      await syncControlPlaneIntegrationTargets(integrationEnvironment);
+      await syncControlPlaneIntegrationTargets({
+        environment: integrationEnvironment,
+        configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
+      });
       const publicAccessTunnel = await startPublicAccess({
         input,
         environment,
@@ -502,18 +510,33 @@ function isNodeErrorCode(error: unknown, code: string): boolean {
   return typeof error === "object" && error !== null && Reflect.get(error, "code") === code;
 }
 
-async function syncControlPlaneIntegrationTargets(
-  environment: IntegrationTestEnvironment,
-): Promise<void> {
+async function syncControlPlaneIntegrationTargets(input: {
+  environment: IntegrationTestEnvironment;
+  configPathInContainer: string;
+}): Promise<void> {
   await runCommand({
     command: "pnpm",
     args: ["--filter", "@mistle/control-plane-api", "integration-targets:sync"],
     cwd: DefaultBuildContextHostPath,
     env: {
-      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: environment.controlPlaneDatabase.pooledUrl,
-      MISTLE_CONTROL_PLANE_SCHEMA_NAME: environment.controlPlaneDatabase.schemaName,
+      MISTLE_CONFIG_PATH: resolveHostPathFromContainerPath({
+        buildContextHostPath: DefaultBuildContextHostPath,
+        containerPath: input.configPathInContainer,
+      }),
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: input.environment.controlPlaneDatabase.pooledUrl,
+      MISTLE_CONTROL_PLANE_SCHEMA_NAME: input.environment.controlPlaneDatabase.schemaName,
     },
   });
+}
+
+export function resolveRuntimeSystemIntegrationConfigPathInContainer(
+  input: CreateSystemTestInput,
+): string {
+  if (input.sandbox?.provider === "e2b") {
+    return E2BIntegrationConfigPathInContainer;
+  }
+
+  return DockerIntegrationConfigPathInContainer;
 }
 
 async function runCommand(input: {

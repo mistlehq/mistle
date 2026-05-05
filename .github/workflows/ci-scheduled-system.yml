@@ -101,6 +101,15 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
+      - name: Build local sandbox base image
+        run: >-
+          nix develop --command docker build --platform linux/amd64
+          --pull=false
+          --target sandbox-base-system-tests
+          -f packages/sandboxd/Dockerfile
+          -t mistle/sandbox-base:dev
+          .
+
       - name: Run runtime system tests
         run: nix develop --command pnpm --filter @mistle/tests test:system:runtime
 
