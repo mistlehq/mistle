@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstancePurposes, type SandboxInstanceSource } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePersistenceModes,
+  SandboxInstancePurposes,
+  type SandboxInstanceSource,
+} from "@mistle/db/data-plane";
 import { type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
@@ -65,6 +69,7 @@ export async function startProfileSetupCheckSandbox(
     organizationId: input.organizationId,
     sandboxProfileId: input.profileId,
     sandboxProfileVersion: input.profileVersion,
+    persistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: SandboxInstancePurposes.SETUP_CHECK,
     idempotencyKey,
     runtimePlan: runtimePlanWithoutSetupScript,

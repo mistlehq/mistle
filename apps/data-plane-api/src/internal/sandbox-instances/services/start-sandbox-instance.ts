@@ -34,7 +34,6 @@ type StartSandboxInstanceContext = {
   tables: Pick<DataPlaneTables, "sandboxInstances">;
   openWorkflow: AppRuntimeResources["openWorkflow"];
   workflowDbPool: AppRuntimeResources["workflowDbPool"];
-  controlPlaneInternalClient: AppRuntimeResources["controlPlaneInternalClient"];
   workflowNamespaceId: DataPlaneApiConfig["workflow"]["namespaceId"];
   sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   sandboxStorageBackend: DataPlaneApiSandboxStorageBackend;
@@ -61,7 +60,7 @@ function createSandboxInstanceId(): string {
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
   purpose: SandboxInstancePurpose;
-  persistentSandboxesEnabled: boolean;
+  effectivePersistenceMode: SandboxInstancePersistenceMode;
   sandboxProvider: DataPlaneApiConfig["sandbox"]["provider"];
   configuredStorageBackend: DataPlaneApiSandboxStorageBackend;
 }): SandboxInstancePersistenceMode {
@@ -69,7 +68,7 @@ export function resolveSandboxInstancePersistenceMode(input: {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
 
-  if (!input.persistentSandboxesEnabled) {
+  if (input.effectivePersistenceMode === SandboxInstancePersistenceModes.EPHEMERAL) {
     return SandboxInstancePersistenceModes.EPHEMERAL;
   }
 
@@ -89,7 +88,7 @@ export function resolveSandboxInstancePersistenceMode(input: {
 
   throw new BadRequestError(
     "INVALID_SANDBOX_STORAGE_CONFIGURATION",
-    `Persistent sandboxes are enabled for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
+    `Persistent sandbox was requested for organization '${input.organizationId}' but no supported durable storage backend is configured for this deployment.`,
   );
 }
 
@@ -128,15 +127,10 @@ export async function startSandboxInstance(
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
   const { sandboxInstances } = ctx.tables;
-  const storagePersistenceMode = await ctx.controlPlaneInternalClient.resolveStoragePersistenceMode(
-    {
-      organizationId: input.organizationId,
-    },
-  );
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
     purpose: input.purpose,
-    persistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
+    effectivePersistenceMode: input.persistenceMode,
     sandboxProvider: ctx.sandboxProvider,
     configuredStorageBackend: ctx.sandboxStorageBackend,
   });

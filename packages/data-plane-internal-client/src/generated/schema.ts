@@ -143,6 +143,8 @@ export interface paths {
             };
             organizationId: string;
             /** @enum {string} */
+            persistenceMode: "ephemeral" | "persistent";
+            /** @enum {string} */
             purpose: "session" | "snapshot" | "setup_check";
             runtimePlan: {
               agentRuntimes: {

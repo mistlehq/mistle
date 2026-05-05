@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 import { resolveSandboxInstancePersistenceMode } from "./start-sandbox-instance.js";
 
 describe("resolveSandboxInstancePersistenceMode", () => {
-  it("returns ephemeral when persistent sandboxes are disabled", () => {
+  it("returns ephemeral when the effective persistence mode is ephemeral", () => {
     expect(
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
         purpose: SandboxInstancePurposes.SESSION,
-        persistentSandboxesEnabled: false,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.EPHEMERAL,
         sandboxProvider: "e2b",
         configuredStorageBackend: "archil",
       }),
@@ -21,7 +21,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
         purpose: SandboxInstancePurposes.SESSION,
-        persistentSandboxesEnabled: true,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxProvider: "e2b",
         configuredStorageBackend: "archil",
       }),
@@ -33,7 +33,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
         purpose: SandboxInstancePurposes.SESSION,
-        persistentSandboxesEnabled: true,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxProvider: "docker",
         configuredStorageBackend: "docker_volume",
       }),
@@ -45,12 +45,12 @@ describe("resolveSandboxInstancePersistenceMode", () => {
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
         purpose: SandboxInstancePurposes.SESSION,
-        persistentSandboxesEnabled: true,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxProvider: "docker",
         configuredStorageBackend: undefined,
       }),
     ).toThrow(
-      "Persistent sandboxes are enabled for organization 'org_test' but no supported durable storage backend is configured for this deployment.",
+      "Persistent sandbox was requested for organization 'org_test' but no supported durable storage backend is configured for this deployment.",
     );
   });
 
@@ -59,7 +59,7 @@ describe("resolveSandboxInstancePersistenceMode", () => {
       resolveSandboxInstancePersistenceMode({
         organizationId: "org_test",
         purpose: SandboxInstancePurposes.SETUP_CHECK,
-        persistentSandboxesEnabled: true,
+        effectivePersistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
         sandboxProvider: "e2b",
         configuredStorageBackend: "archil",
       }),
