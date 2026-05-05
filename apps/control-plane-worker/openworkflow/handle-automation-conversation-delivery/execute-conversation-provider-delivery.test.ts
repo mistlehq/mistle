@@ -38,9 +38,7 @@ type DeliveryServerScenario =
   | "existing_conversation_with_collaboration_mode"
   | "create_conversation"
   | "resume_not_loaded_conversation"
-  | "no_default_model"
-  | "schedule_websocket_closes_before_stream_open"
-  | "schedule_stream_reset_after_delivery_context";
+  | "no_default_model";
 
 const ParentSpanContext = {
   traceId: "0123456789abcdef0123456789abcdef",
@@ -245,34 +243,14 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
 
   let activeStreamId: number | null = null;
   const methodSequence: string[] = [];
-  let connectionCount = 0;
-  let didResetScheduleStream = false;
 
   wsServer.on("connection", (socket: WebSocket) => {
-    connectionCount += 1;
-    if (scenario === "schedule_websocket_closes_before_stream_open" && connectionCount === 1) {
-      socket.close();
-      return;
-    }
-
+    let didHandleOpen = false;
     let threadReadCount = 0;
 
     socket.on("message", (message: RawData) => {
-      const controlMessage = parseStreamControlMessage(toText(message));
-      if (controlMessage !== undefined) {
-        if (controlMessage.type === "stream.open") {
-          activeStreamId = controlMessage.streamId;
-          socket.send(
-            JSON.stringify({
-              type: "stream.open.ok",
-              streamId: controlMessage.streamId,
-            }),
-          );
-        }
-        return;
-      }
-
-      if (activeStreamId === null) {
+      if (!didHandleOpen) {
+        didHandleOpen = true;
         const payload = parseJson(toText(message));
         const record = expectRecord(payload);
         if (
@@ -291,6 +269,15 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
           }),
         );
         return;
+      }
+
+      const controlMessage = parseStreamControlMessage(toText(message));
+      if (controlMessage !== undefined) {
+        return;
+      }
+
+      if (activeStreamId === null) {
+        throw new Error("Expected active stream id.");
       }
 
       const payload = parseJson(decodeAgentTextPayload(message));
@@ -319,21 +306,6 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
 
       if (methodPayload.method === "mistle/setDeliveryContext") {
         deliveryContextDeferred.resolve(readDeliveryContextMessage(payload));
-        if (
-          scenario === "schedule_stream_reset_after_delivery_context" &&
-          !didResetScheduleStream
-        ) {
-          didResetScheduleStream = true;
-          socket.send(
-            JSON.stringify({
-              type: "stream.reset",
-              streamId: activeStreamId,
-              code: "bootstrap_disconnected",
-              message:
-                "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
-            }),
-          );
-        }
         return;
       }
 
@@ -405,11 +377,7 @@ async function startDeliveryServer(scenario: DeliveryServerScenario): Promise<De
       }
 
       if (methodPayload.method === "thread/start") {
-        if (
-          scenario !== "create_conversation" &&
-          scenario !== "schedule_websocket_closes_before_stream_open" &&
-          scenario !== "schedule_stream_reset_after_delivery_context"
-        ) {
+        if (scenario !== "create_conversation") {
           throw new Error("Unexpected thread/start request for this scenario.");
         }
         expectRequestModel({
@@ -709,90 +677,6 @@ describe("executeConversationProviderDelivery", () => {
         "thread/read",
         "turn/start",
       ]);
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("recovers scheduled delivery when the sandbox agent stream resets before the turn starts", async () => {
-    const server = await startDeliveryServer("schedule_stream_reset_after_delivery_context");
-
-    try {
-      const result = await context.with(
-        trace.setSpan(context.active(), trace.wrapSpanContext(ParentSpanContext)),
-        async () =>
-          await executeConversationProviderDelivery({
-            conversationId: "acv_123",
-            runtimeId: "codex",
-            connectionUrl: server.url,
-            inputText: "Tell me a short story",
-            deliveryContext: {
-              source: "schedule",
-              scheduledActionId: "sca_123",
-              deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
-              conversationId: "acv_123",
-              sandboxInstanceId: "sbi_123",
-              routeId: "acr_123",
-            },
-            providerConversationId: null,
-            providerExecutionId: null,
-          }),
-      );
-
-      expect(result).toEqual({
-        providerConversationId: "thread_123",
-        providerExecutionId: "turn_123",
-      });
-      expect(await server.deliveryContextMessage).toMatchObject({
-        method: "mistle/setDeliveryContext",
-        params: {
-          source: "schedule",
-          scheduledActionId: "sca_123",
-          deliveryTaskId: "cdt_123",
-          automationRunId: "aru_123",
-          conversationId: "acv_123",
-          sandboxInstanceId: "sbi_123",
-          routeId: "acr_123",
-        },
-      });
-      expect(await server.methodSequence).toContain("turn/start");
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("recovers scheduled delivery when the sandbox websocket closes before the agent stream opens", async () => {
-    const server = await startDeliveryServer("schedule_websocket_closes_before_stream_open");
-
-    try {
-      const result = await context.with(
-        trace.setSpan(context.active(), trace.wrapSpanContext(ParentSpanContext)),
-        async () =>
-          await executeConversationProviderDelivery({
-            conversationId: "acv_123",
-            runtimeId: "codex",
-            connectionUrl: server.url,
-            inputText: "Tell me a short story",
-            deliveryContext: {
-              source: "schedule",
-              scheduledActionId: "sca_123",
-              deliveryTaskId: "cdt_123",
-              automationRunId: "aru_123",
-              conversationId: "acv_123",
-              sandboxInstanceId: "sbi_123",
-              routeId: "acr_123",
-            },
-            providerConversationId: null,
-            providerExecutionId: null,
-          }),
-      );
-
-      expect(result).toEqual({
-        providerConversationId: "thread_123",
-        providerExecutionId: "turn_123",
-      });
-      expect(await server.methodSequence).toContain("turn/start");
     } finally {
       await server.close();
     }

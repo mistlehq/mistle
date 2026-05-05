@@ -11,7 +11,6 @@ export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
     status: z.enum(["pending", "starting", "running", "stopped", "failed"]),
-    connectable: z.boolean(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
   })

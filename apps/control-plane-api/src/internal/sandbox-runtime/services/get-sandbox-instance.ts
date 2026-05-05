@@ -18,7 +18,6 @@ export async function getSandboxInstance(
 ): Promise<{
   id: string;
   status: "pending" | "starting" | "running" | "stopped" | "failed";
-  connectable: boolean;
   failureCode: string | null;
   failureMessage: string | null;
 }> {
@@ -37,7 +36,6 @@ export async function getSandboxInstance(
   return {
     id: sandboxInstance.id,
     status: sandboxInstance.status,
-    connectable: sandboxInstance.connectable,
     failureCode: sandboxInstance.failureCode,
     failureMessage: sandboxInstance.failureMessage,
   };
