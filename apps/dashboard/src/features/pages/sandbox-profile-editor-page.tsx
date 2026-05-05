@@ -1173,7 +1173,7 @@ function ReadySandboxProfileEditorPage(input: {
     isStarting: startSetupAssistantMutation.isPending,
     onOpen: ({ setupScript }) => {
       setSetupAssistantError(null);
-      const startingPrompt = buildSetupAssistantStartingPrompt({ setupScript });
+      const startingPrompt = buildSetupAssistantStartingPrompt(setupScript);
 
       setSetupAssistantPanelState((currentState) => ({
         startingPrompt,
@@ -1544,10 +1544,9 @@ function SetupScriptAssistantPanel(input: {
                   chatEntries={conversationPane.chatState.entries}
                   composerStateInput={{
                     ...conversationPane.composerStateInput,
-                    collaborationModeSettings: buildSetupAssistantCollaborationModeSettings({
-                      existingSettings:
-                        conversationPane.composerStateInput.collaborationModeSettings,
-                    }),
+                    collaborationModeSettings: buildSetupAssistantCollaborationModeSettings(
+                      conversationPane.composerStateInput.collaborationModeSettings,
+                    ),
                   }}
                   draftState={{
                     composerText,

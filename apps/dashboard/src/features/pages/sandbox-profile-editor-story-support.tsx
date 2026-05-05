@@ -501,7 +501,7 @@ function SetupAssistantPanel(input: {
         <div className="shrink-0 border-t bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
-            composerText={buildSetupAssistantStartingPrompt({ setupScript: input.setupScript })}
+            composerText={buildSetupAssistantStartingPrompt(input.setupScript)}
             gitBranchLabel={null}
             pullRequest={null}
           />

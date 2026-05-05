@@ -16,19 +16,19 @@ Account for any required environment variables, credentials, external services, 
 When the right setup approach is unclear, ask clarifying questions or make a recommendation before drafting changes so the user can confirm alignment.
 `.trim();
 
-export function buildSetupAssistantCollaborationModeSettings(input: {
-  existingSettings?: AgentConversationCollaborationModeSettings | undefined;
-}): AgentConversationCollaborationModeSettings {
+export function buildSetupAssistantCollaborationModeSettings(
+  existingSettings?: AgentConversationCollaborationModeSettings,
+): AgentConversationCollaborationModeSettings {
   return {
     developerInstructions: joinDeveloperInstructionBlocks([
-      input.existingSettings?.developerInstructions,
+      existingSettings?.developerInstructions,
       SetupAssistantDeveloperInstructions,
     ]),
   };
 }
 
-export function buildSetupAssistantStartingPrompt(input: { setupScript: string }): string {
-  const trimmedSetupScript = input.setupScript.trim();
+export function buildSetupAssistantStartingPrompt(setupScript: string): string {
+  const trimmedSetupScript = setupScript.trim();
   const prompt = "Write a setup script";
 
   if (trimmedSetupScript.length === 0) {
@@ -40,7 +40,7 @@ export function buildSetupAssistantStartingPrompt(input: { setupScript: string }
     "",
     "This is the current setup script:",
     "```sh",
-    input.setupScript,
+    setupScript,
     "```",
   ].join("\n");
 }

@@ -182,7 +182,7 @@ export type CodexTurnCollaborationModeSettings = {
   developerInstructions: string | null;
 };
 
-export type CodexTurnStartRequest = {
+type CodexTurnStartRequest = {
   threadId: string;
   input: readonly CodexTurnInputItem[];
   collaborationMode?: {

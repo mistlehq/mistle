@@ -10,9 +10,7 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
   it("adds Setup Assistant instructions without replacing existing developer instructions", () => {
     expect(
       buildSetupAssistantCollaborationModeSettings({
-        existingSettings: {
-          developerInstructions: "Keep existing session guidance.",
-        },
+        developerInstructions: "Keep existing session guidance.",
       }),
     ).toEqual({
       developerInstructions: [
@@ -23,7 +21,7 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
   });
 
   it("returns Setup Assistant instructions when no existing developer instructions are present", () => {
-    expect(buildSetupAssistantCollaborationModeSettings({})).toEqual({
+    expect(buildSetupAssistantCollaborationModeSettings()).toEqual({
       developerInstructions: SetupAssistantDeveloperInstructions,
     });
   });
@@ -31,16 +29,12 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
 
 describe("buildSetupAssistantStartingPrompt", () => {
   it("returns a short editable request when no setup script exists", () => {
-    expect(buildSetupAssistantStartingPrompt({ setupScript: "  \n\t " })).toBe(
-      "Write a setup script",
-    );
+    expect(buildSetupAssistantStartingPrompt("  \n\t ")).toBe("Write a setup script");
   });
 
   it("includes the current setup script when a draft exists", () => {
     expect(
-      buildSetupAssistantStartingPrompt({
-        setupScript: "#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install",
-      }),
+      buildSetupAssistantStartingPrompt("#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install"),
     ).toBe(
       [
         "Fix this setup script",
