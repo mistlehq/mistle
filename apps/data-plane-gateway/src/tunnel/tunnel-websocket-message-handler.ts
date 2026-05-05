@@ -1,5 +1,6 @@
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
+import type { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -25,6 +26,13 @@ export type SigningDelivery = Extract<
   TunnelProtocolDelivery,
   {
     kind: "signingRequest";
+  }
+>;
+
+export type EgressTransportDelivery = Extract<
+  TunnelProtocolDelivery,
+  {
+    kind: "egressTransport";
   }
 >;
 
@@ -54,6 +62,7 @@ export async function handleTunnelWebSocketMessage(input: {
   bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
+  gatewayEgressTransportService: GatewayEgressTransportService;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
   sandboxRuntimeReadinessRepository: SandboxRuntimeReadinessRepository;
@@ -125,6 +134,15 @@ export async function handleTunnelWebSocketMessage(input: {
     }
 
     await input.handleSigningDelivery(translation.delivery);
+  } else if (translation.delivery.kind === "egressTransport") {
+    await input.gatewayEgressTransportService.handleBootstrapTransportMessage({
+      message: translation.delivery.message,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: (message) => {
+        input.currentSocket.send(JSON.stringify(message));
+      },
+      sourceBootstrapSessionId: input.clientSessionId,
+    });
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {

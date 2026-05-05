@@ -13,6 +13,7 @@ import {
   DefaultDataPlaneGatewayLifecycleDurations,
   SandboxInstanceDeadlineService,
 } from "../deadlines/sandbox-instance-deadline-service.js";
+import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
@@ -178,6 +179,7 @@ export function createDataPlaneGatewayRuntime(
       scheduler: systemScheduler,
     },
   );
+  const gatewayEgressTransportService = new GatewayEgressTransportService();
   const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,
@@ -272,6 +274,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxDeadlineLifecycleCoordinator,
     telemetryIngressService,
     sandboxTunnelTaskTracker,
+    gatewayEgressTransportService,
     clock: systemClock,
     scheduler: systemScheduler,
   });
@@ -332,6 +335,7 @@ export function createDataPlaneGatewayRuntime(
   return {
     app,
     internals: {
+      gatewayEgressTransportService,
       portAccessTransportService,
       portsTargetAuthorizeService,
     },

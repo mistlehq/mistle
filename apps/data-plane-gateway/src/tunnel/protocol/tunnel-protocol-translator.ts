@@ -3,6 +3,7 @@ import {
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   parseBootstrapControlMessage,
+  parseEgressTransportMessage,
   parsePortsControlMessage,
   parsePortsTransportMessage,
   parseSigningControlMessage,
@@ -11,6 +12,7 @@ import {
   type BootstrapControlMessage,
   type KeepaliveControlMessage,
   type RuntimeReadyControlMessage,
+  type EgressTransportMessage,
   type SigningRequest,
   type StreamControlMessage,
   type TelemetryClose,
@@ -68,6 +70,10 @@ export type TunnelProtocolDelivery =
   | {
       kind: "signingRequest";
       message: SigningRequest;
+    }
+  | {
+      kind: "egressTransport";
+      message: EgressTransportMessage;
     };
 
 export type TunnelProtocolTranslation = {
@@ -711,6 +717,16 @@ export class TunnelProtocolTranslator {
       throw new TunnelProtocolViolationError(
         `Bootstrap websocket cannot send ports transport message type '${portsTransportMessage.type}'.`,
       );
+    }
+
+    const egressTransportMessage = parseEgressTransportMessage(input.payload);
+    if (egressTransportMessage !== undefined) {
+      return createTranslation({
+        delivery: {
+          kind: "egressTransport",
+          message: egressTransportMessage,
+        },
+      });
     }
 
     const signingControlMessage = parseSigningControlMessage(input.payload);

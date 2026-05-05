@@ -3,6 +3,7 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { Context, Hono } from "hono";
 
+import type { GatewayEgressTransportService } from "./egress/egress-transport-service.js";
 import type { PortAccessNodeEntrypoint } from "./publishing/port-access-node-entrypoint.js";
 import type { PortAccessTransportService } from "./publishing/port-access-transport.js";
 import type { PortsTargetAuthorizeService } from "./publishing/ports-target-authorize-service.js";
@@ -59,6 +60,7 @@ export type StartedServer = {
 export type DataPlaneGatewayRuntime = {
   app: DataPlaneGatewayApp;
   internals: {
+    gatewayEgressTransportService: GatewayEgressTransportService;
     portAccessTransportService: PortAccessTransportService;
     portsTargetAuthorizeService: PortsTargetAuthorizeService;
   };

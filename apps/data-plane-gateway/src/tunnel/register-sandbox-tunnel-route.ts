@@ -6,6 +6,7 @@ import { SpanStatusCode, type Span } from "@opentelemetry/api";
 
 import type { SandboxDeadlineLifecycleCoordinator } from "../deadlines/sandbox-deadline-lifecycle-coordinator.js";
 import type { SandboxInstanceDeadlineService } from "../deadlines/sandbox-instance-deadline-service.js";
+import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import { logger } from "../logger.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -64,6 +65,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxDeadlineLifecycleCoordinator: SandboxDeadlineLifecycleCoordinator;
   telemetryIngressService: SandboxTelemetryIngressService;
   sandboxTunnelTaskTracker: AsyncTaskTracker;
+  gatewayEgressTransportService: GatewayEgressTransportService;
   clock: Clock;
   scheduler: Scheduler;
 };
@@ -323,6 +325,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     : {}),
                   clientSessionId: relaySessionId,
                   currentSocket: ws,
+                  gatewayEgressTransportService: input.gatewayEgressTransportService,
                   handleSigningDelivery: async (delivery) => {
                     const result =
                       await input.sandboxSigningRequestService.handleBootstrapSigningRequest({
@@ -392,6 +395,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 input.portAccessTransportService.rejectPendingStreamsForBootstrapSession({
                   sandboxInstanceId,
                   targetBootstrapSessionId: relaySessionId,
+                });
+                input.gatewayEgressTransportService.cancelStreamsForBootstrapSession({
+                  sandboxInstanceId,
+                  sourceBootstrapSessionId: relaySessionId,
                 });
                 const rejectedPendingAuthorizeRequests =
                   input.portsTargetAuthorizeService.rejectPendingRequestsForBootstrapSession({
