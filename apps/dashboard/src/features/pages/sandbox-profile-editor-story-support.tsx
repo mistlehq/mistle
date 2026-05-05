@@ -117,9 +117,9 @@ export type SandboxProfileEditorPageStoryArgs = {
     config: Record<string, unknown>;
   }[];
   setupScript: string | null;
-  setupScriptAuthoringPanelState?: "closed" | "starting" | "ready" | "proposed-script";
-  setupScriptAuthoringErrorMessage?: string;
-  setupScriptAuthoringState?: "available" | "starting" | "disabled";
+  setupAssistantPanelState?: "closed" | "starting" | "ready" | "proposed-script";
+  setupAssistantErrorMessage?: string;
+  setupAssistantState?: "available" | "starting" | "disabled";
   setupScriptTestStatus?: SetupScriptTestStatus;
 };
 
@@ -240,7 +240,7 @@ const SetupAssistantChatEntries: readonly ChatEntry[] = [
   },
 ];
 
-function createSetupScriptAuthoringPrompt(input: {
+function createSetupAssistantPrompt(input: {
   baseImage: string;
   profileName: string;
   setupScript: string;
@@ -262,7 +262,7 @@ function createSetupScriptAuthoringPrompt(input: {
     "",
     "Do not run the setup script test yourself. Produce a script that I can paste into the profile editor and test there.",
     "",
-    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this authoring session.",
+    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this Setup Assistant session.",
     "",
     "When finished, provide the complete setup script in one shell code block and list any required environment variables.",
   ].join("\n");
@@ -363,33 +363,33 @@ function createSnapshotRefreshScheduleInitialDraft(
 }
 
 function SetupScriptStoryControls(input: {
-  authoringState: SandboxProfileEditorPageStoryArgs["setupScriptAuthoringState"];
+  setupAssistantState: SandboxProfileEditorPageStoryArgs["setupAssistantState"];
   isDraft: boolean;
   onWriteWithAgent?: () => void;
   testStatus: SetupScriptTestStatus;
 }): React.JSX.Element {
-  const showAuthoringAction = input.authoringState !== undefined;
-  const authoringIsStarting = input.authoringState === "starting";
+  const showSetupAssistantAction = input.setupAssistantState !== undefined;
+  const setupAssistantIsStarting = input.setupAssistantState === "starting";
   const testIsBusy = input.testStatus === "starting" || input.testStatus === "running";
   const testIsDisabled = !input.isDraft || input.testStatus === "blank" || testIsBusy;
-  const authoringIsDisabled =
-    input.authoringState === "disabled" || !input.isDraft || authoringIsStarting;
+  const setupAssistantIsDisabled =
+    input.setupAssistantState === "disabled" || !input.isDraft || setupAssistantIsStarting;
   const failOnFirstErrorSwitchId = "story-setup-script-test-fail-on-first-error";
-  const authoringTitle = !input.isDraft
-    ? "Setup script authoring is only available while editing a draft."
-    : input.authoringState === "disabled"
+  const setupAssistantTitle = !input.isDraft
+    ? "Setup Assistant is only available while editing a draft."
+    : input.setupAssistantState === "disabled"
       ? "Add an agent integration before using Setup Assistant."
       : "Open the right panel to write this setup script.";
-  const authoringButton = (
+  const setupAssistantButton = (
     <Button
-      disabled={authoringIsDisabled}
+      disabled={setupAssistantIsDisabled}
       size="sm"
-      title={authoringTitle}
+      title={setupAssistantTitle}
       onClick={input.onWriteWithAgent}
       type="button"
       variant="outline"
     >
-      {authoringIsStarting ? (
+      {setupAssistantIsStarting ? (
         "Starting Setup Assistant..."
       ) : (
         <>
@@ -428,18 +428,18 @@ function SetupScriptStoryControls(input: {
           )}
           {testIsBusy ? "Running..." : "Test"}
         </Button>
-        {showAuthoringAction ? (
-          authoringIsDisabled ? (
+        {showSetupAssistantAction ? (
+          setupAssistantIsDisabled ? (
             <Tooltip>
               <TooltipTrigger render={<span className="inline-flex" />}>
-                {authoringButton}
+                {setupAssistantButton}
               </TooltipTrigger>
               <TooltipContent className="max-w-64 text-left" side="top">
-                {authoringTitle}
+                {setupAssistantTitle}
               </TooltipContent>
             </Tooltip>
           ) : (
-            authoringButton
+            setupAssistantButton
           )
         ) : null}
       </ButtonGroup>
@@ -447,15 +447,15 @@ function SetupScriptStoryControls(input: {
   );
 }
 
-function SetupScriptAuthoringPanel(input: {
+function SetupAssistantPanel(input: {
   baseImage: string;
   onClose: () => void;
   profileName: string;
   setupScript: string;
-  state: Exclude<SandboxProfileEditorPageStoryArgs["setupScriptAuthoringPanelState"], undefined>;
+  state: Exclude<SandboxProfileEditorPageStoryArgs["setupAssistantPanelState"], undefined>;
   version: number;
 }): React.JSX.Element {
-  const prompt = createSetupScriptAuthoringPrompt({
+  const prompt = createSetupAssistantPrompt({
     baseImage: input.baseImage,
     profileName: input.profileName,
     setupScript: input.setupScript,
@@ -595,10 +595,12 @@ function SandboxProfileEditorPageStoryView(
   const [activeSectionId, setActiveSectionId] = useState<StorySectionId>(
     input.initialSectionId ?? "sandbox-profile",
   );
-  const initialAuthoringPanelState = input.setupScriptAuthoringPanelState ?? "closed";
-  const [authoringPanelState, setAuthoringPanelState] = useState(initialAuthoringPanelState);
-  const [authoringPanelOpen, setAuthoringPanelOpen] = useState(
-    initialAuthoringPanelState !== "closed",
+  const initialSetupAssistantPanelState = input.setupAssistantPanelState ?? "closed";
+  const [setupAssistantPanelState, setSetupAssistantPanelState] = useState(
+    initialSetupAssistantPanelState,
+  );
+  const [setupAssistantPanelOpen, setSetupAssistantPanelOpen] = useState(
+    initialSetupAssistantPanelState !== "closed",
   );
   const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
   const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
@@ -683,8 +685,8 @@ function SandboxProfileEditorPageStoryView(
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
   function handleWriteWithAgent(): void {
-    setAuthoringPanelState(input.setupScriptAuthoringState === "starting" ? "starting" : "ready");
-    setAuthoringPanelOpen(true);
+    setSetupAssistantPanelState(input.setupAssistantState === "starting" ? "starting" : "ready");
+    setSetupAssistantPanelOpen(true);
   }
 
   const editorView = (
@@ -768,8 +770,8 @@ function SandboxProfileEditorPageStoryView(
               </SandboxProfilePanelSection>
               <SandboxProfilePanelSection>
                 <div className="flex flex-col gap-4">
-                  {input.setupScriptAuthoringErrorMessage === undefined ? null : (
-                    <Notice variant="alert">{input.setupScriptAuthoringErrorMessage}</Notice>
+                  {input.setupAssistantErrorMessage === undefined ? null : (
+                    <Notice variant="alert">{input.setupAssistantErrorMessage}</Notice>
                   )}
                   <SandboxProfileSetupScriptPanel
                     onBlur={handleSetupScriptBlur}
@@ -779,7 +781,7 @@ function SandboxProfileEditorPageStoryView(
                     saveStatus={setupScriptSaveStatus}
                     testControl={
                       <SetupScriptStoryControls
-                        authoringState={input.setupScriptAuthoringState}
+                        setupAssistantState={input.setupAssistantState}
                         isDraft={mode.kind === "draft"}
                         onWriteWithAgent={handleWriteWithAgent}
                         testStatus={setupScriptTestStatus}
@@ -840,32 +842,28 @@ function SandboxProfileEditorPageStoryView(
 
   return (
     <QueryClientProvider client={queryClient}>
-      {!authoringPanelOpen ? (
+      {!setupAssistantPanelOpen ? (
         editorView
       ) : (
         <div className="fixed inset-0 overflow-hidden">
           <ResizablePanelGroup
             className="h-screen min-h-0 overflow-hidden"
-            id="setup-script-authoring-page-panel-group"
+            id="setup-assistant-page-panel-group"
             orientation="horizontal"
           >
-            <ResizablePanel defaultSize="72%" id="setup-script-authoring-page-main" minSize="45%">
+            <ResizablePanel defaultSize="72%" id="setup-assistant-page-main" minSize="45%">
               <div className="h-full min-h-0 overflow-y-auto overscroll-contain">{editorView}</div>
             </ResizablePanel>
-            <ResizableHandle id="setup-script-authoring-page-resize-handle" />
-            <ResizablePanel
-              defaultSize="28%"
-              id="setup-script-authoring-page-panel"
-              minSize="360px"
-            >
-              <SetupScriptAuthoringPanel
+            <ResizableHandle id="setup-assistant-page-resize-handle" />
+            <ResizablePanel defaultSize="28%" id="setup-assistant-page-panel" minSize="360px">
+              <SetupAssistantPanel
                 baseImage="ghcr.io/mistle/base-node:2026-05-03"
                 onClose={() => {
-                  setAuthoringPanelOpen(false);
+                  setSetupAssistantPanelOpen(false);
                 }}
                 profileName={profileName}
                 setupScript={setupScriptDraft}
-                state={authoringPanelState}
+                state={setupAssistantPanelState}
                 version={mode.version}
               />
             </ResizablePanel>

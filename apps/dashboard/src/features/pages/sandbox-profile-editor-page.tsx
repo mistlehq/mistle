@@ -234,7 +234,7 @@ function createSandboxProfileDefaultPath(profileId: string): string {
   return `/sandbox-profiles/${profileId}/sandbox-profile`;
 }
 
-function createSetupScriptAuthoringPrompt(input: {
+function createSetupAssistantPrompt(input: {
   profileName: string;
   setupScript: string;
   version: number;
@@ -255,7 +255,7 @@ function createSetupScriptAuthoringPrompt(input: {
     "",
     "Do not run the setup script test yourself. Produce a script that I can paste into the profile editor and test there.",
     "",
-    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this authoring session.",
+    "The script should be repeatable, fail fast when required configuration is missing, and avoid relying on state from this Setup Assistant session.",
     "",
     "When finished, provide the complete setup script in one shell code block and list any required environment variables.",
   ].join("\n");
@@ -1180,7 +1180,7 @@ function ReadySandboxProfileEditorPage(input: {
   });
   const setupAssistantDisabledReason =
     input.mode.kind !== "draft"
-      ? "Setup script authoring is only available while editing a draft."
+      ? "Setup Assistant is only available while editing a draft."
       : setupAssistantIntegrationRows === null
         ? "Integration bindings are still loading."
         : !setupAssistantHasAgentRuntime
@@ -1196,7 +1196,7 @@ function ReadySandboxProfileEditorPage(input: {
     isStarting: startSetupAssistantMutation.isPending,
     onOpen: ({ setupScript }) => {
       setSetupAssistantError(null);
-      const initialPrompt = createSetupScriptAuthoringPrompt({
+      const initialPrompt = createSetupAssistantPrompt({
         profileName: metaState.formState.displayName ?? metaState.pageTitle,
         setupScript,
         version: input.mode.version,

@@ -25,53 +25,53 @@ export const EmptySetupScript: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
     setupScript: "",
-    setupScriptAuthoringState: "available",
+    setupAssistantState: "available",
   },
 };
 
 export const SetupAssistantEntry: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
-    setupScriptAuthoringState: "available",
+    setupAssistantState: "available",
   },
 };
 
 export const SetupAssistantStarting: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
-    setupScriptAuthoringPanelState: "starting",
-    setupScriptAuthoringState: "starting",
+    setupAssistantPanelState: "starting",
+    setupAssistantState: "starting",
   },
 };
 
 export const SetupAssistantRequiresAgent: Story = {
   args: {
     initialBindings: [StoryBindings[1]],
-    setupScriptAuthoringState: "disabled",
+    setupAssistantState: "disabled",
   },
 };
 
 export const SetupAssistantAgentRequiredNotice: Story = {
   args: {
     initialBindings: [StoryBindings[1]],
-    setupScriptAuthoringErrorMessage: "Add an agent integration before using Setup Assistant.",
-    setupScriptAuthoringState: "disabled",
+    setupAssistantErrorMessage: "Add an agent integration before using Setup Assistant.",
+    setupAssistantState: "disabled",
   },
 };
 
 export const SetupAssistantPanelReady: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
-    setupScriptAuthoringPanelState: "ready",
-    setupScriptAuthoringState: "available",
+    setupAssistantPanelState: "ready",
+    setupAssistantState: "available",
   },
 };
 
 export const SetupAssistantPanelWithDraft: Story = {
   args: {
     initialBindings: [StoryBindings[0], StoryBindings[1]],
-    setupScriptAuthoringPanelState: "proposed-script",
-    setupScriptAuthoringState: "available",
+    setupAssistantPanelState: "proposed-script",
+    setupAssistantState: "available",
   },
 };
 

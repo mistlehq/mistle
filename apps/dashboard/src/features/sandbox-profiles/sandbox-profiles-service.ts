@@ -439,7 +439,7 @@ const SandboxProfileVersionSetupScriptResponseSchema = z
   })
   .strict();
 
-const SandboxProfileSetupScriptTestRunResponseSchema = z
+const SandboxProfileAcceptedStartResponseSchema = z
   .object({
     status: z.literal("accepted"),
     workflowRunId: z.string().min(1),
@@ -447,7 +447,8 @@ const SandboxProfileSetupScriptTestRunResponseSchema = z
   })
   .strict();
 
-const SandboxProfileSetupAssistantResponseSchema = SandboxProfileSetupScriptTestRunResponseSchema;
+const SandboxProfileSetupScriptTestRunResponseSchema = SandboxProfileAcceptedStartResponseSchema;
+const SandboxProfileSetupAssistantResponseSchema = SandboxProfileAcceptedStartResponseSchema;
 
 export async function listSandboxProfileVersions(input: {
   profileId: string;
