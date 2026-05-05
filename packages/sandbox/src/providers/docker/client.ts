@@ -40,6 +40,7 @@ type DockerHostConfig = Docker.HostConfig & {
 };
 
 const DockerVolumeInitImageRef = "alpine:3.20";
+const DockerHostGatewayExtraHost = "host.docker.internal:host-gateway";
 
 export type DockerStartSandboxResponse = {
   runtimeId: string;
@@ -291,21 +292,12 @@ export class DockerApiClient implements DockerClient {
       await this.#pullImage(parsedRequest.imageRef);
     }
 
-    const hostConfig: DockerHostConfig = {};
-    if (this.#config.networkName !== undefined) {
-      hostConfig.NetworkMode = this.#config.networkName;
-    }
-    // Sandboxd PTY sessions create scoped cgroups under /sys/fs/cgroup, so the
-    // sandbox container needs the host cgroup hierarchy mounted read-write and
-    // exposed through the host cgroup namespace so child pids can move into the
-    // sandbox-owned scopes.
-    hostConfig.Binds = ["/sys/fs/cgroup:/sys/fs/cgroup:rw"];
-    hostConfig.CgroupnsMode = "host";
-    if (parsedRequest.storagePreparation !== undefined) {
-      hostConfig.Mounts = createDockerVolumeSubpathMounts({
-        storage: parsedRequest.storagePreparation,
-      });
-    }
+    const hostConfig = createDockerSandboxHostConfig({
+      ...(this.#config.networkName === undefined ? {} : { networkName: this.#config.networkName }),
+      ...(parsedRequest.storagePreparation === undefined
+        ? {}
+        : { storagePreparation: parsedRequest.storagePreparation }),
+    });
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
@@ -499,4 +491,29 @@ export class DockerApiClient implements DockerClient {
       throw mapDockerClientError(operation, error);
     }
   }
+}
+
+export function createDockerSandboxHostConfig(input: {
+  networkName?: string;
+  storagePreparation?: DockerStartSandboxRequest["storagePreparation"];
+}): DockerHostConfig {
+  const hostConfig: DockerHostConfig = {
+    ExtraHosts: [DockerHostGatewayExtraHost],
+  };
+  if (input.networkName !== undefined) {
+    hostConfig.NetworkMode = input.networkName;
+  }
+  // Sandboxd PTY sessions create scoped cgroups under /sys/fs/cgroup, so the
+  // sandbox container needs the host cgroup hierarchy mounted read-write and
+  // exposed through the host cgroup namespace so child pids can move into the
+  // sandbox-owned scopes.
+  hostConfig.Binds = ["/sys/fs/cgroup:/sys/fs/cgroup:rw"];
+  hostConfig.CgroupnsMode = "host";
+  if (input.storagePreparation !== undefined) {
+    hostConfig.Mounts = createDockerVolumeSubpathMounts({
+      storage: input.storagePreparation,
+    });
+  }
+
+  return hostConfig;
 }
