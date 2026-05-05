@@ -33,7 +33,7 @@
     "@opentelemetry/api-logs": "^0.215.0",
     "@opentelemetry/auto-instrumentations-node": "^0.73.0",
     "@opentelemetry/core": "^2.7.0",
-    "@opentelemetry/exporter-logs-otlp-http": "^0.215.0",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.216.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.215.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.215.0",
     "@opentelemetry/instrumentation-pg": "^0.68.0",
