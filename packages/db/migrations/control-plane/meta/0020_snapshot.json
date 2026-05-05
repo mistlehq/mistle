@@ -4817,10 +4817,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "sandbox_profile_versions_default_persistence_mode_check": {
-          "name": "sandbox_profile_versions_default_persistence_mode_check",
-          "value": "\"control_plane\".\"sandbox_profile_versions\".\"default_persistence_mode\" in ('ephemeral', 'persistent')"
-        },
         "sandbox_profile_versions_snapshot_image_handle_check": {
           "name": "sandbox_profile_versions_snapshot_image_handle_check",
           "value": "(\"control_plane\".\"sandbox_profile_versions\".\"snapshot_image_provider\" is null and \"control_plane\".\"sandbox_profile_versions\".\"snapshot_image_id\" is null) or (\"control_plane\".\"sandbox_profile_versions\".\"snapshot_image_provider\" is not null and \"control_plane\".\"sandbox_profile_versions\".\"snapshot_image_id\" is not null)"

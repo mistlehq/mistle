@@ -54,10 +54,6 @@ export function defineSandboxProfileVersions(schema: PgSchema) {
         columns: [table.sandboxProfileId, table.version],
       }),
       check(
-        "sandbox_profile_versions_default_persistence_mode_check",
-        sql`${table.defaultPersistenceMode} in ('ephemeral', 'persistent')`,
-      ),
-      check(
         "sandbox_profile_versions_snapshot_image_handle_check",
         sql`(${table.snapshotImageProvider} is null and ${table.snapshotImageId} is null) or (${table.snapshotImageProvider} is not null and ${table.snapshotImageId} is not null)`,
       ),
