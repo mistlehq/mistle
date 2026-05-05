@@ -337,28 +337,33 @@ function createSnapshotRefreshScheduleInitialDraft(
 
 function SetupScriptStoryControls(input: {
   setupAssistantState: SandboxProfileEditorPageStoryArgs["setupAssistantState"];
+  setupAssistantPanelIsOpen: boolean;
   isDraft: boolean;
-  onOpenSetupAssistant?: () => void;
+  onToggleSetupAssistant?: () => void;
   testStatus: SetupScriptTestStatus;
 }): React.JSX.Element {
   const showSetupAssistantAction = input.setupAssistantState !== undefined;
-  const setupAssistantIsStarting = input.setupAssistantState === "starting";
+  const setupAssistantIsStarting =
+    !input.setupAssistantPanelIsOpen && input.setupAssistantState === "starting";
   const testIsBusy = input.testStatus === "starting" || input.testStatus === "running";
   const testIsDisabled = !input.isDraft || input.testStatus === "blank" || testIsBusy;
   const setupAssistantIsDisabled =
-    input.setupAssistantState === "disabled" || !input.isDraft || setupAssistantIsStarting;
+    !input.setupAssistantPanelIsOpen &&
+    (input.setupAssistantState === "disabled" || !input.isDraft || setupAssistantIsStarting);
   const failOnFirstErrorSwitchId = "story-setup-script-test-fail-on-first-error";
-  const setupAssistantTitle = !input.isDraft
-    ? "Setup Assistant is only available while editing a draft."
-    : input.setupAssistantState === "disabled"
-      ? "Add an agent integration before using Setup Assistant."
-      : "Open the right panel to write this setup script.";
+  const setupAssistantTitle = input.setupAssistantPanelIsOpen
+    ? "Close the Setup Assistant panel."
+    : !input.isDraft
+      ? "Setup Assistant is only available while editing a draft."
+      : input.setupAssistantState === "disabled"
+        ? "Add an agent integration before using Setup Assistant."
+        : "Open the right panel to write this setup script.";
   const setupAssistantButton = (
     <Button
       disabled={setupAssistantIsDisabled}
       size="sm"
       title={setupAssistantTitle}
-      onClick={input.onOpenSetupAssistant}
+      onClick={input.onToggleSetupAssistant}
       type="button"
       variant="outline"
     >
@@ -648,7 +653,12 @@ function SandboxProfileEditorPageStoryView(
   });
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
-  function handleOpenSetupAssistant(): void {
+  function handleToggleSetupAssistant(): void {
+    if (setupAssistantPanelOpen) {
+      setSetupAssistantPanelOpen(false);
+      return;
+    }
+
     setSetupAssistantPanelState(input.setupAssistantState === "starting" ? "starting" : "ready");
     setSetupAssistantPanelOpen(true);
   }
@@ -746,8 +756,9 @@ function SandboxProfileEditorPageStoryView(
                     testControl={
                       <SetupScriptStoryControls
                         setupAssistantState={input.setupAssistantState}
+                        setupAssistantPanelIsOpen={setupAssistantPanelOpen}
                         isDraft={mode.kind === "draft"}
-                        onOpenSetupAssistant={handleOpenSetupAssistant}
+                        onToggleSetupAssistant={handleToggleSetupAssistant}
                         testStatus={setupScriptTestStatus}
                       />
                     }
