@@ -10,7 +10,7 @@ import type { TestServiceEndpoints, TestServiceRuntime } from "./types.js";
 
 const StateFileVersion = 1;
 const LockPollIntervalMs = 50;
-const LockTimeoutMs = 30_000;
+const DefaultLockTimeoutMs = 30_000;
 const DefaultRunnerPoolRootDirectoryPath = join(tmpdir(), "mistle-test-harness", "runner-pools");
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +28,7 @@ export type AcquireRunnerServicePoolLeaseInput = {
   start: () => Promise<RunnerServicePoolStartedService>;
   healthCheck: (service: TestServiceRuntime) => Promise<void>;
   coordinatorDir?: string;
+  lockTimeoutMs?: number;
 };
 
 export type StopRunnerServicePoolsInput = {
@@ -52,50 +53,56 @@ export async function acquireRunnerServicePoolLease(
 ): Promise<RunnerServicePoolLease> {
   const paths = resolveRunnerServicePoolPaths(input);
 
-  return withRunnerServicePoolLock(paths, async () => {
-    const existingService = await readPersistedService(paths.stateFilePath);
-    if (
-      existingService !== undefined &&
-      (await isPersistedServiceHealthy(input, existingService))
-    ) {
+  return withRunnerServicePoolLock(
+    {
+      ...paths,
+      timeoutMs: input.lockTimeoutMs ?? DefaultLockTimeoutMs,
+    },
+    async () => {
+      const existingService = await readPersistedService(paths.stateFilePath);
+      if (
+        existingService !== undefined &&
+        (await isPersistedServiceHealthy(input, existingService))
+      ) {
+        return {
+          endpoints: existingService.endpoints,
+          ...(existingService.pid === undefined ? {} : { pid: existingService.pid }),
+          ...(existingService.containerId === undefined
+            ? {}
+            : { containerId: existingService.containerId }),
+          release: async () => {},
+        };
+      }
+
+      await rm(paths.stateFilePath, {
+        force: true,
+      });
+
+      const startedService = await input.start();
+      const persistedService = {
+        version: StateFileVersion,
+        key: input.key,
+        endpoints: startedService.endpoints,
+        pid: startedService.pid,
+        containerId: startedService.containerId,
+        ownerPid: process.pid,
+        startedAt: systemClock.nowMs(),
+      };
+
+      await input.healthCheck(startedService);
+      await writeJsonFile(paths.stateFilePath, persistedService);
+      LocalStopCallbacksByStateFilePath.set(paths.stateFilePath, startedService.stop);
+
       return {
-        endpoints: existingService.endpoints,
-        ...(existingService.pid === undefined ? {} : { pid: existingService.pid }),
-        ...(existingService.containerId === undefined
+        endpoints: startedService.endpoints,
+        ...(startedService.pid === undefined ? {} : { pid: startedService.pid }),
+        ...(startedService.containerId === undefined
           ? {}
-          : { containerId: existingService.containerId }),
+          : { containerId: startedService.containerId }),
         release: async () => {},
       };
-    }
-
-    await rm(paths.stateFilePath, {
-      force: true,
-    });
-
-    const startedService = await input.start();
-    const persistedService = {
-      version: StateFileVersion,
-      key: input.key,
-      endpoints: startedService.endpoints,
-      pid: startedService.pid,
-      containerId: startedService.containerId,
-      ownerPid: process.pid,
-      startedAt: systemClock.nowMs(),
-    };
-
-    await input.healthCheck(startedService);
-    await writeJsonFile(paths.stateFilePath, persistedService);
-    LocalStopCallbacksByStateFilePath.set(paths.stateFilePath, startedService.stop);
-
-    return {
-      endpoints: startedService.endpoints,
-      ...(startedService.pid === undefined ? {} : { pid: startedService.pid }),
-      ...(startedService.containerId === undefined
-        ? {}
-        : { containerId: startedService.containerId }),
-      release: async () => {},
-    };
-  });
+    },
+  );
 }
 
 export async function stopRunnerServicePools(input: StopRunnerServicePoolsInput): Promise<void> {
@@ -196,6 +203,7 @@ async function withRunnerServicePoolLock<T>(
     lockOwnerFilePath: string;
     lockRootDirectoryPath: string;
     stateDirectoryPath: string;
+    timeoutMs: number;
   },
   callback: () => Promise<T>,
 ): Promise<T> {
@@ -206,7 +214,7 @@ async function withRunnerServicePoolLock<T>(
     recursive: true,
   });
 
-  const deadline = systemClock.nowMs() + LockTimeoutMs;
+  const deadline = systemClock.nowMs() + paths.timeoutMs;
 
   while (systemClock.nowMs() < deadline) {
     try {

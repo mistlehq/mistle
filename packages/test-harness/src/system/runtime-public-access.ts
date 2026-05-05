@@ -11,9 +11,10 @@ import { parseCloudflaredTunnelCredentialsJson } from "./cloudflared-config.js";
 
 const CloudflaredImageReference = "cloudflare/cloudflared:latest";
 const CloudflaredTunnelPollIntervalMs = 500;
-const CloudflaredTunnelStartupTimeoutMs = 60_000;
+const CloudflaredTunnelStartupTimeoutMs = 180_000;
 const RuntimePublicAccessTunnelLabel = "mistle.runtime-public-access.tunnel-id";
 const RuntimePublicAccessProxyReadyTimeoutMs = 30_000;
+const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
@@ -80,6 +81,7 @@ async function acquireRuntimePublicAccessProxy(input: {
     runId: runnerPoolSession.runId,
     coordinatorDir: runnerPoolSession.coordinatorDir,
     key: `runtime-public-access:${input.tunnelId}:${publicHostnames.join(",")}`,
+    lockTimeoutMs: RuntimePublicAccessProxyPoolLockTimeoutMs,
     start: async () =>
       startRuntimePublicAccessProxy({
         tunnelId: input.tunnelId,
@@ -294,6 +296,7 @@ async function unregisterRuntimePublicAccessRoutes(input: {
 function createRuntimePublicAccessProxyScript(): string {
   return String.raw`
 import { spawn, spawnSync } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { mkdtemp, writeFile } from "node:fs/promises";
@@ -316,7 +319,7 @@ if (!Array.isArray(publicHostnames) || publicHostnames.some((value) => typeof va
 const routes = new Map();
 const server = http.createServer(handleRequest);
 server.on("upgrade", handleUpgrade);
-server.listen(0, "127.0.0.1", async () => {
+server.listen(0, "0.0.0.0", async () => {
   const address = server.address();
   if (address === null || typeof address === "string") {
     throw new Error("Runtime public access proxy did not listen on a TCP port.");
@@ -327,6 +330,7 @@ server.listen(0, "127.0.0.1", async () => {
   await writeFile(readyPath, JSON.stringify({ baseUrl: proxyBaseUrl }), "utf8");
 });
 
+const logStream = createWriteStream(logPath, { flags: "a" });
 let cloudflared;
 let cloudflaredContainerName;
 process.on("SIGTERM", shutdown);
@@ -490,7 +494,12 @@ async function startCloudflared(proxyBaseUrl) {
     "/etc/cloudflared/config.yml",
     "run",
     tunnelId,
-  ], { stdio: "ignore" });
+  ], { stdio: ["ignore", "pipe", "pipe"] });
+  cloudflared.stdout.pipe(logStream, { end: false });
+  cloudflared.stderr.pipe(logStream, { end: false });
+  cloudflared.on("exit", (code, signal) => {
+    logStream.write("cloudflared container process exited code=" + String(code) + " signal=" + String(signal) + "\n");
+  });
 }
 
 function shutdown() {
@@ -501,6 +510,7 @@ function shutdown() {
   if (cloudflaredContainerName !== undefined) {
     spawnSync("docker", ["rm", "--force", cloudflaredContainerName], { stdio: "ignore" });
   }
+  logStream.end();
   process.exit(0);
 }
 

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { stopRunnerServicePools } from "@mistle/test-harness";
+import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 
 const RunId = "runner_service_pool_cross_process";
@@ -59,6 +60,39 @@ describe("runner service pool", () => {
     const lifecycle = await readFile(lifecycleFilePath, "utf8");
     expect(lifecycle.trim().split("\n")).toEqual(["started"]);
   }, 30_000);
+
+  it("honors a caller-specific lock acquisition timeout", async () => {
+    coordinatorDirectoryPath = await mkdtemp(join(tmpdir(), "mistle-runner-service-pool-"));
+    const lifecycleFilePath = join(coordinatorDirectoryPath, "lifecycle.log");
+    const lockMarkerFilePath = join(coordinatorDirectoryPath, "lock-acquired");
+    const serverScriptPath = join(coordinatorDirectoryPath, "pooled-server.mjs");
+    const acquirerScriptPath = join(coordinatorDirectoryPath, "acquire-service.mts");
+
+    await writeFile(serverScriptPath, createServerScript(), "utf8");
+    await writeFile(acquirerScriptPath, createAcquirerScript(), "utf8");
+
+    const firstAcquire = runAcquirer({
+      acquirerScriptPath,
+      coordinatorDirectoryPath,
+      lifecycleFilePath,
+      serverScriptPath,
+      lockMarkerFilePath,
+      startDelayMs: 3_000,
+    });
+    await waitForFile(lockMarkerFilePath);
+
+    await expect(
+      runAcquirer({
+        acquirerScriptPath,
+        coordinatorDirectoryPath,
+        lifecycleFilePath,
+        serverScriptPath,
+        lockTimeoutMs: 100,
+      }),
+    ).rejects.toThrow("Timed out acquiring runner service pool lock");
+
+    await firstAcquire;
+  }, 30_000);
 });
 
 function createServerScript(): string {
@@ -104,17 +138,21 @@ function createAcquirerScript(): string {
 
   return `
 import { spawn } from "node:child_process";
-import { appendFile, readFile, rm } from "node:fs/promises";
+import { appendFile, readFile, rm, writeFile } from "node:fs/promises";
 import { acquireRunnerServicePoolLease } from "${harnessEntryUrl}";
 
 const coordinatorDir = readEnv("COORDINATOR_DIR");
 const lifecycleFilePath = readEnv("LIFECYCLE_FILE");
 const serverScriptPath = readEnv("SERVER_SCRIPT");
+const lockMarkerFilePath = readOptionalEnv("LOCK_MARKER_FILE");
+const lockTimeoutMs = readOptionalNumberEnv("LOCK_TIMEOUT_MS");
+const startDelayMs = readOptionalNumberEnv("START_DELAY_MS") ?? 0;
 
 const lease = await acquireRunnerServicePoolLease({
   runId: "${RunId}",
   key: "${PoolKey}",
   coordinatorDir,
+  ...(lockTimeoutMs === undefined ? {} : { lockTimeoutMs }),
   healthCheck: async (service) => {
     const httpEndpoint = readHttpEndpoint(service);
     const response = await fetch(new URL("/__healthz", httpEndpoint.hostBaseUrl));
@@ -123,6 +161,11 @@ const lease = await acquireRunnerServicePoolLease({
     }
   },
   start: async () => {
+    if (lockMarkerFilePath !== undefined) {
+      await writeFile(lockMarkerFilePath, "acquired\\n", "utf8");
+    }
+    await sleep(startDelayMs);
+
     const startupFilePath = \`\${coordinatorDir}/startup-\${process.pid}.json\`;
     const server = spawn(process.execPath, [serverScriptPath], {
       detached: true,
@@ -166,6 +209,37 @@ function readEnv(name) {
   }
 
   return value;
+}
+
+function readOptionalEnv(name) {
+  const value = process.env[name];
+  if (value === undefined || value.length === 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function readOptionalNumberEnv(name) {
+  const value = readOptionalEnv(name);
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(\`Expected \${name} to be a finite number.\`);
+  }
+
+  return parsed;
+}
+
+async function sleep(delayMs) {
+  if (delayMs <= 0) {
+    return;
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 function readHttpEndpoint(service) {
@@ -220,6 +294,9 @@ function runAcquirer(input: {
   coordinatorDirectoryPath: string;
   lifecycleFilePath: string;
   serverScriptPath: string;
+  lockMarkerFilePath?: string;
+  lockTimeoutMs?: number;
+  startDelayMs?: number;
 }): Promise<{ hostBaseUrl: string }> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -231,6 +308,15 @@ function runAcquirer(input: {
           COORDINATOR_DIR: input.coordinatorDirectoryPath,
           LIFECYCLE_FILE: input.lifecycleFilePath,
           SERVER_SCRIPT: input.serverScriptPath,
+          ...(input.lockMarkerFilePath === undefined
+            ? {}
+            : { LOCK_MARKER_FILE: input.lockMarkerFilePath }),
+          ...(input.lockTimeoutMs === undefined
+            ? {}
+            : { LOCK_TIMEOUT_MS: String(input.lockTimeoutMs) }),
+          ...(input.startDelayMs === undefined
+            ? {}
+            : { START_DELAY_MS: String(input.startDelayMs) }),
         },
         timeout: 15_000,
       },
@@ -244,6 +330,24 @@ function runAcquirer(input: {
       },
     );
   });
+}
+
+async function waitForFile(filePath: string): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      await readFile(filePath, "utf8");
+      return;
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+    }
+
+    await systemSleeper.sleep(StartupPollIntervalMs);
+  }
+
+  throw new Error(`Timed out waiting for file '${filePath}'.`);
 }
 
 function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
@@ -266,4 +370,8 @@ function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
   return {
     hostBaseUrl,
   };
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && Reflect.get(error, "code") === "ENOENT";
 }
