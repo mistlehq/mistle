@@ -447,7 +447,7 @@ function SetupScriptAuthoringPanel(input: {
     "bg-transparent text-foreground shadow-none hover:bg-stone-100 aria-pressed:bg-stone-200";
 
   return (
-    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden pl-5">
+    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain pl-5">
       <Button
         aria-label="Close setup script authoring panel"
         className="absolute top-3 left-1 size-8 px-0"
@@ -504,7 +504,7 @@ function SetupScriptAuthoringPanel(input: {
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-y-auto py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
           <SessionConversationMainContent
             activeTurnId={null}
             chatEntries={SetupAssistantChatEntries}
@@ -820,28 +820,34 @@ function SandboxProfileEditorPageStoryView(
       {!authoringPanelOpen ? (
         editorView
       ) : (
-        <ResizablePanelGroup
-          className="h-screen min-h-0 overflow-hidden"
-          id="setup-script-authoring-page-panel-group"
-          orientation="horizontal"
-        >
-          <ResizablePanel defaultSize="72%" id="setup-script-authoring-page-main" minSize="45%">
-            <div className="h-full min-h-0 overflow-y-auto">{editorView}</div>
-          </ResizablePanel>
-          <ResizableHandle id="setup-script-authoring-page-resize-handle" />
-          <ResizablePanel defaultSize="28%" id="setup-script-authoring-page-panel" minSize="360px">
-            <SetupScriptAuthoringPanel
-              baseImage="ghcr.io/mistle/base-node:2026-05-03"
-              onClose={() => {
-                setAuthoringPanelOpen(false);
-              }}
-              profileName={profileName}
-              setupScript={setupScriptDraft}
-              state={authoringPanelState}
-              version={mode.version}
-            />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+        <div className="fixed inset-0 overflow-hidden">
+          <ResizablePanelGroup
+            className="h-screen min-h-0 overflow-hidden"
+            id="setup-script-authoring-page-panel-group"
+            orientation="horizontal"
+          >
+            <ResizablePanel defaultSize="72%" id="setup-script-authoring-page-main" minSize="45%">
+              <div className="h-full min-h-0 overflow-y-auto overscroll-contain">{editorView}</div>
+            </ResizablePanel>
+            <ResizableHandle id="setup-script-authoring-page-resize-handle" />
+            <ResizablePanel
+              defaultSize="28%"
+              id="setup-script-authoring-page-panel"
+              minSize="360px"
+            >
+              <SetupScriptAuthoringPanel
+                baseImage="ghcr.io/mistle/base-node:2026-05-03"
+                onClose={() => {
+                  setAuthoringPanelOpen(false);
+                }}
+                profileName={profileName}
+                setupScript={setupScriptDraft}
+                state={authoringPanelState}
+                version={mode.version}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
       )}
     </QueryClientProvider>
   );

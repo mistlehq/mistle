@@ -1305,32 +1305,38 @@ function ReadySandboxProfileEditorPage(input: {
   }
 
   return (
-    <ResizablePanelGroup
-      className="h-full min-h-0 overflow-hidden"
-      id="sandbox-profile-setup-assistant-panel-group"
-      orientation="horizontal"
-    >
-      <ResizablePanel defaultSize="72%" id="sandbox-profile-editor-main-panel" minSize="45%">
-        <div className="h-full min-h-0 overflow-y-auto">{editorView}</div>
-      </ResizablePanel>
-      <ResizableHandle id="sandbox-profile-setup-assistant-resize-handle" />
-      <ResizablePanel defaultSize="28%" id="sandbox-profile-setup-assistant-panel" minSize="360px">
-        <SetupScriptAssistantPanel
-          initialPrompt={setupAssistantPanelState.initialPrompt}
-          onClose={() => {
-            setSetupAssistantPanelState((currentState) =>
-              currentState === null
-                ? currentState
-                : {
-                    ...currentState,
-                    isOpen: false,
-                  },
-            );
-          }}
-          sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
-        />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <div className="sticky top-0 h-svh overflow-hidden">
+      <ResizablePanelGroup
+        className="h-full min-h-0 overflow-hidden"
+        id="sandbox-profile-setup-assistant-panel-group"
+        orientation="horizontal"
+      >
+        <ResizablePanel defaultSize="72%" id="sandbox-profile-editor-main-panel" minSize="45%">
+          <div className="h-full min-h-0 overflow-y-auto overscroll-contain">{editorView}</div>
+        </ResizablePanel>
+        <ResizableHandle id="sandbox-profile-setup-assistant-resize-handle" />
+        <ResizablePanel
+          defaultSize="28%"
+          id="sandbox-profile-setup-assistant-panel"
+          minSize="360px"
+        >
+          <SetupScriptAssistantPanel
+            initialPrompt={setupAssistantPanelState.initialPrompt}
+            onClose={() => {
+              setSetupAssistantPanelState((currentState) =>
+                currentState === null
+                  ? currentState
+                  : {
+                      ...currentState,
+                      isOpen: false,
+                    },
+              );
+            }}
+            sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </div>
   );
 }
 
@@ -1387,7 +1393,7 @@ function SetupScriptAssistantPanel(input: {
   }
 
   return (
-    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden pl-5">
+    <aside className="relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden overscroll-contain pl-5">
       <Button
         aria-label="Close setup assistant panel"
         className="absolute top-3 left-1 size-8 px-0"
@@ -1476,7 +1482,7 @@ function SetupScriptAssistantPanel(input: {
           <div className="flex h-full min-h-0 flex-col">
             <div
               aria-label="Setup assistant conversation"
-              className="min-h-0 flex-1 overflow-y-auto"
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
               ref={conversationScrollContainerRef}
               role="region"
             >
