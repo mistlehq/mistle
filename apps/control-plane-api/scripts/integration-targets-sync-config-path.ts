@@ -8,6 +8,7 @@ import { z } from "zod";
 type UnknownRecord = Record<string, unknown>;
 type PartialIntegrationTargetsSyncConfig = {
   databaseUrl?: string;
+  schemaName?: string;
   integrations?: {
     activeMasterEncryptionKeyVersion?: number;
     masterEncryptionKeys?: Record<string, string>;
@@ -17,6 +18,7 @@ type PartialIntegrationTargetsSyncConfig = {
 const IntegrationTargetsSyncConfigSchema = z
   .object({
     databaseUrl: z.string().min(1),
+    schemaName: z.string().min(1).optional(),
     integrations: z
       .object({
         activeMasterEncryptionKeyVersion: z.number().int().min(1),
@@ -103,6 +105,11 @@ function loadEnvConfig(environment: NodeJS.ProcessEnv): PartialIntegrationTarget
   const databaseUrl = environment.MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL;
   if (typeof databaseUrl === "string" && databaseUrl.length > 0) {
     normalizedEnvConfig.databaseUrl = databaseUrl;
+  }
+
+  const schemaName = environment.MISTLE_CONTROL_PLANE_SCHEMA_NAME;
+  if (typeof schemaName === "string" && schemaName.length > 0) {
+    normalizedEnvConfig.schemaName = schemaName;
   }
 
   const activeMasterEncryptionKeyVersion =

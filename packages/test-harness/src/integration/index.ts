@@ -10,6 +10,7 @@ import type { DangerouslyIsolatedTestRegistry } from "../environment/registry.js
 import { startTestEnvironment } from "../environment/runtime.js";
 import { TestEnvironmentIdHeader } from "../environment/test-isolation.js";
 import type {
+  TestEnvironment,
   TestInfraRequirement,
   TestServiceLaunchMode,
   TestServiceDefinition,
@@ -30,6 +31,11 @@ export type { IntegrationTestEnvironment } from "./environment.js";
 
 type MistleTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
+type ServiceAttachableInfraId =
+  | MistleTestExtraInfraId
+  | "sandbox-base-image"
+  | "sandbox-docker-network";
+
 type IntegrationServiceSelection =
   | ServiceId
   | {
@@ -44,6 +50,11 @@ type CreateIntegrationTestInput = {
     google?: "simulated";
   };
   __dangerouslyIsolatedServices?: DangerouslyIsolatedTestRegistry;
+  __internalInfra?: readonly TestInfraRequirement[];
+  __afterStart?: (input: {
+    environment: TestEnvironment<ServiceId>;
+    integrationEnvironment: IntegrationTestEnvironment;
+  }) => Promise<void>;
 };
 
 type IntegrationTestFixture = {
@@ -90,6 +101,12 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
         const integrationEnvironment = createIntegrationEnvironment({
           environment,
         });
+        if (input.__afterStart !== undefined) {
+          await input.__afterStart({
+            environment,
+            integrationEnvironment,
+          });
+        }
         const setupDurationMs = Date.now() - setupStartedAt;
 
         writeIntegrationTimingLine(
@@ -153,6 +170,8 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
       : createTestExtraInfra({
           ids: input.extraInfra,
         });
+  const internalInfra = input.__internalInfra ?? [];
+  const attachableInfra = [...extraInfra, ...internalInfra];
   const services: Record<string, TestServiceDefinition> = {};
 
   for (const entry of serviceEntries) {
@@ -165,7 +184,7 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
         ...catalogService.infra,
         ...extraInfraForService({
           serviceId: entry.serviceId,
-          extraInfra,
+          extraInfra: attachableInfra,
         }),
       ],
       {
@@ -197,16 +216,19 @@ function extraInfraForService(input: {
   return input.extraInfra.filter((infra) => supportedInfraIds.some((id) => id === infra.id));
 }
 
-function supportedExtraInfraIdsForService(serviceId: ServiceId): readonly MistleTestExtraInfraId[] {
+function supportedExtraInfraIdsForService(
+  serviceId: ServiceId,
+): readonly ServiceAttachableInfraId[] {
   switch (serviceId) {
     case ServiceIds.CONTROL_PLANE_API:
-      return ["seaweedfs"];
+      return ["sandbox-base-image", "seaweedfs"];
     case ServiceIds.CONTROL_PLANE_WORKER:
-      return ["mailpit"];
+      return ["mailpit", "sandbox-base-image"];
     case ServiceIds.DATA_PLANE_GATEWAY:
-      return ["otlp"];
-    case ServiceIds.DATA_PLANE_API:
+      return ["otlp", "sandbox-base-image"];
     case ServiceIds.DATA_PLANE_WORKER:
+      return ["sandbox-base-image", "sandbox-docker-network"];
+    case ServiceIds.DATA_PLANE_API:
     case ServiceIds.TOKENIZER_PROXY:
       return [];
   }

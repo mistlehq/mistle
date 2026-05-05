@@ -3,8 +3,17 @@
  * fixture functions must use object destructuring for the first argument.
  */
 
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import { createDockerSandboxProviderInfra } from "../environment/service-catalog.js";
+import type { TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
+
+const execFileAsync = promisify(execFile);
+const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.meta.url));
 
 export type SystemTestServiceSelection =
   | ServiceId
@@ -15,9 +24,14 @@ export type SystemTestServiceSelection =
 
 export type SystemTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
+export type SystemTestSandbox = {
+  provider: "docker";
+};
+
 export type CreateSystemTestInput = {
   services?: readonly SystemTestServiceSelection[];
   extraInfra?: readonly SystemTestExtraInfraId[];
+  sandbox?: SystemTestSandbox;
   auth?: {
     google?: "simulated";
   };
@@ -54,6 +68,10 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
     services: input.services ?? DefaultSystemServices,
     extraInfra: input.extraInfra ?? DefaultSystemExtraInfra,
     ...(input.auth === undefined ? {} : { auth: input.auth }),
+    __internalInfra: createInternalInfra(input),
+    __afterStart: async ({ integrationEnvironment }) => {
+      await syncControlPlaneIntegrationTargets(integrationEnvironment);
+    },
   });
 
   return base.extend<SystemTestFixture>({
@@ -66,6 +84,71 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
       },
     ],
   });
+}
+
+function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRequirement[] {
+  if (input.sandbox === undefined) {
+    return [];
+  }
+
+  switch (input.sandbox.provider) {
+    case "docker":
+      return createDockerSandboxProviderInfra();
+  }
+}
+
+async function syncControlPlaneIntegrationTargets(
+  environment: IntegrationTestEnvironment,
+): Promise<void> {
+  await runCommand({
+    command: "pnpm",
+    args: ["--filter", "@mistle/control-plane-api", "integration-targets:sync"],
+    cwd: DefaultBuildContextHostPath,
+    env: {
+      MISTLE_POSTGRES_CONTROL_PLANE_POOLED_URL: environment.controlPlaneDatabase.pooledUrl,
+      MISTLE_CONTROL_PLANE_SCHEMA_NAME: environment.controlPlaneDatabase.schemaName,
+    },
+  });
+}
+
+async function runCommand(input: {
+  command: string;
+  args: string[];
+  cwd: string;
+  env: Record<string, string>;
+}): Promise<void> {
+  try {
+    await execFileAsync(input.command, input.args, {
+      cwd: input.cwd,
+      env: {
+        ...process.env,
+        ...input.env,
+      },
+    });
+  } catch (error) {
+    const stderr = readErrorOutput(error, "stderr");
+    const stdout = readErrorOutput(error, "stdout");
+    const output = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : "no command output";
+    throw new Error(`Command failed: ${input.command} ${input.args.join(" ")}. Output: ${output}`);
+  }
+}
+
+function readErrorOutput(error: unknown, property: "stderr" | "stdout"): string {
+  if (typeof error !== "object" || error === null) {
+    return "";
+  }
+
+  const descriptor = Object.getOwnPropertyDescriptor(error, property);
+  const output = descriptor?.value;
+  if (typeof output === "string") {
+    return output;
+  }
+
+  if (Buffer.isBuffer(output)) {
+    return output.toString("utf8");
+  }
+
+  return "";
 }
 
 function createRuntimeSystemEnvironment(

@@ -11,7 +11,10 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
-    include: ["system-runtime/*.runtime-system.test.ts"],
+    include: [
+      "system-runtime/*.runtime-system.test.ts",
+      "system-runtime/**/*.runtime-system.test.ts",
+    ],
     setupFiles: [TimingSetupFilePath],
     testTimeout: 180_000,
     hookTimeout: 180_000,

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import { systemSleeper } from "@mistle/time";
 import { BackendPostgres } from "openworkflow/postgres";
 import { Client } from "pg";
 import { createClient } from "redis";
+import { GenericContainer } from "testcontainers";
 
 import { startControlPlaneApi } from "../apps/control-plane-api.js";
 import { startControlPlaneWorker } from "../apps/control-plane-worker.js";
@@ -27,6 +28,7 @@ import { startDataPlaneGateway } from "../apps/data-plane-gateway.js";
 import { startDataPlaneWorker } from "../apps/data-plane-worker.js";
 import { startTokenizerProxy } from "../apps/tokenizer-proxy.js";
 import { registerProcessCleanupTask } from "../cleanup/index.js";
+import { startDockerNetwork } from "../network/start-docker-network.js";
 import { startOtlpTestCollector } from "../services/otlp-test-collector.js";
 import { ensureSeaweedfsS3BucketExists } from "../services/seaweedfs/index.js";
 import { createTestEnvironmentSharedInfraKey } from "../services/shared-infra-coordinator.js";
@@ -38,7 +40,10 @@ import {
 import { acquireSharedSeaweedfsInfra } from "../services/shared-seaweedfs.js";
 import { acquireSharedValkeyInfra, type SharedValkeyLease } from "../services/shared-valkey.js";
 import { DockerIntegrationConfigPathInContainer } from "../system/integration-config-paths.js";
-import { readPreparedTestHarnessRuntime } from "../system/prepared-runtime.js";
+import {
+  DefaultSandboxBaseImageBuild,
+  readPreparedTestHarnessRuntime,
+} from "../system/prepared-runtime.js";
 import { resolveHostPathFromContainerPath } from "../system/provision-system-integration-targets.js";
 import { createServiceRegistry } from "./registry.js";
 import { ensureRunnerPoolSession } from "./runner-pool-session.js";
@@ -68,6 +73,8 @@ const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.
 const DefaultStartupTimeoutMs = 120_000;
 const HostGatewayName = "host.testcontainers.internal";
 const DockerSocketPath = "/var/run/docker.sock";
+const RegistryImageReference = "registry:3";
+const RegistryInternalPort = 5000;
 const DeadServiceBaseUrl = "http://host.testcontainers.internal:9";
 const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
 const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
@@ -86,6 +93,8 @@ const InfraIds = {
   MAILPIT: "mailpit",
   SEAWEEDFS: "seaweedfs",
   OTLP: "otlp",
+  SANDBOX_BASE_IMAGE: "sandbox-base-image",
+  SANDBOX_DOCKER_NETWORK: "sandbox-docker-network",
 };
 
 const PostgresValues = {
@@ -105,6 +114,8 @@ const InfraKinds = {
   MAILPIT: "mailpit",
   SEAWEEDFS: "seaweedfs",
   OTLP: "otlp",
+  SANDBOX_BASE_IMAGE: "sandbox-base-image",
+  DOCKER_NETWORK: "docker-network",
 };
 
 const ValkeyValues = {
@@ -134,6 +145,14 @@ const OtlpValues = {
   TRACES_ENDPOINT: "traces.endpoint",
   LOGS_ENDPOINT: "logs.endpoint",
   METRICS_ENDPOINT: "metrics.endpoint",
+};
+
+const DockerNetworkValues = {
+  NETWORK_NAME: "network.name",
+};
+
+const SandboxBaseImageValues = {
+  IMAGE_REF: "image.ref",
 };
 
 function formatDuration(milliseconds: number): string {
@@ -312,6 +331,10 @@ export function createTestExtraInfra(input: {
   return requirements;
 }
 
+export function createDockerSandboxProviderInfra(): readonly TestInfraRequirement[] {
+  return [createSandboxBaseImageRequirement(), createSandboxDockerNetworkRequirement()];
+}
+
 function createRegistryContext(input: {
   buildContextHostPath?: string;
   configPathInContainer?: string;
@@ -333,6 +356,91 @@ function createPostgresRequirement(input: {
     kind: InfraKinds.POSTGRES,
     provisioner: input.provisioner,
   };
+}
+
+function createSandboxDockerNetworkRequirement(): TestInfraRequirement {
+  return {
+    id: InfraIds.SANDBOX_DOCKER_NETWORK,
+    kind: InfraKinds.DOCKER_NETWORK,
+    provisioner: {
+      kind: InfraKinds.DOCKER_NETWORK,
+      provision: async (provisionInput) => {
+        const network = await startDockerNetwork();
+        const networkName = network.getName();
+
+        return provisionInput.requirements.map((requirement) => ({
+          id: requirement.id,
+          kind: requirement.kind,
+          values: new Map([[DockerNetworkValues.NETWORK_NAME, networkName]]),
+          stop: async () => {
+            await removeDockerSandboxContainersOnNetwork(networkName);
+            await network.stop();
+          },
+        }));
+      },
+    },
+  };
+}
+
+function createSandboxBaseImageRequirement(): TestInfraRequirement {
+  return {
+    id: InfraIds.SANDBOX_BASE_IMAGE,
+    kind: InfraKinds.SANDBOX_BASE_IMAGE,
+    provisioner: {
+      kind: InfraKinds.SANDBOX_BASE_IMAGE,
+      provision: async (provisionInput) => {
+        const registryContainer = await new GenericContainer(RegistryImageReference)
+          .withEnvironment({
+            REGISTRY_STORAGE_DELETE_ENABLED: "true",
+          })
+          .withExposedPorts(RegistryInternalPort)
+          .start();
+        const registryAuthority = `${registryContainer.getHost()}:${String(
+          registryContainer.getMappedPort(RegistryInternalPort),
+        )}`;
+        const sandboxBaseImageRef = `${registryAuthority}/${DefaultSandboxBaseImageBuild.repositoryPath}:dev`;
+        await execFileAsync("docker", [
+          "tag",
+          DefaultSandboxBaseImageBuild.localReference,
+          sandboxBaseImageRef,
+        ]);
+        await execFileAsync("docker", ["push", sandboxBaseImageRef]);
+
+        return provisionInput.requirements.map((requirement) => ({
+          id: requirement.id,
+          kind: requirement.kind,
+          values: new Map([[SandboxBaseImageValues.IMAGE_REF, sandboxBaseImageRef]]),
+          stop: async () => {
+            await registryContainer.stop({
+              remove: true,
+              removeVolumes: true,
+              timeout: 0,
+            });
+          },
+        }));
+      },
+    },
+  };
+}
+
+async function removeDockerSandboxContainersOnNetwork(networkName: string): Promise<void> {
+  const { stdout } = await execFileAsync("docker", [
+    "ps",
+    "-aq",
+    "--filter",
+    "label=mistle.sandbox.provider=docker",
+    "--filter",
+    `network=${networkName}`,
+  ]);
+  const containerIds = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (containerIds.length === 0) {
+    return;
+  }
+
+  await execFileAsync("docker", ["rm", "--force", ...containerIds]);
 }
 
 function createPostgresProvisioner(input: {
@@ -442,11 +550,6 @@ function createPostgresProvisioner(input: {
           port: lease.infra.postgres.pgbouncer.port,
           databaseName,
         });
-        const migrationCoordinatorKey = createPostgresMigrationCoordinatorKey({
-          sharedInfraKey: input.sharedInfraKey,
-          postgresContainerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
-        });
-
         return {
           hostDirectUrl,
           hostPooledUrl,
@@ -456,14 +559,22 @@ function createPostgresProvisioner(input: {
           workflowDataPlaneNamespaceId,
           controlPlaneSchemaName,
           dataPlaneSchemaName,
-          migrationCoordinatorKey,
+          postgresContainerId: lease.infra.postgres.runtimeMetadata.postgresContainerId,
         };
+      });
+      const migrationFingerprint = await measure(timings, "migration-fingerprint", async () =>
+        createPostgresBootstrapMigrationFingerprint(),
+      );
+      const migrationCoordinatorKey = createPostgresMigrationCoordinatorKey({
+        sharedInfraKey: input.sharedInfraKey,
+        postgresContainerId: resolved.postgresContainerId,
+        migrationFingerprint,
       });
 
       await measure(timings, "bootstrap-migrations", async () =>
         runBootstrapMigrationsOnce({
           hostDirectUrl: resolved.hostDirectUrl,
-          migrationCoordinatorKey: resolved.migrationCoordinatorKey,
+          migrationCoordinatorKey,
           timings,
         }),
       );
@@ -1244,12 +1355,65 @@ async function startDataPlaneWorkerDockerService(input: {
 function createPostgresMigrationCoordinatorKey(input: {
   sharedInfraKey: string;
   postgresContainerId: string;
+  migrationFingerprint: string;
 }): string {
   return createHash("sha256")
     .update(input.sharedInfraKey)
     .update("\0")
     .update(input.postgresContainerId)
+    .update("\0")
+    .update(input.migrationFingerprint)
     .digest("hex");
+}
+
+async function createPostgresBootstrapMigrationFingerprint(): Promise<string> {
+  const hash = createHash("sha256");
+  await hashDirectory({
+    hash,
+    rootDirectory: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+    relativeDirectory: ".",
+  });
+  await hashDirectory({
+    hash,
+    rootDirectory: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+    relativeDirectory: ".",
+  });
+  return hash.digest("hex");
+}
+
+async function hashDirectory(input: {
+  hash: ReturnType<typeof createHash>;
+  rootDirectory: string;
+  relativeDirectory: string;
+}): Promise<void> {
+  const directoryPath =
+    input.relativeDirectory === "."
+      ? input.rootDirectory
+      : join(input.rootDirectory, input.relativeDirectory);
+  const entries = await readdir(directoryPath, {
+    withFileTypes: true,
+  });
+
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const relativePath =
+      input.relativeDirectory === "." ? entry.name : join(input.relativeDirectory, entry.name);
+    input.hash.update(relativePath);
+    input.hash.update("\0");
+
+    if (entry.isDirectory()) {
+      await hashDirectory({
+        hash: input.hash,
+        rootDirectory: input.rootDirectory,
+        relativeDirectory: relativePath,
+      });
+      continue;
+    }
+
+    if (entry.isFile()) {
+      input.hash.update(await readFile(join(input.rootDirectory, relativePath)));
+      input.hash.update("\0");
+    }
+  }
 }
 
 async function runPostgresBootstrapMigrations(input: {
@@ -1257,6 +1421,9 @@ async function runPostgresBootstrapMigrations(input: {
   hostDirectUrl: string;
   timings: Map<string, number>;
 }): Promise<void> {
+  await measure(input.timings, "reset-bootstrap-template-schemas", async () =>
+    resetPostgresBootstrapTemplateSchemas(input.hostDirectUrl),
+  );
   await measure(input.timings, "bootstrap-data-plane-db-migrations", async () =>
     runDataPlaneMigrations({
       connectionString: input.hostDirectUrl,
@@ -1323,11 +1490,13 @@ async function runPostgresLogicalMigrations(input: {
 
   if (requiresControlPlanePostgres(input.requirements)) {
     materializations.push(
-      measure(input.timings, "logical-control-plane-schema-materialization", async () =>
-        materializePostgresSchemaFromTemplate({
+      measure(input.timings, "logical-control-plane-db-migrations", async () =>
+        runControlPlaneMigrations({
           connectionString: input.hostDirectUrl,
-          sourceSchemaName: CONTROL_PLANE_SCHEMA_NAME,
-          targetSchemaName: input.controlPlaneSchemaName,
+          schemaName: input.controlPlaneSchemaName,
+          migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
+          migrationsSchema: createLogicalMigrationTrackingSchemaName(input.controlPlaneSchemaName),
+          migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
         }),
       ),
     );
@@ -1335,11 +1504,13 @@ async function runPostgresLogicalMigrations(input: {
 
   if (requiresDataPlanePostgres(input.requirements)) {
     materializations.push(
-      measure(input.timings, "logical-data-plane-schema-materialization", async () =>
-        materializePostgresSchemaFromTemplate({
+      measure(input.timings, "logical-data-plane-db-migrations", async () =>
+        runDataPlaneMigrations({
           connectionString: input.hostDirectUrl,
-          sourceSchemaName: DATA_PLANE_SCHEMA_NAME,
-          targetSchemaName: input.dataPlaneSchemaName,
+          schemaName: input.dataPlaneSchemaName,
+          migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+          migrationsSchema: createLogicalMigrationTrackingSchemaName(input.dataPlaneSchemaName),
+          migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
         }),
       ),
     );
@@ -1348,133 +1519,8 @@ async function runPostgresLogicalMigrations(input: {
   await Promise.all(materializations);
 }
 
-async function materializePostgresSchemaFromTemplate(input: {
-  connectionString: string;
-  sourceSchemaName: string;
-  targetSchemaName: string;
-}): Promise<void> {
-  const client = new Client({
-    connectionString: input.connectionString,
-  });
-
-  await client.connect();
-
-  try {
-    await client.query("begin");
-    await client.query(`create schema ${quoteSqlIdentifier(input.targetSchemaName)}`);
-
-    const tables = await readPostgresSchemaTables({
-      client,
-      schemaName: input.sourceSchemaName,
-    });
-
-    for (const table of tables) {
-      await client.query(
-        `create table ${quoteSqlIdentifier(input.targetSchemaName)}.${quoteSqlIdentifier(table.tableName)} (like ${quoteSqlIdentifier(input.sourceSchemaName)}.${quoteSqlIdentifier(table.tableName)} including all)`,
-      );
-    }
-
-    const foreignKeys = await readPostgresSchemaForeignKeys({
-      client,
-      schemaName: input.sourceSchemaName,
-    });
-
-    for (const foreignKey of foreignKeys) {
-      await client.query(
-        `alter table ${quoteSqlIdentifier(input.targetSchemaName)}.${quoteSqlIdentifier(foreignKey.tableName)} add constraint ${quoteSqlIdentifier(foreignKey.constraintName)} ${rewritePostgresConstraintDefinition(
-          {
-            definition: foreignKey.definition,
-            sourceSchemaName: input.sourceSchemaName,
-            targetSchemaName: input.targetSchemaName,
-          },
-        )}`,
-      );
-    }
-
-    await client.query("commit");
-  } catch (error) {
-    await client.query("rollback");
-    throw error;
-  } finally {
-    await client.end();
-  }
-}
-
-type PostgresSchemaTable = {
-  tableName: string;
-};
-
-type PostgresSchemaForeignKey = {
-  tableName: string;
-  constraintName: string;
-  definition: string;
-};
-
-async function readPostgresSchemaTables(input: {
-  client: Client;
-  schemaName: string;
-}): Promise<readonly PostgresSchemaTable[]> {
-  const result = await input.client.query<{
-    table_name: string;
-  }>(
-    `
-      select c.relname as table_name
-      from pg_catalog.pg_class c
-      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = $1
-        and c.relkind in ('r', 'p')
-      order by c.relname
-    `,
-    [input.schemaName],
-  );
-
-  return result.rows.map((row) => ({
-    tableName: row.table_name,
-  }));
-}
-
-async function readPostgresSchemaForeignKeys(input: {
-  client: Client;
-  schemaName: string;
-}): Promise<readonly PostgresSchemaForeignKey[]> {
-  const result = await input.client.query<{
-    table_name: string;
-    constraint_name: string;
-    definition: string;
-  }>(
-    `
-      select
-        c.relname as table_name,
-        con.conname as constraint_name,
-        pg_catalog.pg_get_constraintdef(con.oid, true) as definition
-      from pg_catalog.pg_constraint con
-      join pg_catalog.pg_class c on c.oid = con.conrelid
-      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = $1
-        and con.contype = 'f'
-      order by c.relname, con.conname
-    `,
-    [input.schemaName],
-  );
-
-  return result.rows.map((row) => ({
-    tableName: row.table_name,
-    constraintName: row.constraint_name,
-    definition: row.definition,
-  }));
-}
-
-function rewritePostgresConstraintDefinition(input: {
-  definition: string;
-  sourceSchemaName: string;
-  targetSchemaName: string;
-}): string {
-  return input.definition
-    .replaceAll(
-      `${quoteSqlIdentifier(input.sourceSchemaName)}.`,
-      `${quoteSqlIdentifier(input.targetSchemaName)}.`,
-    )
-    .replaceAll(`${input.sourceSchemaName}.`, `${quoteSqlIdentifier(input.targetSchemaName)}.`);
+function createLogicalMigrationTrackingSchemaName(schemaName: string): string {
+  return `meta_${createSafeIdentifier(schemaName)}`;
 }
 
 async function dropPostgresLogicalSchemas(input: {
@@ -1486,11 +1532,12 @@ async function dropPostgresLogicalSchemas(input: {
 }): Promise<void> {
   if (input.requirement.id === InfraIds.CONTROL_PLANE_POSTGRES) {
     await measure(input.timings, "drop-control-plane-schema", async () =>
-      dropPostgresSchema({
-        containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
-        username: input.lease.infra.postgres.postgres.username,
-        databaseName: input.lease.infra.postgres.postgres.databaseName,
-        schemaName: input.controlPlaneSchemaName,
+      dropPostgresSchemas({
+        lease: input.lease,
+        schemaNames: [
+          input.controlPlaneSchemaName,
+          createLogicalMigrationTrackingSchemaName(input.controlPlaneSchemaName),
+        ],
       }),
     );
     return;
@@ -1498,11 +1545,12 @@ async function dropPostgresLogicalSchemas(input: {
 
   if (input.requirement.id === InfraIds.DATA_PLANE_POSTGRES) {
     await measure(input.timings, "drop-data-plane-schema", async () =>
-      dropPostgresSchema({
-        containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
-        username: input.lease.infra.postgres.postgres.username,
-        databaseName: input.lease.infra.postgres.postgres.databaseName,
-        schemaName: input.dataPlaneSchemaName,
+      dropPostgresSchemas({
+        lease: input.lease,
+        schemaNames: [
+          input.dataPlaneSchemaName,
+          createLogicalMigrationTrackingSchemaName(input.dataPlaneSchemaName),
+        ],
       }),
     );
     return;
@@ -1531,6 +1579,28 @@ async function runOpenWorkflowPostgresMigrations(input: {
   });
 
   await backend.stop();
+}
+
+async function resetPostgresBootstrapTemplateSchemas(connectionString: string): Promise<void> {
+  const client = new Client({
+    connectionString,
+  });
+  await client.connect();
+
+  try {
+    for (const schemaName of [
+      CONTROL_PLANE_SCHEMA_NAME,
+      DATA_PLANE_SCHEMA_NAME,
+      MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
+      MigrationTracking.DATA_PLANE.SCHEMA_NAME,
+      ControlPlaneOpenWorkflowSchema,
+      DataPlaneOpenWorkflowSchema,
+    ]) {
+      await client.query(`drop schema if exists ${quoteSqlIdentifier(schemaName)} cascade`);
+    }
+  } finally {
+    await client.end();
+  }
 }
 
 async function withPostgresMigrationCoordinatorLock<T>(
@@ -1681,17 +1751,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-async function dropPostgresSchema(input: {
-  containerId: string;
-  username: string;
-  databaseName: string;
-  schemaName: string;
+async function dropPostgresSchemas(input: {
+  lease: SharedPostgresLease;
+  schemaNames: readonly string[];
 }): Promise<void> {
   await runPostgresAdminCommand({
-    containerId: input.containerId,
-    username: input.username,
-    databaseName: input.databaseName,
-    sql: `drop schema if exists "${input.schemaName.replaceAll('"', '""')}" cascade`,
+    containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
+    username: input.lease.infra.postgres.postgres.username,
+    databaseName: input.lease.infra.postgres.postgres.databaseName,
+    sql: input.schemaNames
+      .map((schemaName) => `drop schema if exists ${quoteSqlIdentifier(schemaName)} cascade`)
+      .join(";"),
   });
 }
 

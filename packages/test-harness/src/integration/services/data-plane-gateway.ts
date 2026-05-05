@@ -27,6 +27,7 @@ const Host = "127.0.0.1";
 const InfraIds = {
   OTLP: "otlp",
   POSTGRES: "postgres.data-plane",
+  SANDBOX_BASE_IMAGE: "sandbox-base-image",
   VALKEY: "valkey",
 };
 
@@ -43,6 +44,10 @@ const OtlpValues = {
   TRACES_ENDPOINT: "traces.endpoint",
   LOGS_ENDPOINT: "logs.endpoint",
   METRICS_ENDPOINT: "metrics.endpoint",
+};
+
+const SandboxBaseImageValues = {
+  IMAGE_REF: "image.ref",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -78,6 +83,7 @@ function start(input: {
 
     const postgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
     const otlp = startInput.infra.get(InfraIds.OTLP);
+    const sandboxBaseImage = startInput.infra.get(InfraIds.SANDBOX_BASE_IMAGE);
     const valkey = resolvedInfra(startInput.infra, input.valkeyInfra.id);
     const endpoint = httpEndpoint(startInput, ServiceIds.DATA_PLANE_GATEWAY);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
@@ -85,6 +91,7 @@ function start(input: {
       port: endpoint.port,
       postgres,
       otlp,
+      sandboxBaseImage,
       valkey,
       dataPlaneApiBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
       controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
@@ -130,6 +137,7 @@ function config(input: {
   port: number;
   postgres: ResolvedTestInfra;
   otlp: ResolvedTestInfra | undefined;
+  sandboxBaseImage: ResolvedTestInfra | undefined;
   valkey: ResolvedTestInfra;
   dataPlaneApiBaseUrl: string;
   controlPlaneBaseUrl: string;
@@ -164,7 +172,10 @@ function config(input: {
     },
     sandbox: {
       provider: "docker",
-      defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
+      defaultBaseImage:
+        input.sandboxBaseImage === undefined
+          ? getLocalDevDockerRegistrySandboxBaseImageRef()
+          : infraValue(input.sandboxBaseImage, SandboxBaseImageValues.IMAGE_REF),
       gatewayWsUrl: input.gatewayWsUrl,
       internalGatewayWsUrl: input.gatewayWsUrl,
       connect: {

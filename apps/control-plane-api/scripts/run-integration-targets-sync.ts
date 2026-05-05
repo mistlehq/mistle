@@ -20,7 +20,10 @@ async function main(): Promise<void> {
   const pool = new Pool({
     connectionString: loadedConfig.databaseUrl,
   });
-  const db = createControlPlaneDatabase(pool);
+  const db = createControlPlaneDatabase(
+    pool,
+    loadedConfig.schemaName === undefined ? undefined : { schemaName: loadedConfig.schemaName },
+  );
   const integrationRegistry = createIntegrationRegistry();
 
   try {

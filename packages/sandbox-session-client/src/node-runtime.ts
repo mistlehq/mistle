@@ -11,6 +11,10 @@ import {
   type SandboxSessionSocketEventName,
 } from "./runtime.js";
 
+export type NodeSandboxSessionRuntimeOptions = {
+  headers?: Record<string, string>;
+};
+
 function toMessageData(data: RawData, isBinary: boolean): string | Uint8Array {
   if (!isBinary) {
     if (typeof data === "string") {
@@ -62,8 +66,10 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
     (data: RawData, isBinary: boolean) => void
   >();
 
-  constructor(connectionUrl: string) {
-    this.#socket = new WebSocket(connectionUrl);
+  constructor(connectionUrl: string, options: NodeSandboxSessionRuntimeOptions) {
+    this.#socket = new WebSocket(connectionUrl, {
+      headers: options.headers,
+    });
   }
 
   get readyState(): SandboxSessionSocket["readyState"] {
@@ -160,11 +166,13 @@ function createSequentialStreamId(): () => number {
   };
 }
 
-export function createNodeSandboxSessionRuntime(): SandboxSessionRuntime {
+export function createNodeSandboxSessionRuntime(
+  options: NodeSandboxSessionRuntimeOptions = {},
+): SandboxSessionRuntime {
   const createStreamId = createSequentialStreamId();
 
   return {
-    createSocket: (connectionUrl) => new NodeSandboxSessionSocket(connectionUrl),
+    createSocket: (connectionUrl) => new NodeSandboxSessionSocket(connectionUrl, options),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
       new NodeSandboxScheduledTask(systemScheduler.schedule(callback, timeoutMs)),

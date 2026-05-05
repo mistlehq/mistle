@@ -12,6 +12,7 @@ import { withHostedOpenWorkflowRuntime } from "../../../../../apps/control-plane
 import { ControlPlaneWorkerWorkflows } from "../../../../../apps/control-plane-worker/openworkflow/workflows.js";
 import { runCleanupTasks } from "../../cleanup/index.js";
 import type {
+  ResolvedTestInfra,
   TestInfraRequirement,
   TestService,
   TestServiceDefinition,
@@ -39,6 +40,7 @@ const AppDir = fileURLToPath(new URL("../../../../../apps/control-plane-worker",
 const InfraIds = {
   POSTGRES: "postgres.control-plane",
   MAILPIT: "mailpit",
+  SANDBOX_BASE_IMAGE: "sandbox-base-image",
 };
 
 const PostgresValues = {
@@ -49,6 +51,10 @@ const PostgresValues = {
 const MailpitValues = {
   SMTP_HOST: "smtp.host",
   SMTP_PORT: "smtp.port",
+};
+
+const SandboxBaseImageValues = {
+  IMAGE_REF: "image.ref",
 };
 
 export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
@@ -80,11 +86,13 @@ function start(input: {
 
     const postgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
     const mailpit = startInput.infra.get(InfraIds.MAILPIT);
+    const sandboxBaseImage = startInput.infra.get(InfraIds.SANDBOX_BASE_IMAGE);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
     const env = createControlPlaneWorkerEnv({
       environmentId: startInput.environmentId,
       postgres,
       mailpit,
+      sandboxBaseImage,
       peer,
     });
 
@@ -113,11 +121,13 @@ async function startRuntimeControlPlaneWorker(input: {
 }): Promise<TestService> {
   const postgres = resolvedInfra(input.startInput.infra, input.postgresInfra.id);
   const mailpit = input.startInput.infra.get(InfraIds.MAILPIT);
+  const sandboxBaseImage = input.startInput.infra.get(InfraIds.SANDBOX_BASE_IMAGE);
   const peer = peers(input.startInput.services, input.startInput.plannedEndpoints);
   const env = createControlPlaneWorkerEnv({
     environmentId: input.startInput.environmentId,
     postgres,
     mailpit,
+    sandboxBaseImage,
     peer,
   });
   const config = loadConfig({
@@ -185,6 +195,7 @@ function createControlPlaneWorkerEnv(input: {
   environmentId: string;
   postgres: ReturnType<typeof resolvedInfra>;
   mailpit: ReturnType<typeof resolvedInfra> | undefined;
+  sandboxBaseImage: ResolvedTestInfra | undefined;
   peer: ReturnType<typeof peers>;
 }): Record<string, string> {
   return {
@@ -219,7 +230,10 @@ function createControlPlaneWorkerEnv(input: {
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: input.peer.url(ServiceIds.CONTROL_PLANE_API),
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "integration-new-internal-service-token",
     MISTLE_SANDBOX_PROVIDER: "docker",
-    MISTLE_SANDBOX_DEFAULT_BASE_IMAGE: getLocalDevDockerRegistrySandboxBaseImageRef(),
+    MISTLE_SANDBOX_DEFAULT_BASE_IMAGE:
+      input.sandboxBaseImage === undefined
+        ? getLocalDevDockerRegistrySandboxBaseImageRef()
+        : infraValue(input.sandboxBaseImage, SandboxBaseImageValues.IMAGE_REF),
     MISTLE_SERVICES_DATA_PLANE_GATEWAY_SANDBOX_WS_PUBLIC_URL: input.peer.ws(
       ServiceIds.DATA_PLANE_GATEWAY,
       "/tunnel/sandbox",

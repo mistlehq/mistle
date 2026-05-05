@@ -41,6 +41,7 @@ const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
 const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
 const PostgresValues = {
   HOST_DIRECT_URL: "host.directUrl",
+  HOST_POOLED_URL: "host.pooledUrl",
   CONTROL_PLANE_SCHEMA_NAME: "schema.controlPlane",
   DATA_PLANE_SCHEMA_NAME: "schema.dataPlane",
 };
@@ -88,9 +89,16 @@ export type IntegrationRuntimeStateStore = {
   keyPrefix: string;
 };
 
+export type IntegrationDatabaseInfo = {
+  directUrl: string;
+  pooledUrl: string;
+  schemaName: string;
+};
+
 export type IntegrationTestEnvironment = {
   id: string;
   auth: IntegrationAuth;
+  controlPlaneDatabase: IntegrationDatabaseInfo;
   controlPlaneDb: ControlPlaneDatabase;
   controlPlaneTables: ReturnType<typeof getControlPlaneDatabaseSchema>;
   controlPlaneWorkflow: IntegrationWorkflowClient;
@@ -137,6 +145,19 @@ export function createIntegrationEnvironment(input: {
       auth ??= createIntegrationAuth(integrationEnvironment);
 
       return auth;
+    },
+    get controlPlaneDatabase() {
+      return {
+        directUrl: readPostgresDirectUrl({
+          environment: input.environment,
+          infraId: PostgresInfraIds.CONTROL_PLANE,
+        }),
+        pooledUrl: readPostgresPooledUrl({
+          environment: input.environment,
+          infraId: PostgresInfraIds.CONTROL_PLANE,
+        }),
+        schemaName: readControlPlaneSchemaName(input.environment),
+      };
     },
     get controlPlaneDb() {
       controlPlaneDb ??= createControlPlaneDatabase(
@@ -448,6 +469,21 @@ function readPostgresDirectUrl(input: {
   }
 
   return directUrl;
+}
+
+function readPostgresPooledUrl(input: {
+  environment: TestEnvironment<ServiceId>;
+  infraId: string;
+}): string {
+  const postgres = input.environment.infra.get(input.infraId);
+  const pooledUrl = postgres?.values.get(PostgresValues.HOST_POOLED_URL);
+  if (pooledUrl === undefined) {
+    throw new Error(
+      `Expected integration environment to include Postgres infra '${input.infraId}'.`,
+    );
+  }
+
+  return pooledUrl;
 }
 
 function readDataPlaneSchemaName(environment: TestEnvironment<ServiceId>): string {

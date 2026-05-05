@@ -208,11 +208,11 @@ async function provisionInfra(input: {
 }
 
 async function stopInfra(infra: ReadonlyMap<string, ResolvedTestInfra>): Promise<void> {
-  // Stop in reverse insertion order. This mirrors provisioning order for simple
-  // cases while still running every cleanup task and aggregating failures.
+  // Stop in dependency-sensitive order while preserving reverse insertion order
+  // inside each priority bucket.
   const tasks: CleanupTask[] = [];
 
-  for (const resolvedInfra of Array.from(infra.values()).reverse()) {
+  for (const resolvedInfra of orderInfraForCleanup(infra)) {
     tasks.push(resolvedInfra.stop);
   }
 
@@ -220,6 +220,26 @@ async function stopInfra(infra: ReadonlyMap<string, ResolvedTestInfra>): Promise
     tasks,
     context: "test environment infra cleanup",
   });
+}
+
+function orderInfraForCleanup(
+  infra: ReadonlyMap<string, ResolvedTestInfra>,
+): readonly ResolvedTestInfra[] {
+  return Array.from(infra.values())
+    .reverse()
+    .sort((left, right) => readInfraCleanupPriority(left) - readInfraCleanupPriority(right));
+}
+
+function readInfraCleanupPriority(infra: ResolvedTestInfra): number {
+  if (infra.kind === "docker-network") {
+    return 0;
+  }
+
+  if (infra.kind === "postgres-database") {
+    return 20;
+  }
+
+  return 10;
 }
 
 type ManagedTestServiceHandle = TestServiceHandle & {

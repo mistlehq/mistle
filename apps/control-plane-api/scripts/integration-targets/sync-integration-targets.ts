@@ -1,4 +1,4 @@
-import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { sql } from "drizzle-orm";
 
@@ -39,11 +39,12 @@ async function upsertIntegrationTarget(
   db: ControlPlaneDatabase,
   target: SyncIntegrationTarget,
 ): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(db);
   await db
-    .insert(integrationTargets)
+    .insert(tables.integrationTargets)
     .values(target)
     .onConflictDoUpdate({
-      target: integrationTargets.targetKey,
+      target: tables.integrationTargets.targetKey,
       set: {
         familyId: target.familyId,
         variantId: target.variantId,

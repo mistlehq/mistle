@@ -27,7 +27,7 @@ type RuntimeSystemHttpResponse = Awaited<
 >;
 
 describe("runtime system auth otp", () => {
-  it("signs in with email OTP through runtime control-plane services", async ({ system }) => {
+  it("signs in with email OTP", async ({ system }) => {
     const email = `runtime-system-auth-otp-smoke-${randomUUID()}@example.com`;
 
     await sendSignInOtp({ system, email });

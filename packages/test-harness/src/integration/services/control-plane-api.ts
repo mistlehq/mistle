@@ -30,7 +30,12 @@ const PostgresValues = {
 
 const InfraIds = {
   POSTGRES: "postgres.control-plane",
+  SANDBOX_BASE_IMAGE: "sandbox-base-image",
   SEAWEEDFS: "seaweedfs",
+};
+
+const SandboxBaseImageValues = {
+  IMAGE_REF: "image.ref",
 };
 
 const SeaweedfsValues = {
@@ -97,6 +102,7 @@ function start(input: {
     }
 
     const resolvedPostgres = resolvedInfra(startInput.infra, input.postgresInfra.id);
+    const resolvedSandboxBaseImage = startInput.infra.get(InfraIds.SANDBOX_BASE_IMAGE);
     const resolvedSeaweedfs = startInput.infra.get(InfraIds.SEAWEEDFS);
     const endpoint = httpEndpoint(startInput, ServiceIds.CONTROL_PLANE_API);
     const peer = peers(startInput.services, startInput.plannedEndpoints);
@@ -109,6 +115,7 @@ function start(input: {
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
               gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
               postgres: resolvedPostgres,
+              sandboxBaseImageRef: readSandboxBaseImageRef(resolvedSandboxBaseImage),
               seaweedfs: resolvedSeaweedfs,
             }
           : {
@@ -117,6 +124,7 @@ function start(input: {
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
               gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
               postgres: resolvedPostgres,
+              sandboxBaseImageRef: readSandboxBaseImageRef(resolvedSandboxBaseImage),
               seaweedfs: resolvedSeaweedfs,
               googleAuth: input.googleAuth,
             },
@@ -150,6 +158,7 @@ function config(input: {
   dataPlaneBaseUrl: string;
   gatewayWsUrl: string;
   postgres: ResolvedTestInfra;
+  sandboxBaseImageRef: string | undefined;
   seaweedfs: ResolvedTestInfra | undefined;
   googleAuth?: "simulated";
 }): ControlPlaneApiConfig {
@@ -201,8 +210,8 @@ function config(input: {
     },
     connectionToken: {
       secret: "integration-new-connection-secret",
-      issuer: "integration-new-issuer",
-      audience: "integration-new-audience",
+      issuer: "integration-new-control-plane-api",
+      audience: "integration-new-data-plane-gateway",
     },
     portAccess: {
       baseDomain: "mistle.localhost",
@@ -214,7 +223,7 @@ function config(input: {
       },
     },
     sandbox: {
-      defaultBaseImage: getLocalDevDockerRegistrySandboxBaseImageRef(),
+      defaultBaseImage: input.sandboxBaseImageRef ?? getLocalDevDockerRegistrySandboxBaseImageRef(),
       gatewayWsUrl: input.gatewayWsUrl,
       bootstrap: {
         tokenSecret: "integration-new-bootstrap-token-secret",
@@ -282,6 +291,16 @@ function config(input: {
         : {}),
     },
   };
+}
+
+function readSandboxBaseImageRef(
+  sandboxBaseImage: ResolvedTestInfra | undefined,
+): string | undefined {
+  if (sandboxBaseImage === undefined) {
+    return undefined;
+  }
+
+  return infraValue(sandboxBaseImage, SandboxBaseImageValues.IMAGE_REF);
 }
 
 function readSimulatedGoogleIdToken(token: string): z.infer<typeof SimulatedGoogleIdTokenSchema> {

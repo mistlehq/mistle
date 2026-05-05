@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 
-import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -233,6 +233,7 @@ export async function seedIntegrationTargets(input: {
   manifest: IntegrationTargetsManifest;
 }): Promise<Array<{ targetKey: string; enabled: boolean }>> {
   const seededTargets: Array<{ targetKey: string; enabled: boolean }> = [];
+  const tables = getControlPlaneDatabaseSchema(input.db);
 
   for (const targetFromManifest of input.manifest.targets) {
     const existingTarget = await input.db.query.integrationTargets.findFirst({
@@ -263,14 +264,14 @@ export async function seedIntegrationTargets(input: {
     }
 
     await input.db
-      .update(integrationTargets)
+      .update(tables.integrationTargets)
       .set({
         enabled: targetFromManifest.enabled,
         config: targetFromManifest.config,
         secrets: null,
         updatedAt: sql`now()`,
       })
-      .where(eq(integrationTargets.targetKey, targetFromManifest.targetKey));
+      .where(eq(tables.integrationTargets.targetKey, targetFromManifest.targetKey));
 
     seededTargets.push({
       targetKey: targetFromManifest.targetKey,

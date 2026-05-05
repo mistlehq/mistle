@@ -12,7 +12,10 @@ export function createApp(config: DataPlaneGatewayConfig): DataPlaneGatewayApp {
   });
 
   app.use("*", async (ctx, next) => {
-    const testEnvironmentId = readTestEnvironmentId(config, (name) => ctx.req.header(name));
+    const testEnvironmentId = readTestEnvironmentId(config, {
+      readHeader: (name) => ctx.req.header(name),
+      readQuery: (name) => ctx.req.query(name),
+    });
     ctx.set("config", config);
     if (testEnvironmentId !== undefined) {
       ctx.set("testEnvironmentId", testEnvironmentId);
@@ -39,17 +42,22 @@ export async function stopApp(app: DataPlaneGatewayApp): Promise<void> {
 
 function readTestEnvironmentId(
   config: DataPlaneGatewayConfig,
-  readHeader: (name: string) => string | undefined,
+  input: {
+    readHeader: (name: string) => string | undefined;
+    readQuery: (name: string) => string | undefined;
+  },
 ): string | undefined {
   const testIsolation = config.__dangerouslyEnableTestIsolation;
   if (testIsolation === undefined) {
     return undefined;
   }
 
-  const testEnvironmentId = readHeader(testIsolation.testEnvironmentIdHeader);
+  const testEnvironmentId =
+    input.readHeader(testIsolation.testEnvironmentIdHeader) ??
+    input.readQuery(testIsolation.testEnvironmentIdHeader);
   if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
     throw new Error(
-      `Expected '${testIsolation.testEnvironmentIdHeader}' header for isolated data-plane gateway request.`,
+      `Expected '${testIsolation.testEnvironmentIdHeader}' header or query parameter for isolated data-plane gateway request.`,
     );
   }
 
