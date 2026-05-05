@@ -17,12 +17,7 @@ export function ActivityStatus(input: {
       role="status"
     >
       <BrailleSpinner className="text-stone-400" />
-      <span
-        className={cn(
-          "relative block min-w-[14rem] overflow-hidden text-left",
-          input.labelClassName,
-        )}
-      >
+      <span className={cn("relative block overflow-hidden", input.labelClassName)}>
         <span
           className="block whitespace-nowrap [animation:activity-status-enter_180ms_ease-out]"
           key={input.labelKey ?? input.label}

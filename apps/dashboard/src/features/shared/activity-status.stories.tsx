@@ -21,7 +21,7 @@ export const Default: Story = {
   },
 };
 
-export const SnapshotPanel: Story = {
+export const LeftAlignedRow: Story = {
   args: {
     label: "Creating snapshot",
   },
@@ -29,6 +29,23 @@ export const SnapshotPanel: Story = {
     return (
       <div className="w-[32rem]">
         <ActivityStatus className="justify-start text-muted-foreground" label="Creating snapshot" />
+      </div>
+    );
+  },
+};
+
+export const RightAlignedRow: Story = {
+  args: {
+    label: "Creating snapshot",
+  },
+  render: function Render() {
+    return (
+      <div className="w-[32rem]">
+        <ActivityStatus
+          className="justify-end text-muted-foreground"
+          label="Creating snapshot"
+          labelClassName="min-w-0 text-right"
+        />
       </div>
     );
   },
