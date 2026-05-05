@@ -9,6 +9,8 @@ import type {
   DeleteSandboxProfileResult,
   DeleteSandboxProfileVersionRefreshScheduleResult,
   LaunchableSandboxProfilesResult,
+  PutSandboxProfileVersionPersistenceModeInput,
+  PutSandboxProfileVersionPersistenceModeResult,
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxIntegrationBindingKind,
   SandboxProfile,
@@ -287,6 +289,7 @@ const SandboxProfileVersionRefreshScheduleSummarySchema = z
 
 const SandboxProfileVersionSchema = z
   .object({
+    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
       .object({
@@ -375,6 +378,14 @@ const DeleteSandboxProfileVersionRefreshScheduleResultSchema = z
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
     deleted: z.boolean(),
+  })
+  .strict();
+
+const PutSandboxProfileVersionPersistenceModeResultSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
   })
   .strict();
 
@@ -953,6 +964,46 @@ export async function putSandboxProfileVersionSetupScript(input: {
         operation: "putSandboxProfileVersionSetupScript",
         error,
         fallbackMessage: "Could not save sandbox profile setup script.",
+      }),
+    );
+  }
+}
+
+export async function putSandboxProfileVersionPersistenceMode(
+  input: PutSandboxProfileVersionPersistenceModeInput,
+): Promise<PutSandboxProfileVersionPersistenceModeResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putSandboxProfileVersionPersistenceMode",
+      method: "PUT",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/persistence-mode`,
+      body: {
+        defaultPersistenceMode: input.defaultPersistenceMode,
+      },
+      fallbackMessage: "Could not save sandbox profile persistence mode.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      PutSandboxProfileVersionPersistenceModeResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionPersistenceMode",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile persistence mode response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "putSandboxProfileVersionPersistenceMode",
+        error,
+        fallbackMessage: "Could not save sandbox profile persistence mode.",
       }),
     );
   }

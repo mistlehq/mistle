@@ -27,6 +27,7 @@ import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
+  Switch,
 } from "@mistle/ui";
 import {
   CheckCircleIcon,
@@ -77,6 +78,7 @@ import {
   getSandboxProfileVersionPublishability,
   listSandboxProfileVersions,
   publishSandboxProfileVersion,
+  putSandboxProfileVersionPersistenceMode,
   refreshSandboxProfileVersion,
   startSandboxProfileSetupAssistant,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
@@ -84,6 +86,11 @@ import type {
   SandboxProfile,
   SandboxProfileVersion,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
+import {
+  getOrganizationSandboxStorageSettings,
+  organizationSandboxStorageSettingsQueryKey,
+} from "../settings/organization/sandbox-storage-service.js";
+import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import {
@@ -1326,6 +1333,7 @@ function ReadySandboxProfileEditorPage(input: {
       renderSectionPanel={(sectionId) => (
         <SandboxProfileEditorSectionPanels
           activeSectionId={sectionId}
+          currentVersion={input.currentVersion}
           draftFieldsAreDisabled={draftFieldsAreDisabled}
           integrationDraftState={integrationDraftState}
           integrationsLoader={integrationsLoader}
@@ -1654,6 +1662,7 @@ function renderSetupAssistantMainContent(input: {
 
 function SandboxProfileEditorSectionPanels(input: {
   activeSectionId: SandboxProfileEditorSectionId;
+  currentVersion: SandboxProfileVersion | null;
   draftFieldsAreDisabled: boolean;
   integrationDraftState: SandboxProfileDraftSectionState;
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
@@ -1697,6 +1706,17 @@ function SandboxProfileEditorSectionPanels(input: {
 
   return (
     <div className="flex w-full flex-col gap-8">
+      {input.currentVersion === null ? null : (
+        <SandboxProfilePanelSection>
+          <SandboxProfilePersistenceModeSection
+            disabled={input.draftFieldsAreDisabled}
+            invalidateProfileVersions={input.invalidateProfileVersions}
+            isDraft={input.mode.kind === "draft"}
+            profileId={input.profileId}
+            version={input.currentVersion}
+          />
+        </SandboxProfilePanelSection>
+      )}
       <LoadedSandboxProfileIntegrationSetupSection
         key={`${input.profileId}:integration-setup`}
         loader={input.integrationsLoader}
@@ -1729,6 +1749,94 @@ function SandboxProfileEditorSectionPanels(input: {
 
 export function SandboxProfilePanelSection(input: { children: ReactNode }): React.JSX.Element {
   return <section className="flex flex-col gap-4">{input.children}</section>;
+}
+
+function SandboxProfilePersistenceModeSection(input: {
+  disabled: boolean;
+  invalidateProfileVersions: (profileId: string) => Promise<void>;
+  isDraft: boolean;
+  profileId: string;
+  version: SandboxProfileVersion;
+}): React.JSX.Element {
+  const activeOrganizationId = useRequiredOrganizationId();
+  const queryClient = useQueryClient();
+  const organizationSandboxStorageSettingsQuery = useQuery({
+    queryKey: organizationSandboxStorageSettingsQueryKey(activeOrganizationId),
+    queryFn: async () => getOrganizationSandboxStorageSettings(),
+  });
+  const persistenceModeMutation = useMutation({
+    mutationFn: async (defaultPersistenceMode: SandboxProfileVersion["defaultPersistenceMode"]) =>
+      putSandboxProfileVersionPersistenceMode({
+        profileId: input.profileId,
+        version: input.version.version,
+        defaultPersistenceMode,
+      }),
+    onSuccess: async (result) => {
+      queryClient.setQueryData(
+        sandboxProfileVersionsQueryKey(input.profileId),
+        (currentData: { versions: SandboxProfileVersion[] } | undefined) =>
+          currentData === undefined
+            ? currentData
+            : {
+                versions: currentData.versions.map((version) =>
+                  version.version === result.version
+                    ? { ...version, defaultPersistenceMode: result.defaultPersistenceMode }
+                    : version,
+                ),
+              },
+      );
+      await input.invalidateProfileVersions(input.profileId);
+    },
+  });
+  const selectedMode = persistenceModeMutation.isPending
+    ? persistenceModeMutation.variables
+    : input.version.defaultPersistenceMode;
+  const persistentModeIsEnabled = selectedMode === "persistent";
+  const fieldIsDisabled = input.disabled || !input.isDraft || persistenceModeMutation.isPending;
+  const orgPersistenceIsDisabled =
+    organizationSandboxStorageSettingsQuery.data?.persistentSandboxesEnabled === false;
+  const saveErrorMessage =
+    persistenceModeMutation.error === null || persistenceModeMutation.error === undefined
+      ? null
+      : resolveApiErrorMessage({
+          error: persistenceModeMutation.error,
+          fallbackMessage: "Could not save sandbox profile persistence mode.",
+        });
+
+  return (
+    <div className="space-y-2">
+      {saveErrorMessage === null ? null : <Notice variant="alert">{saveErrorMessage}</Notice>}
+      {fieldIsDisabled ? (
+        <div className="flex w-fit items-center gap-2">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+            Use persistent sandboxes:
+          </span>
+          <span className="text-sm font-medium">{persistentModeIsEnabled ? "Yes" : "No"}</span>
+        </div>
+      ) : (
+        <div className="flex w-fit items-center gap-3">
+          <FieldHeader>
+            <FieldLabel htmlFor="sandbox-profile-persistent-mode">
+              Use persistent sandboxes
+            </FieldLabel>
+          </FieldHeader>
+          <Switch
+            checked={persistentModeIsEnabled}
+            id="sandbox-profile-persistent-mode"
+            onCheckedChange={(checked) => {
+              persistenceModeMutation.mutate(checked ? "persistent" : "ephemeral");
+            }}
+          />
+        </div>
+      )}
+      {persistentModeIsEnabled && orgPersistenceIsDisabled ? (
+        <Notice variant="warning">
+          Organization persistence is disabled. Sessions from this profile will still be created in
+          non-persistent mode.
+        </Notice>
+      ) : null}
+    </div>
+  );
 }
 
 const SandboxProfileEditorTabs = [

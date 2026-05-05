@@ -79,7 +79,7 @@ export function OrganizationSandboxStorageSettingsPageView(
             <Field orientation="horizontal">
               <FieldHeader className="md:w-auto md:flex-1">
                 <FieldLabel htmlFor="persistent-sandboxes-enabled">
-                  Persistent sandboxes enabled
+                  Allow persistent sandboxes
                 </FieldLabel>
                 <FieldDescription>
                   Allow this organization to use persistent sandbox storage.
