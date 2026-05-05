@@ -9,6 +9,7 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
+import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import {
@@ -33,7 +34,10 @@ const InfraIds = {
   POSTGRES: "postgres.data-plane",
 };
 
-export function service(infra: readonly TestInfraRequirement[]): TestServiceDefinition {
+export function service(
+  infra: readonly TestInfraRequirement[],
+  options: IntegrationServiceOptions,
+): TestServiceDefinition {
   return {
     id: ServiceIds.DATA_PLANE_API,
     infra,
@@ -43,16 +47,19 @@ export function service(infra: readonly TestInfraRequirement[]): TestServiceDefi
         host: Host,
       },
     },
+    ...(options.sandbox === undefined ? {} : { poolScope: "environment" }),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.DATA_PLANE_API),
     start: start({
       postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.DATA_PLANE_API),
+      sandbox: options.sandbox,
     }),
   };
 }
 
 function start(input: {
   postgresInfra: TestInfraRequirement;
+  sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
     assertMode(startInput.mode, "runtime", ServiceIds.DATA_PLANE_API);
@@ -66,6 +73,7 @@ function start(input: {
         postgres,
         gatewayBaseUrl: peer.url(ServiceIds.DATA_PLANE_GATEWAY),
         controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
+        sandbox: input.sandbox,
       }),
     });
 
@@ -95,6 +103,7 @@ function config(input: {
   postgres: ResolvedTestInfra;
   gatewayBaseUrl: string;
   controlPlaneBaseUrl: string;
+  sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneApiConfig {
   const pooledUrl = infraValue(input.postgres, PostgresValues.HOST_POOLED_URL);
   const directUrl = infraValue(input.postgres, PostgresValues.HOST_DIRECT_URL);
@@ -117,16 +126,22 @@ function config(input: {
       gatewayBaseUrl: input.gatewayBaseUrl,
     },
     sandbox: {
-      provider: "docker",
+      provider: input.sandbox?.provider ?? "docker",
       egress: {
         tokenSecret: "integration-egress-token-secret",
         tokenIssuer: "mistle",
         tokenAudience: "tokenizer-proxy",
       },
       tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
-      docker: {
-        socketPath: DockerSocketPath,
-      },
+      ...(input.sandbox?.provider === "e2b"
+        ? {
+            e2b: requireE2BOptions(input.sandbox),
+          }
+        : {
+            docker: {
+              socketPath: DockerSocketPath,
+            },
+          }),
     },
     controlPlaneApi: {
       baseUrl: input.controlPlaneBaseUrl,
@@ -137,5 +152,19 @@ function config(input: {
     __dangerouslyEnableTestIsolation: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
+  };
+}
+
+function requireE2BOptions(input: IntegrationSandboxOptions): {
+  apiKey: string;
+  domain: string;
+} {
+  if (input.e2b === undefined) {
+    throw new Error("data-plane-api requires E2B sandbox options when provider is e2b.");
+  }
+
+  return {
+    apiKey: input.e2b.apiKey,
+    domain: input.e2b.domain ?? "e2b.app",
   };
 }

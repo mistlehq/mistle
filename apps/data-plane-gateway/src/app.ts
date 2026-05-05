@@ -12,10 +12,15 @@ export function createApp(config: DataPlaneGatewayConfig): DataPlaneGatewayApp {
   });
 
   app.use("*", async (ctx, next) => {
-    const testEnvironmentId = readTestEnvironmentId(config, {
+    const testEnvironmentIdResult = readTestEnvironmentId(config, {
       readHeader: (name) => ctx.req.header(name),
       readQuery: (name) => ctx.req.query(name),
     });
+    if (testEnvironmentIdResult.kind === "missing") {
+      return ctx.json({ error: testEnvironmentIdResult.message }, 400);
+    }
+
+    const testEnvironmentId = testEnvironmentIdResult.testEnvironmentId;
     ctx.set("config", config);
     if (testEnvironmentId !== undefined) {
       ctx.set("testEnvironmentId", testEnvironmentId);
@@ -46,20 +51,23 @@ function readTestEnvironmentId(
     readHeader: (name: string) => string | undefined;
     readQuery: (name: string) => string | undefined;
   },
-): string | undefined {
+):
+  | { kind: "present"; testEnvironmentId: string | undefined }
+  | { kind: "missing"; message: string } {
   const testIsolation = config.__dangerouslyEnableTestIsolation;
   if (testIsolation === undefined) {
-    return undefined;
+    return { kind: "present", testEnvironmentId: undefined };
   }
 
   const testEnvironmentId =
     input.readHeader(testIsolation.testEnvironmentIdHeader) ??
     input.readQuery(testIsolation.testEnvironmentIdHeader);
   if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
-    throw new Error(
-      `Expected '${testIsolation.testEnvironmentIdHeader}' header or query parameter for isolated data-plane gateway request.`,
-    );
+    return {
+      kind: "missing",
+      message: `Expected '${testIsolation.testEnvironmentIdHeader}' header or query parameter for isolated data-plane gateway request.`,
+    };
   }
 
-  return testEnvironmentId;
+  return { kind: "present", testEnvironmentId };
 }

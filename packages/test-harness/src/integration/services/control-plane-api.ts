@@ -13,6 +13,7 @@ import type {
   TestServiceStartInput,
 } from "../../environment/index.js";
 import { TestEnvironmentIdHeader } from "../../environment/test-isolation.js";
+import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
 import { peers } from "./peers.js";
 import { ServiceIds } from "./service-ids.js";
 import { httpEndpoint, httpHealth, infraRequirement, infraValue, resolvedInfra } from "./shared.js";
@@ -59,12 +60,11 @@ const SimulatedGoogleIdTokenSchema = z.object({
 
 export function service(
   infra: readonly TestInfraRequirement[],
-  options?: {
-    controlPlaneApi?: {
-      googleAuth?: "simulated";
-    };
-  },
+  options: IntegrationServiceOptions,
 ): TestServiceDefinition {
+  const requiresEnvironmentScope =
+    options.sandbox !== undefined || options.controlPlaneApi?.googleAuth === "simulated";
+
   return {
     id: ServiceIds.CONTROL_PLANE_API,
     infra,
@@ -74,17 +74,19 @@ export function service(
         host: ControlPlaneHost,
       },
     },
-    ...(options?.controlPlaneApi?.googleAuth === "simulated" ? { poolScope: "environment" } : {}),
+    ...(requiresEnvironmentScope ? { poolScope: "environment" } : {}),
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.CONTROL_PLANE_API),
     start: start(
       options?.controlPlaneApi?.googleAuth === undefined
         ? {
             postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
+            sandbox: options.sandbox,
           }
         : {
             postgresInfra: infraRequirement(infra, InfraIds.POSTGRES, ServiceIds.CONTROL_PLANE_API),
             googleAuth: options.controlPlaneApi.googleAuth,
+            sandbox: options.sandbox,
           },
     ),
   };
@@ -93,6 +95,7 @@ export function service(
 function start(input: {
   postgresInfra: TestInfraRequirement;
   googleAuth?: "simulated";
+  sandbox: IntegrationSandboxOptions | undefined;
 }): (startInput: TestServiceStartInput) => Promise<TestService> {
   return async (startInput) => {
     if (startInput.mode !== "runtime") {
@@ -115,7 +118,10 @@ function start(input: {
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
               gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
               postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef(resolvedSandboxBaseImage),
+              sandboxBaseImageRef: readSandboxBaseImageRef({
+                sandbox: input.sandbox,
+                sandboxBaseImage: resolvedSandboxBaseImage,
+              }),
               seaweedfs: resolvedSeaweedfs,
             }
           : {
@@ -124,7 +130,10 @@ function start(input: {
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
               gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
               postgres: resolvedPostgres,
-              sandboxBaseImageRef: readSandboxBaseImageRef(resolvedSandboxBaseImage),
+              sandboxBaseImageRef: readSandboxBaseImageRef({
+                sandbox: input.sandbox,
+                sandboxBaseImage: resolvedSandboxBaseImage,
+              }),
               seaweedfs: resolvedSeaweedfs,
               googleAuth: input.googleAuth,
             },
@@ -293,14 +302,19 @@ function config(input: {
   };
 }
 
-function readSandboxBaseImageRef(
-  sandboxBaseImage: ResolvedTestInfra | undefined,
-): string | undefined {
-  if (sandboxBaseImage === undefined) {
+function readSandboxBaseImageRef(input: {
+  sandbox: IntegrationSandboxOptions | undefined;
+  sandboxBaseImage: ResolvedTestInfra | undefined;
+}): string | undefined {
+  if (input.sandbox?.defaultBaseImageRef !== undefined) {
+    return input.sandbox.defaultBaseImageRef;
+  }
+
+  if (input.sandboxBaseImage === undefined) {
     return undefined;
   }
 
-  return infraValue(sandboxBaseImage, SandboxBaseImageValues.IMAGE_REF);
+  return infraValue(input.sandboxBaseImage, SandboxBaseImageValues.IMAGE_REF);
 }
 
 function readSimulatedGoogleIdToken(token: string): z.infer<typeof SimulatedGoogleIdTokenSchema> {

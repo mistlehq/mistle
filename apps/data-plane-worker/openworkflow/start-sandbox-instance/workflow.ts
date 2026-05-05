@@ -636,6 +636,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
         "Failed while waiting for sandbox runtime readiness.",
       );
+      await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        providerSandboxId: startedSandbox.providerSandboxId,
+        sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+        operation: "init",
+        persistenceMode: workflowInput.persistenceMode,
+      });
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
@@ -676,6 +685,15 @@ export const StartSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
         },
         "Sandbox runtime readiness timed out.",
       );
+      await emitSandboxStartupDiagnostics({
+        logger,
+        sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+        providerSandboxId: startedSandbox.providerSandboxId,
+        sandboxInstanceId: startedSandbox.sandboxInstanceId,
+        runtimeProvider: startedSandbox.runtimeProvider,
+        operation: "init",
+        persistenceMode: workflowInput.persistenceMode,
+      });
       try {
         await handleFailedStartup({
           sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,

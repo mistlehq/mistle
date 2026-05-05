@@ -4,13 +4,22 @@
  */
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { systemClock, systemSleeper } from "@mistle/time";
+
+import { MISTLE_TEST_COORDINATOR_DIR_ENV } from "../environment/runner-pool-session.js";
 import { createDockerSandboxProviderInfra } from "../environment/service-catalog.js";
-import type { TestInfraRequirement } from "../environment/types.js";
+import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
 import { createIntegrationTest, type IntegrationTestEnvironment } from "../integration/index.js";
 import { ServiceIds, type ServiceId } from "../integration/services/service-ids.js";
+import type { RuntimePublicAccessTunnel } from "./runtime-public-access.js";
+import { startRuntimeCloudflaredTunnel } from "./runtime-public-access.js";
 
 const execFileAsync = promisify(execFile);
 const DefaultBuildContextHostPath = fileURLToPath(new URL("../../../..", import.meta.url));
@@ -24,14 +33,22 @@ export type SystemTestServiceSelection =
 
 export type SystemTestExtraInfraId = "mailpit" | "otlp" | "seaweedfs";
 
+export type SystemTestSandboxProvider = "docker" | "e2b";
+
 export type SystemTestSandbox = {
-  provider: "docker";
+  provider: SystemTestSandboxProvider;
+};
+
+export type SystemTestPublicAccess = {
+  provider: "cloudflare";
+  services: readonly ServiceId[];
 };
 
 export type CreateSystemTestInput = {
   services?: readonly SystemTestServiceSelection[];
   extraInfra?: readonly SystemTestExtraInfraId[];
   sandbox?: SystemTestSandbox;
+  publicAccess?: SystemTestPublicAccess;
   auth?: {
     google?: "simulated";
   };
@@ -62,6 +79,18 @@ const DefaultSystemServices: readonly SystemTestServiceSelection[] = [
 ];
 
 const DefaultSystemExtraInfra: readonly SystemTestExtraInfraId[] = ["mailpit", "otlp", "seaweedfs"];
+const SandboxBaseImageRepository = "ghcr.io/mistlehq/sandbox-base";
+const SandboxBaseImagePlatform = "linux/amd64";
+const SandboxBaseImageTarget = "sandbox-base-system-tests";
+const SandboxBaseImageHashInputs = ["packages/sandboxd"];
+const SandboxBaseImageLockPollIntervalMs = 1_000;
+const SandboxBaseImageLockTimeoutMs = 30 * 60_000;
+const PublicAccessHostnameEnvVars = new Map<ServiceId, string>([
+  [ServiceIds.CONTROL_PLANE_API, "CONTROL_PLANE_API_TUNNEL_HOSTNAME"],
+  [ServiceIds.DATA_PLANE_GATEWAY, "DATA_PLANE_API_TUNNEL_HOSTNAME"],
+  [ServiceIds.TOKENIZER_PROXY, "TOKENIZER_PROXY_TUNNEL_HOSTNAME"],
+]);
+let systemTestSandboxBaseImageRefPromise: Promise<string> | undefined;
 
 export function createSystemTest(input: CreateSystemTestInput = {}) {
   const base = createIntegrationTest({
@@ -69,8 +98,18 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
     extraInfra: input.extraInfra ?? DefaultSystemExtraInfra,
     ...(input.auth === undefined ? {} : { auth: input.auth }),
     __internalInfra: createInternalInfra(input),
-    __afterStart: async ({ integrationEnvironment }) => {
+    __serviceOptions: async () => createServiceOptions(input),
+    __afterStart: async ({ environment, integrationEnvironment }) => {
       await syncControlPlaneIntegrationTargets(integrationEnvironment);
+      const publicAccessTunnel = await startPublicAccess({
+        input,
+        environment,
+      });
+      if (publicAccessTunnel === undefined) {
+        return undefined;
+      }
+
+      return publicAccessTunnel.stop;
     },
   });
 
@@ -94,7 +133,363 @@ function createInternalInfra(input: CreateSystemTestInput): readonly TestInfraRe
   switch (input.sandbox.provider) {
     case "docker":
       return createDockerSandboxProviderInfra();
+    case "e2b":
+      return [];
   }
+}
+
+async function createServiceOptions(input: CreateSystemTestInput): Promise<{
+  sandbox?: {
+    provider: SystemTestSandboxProvider;
+    defaultBaseImageRef?: string;
+    e2b?: {
+      apiKey: string;
+      domain?: string;
+      cpuCount?: string;
+      memoryMb?: string;
+    };
+    publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
+  };
+}> {
+  if (input.sandbox === undefined) {
+    return {};
+  }
+
+  const publicServiceBaseUrls = createPublicServiceBaseUrls(input.publicAccess);
+  if (input.sandbox.provider === "docker") {
+    return {
+      sandbox: {
+        provider: "docker",
+        ...(publicServiceBaseUrls.size === 0 ? {} : { publicServiceBaseUrls }),
+      },
+    };
+  }
+
+  return {
+    sandbox: {
+      provider: "e2b",
+      defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
+      e2b: readE2BOptions(),
+      publicServiceBaseUrls,
+    },
+  };
+}
+
+function readE2BOptions(): {
+  apiKey: string;
+  domain?: string;
+  cpuCount?: string;
+  memoryMb?: string;
+} {
+  const apiKey = readRequiredEnv("MISTLE_SANDBOX_E2B_API_KEY");
+  const domain = readOptionalEnv("MISTLE_SANDBOX_E2B_DOMAIN");
+  const cpuCount = readOptionalEnv("MISTLE_SANDBOX_E2B_CPU_COUNT");
+  const memoryMb = readOptionalEnv("MISTLE_SANDBOX_E2B_MEMORY_MB");
+
+  return {
+    apiKey,
+    ...(domain === undefined ? {} : { domain }),
+    ...(cpuCount === undefined ? {} : { cpuCount }),
+    ...(memoryMb === undefined ? {} : { memoryMb }),
+  };
+}
+
+function readOptionalEnv(envVar: string): string | undefined {
+  const value = process.env[envVar];
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function readRequiredEnv(envVar: string): string {
+  const value = process.env[envVar];
+  if (value === undefined || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable ${envVar}.`);
+  }
+
+  return value;
+}
+
+function createPublicServiceBaseUrls(
+  publicAccess: SystemTestPublicAccess | undefined,
+): ReadonlyMap<ServiceId, string> {
+  if (publicAccess === undefined) {
+    return new Map();
+  }
+
+  return new Map(
+    publicAccess.services.map((serviceId) => [
+      serviceId,
+      `https://${readPublicAccessHostname(serviceId)}`,
+    ]),
+  );
+}
+
+function readPublicAccessHostname(serviceId: ServiceId): string {
+  const envVar = PublicAccessHostnameEnvVars.get(serviceId);
+  if (envVar === undefined) {
+    throw new Error(
+      `No Cloudflare public access hostname is configured for service '${serviceId}'.`,
+    );
+  }
+
+  return readRequiredEnv(envVar);
+}
+
+async function startPublicAccess(input: {
+  input: CreateSystemTestInput;
+  environment: TestEnvironment<ServiceId>;
+}): Promise<RuntimePublicAccessTunnel | undefined> {
+  if (input.input.publicAccess === undefined) {
+    return undefined;
+  }
+
+  return startRuntimeCloudflaredTunnel({
+    tunnelId: readRequiredEnv("CLOUDFLARE_TUNNEL_ID"),
+    tunnelCredentialsJson: readRequiredEnv("CLOUDFLARE_TUNNEL_CREDENTIALS_JSON"),
+    ingressRules: input.input.publicAccess.services.map((serviceId) => {
+      const service = input.environment.services.get(serviceId);
+      const httpEndpoint = service.endpoints.http;
+      if (httpEndpoint === undefined) {
+        throw new Error(
+          `Service '${serviceId}' does not expose an HTTP endpoint for public access.`,
+        );
+      }
+
+      return {
+        publicHostname: readPublicAccessHostname(serviceId),
+        localBaseUrl: httpEndpoint.hostBaseUrl,
+      };
+    }),
+  });
+}
+
+async function getSystemTestSandboxBaseImageRef(): Promise<string> {
+  if (systemTestSandboxBaseImageRefPromise !== undefined) {
+    return systemTestSandboxBaseImageRefPromise;
+  }
+
+  systemTestSandboxBaseImageRefPromise = resolveSystemTestSandboxBaseImageRef();
+  return systemTestSandboxBaseImageRefPromise;
+}
+
+async function resolveSystemTestSandboxBaseImageRef(): Promise<string> {
+  const tag = `sys-${await createSandboxBaseImageFingerprint()}`;
+  const imageRef = `${SandboxBaseImageRepository}:${tag}`;
+  if (await ghcrImageExists(imageRef)) {
+    return imageRef;
+  }
+
+  return withSystemTestSandboxBaseImageLock(tag, async () => {
+    if (await ghcrImageExists(imageRef)) {
+      return imageRef;
+    }
+
+    await runCommand({
+      command: "pnpm",
+      args: [
+        "run",
+        "dev:sandbox-base:push",
+        "--repository",
+        SandboxBaseImageRepository,
+        "--platform",
+        SandboxBaseImagePlatform,
+        "--target",
+        SandboxBaseImageTarget,
+        "--tag",
+        tag,
+      ],
+      cwd: DefaultBuildContextHostPath,
+      env: {},
+    });
+
+    return imageRef;
+  });
+}
+
+async function ghcrImageExists(imageRef: string): Promise<boolean> {
+  try {
+    await execFileAsync("docker", ["buildx", "imagetools", "inspect", imageRef], {
+      cwd: DefaultBuildContextHostPath,
+      timeout: 30_000,
+      maxBuffer: 1_000_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function createSandboxBaseImageFingerprint(): Promise<string> {
+  const trackedFiles = await readTrackedSandboxBaseImageFiles();
+  const hash = createHash("sha256");
+  hash.update(SandboxBaseImageTarget);
+  hash.update("\0");
+
+  for (const filePath of trackedFiles) {
+    hash.update(filePath);
+    hash.update("\0");
+    hash.update(await readFile(new URL(`../../../../${filePath}`, import.meta.url)));
+    hash.update("\0");
+  }
+
+  return hash.digest("hex").slice(0, 24);
+}
+
+async function readTrackedSandboxBaseImageFiles(): Promise<readonly string[]> {
+  const { stdout } = await execFileAsync("git", ["ls-files", "--", ...SandboxBaseImageHashInputs], {
+    cwd: DefaultBuildContextHostPath,
+    encoding: "utf8",
+    maxBuffer: 1_000_000,
+  });
+
+  return stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .sort();
+}
+
+async function withSystemTestSandboxBaseImageLock<T>(
+  tag: string,
+  callback: () => Promise<T>,
+): Promise<T> {
+  const lockRootDirectoryPath = join(readTestCoordinatorDirectoryPath(), "sandbox-base-images");
+  const lockDirectoryPath = join(lockRootDirectoryPath, `${tag}.lock`);
+  const ownerFilePath = join(lockDirectoryPath, "owner.json");
+  const deadline = systemClock.nowMs() + SandboxBaseImageLockTimeoutMs;
+
+  await mkdir(lockRootDirectoryPath, {
+    recursive: true,
+  });
+
+  while (systemClock.nowMs() < deadline) {
+    try {
+      await mkdir(lockDirectoryPath);
+      await writeFile(
+        ownerFilePath,
+        JSON.stringify({
+          pid: process.pid,
+          createdAt: systemClock.nowMs(),
+          tag,
+        }),
+        "utf8",
+      );
+
+      try {
+        return await callback();
+      } finally {
+        await rm(lockDirectoryPath, {
+          recursive: true,
+          force: true,
+        });
+      }
+    } catch (error) {
+      if (!isNodeErrorCode(error, "EEXIST")) {
+        throw error;
+      }
+
+      await removeStaleSystemTestSandboxBaseImageLock({
+        lockDirectoryPath,
+        ownerFilePath,
+      });
+      await systemSleeper.sleep(SandboxBaseImageLockPollIntervalMs);
+    }
+  }
+
+  throw new Error(
+    `Timed out acquiring system test sandbox base image lock '${lockDirectoryPath}'.`,
+  );
+}
+
+function readTestCoordinatorDirectoryPath(): string {
+  const coordinatorDir = process.env[MISTLE_TEST_COORDINATOR_DIR_ENV];
+  if (coordinatorDir !== undefined && coordinatorDir.length > 0) {
+    return coordinatorDir;
+  }
+
+  return join(tmpdir(), "mistle-test-harness", "system-runtime");
+}
+
+async function removeStaleSystemTestSandboxBaseImageLock(input: {
+  lockDirectoryPath: string;
+  ownerFilePath: string;
+}): Promise<void> {
+  let rawOwner: string;
+  try {
+    rawOwner = await readFile(input.ownerFilePath, "utf8");
+  } catch (error) {
+    if (
+      isNodeErrorCode(error, "ENOENT") &&
+      (await isLockDirectoryExpired(input.lockDirectoryPath))
+    ) {
+      await rm(input.lockDirectoryPath, {
+        recursive: true,
+        force: true,
+      });
+    }
+    return;
+  }
+
+  const ownerPid = readLockOwnerPid(rawOwner, input.ownerFilePath);
+  if (isProcessAlive(ownerPid)) {
+    return;
+  }
+
+  await rm(input.lockDirectoryPath, {
+    recursive: true,
+    force: true,
+  });
+}
+
+function readLockOwnerPid(rawOwner: string, ownerFilePath: string): number {
+  let owner: unknown;
+  try {
+    owner = JSON.parse(rawOwner);
+  } catch (error) {
+    throw new Error(`Invalid system test sandbox base image lock owner '${ownerFilePath}'.`, {
+      cause: error,
+    });
+  }
+
+  if (typeof owner !== "object" || owner === null) {
+    throw new Error(`Invalid system test sandbox base image lock owner '${ownerFilePath}'.`);
+  }
+
+  const pid = Reflect.get(owner, "pid");
+  if (typeof pid !== "number" || !Number.isInteger(pid)) {
+    throw new Error(`Invalid system test sandbox base image lock owner '${ownerFilePath}'.`);
+  }
+
+  return pid;
+}
+
+async function isLockDirectoryExpired(lockDirectoryPath: string): Promise<boolean> {
+  try {
+    const stats = await stat(lockDirectoryPath);
+    return stats.mtimeMs + SandboxBaseImageLockTimeoutMs < systemClock.nowMs();
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return typeof error === "object" && error !== null && Reflect.get(error, "code") === code;
 }
 
 async function syncControlPlaneIntegrationTargets(

@@ -2,7 +2,6 @@
  * This suite uses an extended Vitest fixture created by the system test harness.
  */
 
-import { createSystemTest } from "@mistle/test-harness/system";
 import { describe, expect } from "vitest";
 
 import {
@@ -13,19 +12,14 @@ import {
   waitForRuntimeReadyValue,
 } from "../system/helpers/codex-sandbox.js";
 import { createRuntimeCodexSandboxFixture } from "./helpers/runtime-codex-sandbox.js";
+import { createSandboxSystemTest } from "./helpers/sandbox-system-test.js";
 
-const it = createSystemTest({
-  services: [
-    "control-plane-api",
-    "control-plane-worker",
-    "data-plane-api",
-    "data-plane-gateway",
-    "data-plane-worker",
-    "tokenizer-proxy",
-  ],
+const it = createSandboxSystemTest({
   extraInfra: ["mailpit"],
-  sandbox: {
-    provider: "docker",
+  sandboxProviders: ["docker", "e2b"],
+  publicAccess: {
+    provider: "cloudflare",
+    services: ["data-plane-gateway", "tokenizer-proxy"],
   },
 });
 

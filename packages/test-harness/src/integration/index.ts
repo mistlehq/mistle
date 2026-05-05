@@ -18,6 +18,7 @@ import type {
   TestServiceSelection,
 } from "../environment/types.js";
 import type { IntegrationTestEnvironment } from "./environment.js";
+import type { IntegrationServiceOptions } from "./services/options.js";
 import { ServiceIds, type ServiceId } from "./services/service-ids.js";
 import {
   formatIntegrationDuration,
@@ -54,7 +55,14 @@ type CreateIntegrationTestInput = {
   __afterStart?: (input: {
     environment: TestEnvironment<ServiceId>;
     integrationEnvironment: IntegrationTestEnvironment;
-  }) => Promise<void>;
+  }) => Promise<void | (() => Promise<void>)>;
+  __serviceOptions?:
+    | {
+        sandbox?: IntegrationServiceOptions["sandbox"];
+      }
+    | (() => Promise<{
+        sandbox?: IntegrationServiceOptions["sandbox"];
+      }>);
 };
 
 type IntegrationTestFixture = {
@@ -101,11 +109,15 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
         const integrationEnvironment = createIntegrationEnvironment({
           environment,
         });
+        const extraCleanupTasks: Array<() => Promise<void>> = [];
         if (input.__afterStart !== undefined) {
-          await input.__afterStart({
+          const cleanup = await input.__afterStart({
             environment,
             integrationEnvironment,
           });
+          if (cleanup !== undefined) {
+            extraCleanupTasks.unshift(cleanup);
+          }
         }
         const setupDurationMs = Date.now() - setupStartedAt;
 
@@ -121,6 +133,9 @@ export function createIntegrationTest(input: CreateIntegrationTestInput) {
           );
         } finally {
           const teardownStartedAt = Date.now();
+          for (const cleanup of extraCleanupTasks) {
+            await cleanup();
+          }
           await integrationEnvironment.stop();
           await environment.stop();
           writeIntegrationTimingLine(
@@ -173,6 +188,10 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
   const internalInfra = input.__internalInfra ?? [];
   const attachableInfra = [...extraInfra, ...internalInfra];
   const services: Record<string, TestServiceDefinition> = {};
+  const inputServiceOptions =
+    typeof input.__serviceOptions === "function"
+      ? await input.__serviceOptions()
+      : input.__serviceOptions;
 
   for (const entry of serviceEntries) {
     const catalogService = serviceCatalog[entry.serviceId];
@@ -194,6 +213,11 @@ async function registryFor(input: CreateIntegrationTestInput): Promise<TestServi
             : {
                 googleAuth: input.auth.google,
               },
+        ...(inputServiceOptions?.sandbox === undefined
+          ? {}
+          : {
+              sandbox: inputServiceOptions?.sandbox,
+            }),
       },
     );
   }
@@ -240,12 +264,6 @@ type IntegrationServiceEntry = {
     infra: TestServiceDefinition["infra"],
     options: IntegrationServiceOptions,
   ) => TestServiceDefinition;
-};
-
-type IntegrationServiceOptions = {
-  controlPlaneApi: {
-    googleAuth?: "simulated";
-  };
 };
 
 async function loadSelectedServices(
