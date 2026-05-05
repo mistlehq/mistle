@@ -73,7 +73,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1033.0",
-    "@commitlint/cli": "^20.5.2",
+    "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.0",
     "@mistle/test-harness": "workspace:*",
     "@playwright/test": "^1.58.1",
