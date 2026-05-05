@@ -74,11 +74,23 @@ function createRuntimeSystemEnvironment(
   return {
     id: env.id,
     env,
-    controlPlaneApi: env.controlPlaneApi,
-    controlPlaneWorker: env.controlPlaneWorker,
-    dataPlaneApi: env.dataPlaneApi,
-    dataPlaneGateway: env.dataPlaneGateway,
-    dataPlaneWorker: env.dataPlaneWorker,
-    tokenizerProxy: env.tokenizerProxy,
+    get controlPlaneApi() {
+      return env.controlPlaneApi;
+    },
+    get controlPlaneWorker() {
+      return env.controlPlaneWorker;
+    },
+    get dataPlaneApi() {
+      return env.dataPlaneApi;
+    },
+    get dataPlaneGateway() {
+      return env.dataPlaneGateway;
+    },
+    get dataPlaneWorker() {
+      return env.dataPlaneWorker;
+    },
+    get tokenizerProxy() {
+      return env.tokenizerProxy;
+    },
   };
 }

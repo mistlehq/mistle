@@ -55,6 +55,7 @@
     "sandbox-base:inventory:check-spec": "tsx ./scripts/sandbox-base/check-inventory-spec.ts",
     "test:sandbox-base:linux": "docker build --platform ${MISTLE_SANDBOX_BASE_CHECK_PLATFORM:-linux/amd64} --target sandbox-base -t mistle-sandbox-base-check:local -f packages/sandboxd/Dockerfile .",
     "test:system": "pnpm --filter @mistle/tests test:system",
+    "test:system:runtime": "pnpm --filter @mistle/tests test:system:runtime",
     "test:system:docker": "pnpm --filter @mistle/tests test:system:docker",
     "test:system:e2b": "pnpm --filter @mistle/tests test:system:e2b",
     "test:system:all": "pnpm --filter @mistle/tests test:system:all",
