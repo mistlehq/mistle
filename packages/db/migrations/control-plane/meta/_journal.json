@@ -145,8 +145,15 @@
     {
       "idx": 20,
       "version": "7",
-      "when": 1777529466664,
-      "tag": "0020_prepare-scheduled-automation-sources",
+      "when": 1777946125926,
+      "tag": "0020_add-sandbox-profile-version-persistence-mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1777967466831,
+      "tag": "0021_prepare-scheduled-automation-sources",
       "breakpoints": true
     }
   ]

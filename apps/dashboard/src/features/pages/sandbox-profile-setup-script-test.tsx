@@ -1,8 +1,19 @@
 import { SandboxPtyStates, type SandboxPtyState } from "@mistle/sandbox-session-client";
-import { Button, InlineCode, Label, Notice, Switch } from "@mistle/ui";
+import {
+  Button,
+  ButtonGroup,
+  InlineCode,
+  Label,
+  Notice,
+  Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@mistle/ui";
 import {
   CheckCircleIcon,
   PlayIcon,
+  SidebarSimpleIcon,
   SpinnerGapIcon,
   WarningCircleIcon,
   XIcon,
@@ -38,6 +49,12 @@ type SetupScriptTestViewProps = {
   ptyLifecycleState?: SandboxPtyState;
   status: SetupScriptTestStatus;
   statusMessage?: string | null;
+  setupAssistant?: {
+    disabled: boolean;
+    isStarting: boolean;
+    onClick: () => void;
+    title: string;
+  };
 };
 
 type SetupScriptTestRunnerProps = {
@@ -246,6 +263,26 @@ export function SandboxProfileSetupScriptTestButton(
     input.disabled === true || !input.isDraft || input.status === "blank" || isBusy;
 
   const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
+  const setupAssistantButton =
+    input.setupAssistant === undefined ? null : (
+      <Button
+        disabled={input.setupAssistant.disabled}
+        onClick={input.setupAssistant.onClick}
+        size="sm"
+        title={input.setupAssistant.title}
+        type="button"
+        variant="outline"
+      >
+        {input.setupAssistant.isStarting ? (
+          "Starting Setup Assistant..."
+        ) : (
+          <>
+            <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
+            Setup Assistant
+          </>
+        )}
+      </Button>
+    );
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
@@ -258,24 +295,38 @@ export function SandboxProfileSetupScriptTestButton(
           size="sm"
         />
         <Label className="text-xs normal-case" htmlFor={failOnFirstErrorSwitchId}>
-          Fail on first command error
+          Fail on error
         </Label>
       </div>
-      <Button
-        disabled={isButtonDisabled}
-        onClick={input.onRun}
-        size="sm"
-        title={resolveSetupScriptTestButtonTitle({
-          disabled: input.disabled === true,
-          isDraft: input.isDraft,
-          status: input.status,
-        })}
-        type="button"
-        variant="outline"
-      >
-        {resolveSetupScriptTestButtonIcon(input.status)}
-        {resolveSetupScriptTestButtonLabel(input.status)}
-      </Button>
+      <ButtonGroup>
+        <Button
+          disabled={isButtonDisabled}
+          onClick={input.onRun}
+          size="sm"
+          title={resolveSetupScriptTestButtonTitle({
+            disabled: input.disabled === true,
+            isDraft: input.isDraft,
+            status: input.status,
+          })}
+          type="button"
+          variant="outline"
+        >
+          {resolveSetupScriptTestButtonIcon(input.status)}
+          {resolveSetupScriptTestButtonLabel(input.status)}
+        </Button>
+        {input.setupAssistant === undefined ? null : input.setupAssistant.disabled ? (
+          <Tooltip>
+            <TooltipTrigger render={<span className="inline-flex" />}>
+              {setupAssistantButton}
+            </TooltipTrigger>
+            <TooltipContent className="max-w-64 text-left" side="top">
+              {input.setupAssistant.title}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          setupAssistantButton
+        )}
+      </ButtonGroup>
     </div>
   );
 }

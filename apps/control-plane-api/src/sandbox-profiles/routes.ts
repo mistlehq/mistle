@@ -18,10 +18,12 @@ import * as listSandboxProfileVersions from "./list-sandbox-profile-versions/ind
 import * as listSandboxProfiles from "./list-sandbox-profiles/index.js";
 import * as publishSandboxProfileVersion from "./publish-sandbox-profile-version/index.js";
 import * as putSandboxProfileVersionIntegrationBindings from "./put-sandbox-profile-version-integration-bindings/index.js";
+import * as putSandboxProfileVersionPersistenceMode from "./put-sandbox-profile-version-persistence-mode/index.js";
 import * as putSandboxProfileVersionRefreshSchedule from "./put-sandbox-profile-version-refresh-schedule/index.js";
 import * as putSandboxProfileVersionSetupScript from "./put-sandbox-profile-version-setup-script/index.js";
 import * as refreshSandboxProfileVersion from "./refresh-sandbox-profile-version/index.js";
 import * as startSandboxProfileInstance from "./start-sandbox-profile-instance/index.js";
+import * as startSandboxProfileSetupAssistant from "./start-sandbox-profile-setup-assistant/index.js";
 import * as startSandboxProfileSetupScriptTestRun from "./start-sandbox-profile-setup-script-test-run/index.js";
 import * as updateSandboxProfile from "./update-sandbox-profile/index.js";
 
@@ -63,6 +65,10 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
     putSandboxProfileVersionSetupScript.handler,
   );
   routes.openapi(
+    putSandboxProfileVersionPersistenceMode.route,
+    putSandboxProfileVersionPersistenceMode.handler,
+  );
+  routes.openapi(
     putSandboxProfileVersionRefreshSchedule.route,
     putSandboxProfileVersionRefreshSchedule.handler,
   );
@@ -79,6 +85,10 @@ export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES
   routes.openapi(
     startSandboxProfileSetupScriptTestRun.route,
     startSandboxProfileSetupScriptTestRun.handler,
+  );
+  routes.openapi(
+    startSandboxProfileSetupAssistant.route,
+    startSandboxProfileSetupAssistant.handler,
   );
   routes.openapi(startSandboxProfileInstance.route, startSandboxProfileInstance.handler);
 

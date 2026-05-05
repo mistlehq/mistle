@@ -21,6 +21,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::protocol::egress_refresh::EgressGrantRefreshInput;
 use crate::protocol::startup::StartupInput;
 use crate::sandboxd_state::SandboxdState;
 use crate::security;
@@ -225,6 +226,10 @@ enum ControlRequest {
     Init { startup_input: StartupInput },
     #[serde(rename = "resume")]
     Resume { startup_input: StartupInput },
+    #[serde(rename = "refreshEgressGrants")]
+    RefreshEgressGrants {
+        refresh_input: EgressGrantRefreshInput,
+    },
     #[serde(rename = "sign")]
     Sign { sign_request: ControlSignRequest },
 }
@@ -513,6 +518,18 @@ pub fn submit_resume(socket_path: &Path, startup_input: &StartupInput) -> Result
         socket_path,
         ControlRequest::Resume {
             startup_input: startup_input.clone(),
+        },
+    )
+}
+
+pub fn submit_egress_grant_refresh(
+    socket_path: &Path,
+    refresh_input: &EgressGrantRefreshInput,
+) -> Result<(), ControlError> {
+    submit_startup_request(
+        socket_path,
+        ControlRequest::RefreshEgressGrants {
+            refresh_input: refresh_input.clone(),
         },
     )
 }
@@ -828,6 +845,10 @@ fn handle_connection(
             begin_resume(startup_input, state)?;
             Ok(None)
         }
+        ControlRequest::RefreshEgressGrants { refresh_input } => {
+            begin_egress_grant_refresh(refresh_input, state)?;
+            Ok(None)
+        }
         ControlRequest::Sign { sign_request } => begin_sign(sign_request, state).map(Some),
     }
 }
@@ -1090,6 +1111,50 @@ fn begin_resume(
         .sandboxd_state = Some(sandboxd_state);
 
     resume_result
+}
+
+fn begin_egress_grant_refresh(
+    refresh_input: EgressGrantRefreshInput,
+    state: &Arc<Mutex<ControlServerState>>,
+) -> Result<(), ControlError> {
+    let mut sandboxd_state = {
+        let mut state_guard = state
+            .lock()
+            .expect("control server state lock should not be poisoned");
+        match &state_guard.init_phase {
+            InitPhase::Uninitialized => {
+                return Err(ControlError::StartupRequestRejected(
+                    "sandboxd has not completed initialization".to_string(),
+                ));
+            }
+            InitPhase::Initializing => {
+                return Err(ControlError::StartupRequestRejected(
+                    "sandboxd is still initializing".to_string(),
+                ));
+            }
+            InitPhase::Initialized => state_guard.sandboxd_state.take().ok_or_else(|| {
+                ControlError::ResumeSandboxdState(
+                    "sandboxd state is missing for an initialized daemon".to_string(),
+                )
+            })?,
+            InitPhase::Failed(error) => {
+                return Err(ControlError::StartupRequestRejected(format!(
+                    "sandboxd initialization already failed: {error}"
+                )));
+            }
+        }
+    };
+
+    let refresh_result = sandboxd_state
+        .refresh_egress_grants(&refresh_input, None)
+        .map_err(|error| ControlError::ResumeSandboxdState(error.to_string()));
+
+    state
+        .lock()
+        .expect("control server state lock should not be poisoned")
+        .sandboxd_state = Some(sandboxd_state);
+
+    refresh_result
 }
 
 fn build_health_response(

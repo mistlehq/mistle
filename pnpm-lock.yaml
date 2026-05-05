@@ -455,6 +455,9 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../../packages/sandbox
+      '@mistle/sandbox-egress-auth':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-egress-auth
       '@mistle/sandbox-runtime-contract':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-contract

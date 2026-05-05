@@ -1,5 +1,5 @@
 {
-  "id": "0b21b83d-29b8-48fa-aef8-1cce84e93d02",
+  "id": "b8ebeb79-f298-41eb-a64c-ec56d8770acb",
   "prevId": "05f021c5-16d5-4047-80ab-94801282d009",
   "version": "7",
   "dialect": "postgresql",
@@ -235,13 +235,7 @@
           "name": "source_webhook_event_id",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
-        },
-        "source_scheduled_action_id": {
-          "name": "source_scheduled_action_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "source_order_key": {
           "name": "source_order_key",
@@ -360,22 +354,6 @@
           "method": "btree",
           "with": {}
         },
-        "automation_conversation_delivery_tasks_source_scheduled_action_id_idx": {
-          "name": "automation_conversation_delivery_tasks_source_scheduled_action_id_idx",
-          "columns": [
-            {
-              "expression": "source_scheduled_action_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"control_plane\".\"automation_conversation_delivery_tasks\".\"source_scheduled_action_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "automation_conversation_delivery_tasks_status_idx": {
           "name": "automation_conversation_delivery_tasks_status_idx",
           "columns": [
@@ -461,27 +439,12 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "automation_conversation_delivery_tasks_source_scheduled_action_id_scheduled_actions_id_fk": {
-          "name": "automation_conversation_delivery_tasks_source_scheduled_action_id_scheduled_actions_id_fk",
-          "tableFrom": "automation_conversation_delivery_tasks",
-          "tableTo": "scheduled_actions",
-          "schemaTo": "control_plane",
-          "columnsFrom": ["source_scheduled_action_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "automation_conversation_delivery_tasks_exactly_one_source_check": {
-          "name": "automation_conversation_delivery_tasks_exactly_one_source_check",
-          "value": "(\"control_plane\".\"automation_conversation_delivery_tasks\".\"source_webhook_event_id\" is not null and \"control_plane\".\"automation_conversation_delivery_tasks\".\"source_scheduled_action_id\" is null) or (\"control_plane\".\"automation_conversation_delivery_tasks\".\"source_webhook_event_id\" is null and \"control_plane\".\"automation_conversation_delivery_tasks\".\"source_scheduled_action_id\" is not null)"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "control_plane.automation_conversation_routes": {
@@ -4806,6 +4769,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "default_persistence_mode": {
+          "name": "default_persistence_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ephemeral'"
         }
       },
       "indexes": {
@@ -4988,23 +4958,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "schedule_automations_automation_id_uidx": {
-          "name": "schedule_automations_automation_id_uidx",
-          "columns": [
-            {
-              "expression": "automation_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "schedule_automations_schedule_id_schedules_id_fk": {
           "name": "schedule_automations_schedule_id_schedules_id_fk",

@@ -3,6 +3,7 @@ import type {
   ControlPlaneDatabase,
   IntegrationBindingKind,
   SandboxProfile,
+  SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionState,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -38,6 +39,7 @@ export type SandboxProfilesService = {
     sandboxProfileId: string;
     version: number;
     state: SandboxProfileVersionState;
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     isActive: boolean;
   }>;
   getProfile: (input: { organizationId: string; profileId: string }) => Promise<SandboxProfile>;
@@ -54,6 +56,7 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
+      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       isActive: boolean;
     }>;
   }>;
@@ -91,6 +94,16 @@ export type SandboxProfilesService = {
   }) => Promise<{
     bindings: SandboxProfileVersionIntegrationBinding[];
   }>;
+  putProfileVersionPersistenceMode: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  }) => Promise<{
+    sandboxProfileId: string;
+    version: number;
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+  }>;
   startProfileInstance: (input: {
     organizationId: string;
     profileId: string;
@@ -121,6 +134,7 @@ export type SandboxProfilesService = {
       sandboxProfileId: string;
       version: number;
       state: SandboxProfileVersionState;
+      defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
       isActive: boolean;
     };
     activeVersion: number | null;

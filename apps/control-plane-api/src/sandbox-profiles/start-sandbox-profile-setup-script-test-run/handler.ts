@@ -28,7 +28,6 @@ const routeHandler = async (
       organizationId: session.activeOrganizationId,
       profileId,
       profileVersion: version,
-      setupScript: body.setupScript,
       startedBy: {
         kind: "user",
         id: user.id,

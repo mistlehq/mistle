@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mistle Control Plane API",
-    "version": "0.2.0"
+    "version": "0.3.0"
   },
   "components": {
     "schemas": {},
@@ -14936,6 +14936,10 @@
                       "type": "string",
                       "enum": ["draft", "published"]
                     },
+                    "defaultPersistenceMode": {
+                      "type": "string",
+                      "enum": ["ephemeral", "persistent"]
+                    },
                     "isActive": {
                       "type": "boolean"
                     },
@@ -15032,6 +15036,7 @@
                     "sandboxProfileId",
                     "version",
                     "state",
+                    "defaultPersistenceMode",
                     "isActive",
                     "usable",
                     "refreshSchedule",
@@ -15203,6 +15208,10 @@
                             "type": "string",
                             "enum": ["draft", "published"]
                           },
+                          "defaultPersistenceMode": {
+                            "type": "string",
+                            "enum": ["ephemeral", "persistent"]
+                          },
                           "isActive": {
                             "type": "boolean"
                           },
@@ -15299,6 +15308,7 @@
                           "sandboxProfileId",
                           "version",
                           "state",
+                          "defaultPersistenceMode",
                           "isActive",
                           "usable",
                           "refreshSchedule",
@@ -17164,6 +17174,199 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode": {
+      "put": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "defaultPersistenceMode": {
+                    "type": "string",
+                    "enum": ["ephemeral", "persistent"]
+                  }
+                },
+                "required": ["defaultPersistenceMode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Replace the default persistence mode for the specified sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sandboxProfileId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "defaultPersistenceMode": {
+                      "type": "string",
+                      "enum": ["ephemeral", "persistent"]
+                    }
+                  },
+                  "required": ["sandboxProfileId", "version", "defaultPersistenceMode"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox profile version is not editable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_VERSION_NOT_DRAFT"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule": {
       "put": {
         "tags": ["Sandbox Profiles"],
@@ -17760,6 +17963,10 @@
                           "type": "string",
                           "enum": ["draft", "published"]
                         },
+                        "defaultPersistenceMode": {
+                          "type": "string",
+                          "enum": ["ephemeral", "persistent"]
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -17856,6 +18063,7 @@
                         "sandboxProfileId",
                         "version",
                         "state",
+                        "defaultPersistenceMode",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -18092,6 +18300,10 @@
                           "type": "string",
                           "enum": ["draft", "published"]
                         },
+                        "defaultPersistenceMode": {
+                          "type": "string",
+                          "enum": ["ephemeral", "persistent"]
+                        },
                         "isActive": {
                           "type": "boolean"
                         },
@@ -18188,6 +18400,7 @@
                         "sandboxProfileId",
                         "version",
                         "state",
+                        "defaultPersistenceMode",
                         "isActive",
                         "usable",
                         "refreshSchedule",
@@ -18428,6 +18641,226 @@
         "responses": {
           "201": {
             "description": "Start a setup script test run for the specified sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["accepted"]
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "workflowRunId", "sandboxInstanceId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_PRIMARY_REPOSITORY"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "AGENT_RUNTIME_REQUIRED",
+                            "INVALID_BINDING_CONNECTION_REFERENCE",
+                            "INVALID_CONNECTION_TARGET_REFERENCE",
+                            "CONNECTION_MISMATCH",
+                            "TARGET_DISABLED",
+                            "CONNECTION_NOT_ACTIVE",
+                            "KIND_MISMATCH",
+                            "INVALID_TARGET_CONFIG",
+                            "INVALID_TARGET_SECRETS",
+                            "INVALID_BINDING_CONFIG",
+                            "ROUTE_CONFLICT",
+                            "ARTIFACT_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_INVALID_REF"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant": {
+      "post": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Start a Setup Assistant sandbox for the specified profile version.",
             "content": {
               "application/json": {
                 "schema": {

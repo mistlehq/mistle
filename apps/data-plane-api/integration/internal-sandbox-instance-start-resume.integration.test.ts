@@ -8,7 +8,6 @@ import {
   type ResumeSandboxInstanceInput,
   type StartSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
-import { SandboxStorageConfigSources } from "@mistle/db/control-plane";
 import {
   SandboxInstancePersistenceModes,
   SandboxInstancePurposes,
@@ -140,25 +139,13 @@ describe.concurrent("internal sandbox instance start and resume integration", ()
       organizationId: "org_dp_api_start_persistent_without_storage",
       sandboxProfileId: "sbp_dp_api_start_persistent_without_storage",
       sandboxProfileVersion: 3,
+      persistenceMode: SandboxInstancePersistenceModes.PERSISTENT,
       purpose: SandboxInstancePurposes.SESSION,
       imageId: "im_dp_api_start_persistent_without_storage",
     });
 
-    await env.controlPlaneDb.insert(env.controlPlaneTables.organizations).values({
-      id: workflowInput.organizationId,
-      name: "Data plane API persistent without storage integration",
-      slug: "data-plane-api-persistent-without-storage-integration",
-    });
-    await env.controlPlaneDb
-      .insert(env.controlPlaneTables.organizationSandboxStorageSettings)
-      .values({
-        organizationId: workflowInput.organizationId,
-        persistentSandboxesEnabled: true,
-        storageConfigSource: SandboxStorageConfigSources.MANAGED,
-      });
-
     await expect(clientFor(env).startSandboxInstance(workflowInput)).rejects.toThrow(
-      `Persistent sandboxes are enabled for organization '${workflowInput.organizationId}' but no supported durable storage backend is configured for this deployment.`,
+      `Persistent sandbox was requested for organization '${workflowInput.organizationId}' but no supported durable storage backend is configured for this deployment.`,
     );
 
     await expect(
@@ -327,6 +314,7 @@ function startInput(input: {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  persistenceMode?: StartSandboxInstanceInput["persistenceMode"];
   purpose:
     | typeof SandboxInstancePurposes.SESSION
     | typeof SandboxInstancePurposes.SNAPSHOT
@@ -342,6 +330,7 @@ function startInput(input: {
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
+    persistenceMode: input.persistenceMode ?? SandboxInstancePersistenceModes.EPHEMERAL,
     purpose: input.purpose,
     runtimePlan: runtimePlan({
       sandboxProfileId: input.sandboxProfileId,

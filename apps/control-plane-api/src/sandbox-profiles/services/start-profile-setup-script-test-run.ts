@@ -1,16 +1,13 @@
-import { randomUUID } from "node:crypto";
-
-import { SandboxInstancePurposes, type SandboxInstanceSource } from "@mistle/db/data-plane";
+import { type SandboxInstanceSource } from "@mistle/db/data-plane";
 import { type SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
-import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
+import { startProfileSetupCheckSandbox } from "./start-profile-setup-check-sandbox.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileSetupScriptTestRunInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
-  setupScript: string;
   idempotencyKey?: string;
   startedBy: {
     kind: SandboxInstanceStarterKind;
@@ -36,43 +33,21 @@ export async function startProfileSetupScriptTestRun(
   },
   input: StartProfileSetupScriptTestRunInput,
 ): Promise<StartProfileSetupScriptTestRunOutput> {
-  const idempotencyKey = input.idempotencyKey ?? randomUUID();
-  const compiledRuntimePlan = await compileProfileVersionRuntimePlan(
+  return await startProfileSetupCheckSandbox(
     {
       db,
       integrationsConfig,
+      dataPlaneClient,
+      defaultBaseImage,
     },
     {
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
-      image: {
-        source: "base",
-        imageRef: defaultBaseImage,
-      },
+      requireAgentRuntime: false,
+      startedBy: input.startedBy,
+      source: input.source,
+      ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
     },
   );
-  const { setupScript: _setupScript, ...runtimePlanWithoutSetupScript } = compiledRuntimePlan;
-
-  const startedSandbox = await dataPlaneClient.startSandboxInstance({
-    organizationId: input.organizationId,
-    sandboxProfileId: input.profileId,
-    sandboxProfileVersion: input.profileVersion,
-    purpose: SandboxInstancePurposes.SETUP_CHECK,
-    idempotencyKey,
-    runtimePlan: runtimePlanWithoutSetupScript,
-    startedBy: input.startedBy,
-    source: input.source,
-    image: {
-      imageId: defaultBaseImage,
-      createdAt: new Date().toISOString(),
-      kind: "base",
-    },
-  });
-
-  return {
-    status: startedSandbox.status,
-    workflowRunId: startedSandbox.workflowRunId,
-    sandboxInstanceId: startedSandbox.sandboxInstanceId,
-  };
 }

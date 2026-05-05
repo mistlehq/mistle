@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildCodexTurnInputItems } from "./codex-operations.js";
+import { buildCodexTurnInputItems, buildCodexTurnStartRequest } from "./codex-operations.js";
 
 describe("buildCodexTurnInputItems", () => {
   it("prepends trimmed text ahead of local image items", () => {
@@ -52,5 +52,64 @@ describe("buildCodexTurnInputItems", () => {
         attachments: [],
       }),
     ).toThrow("Provide text or at least one attachment before starting a turn.");
+  });
+});
+
+describe("buildCodexTurnStartRequest", () => {
+  it("includes collaboration mode settings when developer instructions are supplied", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        input: [
+          {
+            type: "text",
+            text: "Write a setup script",
+          },
+        ],
+        collaborationModeSettings: {
+          model: "gpt-5.5",
+          reasoningEffort: "medium",
+          developerInstructions: "You are Setup Assistant.",
+        },
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      input: [
+        {
+          type: "text",
+          text: "Write a setup script",
+        },
+      ],
+      collaborationMode: {
+        mode: "default",
+        settings: {
+          model: "gpt-5.5",
+          reasoning_effort: "medium",
+          developer_instructions: "You are Setup Assistant.",
+        },
+      },
+    });
+  });
+
+  it("omits collaboration mode settings for ordinary turns", () => {
+    expect(
+      buildCodexTurnStartRequest({
+        threadId: "thread_123",
+        input: [
+          {
+            type: "text",
+            text: "Explain the repo",
+          },
+        ],
+      }),
+    ).toEqual({
+      threadId: "thread_123",
+      input: [
+        {
+          type: "text",
+          text: "Explain the repo",
+        },
+      ],
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { SandboxInstancePersistenceModes } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import type { IntegrationTestEnvironment } from "@mistle/test-harness/integration";
 import { systemClock, systemSleeper } from "@mistle/time";
@@ -27,6 +28,10 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
 const StartWorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   actingUserId: z.string().min(1).optional(),
+  persistenceMode: z.enum([
+    SandboxInstancePersistenceModes.EPHEMERAL,
+    SandboxInstancePersistenceModes.PERSISTENT,
+  ]),
   image: z
     .object({
       imageId: z.string().min(1),

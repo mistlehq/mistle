@@ -184,6 +184,7 @@ export interface SandboxRuntimeControlRequest {
 export interface SandboxRuntimeControl {
   init(input: SandboxRuntimeControlRequest): Promise<void>;
   resume(input: SandboxRuntimeControlRequest): Promise<void>;
+  refreshEgressGrants(input: SandboxRuntimeControlRequest): Promise<void>;
   readOperationLog(input: { id: string; operation: "init" | "resume" }): Promise<string | null>;
   close(): Promise<void>;
 }

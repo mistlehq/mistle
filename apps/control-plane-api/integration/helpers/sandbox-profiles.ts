@@ -1,6 +1,8 @@
 import {
   type IntegrationBindingKind,
   type IntegrationConnectionStatus,
+  type SandboxProfileVersionDefaultPersistenceMode,
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileStatuses,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
@@ -30,6 +32,7 @@ export function sandboxProfileVersionRow(input: {
   state?: "draft" | "published";
   publishedAt?: string | null;
   setupScript?: string | null;
+  defaultPersistenceMode?: SandboxProfileVersionDefaultPersistenceMode;
 }) {
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -42,6 +45,8 @@ export function sandboxProfileVersionRow(input: {
           : "2026-01-01T00:00:00.000Z"
         : input.publishedAt,
     ...(input.setupScript === undefined ? {} : { setupScript: input.setupScript }),
+    defaultPersistenceMode:
+      input.defaultPersistenceMode ?? SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
   };
 }
 

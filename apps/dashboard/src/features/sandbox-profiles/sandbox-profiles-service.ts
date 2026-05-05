@@ -9,6 +9,8 @@ import type {
   DeleteSandboxProfileResult,
   DeleteSandboxProfileVersionRefreshScheduleResult,
   LaunchableSandboxProfilesResult,
+  PutSandboxProfileVersionPersistenceModeInput,
+  PutSandboxProfileVersionPersistenceModeResult,
   PutSandboxProfileVersionRefreshScheduleInput,
   SandboxIntegrationBindingKind,
   SandboxProfile,
@@ -18,6 +20,7 @@ import type {
   SandboxProfileVersionAutomationConfig,
   SandboxProfileVersionRefreshSchedule,
   SandboxProfileVersionSetupScript,
+  SandboxProfileSetupAssistant,
   SandboxProfileSetupScriptTestRun,
   SandboxProfilesListResult,
   PublishSandboxProfileVersionResult,
@@ -286,6 +289,7 @@ const SandboxProfileVersionRefreshScheduleSummarySchema = z
 
 const SandboxProfileVersionSchema = z
   .object({
+    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
     isActive: z.boolean(),
     latestSnapshotJob: z
       .object({
@@ -377,6 +381,14 @@ const DeleteSandboxProfileVersionRefreshScheduleResultSchema = z
   })
   .strict();
 
+const PutSandboxProfileVersionPersistenceModeResultSchema = z
+  .object({
+    sandboxProfileId: z.string().min(1),
+    version: z.number().int().min(1),
+    defaultPersistenceMode: z.enum(["ephemeral", "persistent"]),
+  })
+  .strict();
+
 function normalizeSandboxProfileVersionPublishability(
   input: z.infer<typeof SandboxProfileVersionPublishabilitySchema>,
 ): SandboxProfileVersionPublishability {
@@ -438,13 +450,16 @@ const SandboxProfileVersionSetupScriptResponseSchema = z
   })
   .strict();
 
-const SandboxProfileSetupScriptTestRunResponseSchema = z
+const SandboxProfileAcceptedStartResponseSchema = z
   .object({
     status: z.literal("accepted"),
     workflowRunId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
   })
   .strict();
+
+const SandboxProfileSetupScriptTestRunResponseSchema = SandboxProfileAcceptedStartResponseSchema;
+const SandboxProfileSetupAssistantResponseSchema = SandboxProfileAcceptedStartResponseSchema;
 
 export async function listSandboxProfileVersions(input: {
   profileId: string;
@@ -954,6 +969,46 @@ export async function putSandboxProfileVersionSetupScript(input: {
   }
 }
 
+export async function putSandboxProfileVersionPersistenceMode(
+  input: PutSandboxProfileVersionPersistenceModeInput,
+): Promise<PutSandboxProfileVersionPersistenceModeResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "putSandboxProfileVersionPersistenceMode",
+      method: "PUT",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/persistence-mode`,
+      body: {
+        defaultPersistenceMode: input.defaultPersistenceMode,
+      },
+      fallbackMessage: "Could not save sandbox profile persistence mode.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse =
+      PutSandboxProfileVersionPersistenceModeResultSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "putSandboxProfileVersionPersistenceMode",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox profile persistence mode response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "putSandboxProfileVersionPersistenceMode",
+        error,
+        fallbackMessage: "Could not save sandbox profile persistence mode.",
+      }),
+    );
+  }
+}
+
 export async function startSandboxProfileSetupScriptTestRun(input: {
   profileId: string;
   version: number;
@@ -994,6 +1049,49 @@ export async function startSandboxProfileSetupScriptTestRun(input: {
         operation: "startSandboxProfileSetupScriptTestRun",
         error,
         fallbackMessage: "Could not start setup script test run.",
+      }),
+    );
+  }
+}
+
+export async function startSandboxProfileSetupAssistant(input: {
+  profileId: string;
+  version: number;
+  idempotencyKey?: string;
+  signal?: AbortSignal;
+}): Promise<SandboxProfileSetupAssistant> {
+  try {
+    const response = await requestControlPlane({
+      operation: "startSandboxProfileSetupAssistant",
+      method: "POST",
+      pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(
+        input.version,
+      )}/setup-script/assistant`,
+      body: {
+        ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not start Setup Assistant.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxProfileSetupAssistantResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "startSandboxProfileSetupAssistant",
+        status: 500,
+        body: responseBody,
+        message: "Setup Assistant response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "startSandboxProfileSetupAssistant",
+        error,
+        fallbackMessage: "Could not start Setup Assistant.",
       }),
     );
   }

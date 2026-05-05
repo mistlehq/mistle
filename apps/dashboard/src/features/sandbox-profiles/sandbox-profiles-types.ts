@@ -22,6 +22,10 @@ type PutSandboxProfileVersionRefreshScheduleResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["put"]["responses"][200]["content"]["application/json"];
 type DeleteSandboxProfileVersionRefreshScheduleResponse =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/refresh-schedule"]["delete"]["responses"][200]["content"]["application/json"];
+type PutSandboxProfileVersionPersistenceModeRequest =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode"]["put"]["requestBody"]["content"]["application/json"];
+type PutSandboxProfileVersionPersistenceModeResponse =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/persistence-mode"]["put"]["responses"][200]["content"]["application/json"];
 
 export type SandboxProfile = GetSandboxProfileResponse;
 export type SandboxProfileStatus = SandboxProfile["status"];
@@ -56,6 +60,13 @@ export type PutSandboxProfileVersionRefreshScheduleInput =
   };
 export type DeleteSandboxProfileVersionRefreshScheduleResult =
   DeleteSandboxProfileVersionRefreshScheduleResponse;
+export type PutSandboxProfileVersionPersistenceModeInput =
+  PutSandboxProfileVersionPersistenceModeRequest & {
+    profileId: string;
+    version: number;
+  };
+export type PutSandboxProfileVersionPersistenceModeResult =
+  PutSandboxProfileVersionPersistenceModeResponse;
 
 export type SandboxProfileVersionPublishability =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/publishability"]["get"]["responses"][200]["content"]["application/json"];
@@ -81,5 +92,7 @@ export type SandboxProfileVersionSetupScript =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script"]["get"]["responses"][200]["content"]["application/json"];
 export type SandboxProfileSetupScriptTestRun =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/test-runs"]["post"]["responses"][201]["content"]["application/json"];
+export type SandboxProfileSetupAssistant =
+  paths["/v1/sandbox/profiles/{profileId}/versions/{version}/setup-script/assistant"]["post"]["responses"][201]["content"]["application/json"];
 export type SandboxProfileVersionAutomationConfig =
   paths["/v1/sandbox/profiles/{profileId}/versions/{version}/automation-config"]["get"]["responses"][200]["content"]["application/json"];

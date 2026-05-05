@@ -29,6 +29,7 @@ pub mod process;
 pub mod protocol;
 pub mod proxy_ca;
 pub mod pty;
+pub mod refresh_egress_grants;
 pub mod resume;
 pub mod runtime;
 pub mod sandboxd_state;
@@ -69,6 +70,7 @@ fn initialize_sandboxd_tracing() {
 pub enum SandboxdCommand {
     Daemon,
     Init,
+    RefreshEgressGrants,
     Resume,
     Sign,
 }
@@ -88,7 +90,7 @@ impl fmt::Display for ParseSandboxdCommandError {
             }
             Self::UnknownCommand(command) => write!(
                 f,
-                "unknown sandboxd subcommand '{command}' (expected 'init' or 'resume')"
+                "unknown sandboxd subcommand '{command}' (expected 'init', 'resume', or 'refresh-egress-grants')"
             ),
         }
     }
@@ -110,6 +112,7 @@ where
     let command = match command.as_str() {
         "init" => SandboxdCommand::Init,
         "resume" => SandboxdCommand::Resume,
+        "refresh-egress-grants" => SandboxdCommand::RefreshEgressGrants,
         _ => {
             return Err(ParseSandboxdCommandError::UnknownCommand(command));
         }
@@ -197,6 +200,16 @@ where
             Ok(()) => 0,
             Err(_) => 1,
         },
+        SandboxdCommand::RefreshEgressGrants => {
+            match refresh_egress_grants::run_refresh_egress_grants(
+                stdin,
+                stdout,
+                Path::new(control::DEFAULT_CONTROL_SOCKET_PATH),
+            ) {
+                Ok(()) => 0,
+                Err(_) => 1,
+            }
+        }
         SandboxdCommand::Sign => match sign::run_sign(parsed_args, &sign_control_socket_path()) {
             Ok(()) => 0,
             Err(error) => {
@@ -245,6 +258,13 @@ mod tests {
         let command = parse_sandboxd_command(["resume"]);
 
         assert_eq!(command, Ok(SandboxdCommand::Resume));
+    }
+
+    #[test]
+    fn parses_refresh_egress_grants() {
+        let command = parse_sandboxd_command(["refresh-egress-grants"]);
+
+        assert_eq!(command, Ok(SandboxdCommand::RefreshEgressGrants));
     }
 
     #[test]

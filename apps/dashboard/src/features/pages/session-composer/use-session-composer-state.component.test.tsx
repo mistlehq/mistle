@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import type { CodexModelSummary } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
+import type {
+  CodexModelSummary,
+  CodexTurnCollaborationModeSettings,
+} from "@mistle/integrations-definitions/agent-runtimes/codex/client";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -67,6 +70,7 @@ const PendingDiffCommentsFixture: readonly PendingSessionDiffComment[] = [
 ];
 
 function SessionComposerStateHarness(input: {
+  collaborationDeveloperInstructions?: string;
   composerText: string;
   deferSubmit?: boolean;
   pendingDiffComments: readonly PendingSessionDiffComment[];
@@ -76,6 +80,8 @@ function SessionComposerStateHarness(input: {
   const [pendingDiffComments, setPendingDiffComments] = useState(input.pendingDiffComments);
   const [submittedPrompt, setSubmittedPrompt] = useState<string | null>(null);
   const [transcriptPrompt, setTranscriptPrompt] = useState<string | null>(null);
+  const [collaborationModeSettings, setCollaborationModeSettings] =
+    useState<CodexTurnCollaborationModeSettings | null>(null);
   const [resolveSubmit, setResolveSubmit] = useState<(() => void) | null>(null);
 
   const composerState = useSessionComposerState({
@@ -112,6 +118,13 @@ function SessionComposerStateHarness(input: {
         pullRequest: null,
       },
       contextUsage: null,
+      ...(input.collaborationDeveloperInstructions === undefined
+        ? {}
+        : {
+            collaborationModeSettings: {
+              developerInstructions: input.collaborationDeveloperInstructions,
+            },
+          }),
       sessionErrorMessage: null,
       turnControl: {
         activeTurnState: "idle",
@@ -121,13 +134,14 @@ function SessionComposerStateHarness(input: {
         isSteering: false,
         isInterrupting: false,
         completedTurnErrorMessage: null,
-        startTurn: async ({ submittedPrompt, transcriptPrompt }) => {
+        startTurn: async ({ submittedPrompt, transcriptPrompt, collaborationModeSettings }) => {
           if (input.shouldFailSubmit) {
             throw new Error("Could not submit chat message.");
           }
 
           setSubmittedPrompt(submittedPrompt);
           setTranscriptPrompt(transcriptPrompt ?? null);
+          setCollaborationModeSettings(collaborationModeSettings ?? null);
           if (input.deferSubmit) {
             await new Promise<void>((resolve) => {
               setResolveSubmit(() => resolve);
@@ -181,6 +195,9 @@ function SessionComposerStateHarness(input: {
       </div>
       <div data-testid="submitted-prompt">{submittedPrompt ?? ""}</div>
       <div data-testid="transcript-prompt">{transcriptPrompt ?? ""}</div>
+      <div data-testid="collaboration-mode-settings">
+        {collaborationModeSettings === null ? "" : JSON.stringify(collaborationModeSettings)}
+      </div>
       <div data-testid="composer-text">{composerText}</div>
       <div data-testid="pending-attachments">
         {composerState.composerViewModel.pendingAttachments
@@ -271,6 +288,29 @@ describe("useSessionComposerState", () => {
       "Submit this with review comments",
     );
     expect(screen.getByTestId("pending-diff-comments").textContent).toBe("2");
+  });
+
+  it("submits developer instructions with the selected model for scoped conversations", async () => {
+    render(
+      <SessionComposerStateHarness
+        collaborationDeveloperInstructions="You are Setup Assistant."
+        composerText="Draft the setup script"
+        pendingDiffComments={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("submitted-prompt").textContent).toBe("Draft the setup script");
+    });
+    expect(screen.getByTestId("collaboration-mode-settings").textContent).toBe(
+      JSON.stringify({
+        model: "gpt-5.4",
+        reasoningEffort: "medium",
+        developerInstructions: "You are Setup Assistant.",
+      }),
+    );
   });
 
   it("keeps non-image files pending without showing the image warning", () => {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { GlobalSandboxStorageConfigSchema } from "../../global/schema.js";
+import { GlobalSandboxTokenConfigSchema } from "../../global/schema.js";
 
 const SandboxProviders = ["docker", "e2b"] as const;
 const DefaultE2BCloudDomain = "e2b.app";
@@ -9,6 +10,11 @@ const HttpBaseUrlSchema = z.url().refine((value) => {
   const parsedUrl = new URL(value);
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 }, "Expected an http or https URL.");
+
+const DataPlaneApiTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+}, "sandbox.tokenizerProxyEgressBaseUrl must use http or https.");
 
 export const DataPlaneApiServerConfigSchema = z
   .object({
@@ -76,6 +82,8 @@ export const DataPlaneApiSandboxConfigSchema = z
   .object({
     provider: z.enum(SandboxProviders),
     storage: GlobalSandboxStorageConfigSchema.optional(),
+    egress: GlobalSandboxTokenConfigSchema,
+    tokenizerProxyEgressBaseUrl: DataPlaneApiTokenizerProxyEgressBaseUrlSchema,
     docker: DataPlaneApiSandboxDockerConfigSchema.optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.optional(),
   })
@@ -85,6 +93,8 @@ export const PartialDataPlaneApiSandboxConfigSchema = z
   .object({
     provider: z.enum(SandboxProviders).optional(),
     storage: GlobalSandboxStorageConfigSchema.partial().optional(),
+    egress: GlobalSandboxTokenConfigSchema.partial().optional(),
+    tokenizerProxyEgressBaseUrl: DataPlaneApiTokenizerProxyEgressBaseUrlSchema.optional(),
     docker: DataPlaneApiSandboxDockerConfigSchema.partial().optional(),
     e2b: DataPlaneApiSandboxE2BConfigSchema.partial().optional(),
   })
@@ -126,7 +136,7 @@ const DataPlaneApiProviderRequirementMessages = {
 } as const;
 
 export function getDataPlaneApiSandboxProviderValidationIssue(input: {
-  appSandbox: DataPlaneApiConfig["sandbox"];
+  appSandbox: Pick<DataPlaneApiConfig["sandbox"], "provider" | "docker" | "e2b">;
 }): {
   path: readonly ["sandbox", "docker"] | readonly ["sandbox", "e2b"];
   message: string;

@@ -1,9 +1,21 @@
-import { createSandboxAdapter, type SandboxAdapter, type SandboxProvider } from "@mistle/sandbox";
+import {
+  createSandboxAdapter,
+  createSandboxRuntimeControl,
+  type SandboxAdapter,
+  type SandboxProvider,
+  type SandboxRuntimeControl,
+} from "@mistle/sandbox";
 
 import type { DataPlaneApiRuntimeConfig } from "../types.js";
 
 export function createSandboxRuntimeAdapter(config: DataPlaneApiRuntimeConfig): SandboxAdapter {
   return createSandboxAdapter(createSandboxProviderConfig(config));
+}
+
+export function createDataPlaneSandboxRuntimeControl(
+  config: DataPlaneApiRuntimeConfig,
+): SandboxRuntimeControl {
+  return createSandboxRuntimeControl(createSandboxProviderConfig(config));
 }
 
 function createSandboxProviderConfig(

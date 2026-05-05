@@ -4,6 +4,7 @@ import {
   normalizeCodexLocalImageAttachment,
   startCodexTurn,
   steerCodexTurn,
+  type CodexTurnCollaborationModeSettings,
   type CodexTurnInputLocalImageItem,
   type CodexJsonRpcClient,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/client";
@@ -35,12 +36,14 @@ function buildTurnRequest(input: {
   submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
   transcriptPrompt?: string;
   displayAttachments?: readonly ChatAttachment[];
+  collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): {
   submittedPrompt: string;
   transcriptPrompt: string;
   submittedAttachments: readonly CodexTurnInputLocalImageItem[];
   displayAttachments: readonly ChatAttachment[];
   items: ReturnType<typeof buildCodexTurnInputItems>;
+  collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 } {
   const submittedPrompt = input.submittedPrompt.trim();
   const transcriptPrompt = (input.transcriptPrompt ?? input.submittedPrompt).trim();
@@ -58,6 +61,9 @@ function buildTurnRequest(input: {
       text: submittedPrompt,
       attachments: submittedAttachments,
     }),
+    ...(input.collaborationModeSettings === undefined
+      ? {}
+      : { collaborationModeSettings: input.collaborationModeSettings }),
   };
 }
 
@@ -162,6 +168,7 @@ export function useCodexChatController(input: {
       submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
       transcriptPrompt?: string;
       displayAttachments?: readonly ChatAttachment[];
+      collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
     }) => {
       const rpcClient = input.rpcClientRef.current;
       const threadId = input.threadIdRef.current;
@@ -176,6 +183,9 @@ export function useCodexChatController(input: {
         rpcClient,
         threadId,
         input: turnRequest.items,
+        ...(turnRequest.collaborationModeSettings === undefined
+          ? {}
+          : { collaborationModeSettings: turnRequest.collaborationModeSettings }),
       });
       dispatchChatAction({
         type: "turn_started",
@@ -338,6 +348,7 @@ export function useCodexChatController(input: {
         submittedAttachments?: readonly CodexTurnInputLocalImageItem[];
         transcriptPrompt?: string;
         displayAttachments?: readonly ChatAttachment[];
+        collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
       }): Promise<void> => {
         await startTurnMutation.mutateAsync(turnInput);
       },

@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  SandboxProfileVersionDefaultPersistenceModes,
+  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionStates,
   type SandboxProfileVersionState,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import {
+  SandboxInstancePersistenceModes,
+  type SandboxInstancePersistenceMode,
   SandboxInstancePurposes,
   type SandboxInstanceSource,
   type SandboxInstanceStarterKind,
@@ -15,6 +19,7 @@ import { SandboxProvider } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowImageInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq } from "drizzle-orm";
 
+import { resolveSandboxStoragePersistenceMode } from "../../sandbox-storage/services/internal-sandbox-storage.js";
 import { compileProfileVersionRuntimePlan } from "../compile-profile-version-runtime-plan.js";
 import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "../errors.js";
 import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "../errors.js";
@@ -53,6 +58,7 @@ type StartProfileInstanceOutput = {
 
 type ResolvedLaunchImage = {
   versionState: SandboxProfileVersionState;
+  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
   compileImage: ResolvedSandboxImage;
   workflowImage: StartSandboxInstanceWorkflowImageInput;
 };
@@ -70,6 +76,21 @@ function assertSnapshotImageProvider(
   }
 
   throw new Error(`Unsupported persisted snapshot image provider '${provider}'.`);
+}
+
+export function resolveProfileStartPersistenceMode(input: {
+  organizationPersistentSandboxesEnabled: boolean;
+  defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
+}): SandboxInstancePersistenceMode {
+  if (!input.organizationPersistentSandboxesEnabled) {
+    return SandboxInstancePersistenceModes.EPHEMERAL;
+  }
+
+  if (input.defaultPersistenceMode === SandboxProfileVersionDefaultPersistenceModes.PERSISTENT) {
+    return SandboxInstancePersistenceModes.PERSISTENT;
+  }
+
+  return SandboxInstancePersistenceModes.EPHEMERAL;
 }
 
 async function resolveEffectiveRuntimePlan(
@@ -141,6 +162,7 @@ async function resolveLaunchImage(
     .select({
       profileId: tables.sandboxProfiles.id,
       state: tables.sandboxProfileVersions.state,
+      defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
       snapshotImageProvider: tables.sandboxProfileVersions.snapshotImageProvider,
       snapshotImageId: tables.sandboxProfileVersions.snapshotImageId,
     })
@@ -173,6 +195,13 @@ async function resolveLaunchImage(
     );
   }
 
+  if (sandboxProfileVersion.defaultPersistenceMode === null) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
+
   if (sandboxProfileVersion.state === SandboxProfileVersionStates.PUBLISHED) {
     if (
       sandboxProfileVersion.snapshotImageProvider === null ||
@@ -186,6 +215,7 @@ async function resolveLaunchImage(
 
     return {
       versionState: sandboxProfileVersion.state,
+      defaultPersistenceMode: sandboxProfileVersion.defaultPersistenceMode,
       compileImage: {
         source: "snapshot",
         imageRef: sandboxProfileVersion.snapshotImageId,
@@ -200,6 +230,7 @@ async function resolveLaunchImage(
 
   return {
     versionState: sandboxProfileVersion.state,
+    defaultPersistenceMode: sandboxProfileVersion.defaultPersistenceMode,
     compileImage: {
       source: "base",
       imageRef: defaultBaseImage,
@@ -271,11 +302,20 @@ export async function startProfileInstance(
     organizationId: serviceInput.organizationId,
     ...(serviceInput.actingUser === undefined ? {} : { actingUser: serviceInput.actingUser }),
   });
+  const storagePersistenceMode = await resolveSandboxStoragePersistenceMode({
+    db,
+    organizationId: serviceInput.organizationId,
+  });
+  const persistenceMode = resolveProfileStartPersistenceMode({
+    organizationPersistentSandboxesEnabled: storagePersistenceMode.persistentSandboxesEnabled,
+    defaultPersistenceMode: launchImage.defaultPersistenceMode,
+  });
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: serviceInput.organizationId,
     sandboxProfileId: serviceInput.profileId,
     sandboxProfileVersion: serviceInput.profileVersion,
+    persistenceMode,
     purpose: SandboxInstancePurposes.SESSION,
     idempotencyKey,
     runtimePlan,

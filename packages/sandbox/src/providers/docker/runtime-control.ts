@@ -18,6 +18,7 @@ import {
 import type { DockerSandboxConfig } from "./config.js";
 
 const InitCommand = ["/opt/mistle/bin/sandboxd", "init"];
+const RefreshEgressGrantsCommand = ["/opt/mistle/bin/sandboxd", "refresh-egress-grants"];
 const DockerExecExitPollIntervalMs = 50;
 const DockerInitExecExitTimeoutMs = 120_000;
 const DockerExecExitPollAttempts = DockerInitExecExitTimeoutMs / DockerExecExitPollIntervalMs;
@@ -199,6 +200,79 @@ export class DockerSandboxRuntimeControl implements SandboxRuntimeControl {
 
   async resume(input: { id: string; payload: Uint8Array<ArrayBufferLike> }): Promise<void> {
     await this.init(input);
+  }
+
+  async refreshEgressGrants(input: {
+    id: string;
+    payload: Uint8Array<ArrayBufferLike>;
+  }): Promise<void> {
+    if (input.id.trim().length === 0) {
+      throw new SandboxConfigurationError("Sandbox id is required.");
+    }
+
+    try {
+      const container = this.#docker.getContainer(input.id);
+      const exec = await this.#runDockerOperation(
+        DockerClientOperationIds.REFRESH_EGRESS_GRANTS,
+        () =>
+          container.exec({
+            AttachStdin: true,
+            AttachStdout: true,
+            AttachStderr: true,
+            Cmd: RefreshEgressGrantsCommand,
+            Tty: false,
+            User: "root",
+          }),
+      );
+      const execStream = await this.#runDockerOperation(
+        DockerClientOperationIds.REFRESH_EGRESS_GRANTS,
+        () =>
+          exec.start({
+            hijack: true,
+            stdin: true,
+            Detach: false,
+            Tty: false,
+          }),
+      );
+      const stdout = new PassThrough();
+      const stderr = new PassThrough();
+      container.modem.demuxStream(execStream, stdout, stderr);
+      const capturedStdout = captureUtf8Stream(stdout);
+      const capturedStderr = captureUtf8Stream(stderr);
+
+      await writePayloadToStream(execStream, input.payload);
+      await endWritableStream(execStream);
+
+      const exitCode = await this.#runDockerOperation(
+        DockerClientOperationIds.REFRESH_EGRESS_GRANTS,
+        () => waitForDockerExecExitCode(exec),
+      );
+      const stdoutText = capturedStdout.read();
+      const stderrText = capturedStderr.read();
+      capturedStdout.stop();
+      capturedStderr.stop();
+
+      if (exitCode !== 0) {
+        throw new Error(
+          `Docker sandbox egress grant refresh command exited with code ${String(exitCode)}.${formatCommandOutput(
+            {
+              stdout: stdoutText,
+              stderr: stderrText,
+            },
+          )}`,
+        );
+      }
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: input.id,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 
   async readOperationLog(input: {

@@ -13,6 +13,7 @@ import {
 } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { cleanupTestQueryClients, createTestQueryClient } from "../../test-support/query-client.js";
 import {
   sandboxProfileDetailQueryKey,
@@ -22,6 +23,7 @@ import {
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { SandboxProfileVersion } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { organizationSandboxStorageSettingsQueryKey } from "../settings/organization/sandbox-storage-service.js";
 import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import {
   applyPublishedSandboxProfileVersionToProfile,
@@ -50,6 +52,7 @@ function createSandboxProfileVersionFixture(input: {
   sandboxProfileId: string;
   version: number;
   state: SandboxProfileVersion["state"];
+  defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   isActive: boolean;
   usable?: boolean;
   latestSnapshotJob?: SandboxProfileVersion["latestSnapshotJob"];
@@ -59,6 +62,7 @@ function createSandboxProfileVersionFixture(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     state: input.state,
+    defaultPersistenceMode: input.defaultPersistenceMode ?? "ephemeral",
     isActive: input.isActive,
     usable: input.usable ?? input.state === "published",
     latestSnapshotJob: input.latestSnapshotJob ?? null,
@@ -111,6 +115,7 @@ function createFailedSnapshotJobFixture(): NonNullable<SandboxProfileVersion["la
 
 function createSandboxProfileVersionsForTest(input: {
   profileId: string;
+  defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
   refreshSchedule?: SandboxProfileVersion["refreshSchedule"];
   version: number;
   versionState: SandboxProfileEditorTestVersionState;
@@ -126,6 +131,9 @@ function createSandboxProfileVersionsForTest(input: {
       sandboxProfileId: input.profileId,
       version: versionInput.version ?? input.version,
       state: versionInput.state,
+      ...(input.defaultPersistenceMode === undefined
+        ? {}
+        : { defaultPersistenceMode: input.defaultPersistenceMode }),
       isActive: versionInput.isActive ?? false,
     });
 
@@ -283,6 +291,8 @@ function renderSandboxProfileEditor(input?: {
     };
   }[];
   integrationsLoading?: boolean;
+  defaultPersistenceMode?: SandboxProfileVersion["defaultPersistenceMode"];
+  persistentSandboxesEnabled?: boolean;
   routeSearch?: string;
   routeState?: unknown;
   routeSection?: SandboxProfileEditorTestRouteSection;
@@ -312,11 +322,22 @@ function renderSandboxProfileEditor(input?: {
   });
   const versions = createSandboxProfileVersionsForTest({
     profileId,
+    ...(input?.defaultPersistenceMode === undefined
+      ? {}
+      : { defaultPersistenceMode: input.defaultPersistenceMode }),
     ...(input?.refreshSchedule === undefined ? {} : { refreshSchedule: input.refreshSchedule }),
     version,
     versionState: resolvedVersionState,
   });
 
+  seedAuthenticatedSession(queryClient);
+  queryClient.setQueryData(organizationSandboxStorageSettingsQueryKey("org_123"), {
+    persistentSandboxesEnabled: input?.persistentSandboxesEnabled ?? true,
+    storageBackend: null,
+    storageConfigSource: "managed",
+    storageConfigVersion: null,
+    organizationStorageConfigSummary: null,
+  });
   queryClient.setQueryData(sandboxProfileDetailQueryKey(profileId), {
     id: profileId,
     displayName: "Prototype Profile",
@@ -1571,6 +1592,18 @@ describe("SandboxProfileEditorPage", () => {
 
   it("allows setup script testing for draft scripts with content", () => {
     renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {
+            runtime: {
+              runtimeId: "codex",
+            },
+          },
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: "pnpm install\npnpm dev:bootstrap",
       versionState: "draft",
@@ -1579,12 +1612,16 @@ describe("SandboxProfileEditorPage", () => {
     const testButton = screen.getByRole("button", {
       name: "Test",
     });
+    const setupAssistantButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
     const failOnFirstErrorSwitch = screen.getByRole("switch", {
-      name: "Fail on first command error",
+      name: "Fail on error",
     });
 
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
     expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(failOnFirstErrorSwitch);
@@ -1593,6 +1630,18 @@ describe("SandboxProfileEditorPage", () => {
 
   it("disables setup script testing for empty and published scripts", () => {
     renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-agent",
+          connectionId: "connection-agent",
+          kind: "agent",
+          config: {
+            runtime: {
+              runtimeId: "codex",
+            },
+          },
+        },
+      ],
       routeSection: "sandbox-profile",
       setupScript: null,
       versionState: "draft",
@@ -1601,8 +1650,12 @@ describe("SandboxProfileEditorPage", () => {
     const emptyDraftTestButton = screen.getByRole("button", {
       name: "Test",
     });
+    const emptyDraftWriteButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
     expect(emptyDraftTestButton.hasAttribute("disabled")).toBe(true);
     expect(emptyDraftTestButton.getAttribute("title")).toBe("Add a setup script before testing.");
+    expect(emptyDraftWriteButton.hasAttribute("disabled")).toBe(false);
 
     cleanup();
 
@@ -1615,9 +1668,38 @@ describe("SandboxProfileEditorPage", () => {
     const publishedTestButton = screen.getByRole("button", {
       name: "Test",
     });
+    const publishedWriteButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
     expect(publishedTestButton.hasAttribute("disabled")).toBe(true);
     expect(publishedTestButton.getAttribute("title")).toBe(
       "Setup script testing is only available while editing a draft.",
+    );
+    expect(publishedWriteButton.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("disables Setup Assistant when no agent runtime is configured", () => {
+    renderSandboxProfileEditor({
+      bindings: [
+        {
+          id: "binding-git",
+          connectionId: "connection-git",
+          kind: "git",
+          config: {},
+        },
+      ],
+      routeSection: "sandbox-profile",
+      setupScript: "pnpm install",
+      versionState: "draft",
+    });
+
+    const setupAssistantButton = screen.getByRole("button", {
+      name: "Setup Assistant",
+    });
+
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(true);
+    expect(setupAssistantButton.getAttribute("title")).toBe(
+      "Add an agent integration before using Setup Assistant.",
     );
   });
 
@@ -1698,6 +1780,49 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(screen.getByText("Viewing: Draft")).toBeDefined();
     expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
+  });
+
+  it("shows the editable draft persistence mode", () => {
+    renderSandboxProfileEditor({
+      defaultPersistenceMode: "persistent",
+      versionState: "draft",
+    });
+
+    const persistenceSwitch = screen.getByRole("switch", {
+      name: "Use persistent sandboxes",
+    });
+
+    expect(persistenceSwitch.getAttribute("aria-checked")).toBe("true");
+    expect(persistenceSwitch.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("renders published profile persistence mode as read-only", () => {
+    renderSandboxProfileEditor({
+      defaultPersistenceMode: "persistent",
+      versionState: "published",
+    });
+
+    expect(
+      screen.queryByRole("switch", {
+        name: "Use persistent sandboxes",
+      }),
+    ).toBeNull();
+    expect(screen.getByText("Use persistent sandboxes:")).toBeDefined();
+    expect(screen.getByText("Yes")).toBeDefined();
+  });
+
+  it("warns when profile persistence is enabled but organization persistence is disabled", () => {
+    renderSandboxProfileEditor({
+      defaultPersistenceMode: "persistent",
+      persistentSandboxesEnabled: false,
+      versionState: "draft",
+    });
+
+    expect(
+      screen.getByText(
+        "Organization persistence is disabled. Sessions from this profile will still be created in non-persistent mode.",
+      ),
+    ).toBeDefined();
   });
 
   it("does not offer discard for draft-only profiles", () => {

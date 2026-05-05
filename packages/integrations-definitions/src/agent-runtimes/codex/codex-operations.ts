@@ -176,6 +176,25 @@ export type CodexTurnInputLocalImageItem = {
 
 export type CodexTurnInputItem = CodexTurnInputLocalImageItem | CodexTurnInputTextItem;
 
+export type CodexTurnCollaborationModeSettings = {
+  model: string;
+  reasoningEffort: string | null;
+  developerInstructions: string | null;
+};
+
+type CodexTurnStartRequest = {
+  threadId: string;
+  input: readonly CodexTurnInputItem[];
+  collaborationMode?: {
+    mode: "default";
+    settings: {
+      model: string;
+      reasoning_effort: string | null;
+      developer_instructions: string | null;
+    };
+  };
+};
+
 export function buildCodexTurnInputItems(input: {
   text: string;
   attachments: readonly CodexTurnInputLocalImageItem[];
@@ -198,6 +217,29 @@ export function buildCodexTurnInputItems(input: {
   }
 
   return items;
+}
+
+export function buildCodexTurnStartRequest(input: {
+  threadId: string;
+  input: readonly CodexTurnInputItem[];
+  collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
+}): CodexTurnStartRequest {
+  return {
+    threadId: input.threadId,
+    input: input.input,
+    ...(input.collaborationModeSettings === undefined
+      ? {}
+      : {
+          collaborationMode: {
+            mode: "default",
+            settings: {
+              model: input.collaborationModeSettings.model,
+              reasoning_effort: input.collaborationModeSettings.reasoningEffort,
+              developer_instructions: input.collaborationModeSettings.developerInstructions,
+            },
+          },
+        }),
+  };
 }
 
 export async function startCodexThread(input: {
@@ -228,11 +270,9 @@ export async function startCodexTurn(input: {
   rpcClient: CodexJsonRpcClient;
   threadId: string;
   input: readonly CodexTurnInputItem[];
+  collaborationModeSettings?: CodexTurnCollaborationModeSettings | undefined;
 }): Promise<{ turnId: string; status: string; response: unknown }> {
-  const response = await input.rpcClient.call("turn/start", {
-    threadId: input.threadId,
-    input: input.input,
-  });
+  const response = await input.rpcClient.call("turn/start", buildCodexTurnStartRequest(input));
 
   const parsedResponse = TurnStartResponseSchema.safeParse(response);
   if (!parsedResponse.success) {

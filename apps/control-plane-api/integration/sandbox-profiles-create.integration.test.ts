@@ -2,7 +2,11 @@
  * The integration harness returns a Vitest fixture-bound `it` function.
  */
 
-import { SandboxProfileStatuses, SandboxProfileVersionStates } from "@mistle/db/control-plane";
+import {
+  SandboxProfileStatuses,
+  SandboxProfileVersionDefaultPersistenceModes,
+  SandboxProfileVersionStates,
+} from "@mistle/db/control-plane";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
@@ -66,6 +70,9 @@ describe.concurrent("sandbox profiles create integration", () => {
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
     expect(initialVersion.state).toBe(SandboxProfileVersionStates.DRAFT);
+    expect(initialVersion.defaultPersistenceMode).toBe(
+      SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
+    );
     expect(initialVersion.publishedAt).toBeNull();
   });
 

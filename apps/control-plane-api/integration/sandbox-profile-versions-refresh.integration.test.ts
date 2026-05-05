@@ -3,6 +3,7 @@
  */
 
 import {
+  SandboxProfileVersionDefaultPersistenceModes,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -72,6 +73,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         sandboxProfileId: "sbp_version_refresh_001",
         version: 2,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: true,
         usable: true,
         refreshSchedule: null,
@@ -175,6 +177,7 @@ describe.concurrent("sandbox profile versions refresh integration", () => {
         sandboxProfileId: "sbp_version_refresh_not_usable_001",
         version: 1,
         state: SandboxProfileVersionStates.PUBLISHED,
+        defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceModes.EPHEMERAL,
         isActive: false,
         usable: false,
         refreshSchedule: null,

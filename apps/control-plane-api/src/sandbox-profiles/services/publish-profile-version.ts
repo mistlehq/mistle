@@ -1,5 +1,6 @@
 import {
   getControlPlaneDatabaseSchema,
+  type SandboxProfileVersionDefaultPersistenceMode,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -32,6 +33,7 @@ type PublishProfileVersionOutput = {
     sandboxProfileId: string;
     version: number;
     state: (typeof SandboxProfileVersionStates)[keyof typeof SandboxProfileVersionStates];
+    defaultPersistenceMode: SandboxProfileVersionDefaultPersistenceMode;
     isActive: boolean;
     usable: boolean;
     refreshSchedule: ProfileVersionRefreshScheduleSummary | null;
@@ -145,6 +147,7 @@ export async function publishProfileVersion(
         sandboxProfileId: tables.sandboxProfileVersions.sandboxProfileId,
         version: tables.sandboxProfileVersions.version,
         state: tables.sandboxProfileVersions.state,
+        defaultPersistenceMode: tables.sandboxProfileVersions.defaultPersistenceMode,
       });
 
     if (publishedVersion === undefined) {
