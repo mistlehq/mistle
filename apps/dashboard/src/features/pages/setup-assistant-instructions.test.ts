@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildSetupAssistantCollaborationModeSettings,
-  buildSetupAssistantStartingPrompt,
+  buildSetupAssistantInitialComposerText,
   SetupAssistantDeveloperInstructions,
 } from "./setup-assistant-instructions.js";
 
@@ -27,14 +27,16 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
   });
 });
 
-describe("buildSetupAssistantStartingPrompt", () => {
+describe("buildSetupAssistantInitialComposerText", () => {
   it("returns a short editable request when no setup script exists", () => {
-    expect(buildSetupAssistantStartingPrompt("  \n\t ")).toBe("Write a setup script");
+    expect(buildSetupAssistantInitialComposerText("  \n\t ")).toBe("Write a setup script");
   });
 
   it("includes the current setup script when a draft exists", () => {
     expect(
-      buildSetupAssistantStartingPrompt("#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install"),
+      buildSetupAssistantInitialComposerText(
+        "#!/usr/bin/env bash\nset -euo pipefail\n\npnpm install",
+      ),
     ).toBe(
       [
         "Fix this script:",

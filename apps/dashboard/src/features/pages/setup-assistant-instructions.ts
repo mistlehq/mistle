@@ -27,7 +27,7 @@ export function buildSetupAssistantCollaborationModeSettings(
   };
 }
 
-export function buildSetupAssistantStartingPrompt(setupScript: string): string {
+export function buildSetupAssistantInitialComposerText(setupScript: string): string {
   const trimmedSetupScript = setupScript.trim();
   const prompt = "Write a setup script";
 

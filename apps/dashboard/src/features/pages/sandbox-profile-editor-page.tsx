@@ -149,7 +149,7 @@ import {
 } from "./session-terminal-workspace.js";
 import {
   buildSetupAssistantCollaborationModeSettings,
-  buildSetupAssistantStartingPrompt,
+  buildSetupAssistantInitialComposerText,
 } from "./setup-assistant-instructions.js";
 import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
@@ -179,7 +179,7 @@ type SetupScriptAssistantControl = {
   title: string;
 };
 type SetupScriptAssistantPanelState = {
-  startingPrompt: string;
+  initialComposerText: string;
   isOpen: boolean;
   sandboxInstanceId: string | null;
 };
@@ -1173,10 +1173,10 @@ function ReadySandboxProfileEditorPage(input: {
     isStarting: startSetupAssistantMutation.isPending,
     onOpen: ({ setupScript }) => {
       setSetupAssistantError(null);
-      const startingPrompt = buildSetupAssistantStartingPrompt(setupScript);
+      const initialComposerText = buildSetupAssistantInitialComposerText(setupScript);
 
       setSetupAssistantPanelState((currentState) => ({
-        startingPrompt,
+        initialComposerText,
         isOpen: true,
         sandboxInstanceId: currentState?.sandboxInstanceId ?? null,
       }));
@@ -1358,7 +1358,7 @@ function ReadySandboxProfileEditorPage(input: {
               );
             }}
             sandboxInstanceId={setupAssistantPanelState.sandboxInstanceId}
-            startingPrompt={setupAssistantPanelState.startingPrompt}
+            initialComposerText={setupAssistantPanelState.initialComposerText}
           />
         </ResizablePanel>
       </ResizablePanelGroup>
@@ -1369,12 +1369,12 @@ function ReadySandboxProfileEditorPage(input: {
 function SetupScriptAssistantPanel(input: {
   onClose: () => void;
   sandboxInstanceId: string | null;
-  startingPrompt: string;
+  initialComposerText: string;
 }): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const [composerText, setComposerText] = useState(input.startingPrompt);
+  const [composerText, setComposerText] = useState(input.initialComposerText);
   const [pendingDiffComments, setPendingDiffComments] = useState<
     readonly PendingSessionDiffComment[]
   >([]);
@@ -1411,8 +1411,8 @@ function SetupScriptAssistantPanel(input: {
   );
 
   useEffect(() => {
-    setComposerText(input.startingPrompt);
-  }, [input.startingPrompt]);
+    setComposerText(input.initialComposerText);
+  }, [input.initialComposerText]);
 
   function handleClearPendingDiffComments(): void {
     setPendingDiffComments([]);

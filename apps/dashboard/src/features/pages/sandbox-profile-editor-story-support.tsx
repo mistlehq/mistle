@@ -72,7 +72,7 @@ import {
   type SnapshotRefreshSchedule,
 } from "./sandbox-profile-snapshot-panel.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
-import { buildSetupAssistantStartingPrompt } from "./setup-assistant-instructions.js";
+import { buildSetupAssistantInitialComposerText } from "./setup-assistant-instructions.js";
 
 export {
   StoryGithubConnection,
@@ -501,7 +501,7 @@ function SetupAssistantPanel(input: {
         <div className="shrink-0 border-t bg-background px-5 py-4">
           <ChatComposer
             {...SessionComposerFixtureProps}
-            composerText={buildSetupAssistantStartingPrompt(input.setupScript)}
+            composerText={buildSetupAssistantInitialComposerText(input.setupScript)}
             gitBranchLabel={null}
             pullRequest={null}
           />
