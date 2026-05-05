@@ -1591,7 +1591,7 @@ describe("SandboxProfileEditorPage", () => {
     const testButton = screen.getByRole("button", {
       name: "Test",
     });
-    const writeWithAgentButton = screen.getByRole("button", {
+    const setupAssistantButton = screen.getByRole("button", {
       name: "Setup Assistant",
     });
     const failOnFirstErrorSwitch = screen.getByRole("switch", {
@@ -1600,7 +1600,7 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(testButton.hasAttribute("disabled")).toBe(false);
     expect(testButton.getAttribute("title")).toBe("Test setup script");
-    expect(writeWithAgentButton.hasAttribute("disabled")).toBe(false);
+    expect(setupAssistantButton.hasAttribute("disabled")).toBe(false);
     expect(failOnFirstErrorSwitch.getAttribute("aria-checked")).toBe("true");
 
     fireEvent.click(failOnFirstErrorSwitch);

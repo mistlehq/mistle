@@ -44,6 +44,7 @@ export async function startProfileSetupScriptTestRun(
       organizationId: input.organizationId,
       profileId: input.profileId,
       profileVersion: input.profileVersion,
+      requireAgentRuntime: false,
       startedBy: input.startedBy,
       source: input.source,
       ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),

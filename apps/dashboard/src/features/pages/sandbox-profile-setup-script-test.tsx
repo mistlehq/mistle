@@ -49,7 +49,7 @@ type SetupScriptTestViewProps = {
   ptyLifecycleState?: SandboxPtyState;
   status: SetupScriptTestStatus;
   statusMessage?: string | null;
-  writeWithAgent?: {
+  setupAssistant?: {
     disabled: boolean;
     isStarting: boolean;
     onClick: () => void;
@@ -263,17 +263,17 @@ export function SandboxProfileSetupScriptTestButton(
     input.disabled === true || !input.isDraft || input.status === "blank" || isBusy;
 
   const failOnFirstErrorSwitchId = "setup-script-test-fail-on-first-error";
-  const writeWithAgentButton =
-    input.writeWithAgent === undefined ? null : (
+  const setupAssistantButton =
+    input.setupAssistant === undefined ? null : (
       <Button
-        disabled={input.writeWithAgent.disabled}
-        onClick={input.writeWithAgent.onClick}
+        disabled={input.setupAssistant.disabled}
+        onClick={input.setupAssistant.onClick}
         size="sm"
-        title={input.writeWithAgent.title}
+        title={input.setupAssistant.title}
         type="button"
         variant="outline"
       >
-        {input.writeWithAgent.isStarting ? (
+        {input.setupAssistant.isStarting ? (
           "Starting Setup Assistant..."
         ) : (
           <>
@@ -314,17 +314,17 @@ export function SandboxProfileSetupScriptTestButton(
           {resolveSetupScriptTestButtonIcon(input.status)}
           {resolveSetupScriptTestButtonLabel(input.status)}
         </Button>
-        {input.writeWithAgent === undefined ? null : input.writeWithAgent.disabled ? (
+        {input.setupAssistant === undefined ? null : input.setupAssistant.disabled ? (
           <Tooltip>
             <TooltipTrigger render={<span className="inline-flex" />}>
-              {writeWithAgentButton}
+              {setupAssistantButton}
             </TooltipTrigger>
             <TooltipContent className="max-w-64 text-left" side="top">
-              {input.writeWithAgent.title}
+              {input.setupAssistant.title}
             </TooltipContent>
           </Tooltip>
         ) : (
-          writeWithAgentButton
+          setupAssistantButton
         )}
       </ButtonGroup>
     </div>

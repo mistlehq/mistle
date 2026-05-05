@@ -12,7 +12,7 @@ type StartProfileSetupCheckSandboxInput = {
   profileId: string;
   profileVersion: number;
   idempotencyKey?: string;
-  requireAgentRuntime?: boolean;
+  requireAgentRuntime: boolean;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;

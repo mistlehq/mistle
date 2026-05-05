@@ -20,7 +20,7 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -365,7 +365,7 @@ function createSnapshotRefreshScheduleInitialDraft(
 function SetupScriptStoryControls(input: {
   setupAssistantState: SandboxProfileEditorPageStoryArgs["setupAssistantState"];
   isDraft: boolean;
-  onWriteWithAgent?: () => void;
+  onOpenSetupAssistant?: () => void;
   testStatus: SetupScriptTestStatus;
 }): React.JSX.Element {
   const showSetupAssistantAction = input.setupAssistantState !== undefined;
@@ -385,7 +385,7 @@ function SetupScriptStoryControls(input: {
       disabled={setupAssistantIsDisabled}
       size="sm"
       title={setupAssistantTitle}
-      onClick={input.onWriteWithAgent}
+      onClick={input.onOpenSetupAssistant}
       type="button"
       variant="outline"
     >
@@ -684,7 +684,7 @@ function SandboxProfileEditorPageStoryView(
   });
   const setupScriptTestStatus =
     input.setupScriptTestStatus ?? (setupScriptDraft.trim().length === 0 ? "blank" : "idle");
-  function handleWriteWithAgent(): void {
+  function handleOpenSetupAssistant(): void {
     setSetupAssistantPanelState(input.setupAssistantState === "starting" ? "starting" : "ready");
     setSetupAssistantPanelOpen(true);
   }
@@ -783,7 +783,7 @@ function SandboxProfileEditorPageStoryView(
                       <SetupScriptStoryControls
                         setupAssistantState={input.setupAssistantState}
                         isDraft={mode.kind === "draft"}
-                        onWriteWithAgent={handleWriteWithAgent}
+                        onOpenSetupAssistant={handleOpenSetupAssistant}
                         testStatus={setupScriptTestStatus}
                       />
                     }
@@ -877,15 +877,17 @@ function SandboxProfileEditorPageStoryView(
 export function SandboxProfileEditorPageStory(
   input: SandboxProfileEditorPageStoryArgs,
 ): React.JSX.Element {
-  const [router] = useState(() =>
-    createMemoryRouter(
-      createRoutesFromElements(
-        <Route element={<SandboxProfileEditorPageStoryView {...input} />} path="/" />,
+  const router = useMemo(
+    () =>
+      createMemoryRouter(
+        createRoutesFromElements(
+          <Route element={<SandboxProfileEditorPageStoryView {...input} />} path="/" />,
+        ),
+        {
+          initialEntries: ["/"],
+        },
       ),
-      {
-        initialEntries: ["/"],
-      },
-    ),
+    [input],
   );
 
   return <RouterProvider router={router} />;

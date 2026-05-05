@@ -2346,7 +2346,7 @@ function ReadySandboxProfileSetupScriptSection(input: {
         testControl={
           <SandboxProfileSetupScriptTestButton
             {...setupScriptTest.buttonProps}
-            writeWithAgent={{
+            setupAssistant={{
               disabled: input.setupAssistantControl.disabled,
               isStarting: input.setupAssistantControl.isStarting,
               onClick: () => {
