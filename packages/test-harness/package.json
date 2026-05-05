@@ -14,6 +14,12 @@
       "node": "./src/integration/index.ts",
       "import": "./src/integration/index.ts",
       "default": "./src/integration/index.ts"
+    },
+    "./system": {
+      "types": "./src/system/index.ts",
+      "node": "./src/system/index.ts",
+      "import": "./src/system/index.ts",
+      "default": "./src/system/index.ts"
     }
   },
   "scripts": {
