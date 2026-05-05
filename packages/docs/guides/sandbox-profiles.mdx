@@ -1,0 +1,77 @@
+---
+title: Sandbox Profiles
+description: Configure the tools, setup, and environment agents start with
+---
+
+## Overview
+
+Sandbox profiles define the execution environment an agent starts with.
+
+Use a sandbox profile to control:
+
+- the base image or sandbox provider settings
+- installed tools and runtimes
+- setup scripts
+- allowed integrations and connection behavior
+- environment configuration required for agent work
+
+Profiles make agent environments repeatable. Instead of configuring every session by hand, teams publish profile versions and start sessions from those published versions.
+
+## Draft And Published Versions
+
+Sandbox profile changes are made as drafts. Publishing a profile version makes that configuration available for new sessions.
+
+Published versions are immutable from the point of view of future sessions. To change the environment, edit the draft and publish a new version.
+
+## Setup Scripts
+
+Setup scripts prepare the sandbox environment for the profile. They can install tools, configure agent settings, or prepare dependencies that future sessions need.
+
+Setup scripts are important because they make an agent's starting environment explicit and repeatable. Without a setup script, each session depends on whatever the base image already contains and whatever setup the agent discovers during the task. That can waste time and make failures hard to reproduce.
+
+Use setup scripts to:
+
+- install required tools and runtimes
+- configure package managers, CLIs, and agent settings
+- prepare repository-specific dependencies
+- warm dependency caches
+- run smoke checks that prove the environment is ready
+
+Keep setup scripts deterministic and explicit. A session should not depend on manual setup that is not captured in the profile.
+
+## Experiment With Setup Scripts
+
+Setup script changes are made on draft profile versions. Published versions are read-only.
+
+To experiment with a setup script:
+
+1. Open the sandbox profile.
+2. Edit the draft version.
+3. Update the **Setup script** field.
+4. Use **Setup script behavior** to confirm where repositories are cloned and which tools are available.
+5. Select **Test setup script** to run the script in a temporary sandbox.
+6. Inspect the test output, adjust the script, and test again.
+7. Publish the profile version when the script is reliable.
+
+Setup script testing is only available while editing a draft, and only after the script has content.
+
+## Snapshots
+
+When a profile version is published, Mistle can prepare a snapshot for that version. The snapshot captures the prepared environment so new sessions can start from the profile-specific image instead of rebuilding from the shared base image every time.
+
+Read [Snapshots](/guides/snapshots) for the snapshot lifecycle.
+
+## Persistent Sandboxes
+
+Draft profile versions can opt into persistent sandboxes when organization persistence is enabled.
+
+Use persistent sandboxes when sessions from a profile should retain selected workspace state across compute stops, resumes, or provider expiry. This is experimental and should be used deliberately.
+
+Read [Persistent Sandboxes](/guides/persistent-sandboxes) for setup steps, limits, and how persistence differs from snapshots.
+
+## Next Steps
+
+- Read [Snapshots](/guides/snapshots) to understand prepared profile images.
+- Read [Persistent Sandboxes](/guides/persistent-sandboxes) to understand experimental per-session state persistence.
+- Read [Sessions](/guides/sessions) to see how users start work from a profile.
+- Read [Self-Hosted Configuration](/guides/self-hosted-configuration) for deployment-level sandbox settings.

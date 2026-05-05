@@ -22,6 +22,17 @@
             "pages": ["index"]
           },
           {
+            "group": "Core Concepts",
+            "pages": [
+              "guides/integrations",
+              "guides/account-linking",
+              "guides/sandbox-profiles",
+              "guides/snapshots",
+              "guides/sessions",
+              "guides/automations"
+            ]
+          },
+          {
             "group": "Integrations",
             "pages": [
               "guides/aws-integration-setup",
@@ -34,6 +45,10 @@
               "guides/signoz-integration-setup",
               "guides/slack-integration-setup"
             ]
+          },
+          {
+            "group": "Experimental",
+            "pages": ["guides/persistent-sandboxes"]
           }
         ]
       },

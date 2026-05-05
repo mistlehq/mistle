@@ -1,0 +1,97 @@
+---
+title: Account Linking
+description: Attribute provider activity and agent work to the right Mistle user
+---
+
+## Overview
+
+Account linking lets users connect their Mistle account to their identity in a supported integration provider, such as Slack or GitHub.
+
+Organizations can enable supported integrations as account-linking providers. Once linked, Mistle can map provider activity back to the correct Mistle user, so actions, workflow runs, and agent work are attributed to the right person.
+
+## Example Flow
+
+In this example, a user asks an agent to do work from Slack. The agent completes the work and opens a pull request in GitHub.
+
+Account linking lets Mistle connect:
+
+- the Slack user who requested the work
+- the Mistle user account
+- the GitHub identity involved in the resulting pull request
+
+Without account linking, Mistle may know that a Slack user triggered work and that a GitHub connection opened a pull request, but it cannot reliably prove those identities belong to the same person.
+
+## What Account Linking Enables
+
+- accurate requester attribution for work triggered from provider events
+- correct user context for agent workflows
+- clearer audit trails across Slack, GitHub, and Mistle
+- safer automation behavior when provider activity needs to resolve to a known user
+
+## Set Up Account Linking
+
+Account linking has two parts:
+
+- an organization owner or admin enables the provider for the organization
+- each user links their own provider account from their profile settings
+
+### 1. Create An Eligible Integration Connection
+
+First, create an active integration connection for the provider you want to use for identity linking.
+
+Current identity-linking providers require these connection methods:
+
+| Provider | Required connection method |
+| -------- | -------------------------- |
+| GitHub   | GitHub App installation    |
+| Slack    | Slack app                  |
+
+The connection also needs the linked-user authorization fields for that provider:
+
+- GitHub: `Client ID (Linked User Auth)` on the GitHub App installation connection.
+- Slack: `Client ID (Linked User Auth)` and `Client secret (Linked User Auth)` on the Slack app connection.
+
+If the connection does not appear as an option in Identity Linking settings, check that it is active and uses the required connection method.
+
+### 2. Enable The Provider For The Organization
+
+Organization owners and admins can enable identity linking from the dashboard:
+
+1. Open **Settings**.
+2. Go to **Organization > Identity Linking**.
+3. Find the provider row, such as GitHub or Slack.
+4. Select the eligible integration connection.
+5. Turn on **Enable [provider] identity linking**.
+
+Once enabled, users in the organization can link their own account for that provider.
+
+### 3. Ask Users To Link Their Accounts
+
+Each user links their own provider account from profile settings:
+
+1. Open **Settings**.
+2. Go to **Account > Profile**.
+3. Find **Linked Accounts**.
+4. Select **Link account** for the provider.
+5. Complete the provider authorization flow.
+
+After linking, the card shows the linked provider account. If authorization later expires or needs to be refreshed, the same card shows **Relink**.
+
+GitHub linked accounts can also show Git-specific settings such as commit email and commit signing key configuration.
+
+## View Linked Identities
+
+Organization owners and admins can see linked identities from the same organization settings page:
+
+1. Open **Settings**.
+2. Go to **Organization > Identity Linking**.
+3. Use the **Linked Users** column for the provider.
+4. Select the view action for that provider.
+
+The linked users dialog shows each organization member's Mistle name and email, their linked provider identity summary when available, link status, and the last updated time.
+
+## Next Steps
+
+- Read [Integrations](/guides/integrations) for the provider connection model.
+- Read [GitHub](/guides/github-integration-setup) or [Slack](/guides/slack-integration-setup) for provider-specific setup.
+- Read [Automations](/guides/automations) to see how linked identities are used when events trigger agent work.

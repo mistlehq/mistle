@@ -1,0 +1,57 @@
+---
+title: Integrations
+description: Connect external systems and model providers to Mistle
+---
+
+## Overview
+
+Integrations let agents interact with external systems without placing long-lived credentials inside the sandboxes where agents perform tasks.
+
+For example, integrations can let an agent:
+
+- respond in Slack
+- work in GitHub and open pull requests
+- inspect logs and traces in Datadog or SigNoz
+- read or update issues in Jira or Linear
+- call model providers such as OpenAI
+
+## Recommended Starting Integrations
+
+Most useful Mistle workflows need at least:
+
+- [OpenAI](/guides/openai-integration-setup), so agents can call model APIs.
+- [GitHub](/guides/github-integration-setup), so agents can inspect repositories, make changes, and open pull requests.
+
+Other integrations are optional and should match the systems where your team wants agents to receive context, take action, or report results.
+
+## Credentials
+
+Integrations let teams manage credentials and access centrally. Secrets are encrypted with organization-scoped keys and protected by master encryption keys unique to each Mistle deployment.
+
+Sandboxes are credentialless by default. When an agent needs a connected service, requests go through Mistle-controlled services that resolve and apply the right credentials outside the sandbox.
+
+## Provider Tools
+
+When possible, Mistle installs official provider tools in sandboxes so agents can use provider-supported interfaces.
+
+When an official tool is unavailable or not well suited for agent workflows, Mistle uses maintained CLI tools built for those integrations. Those tools live in [mistlehq/tools](https://github.com/mistlehq/tools).
+
+## Supported Integrations
+
+Mistle currently ships setup guides for:
+
+- [AWS](/guides/aws-integration-setup)
+- [Datadog](/guides/datadog-integration-setup)
+- [GitHub](/guides/github-integration-setup)
+- [Jira](/guides/jira-integration-setup)
+- [Linear](/guides/linear-integration-setup)
+- [OpenAI](/guides/openai-integration-setup)
+- [PlanetScale](/guides/planetscale-integration-setup)
+- [SigNoz](/guides/signoz-integration-setup)
+- [Slack](/guides/slack-integration-setup)
+
+## Next Steps
+
+- Read [Account Linking](/guides/account-linking) when provider identities should map back to Mistle users.
+- Read [Automations](/guides/automations) when provider events should trigger agent work.
+- For self-hosted deployments, read [Self-Hosted Integrations Overview](/guides/self-hosted-integrations-overview).

@@ -1,0 +1,51 @@
+---
+title: Sessions
+description: Start interactive agent work in a configured sandbox
+---
+
+## Overview
+
+Sessions are interactive agent workspaces started from a sandbox profile.
+
+Use sessions for work such as:
+
+- debugging failing tests
+- reviewing code changes
+- implementing repository changes
+- investigating logs or provider state through integrations
+- preparing pull requests
+
+Each session runs in a sandbox environment with the tools, setup, and integration access defined by the selected sandbox profile and organization configuration.
+
+## How Sessions Start
+
+When a user starts a session, Mistle selects the requested sandbox profile version and creates a sandbox for the agent.
+
+If the profile version has a usable snapshot, the sandbox can start from that prepared image. This avoids repeating setup work that was already captured by the profile snapshot.
+
+## Agent Access
+
+Agents can use configured integrations to interact with external systems. Credentials are managed by Mistle and are not placed directly inside the sandbox as long-lived secrets.
+
+The exact tools and provider access available in a session come from the profile, organization settings, and connected integrations.
+
+## External Activity Links
+
+When an agent writes back to supported external systems, Mistle adds a link back to the session where the work happened.
+
+For example, Slack messages, GitHub comments or pull requests, Jira issues or comments, and Linear issues or comments can include a **View session** link. That link lets teammates open the Mistle session behind the external update and inspect the work context.
+
+## Persistence
+
+Sessions are workspaces for ongoing agent work. By default, session sandboxes are ephemeral.
+
+Use [Snapshots](/guides/snapshots) when a workflow needs a reusable prepared environment for many future sessions.
+
+Use [Persistent Sandboxes](/guides/persistent-sandboxes) when a specific session's working state should survive compute stops, resumes, or provider expiry. Persistent sandboxes are experimental and require both organization-level enablement and profile-level opt-in.
+
+## Next Steps
+
+- Read [Sandbox Profiles](/guides/sandbox-profiles) to configure the environment sessions start from.
+- Read [Persistent Sandboxes](/guides/persistent-sandboxes) when session workspace state needs to survive compute lifecycle changes.
+- Read [Integrations](/guides/integrations) to connect external systems.
+- Read [Automations](/guides/automations) for event-triggered agent sessions.

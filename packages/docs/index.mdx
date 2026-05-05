@@ -8,10 +8,25 @@ description: Mistle is open source software for configuring coding agents and th
   `docs/` in the repo.
 </Note>
 
-Teams use Mistle to setup sandbox environments for coding agents and manage credentials that the agents use. This allows them to delegate work like improving test coverage, implementing analytics, handling on-call triage, and building well-scoped features.
+Mistle is open source software for running and automating sandboxed coding agents.
+
+Teams use Mistle to configure agent execution environments, connect external systems, and delegate work like improving test coverage, implementing analytics, handling on-call triage, and building well-scoped features.
+
+## What Mistle Provides
+
+- [Integrations](/guides/integrations) connect external systems and models such as GitHub, Slack, OpenAI, Datadog, Jira, and Linear.
+- [Account linking](/guides/account-linking) maps provider identities back to Mistle users so work can be attributed to the right person.
+- [Sandbox profiles](/guides/sandbox-profiles) define the tools, permissions, setup, and environment an agent starts with.
+- [Snapshots](/guides/snapshots) capture prepared sandbox environments so sessions can start quickly with required tools and dependencies already available.
+- [Sessions](/guides/sessions) start interactive agent work such as debugging, code review, and repository changes.
+- [Automations](/guides/automations) respond to external events, such as webhook deliveries from connected systems.
+
+## Experimental
+
+- [Persistent sandboxes](/guides/persistent-sandboxes) can preserve selected session state across compute stops or provider expiry. This is experimental and configured through organization sandbox settings and sandbox profiles.
 
 ## Start Here
 
-- Read the product and repository overview in the main project's [README.md](https://github.com/mistlehq/mistle/blob/main/README.md).
 - Visit [Docker Compose Quickstart](/guides/self-hosted-docker-compose-quickstart) to get Mistle running locally using Docker Compose.
+- Read [Sandbox Profiles](/guides/sandbox-profiles) and [Sessions](/guides/sessions) to understand how agent work is configured and started.
 - Use the provider pages in the `Integrations` section for specific details on how to connect to each provider.
