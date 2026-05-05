@@ -59,6 +59,11 @@ function buildDataPlaneApiServiceEnv(): NodeJS.ProcessEnv {
     MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL: "http://control-plane-api:8080",
     MISTLE_INTERNAL_AUTH_SHARED_TOKEN: "internal-service-token",
     MISTLE_SANDBOX_PROVIDER: "docker",
+    MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "egress-token-secret",
+    MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "mistle",
+    MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "tokenizer-proxy",
+    MISTLE_SERVICES_TOKENIZER_PROXY_EGRESS_URL:
+      "http://tokenizer-proxy:8085/tokenizer-proxy/egress",
     MISTLE_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
     MISTLE_SANDBOX_E2B_API_KEY: "shared-e2b-secret",
   };
@@ -248,6 +253,12 @@ describe("loadConfig", () => {
 
     expect(loadedConfig.app.sandbox).toEqual({
       provider: "docker",
+      egress: {
+        tokenSecret: "egress-token-secret",
+        tokenIssuer: "mistle",
+        tokenAudience: "tokenizer-proxy",
+      },
+      tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy:8085/tokenizer-proxy/egress",
       docker: {
         socketPath: "/var/run/docker.sock",
       },

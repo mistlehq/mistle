@@ -3,6 +3,7 @@
  */
 
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   TestEnvironmentIdHeader,
@@ -56,6 +57,12 @@ describe.concurrent("control-plane worker automation connection acquisition", ()
       acquireAutomationConnection(
         {
           controlPlaneInternalClient: createControlPlaneInternalClient(env),
+          dataPlaneClient: createDataPlaneSandboxInstancesClient({
+            baseUrl: env.dataPlaneApi.hostBaseUrl,
+            serviceToken: InternalServiceToken,
+            testEnvironmentId: env.id,
+            testEnvironmentIdHeader: TestEnvironmentIdHeader,
+          }),
         },
         {
           preparedAutomationRun,

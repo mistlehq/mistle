@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
 use std::task::{Context, Poll};
@@ -106,6 +107,7 @@ struct EgressProxyLogContext<'a> {
 #[derive(Debug)]
 pub struct EgressProxy {
     runtime_env: BTreeMap<String, String>,
+    routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     #[cfg(any(test, debug_assertions))]
@@ -133,7 +135,7 @@ struct EgressProxyRoute {
 struct EgressProxyState {
     sandbox_instance_id: String,
     tokenizer_proxy_egress_base_url: String,
-    routes: Arc<Vec<EgressProxyRoute>>,
+    routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     client: Client<EgressConnector, Incoming>,
     proxy_ca_certificate_pem: Arc<String>,
     proxy_ca_private_key_pem: Arc<String>,
@@ -641,10 +643,11 @@ impl EgressProxy {
             .https_or_http()
             .enable_http1()
             .wrap_connector(http_connector);
+        let routes = Arc::new(RwLock::new(routes));
         let state = EgressProxyState {
             sandbox_instance_id: supervisor_handle.sandbox_instance_id().to_string(),
             tokenizer_proxy_egress_base_url: tokenizer_proxy_egress_base_url.to_string(),
-            routes: Arc::new(routes),
+            routes: routes.clone(),
             client: Client::builder(TokioExecutor::new()).build(https_connector),
             proxy_ca_certificate_pem: Arc::new(generated_proxy_ca.certificate_pem.clone()),
             proxy_ca_private_key_pem: Arc::new(generated_proxy_ca.private_key_pem),
@@ -709,6 +712,7 @@ impl EgressProxy {
 
         Ok(Some(Self {
             runtime_env,
+            routes,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
             #[cfg(any(test, debug_assertions))]
@@ -720,6 +724,80 @@ impl EgressProxy {
 
     pub fn runtime_env(&self) -> &BTreeMap<String, String> {
         &self.runtime_env
+    }
+
+    pub fn refresh_grants(
+        &self,
+        runtime_plan: &CompiledRuntimePlan,
+        egress_grant_by_rule_id: &BTreeMap<String, String>,
+    ) -> Result<(), EgressProxyError> {
+        let log_context = EgressProxyLogContext {
+            clock: &SystemClock,
+            sandbox_instance_id: self.supervisor_handle.sandbox_instance_id(),
+        };
+        let route_count = runtime_plan.egress_routes.len();
+        emit_egress_proxy_log(
+            log_context.clock,
+            log_context.sandbox_instance_id,
+            "egress_proxy_grant_refresh_started",
+            &[("routeCount", Value::from(route_count))],
+        );
+
+        let refreshed_routes = runtime_plan
+            .egress_routes
+            .iter()
+            .map(|route| build_proxy_route_with_grants(route, egress_grant_by_rule_id))
+            .collect::<Result<Vec<_>, _>>();
+
+        let refreshed_routes = match refreshed_routes {
+            Ok(refreshed_routes) => refreshed_routes,
+            Err(error) => {
+                emit_egress_proxy_log(
+                    log_context.clock,
+                    log_context.sandbox_instance_id,
+                    "egress_proxy_grant_refresh_failed",
+                    &[
+                        ("routeCount", Value::from(route_count)),
+                        ("error", Value::String(error.to_string())),
+                    ],
+                );
+                return Err(error);
+            }
+        };
+
+        let refresh_result = {
+            let mut routes = self
+                .routes
+                .write()
+                .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+            validate_refresh_routes_are_compatible(&routes, &refreshed_routes)?;
+            *routes = refreshed_routes;
+            Ok::<(), EgressProxyError>(())
+        };
+
+        match refresh_result {
+            Ok(()) => {
+                emit_egress_proxy_log(
+                    log_context.clock,
+                    log_context.sandbox_instance_id,
+                    "egress_proxy_grant_refresh_completed",
+                    &[("routeCount", Value::from(route_count))],
+                );
+                Ok(())
+            }
+            Err(error) => {
+                emit_egress_proxy_log(
+                    log_context.clock,
+                    log_context.sandbox_instance_id,
+                    "egress_proxy_grant_refresh_failed",
+                    &[
+                        ("routeCount", Value::from(route_count)),
+                        ("error", Value::String(error.to_string())),
+                    ],
+                );
+                Err(error)
+            }
+        }
     }
 
     pub fn managed_env_keys() -> &'static [&'static str] {
@@ -1081,6 +1159,13 @@ fn build_proxy_route(
     route: &CompiledEgressRoute,
     startup_input: &StartupInput,
 ) -> Result<EgressProxyRoute, EgressProxyError> {
+    build_proxy_route_with_grants(route, &startup_input.egress_grant_by_rule_id)
+}
+
+fn build_proxy_route_with_grants(
+    route: &CompiledEgressRoute,
+    egress_grant_by_rule_id: &BTreeMap<String, String>,
+) -> Result<EgressProxyRoute, EgressProxyError> {
     let upstream_url = url::Url::parse(&route.upstream.base_url).map_err(|error| {
         EgressProxyError::new(format!(
             "runtime plan egress route '{}' has invalid upstream base url '{}': {error}",
@@ -1093,8 +1178,7 @@ fn build_proxy_route(
             route.egress_rule_id, route.upstream.base_url
         ))
     })?;
-    let grant = startup_input
-        .egress_grant_by_rule_id
+    let grant = egress_grant_by_rule_id
         .get(&route.egress_rule_id)
         .ok_or_else(|| {
             EgressProxyError::new(format!(
@@ -1393,8 +1477,8 @@ async fn forward_upgrade_request(
         .uri
         .path_and_query()
         .map_or("/", |path_and_query| path_and_query.as_str());
-    let route = match_route(
-        &state.routes,
+    let route = match_state_route(
+        &state,
         &request_target.host,
         request_path_and_query,
         request_method.as_str(),
@@ -1417,7 +1501,9 @@ async fn forward_upgrade_request(
         host: request_target.host.clone(),
         path_and_query: request_path_and_query.to_string(),
         route_mode: if route.is_some() { "managed" } else { "direct" },
-        egress_rule_id: route.map(|matched_route| matched_route.egress_rule_id.clone()),
+        egress_rule_id: route
+            .as_ref()
+            .map(|matched_route| matched_route.egress_rule_id.clone()),
         upstream_url: upstream_uri.to_string(),
         started_at_ms: state.clock.now_ms(),
         clock: state.clock.clone(),
@@ -1435,7 +1521,7 @@ async fn forward_upgrade_request(
     for (header_name, header_value) in filter_upgrade_request_headers(&parts.headers) {
         outbound_request = outbound_request.header(header_name, header_value);
     }
-    let outbound_request = match route {
+    let outbound_request = match &route {
         Some(route) => outbound_request
             .header(
                 TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME,
@@ -1455,7 +1541,7 @@ async fn forward_upgrade_request(
             .client
             .request(outbound_request)
             .await
-            .map_err(|error| match route {
+            .map_err(|error| match &route {
                 Some(route) => EgressProxyError::new(format!(
                     "failed to forward upgrade request for '{}' through tokenizer-proxy route '{}': {error}",
                     route.host, route.upstream_base_url
@@ -1558,8 +1644,8 @@ async fn forward_request(
         .uri
         .path_and_query()
         .map_or("/", |path_and_query| path_and_query.as_str());
-    let route = match_route(
-        &state.routes,
+    let route = match_state_route(
+        &state,
         &request_target.host,
         request_path_and_query,
         request_method.as_str(),
@@ -1582,7 +1668,9 @@ async fn forward_request(
         host: request_target.host.clone(),
         path_and_query: request_path_and_query.to_string(),
         route_mode: if route.is_some() { "managed" } else { "direct" },
-        egress_rule_id: route.map(|matched_route| matched_route.egress_rule_id.clone()),
+        egress_rule_id: route
+            .as_ref()
+            .map(|matched_route| matched_route.egress_rule_id.clone()),
         upstream_url: upstream_uri.to_string(),
         started_at_ms: state.clock.now_ms(),
         clock: state.clock.clone(),
@@ -1603,7 +1691,7 @@ async fn forward_request(
     for (header_name, header_value) in filter_outbound_request_headers(&parts.headers) {
         outbound_request = outbound_request.header(header_name, header_value);
     }
-    let outbound_request = match route {
+    let outbound_request = match &route {
         Some(route) => outbound_request
             .header(
                 TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME,
@@ -1631,7 +1719,7 @@ async fn forward_request(
                 "egress_proxy_request_failed",
                 &request_failed_fields,
             );
-            return Err(match route {
+            return Err(match &route {
                 Some(route) => EgressProxyError::new(format!(
                     "failed to forward request for '{}' through tokenizer-proxy route '{}': {error_text}",
                     route.host, route.upstream_base_url
@@ -1773,6 +1861,19 @@ fn normalize_authority_host(authority: &str) -> String {
         )
 }
 
+fn match_state_route(
+    state: &EgressProxyState,
+    host: &str,
+    path: &str,
+    method: &str,
+) -> Result<Option<EgressProxyRoute>, EgressProxyError> {
+    let routes = state
+        .routes
+        .read()
+        .map_err(|_| EgressProxyError::new("egress proxy route table lock is poisoned"))?;
+    match_route(&routes, host, path, method).map(|route| route.cloned())
+}
+
 fn match_route<'a>(
     routes: &'a [EgressProxyRoute],
     host: &str,
@@ -1801,6 +1902,35 @@ fn match_route<'a>(
             "multiple sandbox egress routes matched proxied request {method} {host}{path}"
         ))),
     }
+}
+
+fn validate_refresh_routes_are_compatible(
+    current_routes: &[EgressProxyRoute],
+    refreshed_routes: &[EgressProxyRoute],
+) -> Result<(), EgressProxyError> {
+    if current_routes.len() != refreshed_routes.len() {
+        return Err(EgressProxyError::new(format!(
+            "egress proxy grant refresh expected {} routes but received {} routes",
+            current_routes.len(),
+            refreshed_routes.len()
+        )));
+    }
+
+    for (current_route, refreshed_route) in current_routes.iter().zip(refreshed_routes) {
+        if current_route.egress_rule_id != refreshed_route.egress_rule_id
+            || current_route.upstream_base_url != refreshed_route.upstream_base_url
+            || current_route.host != refreshed_route.host
+            || current_route.path_prefixes != refreshed_route.path_prefixes
+            || current_route.methods != refreshed_route.methods
+        {
+            return Err(EgressProxyError::new(format!(
+                "egress proxy grant refresh cannot change route '{}' definition",
+                current_route.egress_rule_id
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 fn build_tokenizer_proxy_forward_uri(
@@ -2151,6 +2281,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::mpsc;
     use std::thread;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -2184,6 +2315,8 @@ mod tests {
         refresh_command_path: PathBuf,
         refresh_marker_path: PathBuf,
     }
+
+    static TEST_PROXY_CA_PATH_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn joins_proxy_forward_paths_without_duplicate_slashes() {
@@ -2313,6 +2446,111 @@ mod tests {
         assert!(EgressProxy::managed_env_keys().contains(&"HTTPS_PROXY"));
         assert!(EgressProxy::managed_env_keys().contains(&"NODE_EXTRA_CA_CERTS"));
         assert!(EgressProxy::managed_env_keys().contains(&"NIX_SSL_CERT_FILE"));
+    }
+
+    #[test]
+    fn refresh_grants_replaces_route_grants_without_restarting_proxy() {
+        let listener_address = reserve_test_listener_address();
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            test_proxy_ca_config(&proxy_ca_paths),
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+        let stable_proxy_url = proxy
+            .runtime_env()
+            .get("HTTPS_PROXY")
+            .cloned()
+            .expect("proxy env should include HTTPS_PROXY");
+        let refreshed_startup_input = startup_input_with_grant("grant-2");
+
+        proxy
+            .refresh_grants(
+                &runtime_plan,
+                &refreshed_startup_input.egress_grant_by_rule_id,
+            )
+            .expect("grant refresh should succeed for unchanged route definitions");
+
+        let routes = proxy
+            .routes
+            .read()
+            .expect("route table should not be poisoned");
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].grant, "grant-2");
+        assert_eq!(
+            proxy.runtime_env().get("HTTPS_PROXY"),
+            Some(&stable_proxy_url),
+            "refresh should not replace the local proxy listener"
+        );
+        drop(routes);
+
+        proxy.close().expect("egress proxy close should succeed");
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
+    }
+
+    #[test]
+    fn refresh_grants_rejects_route_definition_changes() {
+        let listener_address = reserve_test_listener_address();
+        let proxy_ca_paths = test_proxy_ca_paths();
+        let runtime_plan = sample_runtime_plan();
+        let startup_input = sample_startup_input();
+        let supervisor_handle = SandboxdSupervisorHandle::new(
+            "sandbox-123",
+            Arc::new(SystemClock),
+            BTreeSet::from([SupervisedComponent::EgressProxy]),
+        );
+
+        let proxy = EgressProxy::start_with_options(
+            &runtime_plan,
+            &startup_input,
+            "http://tokenizer-proxy:5205/tokenizer-proxy/egress",
+            listener_address,
+            test_proxy_ca_config(&proxy_ca_paths),
+            Arc::new(SystemClock),
+            supervisor_handle,
+        )
+        .expect("egress proxy start should succeed")
+        .expect("egress proxy should be configured");
+        let mut changed_runtime_plan = sample_runtime_plan();
+        changed_runtime_plan.egress_routes[0].r#match.path_prefixes = Some(vec!["/v2".to_string()]);
+        let refreshed_startup_input = startup_input_with_grant("grant-2");
+
+        let error = proxy
+            .refresh_grants(
+                &changed_runtime_plan,
+                &refreshed_startup_input.egress_grant_by_rule_id,
+            )
+            .expect_err("grant refresh should reject route definition changes");
+
+        assert!(
+            error
+                .to_string()
+                .contains("cannot change route 'egress-rule-1' definition"),
+            "unexpected refresh error: {error}"
+        );
+        let routes = proxy
+            .routes
+            .read()
+            .expect("route table should not be poisoned");
+        assert_eq!(routes[0].grant, "grant-1");
+        drop(routes);
+
+        proxy.close().expect("egress proxy close should succeed");
+        let _ = fs::remove_dir_all(&proxy_ca_paths.root_directory);
     }
 
     #[test]
@@ -3078,6 +3316,10 @@ mod tests {
     }
 
     fn sample_startup_input() -> StartupInput {
+        startup_input_with_grant("grant-1")
+    }
+
+    fn startup_input_with_grant(grant: &str) -> StartupInput {
         StartupInput {
             startup_mode: StartupMode::New,
             execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
@@ -3087,7 +3329,7 @@ mod tests {
             runtime_plan: serde_json::json!({}),
             egress_grant_by_rule_id: BTreeMap::from([(
                 "egress-rule-1".to_string(),
-                "grant-1".to_string(),
+                grant.to_string(),
             )]),
             git_identity: None,
         }
@@ -3098,8 +3340,9 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time should be after unix epoch")
             .as_nanos();
+        let counter = TEST_PROXY_CA_PATH_COUNTER.fetch_add(1, Ordering::Relaxed);
         let root_directory =
-            std::env::temp_dir().join(format!("mistle-egress-proxy-test-{unique_id}"));
+            std::env::temp_dir().join(format!("mistle-egress-proxy-test-{unique_id}-{counter}"));
         let system_certificate_bundle_path =
             root_directory.join("etc/ssl/certs/ca-certificates.crt");
         let runtime_certificate_path =

@@ -1,4 +1,5 @@
 import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { systemSleeper } from "@mistle/time";
 
 import type {
@@ -21,6 +22,7 @@ const SandboxStartPollIntervalMs = 1_000;
 export async function acquireAutomationConnection(
   ctx: {
     controlPlaneInternalClient: ControlPlaneInternalClient;
+    dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "refreshSandboxEgressGrants">;
   },
   input: {
     preparedAutomationRun: PreparedAutomationRun;
@@ -53,6 +55,7 @@ export async function acquireAutomationConnection(
       const deadline = waitStartedAt + SandboxStartTimeoutMs;
       let isSandboxRunning = false;
       let didRequestResume = false;
+      let didRefreshRunningSandboxEgressGrants = false;
       let pollCount = 0;
 
       while (Date.now() < deadline) {
@@ -68,6 +71,43 @@ export async function acquireAutomationConnection(
         });
 
         if (sandboxInstance.status === "running") {
+          if (
+            input.ensuredAutomationSandbox.startupWorkflowRunId === null &&
+            !didRefreshRunningSandboxEgressGrants
+          ) {
+            didRefreshRunningSandboxEgressGrants = true;
+            logAutomationConversationDeliveryEvent({
+              eventName: "sandbox.egress_grants_refresh_requested",
+              message:
+                "Refreshing running sandbox egress grants before automation connection token mint",
+              telemetryContext: {
+                automationRunId: input.preparedAutomationRun.automationRunId,
+                conversationId: input.preparedAutomationRun.conversationId,
+                deliveryTaskId: input.deliveryTaskId,
+                sandboxInstanceId: sandboxInstance.id,
+                webhookEventId: input.preparedAutomationRun.webhookEventId,
+                workflowRunId: input.workflowRunId,
+              },
+              attributes: {
+                "mistle.sandbox.poll_count": pollCount,
+                "mistle.sandbox.status": sandboxInstance.status,
+                "mistle.sandbox.wait_phase": "egress_grants_refresh",
+              },
+            });
+
+            await ctx.dataPlaneClient.refreshSandboxEgressGrants({
+              organizationId: input.preparedAutomationRun.organizationId,
+              instanceId: sandboxInstance.id,
+              ...(input.preparedAutomationRun.actingUserId === undefined
+                ? {}
+                : { actingUserId: input.preparedAutomationRun.actingUserId }),
+            });
+
+            waitSpan.setAttributes({
+              "mistle.sandbox.egress_grants_refreshed": true,
+            });
+          }
+
           isSandboxRunning = true;
           waitSpan.setAttributes({
             "mistle.sandbox.wait_ms": Date.now() - waitStartedAt,

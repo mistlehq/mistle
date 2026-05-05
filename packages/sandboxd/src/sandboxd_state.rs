@@ -25,6 +25,7 @@ use crate::egress_proxy::EgressProxy;
 use crate::keepalive::KeepaliveManager;
 use crate::process;
 use crate::process::{CodexAppServerControlHandle, CodexAppServerObservationHandle};
+use crate::protocol::egress_refresh::EgressGrantRefreshInput;
 use crate::protocol::startup::{StartupExecutionMode, StartupInput, StartupMode};
 use crate::pty::{DEFAULT_PTY_SHELL, DEFAULT_PTY_TERM};
 use crate::runtime;
@@ -447,7 +448,6 @@ impl SandboxdState {
                 "snapshot materialization sandboxes do not support resume".to_string(),
             ));
         }
-
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         runtime::git_identity::apply_git_identity(startup_input, global_git_config_path).map_err(
             |error| {
@@ -463,6 +463,13 @@ impl SandboxdState {
             },
         )?;
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
+        self.refresh_egress_grants(
+            &EgressGrantRefreshInput {
+                runtime_plan: startup_input.runtime_plan.clone(),
+                egress_grant_by_rule_id: startup_input.egress_grant_by_rule_id.clone(),
+            },
+            diagnostics_logger.clone(),
+        )?;
         if let Some(tunnel_session) = self.tunnel_session.take() {
             tunnel_session.close();
         }
@@ -499,6 +506,49 @@ impl SandboxdState {
             })?,
         );
         record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
+
+        Ok(())
+    }
+
+    pub fn refresh_egress_grants(
+        &mut self,
+        input: &EgressGrantRefreshInput,
+        diagnostics_logger: Option<StartupDiagnosticsLogger>,
+    ) -> Result<(), SandboxdStateError> {
+        let runtime_plan: runtime::CompiledRuntimePlan =
+            serde_json::from_value(input.runtime_plan.clone()).map_err(|error| {
+                let error_text = error.to_string();
+                SandboxdStateError::ApplyRuntimePlan(error_text)
+            })?;
+
+        record_operation_phase_started(&diagnostics_logger, "refresh_egress_proxy_grants");
+        if let Some(egress_proxy) = &self.egress_proxy {
+            egress_proxy
+                .refresh_grants(&runtime_plan, &input.egress_grant_by_rule_id)
+                .map_err(|error| {
+                    record_operation_phase_failure(
+                        &diagnostics_logger,
+                        "refresh_egress_proxy_grants",
+                        BTreeMap::from([(
+                            "error".to_string(),
+                            startup_diagnostics_string(error.to_string()),
+                        )]),
+                    );
+                    SandboxdStateError::StartEgressProxy(error.to_string())
+                })?;
+        } else if !runtime_plan.egress_routes.is_empty() {
+            let error = "egress grant refresh input includes egress routes, but local egress proxy is not running";
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "refresh_egress_proxy_grants",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                )]),
+            );
+            return Err(SandboxdStateError::StartEgressProxy(error.to_string()));
+        }
+        record_operation_phase_completed(&diagnostics_logger, "refresh_egress_proxy_grants");
 
         Ok(())
     }

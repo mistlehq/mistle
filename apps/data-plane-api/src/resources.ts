@@ -9,13 +9,16 @@ import {
   createDataPlaneTestSchemaName,
   createDataPlaneWorkflowNamespaceId,
 } from "@mistle/db/test-environment";
-import type { SandboxAdapter } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
 import { Pool } from "pg";
 
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "./openworkflow/index.js";
 import { GatewayHttpSandboxRuntimeStateReader } from "./runtime-state/gateway-http-sandbox-runtime-state-reader.js";
 import type { SandboxRuntimeStateReader } from "./runtime-state/sandbox-runtime-state-reader.js";
-import { createSandboxRuntimeAdapter } from "./sandbox/adapter.js";
+import {
+  createDataPlaneSandboxRuntimeControl,
+  createSandboxRuntimeAdapter,
+} from "./sandbox/adapter.js";
 import type { DataPlaneApiRuntimeConfig } from "./types.js";
 
 export type AppRuntimeResources = {
@@ -27,6 +30,7 @@ export type AppRuntimeResources = {
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   runtimeStateReader: SandboxRuntimeStateReader;
   sandboxAdapter: SandboxAdapter;
+  sandboxRuntimeControl: SandboxRuntimeControl;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   testWorkflowsByEnvironmentId: ReadonlyMap<
     string,
@@ -77,6 +81,7 @@ export async function createAppResources(
     internalAuthServiceToken: runtimeConfig.app.internalAuth.serviceToken,
   });
   const sandboxAdapter = createSandboxRuntimeAdapter(runtimeConfig);
+  const sandboxRuntimeControl = createDataPlaneSandboxRuntimeControl(runtimeConfig);
 
   let workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
 
@@ -104,6 +109,7 @@ export async function createAppResources(
     openWorkflow,
     runtimeStateReader,
     sandboxAdapter,
+    sandboxRuntimeControl,
     controlPlaneInternalClient,
     testWorkflowsByEnvironmentId,
     getDb: (request = {}) => getDataPlaneDb(request),

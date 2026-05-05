@@ -118,6 +118,12 @@ function config(input: {
     },
     sandbox: {
       provider: "docker",
+      egress: {
+        tokenSecret: "integration-egress-token-secret",
+        tokenIssuer: "mistle",
+        tokenAudience: "tokenizer-proxy",
+      },
+      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
       docker: {
         socketPath: DockerSocketPath,
       },

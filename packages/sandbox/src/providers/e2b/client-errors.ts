@@ -77,6 +77,7 @@ export const E2BClientOperationIds = {
    * for `/opt/mistle/bin/sandboxd resume`.
    */
   RESUME: "resume",
+  REFRESH_EGRESS_GRANTS: "refresh_egress_grants",
   /**
    * `sandbox.commands.run(...)` for in-guest Archil mount and bind-mount orchestration.
    */
