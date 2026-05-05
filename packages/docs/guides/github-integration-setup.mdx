@@ -8,31 +8,41 @@ icon: data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9z
 
 GitHub can be connected in two ways:
 
-- API key
-- GitHub App installation
+1. **GitHub App installation**
+   - **Create from manifest** (recommended): Mistle creates and configures the GitHub App via a manifest
+   - **Use an existing app**: connect a GitHub App you already created in GitHub
+2. **API key**
+   - Use this when the connection only needs access to GitHub resources and does not need webhook events
 
-Use API key when the connection only needs access to GitHub resources.
-Use GitHub App installation when the connection also needs to receive webhook events from GitHub.
-
-## Option 1: Connect With An API Key
-
-API key gives access to the GitHub resources available to that token, but it does not support webhook events from GitHub.
-
-Create a GitHub personal access token or other API token with the scopes your workflows need, then create the Mistle connection with:
-
-| Field   | Value        |
-| ------- | ------------ |
-| API key | GitHub token |
-
-## Option 2: Connect With A GitHub App Installation
+## Option 1: Connect With A GitHub App Installation
 
 GitHub App installation gives access through the installed GitHub App and supports webhook events from GitHub.
 
-### Create The GitHub App
+Choose one of these setup paths:
 
-Create a GitHub App in GitHub.com or GHES.
+1. **Create from manifest** (recommended): Mistle creates and configures the GitHub App via a manifest.
+2. **Use an existing app**: connect a GitHub App you already created in GitHub.
 
-Configure these values:
+### Option 1A: Create From Manifest (Recommended)
+
+1. Open **Integrations** in the dashboard and choose the GitHub target.
+2. Select **GitHub App installation**.
+3. Choose **Create from manifest**.
+4. Choose whether to create the app in a personal account or organization.
+5. Review and edit the manifest before creating the app.
+6. Submit the manifest to GitHub.
+7. Continue the installation in GitHub after the app is created.
+8. Return to Mistle to complete the connection.
+
+You can edit the manifest before creating the app. Mistle will use your manifest values for app settings such as the name, description, homepage URL, permissions, and subscribed events.
+
+To keep the integration working, Mistle always overrides the webhook and callback settings when it submits the manifest. This ensures GitHub delivers webhook events to Mistle, returns the manifest flow to Mistle after app creation, supports GitHub identity linking, and redirects post-installation setup back to Mistle so the installation can be verified and the connection can be completed.
+
+### Option 1B: Use An Existing GitHub App
+
+If you already created a GitHub App in GitHub.com or GHES, you can connect it directly in Mistle.
+
+Configure these values in GitHub:
 
 1. **GitHub App name** (eg. `Mistle GitHub App`)
 2. **Homepage URL** - Any valid URL for your organization
@@ -52,7 +62,7 @@ Configure these values:
 6. For **Subscribe to events**, enable the events you want Mistle to take action on. This can be changed later.
 7. **Private key** - Generate and download a PEM private key from GitHub App settings.
 
-### Connect It In Mistle
+### Connect The Existing App In Mistle
 
 Open **Integrations** in the dashboard, choose the GitHub target, then select **GitHub App installation**.
 
@@ -62,6 +72,7 @@ Enter:
 | ------------------- | -------------------------------------------------- |
 | App ID              | GitHub App ID                                      |
 | App slug            | GitHub App slug                                    |
+| Client ID           | GitHub App client ID                               |
 | App private key PEM | GitHub App private key PEM                         |
 | Webhook secret      | Shared webhook secret configured on the GitHub App |
 
@@ -82,6 +93,16 @@ Copy those values directly into your GitHub App settings:
 3. Ensure the webhook is active in GitHub.
 
 Return to Mistle and click **Install GitHub App**.
+
+## Option 2: Connect With An API Key
+
+API key gives access to the GitHub resources available to that token, but it does not support webhook events from GitHub.
+
+Create a GitHub personal access token or other API token with the scopes your workflows need, then create the Mistle connection with:
+
+| Field   | Value        |
+| ------- | ------------ |
+| API key | GitHub token |
 
 ## GitHub Enterprise Server
 
