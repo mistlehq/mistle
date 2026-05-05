@@ -24,6 +24,19 @@ Most useful Mistle workflows need at least:
 
 Other integrations are optional and should match the systems where your team wants agents to receive context, take action, or report results.
 
+## After Connecting Integrations
+
+Creating an integration connection makes the provider available to Mistle, but sessions use the integrations configured on their sandbox profile.
+
+After connecting a provider:
+
+1. Open the sandbox profile that should use it.
+2. Add or update the profile's integration configuration.
+3. Publish the profile version.
+4. Start a session from that published profile.
+
+Read [Sandbox Profiles](/guides/sandbox-profiles) for the profile publishing flow.
+
 ## Credentials
 
 Integrations let teams manage credentials and access centrally. Secrets are encrypted with organization-scoped keys and protected by master encryption keys unique to each Mistle deployment.

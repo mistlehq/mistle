@@ -23,6 +23,21 @@ Sandbox profile changes are made as drafts. Publishing a profile version makes t
 
 Published versions are immutable from the point of view of future sessions. To change the environment, edit the draft and publish a new version.
 
+## Publish A Working Profile
+
+A usable profile usually needs more than a name and base image. Before publishing, configure the pieces the agent will need at runtime:
+
+1. Create or edit a sandbox profile draft.
+2. Select the integrations the profile should expose to sessions.
+3. Add repository or workspace configuration when the agent should work in source code.
+4. Write and test the setup script.
+5. Choose whether sessions from this profile should use persistent sandboxes.
+6. Publish the profile version.
+7. Wait for the snapshot to become ready.
+8. Start a session from the published profile.
+
+If the snapshot fails or stays unavailable, sessions cannot start from that published profile version until the snapshot is fixed or refreshed.
+
 ## Setup Scripts
 
 Setup scripts prepare the sandbox environment for the profile. They can install tools, configure agent settings, or prepare dependencies that future sessions need.

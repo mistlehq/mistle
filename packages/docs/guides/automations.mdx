@@ -24,6 +24,29 @@ Automations depend on the same building blocks as interactive sessions:
 - webhook or callback configuration for providers that send events to Mistle
 - account linking when provider activity should be attributed to a specific Mistle user
 
+## Automation Types
+
+Mistle supports two automation shapes:
+
+- Event-triggered automations respond to provider events, such as Slack app mentions or GitHub webhooks.
+- Scheduled automations run on a saved schedule and start work without waiting for a provider event.
+
+Both shapes use a sandbox profile to define the environment where agent work runs.
+
+## Create An Automation
+
+To create an automation:
+
+1. Open **Automations**.
+2. Create a new automation.
+3. Choose whether it should be event-triggered or scheduled.
+4. Select the integration event or schedule.
+5. Choose the sandbox profile version that should run the work.
+6. Describe the task or instructions the agent should follow.
+7. Save the automation.
+
+For event-triggered automations, make sure the provider integration has webhook delivery configured and can reach Mistle.
+
 ## Event Flow
 
 A typical automation flow is:

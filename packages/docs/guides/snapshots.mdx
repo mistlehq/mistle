@@ -34,6 +34,18 @@ Snapshots are tied to sandbox profile versions.
 
 Only one queued or running snapshot job is allowed per profile version at a time.
 
+## Check Snapshot Status
+
+Snapshot status is shown on the sandbox profile version. Use it when a profile is not available for new sessions.
+
+Common states to look for:
+
+- queued or running: Mistle is still preparing the snapshot
+- ready: new sessions can start from the prepared image
+- failed: inspect the setup script and snapshot output, then refresh the snapshot after fixing the profile
+
+If setup changes are needed, edit the draft profile version, test the setup script, and publish a new version.
+
 ## What Snapshots Are Not
 
 Snapshots are not per-session durable storage. They do not preserve the ongoing filesystem changes from a user's sandbox session.

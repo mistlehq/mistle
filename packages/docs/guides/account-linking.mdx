@@ -51,6 +51,8 @@ The connection also needs the linked-user authorization fields for that provider
 - GitHub: `Client ID (Linked User Auth)` on the GitHub App installation connection.
 - Slack: `Client ID (Linked User Auth)` and `Client secret (Linked User Auth)` on the Slack app connection.
 
+These values come from the provider app that users authorize during account linking. For GitHub, use the GitHub App's client ID. For Slack, use the Slack app's client ID and client secret.
+
 If the connection does not appear as an option in Identity Linking settings, check that it is active and uses the required connection method.
 
 ### 2. Enable The Provider For The Organization
@@ -93,5 +95,5 @@ The linked users dialog shows each organization member's Mistle name and email, 
 ## Next Steps
 
 - Read [Integrations](/guides/integrations) for the provider connection model.
-- Read [GitHub](/guides/github-integration-setup) or [Slack](/guides/slack-integration-setup) for provider-specific setup.
+- Read [GitHub](/guides/github-integration-setup) or [Slack](/guides/slack-integration-setup) for provider-specific identity-linking setup.
 - Read [Automations](/guides/automations) to see how linked identities are used when events trigger agent work.

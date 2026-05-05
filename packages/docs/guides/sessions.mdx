@@ -23,6 +23,19 @@ When a user starts a session, Mistle selects the requested sandbox profile versi
 
 If the profile version has a usable snapshot, the sandbox can start from that prepared image. This avoids repeating setup work that was already captured by the profile snapshot.
 
+## Start A Session
+
+To start interactive agent work:
+
+1. Open **Sessions**.
+2. Create a new session.
+3. Choose the sandbox profile for the work.
+4. Choose the repository or workspace when the profile provides options.
+5. Describe the task for the agent.
+6. Start the session.
+
+If the profile is not available for new sessions, check that the profile has a published version and a ready snapshot.
+
 ## Agent Access
 
 Agents can use configured integrations to interact with external systems. Credentials are managed by Mistle and are not placed directly inside the sandbox as long-lived secrets.
