@@ -53,6 +53,7 @@ export type CreateSystemTestInput = {
   services?: readonly SystemTestServiceSelection[];
   extraInfra?: readonly SystemTestExtraInfraId[];
   sandbox?: SystemTestSandbox;
+  gatewayProxy?: true;
   publicAccess?: SystemTestPublicAccess;
   auth?: {
     google?: "simulated";
@@ -165,6 +166,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       cpuCount?: string;
       memoryMb?: string;
     };
+    gatewayProxy?: true;
     publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
   };
 }> {
@@ -176,6 +178,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
     return {
       sandbox: {
         provider: "docker",
+        ...(input.gatewayProxy === true ? { gatewayProxy: true } : {}),
       },
     };
   }
@@ -186,6 +189,7 @@ export async function createRuntimeSystemServiceOptions(input: CreateSystemTestI
       provider: "e2b",
       defaultBaseImageRef: await getSystemTestSandboxBaseImageRef(),
       e2b: readE2BOptions(),
+      ...(input.gatewayProxy === true ? { gatewayProxy: true } : {}),
       publicServiceBaseUrls,
     },
   };

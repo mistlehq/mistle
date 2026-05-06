@@ -13,6 +13,7 @@ export type IntegrationSandboxOptions = {
   provider: IntegrationSandboxProvider;
   defaultBaseImageRef?: string;
   e2b?: IntegrationSandboxE2BOptions;
+  gatewayProxy?: true;
   publicServiceBaseUrls?: ReadonlyMap<ServiceId, string>;
 };
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ServiceIds } from "../integration/services/service-ids.js";
+import { createDockerSandboxReachableHostUrl } from "./docker-sandbox-networking.js";
 import {
   DockerIntegrationConfigPathInContainer,
   E2BIntegrationConfigPathInContainer,
@@ -55,5 +56,29 @@ describe("createRuntimeSystemServiceOptions", () => {
         provider: "docker",
       },
     });
+  });
+
+  it("marks Docker sandbox system tests for gateway proxy mode when requested", async () => {
+    await expect(
+      createRuntimeSystemServiceOptions({
+        sandbox: {
+          provider: "docker",
+        },
+        gatewayProxy: true,
+      }),
+    ).resolves.toEqual({
+      sandbox: {
+        provider: "docker",
+        gatewayProxy: true,
+      },
+    });
+  });
+});
+
+describe("createDockerSandboxReachableHostUrl", () => {
+  it("rewrites a host URL to the Docker host gateway name", () => {
+    expect(createDockerSandboxReachableHostUrl("http://127.0.0.1:8080/upstream")).toBe(
+      "http://host.docker.internal:8080/upstream",
+    );
   });
 });

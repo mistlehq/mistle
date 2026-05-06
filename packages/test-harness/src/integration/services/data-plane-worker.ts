@@ -22,6 +22,7 @@ import {
   TestEnvironmentIdHeader,
   createDataPlaneWorkflowNamespaceId,
 } from "../../environment/test-isolation.js";
+import { createDockerSandboxReachableHostUrl } from "../../system/docker-sandbox-networking.js";
 import { startHostedOpenWorkflowWorker } from "./openworkflow-worker-host.js";
 import type { IntegrationServiceOptions, IntegrationSandboxOptions } from "./options.js";
 import { peers } from "./peers.js";
@@ -271,6 +272,7 @@ function createDataPlaneWorkerEnv(input: {
     MISTLE_SANDBOX_TOKENS_EGRESS_SECRET: "integration-new-egress-token-secret",
     MISTLE_SANDBOX_TOKENS_EGRESS_ISSUER: "integration-new-data-plane-worker",
     MISTLE_SANDBOX_TOKENS_EGRESS_AUDIENCE: "integration-new-tokenizer-proxy",
+    ...(input.sandbox?.gatewayProxy === true ? { GATEWAY_PROXY_ENABLED: "1" } : {}),
     MISTLE_SANDBOX_PUBLISH_BASE_DOMAIN: "mistle.example.test",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_SECRET: "integration-new-port-access-secret",
     MISTLE_SANDBOX_PUBLISH_ACCESS_TOKEN_ISSUER: "integration-new-control-plane-api",
@@ -316,8 +318,9 @@ async function createSandboxReachableEndpoints(input: {
     };
   }
 
-  const sandboxGatewayWsUrl = createHostDockerInternalUrl(gatewayWsUrl);
-  const sandboxTokenizerProxyEgressUrl = createHostDockerInternalUrl(tokenizerProxyEgressUrl);
+  const sandboxGatewayWsUrl = createDockerSandboxReachableHostUrl(gatewayWsUrl);
+  const sandboxTokenizerProxyEgressUrl =
+    createDockerSandboxReachableHostUrl(tokenizerProxyEgressUrl);
   readUrlPort(sandboxGatewayWsUrl, "data-plane gateway sandbox websocket URL");
   readUrlPort(sandboxTokenizerProxyEgressUrl, "tokenizer proxy egress URL");
 
@@ -407,12 +410,6 @@ function createTokenizerProxyEgressUrl(input: { baseUrl: string; environmentId: 
   )
     .toString()
     .replace(/\/$/u, "");
-}
-
-function createHostDockerInternalUrl(value: string): string {
-  const url = new URL(value);
-  url.hostname = "host.docker.internal";
-  return url.toString().replace(/\/$/u, "");
 }
 
 function readUrlPort(value: string, description: string): number {
