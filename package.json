@@ -16,6 +16,7 @@
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
     "dev:sandbox-base:push": "tsx ./scripts/dev/build-sandbox-base-image.ts",
+    "e2b:prebuild-template": "pnpm --filter @mistle/sandbox... build && tsx ./scripts/e2b/prebuild-template.ts",
     "build": "turbo run build",
     "build:ts": "turbo run build --filter=!@mistle/sandboxd --filter=!@mistle/commit-sign",
     "format": "oxfmt . && pnpm --filter @mistle/sandboxd format && pnpm --filter @mistle/commit-sign format",
