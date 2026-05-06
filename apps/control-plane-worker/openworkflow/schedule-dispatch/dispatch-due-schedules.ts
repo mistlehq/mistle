@@ -13,6 +13,7 @@ import { recordMissingScheduleTarget } from "./telemetry.js";
 
 const CatchUpWindowMs = 24 * 60 * 60 * 1000;
 const ClaimBatchSize = 500;
+const MaxDueRangeIterations = 26 * 60;
 const MaxBatchesPerDispatch = 100;
 
 type ClaimedScheduleRow = {
@@ -279,20 +280,26 @@ async function consumeClaimedSchedule(
     });
   }
 
+  const dueRange = resolveDueScheduleRange({
+    cutoffMinute: input.cutoffMinute,
+    schedule: input.schedule,
+    scheduledAt,
+  });
+
   const pendingActionId = await insertPendingScheduledAction(tx, {
     organizationId: input.schedule.organizationId,
     scheduleId: input.schedule.id,
-    scheduledAt,
+    scheduledAt: dueRange.latestDueScheduledAt,
     targetPayload: targetPayload.payload,
     targetType: input.schedule.targetType,
     timezone: input.schedule.timezone,
   });
-  await advanceScheduleCursor(tx, {
-    consumedScheduledAt: scheduledAt,
-    cronExpression: input.schedule.cronExpression,
-    endAt: input.schedule.endAt === null ? null : new Date(input.schedule.endAt),
+
+  await updateScheduleCursor(tx, {
+    enabled: dueRange.nextScheduledAt !== null,
+    lastScheduledAt: dueRange.latestDueScheduledAt,
+    nextScheduledAt: dueRange.nextScheduledAt,
     scheduleId: input.schedule.id,
-    timezone: input.schedule.timezone,
   });
 
   if (pendingActionId === null) {
@@ -451,6 +458,50 @@ function resolveSkippedLateRange(input: {
   };
 }
 
+function resolveDueScheduleRange(input: {
+  cutoffMinute: Date;
+  schedule: ClaimedScheduleRow;
+  scheduledAt: Date;
+}): {
+  latestDueScheduledAt: Date;
+  nextScheduledAt: Date | null;
+} {
+  const endAt = input.schedule.endAt === null ? null : new Date(input.schedule.endAt);
+  let latestDueScheduledAt = input.scheduledAt;
+  let nextOccurrence = findNextScheduleOccurrence({
+    after: latestDueScheduledAt,
+    cronExpression: input.schedule.cronExpression,
+    endAt,
+    timezone: input.schedule.timezone,
+  });
+  let iterationCount = 0;
+
+  while (
+    nextOccurrence !== null &&
+    nextOccurrence.scheduledAt.getTime() <= input.cutoffMinute.getTime()
+  ) {
+    iterationCount += 1;
+    if (iterationCount > MaxDueRangeIterations) {
+      throw new Error(
+        `Exceeded due schedule range iteration limit for schedule ${input.schedule.id}.`,
+      );
+    }
+
+    latestDueScheduledAt = nextOccurrence.scheduledAt;
+    nextOccurrence = findNextScheduleOccurrence({
+      after: latestDueScheduledAt,
+      cronExpression: input.schedule.cronExpression,
+      endAt,
+      timezone: input.schedule.timezone,
+    });
+  }
+
+  return {
+    latestDueScheduledAt,
+    nextScheduledAt: nextOccurrence?.scheduledAt ?? null,
+  };
+}
+
 async function insertPendingScheduledAction(
   tx: ControlPlaneTransaction,
   input: {
@@ -570,31 +621,6 @@ async function insertFailedScheduledAction(
     });
 
   return insertedRows[0]?.id ?? null;
-}
-
-async function advanceScheduleCursor(
-  tx: ControlPlaneTransaction,
-  input: {
-    consumedScheduledAt: Date;
-    cronExpression: string;
-    endAt: Date | null;
-    scheduleId: string;
-    timezone: string;
-  },
-): Promise<void> {
-  const nextOccurrence = findNextScheduleOccurrence({
-    after: input.consumedScheduledAt,
-    cronExpression: input.cronExpression,
-    endAt: input.endAt,
-    timezone: input.timezone,
-  });
-
-  await updateScheduleCursor(tx, {
-    enabled: nextOccurrence !== null,
-    lastScheduledAt: input.consumedScheduledAt,
-    nextScheduledAt: nextOccurrence?.scheduledAt ?? null,
-    scheduleId: input.scheduleId,
-  });
 }
 
 async function updateScheduleCursor(

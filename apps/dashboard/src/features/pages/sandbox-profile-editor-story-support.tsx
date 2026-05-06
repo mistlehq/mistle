@@ -315,7 +315,7 @@ function createSnapshotRefreshScheduleInitialDraft(
 ): { cronExpression: string; timezone: string } | null {
   if (state === "invalid-preview") {
     return {
-      cronExpression: "*/15 9 * * *",
+      cronExpression: "not a cron expression",
       timezone: "Asia/Singapore",
     };
   }

@@ -17,9 +17,6 @@ export type FindNextScheduleOccurrenceInput = Readonly<{
   endAt?: Date | null;
 }>;
 
-const NumericMinutePattern = /^(?:[0-5]?\d)$/;
-const NumericHourPattern = /^(?:[01]?\d|2[0-3])$/;
-
 export function findNextScheduleOccurrence(
   input: FindNextScheduleOccurrenceInput,
 ): ScheduleOccurrence | null {
@@ -86,15 +83,6 @@ export function validateScheduleCronExpression(cronExpression: string): void {
   const fields = cronExpression.trim().split(/\s+/);
   if (fields.length !== 5) {
     throw new Error("Schedule cron expression must use exactly 5 fields.");
-  }
-
-  const [minute, hour] = fields;
-  if (minute === undefined || !NumericMinutePattern.test(minute)) {
-    throw new Error("Schedule cron expression minute field must be one numeric value.");
-  }
-
-  if (hour === undefined || !NumericHourPattern.test(hour)) {
-    throw new Error("Schedule cron expression hour field must be one numeric value.");
   }
 
   new Cron(cronExpression, {

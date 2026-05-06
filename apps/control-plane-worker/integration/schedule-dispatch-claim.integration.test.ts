@@ -183,6 +183,59 @@ describe("control-plane worker schedule dispatch claims", () => {
     expect(persistedActions).toHaveLength(1);
   });
 
+  it("collapses stale interval schedule catch-up to the latest due occurrence", async ({ env }) => {
+    await seedOrganizationAndAutomation({
+      env,
+      organizationId: "org_integration_new_schedule_interval_collapse",
+      automationId: "atm_integration_new_schedule_interval_collapse",
+    });
+    await seedAutomationSchedule({
+      env,
+      scheduleId: "sch_integration_new_schedule_interval_collapse",
+      organizationId: "org_integration_new_schedule_interval_collapse",
+      automationId: "atm_integration_new_schedule_interval_collapse",
+      cronExpression: "*/10 * * * *",
+      nextScheduledAt: "2026-04-28T01:00:00.000Z",
+    });
+
+    const result = await dispatchDueSchedules(
+      { db: env.controlPlaneDb },
+      {
+        cutoffMinute: new Date("2026-04-28T01:30:00.000Z"),
+      },
+    );
+
+    expect(result.pendingScheduledActionIds).toHaveLength(1);
+    expect(result.claimedScheduleCount).toBe(1);
+    expect(result.createdScheduledActionCount).toBe(1);
+    expect(result.skippedLateCount).toBe(0);
+    expect(result.backlogFastForwardedCount).toBe(0);
+    expect(result.reachedMaxBatches).toBe(false);
+
+    const persistedActions = await env.controlPlaneDb.query.scheduledActions.findMany({
+      where: (table, { eq }) =>
+        eq(table.scheduleId, "sch_integration_new_schedule_interval_collapse"),
+      orderBy: (table, { asc }) => [asc(table.scheduledAt)],
+    });
+    expect(persistedActions).toEqual([
+      expect.objectContaining({
+        scheduleId: "sch_integration_new_schedule_interval_collapse",
+        scheduledAt: "2026-04-28 01:30:00+00",
+        status: ScheduledActionStatuses.PENDING,
+      }),
+    ]);
+
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, "sch_integration_new_schedule_interval_collapse"),
+    });
+    expect(persistedSchedule).toEqual(
+      expect.objectContaining({
+        lastScheduledAt: "2026-04-28 01:30:00+00",
+        nextScheduledAt: "2026-04-28 01:40:00+00",
+      }),
+    );
+  });
+
   it("disables finite schedules when there is no future occurrence within endAt", async ({
     env,
   }) => {
@@ -312,6 +365,7 @@ async function seedAutomationSchedule(input: {
   scheduleId: string;
   organizationId: string;
   automationId: string;
+  cronExpression?: string;
   enabled?: boolean;
   nextScheduledAt: string | null;
   endAt?: string;
@@ -322,7 +376,7 @@ async function seedAutomationSchedule(input: {
     organizationId: input.organizationId,
     targetType: ScheduleTargetTypes.AUTOMATION_RUN,
     name: input.scheduleId,
-    cronExpression: "0 9 * * *",
+    cronExpression: input.cronExpression ?? "0 9 * * *",
     timezone: "Asia/Singapore",
     enabled: input.enabled ?? true,
     nextScheduledAt: input.nextScheduledAt,

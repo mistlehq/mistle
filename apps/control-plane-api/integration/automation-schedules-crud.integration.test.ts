@@ -79,7 +79,7 @@ describe("automation schedules CRUD integration", () => {
         enabled: true,
         schedule: {
           name: "Daily morning schedule",
-          cronExpression: "0 9 * * *",
+          cronExpression: "*/30 * * * *",
           timezone: "Asia/Singapore",
         },
         inputTemplate: "Summarize open issues for {{schedule.localScheduledDate}}",
@@ -96,7 +96,7 @@ describe("automation schedules CRUD integration", () => {
     expect(body.name).toBe("Daily issue triage");
     expect(body.enabled).toBe(true);
     expect(body.schedule.name).toBe("Daily morning schedule");
-    expect(body.schedule.cronExpression).toBe("0 9 * * *");
+    expect(body.schedule.cronExpression).toBe("*/30 * * * *");
     expect(body.schedule.timezone).toBe("Asia/Singapore");
     expect(body.schedule.enabled).toBe(true);
     expect(body.schedule.nextScheduledAt).not.toBeNull();

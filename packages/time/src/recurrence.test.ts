@@ -55,22 +55,88 @@ describe("@mistle/time recurrence", () => {
     }).toThrow("Schedule cron expression must use exactly 5 fields.");
   });
 
-  it("rejects cron expressions with multiple minute slots", () => {
-    expect(() => {
-      validateScheduleCronExpression("0,30 9 * * *");
-    }).toThrow("Schedule cron expression minute field must be one numeric value.");
+  it("supports multiple minute slots", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-04-28T01:00:00.000Z"),
+      cronExpression: "0,30 9 * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:30:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:30",
+    });
   });
 
-  it("rejects cron expressions with multiple hour slots", () => {
-    expect(() => {
-      validateScheduleCronExpression("0 8,9 * * *");
-    }).toThrow("Schedule cron expression hour field must be one numeric value.");
+  it("supports multiple hour slots", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-04-28T00:00:00.000Z"),
+      cronExpression: "0 8,9 * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:00:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:00",
+    });
   });
 
-  it("rejects cron expressions with stepped minute slots", () => {
-    expect(() => {
-      validateScheduleCronExpression("*/15 9 * * *");
-    }).toThrow("Schedule cron expression minute field must be one numeric value.");
+  it("supports stepped minute intervals", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-04-28T01:00:00.000Z"),
+      cronExpression: "*/15 9 * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:15:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:15",
+    });
+  });
+
+  it("supports hourly schedules at a fixed minute", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-04-28T01:00:00.000Z"),
+      cronExpression: "1 * * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:01:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:01",
+    });
+  });
+
+  it("supports stepped hour intervals", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-04-28T01:00:00.000Z"),
+      cronExpression: "0 */2 * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T02:00:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "10:00",
+    });
+  });
+
+  it("supports sub-hour weekday business-hour intervals", () => {
+    const occurrence = findNextScheduleOccurrence({
+      after: new Date("2026-05-04T00:45:00.000Z"),
+      cronExpression: "*/30 9-17 * * 1-5",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-05-04T01:00:00.000Z"),
+      localScheduledDate: "2026-05-04",
+      localScheduledTime: "09:00",
+    });
   });
 
   it("rejects invalid timezones", () => {

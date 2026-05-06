@@ -54,6 +54,18 @@ const MonthFieldLabels = new Map([
   ["10", "October"],
   ["11", "November"],
   ["12", "December"],
+  ["JAN", "January"],
+  ["FEB", "February"],
+  ["MAR", "March"],
+  ["APR", "April"],
+  ["MAY", "May"],
+  ["JUN", "June"],
+  ["JUL", "July"],
+  ["AUG", "August"],
+  ["SEP", "September"],
+  ["OCT", "October"],
+  ["NOV", "November"],
+  ["DEC", "December"],
 ]);
 const DayOfWeekFieldLabels = new Map([
   ["0", "Sunday"],
@@ -64,6 +76,13 @@ const DayOfWeekFieldLabels = new Map([
   ["5", "Friday"],
   ["6", "Saturday"],
   ["7", "Sunday"],
+  ["SUN", "Sunday"],
+  ["MON", "Monday"],
+  ["TUE", "Tuesday"],
+  ["WED", "Wednesday"],
+  ["THU", "Thursday"],
+  ["FRI", "Friday"],
+  ["SAT", "Saturday"],
 ]);
 
 export function resolveSandboxProfileEditorVersionMode(input: {
@@ -304,7 +323,19 @@ function describeCronFieldPart(input: {
   part: string;
   labelMap: ReadonlyMap<string, string> | null;
 }): string {
-  const mappedLabel = input.labelMap?.get(input.part);
+  if (input.part.includes("-")) {
+    const [start, end] = input.part.split("-");
+    if (start !== undefined && end !== undefined) {
+      return `${describeCronFieldPart({ part: start, labelMap: input.labelMap })}-${describeCronFieldPart(
+        {
+          part: end,
+          labelMap: input.labelMap,
+        },
+      )}`;
+    }
+  }
+
+  const mappedLabel = input.labelMap?.get(input.part.toUpperCase());
   if (mappedLabel !== undefined) {
     return mappedLabel;
   }
@@ -320,11 +351,28 @@ export function formatCronExpressionBreakdownDiagram(input: CronExpressionBreakd
     `| | | month: ${input.month.toLowerCase()}`,
     `| | day of month: ${input.dayOfMonth.toLowerCase()}`,
     `| hour: ${formatHourLabel(input.hour)}`,
-    `minute: ${input.minute}`,
+    `minute: ${formatMinuteLabel(input.minute)}`,
   ].join("\n");
 }
 
+function formatMinuteLabel(minute: string): string {
+  if (minute === "*") {
+    return "every minute";
+  }
+
+  if (minute.startsWith("*/")) {
+    const interval = minute.slice(2);
+    return `every ${interval} minutes`;
+  }
+
+  return `at minute ${minute}`;
+}
+
 function formatHourLabel(hour: string): string {
+  if (hour === "*") {
+    return "every hour";
+  }
+
   const hourNumber = Number(hour);
   if (!Number.isInteger(hourNumber) || hourNumber < 0 || hourNumber > 23) {
     return hour;
