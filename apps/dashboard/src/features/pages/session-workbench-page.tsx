@@ -145,7 +145,7 @@ function SessionWorkbenchPageContent(input: {
           pressed: workbench.diffPanelState.isVisible,
           title: diffButtonTitle,
         }}
-        extraActions={<SessionPortAccessPopover state={workbench.portAccessState} />}
+        portAccessControl={<SessionPortAccessPopover state={workbench.portAccessState} />}
         repositoryControl={{
           ariaLabel: "Primary repository",
           disabled:

@@ -1,5 +1,5 @@
 import { SandboxPtyStates } from "@mistle/sandbox-session-client";
-import { Badge } from "@mistle/ui";
+import type { ProcessEntry } from "@mistle/sandbox-session-protocol";
 import { useState } from "react";
 
 import type {
@@ -19,14 +19,40 @@ import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
 } from "./session-conversation-pane.js";
+import { SessionPortAccessPopover } from "./session-port-access-popover.js";
 import { SessionTerminalSurface } from "./session-terminal-surface.js";
+import {
+  SessionWorkbenchHeaderActions,
+  type SessionWorkbenchHeaderRepositoryOption,
+} from "./session-workbench-header-actions.js";
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
+import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 export const StorySandboxInstanceId = "sbi_storybook";
 const textEncoder = new TextEncoder();
+const StoryRepositoryOptions = [
+  { value: "__none__", label: "None" },
+  { value: "/root/mistle", label: "mistle" },
+  { value: "/root/mistle-docs", label: "mistle-docs" },
+] satisfies ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+const StoryHeaderButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-stone-100";
+const StoryHeaderButtonPressedClassName =
+  "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300";
+const StoryPortAccessProcesses = [
+  {
+    pid: 4321,
+    command: "vite dev --host 127.0.0.1 --port 5173",
+    listeners: [
+      {
+        bindAddress: "127.0.0.1",
+        port: 5173,
+      },
+    ],
+  },
+] satisfies ProcessEntry[];
 
 export type SessionConversationStoryArgs = {
   activeTurnId: React.ComponentProps<typeof SessionConversationMainContent>["activeTurnId"];
@@ -129,6 +155,119 @@ export function createStoryWorkbenchCliPtyState(output: string): UseSandboxPtySt
   };
 }
 
+type SessionWorkbenchStoryHeaderActionsProps = {
+  headerStatusUi?: SandboxStatusBadgeUi;
+  isCliVisible?: boolean;
+  isDiffVisible?: boolean;
+  isTerminalVisible?: boolean;
+  onCliToggle?: () => void;
+  onDiffToggle?: () => void;
+  onTerminalToggle?: () => void;
+};
+
+function createStoryHeaderStatus(
+  headerStatusUi: SandboxStatusBadgeUi,
+): React.ComponentProps<typeof SessionWorkbenchHeaderActions>["status"] {
+  if (headerStatusUi.variant === "destructive") {
+    return {
+      kind: "error",
+      label: headerStatusUi.label,
+    };
+  }
+
+  return {
+    kind: headerStatusUi.variant === "secondary" ? "connected" : "not_connected",
+    label: headerStatusUi.label,
+  };
+}
+
+function getStoryHeaderButtonClassName(isPressed: boolean): string {
+  return isPressed ? StoryHeaderButtonPressedClassName : StoryHeaderButtonClassName;
+}
+
+export function SessionWorkbenchStoryHeaderActions(
+  input: SessionWorkbenchStoryHeaderActionsProps,
+): React.JSX.Element {
+  const [selectedRepositoryValue, setSelectedRepositoryValue] = useState<string | null>(
+    StoryRepositoryOptions[1]?.value ?? null,
+  );
+  const [isPortAccessPanelOpen, setPortAccessPanelOpen] = useState(false);
+  const headerStatusUi = input.headerStatusUi ?? {
+    label: "Connected",
+    variant: "secondary",
+    className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+  };
+  const isCliVisible = input.isCliVisible ?? false;
+  const isDiffVisible = input.isDiffVisible ?? false;
+  const isTerminalVisible = input.isTerminalVisible ?? false;
+  const handleCliToggle =
+    input.onCliToggle ??
+    (() => {
+      return;
+    });
+  const handleDiffToggle =
+    input.onDiffToggle ??
+    (() => {
+      return;
+    });
+  const handleTerminalToggle =
+    input.onTerminalToggle ??
+    (() => {
+      return;
+    });
+  const portAccessState = {
+    buttonDisabledReason: null,
+    errorMessage: null,
+    isLoadingProcesses: false,
+    isOpeningProcessKey: null,
+    isPanelOpen: isPortAccessPanelOpen,
+    observedAt: null,
+    openProcess: async () => {
+      return;
+    },
+    processes: StoryPortAccessProcesses,
+    setPanelOpen: setPortAccessPanelOpen,
+  } satisfies SessionPortAccessState;
+
+  return (
+    <SessionWorkbenchHeaderActions
+      cliControl={{
+        ariaLabel: "TUI",
+        className: getStoryHeaderButtonClassName(isCliVisible),
+        disabled: false,
+        onClick: handleCliToggle,
+        pressed: isCliVisible,
+        title: isCliVisible ? "Return to chat" : "Open Codex TUI",
+      }}
+      diffControl={{
+        ariaLabel: isDiffVisible ? "Changes" : "Open changes",
+        className: getStoryHeaderButtonClassName(isDiffVisible),
+        disabled: false,
+        onClick: handleDiffToggle,
+        pressed: isDiffVisible,
+        title: isDiffVisible ? "Changes" : "Open changes",
+      }}
+      portAccessControl={<SessionPortAccessPopover state={portAccessState} />}
+      repositoryControl={{
+        ariaLabel: "Primary repository",
+        onValueChange: setSelectedRepositoryValue,
+        options: StoryRepositoryOptions,
+        selectedValue: selectedRepositoryValue,
+        title: "Primary repository",
+      }}
+      status={createStoryHeaderStatus(headerStatusUi)}
+      terminalControl={{
+        ariaLabel: isTerminalVisible ? "Terminal" : "Open terminal",
+        className: getStoryHeaderButtonClassName(isTerminalVisible),
+        disabled: false,
+        onClick: handleTerminalToggle,
+        pressed: isTerminalVisible,
+        title: isTerminalVisible ? "Terminal" : "Open terminal",
+      }}
+    />
+  );
+}
+
 export function createStorySessionMainContent(
   overrides?: Partial<SessionConversationStoryArgs>,
 ): React.JSX.Element {
@@ -198,29 +337,9 @@ export function renderSessionWorkbenchStoryWithChrome(input: {
           )
         }
         actions={
-          input.headerActions ??
-          (headerStatusUi.variant === "destructive" ? (
-            <Badge
-              aria-label={headerStatusUi.label}
-              className={headerStatusUi.className}
-              title={headerStatusUi.label}
-              variant={headerStatusUi.variant}
-            >
-              {headerStatusUi.label}
-            </Badge>
-          ) : (
-            <span
-              aria-label={headerStatusUi.label}
-              className={[
-                "inline-block size-2.5 rounded-full border",
-                headerStatusUi.variant === "secondary"
-                  ? "border-emerald-700 bg-emerald-600"
-                  : "border-stone-300 bg-stone-300",
-              ].join(" ")}
-              role="status"
-              title={headerStatusUi.label}
-            />
-          ))
+          input.headerActions ?? (
+            <SessionWorkbenchStoryHeaderActions headerStatusUi={headerStatusUi} />
+          )
         }
       >
         {input.children}

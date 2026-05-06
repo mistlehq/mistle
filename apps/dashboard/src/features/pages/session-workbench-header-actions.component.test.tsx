@@ -103,6 +103,50 @@ describe("SessionWorkbenchHeaderActions", () => {
     expect(screen.queryByRole("combobox", { name: "Primary repository" })).toBeNull();
   });
 
+  it("renders the port access control in the workbench control group", () => {
+    render(
+      <SessionWorkbenchHeaderActions
+        cliControl={{
+          ariaLabel: "TUI",
+          className: "",
+          disabled: false,
+          onClick: () => {
+            return;
+          },
+          pressed: false,
+          title: "Open Codex TUI",
+        }}
+        diffControl={{
+          ariaLabel: "Open changes",
+          className: "",
+          disabled: false,
+          onClick: () => {
+            return;
+          },
+          pressed: false,
+          title: "Open changes",
+        }}
+        portAccessControl={<button type="button">Open processes</button>}
+        status={{
+          kind: "connected",
+          label: "Connected",
+        }}
+        terminalControl={{
+          ariaLabel: "Open terminal",
+          className: "",
+          disabled: false,
+          onClick: () => {
+            return;
+          },
+          pressed: false,
+          title: "Open terminal",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Open processes" })).toBeDefined();
+  });
+
   it("renders the repository refresh indicator inside the selector trigger", () => {
     render(
       <SessionWorkbenchHeaderActions

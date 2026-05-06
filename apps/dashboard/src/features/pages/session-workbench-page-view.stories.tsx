@@ -20,11 +20,11 @@ import {
   createStorySessionBottomPanel,
   createStorySessionMainContent,
   SessionWorkbenchStoryChrome,
+  SessionWorkbenchStoryHeaderActions,
   StoryTerminalSurfaceBody,
   StorySandboxInstanceId,
 } from "./session-story-support.js";
 import { SessionTerminalWorkspaceView } from "./session-terminal-workspace.js";
-import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 type SessionWorkbenchPageViewStoryArgs = React.ComponentProps<typeof SessionWorkbenchPageView> & {
@@ -66,42 +66,10 @@ function StoryPageViewHeaderToggleTerminalWorkspace(): React.JSX.Element {
   return (
     <SessionWorkbenchStoryChrome
       headerActions={
-        <SessionWorkbenchHeaderActions
-          cliControl={{
-            ariaLabel: "TUI",
-            className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
-            disabled: false,
-            onClick: () => {
-              return;
-            },
-            pressed: false,
-            title: "Open Codex TUI",
-          }}
-          diffControl={{
-            ariaLabel: "Open changes",
-            className: "bg-transparent text-foreground shadow-none hover:bg-stone-100",
-            disabled: false,
-            onClick: () => {
-              return;
-            },
-            pressed: false,
-            title: "Open changes",
-          }}
-          status={{
-            kind: "connected",
-            label: "Connected",
-          }}
-          terminalControl={{
-            ariaLabel: isBottomPanelVisible ? "Terminal" : "Open terminal",
-            className: isBottomPanelVisible
-              ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-              : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
-            disabled: false,
-            onClick: () => {
-              setIsBottomPanelVisible((currentValue) => !currentValue);
-            },
-            pressed: isBottomPanelVisible,
-            title: isBottomPanelVisible ? "Terminal" : "Open terminal",
+        <SessionWorkbenchStoryHeaderActions
+          isTerminalVisible={isBottomPanelVisible}
+          onTerminalToggle={() => {
+            setIsBottomPanelVisible((currentValue) => !currentValue);
           }}
         />
       }
@@ -194,7 +162,7 @@ export const SessionErrorHeader: Story = {
   },
 };
 
-export const WithErrorNoticees: Story = {
+export const WithErrorNotices: Story = {
   args: {
     alert: {
       title: "Could not load sandbox status",

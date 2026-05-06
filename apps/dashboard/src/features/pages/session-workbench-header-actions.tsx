@@ -43,7 +43,7 @@ type SessionWorkbenchHeaderButtonControl = {
 export function SessionWorkbenchHeaderActions(input: {
   cliControl: SessionWorkbenchHeaderButtonControl;
   diffControl: SessionWorkbenchHeaderButtonControl;
-  extraActions?: React.ReactNode;
+  portAccessControl?: React.ReactNode;
   repositoryControl?: SessionWorkbenchHeaderRepositoryControl;
   status: {
     kind: "connected" | "error" | "not_connected";
@@ -160,7 +160,7 @@ export function SessionWorkbenchHeaderActions(input: {
       >
         <GitDiffIcon className="size-4" />
       </Button>
-      {input.extraActions}
+      {input.portAccessControl}
       <Button
         aria-label={input.terminalControl.ariaLabel}
         aria-pressed={input.terminalControl.pressed}
