@@ -54,6 +54,7 @@ export async function startRuntimeCloudflaredTunnel(input: {
     ingressRules: input.ingressRules,
   });
   await waitForRuntimePublicAccessRoutesReady({
+    proxy,
     environmentId: input.environmentId,
     ingressRules: input.ingressRules,
     timeoutMs: RuntimePublicAccessRouteReadyTimeoutMs,
@@ -290,10 +291,20 @@ async function registerRuntimePublicAccessRoutes(input: {
     }),
   });
   if (!response.ok) {
+    const bodyPreview = await readResponseBodyPreview(response);
     throw new Error(
-      `Runtime public access proxy route registration failed with status ${String(response.status)}.`,
+      `Runtime public access proxy route registration failed with status ${String(response.status)}. Body: ${bodyPreview}`,
     );
   }
+
+  console.info(
+    JSON.stringify({
+      event: "runtime_public_access.routes_registered",
+      environmentId: input.environmentId,
+      routeCount: input.ingressRules.length,
+      routes: input.ingressRules,
+    }),
+  );
 
   return true;
 }
@@ -319,6 +330,7 @@ async function unregisterRuntimePublicAccessRoutes(input: {
 }
 
 async function waitForRuntimePublicAccessRoutesReady(input: {
+  proxy: RuntimePublicAccessProxy;
   environmentId: string;
   ingressRules: ReadonlyArray<{
     publicHostname: string;
@@ -329,6 +341,7 @@ async function waitForRuntimePublicAccessRoutesReady(input: {
   const startedAt = Date.now();
   for (const rule of input.ingressRules) {
     await waitForRuntimePublicAccessRouteReady({
+      proxy: input.proxy,
       environmentId: input.environmentId,
       publicHostname: rule.publicHostname,
       timeoutMs: Math.max(0, input.timeoutMs - (Date.now() - startedAt)),
@@ -336,29 +349,119 @@ async function waitForRuntimePublicAccessRoutesReady(input: {
   }
 }
 
+type RuntimePublicAccessRouteProbeOutcome =
+  | {
+      kind: "fetch_error";
+      errorName: string;
+      errorMessage: string;
+    }
+  | {
+      kind: "http";
+      status: number;
+      statusText: string;
+      bodyPreview: string;
+    };
+
 async function waitForRuntimePublicAccessRouteReady(input: {
+  proxy: RuntimePublicAccessProxy;
   environmentId: string;
   publicHostname: string;
   timeoutMs: number;
 }): Promise<void> {
   const startedAt = Date.now();
   const routeHealthUrl = createRuntimePublicAccessRouteHealthUrl(input);
+  let attemptCount = 0;
+  let lastProbeOutcome: RuntimePublicAccessRouteProbeOutcome | undefined;
   while (Date.now() - startedAt < input.timeoutMs) {
+    attemptCount += 1;
     try {
       const response = await fetch(routeHealthUrl);
       if (response.ok) {
+        console.info(
+          JSON.stringify({
+            event: "runtime_public_access.route_ready",
+            environmentId: input.environmentId,
+            publicHostname: input.publicHostname,
+            routeHealthUrl: routeHealthUrl.toString(),
+            attemptCount,
+            elapsedMs: Date.now() - startedAt,
+          }),
+        );
         return;
       }
-    } catch {
+      lastProbeOutcome = {
+        kind: "http",
+        status: response.status,
+        statusText: response.statusText,
+        bodyPreview: await readResponseBodyPreview(response),
+      };
+    } catch (error) {
+      lastProbeOutcome = {
+        kind: "fetch_error",
+        errorName: error instanceof Error ? error.name : "Error",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      };
       // Keep polling until the environment-scoped route reaches the local service.
     }
 
     await systemSleeper.sleep(CloudflaredTunnelPollIntervalMs);
   }
 
+  const proxyDiagnostics = await readRuntimePublicAccessProxyDiagnostics(input.proxy);
   throw new Error(
-    `Timed out waiting for runtime Cloudflare public access route at ${routeHealthUrl.toString()} after ${String(input.timeoutMs)}ms.`,
+    `Timed out waiting for runtime Cloudflare public access route at ${routeHealthUrl.toString()} after ${String(input.timeoutMs)}ms. Diagnostics: ${JSON.stringify(
+      {
+        environmentId: input.environmentId,
+        publicHostname: input.publicHostname,
+        routeHealthUrl: routeHealthUrl.toString(),
+        attemptCount,
+        lastProbeOutcome,
+        proxyDiagnostics,
+      },
+    )}`,
   );
+}
+
+async function readResponseBodyPreview(response: Response): Promise<string> {
+  const body = await response.text().catch((error: unknown) => {
+    return `<<failed to read response body: ${
+      error instanceof Error ? error.message : String(error)
+    }>>`;
+  });
+  return body.slice(0, 1000);
+}
+
+async function readRuntimePublicAccessProxyDiagnostics(
+  proxy: RuntimePublicAccessProxy,
+): Promise<unknown> {
+  const endpoint = proxy.endpoints.http;
+  if (endpoint === undefined) {
+    return {
+      error: "runtime public access proxy did not expose an HTTP endpoint",
+    };
+  }
+
+  try {
+    const response = await fetch(new URL("/__mistle/diagnostics", endpoint.hostBaseUrl));
+    const body = await response.text();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(body);
+    } catch {
+      parsed = {
+        rawBody: body.slice(0, 1000),
+      };
+    }
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      body: parsed,
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }
 
 export function createRuntimePublicAccessRouteHealthUrl(input: {
@@ -449,6 +552,27 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (request.url === "/__mistle/diagnostics" && request.method === "GET") {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify({
+      ok: true,
+      publicHostnames,
+      cloudflaredContainerName,
+      cloudflaredPid: cloudflared?.pid,
+      routeCount: routes.size,
+      routes: Array.from(routes.entries()).map(([key, localBaseUrl]) => {
+        const separatorIndex = key.lastIndexOf(":");
+        return {
+          key,
+          publicHostname: separatorIndex > 0 ? key.slice(0, separatorIndex) : key,
+          environmentId: separatorIndex > 0 ? key.slice(separatorIndex + 1) : "",
+          localBaseUrl,
+        };
+      }),
+    }));
+    return;
+  }
+
   if (request.url === "/__mistle/register" && request.method === "POST") {
     const body = await readBody(request);
     const parsed = JSON.parse(body);
@@ -466,6 +590,7 @@ async function handleRequest(request, response) {
       }
       routes.set(createRouteKey(route.publicHostname, parsed.environmentId), route.localBaseUrl);
     }
+    logStream.write("registered runtime public access routes environmentId=" + parsed.environmentId + " routeCount=" + String(parsed.routes.length) + "\n");
     response.writeHead(204);
     response.end();
     return;
@@ -480,6 +605,7 @@ async function handleRequest(request, response) {
           routes.delete(key);
         }
       }
+      logStream.write("unregistered runtime public access routes environmentId=" + parsed.environmentId + "\n");
     }
     response.writeHead(204);
     response.end();

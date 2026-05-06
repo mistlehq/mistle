@@ -1,23 +1,23 @@
-import {
-  SandboxInstanceStatuses,
-  type DataPlaneDatabase,
-  type DataPlaneTables,
-} from "@mistle/db/data-plane";
+import { type DataPlaneDatabase, type DataPlaneTables } from "@mistle/db/data-plane";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import type { SandboxRuntimeControl } from "@mistle/sandbox";
 import { createRuntimePlanEgressGrantByRuleId } from "@mistle/sandbox-egress-auth";
 import { and, eq, isNull } from "drizzle-orm";
 
+import type { AppRuntimeResources } from "../../../resources.js";
 import type { DataPlaneApiConfig } from "../../../types.js";
 import type {
   RefreshSandboxEgressGrantsInput,
   RefreshSandboxEgressGrantsResponse,
 } from "../refresh-egress-grants/schema.js";
+import { DataPlaneSandboxInstanceStatuses } from "../schemas.js";
+import { readEffectiveSandboxStatus } from "./read-effective-sandbox-status.js";
 
 type RefreshSandboxEgressGrantsContext = {
   config: DataPlaneApiConfig;
   db: DataPlaneDatabase;
   tables: Pick<DataPlaneTables, "sandboxInstances" | "sandboxInstanceRuntimePlans">;
+  runtimeStateReader: AppRuntimeResources["runtimeStateReader"];
   sandboxRuntimeControl: SandboxRuntimeControl;
 };
 
@@ -76,9 +76,19 @@ export async function refreshSandboxEgressGrants(
   }
 
   const { sandboxInstance } = sandboxRow;
-  if (sandboxInstance.status !== SandboxInstanceStatuses.RUNNING) {
+  const effectiveStatus = await readEffectiveSandboxStatus(
+    {
+      runtimeStateReader: ctx.runtimeStateReader,
+    },
+    {
+      sandboxInstanceId: sandboxInstance.id,
+      persistedStatus: sandboxInstance.status,
+    },
+  );
+
+  if (effectiveStatus !== DataPlaneSandboxInstanceStatuses.RUNNING) {
     throw new Error(
-      `Sandbox instance '${input.instanceId}' is '${sandboxInstance.status}' and cannot refresh egress grants.`,
+      `Sandbox instance '${input.instanceId}' is '${effectiveStatus}' and cannot refresh egress grants.`,
     );
   }
 
