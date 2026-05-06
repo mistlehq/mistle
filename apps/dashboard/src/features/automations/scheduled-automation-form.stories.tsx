@@ -53,7 +53,7 @@ const EmptyCreateValues: ScheduledAutomationFormValues = {
   inputTemplate: "",
 };
 
-const ExistingAutomationValues: ScheduledAutomationFormValues = {
+export const ExistingScheduledAutomationValues: ScheduledAutomationFormValues = {
   name: "Daily repository triage",
   sandboxProfileId: "sbp_repo_maintainer",
   primaryRepositoryId: "mistlehq/platform",
@@ -64,7 +64,7 @@ const ExistingAutomationValues: ScheduledAutomationFormValues = {
   inputTemplate: "Review open pull requests and summarize anything blocked.",
 };
 
-function StoryHarness(input: {
+export function ScheduledAutomationFormStoryHarness(input: {
   mode: "create" | "edit";
   values: ScheduledAutomationFormValues;
   fieldErrors?: Partial<Record<ScheduledAutomationFormValueKey, string>>;
@@ -140,12 +140,13 @@ function StoryHarness(input: {
 
 const meta = {
   title: "Dashboard/Automations/Schedule/Form",
-  component: StoryHarness,
+  component: ScheduledAutomationFormStoryHarness,
   decorators: [withDashboardPageStory],
+  excludeStories: ["ExistingScheduledAutomationValues", "ScheduledAutomationFormStoryHarness"],
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof StoryHarness>;
+} satisfies Meta<typeof ScheduledAutomationFormStoryHarness>;
 
 export default meta;
 
@@ -163,7 +164,7 @@ export const EditPageLayout: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     primaryRepositoryOptions: PrimaryRepositoryOptions,
-    values: ExistingAutomationValues,
+    values: ExistingScheduledAutomationValues,
   },
 };
 
@@ -184,7 +185,7 @@ export const NewConversationEachRun: Story = {
     mode: "create",
     primaryRepositoryOptions: PrimaryRepositoryOptions,
     values: {
-      ...ExistingAutomationValues,
+      ...ExistingScheduledAutomationValues,
       conversationMode: ScheduledAutomationConversationModes.NEW_EACH_RUN,
     },
   },
@@ -226,6 +227,6 @@ export const Saving: Story = {
     isSaving: true,
     onDelete: function onDelete() {},
     primaryRepositoryOptions: PrimaryRepositoryOptions,
-    values: ExistingAutomationValues,
+    values: ExistingScheduledAutomationValues,
   },
 };

@@ -110,7 +110,7 @@ function createGitHubTargetFixture(): IntegrationTarget {
   };
 }
 
-function createDraftGitHubConnection(input?: {
+export function createDraftGitHubConnection(input?: {
   config?: Record<string, unknown>;
   configuredSecretNames?: readonly string[];
   externalSubjectId?: string;
@@ -392,7 +392,7 @@ function GitHubCreatePageStory(): React.JSX.Element {
   );
 }
 
-function GitHubAppSetupPageStory(input: {
+export function GitHubAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
 }): React.JSX.Element {
@@ -434,7 +434,7 @@ function GitHubAppSetupPageStory(input: {
   );
 }
 
-function GitHubInstalledDetailPageStory(): React.JSX.Element {
+export function GitHubInstalledDetailPageStory(): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
@@ -484,6 +484,11 @@ function GitHubInstalledDetailPageStory(): React.JSX.Element {
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/GitHub App",
   decorators: [withDashboardPageStory],
+  excludeStories: [
+    "createDraftGitHubConnection",
+    "GitHubAppSetupPageStory",
+    "GitHubInstalledDetailPageStory",
+  ],
 } satisfies Meta;
 
 export default pageMeta;

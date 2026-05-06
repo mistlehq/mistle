@@ -34,6 +34,13 @@ Choose one of these setup paths:
 7. Continue the installation in GitHub after the app is created.
 8. Return to Mistle to complete the connection.
 
+<Frame>
+  <img
+    src="/images/product-screens/github-create-from-manifest.png"
+    alt="Mistle GitHub App setup page with Create from manifest selected and an editable GitHub App manifest"
+  />
+</Frame>
+
 You can edit the manifest before creating the app. Mistle will use your manifest values for app settings such as the name, description, homepage URL, permissions, and subscribed events.
 
 To keep the integration working, Mistle always overrides the webhook and callback settings when it submits the manifest. This ensures GitHub delivers webhook events to Mistle, returns the manifest flow to Mistle after app creation, supports GitHub identity linking, and redirects post-installation setup back to Mistle so the installation can be verified and the connection can be completed.
@@ -93,6 +100,13 @@ Copy those values directly into your GitHub App settings:
 1. Set the GitHub App's **Webhook URL** to Mistle's **Webhook callback URL**.
 2. Set the GitHub App's **Setup URL** to Mistle's **Post-installation setup URL**.
 3. Ensure the webhook is active in GitHub.
+
+<Frame>
+  <img
+    src="/images/product-screens/github-installed-connection.png"
+    alt="GitHub App connection detail page showing installation, authentication, synced resources, and webhook URL"
+  />
+</Frame>
 
 Return to Mistle and click **Install GitHub App**.
 

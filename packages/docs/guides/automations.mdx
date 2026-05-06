@@ -45,7 +45,29 @@ To create an automation:
 6. Describe the task or instructions the agent should follow.
 7. Save the automation.
 
+### Event-Triggered Automations
+
+Event-triggered automations listen for a provider event, such as a Slack app mention, then start agent work with the selected sandbox profile and repository context.
+
+<Frame>
+  <img
+    src="/images/product-screens/event-automation.png"
+    alt="Event-triggered automation form with Slack app mention trigger, sandbox profile, repository, and instructions"
+  />
+</Frame>
+
 For event-triggered automations, make sure the provider integration has webhook delivery configured and can reach Mistle.
+
+### Scheduled Automations
+
+Scheduled automations run from a saved schedule. The schedule, timezone, sandbox profile, repository, and instructions define what work Mistle starts each time the schedule fires.
+
+<Frame>
+  <img
+    src="/images/product-screens/scheduled-automation.png"
+    alt="Scheduled automation form with cron schedule, timezone, sandbox profile, repository, and saved instructions"
+  />
+</Frame>
 
 ## Event Flow
 

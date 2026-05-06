@@ -287,7 +287,7 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   }),
 ];
 
-const SlackWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
+export const SlackWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
     id: SlackAppMentionTriggerId,
     eventType: "slack:app_mention",
@@ -346,7 +346,7 @@ const ExistingAutomationValues: WebhookAutomationFormValues = {
   },
 };
 
-const ExistingSlackAutomationValues: WebhookAutomationFormValues = {
+export const ExistingSlackAutomationValues: WebhookAutomationFormValues = {
   name: "Slack mention triage",
   sandboxProfileId: "sbp_repo_maintainer",
   primaryRepositoryId: "mistlehq/platform",
@@ -377,7 +377,7 @@ const ExistingSlackAutomationWithArchivedChannelValues: WebhookAutomationFormVal
   },
 };
 
-function StoryHarness(input: {
+export function WebhookAutomationFormStoryHarness(input: {
   mode: "create" | "edit";
   values: WebhookAutomationFormValues;
   fieldErrors?: Partial<Record<WebhookAutomationFormValueKey, string>>;
@@ -467,12 +467,17 @@ function StoryHarness(input: {
 
 const meta = {
   title: "Dashboard/Automations/Event/Form",
-  component: StoryHarness,
+  component: WebhookAutomationFormStoryHarness,
   decorators: [withDashboardPageStory],
+  excludeStories: [
+    "ExistingSlackAutomationValues",
+    "SlackWebhookEventOptions",
+    "WebhookAutomationFormStoryHarness",
+  ],
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof StoryHarness>;
+} satisfies Meta<typeof WebhookAutomationFormStoryHarness>;
 
 export default meta;
 

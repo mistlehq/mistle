@@ -110,7 +110,12 @@ export function createStoryConnectionMethods(
         id: method.id,
         kind: method.kind,
         label: method.label,
+        ...(method.connectionDetail === undefined
+          ? {}
+          : { connectionDetail: method.connectionDetail }),
+        ...(method.createBehavior === undefined ? {} : { createBehavior: method.createBehavior }),
         ...(method.postCreate === undefined ? {} : { postCreate: method.postCreate }),
+        ...(method.setupFlow === undefined ? {} : { setupFlow: method.setupFlow }),
         secretFields: method.secretFields.map((secretField) => ({
           description: secretField.description,
           inputType: secretField.inputType,

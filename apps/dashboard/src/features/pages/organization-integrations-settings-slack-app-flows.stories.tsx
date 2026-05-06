@@ -110,7 +110,7 @@ function createSlackTargetFixture(): IntegrationTarget {
   };
 }
 
-function createDraftSlackConnection(input?: {
+export function createDraftSlackConnection(input?: {
   config?: Record<string, unknown>;
   configuredSecretNames?: readonly string[];
   externalSubjectId?: string;
@@ -381,7 +381,7 @@ function SlackCreatePageStory(): React.JSX.Element {
   );
 }
 
-function SlackAppSetupPageStory(input: {
+export function SlackAppSetupPageStory(input: {
   connection: IntegrationConnection;
   initialEntry?: string;
 }): React.JSX.Element {
@@ -422,7 +422,7 @@ function SlackAppSetupPageStory(input: {
   );
 }
 
-function SlackInstalledDetailPageStory(): React.JSX.Element {
+export function SlackInstalledDetailPageStory(): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
@@ -470,6 +470,11 @@ function SlackInstalledDetailPageStory(): React.JSX.Element {
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/Slack App",
   decorators: [withDashboardPageStory],
+  excludeStories: [
+    "createDraftSlackConnection",
+    "SlackAppSetupPageStory",
+    "SlackInstalledDetailPageStory",
+  ],
 } satisfies Meta;
 
 export default pageMeta;

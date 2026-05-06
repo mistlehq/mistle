@@ -34,6 +34,13 @@ Choose one of these setup paths:
 7. Approve the Slack app installation in your workspace.
 8. Return to Mistle to complete the connection.
 
+<Frame>
+  <img
+    src="/images/product-screens/slack-create-from-manifest.png"
+    alt="Mistle Slack App setup page with Create from manifest selected, app configuration token input, and editable Slack app manifest"
+  />
+</Frame>
+
 You can edit the manifest before creating the app. Mistle will use your manifest values for app settings such as the app name, description, and other Slack app configuration that does not need to be managed by Mistle.
 
 To keep the integration working, Mistle always overrides the Slack app webhook and callback settings before submitting the manifest. Mistle sets the Events API request URL to the Mistle callback URL for that connection, adds the required redirect URLs for Slack app installation and Slack identity linking, and adds the required bot scopes and bot events needed for supported Slack automations and resource sync.
@@ -99,6 +106,13 @@ If you use Slack-triggered automations:
 2. Copy the displayed callback URL.
 3. Paste it into the Slack app's **Events API Request URL** field.
 4. Save and verify the request URL in Slack.
+
+<Frame>
+  <img
+    src="/images/product-screens/slack-installed-connection.png"
+    alt="Slack app connection detail page showing authentication, synced channel resources, and webhook callback URL"
+  />
+</Frame>
 
 ## Private Channels
 
