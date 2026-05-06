@@ -4,6 +4,7 @@ import {
   createRuntimePublicAccessProxyPoolKey,
   createRuntimePublicAccessRouteHealthUrl,
   normalizeRuntimePublicAccessHostnames,
+  readRuntimePublicAccessEnvironmentIdFromPath,
 } from "./runtime-public-access.js";
 
 describe("createRuntimePublicAccessProxyPoolKey", () => {
@@ -41,5 +42,21 @@ describe("createRuntimePublicAccessRouteHealthUrl", () => {
         publicHostname: "gateway.example.com",
       }).toString(),
     ).toBe("https://gateway.example.com/__healthz?x-mistle-test-environment-id=test_env_123");
+  });
+});
+
+describe("readRuntimePublicAccessEnvironmentIdFromPath", () => {
+  it("reads path-carried environment ids used by public tokenizer egress URLs", () => {
+    expect(
+      readRuntimePublicAccessEnvironmentIdFromPath(
+        "/__test-environments/test_env_123/tokenizer-proxy/egress/mistlehq/repo.git",
+      ),
+    ).toBe("test_env_123");
+  });
+
+  it("ignores requests without a complete test-environment path prefix", () => {
+    expect(readRuntimePublicAccessEnvironmentIdFromPath("/tokenizer-proxy/egress")).toBeUndefined();
+    expect(readRuntimePublicAccessEnvironmentIdFromPath("/__test-environments")).toBeUndefined();
+    expect(readRuntimePublicAccessEnvironmentIdFromPath("/__test-environments/")).toBeUndefined();
   });
 });

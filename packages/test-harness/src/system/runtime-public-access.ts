@@ -370,6 +370,23 @@ export function createRuntimePublicAccessRouteHealthUrl(input: {
   return url;
 }
 
+export function readRuntimePublicAccessEnvironmentIdFromPath(
+  requestPath: string,
+): string | undefined {
+  const prefix = "/__test-environments/";
+  if (!requestPath.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+
+  return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
+}
+
 function createRuntimePublicAccessProxyScript(): string {
   return String.raw`
 import { spawn, spawnSync } from "node:child_process";
@@ -553,7 +570,7 @@ function connectUpgradeTarget(input) {
 function resolveTarget(request) {
   const host = String(request.headers.host ?? "").split(":")[0];
   const requestUrl = new URL(request.url ?? "/", "http://" + host);
-  const environmentId = String(request.headers["x-mistle-test-environment-id"] ?? requestUrl.searchParams.get("x-mistle-test-environment-id") ?? "");
+  const environmentId = String(request.headers["x-mistle-test-environment-id"] ?? requestUrl.searchParams.get("x-mistle-test-environment-id") ?? readEnvironmentIdFromPath(requestUrl.pathname) ?? "");
   if (host.length === 0 || environmentId.length === 0) {
     return undefined;
   }
@@ -565,6 +582,19 @@ function resolveTarget(request) {
     environmentId,
     localBaseUrl,
   };
+}
+
+function readEnvironmentIdFromPath(requestPath) {
+  const prefix = "/__test-environments/";
+  if (!requestPath.startsWith(prefix)) {
+    return undefined;
+  }
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+  return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
 }
 
 function createRouteKey(hostname, environmentId) {
