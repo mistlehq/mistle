@@ -189,6 +189,51 @@ export interface SandboxRuntimeControl {
   close(): Promise<void>;
 }
 
+export const SandboxTransparentProxyBypassKinds = {
+  SOCKET_MARK: "socket_mark",
+} as const;
+export type SandboxTransparentProxyBypassKind =
+  (typeof SandboxTransparentProxyBypassKinds)[keyof typeof SandboxTransparentProxyBypassKinds];
+
+export interface SandboxTransparentProxySocketMarkBypass {
+  readonly kind: typeof SandboxTransparentProxyBypassKinds.SOCKET_MARK;
+  readonly mark: number;
+}
+
+export type SandboxTransparentProxyBypass = SandboxTransparentProxySocketMarkBypass;
+
+export const SandboxTransparentProxyExclusionKinds = {
+  CIDR: "cidr",
+  HOST: "host",
+} as const;
+export type SandboxTransparentProxyExclusionKind =
+  (typeof SandboxTransparentProxyExclusionKinds)[keyof typeof SandboxTransparentProxyExclusionKinds];
+
+export interface SandboxTransparentProxyCidrExclusion {
+  readonly kind: typeof SandboxTransparentProxyExclusionKinds.CIDR;
+  readonly value: string;
+  readonly reason: string;
+}
+
+export interface SandboxTransparentProxyHostExclusion {
+  readonly kind: typeof SandboxTransparentProxyExclusionKinds.HOST;
+  readonly value: string;
+  readonly reason: string;
+}
+
+export type SandboxTransparentProxyExclusion =
+  | SandboxTransparentProxyCidrExclusion
+  | SandboxTransparentProxyHostExclusion;
+
+export interface SandboxTransparentProxyConfiguration {
+  readonly provider: SandboxRuntimeProvider;
+  readonly supported: boolean;
+  readonly passthroughBypass: SandboxTransparentProxyBypass;
+  readonly requiredLinuxCapabilities: readonly string[];
+  readonly exclusions: readonly SandboxTransparentProxyExclusion[];
+  readonly smokeRequirements: readonly string[];
+}
+
 export interface SandboxStartRequest {
   readonly image: SandboxImageHandle;
   readonly env?: Readonly<Record<string, string>>;
@@ -213,6 +258,7 @@ export interface SandboxCaptureSnapshotRequest {
 }
 
 export interface SandboxAdapter {
+  getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration;
   prepareStorageForStart(
     request: SandboxPrepareStorageForStartRequest,
   ): Promise<SandboxStartStoragePreparation>;

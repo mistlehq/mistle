@@ -21,10 +21,12 @@ import {
   type SandboxStartStoragePreparation,
   type SandboxStartRequest,
   type SandboxStopRequest,
+  type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import type { E2BClient } from "./client.js";
 import { createE2BAttachStorageCommand, createE2BCleanupStorageCommand } from "./storage.js";
+import { createE2BTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { E2BSandboxInspectResult } from "./types.js";
 
 const ArchilMountTokenEnv = "ARCHIL_MOUNT_TOKEN";
@@ -85,6 +87,10 @@ export class E2BSandboxAdapter implements SandboxAdapter {
 
   constructor(client: E2BClient) {
     this.#client = client;
+  }
+
+  getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
+    return createE2BTransparentProxyConfiguration();
   }
 
   async prepareStorageForStart(

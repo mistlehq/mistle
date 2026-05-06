@@ -22,9 +22,11 @@ import {
   type SandboxStartStoragePreparation,
   type SandboxStartRequest,
   type SandboxStopRequest,
+  type SandboxTransparentProxyConfiguration,
 } from "../../types.js";
 import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
+import { createDockerTransparentProxyConfiguration } from "./transparent-proxy.js";
 import type { DockerSandboxInspectResult } from "./types.js";
 
 function createSandboxHandle(runtimeId: string): SandboxHandle {
@@ -55,6 +57,10 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
   constructor(client: DockerClient) {
     this.#client = client;
+  }
+
+  getTransparentProxyConfiguration(): SandboxTransparentProxyConfiguration {
+    return createDockerTransparentProxyConfiguration();
   }
 
   async prepareStorageForStart(

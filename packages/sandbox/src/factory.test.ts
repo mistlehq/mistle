@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { SandboxConfigurationError } from "./errors.js";
 import { createSandboxAdapter, createSandboxRuntimeControl } from "./factory.js";
-import { SandboxPersistentStorageLayout, SandboxProvider, SandboxStorageBackend } from "./types.js";
+import {
+  SandboxPersistentStorageLayout,
+  SandboxProvider,
+  SandboxStorageBackend,
+  SandboxTransparentProxyBypassKinds,
+} from "./types.js";
 
 describe("createSandboxAdapter", () => {
   it("creates a docker adapter when docker config is provided", () => {
@@ -22,6 +27,12 @@ describe("createSandboxAdapter", () => {
     expect(typeof adapter.cleanupStorage).toBe("function");
     expect(typeof adapter.stop).toBe("function");
     expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.DOCKER,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
   });
 
   it("throws when docker config is missing", () => {
@@ -49,6 +60,12 @@ describe("createSandboxAdapter", () => {
     expect(typeof adapter.cleanupStorage).toBe("function");
     expect(typeof adapter.stop).toBe("function");
     expect(typeof adapter.destroy).toBe("function");
+    expect(adapter.getTransparentProxyConfiguration()).toMatchObject({
+      provider: SandboxProvider.E2B,
+      passthroughBypass: {
+        kind: SandboxTransparentProxyBypassKinds.SOCKET_MARK,
+      },
+    });
   });
 
   it("throws when E2B config is missing", () => {
