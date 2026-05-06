@@ -10,7 +10,7 @@ import {
   createSessionsPageStoryQueryClient,
 } from "./sessions-page.story-fixtures.js";
 
-export type NewSessionPageStoryArgs = {
+type NewSessionPageStoryArgs = {
   launchableProfiles: LaunchableSandboxProfilesResult["items"];
   initialSelectedProfileId: string;
 };

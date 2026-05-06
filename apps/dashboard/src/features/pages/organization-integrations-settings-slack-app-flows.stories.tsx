@@ -422,7 +422,7 @@ export function SlackAppSetupPageStory(input: {
   );
 }
 
-export function SlackInstalledDetailPageStory(): React.JSX.Element {
+function SlackInstalledDetailPageStory(): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
@@ -470,11 +470,7 @@ export function SlackInstalledDetailPageStory(): React.JSX.Element {
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/Slack App",
   decorators: [withDashboardPageStory],
-  excludeStories: [
-    "createDraftSlackConnection",
-    "SlackAppSetupPageStory",
-    "SlackInstalledDetailPageStory",
-  ],
+  excludeStories: ["createDraftSlackConnection", "SlackAppSetupPageStory"],
 } satisfies Meta;
 
 export default pageMeta;

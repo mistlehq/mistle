@@ -434,7 +434,7 @@ export function GitHubAppSetupPageStory(input: {
   );
 }
 
-export function GitHubInstalledDetailPageStory(): React.JSX.Element {
+function GitHubInstalledDetailPageStory(): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const [queryClient] = useState(() =>
     createStoryQueryClient({
@@ -484,11 +484,7 @@ export function GitHubInstalledDetailPageStory(): React.JSX.Element {
 const pageMeta = {
   title: "Dashboard/Integrations/Setup/GitHub App",
   decorators: [withDashboardPageStory],
-  excludeStories: [
-    "createDraftGitHubConnection",
-    "GitHubAppSetupPageStory",
-    "GitHubInstalledDetailPageStory",
-  ],
+  excludeStories: ["createDraftGitHubConnection", "GitHubAppSetupPageStory"],
 } satisfies Meta;
 
 export default pageMeta;

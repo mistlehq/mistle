@@ -11,7 +11,10 @@ import {
   SlackWebhookEventOptions,
   WebhookAutomationFormStoryHarness,
 } from "../automations/webhook-automation-form.stories.js";
-import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
+import {
+  IntegrationConnectionDetailView,
+  type IntegrationConnectionDetailViewProps,
+} from "../integrations/integration-connection-detail-view.js";
 import {
   createGitHubAppDetailViewStoryProps,
   createSlackDetailViewStoryProps,
@@ -162,49 +165,41 @@ function IdentityLinkingProfileSettingsStory(): React.JSX.Element {
   );
 }
 
-function GitHubInstalledConnectionStory(): React.JSX.Element {
+const InstalledConnectionTitleEditor: NonNullable<
+  IntegrationConnectionDetailViewProps["titleEditor"]
+> = {
+  disabled: false,
+  errorMessageByConnectionId: {},
+  onStartEditing: () => {},
+  onSave: async () => {},
+};
+
+function InstalledConnectionScreen(input: {
+  detailViewProps: IntegrationConnectionDetailViewProps;
+}): React.JSX.Element {
   return (
     <DocsProductScreen>
       <div className="mx-auto max-w-5xl px-6 py-8">
         <IntegrationConnectionDetailView
-          {...createGitHubAppDetailViewStoryProps()}
+          {...input.detailViewProps}
           onCreateWebhookSource={() => {}}
           onDeleteWebhookSource={() => {}}
           onEditAuthentication={() => {}}
           onRefreshResource={() => {}}
           onStartGitHubAppInstallation={async () => {}}
-          titleEditor={{
-            disabled: false,
-            errorMessageByConnectionId: {},
-            onStartEditing: () => {},
-            onSave: async () => {},
-          }}
+          titleEditor={InstalledConnectionTitleEditor}
         />
       </div>
     </DocsProductScreen>
   );
 }
 
+function GitHubInstalledConnectionStory(): React.JSX.Element {
+  return <InstalledConnectionScreen detailViewProps={createGitHubAppDetailViewStoryProps()} />;
+}
+
 function SlackInstalledConnectionStory(): React.JSX.Element {
-  return (
-    <DocsProductScreen>
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        <IntegrationConnectionDetailView
-          {...createSlackDetailViewStoryProps()}
-          onCreateWebhookSource={() => {}}
-          onDeleteWebhookSource={() => {}}
-          onEditAuthentication={() => {}}
-          onRefreshResource={() => {}}
-          titleEditor={{
-            disabled: false,
-            errorMessageByConnectionId: {},
-            onStartEditing: () => {},
-            onSave: async () => {},
-          }}
-        />
-      </div>
-    </DocsProductScreen>
-  );
+  return <InstalledConnectionScreen detailViewProps={createSlackDetailViewStoryProps()} />;
 }
 
 function SandboxProfileDraftStory(): React.JSX.Element {
