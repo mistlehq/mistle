@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { systemScheduler } from "@mistle/time";
 import { QueryClientProvider, useMutation, useQuery } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
@@ -23,6 +24,12 @@ function createDeferredPromise<T>() {
     promise,
     resolve,
   };
+}
+
+async function waitForSchedulerDelay(delayMs: number): Promise<void> {
+  await new Promise<void>((resolve) => {
+    systemScheduler.schedule(resolve, delayMs);
+  });
 }
 
 function QueryLoadingHarness(props: {
@@ -103,13 +110,38 @@ describe("top-loading-bar", () => {
       </QueryClientProvider>,
     );
 
-    expect(await screen.findByRole("progressbar", { name: "Loading" })).toBeTruthy();
+    const progressBar = await screen.findByRole("progressbar", { name: "Loading" });
+    const progressIndicator = progressBar.firstElementChild;
+    if (progressIndicator === null) {
+      throw new Error("Top loading bar rendered without a progress indicator.");
+    }
+    expect(progressIndicator.getAttribute("style")).toContain("translate3d(-92%,0,0)");
 
     pendingQuery.resolve("ready");
 
     await waitFor(() => {
       expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
     });
+  });
+
+  it("does not render when a query resolves before the loading bar show delay", async () => {
+    const queryClient = createTestQueryClient();
+    const router = createMemoryRouter(
+      createRoutesFromElements(
+        <Route element={<QueryLoadingHarness promise={Promise.resolve("ready")} />} path="/" />,
+      ),
+      { initialEntries: ["/"] },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    await waitForSchedulerDelay(250);
+
+    expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
   });
 
   it("does not render for queries that select no shell loading indicator", async () => {
