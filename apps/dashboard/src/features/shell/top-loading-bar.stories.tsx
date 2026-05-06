@@ -10,10 +10,6 @@ import {
 } from "./app-shell-loading-indicator-meta.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
-type TopLoadingBarStoryArgs = {
-  initiallyActive: boolean;
-};
-
 type DeferredQuery = {
   promise: Promise<string>;
   resolve: (value: string) => void;
@@ -30,19 +26,10 @@ const meta = {
   title: "Dashboard/Shell/TopLoadingBar",
   component: TopLoadingBarStory,
   tags: ["autodocs"],
-  argTypes: {
-    initiallyActive: {
-      control: "boolean",
-      description: "Starts the story with an active query so the loading bar is visible on load.",
-    },
-  },
   parameters: {
     layout: "fullscreen",
   },
-  args: {
-    initiallyActive: true,
-  },
-} satisfies Meta<TopLoadingBarStoryArgs>;
+} satisfies Meta<typeof TopLoadingBarStory>;
 
 export default meta;
 
@@ -50,12 +37,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Interactive: Story = {};
 
-function TopLoadingBarStory(input: TopLoadingBarStoryArgs): React.JSX.Element {
+function TopLoadingBarStory(): React.JSX.Element {
   const [queryClient] = useState(() => createStoryQueryClient());
   const [router] = useState(() =>
     createMemoryRouter([
       {
-        element: <TopLoadingBarHarness initiallyActive={input.initiallyActive} />,
+        element: <TopLoadingBarHarness />,
         path: "/",
       },
     ]),
@@ -68,9 +55,9 @@ function TopLoadingBarStory(input: TopLoadingBarStoryArgs): React.JSX.Element {
   );
 }
 
-function TopLoadingBarHarness(input: { initiallyActive: boolean }): React.JSX.Element {
+function TopLoadingBarHarness(): React.JSX.Element {
   const [loadId, setLoadId] = useState(0);
-  const [isActive, setIsActive] = useState(input.initiallyActive);
+  const [isActive, setIsActive] = useState(true);
   const [deferredQuery, setDeferredQuery] = useState(() => createDeferredQuery());
 
   useQuery({
