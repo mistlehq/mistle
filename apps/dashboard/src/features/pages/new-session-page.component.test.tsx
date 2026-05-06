@@ -9,7 +9,7 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import { launchableSandboxProfilesQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { NewSessionPage } from "./new-session-page.js";
+import { NewSessionPage, shouldClearSelectedProfile } from "./new-session-page.js";
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
 
 function installMatchMediaStub(): void {
@@ -254,5 +254,45 @@ describe("NewSessionPage", () => {
         "Git, diffs, and repo-local instructions will use this repository by default.",
       ),
     ).toBeDefined();
+  });
+
+  it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+        }),
+        selectableProfiles: [],
+        isSelectableProfilesPending: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps the current selection while launchable profiles are still loading", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+        }),
+        selectableProfiles: [],
+        isSelectableProfilesPending: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps the current selection when the selected profile is still launchable", () => {
+    expect(
+      shouldClearSelectedProfile({
+        selectedProfile: buildStoryLaunchableSandboxProfile({
+          id: "sbp_profile_alpha",
+        }),
+        selectableProfiles: [
+          buildStoryLaunchableSandboxProfile({
+            id: "sbp_profile_alpha",
+          }),
+        ],
+        isSelectableProfilesPending: false,
+      }),
+    ).toBe(false);
   });
 });

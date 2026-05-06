@@ -19,7 +19,6 @@ import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable
 import { startSandboxInstanceFromProfileVersion } from "../sessions/sessions-service.js";
 import { FormPageActionBar, FormPageSection, FormPageStack } from "../shared/form-page.js";
 import { PageFrame } from "../shared/page-frame.js";
-import { shouldClearSelectedProfile } from "./sessions-page.js";
 
 type NewSessionPageRepositoryOption = {
   value: string;
@@ -34,6 +33,20 @@ const WorkspaceRootOption: NewSessionPageRepositoryOption = {
   label: "None",
   path: WorkspaceRootDescription,
 };
+
+export function shouldClearSelectedProfile(input: {
+  selectedProfile: LaunchableSandboxProfile | null;
+  selectableProfiles: readonly LaunchableSandboxProfile[];
+  isSelectableProfilesPending: boolean;
+}): boolean {
+  if (input.selectedProfile === null || input.isSelectableProfilesPending) {
+    return false;
+  }
+
+  const selectedProfileId = input.selectedProfile.id;
+
+  return !input.selectableProfiles.some((profile) => profile.id === selectedProfileId);
+}
 
 export function NewSessionPage(input?: { initialSelectedProfileId?: string }): React.JSX.Element {
   const navigate = useNavigate();

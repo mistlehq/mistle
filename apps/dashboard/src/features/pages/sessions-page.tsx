@@ -19,7 +19,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
@@ -66,20 +65,6 @@ function parseCursor(rawValue: string | null): string | null {
   }
 
   return normalized;
-}
-
-export function shouldClearSelectedProfile(input: {
-  selectedProfile: LaunchableSandboxProfile | null;
-  selectableProfiles: readonly LaunchableSandboxProfile[];
-  isSelectableProfilesPending: boolean;
-}): boolean {
-  if (input.selectedProfile === null || input.isSelectableProfilesPending) {
-    return false;
-  }
-
-  const selectedProfileId = input.selectedProfile.id;
-
-  return !input.selectableProfiles.some((profile) => profile.id === selectedProfileId);
 }
 
 function SessionTitleCell(input: { href?: string; title: string }): React.JSX.Element {
@@ -169,19 +154,6 @@ function resolveUpdatedLabel(input: {
   );
 }
 
-export function resolveSessionResultsSummary(input: {
-  listedSessionCount: number;
-  totalResults: number;
-}): {
-  visibleCount: number;
-  totalCount: number;
-} {
-  return {
-    visibleCount: input.listedSessionCount,
-    totalCount: input.totalResults,
-  };
-}
-
 export function SessionsPage(): React.JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
@@ -266,14 +238,6 @@ export function SessionsPage(): React.JSX.Element {
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
   const nextPageDisabled = sandboxInstancesQuery.isPending;
   const previousPageDisabled = sandboxInstancesQuery.isPending;
-  const sessionResultsSummary =
-    sandboxInstancesQuery.data === undefined
-      ? null
-      : resolveSessionResultsSummary({
-          listedSessionCount: sandboxInstancesQuery.data.items.length,
-          totalResults: sandboxInstancesQuery.data.totalResults,
-        });
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -378,9 +342,10 @@ export function SessionsPage(): React.JSX.Element {
 
           <TableListingFooter
             resultsCount={
-              sessionResultsSummary === null ? null : (
+              sandboxInstancesQuery.data === undefined ? null : (
                 <p className="text-muted-foreground text-sm">
-                  Showing {sessionResultsSummary.visibleCount} of {sessionResultsSummary.totalCount}
+                  Showing {sandboxInstancesQuery.data.items.length} of{" "}
+                  {sandboxInstancesQuery.data.totalResults}
                 </p>
               )
             }

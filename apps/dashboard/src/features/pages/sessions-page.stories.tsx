@@ -1,17 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { withDashboardPageStory } from "../../storybook/decorators.js";
-import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
-import {
-  buildSandboxInstanceListItemFixture,
-  buildStoryLaunchableSandboxProfile,
-} from "./sessions-page.story-fixtures.js";
+import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
 import { SessionsStoryHarness } from "./sessions-story-harness.js";
 
 type SessionsPageStoryArgs = {
   initialEntries: readonly string[];
-  launchableProfiles?: LaunchableSandboxProfilesResult["items"];
   sandboxInstancesList?: SandboxInstancesListResult;
 };
 
@@ -24,17 +19,6 @@ const meta = {
   decorators: [withDashboardPageStory],
   args: {
     initialEntries: ["/sessions"],
-    launchableProfiles: [
-      buildStoryLaunchableSandboxProfile({
-        id: "sbp_profile_alpha",
-        displayName: "Alpha Profile",
-      }),
-      buildStoryLaunchableSandboxProfile({
-        id: "sbp_profile_beta",
-        displayName: "Beta Profile",
-        latestVersion: 7,
-      }),
-    ],
     sandboxInstancesList: {
       items: [
         buildSandboxInstanceListItemFixture({
@@ -79,9 +63,6 @@ const meta = {
     return (
       <SessionsStoryHarness
         initialEntries={args.initialEntries}
-        {...(args.launchableProfiles !== undefined
-          ? { launchableProfiles: args.launchableProfiles }
-          : {})}
         {...(args.sandboxInstancesList !== undefined
           ? { sandboxInstancesList: args.sandboxInstancesList }
           : {})}

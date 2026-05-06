@@ -13,43 +13,8 @@ import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
-import {
-  resolveSessionResultsSummary,
-  SessionsPage,
-  shouldClearSelectedProfile,
-} from "./sessions-page.js";
+import { SessionsPage } from "./sessions-page.js";
 import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
-
-type SelectableProfile = {
-  activeVersion: number | null;
-  id: string;
-  displayName: string;
-  status: "active";
-  latestVersion: number;
-  repositoryOptions: [];
-  createdAt: string;
-  updatedAt: string;
-  organizationId: string;
-};
-
-function buildSelectableProfile(
-  overrides: Partial<SelectableProfile> & Pick<SelectableProfile, "id">,
-): SelectableProfile {
-  const { id, ...restOverrides } = overrides;
-
-  return {
-    id,
-    activeVersion: 3,
-    displayName: "Alpha Profile",
-    status: "active",
-    latestVersion: 3,
-    repositoryOptions: [],
-    createdAt: "2026-03-10T00:00:00.000Z",
-    updatedAt: "2026-03-10T00:00:00.000Z",
-    organizationId: "org_123",
-    ...restOverrides,
-  };
-}
 
 function createSessionsPageQueryClient(
   input?: Parameters<typeof createTestQueryClient>[0],
@@ -265,30 +230,6 @@ describe("SessionsPage", () => {
     expect(screen.getByText("Alpha Profile")).toBeDefined();
   });
 
-  it("uses listed sessions for the visible results", () => {
-    expect(
-      resolveSessionResultsSummary({
-        listedSessionCount: 1,
-        totalResults: 1,
-      }),
-    ).toStrictEqual({
-      visibleCount: 1,
-      totalCount: 1,
-    });
-  });
-
-  it("uses the listed total for short pages", () => {
-    expect(
-      resolveSessionResultsSummary({
-        listedSessionCount: 1,
-        totalResults: 21,
-      }),
-    ).toStrictEqual({
-      visibleCount: 1,
-      totalCount: 21,
-    });
-  });
-
   it("renders a compact failure indicator with tooltip details", () => {
     const queryClient = createSessionsPageQueryClient({
       refetchOnMount: false,
@@ -489,45 +430,5 @@ describe("SessionsPage", () => {
     expect(within(rendered.container).getByText("GitHub Repo Triage")).toBeDefined();
     expect(within(rendered.container).queryByText("dashboard")).toBeNull();
     expect(within(rendered.container).queryByText("webhook")).toBeNull();
-  });
-
-  it("clears a stale selected profile after launchable profiles finish refetching without it", () => {
-    expect(
-      shouldClearSelectedProfile({
-        selectedProfile: buildSelectableProfile({
-          id: "sbp_profile_alpha",
-        }),
-        selectableProfiles: [],
-        isSelectableProfilesPending: false,
-      }),
-    ).toBe(true);
-  });
-
-  it("keeps the current selection while launchable profiles are still loading", () => {
-    expect(
-      shouldClearSelectedProfile({
-        selectedProfile: buildSelectableProfile({
-          id: "sbp_profile_alpha",
-        }),
-        selectableProfiles: [],
-        isSelectableProfilesPending: true,
-      }),
-    ).toBe(false);
-  });
-
-  it("keeps the current selection when the selected profile is still launchable", () => {
-    expect(
-      shouldClearSelectedProfile({
-        selectedProfile: buildSelectableProfile({
-          id: "sbp_profile_alpha",
-        }),
-        selectableProfiles: [
-          buildSelectableProfile({
-            id: "sbp_profile_alpha",
-          }),
-        ],
-        isSelectableProfilesPending: false,
-      }),
-    ).toBe(false);
   });
 });
