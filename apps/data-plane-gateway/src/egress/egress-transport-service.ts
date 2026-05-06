@@ -25,6 +25,7 @@ const HopByHopHeaderNames = new Set([
   "trailer",
   "transfer-encoding",
 ]);
+const Base64PayloadPattern = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/u;
 
 const EgressTracer = trace.getTracer("@mistle/data-plane-gateway/egress");
 const EgressMeter = metrics.getMeter("@mistle/data-plane-gateway/egress");
@@ -53,6 +54,7 @@ type EgressStreamOutcome =
   | "upstream_connect_failed"
   | "upstream_handshake_failed"
   | "upstream_io_error"
+  | "malformed_frame"
   | "forbidden_tunnel_state";
 
 type SendBootstrapMessage = (message: EgressTransportMessage) => void;
@@ -141,6 +143,15 @@ function toStreamKey(input: GatewayEgressStreamIdentity): string {
 
 function toUrl(input: EgressHttpOpen["request"]): URL {
   return new URL(`${input.scheme}://${input.authority}${buildRequestPath(input)}`);
+}
+
+function decodeCanonicalBase64(payload: string): Buffer | undefined {
+  if (!Base64PayloadPattern.test(payload)) {
+    return undefined;
+  }
+
+  const decoded = Buffer.from(payload, "base64");
+  return decoded.toString("base64") === payload ? decoded : undefined;
 }
 
 function buildStreamAttributes(input: {
@@ -250,14 +261,15 @@ export class GatewayEgressTransportService {
         return true;
       case "egress.http.request.body.chunk":
         return this.writeRequestBodyChunk({
-          bytes: Buffer.from(input.message.bytes, "base64"),
+          message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
-          streamId: input.message.streamId,
         });
       case "egress.http.request.body.end":
         return this.endRequestBody({
           sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
           streamId: input.message.streamId,
         });
@@ -265,12 +277,14 @@ export class GatewayEgressTransportService {
         return this.writeUpgradedBytes({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.tcp.close":
         return this.closeUpgradedDirection({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.stream.cancel":
@@ -340,9 +354,14 @@ export class GatewayEgressTransportService {
       streamId: input.message.streamId,
     });
     if (this.#activeStreamsByKey.has(key)) {
-      throw new GatewayEgressForbiddenTunnelStateError(
-        `Egress stream '${String(input.message.streamId)}' is already active.`,
-      );
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.message.streamId)}' is already active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return;
     }
 
     const url = toUrl(input.message.request);
@@ -585,34 +604,74 @@ export class GatewayEgressTransportService {
   }
 
   private writeRequestBodyChunk(input: {
-    bytes: Buffer;
+    message: Extract<EgressTransportMessage, { type: "egress.http.request.body.chunk" }>;
     sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
-    streamId: number;
   }): boolean {
-    const stream = this.getActiveStream(input);
+    const streamIdentity = {
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    };
+    const stream = this.getActiveStream(streamIdentity);
     if (stream === undefined) {
-      return false;
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.message.streamId)}' is not active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return true;
     }
     if (stream.requestEnded || stream.upgraded) {
-      throw new GatewayEgressForbiddenTunnelStateError(
-        `Egress stream '${String(input.streamId)}' cannot accept request body chunks.`,
-      );
+      this.failActiveStream({
+        error: new GatewayEgressForbiddenTunnelStateError(
+          `Egress stream '${String(input.message.streamId)}' cannot accept request body chunks.`,
+        ),
+        failureCode: "forbidden_tunnel_state",
+        outcome: "forbidden_tunnel_state",
+        stream,
+      });
+      return true;
     }
 
-    stream.totalRequestBytes += input.bytes.byteLength;
-    EgressStreamBytes.add(input.bytes.byteLength, {
+    const bytes = decodeCanonicalBase64(input.message.bytes);
+    if (bytes === undefined) {
+      this.failActiveStream({
+        error: new Error("Egress HTTP request body chunk must contain canonical base64 bytes."),
+        failureCode: "malformed_frame",
+        outcome: "malformed_frame",
+        stream,
+      });
+      return true;
+    }
+
+    stream.totalRequestBytes += bytes.byteLength;
+    EgressStreamBytes.add(bytes.byteLength, {
       ...stream.attributes,
       "mistle.gateway.egress.byte_direction": "request",
     });
-    stream.request.write(input.bytes);
+    stream.request.write(bytes);
     return true;
   }
 
-  private endRequestBody(input: GatewayEgressStreamIdentity): boolean {
+  private endRequestBody(
+    input: GatewayEgressStreamIdentity & {
+      sendBootstrapMessage: SendBootstrapMessage;
+    },
+  ): boolean {
     const stream = this.getActiveStream(input);
     if (stream === undefined) {
-      return false;
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.streamId)}' is not active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.streamId,
+      });
+      return true;
     }
     if (stream.requestEnded || stream.upgraded) {
       return true;
@@ -626,6 +685,7 @@ export class GatewayEgressTransportService {
   private writeUpgradedBytes(input: {
     message: EgressTcpData;
     sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
   }): boolean {
     const stream = this.getActiveStream({
@@ -634,15 +694,38 @@ export class GatewayEgressTransportService {
       streamId: input.message.streamId,
     });
     if (stream === undefined) {
-      return false;
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.message.streamId)}' is not active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return true;
     }
     if (!stream.upgraded || stream.socket === undefined || input.message.direction !== "request") {
-      throw new GatewayEgressForbiddenTunnelStateError(
-        `Egress stream '${String(input.message.streamId)}' cannot accept upgraded request bytes.`,
-      );
+      this.failActiveStream({
+        error: new GatewayEgressForbiddenTunnelStateError(
+          `Egress stream '${String(input.message.streamId)}' cannot accept upgraded request bytes.`,
+        ),
+        failureCode: "forbidden_tunnel_state",
+        outcome: "forbidden_tunnel_state",
+        stream,
+      });
+      return true;
     }
 
-    const bytes = Buffer.from(input.message.bytes, "base64");
+    const bytes = decodeCanonicalBase64(input.message.bytes);
+    if (bytes === undefined) {
+      this.failActiveStream({
+        error: new Error("Egress TCP data frame must contain canonical base64 bytes."),
+        failureCode: "malformed_frame",
+        outcome: "malformed_frame",
+        stream,
+      });
+      return true;
+    }
+
     stream.totalRequestBytes += bytes.byteLength;
     EgressStreamBytes.add(bytes.byteLength, {
       ...stream.attributes,
@@ -655,6 +738,7 @@ export class GatewayEgressTransportService {
   private closeUpgradedDirection(input: {
     message: EgressTcpClose;
     sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
   }): boolean {
     const stream = this.getActiveStream({
@@ -663,12 +747,25 @@ export class GatewayEgressTransportService {
       streamId: input.message.streamId,
     });
     if (stream === undefined) {
-      return false;
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.message.streamId)}' is not active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return true;
     }
     if (!stream.upgraded || stream.socket === undefined || input.message.direction !== "request") {
-      throw new GatewayEgressForbiddenTunnelStateError(
-        `Egress stream '${String(input.message.streamId)}' cannot close upgraded request bytes.`,
-      );
+      this.failActiveStream({
+        error: new GatewayEgressForbiddenTunnelStateError(
+          `Egress stream '${String(input.message.streamId)}' cannot close upgraded request bytes.`,
+        ),
+        failureCode: "forbidden_tunnel_state",
+        outcome: "forbidden_tunnel_state",
+        stream,
+      });
+      return true;
     }
 
     stream.socket.end();
@@ -756,6 +853,38 @@ export class GatewayEgressTransportService {
 
     this.failActiveStream({
       error: new GatewayEgressForbiddenTunnelStateError(errorMessage),
+      failureCode: "forbidden_tunnel_state",
+      outcome: "forbidden_tunnel_state",
+      stream,
+    });
+  }
+
+  private rejectForbiddenStreamState(input: {
+    message: string;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): void {
+    const stream = this.getActiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.streamId,
+    });
+    if (stream === undefined) {
+      this.sendStreamError({
+        code: "forbidden_tunnel_state",
+        message: input.message,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.streamId,
+      });
+      return;
+    }
+
+    this.failActiveStream({
+      error: new GatewayEgressForbiddenTunnelStateError(input.message),
       failureCode: "forbidden_tunnel_state",
       outcome: "forbidden_tunnel_state",
       stream,

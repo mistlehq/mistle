@@ -26,6 +26,7 @@ import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
+  waitForWebSocketClose,
 } from "../integration/websocket-test-helpers.js";
 
 const BootstrapTokenSecret = "integration-new-bootstrap-token-secret";
@@ -471,6 +472,256 @@ describe.concurrent("gateway egress transport integration", () => {
     },
     TestTimeoutMs,
   );
+
+  it(
+    "returns a stream error for non-canonical base64 request body chunks",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const upstream = await startSimulatedStreamingHttpUpstream();
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        const upstreamUrl = new URL("/invalid-base64", upstream.baseUrl);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_invalid_base64",
+            streamId: 17,
+            request: {
+              method: "POST",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: upstreamUrl.pathname,
+              headers: {},
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 17,
+            bytes: "not-canonical-base64",
+            encoding: "base64",
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for non-canonical base64 egress frame error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 17,
+          code: "malformed_frame",
+          message: "Egress HTTP request body chunk must contain canonical base64 bytes.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "returns a stream error for request body chunks after the request body has ended",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const upstream = await startSimulatedStreamingHttpUpstream();
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        const upstreamUrl = new URL("/invalid-state", upstream.baseUrl);
+        await openStreamingEgressRequest({
+          bootstrapSocket,
+          path: upstreamUrl.pathname,
+          streamId: 18,
+          upstreamHost: upstreamUrl.host,
+        });
+        await withTimeout({
+          label: "waiting for invalid-state upstream request",
+          promise: upstream.nextRequest(),
+        });
+        await withTimeout({
+          label: "waiting for invalid-state response start",
+          promise: messageQueue.next(),
+        });
+        await withTimeout({
+          label: "waiting for invalid-state response body chunk",
+          promise: messageQueue.next(),
+        });
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 18,
+            bytes: Buffer.from("late body", "utf8").toString("base64"),
+            encoding: "base64",
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for forbidden egress stream state error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 18,
+          code: "forbidden_tunnel_state",
+          message: "Egress stream '18' cannot accept request body chunks.",
+        });
+        await withTimeout({
+          label: "waiting for invalid-state upstream response to close",
+          promise: upstream.nextResponseClosed(),
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "keeps egress streams isolated by bootstrap tunnel session when stream ids are reused",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const firstUpstream = await startSimulatedStreamingHttpUpstream();
+      const secondUpstream = await startSimulatedStreamingHttpUpstream();
+      const firstBootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const firstMessageQueue = createWebSocketMessageQueue(firstBootstrapSocket);
+      const firstSocketClosed = waitForWebSocketClose(firstBootstrapSocket);
+
+      let secondBootstrapSocket: WebSocket | undefined;
+      let secondMessageQueue: WebSocketMessageQueue | undefined;
+
+      try {
+        const firstUpstreamUrl = new URL("/first-session", firstUpstream.baseUrl);
+        await openStreamingEgressRequest({
+          bootstrapSocket: firstBootstrapSocket,
+          path: firstUpstreamUrl.pathname,
+          streamId: 16,
+          upstreamHost: firstUpstreamUrl.host,
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for first bootstrap-session upstream request",
+            promise: firstUpstream.nextRequest(),
+          }),
+        ).resolves.toEqual({
+          body: "",
+          headers: expect.any(Object),
+          method: "GET",
+          url: "/first-session",
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for first bootstrap-session response start",
+            promise: firstMessageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.start",
+          streamId: 16,
+          status: 200,
+          headers: expect.objectContaining({
+            "content-type": ["text/plain; charset=utf-8"],
+          }),
+        });
+
+        secondBootstrapSocket = await connectBootstrapSocket({
+          env,
+          sandboxInstanceId,
+        });
+        secondMessageQueue = createWebSocketMessageQueue(secondBootstrapSocket);
+
+        const secondUpstreamUrl = new URL("/second-session", secondUpstream.baseUrl);
+        await openStreamingEgressRequest({
+          bootstrapSocket: secondBootstrapSocket,
+          path: secondUpstreamUrl.pathname,
+          streamId: 16,
+          upstreamHost: secondUpstreamUrl.host,
+        });
+
+        await expect(
+          withTimeout({
+            label: "waiting for second bootstrap-session upstream request",
+            promise: secondUpstream.nextRequest(),
+          }),
+        ).resolves.toEqual({
+          body: "",
+          headers: expect.any(Object),
+          method: "GET",
+          url: "/second-session",
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for second bootstrap-session response start",
+            promise: secondMessageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.start",
+          streamId: 16,
+          status: 200,
+          headers: expect.objectContaining({
+            "content-type": ["text/plain; charset=utf-8"],
+          }),
+        });
+
+        await withTimeout({
+          label: "waiting for replaced first bootstrap tunnel to close",
+          promise: firstSocketClosed,
+        });
+        await withTimeout({
+          label: "waiting for first bootstrap-session upstream response to close",
+          promise: firstUpstream.nextResponseClosed(),
+        });
+
+        await sendWebSocketMessage(
+          secondBootstrapSocket,
+          JSON.stringify({
+            type: "egress.stream.cancel",
+            streamId: 16,
+            reason: "test completed",
+          }),
+        );
+        await withTimeout({
+          label: "waiting for second bootstrap-session upstream response to close",
+          promise: secondUpstream.nextResponseClosed(),
+        });
+      } finally {
+        firstMessageQueue.close();
+        secondMessageQueue?.close();
+        await closeIfOpen(firstBootstrapSocket);
+        if (secondBootstrapSocket !== undefined) {
+          await closeIfOpen(secondBootstrapSocket);
+        }
+        await firstUpstream.close();
+        await secondUpstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
 });
 
 async function insertSandboxInstanceRow(input: {
@@ -513,6 +764,36 @@ async function connectBootstrapSocket(input: {
       [TestEnvironmentIdHeader]: input.env.id,
     },
   });
+}
+
+async function openStreamingEgressRequest(input: {
+  bootstrapSocket: WebSocket;
+  path: string;
+  streamId: number;
+  upstreamHost: string;
+}): Promise<void> {
+  await sendWebSocketMessage(
+    input.bootstrapSocket,
+    JSON.stringify({
+      type: "egress.http.open",
+      requestId: `req_gateway_egress_session_${String(input.streamId)}`,
+      streamId: input.streamId,
+      request: {
+        method: "GET",
+        scheme: "http",
+        authority: input.upstreamHost,
+        path: input.path,
+        headers: {},
+      },
+    }),
+  );
+  await sendWebSocketMessage(
+    input.bootstrapSocket,
+    JSON.stringify({
+      type: "egress.http.request.body.end",
+      streamId: input.streamId,
+    }),
+  );
 }
 
 async function startSimulatedHttpUpstream(): Promise<SimulatedHttpUpstream> {
