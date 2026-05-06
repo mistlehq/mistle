@@ -36,6 +36,7 @@ const SANDBOXD_EGRESS_PROXY_URL = "http://127.0.0.1:38513";
 const SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT = 38_514;
 const HTTP_REQUEST_BODY = "phase4a-gateway-egress-http-smoke";
 const TRANSPARENT_HTTP_REQUEST_BODY = "phase4c-transparent-gateway-egress-http-smoke";
+const TRANSPARENT_TCP_REQUEST_BODY = "phase4d-transparent-opaque-tcp-smoke";
 const WEBSOCKET_REQUEST_BODY = "phase4b-gateway-egress-websocket-smoke";
 const SECURE_WEBSOCKET_REQUEST_BODY = "phase4b-gateway-egress-secure-websocket-smoke";
 const TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY =
@@ -71,7 +72,7 @@ type RecordedWebsocketExchange = {
 
 describe("runtime system gateway egress HTTP smoke", () => {
   it(
-    "forwards sandbox HTTP, HTTPS, WS, and WSS proxy traffic through the gateway tunnel",
+    "forwards sandbox HTTP, HTTPS, WS, WSS, and opaque TCP traffic through the gateway tunnel",
     async ({ system }) => {
       const upstream = await startSimulatedHttpUpstream();
       const secureUpstream = await startSimulatedSecureWebsocketUpstream();
@@ -145,6 +146,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
                 `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
                 `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
                 `export TRANSPARENT_WSS_MESSAGE=${shellQuote(TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY)}`,
+                `export TRANSPARENT_TCP_MESSAGE=${shellQuote(TRANSPARENT_TCP_REQUEST_BODY)}`,
                 "timeout 30 bash <<'BASH'",
                 transparentGatewaySmokeScript(),
                 "BASH",
@@ -221,6 +223,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
         expect(
           secureUpstream.websocketExchanges[1]?.headers["x-mistle-egress-grant"],
         ).toBeUndefined();
+        expect(result.stdout).toContain(`TRANSPARENT-TCP:echo:${TRANSPARENT_TCP_REQUEST_BODY}`);
       } finally {
         https.globalAgent.options.ca = previousGlobalAgentCa;
         if (sandboxInstanceIdForCleanup !== undefined) {
@@ -596,14 +599,59 @@ function secureWebsocketProxySmokeScript(): string {
 function transparentGatewaySmokeScript(): string {
   return [
     "set -euo pipefail",
+    'tcp_port_file="$(mktemp)"',
+    "perl -MIO::Socket::INET - \"${tcp_port_file}\" <<'PERL' &",
+    "use strict;",
+    "use warnings;",
+    "",
+    "my $port_file = $ARGV[0];",
+    "my $server = IO::Socket::INET->new(",
+    "  LocalAddr => '127.0.0.1',",
+    "  LocalPort => 0,",
+    "  Proto => 'tcp',",
+    "  Listen => 1,",
+    "  Reuse => 1,",
+    ') or die "failed to start TCP smoke server: $!";',
+    "open(my $handle, '>', $port_file) or die \"failed to write TCP smoke port file: $!\";",
+    "print $handle $server->sockport;",
+    "close($handle);",
+    "for my $connection_index (1..2) {",
+    '  my $client = $server->accept() or die "failed to accept TCP smoke client: $!";',
+    "  my $payload = '';",
+    "  $client->recv($payload, 65536);",
+    '  print $client "echo:$payload";',
+    "  close($client);",
+    "}",
+    "close($server);",
+    "PERL",
+    'tcp_server_pid="$!"',
     "cleanup_transparent_rules() {",
+    '  iptables -t nat -D OUTPUT -p tcp -m mark --mark "${TRANSPARENT_PROXY_PORT}" -j RETURN 2>/dev/null || true',
     '  iptables -t nat -D OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_HTTP_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" 2>/dev/null || true',
     '  iptables -t nat -D OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_SECURE_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" 2>/dev/null || true',
+    '  iptables -t nat -D OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_TCP_PORT:-0}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" 2>/dev/null || true',
     "}",
-    "trap cleanup_transparent_rules EXIT",
+    "cleanup_transparent_smoke() {",
+    "  cleanup_transparent_rules",
+    '  kill "${tcp_server_pid}" 2>/dev/null || true',
+    "}",
+    "trap cleanup_transparent_smoke EXIT",
+    'while [ ! -s "${tcp_port_file}" ]; do sleep 0.05; done',
+    'TRANSPARENT_TCP_PORT="$(cat "${tcp_port_file}")"',
     "cleanup_transparent_rules",
+    'exec 4<>"/dev/tcp/127.0.0.1/${TRANSPARENT_TCP_PORT}"',
+    'printf "direct:%s" "${TRANSPARENT_TCP_MESSAGE}" >&4',
+    "direct_tcp_response_byte_count=$((12 + ${#TRANSPARENT_TCP_MESSAGE}))",
+    'direct_tcp_response=""',
+    'IFS= read -r -N "${direct_tcp_response_byte_count}" direct_tcp_response <&4 || { printf \'direct TCP read failed after receiving: %s\\n\' "${direct_tcp_response}" >&2; exit 1; }',
+    '[ "${direct_tcp_response}" = "echo:direct:${TRANSPARENT_TCP_MESSAGE}" ] || { printf \'unexpected direct TCP response: %s\\n\' "${direct_tcp_response}" >&2; exit 1; }',
+    "exec 4<&-",
+    "exec 4>&-",
+    'iptables -t nat -A OUTPUT -p tcp -m mark --mark "${TRANSPARENT_PROXY_PORT}" -j RETURN || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
     'iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_HTTP_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
     'iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_SECURE_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    'iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_TCP_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    'ss -ltnp | grep -q ":${TRANSPARENT_PROXY_PORT} " || { printf "transparent proxy listener is not bound\\n" >&2; ss -ltnp >&2; iptables -t nat -S OUTPUT >&2; exit 1; }',
     "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy",
     'curl -fsS -X POST -H "content-type: text/plain" --data "${TRANSPARENT_HTTP_MESSAGE}" "${TRANSPARENT_HTTP_URL}"',
     "printf '\\n'",
@@ -618,5 +666,12 @@ function transparentGatewaySmokeScript(): string {
     "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected transparent WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
     'grep -a "echo:${TRANSPARENT_WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected transparent WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
     "printf 'TRANSPARENT-WSS:echo:%s\\n' \"${TRANSPARENT_WSS_MESSAGE}\"",
+    'exec 5<>"/dev/tcp/127.0.0.1/${TRANSPARENT_TCP_PORT}"',
+    'printf "%s" "${TRANSPARENT_TCP_MESSAGE}" >&5',
+    "tcp_response_byte_count=$((5 + ${#TRANSPARENT_TCP_MESSAGE}))",
+    'tcp_response=""',
+    'IFS= read -r -N "${tcp_response_byte_count}" tcp_response <&5 || { printf \'transparent TCP read failed after receiving: %s\\n\' "${tcp_response}" >&2; exit 1; }',
+    '[ "${tcp_response}" = "echo:${TRANSPARENT_TCP_MESSAGE}" ] || { printf \'unexpected transparent TCP response: %s\\n\' "${tcp_response}" >&2; exit 1; }',
+    "printf 'TRANSPARENT-TCP:echo:%s\\n' \"${TRANSPARENT_TCP_MESSAGE}\"",
   ].join("\n");
 }

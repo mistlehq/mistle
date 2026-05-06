@@ -43,7 +43,7 @@ use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Map, Value};
 use tokio::io::copy_bidirectional;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use tokio::runtime::Builder;
 use tokio::sync::{mpsc as tokio_mpsc, oneshot};
 use tokio_rustls::rustls::{ServerConfig, server::Acceptor as RustlsServerAcceptor};
@@ -68,6 +68,8 @@ const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
 #[cfg(target_os = "linux")]
 const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
+#[cfg(target_os = "linux")]
+const TRANSPARENT_PASSTHROUGH_SOCKET_MARK: u32 = 38_514;
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -202,6 +204,7 @@ struct RequestTargetOverride {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum TransparentProxyProtocol {
+    Empty,
     PlainHttp,
     Tls,
     Unsupported,
@@ -1755,7 +1758,7 @@ fn run_transparent_proxy_server(
 }
 
 async fn handle_transparent_proxy_connection(
-    stream: tokio::net::TcpStream,
+    stream: TcpStream,
     peer_address: SocketAddr,
     state: EgressProxyState,
 ) -> Result<(), EgressProxyError> {
@@ -1774,6 +1777,15 @@ async fn handle_transparent_proxy_connection(
         ),
     ];
     match protocol {
+        TransparentProxyProtocol::Empty => {
+            emit_egress_proxy_log(
+                state.clock.as_ref(),
+                &state.sandbox_instance_id,
+                "egress_proxy_transparent_connection_empty",
+                &fields,
+            );
+            Ok(())
+        }
         TransparentProxyProtocol::PlainHttp => {
             fields.push(("scheme", Value::String("http".to_string())));
             fields.push(("authority", Value::String(authority.clone())));
@@ -1829,19 +1841,14 @@ async fn handle_transparent_proxy_connection(
                 })
         }
         TransparentProxyProtocol::Unsupported => {
-            emit_egress_proxy_log(
-                state.clock.as_ref(),
-                &state.sandbox_instance_id,
-                "egress_proxy_transparent_connection_unsupported",
-                &fields,
-            );
-            Ok(())
+            handle_transparent_passthrough_connection(stream, original_destination, state, fields)
+                .await
         }
     }
 }
 
 async fn classify_transparent_proxy_stream(
-    stream: &tokio::net::TcpStream,
+    stream: &TcpStream,
 ) -> Result<TransparentProxyProtocol, EgressProxyError> {
     let mut first_byte = [0_u8; 1];
     let byte_count = stream.peek(&mut first_byte).await.map_err(|error| {
@@ -1850,7 +1857,9 @@ async fn classify_transparent_proxy_stream(
         ))
     })?;
     if byte_count == 0 {
-        return Ok(TransparentProxyProtocol::Unsupported);
+        // The supervisor health check opens and closes a TCP connection without
+        // sending bytes; treat that as healthy listener traffic, not passthrough.
+        return Ok(TransparentProxyProtocol::Empty);
     }
     Ok(classify_transparent_proxy_first_byte(first_byte[0]))
 }
@@ -1867,10 +1876,95 @@ fn classify_transparent_proxy_first_byte(first_byte: u8) -> TransparentProxyProt
 
 fn transparent_proxy_protocol_name(protocol: TransparentProxyProtocol) -> &'static str {
     match protocol {
+        TransparentProxyProtocol::Empty => "empty",
         TransparentProxyProtocol::PlainHttp => "http",
         TransparentProxyProtocol::Tls => "tls",
         TransparentProxyProtocol::Unsupported => "unsupported",
     }
+}
+
+async fn handle_transparent_passthrough_connection(
+    mut downstream: TcpStream,
+    original_destination: SocketAddr,
+    state: EgressProxyState,
+    fields: Vec<(&'static str, Value)>,
+) -> Result<(), EgressProxyError> {
+    emit_egress_proxy_log(
+        state.clock.as_ref(),
+        &state.sandbox_instance_id,
+        "egress_proxy_transparent_passthrough_started",
+        &fields,
+    );
+
+    let started_at_ms = state.clock.now_ms();
+    let mut upstream = connect_transparent_passthrough_upstream(original_destination).await?;
+    let copy_result = copy_bidirectional(&mut downstream, &mut upstream)
+        .await
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "transparent passthrough copy to '{original_destination}' failed: {error}"
+            ))
+        })?;
+
+    let ended_at_ms = state.clock.now_ms();
+    let duration_ms = ended_at_ms.saturating_sub(started_at_ms);
+    let mut completed_fields = fields;
+    completed_fields.push(("outcome", Value::String("completed".to_string())));
+    completed_fields.push(("requestBytes", Value::from(copy_result.0)));
+    completed_fields.push(("responseBytes", Value::from(copy_result.1)));
+    completed_fields.push(("durationMs", Value::from(duration_ms)));
+    emit_egress_proxy_log(
+        state.clock.as_ref(),
+        &state.sandbox_instance_id,
+        "egress_proxy_transparent_passthrough_completed",
+        &completed_fields,
+    );
+
+    Ok(())
+}
+
+async fn connect_transparent_passthrough_upstream(
+    original_destination: SocketAddr,
+) -> Result<TcpStream, EgressProxyError> {
+    let socket = match original_destination {
+        SocketAddr::V4(_) => TcpSocket::new_v4(),
+        SocketAddr::V6(_) => TcpSocket::new_v6(),
+    }
+    .map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to create transparent passthrough upstream socket: {error}"
+        ))
+    })?;
+
+    configure_transparent_passthrough_upstream_socket(&socket)?;
+    socket.connect(original_destination).await.map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to connect transparent passthrough upstream '{original_destination}': {error}"
+        ))
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn configure_transparent_passthrough_upstream_socket(
+    socket: &TcpSocket,
+) -> Result<(), EgressProxyError> {
+    nix::sys::socket::setsockopt(
+        socket,
+        nix::sys::socket::sockopt::Mark,
+        &TRANSPARENT_PASSTHROUGH_SOCKET_MARK,
+    )
+    .map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to mark transparent passthrough upstream socket: {error}"
+        ))
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn configure_transparent_passthrough_upstream_socket(
+    _socket: &TcpSocket,
+) -> Result<(), EgressProxyError> {
+    Ok(())
 }
 
 async fn handle_proxy_request(
