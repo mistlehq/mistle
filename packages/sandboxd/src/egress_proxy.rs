@@ -16,10 +16,10 @@ use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Command;
-use std::sync::Arc;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, TryRecvError};
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
@@ -42,7 +42,7 @@ use serde_json::{Map, Value};
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
-use tokio::sync::oneshot;
+use tokio::sync::{mpsc as tokio_mpsc, oneshot};
 use tokio_rustls::TlsAcceptor;
 use tokio_rustls::rustls::ServerConfig;
 
@@ -52,7 +52,7 @@ use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, SystemClock, format_rfc3339_timestamp};
 use crate::tunnel::session::{
-    GatewayEgressForwarder, TunnelEgressHttpRequest, TunnelEgressHttpResponse,
+    GatewayEgressForwarder, TunnelEgressHttpRequest, TunnelEgressHttpResponse, TunnelSessionError,
 };
 
 const TOKENIZER_PROXY_EGRESS_GRANT_HEADER_NAME: &str = "X-Mistle-Egress-Grant";
@@ -203,7 +203,7 @@ struct EgressProxyRequestContext {
 }
 
 struct InstrumentedResponseBody {
-    inner: Incoming,
+    inner: HyperBody,
     context: Arc<EgressProxyRequestContext>,
     upstream_status: StatusCode,
     upstream_trace_id: Option<String>,
@@ -211,6 +211,10 @@ struct InstrumentedResponseBody {
     forwarded_bytes: u64,
     first_chunk_at_ms: Option<u64>,
     ended: bool,
+}
+
+struct GatewayEgressResponseBody {
+    inner: Mutex<tokio_mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>>,
 }
 
 impl EgressProxyError {
@@ -493,7 +497,7 @@ impl Body for InstrumentedResponseBody {
                     Some(error_message.as_str()),
                     &[],
                 );
-                Poll::Ready(Some(Err(Box::new(error))))
+                Poll::Ready(Some(Err(error)))
             }
             Poll::Ready(None) => {
                 self.finalize(
@@ -527,6 +531,27 @@ impl Drop for InstrumentedResponseBody {
             None,
             &[],
         );
+    }
+}
+
+impl Body for GatewayEgressResponseBody {
+    type Data = Bytes;
+    type Error = BoxError;
+
+    fn poll_frame(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<Frame<Self::Data>, Self::Error>>> {
+        let mut receiver = self
+            .inner
+            .lock()
+            .expect("gateway egress response body lock should not be poisoned");
+        match receiver.poll_recv(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Some(Ok(bytes))) => Poll::Ready(Some(Ok(Frame::data(bytes)))),
+            Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(Box::new(error)))),
+            Poll::Ready(None) => Poll::Ready(None),
+        }
     }
 }
 
@@ -1659,7 +1684,7 @@ async fn forward_upgrade_request(
         );
         return response_builder
             .body(box_body(InstrumentedResponseBody {
-                inner: body,
+                inner: box_body(body),
                 context: request_context,
                 upstream_status,
                 upstream_trace_id: header_value_to_string(
@@ -1893,7 +1918,7 @@ async fn forward_request(
 
     response_builder
         .body(box_body(InstrumentedResponseBody {
-            inner: body,
+            inner: box_body(body),
             context: request_context,
             upstream_status,
             upstream_trace_id,
@@ -1935,17 +1960,11 @@ async fn forward_request_through_gateway(
         started_at_ms: state.clock.now_ms(),
         clock: state.clock.clone(),
     });
-    let body_bytes = body
-        .collect()
-        .await
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to read proxied request body for gateway egress: {error}"
-            ))
-        })?
-        .to_bytes();
     let mut request_started_fields = request_context.common_fields();
-    request_started_fields.push(("hasRequestBody", Value::Bool(!body_bytes.is_empty())));
+    request_started_fields.push((
+        "hasRequestBody",
+        Value::Bool(body.size_hint().lower() > 0 || body.size_hint().upper().unwrap_or(1) > 0),
+    ));
     emit_egress_proxy_log(
         request_context.clock.as_ref(),
         &request_context.sandbox_instance_id,
@@ -1970,18 +1989,63 @@ async fn forward_request_through_gateway(
         path,
         query,
         headers,
-        body: body_bytes.to_vec(),
     };
 
-    let gateway_response =
-        tokio::task::spawn_blocking(move || forwarder.request_http(tunnel_request))
-            .await
-            .map_err(|error| {
-                EgressProxyError::new(format!("gateway egress forwarding task failed: {error}"))
-            })?
-            .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let exchange = forwarder
+        .open_http(tunnel_request)
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let (request_body_sender, response_receiver) = exchange.into_parts();
+    let mut request_body_task = tokio::spawn(stream_gateway_egress_request_body(
+        body,
+        request_body_sender,
+    ));
+    let mut response_start_task =
+        tokio::task::spawn_blocking(move || response_receiver.recv_response_start());
+    let gateway_response = tokio::select! {
+        request_body_result = &mut request_body_task => {
+            request_body_result
+                .map_err(|error| EgressProxyError::new(format!("gateway egress request body task failed: {error}")))??;
+            response_start_task.await
+                .map_err(|error| EgressProxyError::new(format!("gateway egress forwarding task failed: {error}")))?
+                .map_err(|error| EgressProxyError::new(error.to_string()))?
+        }
+        response_start_result = &mut response_start_task => {
+            match response_start_result
+                .map_err(|error| EgressProxyError::new(format!("gateway egress forwarding task failed: {error}")))?
+            {
+                Ok(response) => response,
+                Err(error) => {
+                    request_body_task.abort();
+                    return Err(EgressProxyError::new(error.to_string()));
+                }
+            }
+        }
+    };
 
     response_from_gateway_egress_response(gateway_response, request_context)
+}
+
+async fn stream_gateway_egress_request_body(
+    mut body: Incoming,
+    request_body_sender: crate::tunnel::session::GatewayEgressHttpRequestBodySender,
+) -> Result<(), EgressProxyError> {
+    while let Some(frame) = body.frame().await {
+        let frame = frame.map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to read proxied request body for gateway egress: {error}"
+            ))
+        })?;
+        if let Ok(bytes) = frame.into_data()
+            && !bytes.is_empty()
+        {
+            request_body_sender
+                .send_chunk(bytes)
+                .map_err(|error| EgressProxyError::new(error.to_string()))?;
+        }
+    }
+    request_body_sender
+        .send_end()
+        .map_err(|error| EgressProxyError::new(error.to_string()))
 }
 
 fn response_from_gateway_egress_response(
@@ -2014,18 +2078,19 @@ fn response_from_gateway_egress_response(
         request_context.request_id.as_str(),
     );
 
-    let completed_fields = request_context.common_fields();
-    emit_egress_proxy_log(
-        request_context.clock.as_ref(),
-        &request_context.sandbox_instance_id,
-        "egress_proxy_response_body_completed",
-        &completed_fields,
-    );
-
     response_builder
-        .body(box_body(
-            Full::new(Bytes::from(gateway_response.body)).map_err(infallible_to_box_error),
-        ))
+        .body(box_body(InstrumentedResponseBody {
+            inner: box_body(GatewayEgressResponseBody {
+                inner: Mutex::new(gateway_response.body),
+            }),
+            context: request_context,
+            upstream_status: status,
+            upstream_trace_id: None,
+            chunk_count: 0,
+            forwarded_bytes: 0,
+            first_chunk_at_ms: None,
+            ended: false,
+        }))
         .map_err(|error| {
             EgressProxyError::new(format!("failed to build gateway egress response: {error}"))
         })

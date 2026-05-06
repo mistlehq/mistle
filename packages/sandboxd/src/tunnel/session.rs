@@ -171,14 +171,87 @@ pub struct TunnelEgressHttpRequest {
     pub path: String,
     pub query: Option<String>,
     pub headers: RepeatedHeaderValues,
-    pub body: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TunnelEgressHttpResponse {
     pub status: u16,
     pub headers: RepeatedHeaderValues,
-    pub body: Vec<u8>,
+    pub body: mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>,
+}
+
+impl std::fmt::Debug for TunnelEgressHttpResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TunnelEgressHttpResponse")
+            .field("status", &self.status)
+            .field("headers", &self.headers)
+            .finish_non_exhaustive()
+    }
+}
+
+pub struct GatewayEgressHttpRequestBodySender {
+    request_sender: mpsc::UnboundedSender<TunnelSessionRequest>,
+    stream_id: u32,
+}
+
+pub struct GatewayEgressHttpExchange {
+    pub body_sender: GatewayEgressHttpRequestBodySender,
+    response_receiver:
+        std::sync::mpsc::Receiver<Result<TunnelEgressHttpResponse, TunnelSessionError>>,
+}
+
+pub struct GatewayEgressHttpResponseReceiver {
+    response_receiver:
+        std::sync::mpsc::Receiver<Result<TunnelEgressHttpResponse, TunnelSessionError>>,
+}
+
+impl GatewayEgressHttpRequestBodySender {
+    pub fn send_chunk(&self, bytes: Bytes) -> Result<(), TunnelSessionError> {
+        self.request_sender
+            .send(TunnelSessionRequest::EgressHttpRequestBodyChunk {
+                bytes,
+                stream_id: self.stream_id,
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))
+    }
+
+    pub fn send_end(&self) -> Result<(), TunnelSessionError> {
+        self.request_sender
+            .send(TunnelSessionRequest::EgressHttpRequestBodyEnd {
+                stream_id: self.stream_id,
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))
+    }
+}
+
+impl GatewayEgressHttpExchange {
+    pub fn into_parts(
+        self,
+    ) -> (
+        GatewayEgressHttpRequestBodySender,
+        GatewayEgressHttpResponseReceiver,
+    ) {
+        (
+            self.body_sender,
+            GatewayEgressHttpResponseReceiver {
+                response_receiver: self.response_receiver,
+            },
+        )
+    }
+
+    pub fn recv_response_start(self) -> Result<TunnelEgressHttpResponse, TunnelSessionError> {
+        GatewayEgressHttpResponseReceiver {
+            response_receiver: self.response_receiver,
+        }
+        .recv_response_start()
+    }
+}
+
+impl GatewayEgressHttpResponseReceiver {
+    pub fn recv_response_start(self) -> Result<TunnelEgressHttpResponse, TunnelSessionError> {
+        self.response_receiver
+            .recv_timeout(DEFAULT_EGRESS_HTTP_REQUEST_TIMEOUT)
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -203,10 +276,10 @@ impl GatewayEgressForwarder {
         *sender = Some(request_sender);
     }
 
-    pub fn request_http(
+    pub fn open_http(
         &self,
         request: TunnelEgressHttpRequest,
-    ) -> Result<TunnelEgressHttpResponse, TunnelSessionError> {
+    ) -> Result<GatewayEgressHttpExchange, TunnelSessionError> {
         let stream_id = self
             .next_stream_id
             .fetch_add(1, Ordering::Relaxed)
@@ -224,16 +297,20 @@ impl GatewayEgressForwarder {
             })?;
         let (response_sender, response_receiver) = std::sync::mpsc::channel();
         request_sender
-            .send(TunnelSessionRequest::EgressHttp {
+            .send(TunnelSessionRequest::EgressHttpOpen {
                 request,
                 response_sender,
                 stream_id,
             })
             .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
 
-        response_receiver
-            .recv_timeout(DEFAULT_EGRESS_HTTP_REQUEST_TIMEOUT)
-            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?
+        Ok(GatewayEgressHttpExchange {
+            body_sender: GatewayEgressHttpRequestBodySender {
+                request_sender,
+                stream_id,
+            },
+            response_receiver,
+        })
     }
 }
 
@@ -438,10 +515,17 @@ enum TunnelSessionRequest {
         request: TunnelSigningRequest,
         response_sender: std::sync::mpsc::Sender<Result<TunnelSigningResponse, TunnelSessionError>>,
     },
-    EgressHttp {
+    EgressHttpOpen {
         request: TunnelEgressHttpRequest,
         response_sender:
             std::sync::mpsc::Sender<Result<TunnelEgressHttpResponse, TunnelSessionError>>,
+        stream_id: u32,
+    },
+    EgressHttpRequestBodyChunk {
+        bytes: Bytes,
+        stream_id: u32,
+    },
+    EgressHttpRequestBodyEnd {
         stream_id: u32,
     },
 }
@@ -576,9 +660,10 @@ struct PendingExecOpenState {
 }
 
 struct PendingEgressHttpRequest {
-    response_sender: std::sync::mpsc::Sender<Result<TunnelEgressHttpResponse, TunnelSessionError>>,
+    response_sender:
+        Option<std::sync::mpsc::Sender<Result<TunnelEgressHttpResponse, TunnelSessionError>>>,
     response: Option<EgressHttpResponseStart>,
-    body: Vec<u8>,
+    body_sender: Option<mpsc::UnboundedSender<Result<Bytes, TunnelSessionError>>>,
 }
 
 #[derive(Deserialize)]
@@ -1416,9 +1501,12 @@ fn fail_pending_egress_http_requests(session_state: &mut TunnelSessionMutableSta
     for pending_request in
         std::mem::take(&mut session_state.pending_egress_http_requests).into_values()
     {
-        let _ = pending_request
-            .response_sender
-            .send(Err(TunnelSessionError::Egress(message.to_string())));
+        let error = TunnelSessionError::Egress(message.to_string());
+        if let Some(body_sender) = pending_request.body_sender {
+            let _ = body_sender.send(Err(error));
+        } else if let Some(response_sender) = pending_request.response_sender {
+            let _ = response_sender.send(Err(error));
+        }
     }
 }
 
@@ -4023,7 +4111,7 @@ fn handle_tunnel_session_request(
                 }
             }
         }
-        TunnelSessionRequest::EgressHttp {
+        TunnelSessionRequest::EgressHttpOpen {
             request,
             response_sender,
             stream_id,
@@ -4054,43 +4142,16 @@ fn handle_tunnel_session_request(
                 },
             })
             .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
-            let body = request.body;
-            let body_chunk_payload = if body.is_empty() {
-                None
-            } else {
-                Some(
-                    serde_json::to_string(&EgressHttpRequestBodyChunk {
-                        message_type: "egress.http.request.body.chunk".to_string(),
-                        stream_id,
-                        bytes: base64::engine::general_purpose::STANDARD.encode(&body),
-                        encoding: "base64".to_string(),
-                    })
-                    .map_err(|error| TunnelSessionError::Egress(error.to_string()))?,
-                )
-            };
-            let body_end_payload = serde_json::to_string(&EgressHttpRequestBodyEnd {
-                message_type: "egress.http.request.body.end".to_string(),
-                stream_id,
-            })
-            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
-
             session_state.pending_egress_http_requests.insert(
                 stream_id,
                 PendingEgressHttpRequest {
-                    response_sender,
+                    response_sender: Some(response_sender),
                     response: None,
-                    body: Vec::new(),
+                    body_sender: None,
                 },
             );
 
-            let write_result = write_tunnel_text(tunnel_writer_sender, open_payload)
-                .and_then(|()| {
-                    if let Some(body_chunk_payload) = body_chunk_payload {
-                        write_tunnel_text(tunnel_writer_sender, body_chunk_payload)?;
-                    }
-                    Ok(())
-                })
-                .and_then(|()| write_tunnel_text(tunnel_writer_sender, body_end_payload));
+            let write_result = write_tunnel_text(tunnel_writer_sender, open_payload);
 
             match write_result {
                 Ok(()) => Ok(TunnelSessionControlFlow::Continue),
@@ -4098,14 +4159,46 @@ fn handle_tunnel_session_request(
                     if let Some(pending_request) = session_state
                         .pending_egress_http_requests
                         .remove(&stream_id)
+                        && let Some(response_sender) = pending_request.response_sender
                     {
-                        let _ = pending_request
-                            .response_sender
+                        let _ = response_sender
                             .send(Err(TunnelSessionError::Egress(error.to_string())));
                     }
                     Err(error)
                 }
             }
+        }
+        TunnelSessionRequest::EgressHttpRequestBodyChunk { bytes, stream_id } => {
+            if !session_state
+                .pending_egress_http_requests
+                .contains_key(&stream_id)
+            {
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+            let body_chunk_payload = serde_json::to_string(&EgressHttpRequestBodyChunk {
+                message_type: "egress.http.request.body.chunk".to_string(),
+                stream_id,
+                bytes: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                encoding: "base64".to_string(),
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
+            write_tunnel_text(tunnel_writer_sender, body_chunk_payload)?;
+            Ok(TunnelSessionControlFlow::Continue)
+        }
+        TunnelSessionRequest::EgressHttpRequestBodyEnd { stream_id } => {
+            if !session_state
+                .pending_egress_http_requests
+                .contains_key(&stream_id)
+            {
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+            let body_end_payload = serde_json::to_string(&EgressHttpRequestBodyEnd {
+                message_type: "egress.http.request.body.end".to_string(),
+                stream_id,
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
+            write_tunnel_text(tunnel_writer_sender, body_end_payload)?;
+            Ok(TunnelSessionControlFlow::Continue)
         }
     }
 }
@@ -4553,7 +4646,21 @@ fn handle_egress_transport_message(
                     message.stream_id
                 )));
             }
+            let (body_sender, body_receiver) = mpsc::unbounded_channel();
+            let response = TunnelEgressHttpResponse {
+                status: message.status,
+                headers: message.headers.clone(),
+                body: body_receiver,
+            };
+            let Some(response_sender) = pending_request.response_sender.take() else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.http.response.start streamId {} already delivered response start",
+                    message.stream_id
+                )));
+            };
+            let _ = response_sender.send(Ok(response));
             pending_request.response = Some(message);
+            pending_request.body_sender = Some(body_sender);
         }
         crate::tunnel::protocol::EgressTransportMessage::HttpResponseBodyChunk(message) => {
             let Some(pending_request) = session_state
@@ -4574,7 +4681,13 @@ fn handle_egress_transport_message(
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(message.bytes.as_bytes())
                 .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
-            pending_request.body.extend(bytes);
+            let Some(body_sender) = &pending_request.body_sender else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.http.response.body.chunk streamId {} arrived before response start",
+                    message.stream_id
+                )));
+            };
+            let _ = body_sender.send(Ok(Bytes::from(bytes)));
         }
         crate::tunnel::protocol::EgressTransportMessage::HttpResponseBodyEnd(message) => {
             let Some(pending_request) = session_state
@@ -4587,21 +4700,15 @@ fn handle_egress_transport_message(
                 )));
             };
             let Some(response) = pending_request.response else {
-                let _ = pending_request
-                    .response_sender
-                    .send(Err(TunnelSessionError::Egress(format!(
+                if let Some(response_sender) = pending_request.response_sender {
+                    let _ = response_sender.send(Err(TunnelSessionError::Egress(format!(
                         "egress.http.response.body.end streamId {} arrived before response start",
                         message.stream_id
                     ))));
+                }
                 return Ok(());
             };
-            let _ = pending_request
-                .response_sender
-                .send(Ok(TunnelEgressHttpResponse {
-                    status: response.status,
-                    headers: response.headers,
-                    body: pending_request.body,
-                }));
+            drop(response);
         }
         crate::tunnel::protocol::EgressTransportMessage::StreamError(message) => {
             let Some(pending_request) = session_state
@@ -4613,12 +4720,15 @@ fn handle_egress_transport_message(
                     message.stream_id
                 )));
             };
-            let _ = pending_request
-                .response_sender
-                .send(Err(TunnelSessionError::Egress(format!(
-                    "gateway egress stream failed with {}: {}",
-                    message.code, message.message
-                ))));
+            let stream_error = TunnelSessionError::Egress(format!(
+                "gateway egress stream failed with {}: {}",
+                message.code, message.message
+            ));
+            if let Some(body_sender) = pending_request.body_sender {
+                let _ = body_sender.send(Err(stream_error));
+            } else if let Some(response_sender) = pending_request.response_sender {
+                let _ = response_sender.send(Err(stream_error));
+            }
         }
         crate::tunnel::protocol::EgressTransportMessage::HttpOpen(message) => {
             return Err(TunnelSessionError::Egress(format!(
@@ -5597,10 +5707,11 @@ mod tests {
     use super::{
         AgentStreamState, AgentStreamStats, ConnectedTunnelSessionOutcome, DEFAULT_ATTACHMENT_ROOT,
         PTY_OUTCOME_CLOSED, PendingEgressHttpRequest, PortAccessTcpStreamState, PtySessionStats,
-        PtySessionTermination, TunnelEgressHttpResponse, TunnelSessionError, TunnelSessionEvent,
-        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRuntime,
-        TunnelWriterMessage, connect_bootstrap_websocket, handle_egress_transport_message,
-        handle_ports_transport_message, handle_tunnel_control_message, handle_tunnel_session_event,
+        PtySessionTermination, TunnelEgressHttpRequest, TunnelSessionError, TunnelSessionEvent,
+        TunnelSessionLoopContext, TunnelSessionMutableState, TunnelSessionRequest,
+        TunnelSessionRuntime, TunnelWriterMessage, connect_bootstrap_websocket,
+        handle_egress_transport_message, handle_ports_transport_message,
+        handle_tunnel_control_message, handle_tunnel_session_event, handle_tunnel_session_request,
         prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
         publish_pty_session_summary, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
         run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
@@ -5620,6 +5731,7 @@ mod tests {
 
     #[cfg(target_os = "linux")]
     use base64::Engine;
+    use bytes::Bytes;
     use serde_json::{Value, json};
     use tungstenite::{
         Error as WebSocketError, Message, WebSocket, accept, accept_hdr,
@@ -5634,11 +5746,13 @@ mod tests {
     use crate::time::{Clock, SystemClock, ThreadSleeper};
     use crate::tunnel::port_access_transport::{PortAccessTcpCommand, PortAccessTransportEvent};
     use crate::tunnel::protocol::{
-        AGENT_STREAM_WINDOW_BYTES, EgressHttpResponseBodyChunk, EgressHttpResponseBodyEnd,
-        EgressHttpResponseStart, EgressStreamError, EgressTransportMessage, PAYLOAD_KIND_RAW_BYTES,
+        AGENT_STREAM_WINDOW_BYTES, EgressHttpRequestBodyChunk, EgressHttpRequestBodyEnd,
+        EgressHttpResponseBodyChunk, EgressHttpResponseBodyEnd, EgressHttpResponseStart,
+        EgressStreamError, EgressTransportMessage, PAYLOAD_KIND_RAW_BYTES,
         PAYLOAD_KIND_WEBSOCKET_TEXT, PortAccessTarget, PortsTcpClose, PortsTcpConnected,
         PortsTcpOpen, PortsTransportMessage, StreamDataFrame, StreamSendWindow,
-        decode_stream_data_frame, encode_stream_data_frame, parse_stream_control_message,
+        decode_stream_data_frame, encode_stream_data_frame, parse_egress_transport_message,
+        parse_stream_control_message,
     };
     use crate::tunnel::session::{
         TunnelSession, TunnelSigningRequest, TunnelSigningResponse, decode_bounded_output,
@@ -5736,8 +5850,95 @@ mod tests {
         serde_json::from_str::<Value>(&payload).expect("writer text payload should be json")
     }
 
-    #[test]
-    fn completes_pending_gateway_egress_http_request_from_response_frames() {
+    #[tokio::test]
+    async fn gateway_egress_http_request_body_is_sent_as_stream_frames() {
+        let (tunnel_writer_sender, mut tunnel_writer_receiver) =
+            tokio::sync::mpsc::unbounded_channel();
+        let (response_sender, _response_receiver) = mpsc::channel();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_egress_http_requests: BTreeMap::new(),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::EgressHttpOpen {
+                request: TunnelEgressHttpRequest {
+                    request_id: "egp_1".to_string(),
+                    method: "POST".to_string(),
+                    scheme: "https".to_string(),
+                    authority: "chatgpt.com".to_string(),
+                    path: "/backend-api/codex/models".to_string(),
+                    query: None,
+                    headers: BTreeMap::new(),
+                },
+                response_sender,
+                stream_id: 93,
+            },
+            &tunnel_writer_sender,
+            &mut session_state,
+        )
+        .expect("egress open request should be written");
+        let open = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        assert_eq!(open["type"], "egress.http.open");
+        assert_eq!(open["streamId"], 93);
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::EgressHttpRequestBodyChunk {
+                bytes: Bytes::from_static(b"hello"),
+                stream_id: 93,
+            },
+            &tunnel_writer_sender,
+            &mut session_state,
+        )
+        .expect("egress request body chunk should be written");
+        let chunk_payload = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        let chunk = parse_egress_transport_message(&chunk_payload.to_string())
+            .expect("request body chunk should parse")
+            .expect("request body chunk should be an egress transport message");
+        let EgressTransportMessage::HttpRequestBodyChunk(EgressHttpRequestBodyChunk {
+            bytes,
+            encoding,
+            stream_id,
+            ..
+        }) = chunk
+        else {
+            panic!("expected egress.http.request.body.chunk");
+        };
+        assert_eq!(stream_id, 93);
+        assert_eq!(encoding, "base64");
+        assert_eq!(bytes, "aGVsbG8=");
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::EgressHttpRequestBodyEnd { stream_id: 93 },
+            &tunnel_writer_sender,
+            &mut session_state,
+        )
+        .expect("egress request body end should be written");
+        let end_payload = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        let end = parse_egress_transport_message(&end_payload.to_string())
+            .expect("request body end should parse")
+            .expect("request body end should be an egress transport message");
+        let EgressTransportMessage::HttpRequestBodyEnd(EgressHttpRequestBodyEnd {
+            stream_id, ..
+        }) = end
+        else {
+            panic!("expected egress.http.request.body.end");
+        };
+        assert_eq!(stream_id, 93);
+    }
+
+    #[tokio::test]
+    async fn completes_pending_gateway_egress_http_request_from_response_frames() {
         let (response_sender, response_receiver) = mpsc::channel();
         let mut session_state = TunnelSessionMutableState {
             telemetry_relay: TelemetryRelay::default(),
@@ -5745,9 +5946,9 @@ mod tests {
             pending_egress_http_requests: BTreeMap::from([(
                 91,
                 PendingEgressHttpRequest {
-                    response_sender,
+                    response_sender: Some(response_sender),
                     response: None,
-                    body: Vec::new(),
+                    body_sender: None,
                 },
             )]),
             pending_agent_opens: BTreeMap::new(),
@@ -5774,6 +5975,18 @@ mod tests {
             &mut session_state,
         )
         .expect("response start should attach to pending egress request");
+        let mut response = response_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("egress response should be delivered")
+            .expect("egress response should succeed");
+        assert_eq!(
+            response.status, 201,
+            "response start should complete before body end"
+        );
+        assert_eq!(
+            response.headers,
+            BTreeMap::from([("content-type".to_string(), vec!["text/plain".to_string()])])
+        );
         handle_egress_transport_message(
             EgressTransportMessage::HttpResponseBodyChunk(EgressHttpResponseBodyChunk {
                 message_type: "egress.http.response.body.chunk".to_string(),
@@ -5783,7 +5996,14 @@ mod tests {
             }),
             &mut session_state,
         )
-        .expect("response body chunk should append to pending egress request");
+        .expect("response body chunk should stream to the response body");
+        let streamed_chunk = response
+            .body
+            .recv()
+            .await
+            .expect("egress response body chunk should be delivered")
+            .expect("egress response body chunk should succeed");
+        assert_eq!(streamed_chunk, Bytes::from_static(b"pong"));
         handle_egress_transport_message(
             EgressTransportMessage::HttpResponseBodyEnd(EgressHttpResponseBodyEnd {
                 message_type: "egress.http.response.body.end".to_string(),
@@ -5792,22 +6012,6 @@ mod tests {
             &mut session_state,
         )
         .expect("response body end should complete pending egress request");
-
-        let response = response_receiver
-            .recv_timeout(Duration::from_secs(1))
-            .expect("egress response should be delivered")
-            .expect("egress response should succeed");
-        assert_eq!(
-            response,
-            TunnelEgressHttpResponse {
-                status: 201,
-                headers: BTreeMap::from([(
-                    "content-type".to_string(),
-                    vec!["text/plain".to_string()],
-                )]),
-                body: b"pong".to_vec(),
-            }
-        );
         assert!(session_state.pending_egress_http_requests.is_empty());
     }
 
@@ -5820,9 +6024,9 @@ mod tests {
             pending_egress_http_requests: BTreeMap::from([(
                 92,
                 PendingEgressHttpRequest {
-                    response_sender,
+                    response_sender: Some(response_sender),
                     response: None,
-                    body: Vec::new(),
+                    body_sender: None,
                 },
             )]),
             pending_agent_opens: BTreeMap::new(),
