@@ -3,6 +3,7 @@
  */
 
 import {
+  AutomationKinds,
   SandboxProfileVersionSnapshotJobStates,
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
@@ -153,7 +154,9 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
     expect(persistedProfile?.activeVersion).toBe(1);
   });
 
-  it("promotes refresh snapshots without changing the active version", async ({ env }) => {
+  it("promotes refresh snapshots without changing the active version or automation targets", async ({
+    env,
+  }) => {
     const session = await env.auth.createSession({
       email: "integration-new-internal-snapshot-job-refresh-success@example.com",
     });
@@ -167,6 +170,14 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
       state: SandboxProfileVersionSnapshotJobStates.RUNNING,
       activeVersion: 3,
       existingSnapshotImageId: "sha256:old-snapshot",
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_refresh_target",
+      targetId: "atg_internal_snapshot_refresh_target",
+      sandboxProfileId: "sbp_internal_snapshot_refresh_success",
+      sandboxProfileVersion: 3,
+      enabled: true,
     });
 
     const response = await snapshotJobRequest(env, {
@@ -195,6 +206,214 @@ describe.concurrent("internal sandbox profile version snapshot jobs integration"
       snapshotImageId: "sha256:new-snapshot",
     });
     expect(persistedProfile?.activeVersion).toBe(3);
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_refresh_target"),
+    ).resolves.toBe(3);
+  });
+
+  it("advances all automation targets for a profile after a publish snapshot succeeds", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-snapshot-job-advance-automation-targets@example.com",
+    });
+
+    await seedSnapshotJob(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_snapshot_advance_targets",
+      jobId: "ssj_internal_snapshot_advance_targets",
+      workflowRunId: "wf_internal_snapshot_advance_targets",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      activeVersion: 1,
+      profileVersion: 2,
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_advance_targets_one",
+      targetId: "atg_internal_snapshot_advance_targets_one",
+      sandboxProfileId: "sbp_internal_snapshot_advance_targets",
+      sandboxProfileVersion: 1,
+      enabled: true,
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_advance_targets_two",
+      automationKind: AutomationKinds.WEBHOOK,
+      targetId: "atg_internal_snapshot_advance_targets_two",
+      sandboxProfileId: "sbp_internal_snapshot_advance_targets",
+      sandboxProfileVersion: 7,
+      enabled: false,
+    });
+    await seedSnapshotJob(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_snapshot_advance_targets_other",
+      jobId: "ssj_internal_snapshot_advance_targets_other",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.QUEUED,
+      activeVersion: 4,
+      profileVersion: 4,
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_advance_targets_other",
+      targetId: "atg_internal_snapshot_advance_targets_other",
+      sandboxProfileId: "sbp_internal_snapshot_advance_targets_other",
+      sandboxProfileVersion: 4,
+      enabled: true,
+    });
+
+    const response = await snapshotJobRequest(env, {
+      jobId: "ssj_internal_snapshot_advance_targets",
+      action: "succeed",
+      body: {
+        workflowRunId: "wf_internal_snapshot_advance_targets",
+        image: {
+          provider: "docker",
+          imageId: "sha256:advance-targets",
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_advance_targets_one"),
+    ).resolves.toBe(2);
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_advance_targets_two"),
+    ).resolves.toBe(2);
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_advance_targets_other"),
+    ).resolves.toBe(4);
+  });
+
+  it("does not move automation targets backward when an older publish snapshot succeeds after a newer version is active", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-snapshot-job-older-publish-after-newer-active@example.com",
+    });
+
+    await seedSnapshotJob(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_snapshot_older_publish",
+      jobId: "ssj_internal_snapshot_older_publish",
+      workflowRunId: "wf_internal_snapshot_older_publish",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      activeVersion: 3,
+      profileVersion: 2,
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_older_publish",
+      targetId: "atg_internal_snapshot_older_publish",
+      sandboxProfileId: "sbp_internal_snapshot_older_publish",
+      sandboxProfileVersion: 3,
+      enabled: true,
+    });
+
+    const response = await snapshotJobRequest(env, {
+      jobId: "ssj_internal_snapshot_older_publish",
+      action: "succeed",
+      body: {
+        workflowRunId: "wf_internal_snapshot_older_publish",
+        image: {
+          provider: "docker",
+          imageId: "sha256:older-publish",
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_older_publish"),
+    ).resolves.toBe(3);
+  });
+
+  it("keeps automation targets on the newer version when publish snapshots complete out of order", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-internal-snapshot-job-out-of-order-publish@example.com",
+    });
+
+    await seedSnapshotJob(env, {
+      organizationId: session.organizationId,
+      profileId: "sbp_internal_snapshot_out_of_order_publish",
+      jobId: "ssj_internal_snapshot_out_of_order_publish_v2",
+      workflowRunId: "wf_internal_snapshot_out_of_order_publish_v2",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      activeVersion: 1,
+      profileVersion: 2,
+    });
+    await seedSnapshotJobForExistingProfile(env, {
+      profileId: "sbp_internal_snapshot_out_of_order_publish",
+      jobId: "ssj_internal_snapshot_out_of_order_publish_v3",
+      workflowRunId: "wf_internal_snapshot_out_of_order_publish_v3",
+      trigger: SandboxProfileVersionSnapshotJobTriggers.PUBLISH,
+      state: SandboxProfileVersionSnapshotJobStates.RUNNING,
+      profileVersion: 3,
+    });
+    await seedAutomationTarget(env, {
+      organizationId: session.organizationId,
+      automationId: "aut_internal_snapshot_out_of_order_publish",
+      targetId: "atg_internal_snapshot_out_of_order_publish",
+      sandboxProfileId: "sbp_internal_snapshot_out_of_order_publish",
+      sandboxProfileVersion: 1,
+      enabled: true,
+    });
+
+    const newerResponse = await snapshotJobRequest(env, {
+      jobId: "ssj_internal_snapshot_out_of_order_publish_v3",
+      action: "succeed",
+      body: {
+        workflowRunId: "wf_internal_snapshot_out_of_order_publish_v3",
+        image: {
+          provider: "docker",
+          imageId: "sha256:out-of-order-publish-v3",
+        },
+      },
+    });
+
+    expect(newerResponse.status).toBe(200);
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_out_of_order_publish"),
+    ).resolves.toBe(3);
+    await expect(
+      readSnapshotProfile(env, {
+        profileId: "sbp_internal_snapshot_out_of_order_publish",
+      }),
+    ).resolves.toMatchObject({
+      activeVersion: 3,
+    });
+
+    const olderResponse = await snapshotJobRequest(env, {
+      jobId: "ssj_internal_snapshot_out_of_order_publish_v2",
+      action: "succeed",
+      body: {
+        workflowRunId: "wf_internal_snapshot_out_of_order_publish_v2",
+        image: {
+          provider: "docker",
+          imageId: "sha256:out-of-order-publish-v2",
+        },
+      },
+    });
+
+    expect(olderResponse.status).toBe(200);
+    await expect(
+      readAutomationTargetVersion(env, "atg_internal_snapshot_out_of_order_publish"),
+    ).resolves.toBe(3);
+    await expect(
+      readSnapshotProfile(env, {
+        profileId: "sbp_internal_snapshot_out_of_order_publish",
+      }),
+    ).resolves.toMatchObject({
+      activeVersion: 3,
+    });
   });
 
   it("keeps the current snapshot and active version when a refresh job fails", async ({ env }) => {
@@ -309,17 +528,48 @@ async function seedSnapshotJob(
     workflowRunId?: string;
     activeVersion?: number | null;
     existingSnapshotImageId?: string;
+    profileVersion?: number;
   },
 ): Promise<void> {
+  const profileVersion = input.profileVersion ?? 1;
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values({
     id: input.profileId,
     organizationId: input.organizationId,
     displayName: "Snapshot Job Profile",
     activeVersion: input.activeVersion ?? null,
   });
+  await seedSnapshotJobForExistingProfile(env, {
+    profileId: input.profileId,
+    jobId: input.jobId,
+    trigger: input.trigger,
+    state: input.state,
+    ...(input.workflowRunId === undefined ? {} : { workflowRunId: input.workflowRunId }),
+    ...(input.existingSnapshotImageId === undefined
+      ? {}
+      : { existingSnapshotImageId: input.existingSnapshotImageId }),
+    profileVersion,
+  });
+}
+
+async function seedSnapshotJobForExistingProfile(
+  env: IntegrationTestEnvironment,
+  input: {
+    profileId: string;
+    jobId: string;
+    trigger:
+      | typeof SandboxProfileVersionSnapshotJobTriggers.PUBLISH
+      | typeof SandboxProfileVersionSnapshotJobTriggers.MANUAL_REFRESH;
+    state:
+      | typeof SandboxProfileVersionSnapshotJobStates.QUEUED
+      | typeof SandboxProfileVersionSnapshotJobStates.RUNNING;
+    workflowRunId?: string;
+    existingSnapshotImageId?: string;
+    profileVersion: number;
+  },
+): Promise<void> {
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values({
     sandboxProfileId: input.profileId,
-    version: 1,
+    version: input.profileVersion,
     state: SandboxProfileVersionStates.PUBLISHED,
     publishedAt: "2026-04-01T00:00:00.000Z",
     ...(input.existingSnapshotImageId === undefined
@@ -332,13 +582,41 @@ async function seedSnapshotJob(
   await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersionSnapshotJobs).values({
     id: input.jobId,
     sandboxProfileId: input.profileId,
-    sandboxProfileVersion: 1,
+    sandboxProfileVersion: input.profileVersion,
     workflowRunId: input.workflowRunId,
     trigger: input.trigger,
     state: input.state,
     ...(input.state === SandboxProfileVersionSnapshotJobStates.RUNNING
       ? { startedAt: "2026-04-01T00:00:00.000Z" }
       : {}),
+  });
+}
+
+async function seedAutomationTarget(
+  env: IntegrationTestEnvironment,
+  input: {
+    organizationId: string;
+    automationId: string;
+    automationKind?: typeof AutomationKinds.SCHEDULE | typeof AutomationKinds.WEBHOOK;
+    targetId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+    enabled: boolean;
+  },
+): Promise<void> {
+  await env.controlPlaneDb.insert(env.controlPlaneTables.automations).values({
+    id: input.automationId,
+    organizationId: input.organizationId,
+    kind: input.automationKind ?? AutomationKinds.SCHEDULE,
+    name: "Snapshot Target Automation",
+    enabled: input.enabled,
+  });
+  await env.controlPlaneDb.insert(env.controlPlaneTables.automationTargets).values({
+    id: input.targetId,
+    automationId: input.automationId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    primaryRepositoryId: null,
   });
 }
 
@@ -380,6 +658,20 @@ async function readSnapshotVersion(
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, 1)),
   });
+}
+
+async function readAutomationTargetVersion(
+  env: IntegrationTestEnvironment,
+  targetId: string,
+): Promise<number | undefined> {
+  const target = await env.controlPlaneDb.query.automationTargets.findFirst({
+    columns: {
+      sandboxProfileVersion: true,
+    },
+    where: (table, { eq }) => eq(table.id, targetId),
+  });
+
+  return target?.sandboxProfileVersion;
 }
 
 async function readSnapshotProfile(

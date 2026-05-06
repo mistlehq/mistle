@@ -1,11 +1,14 @@
 import {
+  type SandboxProfileVersionSnapshotJobTrigger,
   SandboxProfileVersionSnapshotJobStates,
+  SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
   type ControlPlaneDatabase,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
+import { logger } from "../../../logger.js";
 import {
   createSnapshotJobNotFoundError,
   createSnapshotJobOwnershipMismatchError,
@@ -25,13 +28,14 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
     };
   },
 ): Promise<{ status: "ok" }> {
-  await ctx.db.transaction(async (tx) => {
+  const successResult = await ctx.db.transaction(async (tx) => {
     const tables = getControlPlaneDatabaseSchema(tx);
 
     const [lockedRow] = await tx
       .select({
         state: tables.sandboxProfileVersionSnapshotJobs.state,
         workflowRunId: tables.sandboxProfileVersionSnapshotJobs.workflowRunId,
+        trigger: tables.sandboxProfileVersionSnapshotJobs.trigger,
         candidateImageProvider: tables.sandboxProfileVersionSnapshotJobs.candidateImageProvider,
         candidateImageId: tables.sandboxProfileVersionSnapshotJobs.candidateImageId,
         sandboxProfileId: tables.sandboxProfileVersionSnapshotJobs.sandboxProfileId,
@@ -68,6 +72,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
 
     const actualState = lockedRow.state;
     const workflowRunId = lockedRow.workflowRunId;
+    const trigger = lockedRow.trigger;
     const candidateImageProvider = lockedRow.candidateImageProvider;
     const candidateImageId = lockedRow.candidateImageId;
     const sandboxProfileId = lockedRow.sandboxProfileId;
@@ -91,7 +96,15 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       versionSnapshotImageProvider === input.image.provider &&
       versionSnapshotImageId === input.image.imageId
     ) {
-      return;
+      return {
+        shouldAdvanceAutomationTargets: shouldAdvanceAutomationTargetsForSnapshot({
+          trigger,
+          activeVersion,
+          sandboxProfileVersion,
+        }),
+        sandboxProfileId,
+        sandboxProfileVersion,
+      };
     }
 
     if (actualState !== SandboxProfileVersionSnapshotJobStates.RUNNING) {
@@ -112,6 +125,8 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
 
     const isInitialMaterialization =
       versionSnapshotImageProvider === null && versionSnapshotImageId === null;
+    const shouldActivateVersion =
+      isInitialMaterialization && (activeVersion === null || activeVersion < sandboxProfileVersion);
 
     const updatedRows = await tx
       .update(tables.sandboxProfileVersionSnapshotJobs)
@@ -171,10 +186,7 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
       });
     }
 
-    if (
-      isInitialMaterialization &&
-      (activeVersion === null || activeVersion < sandboxProfileVersion)
-    ) {
+    if (shouldActivateVersion) {
       await tx
         .update(tables.sandboxProfiles)
         .set({
@@ -182,9 +194,72 @@ export async function markSandboxProfileVersionSnapshotJobSucceeded(
         })
         .where(eq(tables.sandboxProfiles.id, sandboxProfileId));
     }
+
+    return {
+      shouldAdvanceAutomationTargets: shouldAdvanceAutomationTargetsForSnapshot({
+        trigger,
+        activeVersion,
+        sandboxProfileVersion,
+        shouldActivateVersion,
+      }),
+      sandboxProfileId,
+      sandboxProfileVersion,
+    };
   });
+
+  if (successResult.shouldAdvanceAutomationTargets) {
+    await tryAdvanceAutomationTargetsToPublishedProfileVersion(ctx, {
+      snapshotJobId: input.snapshotJobId,
+      sandboxProfileId: successResult.sandboxProfileId,
+      sandboxProfileVersion: successResult.sandboxProfileVersion,
+    });
+  }
 
   return {
     status: "ok",
   };
+}
+
+function shouldAdvanceAutomationTargetsForSnapshot(input: {
+  trigger: SandboxProfileVersionSnapshotJobTrigger;
+  activeVersion: number | null;
+  sandboxProfileVersion: number;
+  shouldActivateVersion?: boolean;
+}): boolean {
+  return (
+    input.trigger === SandboxProfileVersionSnapshotJobTriggers.PUBLISH &&
+    (input.activeVersion === input.sandboxProfileVersion || input.shouldActivateVersion === true)
+  );
+}
+
+async function tryAdvanceAutomationTargetsToPublishedProfileVersion(
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
+  input: {
+    snapshotJobId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+): Promise<void> {
+  try {
+    const tables = getControlPlaneDatabaseSchema(ctx.db);
+    await ctx.db
+      .update(tables.automationTargets)
+      .set({
+        sandboxProfileVersion: input.sandboxProfileVersion,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(tables.automationTargets.sandboxProfileId, input.sandboxProfileId));
+  } catch (error) {
+    logger.error(
+      {
+        err: error,
+        snapshotJobId: input.snapshotJobId,
+        sandboxProfileId: input.sandboxProfileId,
+        sandboxProfileVersion: input.sandboxProfileVersion,
+      },
+      "Failed to advance automation targets after sandbox profile snapshot succeeded.",
+    );
+  }
 }
