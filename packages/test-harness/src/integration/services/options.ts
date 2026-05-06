@@ -7,6 +7,7 @@ export type IntegrationSandboxE2BOptions = {
   domain?: string;
   cpuCount?: string;
   memoryMb?: string;
+  templateLockDirectoryPath?: string;
 };
 
 export type IntegrationSandboxOptions = {

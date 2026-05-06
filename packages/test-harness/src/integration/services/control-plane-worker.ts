@@ -288,6 +288,9 @@ function createE2BEnv(input: IntegrationSandboxOptions): Record<string, string> 
     ...(input.e2b.memoryMb === undefined
       ? {}
       : { MISTLE_SANDBOX_E2B_MEMORY_MB: input.e2b.memoryMb }),
+    ...(input.e2b.templateLockDirectoryPath === undefined
+      ? {}
+      : { MISTLE_SANDBOX_E2B_TEMPLATE_LOCK_DIR: input.e2b.templateLockDirectoryPath }),
   };
 }
 

@@ -196,6 +196,7 @@ function readE2BOptions(): {
   domain?: string;
   cpuCount?: string;
   memoryMb?: string;
+  templateLockDirectoryPath: string;
 } {
   const apiKey = readRequiredEnv("MISTLE_SANDBOX_E2B_API_KEY");
   const domain = readOptionalEnv("MISTLE_SANDBOX_E2B_DOMAIN");
@@ -207,6 +208,7 @@ function readE2BOptions(): {
     ...(domain === undefined ? {} : { domain }),
     ...(cpuCount === undefined ? {} : { cpuCount }),
     ...(memoryMb === undefined ? {} : { memoryMb }),
+    templateLockDirectoryPath: join(readTestCoordinatorDirectoryPath(), "e2b-template-aliases"),
   };
 }
 

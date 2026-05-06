@@ -6,6 +6,7 @@ import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./cl
 import {
   createE2BDaemonCommandOptions,
   E2BStartRateLimiter,
+  isE2BTemplateStartRefNotReadyError,
   isTransientE2BSourceError,
   runE2BOperationWithTransientRetries,
 } from "./client.js";
@@ -96,6 +97,39 @@ describe("isTransientE2BSourceError", () => {
   });
 });
 
+describe("isE2BTemplateStartRefNotReadyError", () => {
+  it("recognizes E2B create errors where the resolved default template tag is not ready", () => {
+    const source = new Error(
+      "404: tag 'default' does not exist for template 'mistle/mistle-sandbox-base-abc123'",
+    );
+
+    expect(isE2BTemplateStartRefNotReadyError(source, "mistle-sandbox-base-abc123:default")).toBe(
+      true,
+    );
+  });
+
+  it("recognizes nested E2B default tag readiness errors", () => {
+    const source = new Error(
+      "404: tag 'default' does not exist for template 'mistle/mistle-sandbox-base-abc123'",
+    );
+    const wrapped = new Error("E2B operation `create_sandbox` failed", { cause: source });
+
+    expect(isE2BTemplateStartRefNotReadyError(wrapped, "mistle-sandbox-base-abc123:default")).toBe(
+      true,
+    );
+  });
+
+  it("does not match unrelated template aliases", () => {
+    const source = new Error(
+      "404: tag 'default' does not exist for template 'mistle/mistle-sandbox-base-other'",
+    );
+
+    expect(isE2BTemplateStartRefNotReadyError(source, "mistle-sandbox-base-abc123:default")).toBe(
+      false,
+    );
+  });
+});
+
 describe("runE2BOperationWithTransientRetries", () => {
   it("retries transient E2B transport failures with bounded backoff", async () => {
     const sleepDurations: number[] = [];
@@ -123,5 +157,37 @@ describe("runE2BOperationWithTransientRetries", () => {
     expect(result).toBe("created");
     expect(attempts).toBe(3);
     expect(sleepDurations).toEqual([25, 50]);
+  });
+
+  it("retries caller-classified E2B readiness failures with bounded backoff", async () => {
+    const sleepDurations: number[] = [];
+    let attempts = 0;
+
+    const result = await runE2BOperationWithTransientRetries({
+      operation: E2BClientOperationIds.CREATE_SANDBOX,
+      maxAttempts: 4,
+      retryDelayMs: 10,
+      sleeper: {
+        sleep: async (durationMs) => {
+          sleepDurations.push(durationMs);
+        },
+      },
+      shouldRetry: (error) =>
+        isE2BTemplateStartRefNotReadyError(error, "mistle-sandbox-base-abc123:default"),
+      run: async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw new Error(
+            "404: tag 'default' does not exist for template 'mistle/mistle-sandbox-base-abc123'",
+          );
+        }
+
+        return "created";
+      },
+    });
+
+    expect(result).toBe("created");
+    expect(attempts).toBe(3);
+    expect(sleepDurations).toEqual([10, 20]);
   });
 });

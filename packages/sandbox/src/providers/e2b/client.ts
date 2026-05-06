@@ -44,7 +44,11 @@ import {
   type E2BStopSandboxRequest,
   type ValidatedE2BSandboxConfig,
 } from "./schemas.js";
-import { E2BApiTemplateRegistry, type E2BTemplateRegistry } from "./template-registry.js";
+import {
+  E2BApiTemplateRegistry,
+  E2BTemplateDefaultTag,
+  type E2BTemplateRegistry,
+} from "./template-registry.js";
 import type { E2BSandboxInspectResult } from "./types.js";
 
 const InitCommand = "/opt/mistle/bin/sandboxd init";
@@ -60,6 +64,9 @@ const E2BInitCommandTimeoutMs = 2 * 60 * 1000;
 const E2BCreateSandboxMinIntervalMs = 1_500;
 const E2BTransientRetryAttempts = 3;
 const E2BTransientRetryDelayMs = 1_000;
+const E2BCreateSandboxTemplateReadinessRetryAttempts = 10;
+const E2BCreateSandboxTemplateReadinessRetryDelayMs = 1_000;
+const E2BTemplateLockDirectoryEnvVar = "MISTLE_SANDBOX_E2B_TEMPLATE_LOCK_DIR";
 export type E2BStartSandboxResponse = {
   sandboxId: string;
 };
@@ -97,6 +104,15 @@ function createE2BConnectionOptions(config: ValidatedE2BSandboxConfig): Connecti
     apiKey: config.apiKey,
     ...(config.domain === undefined ? {} : { domain: config.domain }),
   };
+}
+
+function readE2BTemplateLockDirectoryPath(): string | undefined {
+  const value = process.env[E2BTemplateLockDirectoryEnvVar];
+  if (value === undefined || value.trim().length === 0) {
+    return undefined;
+  }
+
+  return value;
 }
 
 function formatCommandOutput(input: { stdout: string; stderr: string }): string {
@@ -198,12 +214,43 @@ export function isTransientE2BSourceError(error: unknown, remainingCauseDepth = 
   return isTransientE2BSourceError(error.cause, remainingCauseDepth - 1);
 }
 
+export function isE2BTemplateStartRefNotReadyError(
+  error: unknown,
+  templateStartRef: string,
+  remainingCauseDepth = 3,
+): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const tagSuffix = `:${E2BTemplateDefaultTag}`;
+  const alias = templateStartRef.endsWith(tagSuffix)
+    ? templateStartRef.slice(0, -tagSuffix.length)
+    : templateStartRef;
+  const normalizedMessage = error.message.toLowerCase();
+  const normalizedAlias = alias.toLowerCase();
+
+  if (
+    normalizedMessage.includes(`tag '${E2BTemplateDefaultTag}' does not exist`) &&
+    normalizedMessage.includes(normalizedAlias)
+  ) {
+    return true;
+  }
+
+  if (remainingCauseDepth <= 0) {
+    return false;
+  }
+
+  return isE2BTemplateStartRefNotReadyError(error.cause, templateStartRef, remainingCauseDepth - 1);
+}
+
 export async function runE2BOperationWithTransientRetries<Result>(input: {
   operation: E2BClientOperation;
   run: () => Promise<Result>;
   maxAttempts?: number;
   retryDelayMs?: number;
   sleeper?: Sleeper;
+  shouldRetry?: (error: unknown) => boolean;
 }): Promise<Result> {
   const maxAttempts = input.maxAttempts ?? E2BTransientRetryAttempts;
   const retryDelayMs = input.retryDelayMs ?? E2BTransientRetryDelayMs;
@@ -213,7 +260,8 @@ export async function runE2BOperationWithTransientRetries<Result>(input: {
     try {
       return await input.run();
     } catch (error) {
-      if (attempt >= maxAttempts || !isTransientE2BSourceError(error)) {
+      const shouldRetry = input.shouldRetry?.(error) === true || isTransientE2BSourceError(error);
+      if (attempt >= maxAttempts || !shouldRetry) {
         throw error;
       }
 
@@ -314,10 +362,14 @@ export class E2BApiClient implements E2BClient {
   }) {
     this.#connectionOptions = createE2BConnectionOptions(input.config);
     this.#startRateLimiter = input.startRateLimiter ?? defaultE2BStartRateLimiter;
+    const templateLockDirectoryPath = readE2BTemplateLockDirectoryPath();
     this.#templateRegistry =
       input.templateRegistry ??
       new E2BApiTemplateRegistry(this.#connectionOptions, {
         cpuCount: input.config.cpuCount ?? E2BDefaultTemplateCpuCount,
+        ...(templateLockDirectoryPath === undefined
+          ? {}
+          : { lockDirectoryPath: templateLockDirectoryPath }),
         memoryMb: input.config.memoryMb ?? E2BDefaultTemplateMemoryMb,
       });
   }
@@ -329,6 +381,9 @@ export class E2BApiClient implements E2BClient {
     try {
       const sandbox = await runE2BOperationWithTransientRetries({
         operation: E2BClientOperationIds.CREATE_SANDBOX,
+        maxAttempts: E2BCreateSandboxTemplateReadinessRetryAttempts,
+        retryDelayMs: E2BCreateSandboxTemplateReadinessRetryDelayMs,
+        shouldRetry: (error) => isE2BTemplateStartRefNotReadyError(error, templateAlias),
         run: async () => {
           await this.#startRateLimiter.waitForTurn();
           return Sandbox.create(

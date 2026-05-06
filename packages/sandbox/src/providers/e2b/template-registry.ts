@@ -34,6 +34,7 @@ export function createE2BTemplateStartRef(alias: string): string {
 export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
   readonly #connectionOptions: ConnectionOpts;
   readonly #cpuCount: number | undefined;
+  readonly #lockDirectoryPath: string | undefined;
   readonly #memoryMb: number | undefined;
   readonly #aliasPromisesByBaseRef = new Map<string, Promise<string>>();
 
@@ -41,11 +42,13 @@ export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
     connectionOptions: ConnectionOpts,
     templateResources?: {
       cpuCount?: number;
+      lockDirectoryPath?: string;
       memoryMb?: number;
     },
   ) {
     this.#connectionOptions = connectionOptions;
     this.#cpuCount = templateResources?.cpuCount;
+    this.#lockDirectoryPath = templateResources?.lockDirectoryPath;
     this.#memoryMb = templateResources?.memoryMb;
   }
 
@@ -71,6 +74,9 @@ export class E2BApiTemplateRegistry implements E2BTemplateRegistry {
       baseRef,
       connectionOptions: this.#connectionOptions,
       ...(this.#cpuCount === undefined ? {} : { cpuCount: this.#cpuCount }),
+      ...(this.#lockDirectoryPath === undefined
+        ? {}
+        : { lockDirectoryPath: this.#lockDirectoryPath }),
       ...(this.#memoryMb === undefined ? {} : { memoryMb: this.#memoryMb }),
     });
 
