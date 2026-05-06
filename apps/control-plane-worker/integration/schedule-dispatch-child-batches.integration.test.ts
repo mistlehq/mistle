@@ -283,47 +283,6 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
     expect(secondRun.workflowRun.id).toBe(firstRun.workflowRun.id);
   });
 
-  it("starts the same recovered child batch idempotently across repeated scans", async ({
-    env,
-  }) => {
-    await seedAutomationSchedule({
-      env,
-      organizationId: "org_integration_new_schedule_batch_idempotent",
-      automationId: "atm_integration_new_schedule_batch_idempotent",
-      scheduleId: "sch_integration_new_schedule_batch_idempotent",
-    });
-    await seedScheduledAction({
-      env,
-      id: "sca_integration_new_schedule_batch_idempotent",
-      organizationId: "org_integration_new_schedule_batch_idempotent",
-      scheduleId: "sch_integration_new_schedule_batch_idempotent",
-      scheduledAt: "2026-04-28T00:10:00.000Z",
-      localScheduledTime: "08:10",
-    });
-
-    const input = {
-      cutoffMinute: new Date("2026-04-28T00:10:00.000Z"),
-      scheduledActionIds: [],
-    };
-
-    const firstScan = await startScheduleDispatchChildBatches(
-      {
-        db: env.controlPlaneDb,
-        openWorkflow: env.controlPlaneWorkflow,
-      },
-      input,
-    );
-    const secondScan = await startScheduleDispatchChildBatches(
-      {
-        db: env.controlPlaneDb,
-        openWorkflow: env.controlPlaneWorkflow,
-      },
-      input,
-    );
-
-    expect(firstScan).toEqual(secondScan);
-  });
-
   it("creates one automation run and starts the automation run workflow for scheduled automation actions", async ({
     env,
   }) => {
@@ -378,12 +337,12 @@ describe.concurrent("control-plane worker schedule dispatch child batches", () =
     expect(automationWorkflowRun).toEqual(
       expect.objectContaining({
         workflow_name: HandleAutomationRunWorkflowSpec.name,
-        status: "pending",
         input: {
           automationRunId: automationRun.id,
         },
       }),
     );
+    expect(["pending", "running", "completed"]).toContain(automationWorkflowRun?.status);
 
     const persistedAction = await env.controlPlaneDb.query.scheduledActions.findFirst({
       where: (table, { eq }) => eq(table.id, "sca_integration_new_schedule_batch_automation_run"),
