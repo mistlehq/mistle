@@ -322,7 +322,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   initialRows: readonly SandboxProfileBindingEditorRow[];
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
 }): {
   integrationSaveError: string | null;
   integrationRows: readonly SandboxProfileBindingEditorRow[];
@@ -342,7 +341,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   onIntegrationSaveErrorDismiss: () => void;
-  isSubmittingIntegrationBindings: boolean;
 } {
   const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
@@ -573,6 +571,5 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
     onIntegrationSaveErrorDismiss,
-    isSubmittingIntegrationBindings: putIntegrationBindingsMutation.isPending,
   };
 }

@@ -175,12 +175,10 @@ type SandboxProfileDraftSectionState = {
   flushDraftChanges: () => Promise<boolean>;
   hasUnpersistedChanges: boolean;
   integrationRows?: readonly SandboxProfileBindingEditorRow[] | null;
-  isSaving: boolean;
 };
 type SandboxProfilePersistenceDraftState = {
   flushDraftChanges: () => Promise<boolean>;
   hasUnpersistedChanges: boolean;
-  isSaving: boolean;
 };
 type SetupScriptAssistantControl = {
   disabled: boolean;
@@ -199,7 +197,6 @@ function createIdleSandboxProfileDraftSectionState(): SandboxProfileDraftSection
   return {
     flushDraftChanges: async () => true,
     hasUnpersistedChanges: false,
-    isSaving: false,
   };
 }
 
@@ -207,7 +204,6 @@ function createIdleSandboxProfilePersistenceDraftState(): SandboxProfilePersiste
   return {
     flushDraftChanges: async () => true,
     hasUnpersistedChanges: false,
-    isSaving: false,
   };
 }
 
@@ -1110,7 +1106,6 @@ function ReadySandboxProfileEditorPage(input: {
     useState<SetupScriptAssistantPanelState | null>(null);
   const activeSectionId = input.routeSectionId;
   const draftFieldsAreReadOnly = input.mode.kind !== "draft" || publishRequestIsPending;
-  const draftFieldsAreDisabled = draftFieldsAreReadOnly;
   const snapshotVersion = resolveLatestPublishedSandboxProfileVersion(input.versions);
   const snapshotPanelState = resolveSnapshotPanelState(snapshotVersion);
   const editorSections = createSandboxProfileEditorSections({
@@ -1184,7 +1179,7 @@ function ReadySandboxProfileEditorPage(input: {
         ? "Integration bindings are still loading."
         : !setupAssistantHasAgentRuntime
           ? SetupAssistantAgentRuntimeRequiredMessage
-          : draftFieldsAreDisabled
+          : draftFieldsAreReadOnly
             ? "Setup Assistant is unavailable while draft changes are saving."
             : startSetupAssistantMutation.isPending
               ? "Setup Assistant is starting."
@@ -1361,13 +1356,10 @@ function ReadySandboxProfileEditorPage(input: {
         <SandboxProfileEditorSectionPanels
           activeSectionId={sectionId}
           currentVersion={input.currentVersion}
-          draftFieldsAreDisabled={draftFieldsAreDisabled}
           draftFieldsAreReadOnly={draftFieldsAreReadOnly}
           integrationDraftState={integrationDraftState}
           integrationsLoader={integrationsLoader}
           invalidateProfileVersions={input.invalidateProfileVersions}
-          invalidateVersionBindings={input.invalidateVersionBindings}
-          invalidateVersionSetupScript={input.invalidateVersionSetupScript}
           mode={input.mode}
           onPersistenceDraftStateChange={setPersistenceDraftState}
           onIntegrationDraftStateChange={setIntegrationDraftState}
@@ -1697,13 +1689,10 @@ function renderSetupAssistantMainContent(input: {
 function SandboxProfileEditorSectionPanels(input: {
   activeSectionId: SandboxProfileEditorSectionId;
   currentVersion: SandboxProfileVersion | null;
-  draftFieldsAreDisabled: boolean;
   draftFieldsAreReadOnly: boolean;
   integrationDraftState: SandboxProfileDraftSectionState;
   integrationsLoader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
   invalidateProfileVersions: (profileId: string) => Promise<void>;
-  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
-  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
   mode: SandboxProfileEditorVersionMode;
   onPersistenceDraftStateChange: (state: SandboxProfilePersistenceDraftState) => void;
   onIntegrationDraftStateChange: (state: SandboxProfileDraftSectionState) => void;
@@ -1747,14 +1736,13 @@ function SandboxProfileEditorSectionPanels(input: {
         loader={input.integrationsLoader}
         onDraftStateChange={input.onIntegrationDraftStateChange}
         profileId={input.profileId}
-        disabled={input.draftFieldsAreDisabled}
+        disabled={input.draftFieldsAreReadOnly}
         readOnly={input.draftFieldsAreReadOnly}
         version={input.mode.version}
-        invalidateVersionBindings={input.invalidateVersionBindings}
       />
       <SandboxProfilePanelSection>
         <LoadedSandboxProfileSetupScriptSection
-          disabled={input.draftFieldsAreDisabled}
+          disabled={input.draftFieldsAreReadOnly}
           key={`${input.profileId}:${String(input.mode.version)}:setup-script`}
           integrationRows={resolveSandboxProfileSetupScriptIntegrationRows(
             input.integrationsLoader.initialRows,
@@ -1762,7 +1750,6 @@ function SandboxProfileEditorSectionPanels(input: {
           )}
           loader={input.setupScriptLoader}
           profileId={input.profileId}
-          invalidateVersionSetupScript={input.invalidateVersionSetupScript}
           onDraftStateChange={input.onSetupScriptDraftStateChange}
           setupAssistantControl={input.setupAssistantControl}
           isDraft={input.mode.kind === "draft"}
@@ -1772,7 +1759,7 @@ function SandboxProfileEditorSectionPanels(input: {
       {input.currentVersion === null ? null : (
         <SandboxProfilePanelSection>
           <SandboxProfilePersistenceModeSection
-            disabled={input.draftFieldsAreDisabled}
+            disabled={input.draftFieldsAreReadOnly}
             invalidateProfileVersions={input.invalidateProfileVersions}
             isDraft={input.mode.kind === "draft"}
             onDraftStateChange={input.onPersistenceDraftStateChange}
@@ -1885,15 +1872,8 @@ function SandboxProfilePersistenceModeSection(input: {
     onDraftStateChange({
       flushDraftChanges: persistDraftChanges,
       hasUnpersistedChanges: draftPersistenceMode !== persistedPersistenceMode,
-      isSaving: persistenceModeMutationIsPending,
     });
-  }, [
-    draftPersistenceMode,
-    onDraftStateChange,
-    persistDraftChanges,
-    persistedPersistenceMode,
-    persistenceModeMutationIsPending,
-  ]);
+  }, [draftPersistenceMode, onDraftStateChange, persistDraftChanges, persistedPersistenceMode]);
 
   const persistentModeIsEnabled = draftPersistenceMode === "persistent";
   const fieldIsReadOnly = disabled || !isDraft;
@@ -2322,7 +2302,6 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
   disabled: boolean;
   readOnly: boolean;
   loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
-  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
 }): React.JSX.Element {
   const showBindingsUnavailableNotice = input.loader.integrationBindingsQuery.isError;
@@ -2363,7 +2342,6 @@ function LoadedSandboxProfileIntegrationSetupSection(input: {
       availableTargets={input.loader.availableTargets}
       disabled={input.disabled}
       readOnly={input.readOnly}
-      invalidateVersionBindings={input.invalidateVersionBindings}
       integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
       {...(input.onDraftStateChange === undefined
         ? {}
@@ -2417,7 +2395,6 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
   availableTargets: readonly IntegrationTargetSummary[];
   disabled: boolean;
   readOnly: boolean;
-  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
   integrationDirectoryQuery: ReturnType<
     typeof useSandboxProfileIntegrationsLoader
   >["integrationDirectoryQuery"];
@@ -2429,7 +2406,6 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
     initialRows: input.initialRows,
     availableConnections: input.availableConnections,
     availableTargets: input.availableTargets,
-    invalidateVersionBindings: input.invalidateVersionBindings,
   });
   const onDraftStateChange = input.onDraftStateChange;
 
@@ -2438,14 +2414,12 @@ function ReadySandboxProfileIntegrationSetupSection(input: {
       flushDraftChanges: integrationsState.flushDraftChanges,
       hasUnpersistedChanges: integrationsState.hasUnsavedChanges,
       integrationRows: integrationsState.integrationRows,
-      isSaving: integrationsState.isSubmittingIntegrationBindings,
     });
   }, [
     onDraftStateChange,
     integrationsState.flushDraftChanges,
     integrationsState.hasUnsavedChanges,
     integrationsState.integrationRows,
-    integrationsState.isSubmittingIntegrationBindings,
   ]);
 
   return (
@@ -2480,7 +2454,6 @@ function LoadedSandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   integrationRows: readonly SandboxProfileBindingEditorRow[] | null;
   loader: ReturnType<typeof useSandboxProfileSetupScriptLoader>;
-  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
   isDraft: boolean;
   setupAssistantControl: SetupScriptAssistantControl;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
@@ -2505,7 +2478,6 @@ function LoadedSandboxProfileSetupScriptSection(input: {
 
   return (
     <ReadySandboxProfileSetupScriptSection
-      invalidateVersionSetupScript={input.invalidateVersionSetupScript}
       isDraft={input.isDraft}
       profileId={input.profileId}
       disabled={input.disabled}
@@ -2526,7 +2498,6 @@ function ReadySandboxProfileSetupScriptSection(input: {
   disabled: boolean;
   integrationRows: readonly SandboxProfileBindingEditorRow[] | null;
   setupScript: string | null;
-  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
   isDraft: boolean;
   setupAssistantControl: SetupScriptAssistantControl;
   onDraftStateChange?: (state: SandboxProfileDraftSectionState) => void;
@@ -2535,7 +2506,6 @@ function ReadySandboxProfileSetupScriptSection(input: {
     profileId: input.profileId,
     version: input.version,
     setupScript: input.setupScript,
-    invalidateVersionSetupScript: input.invalidateVersionSetupScript,
   });
   const setupScriptTest = useSandboxProfileSetupScriptTestRun({
     disabled: input.disabled,
@@ -2550,14 +2520,8 @@ function ReadySandboxProfileSetupScriptSection(input: {
     onDraftStateChange?.({
       flushDraftChanges: setupScriptState.flushDraftChanges,
       hasUnpersistedChanges: setupScriptState.hasUnsavedChanges,
-      isSaving: setupScriptState.isSaving,
     });
-  }, [
-    onDraftStateChange,
-    setupScriptState.flushDraftChanges,
-    setupScriptState.hasUnsavedChanges,
-    setupScriptState.isSaving,
-  ]);
+  }, [onDraftStateChange, setupScriptState.flushDraftChanges, setupScriptState.hasUnsavedChanges]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -2567,7 +2531,6 @@ function ReadySandboxProfileSetupScriptSection(input: {
       <SandboxProfileSetupScriptPanel
         errorMessage={setupScriptState.errorMessage}
         isSaving={setupScriptState.isSaving}
-        onBlur={setupScriptState.onBlur}
         onChange={setupScriptState.onChange}
         testControl={
           <SandboxProfileSetupScriptTestButton
@@ -2625,7 +2588,6 @@ export function SandboxProfileSetupScriptPanel(input: {
   isSaving?: boolean;
   errorMessage?: string | null;
   onChange?: (nextValue: string) => void;
-  onBlur?: () => void;
   repositoryHandles?: readonly string[];
   testControl?: ReactNode;
   testPanel?: ReactNode;
@@ -2653,7 +2615,6 @@ export function SandboxProfileSetupScriptPanel(input: {
               }}
               placeholderText={SetupScriptPlaceholder}
               value={input.value}
-              {...(input.onBlur === undefined ? {} : { onBlur: input.onBlur })}
             />
             {input.testPanel}
             {input.disabled === true ? null : (

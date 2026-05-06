@@ -44,7 +44,6 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   profileId: string;
   version: number;
   setupScript: string | null;
-  invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
 }): {
   draftValue: string;
   errorMessage: string | null;
@@ -52,7 +51,6 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   flushDraftChanges: () => Promise<boolean>;
   isSaving: boolean;
   onChange: (nextValue: string) => void;
-  onBlur: () => void;
 } {
   const [draftValue, setDraftValue] = useState(input.setupScript ?? "");
   const [persistedValue, setPersistedValue] = useState(input.setupScript ?? "");
@@ -154,6 +152,5 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     flushDraftChanges: saveCurrentDraft,
     isSaving: saveMutation.isPending,
     onChange,
-    onBlur: () => {},
   };
 }

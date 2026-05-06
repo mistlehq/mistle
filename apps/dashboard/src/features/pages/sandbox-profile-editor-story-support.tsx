@@ -572,14 +572,6 @@ function SandboxProfileEditorPageStoryView(
     setProfileName(nextValue);
   }
 
-  function handleSetupScriptBlur(): void {
-    if (setupScriptDraft === persistedSetupScript) {
-      return;
-    }
-
-    setPersistedSetupScript(setupScriptDraft);
-  }
-
   const isEditable =
     input.lifecycleState === undefined ||
     input.lifecycleState === "draft" ||
@@ -712,7 +704,6 @@ function SandboxProfileEditorPageStoryView(
                     <Notice variant="alert">{input.setupAssistantErrorMessage}</Notice>
                   )}
                   <SandboxProfileSetupScriptPanel
-                    onBlur={handleSetupScriptBlur}
                     onChange={setSetupScriptDraft}
                     disabled={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
