@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createRuntimePublicAccessProxyPoolKey,
+  createRuntimePublicAccessRouteHealthUrl,
   normalizeRuntimePublicAccessHostnames,
 } from "./runtime-public-access.js";
 
@@ -29,5 +30,16 @@ describe("normalizeRuntimePublicAccessHostnames", () => {
     expect(() => normalizeRuntimePublicAccessHostnames([])).toThrow(
       "Runtime public access proxy requires at least one public hostname.",
     );
+  });
+});
+
+describe("createRuntimePublicAccessRouteHealthUrl", () => {
+  it("targets the environment-scoped service route instead of only the shared proxy", () => {
+    expect(
+      createRuntimePublicAccessRouteHealthUrl({
+        environmentId: "test_env_123",
+        publicHostname: "gateway.example.com",
+      }).toString(),
+    ).toBe("https://gateway.example.com/__healthz?x-mistle-test-environment-id=test_env_123");
   });
 });

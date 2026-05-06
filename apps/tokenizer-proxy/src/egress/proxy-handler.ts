@@ -153,13 +153,18 @@ function joinPath(basePath: string, suffixPath: string): string {
     : `${normalizedBasePath}/${normalizedSuffixPath}`;
 }
 
-function resolveTargetPath(requestPath: string): string | undefined {
+function resolveTargetPath(input: {
+  allowTestEnvironmentPath: boolean;
+  requestPath: string;
+}): string | undefined {
+  const { allowTestEnvironmentPath, requestPath } = input;
+
   if (requestPath === EGRESS_BASE_PATH) {
     return "/";
   }
 
   if (!requestPath.startsWith(`${EGRESS_BASE_PATH}/`)) {
-    return resolveTestEnvironmentTargetPath(requestPath);
+    return allowTestEnvironmentPath ? resolveTestEnvironmentTargetPath(requestPath) : undefined;
   }
 
   return requestPath.slice(EGRESS_BASE_PATH.length);
@@ -190,7 +195,10 @@ function resolveTestEnvironmentTargetPath(requestPath: string): string | undefin
 }
 
 function resolveRequestTargetPath(ctx: Context<AppContextBindings>): string {
-  const targetPath = resolveTargetPath(ctx.req.path);
+  const targetPath = resolveTargetPath({
+    allowTestEnvironmentPath: ctx.get("config").__dangerouslyEnableTestIsolation !== undefined,
+    requestPath: ctx.req.path,
+  });
   if (targetPath !== undefined) {
     return targetPath;
   }

@@ -12,6 +12,7 @@ export const MISTLE_TEST_RUN_OWNER_PID_ENV = "MISTLE_TEST_RUN_OWNER_PID";
 export type RunnerPoolSession = {
   runId: string;
   coordinatorDir: string;
+  ownerPid: number;
 };
 
 export function ensureRunnerPoolSession(environment: NodeJS.ProcessEnv): RunnerPoolSession {
@@ -25,16 +26,20 @@ export function ensureRunnerPoolSession(environment: NodeJS.ProcessEnv): RunnerP
     key: MISTLE_TEST_COORDINATOR_DIR_ENV,
     create: () => join(tmpdir(), "mistle-test-harness", "runner-pools", runId),
   });
-  ensureEnvValue({
-    environment,
-    key: MISTLE_TEST_RUN_OWNER_PID_ENV,
-    create: () => String(process.pid),
-  });
+  const ownerPid = readProcessId(
+    ensureEnvValue({
+      environment,
+      key: MISTLE_TEST_RUN_OWNER_PID_ENV,
+      create: () => String(process.pid),
+    }),
+    MISTLE_TEST_RUN_OWNER_PID_ENV,
+  );
   environment[MISTLE_TEST_POOLING_ENV] = "1";
 
   return {
     runId,
     coordinatorDir,
+    ownerPid,
   };
 }
 
@@ -49,10 +54,25 @@ export function resolveRunnerPoolSession(environment: NodeJS.ProcessEnv): Runner
     throw new Error(`Missing required environment variable ${MISTLE_TEST_COORDINATOR_DIR_ENV}.`);
   }
 
+  const ownerPidValue = environment[MISTLE_TEST_RUN_OWNER_PID_ENV];
+  if (ownerPidValue === undefined || ownerPidValue.length === 0) {
+    throw new Error(`Missing required environment variable ${MISTLE_TEST_RUN_OWNER_PID_ENV}.`);
+  }
+
   return {
     runId,
     coordinatorDir,
+    ownerPid: readProcessId(ownerPidValue, MISTLE_TEST_RUN_OWNER_PID_ENV),
   };
+}
+
+function readProcessId(value: string, label: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error(`${label} must be a positive integer process id.`);
+  }
+
+  return parsed;
 }
 
 function ensureEnvValue(input: {

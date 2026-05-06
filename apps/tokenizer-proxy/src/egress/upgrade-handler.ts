@@ -121,13 +121,21 @@ function joinPath(basePath: string, suffixPath: string): string {
     : `${normalizedBasePath}/${normalizedSuffixPath}`;
 }
 
-function resolveTargetPath(requestUrl: string): string {
+function resolveTargetPath(input: {
+  allowTestEnvironmentPath: boolean;
+  requestUrl: string;
+}): string {
+  const { allowTestEnvironmentPath, requestUrl } = input;
   const requestPath = new URL(requestUrl, "http://tokenizer-proxy.internal").pathname;
   if (requestPath === EGRESS_BASE_PATH) {
     return "/";
   }
 
   if (!requestPath.startsWith(`${EGRESS_BASE_PATH}/`)) {
+    if (!allowTestEnvironmentPath) {
+      throwEgressScopeError(requestPath);
+    }
+
     return resolveTestEnvironmentTargetPath(requestPath);
   }
 
@@ -618,7 +626,10 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
 
       let targetPath: string;
       try {
-        targetPath = resolveTargetPath(requestUrl);
+        targetPath = resolveTargetPath({
+          allowTestEnvironmentPath: input.testEnvironmentIdHeader !== undefined,
+          requestUrl,
+        });
       } catch (error) {
         writeFailure(
           socket,

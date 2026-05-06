@@ -83,8 +83,10 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
 
   app.all(EGRESS_BASE_PATH, egressProxyHandler);
   app.all(EGRESS_WILDCARD_BASE_PATH, egressProxyHandler);
-  app.all(TEST_ENVIRONMENT_EGRESS_BASE_PATH_PATTERN, egressProxyHandler);
-  app.all(TEST_ENVIRONMENT_EGRESS_WILDCARD_BASE_PATH_PATTERN, egressProxyHandler);
+  if (config.__dangerouslyEnableTestIsolation !== undefined) {
+    app.all(TEST_ENVIRONMENT_EGRESS_BASE_PATH_PATTERN, egressProxyHandler);
+    app.all(TEST_ENVIRONMENT_EGRESS_WILDCARD_BASE_PATH_PATTERN, egressProxyHandler);
+  }
 
   return {
     app,
@@ -115,7 +117,7 @@ function readTestEnvironmentId(
     readTestEnvironmentIdFromPath(input.requestPath);
   if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
     throw new Error(
-      `Expected '${testIsolation.testEnvironmentIdHeader}' header or query parameter for isolated tokenizer-proxy request.`,
+      `Expected '${testIsolation.testEnvironmentIdHeader}' header, query parameter, or path prefix for isolated tokenizer-proxy request.`,
     );
   }
 

@@ -17,6 +17,7 @@ describe("ensureRunnerPoolSession", () => {
     const session = ensureRunnerPoolSession(environment);
 
     expect(session.runId).toBe("integration_run");
+    expect(session.ownerPid).toBe(12345);
     expect(environment[MISTLE_TEST_RUN_OWNER_PID_ENV]).toBe("12345");
     expect(environment[MISTLE_TEST_POOLING_ENV]).toBe("1");
   });
@@ -26,8 +27,9 @@ describe("ensureRunnerPoolSession", () => {
       [MISTLE_TEST_RUN_ID_ENV]: "standalone_run",
     };
 
-    ensureRunnerPoolSession(environment);
+    const session = ensureRunnerPoolSession(environment);
 
+    expect(session.ownerPid).toBe(process.pid);
     expect(environment[MISTLE_TEST_RUN_OWNER_PID_ENV]).toBe(String(process.pid));
     expect(environment[MISTLE_TEST_POOLING_ENV]).toBe("1");
   });
