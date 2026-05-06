@@ -33,7 +33,7 @@
       },
       "command": "archil",
       "displayName": "Archil",
-      "version": "v0.8.9-1777069697"
+      "version": "v0.8.10-1778086505"
     },
     {
       "category": {
@@ -103,9 +103,9 @@
         "id": "debugging-and-system",
         "title": "Debugging and system"
       },
-      "command": "iptables",
-      "displayName": "iptables",
-      "version": "1.8.9"
+      "command": "nft",
+      "displayName": "nftables",
+      "version": "1.0.6"
     },
     {
       "category": {

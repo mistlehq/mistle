@@ -158,11 +158,11 @@ export const SandboxBaseInventorySpec = {
     },
     {
       category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
-      command: "iptables",
-      displayName: "iptables",
-      dockerfileAssertions: [aptPackage("iptables", SandboxBaseCommonStage)],
-      versionCommand: ["iptables", "--version"],
-      versionParser: parseIptablesVersion,
+      command: "nft",
+      displayName: "nftables",
+      dockerfileAssertions: [aptPackage("nftables", SandboxBaseCommonStage)],
+      versionCommand: ["nft", "--version"],
+      versionParser: parseNftablesVersion,
     },
     {
       category: SandboxBaseToolCategories.CLI_UTILITIES,
@@ -270,7 +270,7 @@ function parseJqVersion(output: string): string {
   return parseFirstLine(output).replace(/^jq-/u, "");
 }
 
-function parseIptablesVersion(output: string): string {
+function parseNftablesVersion(output: string): string {
   return parseRequiredToken(output, 1).replace(/^v/u, "");
 }
 

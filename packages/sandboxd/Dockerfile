@@ -17,11 +17,11 @@ RUN apt-get update \
     gawk \
     git \
     grep \
-    iptables \
     iproute2 \
     jq \
     less \
     lsof \
+    nftables \
     ripgrep \
     sed \
     tar \
