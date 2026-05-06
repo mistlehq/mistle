@@ -145,13 +145,15 @@ function toUrl(input: EgressHttpOpen["request"]): URL {
   return new URL(`${input.scheme}://${input.authority}${buildRequestPath(input)}`);
 }
 
-function decodeCanonicalBase64(payload: string): Buffer | undefined {
+// Node's base64 decoder accepts malformed input leniently, so validate the
+// alphabet and padding before decoding. We intentionally avoid a decode/re-encode
+// canonicality check here because egress byte chunks are on the streaming path.
+function decodeValidatedBase64(payload: string): Buffer | undefined {
   if (!Base64PayloadPattern.test(payload)) {
     return undefined;
   }
 
-  const decoded = Buffer.from(payload, "base64");
-  return decoded.toString("base64") === payload ? decoded : undefined;
+  return Buffer.from(payload, "base64");
 }
 
 function buildStreamAttributes(input: {
@@ -637,10 +639,10 @@ export class GatewayEgressTransportService {
       return true;
     }
 
-    const bytes = decodeCanonicalBase64(input.message.bytes);
+    const bytes = decodeValidatedBase64(input.message.bytes);
     if (bytes === undefined) {
       this.failActiveStream({
-        error: new Error("Egress HTTP request body chunk must contain canonical base64 bytes."),
+        error: new Error("Egress HTTP request body chunk must contain valid base64 bytes."),
         failureCode: "malformed_frame",
         outcome: "malformed_frame",
         stream,
@@ -715,10 +717,10 @@ export class GatewayEgressTransportService {
       return true;
     }
 
-    const bytes = decodeCanonicalBase64(input.message.bytes);
+    const bytes = decodeValidatedBase64(input.message.bytes);
     if (bytes === undefined) {
       this.failActiveStream({
-        error: new Error("Egress TCP data frame must contain canonical base64 bytes."),
+        error: new Error("Egress TCP data frame must contain valid base64 bytes."),
         failureCode: "malformed_frame",
         outcome: "malformed_frame",
         stream,

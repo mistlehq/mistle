@@ -474,7 +474,7 @@ describe.concurrent("gateway egress transport integration", () => {
   );
 
   it(
-    "returns a stream error for non-canonical base64 request body chunks",
+    "returns a stream error for invalid base64 request body chunks",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({ env, sandboxInstanceId });
@@ -507,21 +507,21 @@ describe.concurrent("gateway egress transport integration", () => {
           JSON.stringify({
             type: "egress.http.request.body.chunk",
             streamId: 17,
-            bytes: "not-canonical-base64",
+            bytes: "not-valid-base64",
             encoding: "base64",
           }),
         );
 
         await expect(
           withTimeout({
-            label: "waiting for non-canonical base64 egress frame error",
+            label: "waiting for invalid base64 egress frame error",
             promise: messageQueue.next(),
           }),
         ).resolves.toEqual({
           type: "egress.stream.error",
           streamId: 17,
           code: "malformed_frame",
-          message: "Egress HTTP request body chunk must contain canonical base64 bytes.",
+          message: "Egress HTTP request body chunk must contain valid base64 bytes.",
         });
       } finally {
         messageQueue.close();
