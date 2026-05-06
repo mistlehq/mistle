@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,6 +35,10 @@ export type AcquireRunnerServicePoolLeaseInput = {
 export type StopRunnerServicePoolsInput = {
   runId: string;
   coordinatorDir?: string;
+};
+
+export type CleanupStaleRunnerServicePoolsInput = {
+  coordinatorRootDir?: string;
 };
 
 type PersistedRunnerService = {
@@ -122,19 +127,68 @@ export async function stopRunnerServicePools(input: StopRunnerServicePoolsInput)
       continue;
     }
 
-    const localStop = LocalStopCallbacksByStateFilePath.get(stateFilePath);
-    if (localStop !== undefined) {
-      await localStop();
-      LocalStopCallbacksByStateFilePath.delete(stateFilePath);
-    } else if (persistedService.pid !== undefined && isProcessAlive(persistedService.pid)) {
-      process.kill(persistedService.pid, "SIGTERM");
-    } else if (persistedService.containerId !== undefined) {
-      await stopContainerById(persistedService.containerId);
-    }
+    await stopPersistedService({
+      persistedService,
+      stateFilePath,
+    });
 
     await rm(stateFilePath, {
       force: true,
     });
+  }
+}
+
+export async function cleanupStaleRunnerServicePools(
+  input: CleanupStaleRunnerServicePoolsInput = {},
+): Promise<void> {
+  const rootDirectoryPath = input.coordinatorRootDir ?? DefaultRunnerPoolRootDirectoryPath;
+  const serviceStateDirectoryPaths = await findRunnerServiceStateDirectories({
+    rootDirectoryPath,
+    maxDepth: 4,
+  });
+
+  for (const serviceStateDirectoryPath of serviceStateDirectoryPaths) {
+    const entries = await readDirectoryEntries(serviceStateDirectoryPath);
+    for (const entry of entries) {
+      if (!entry.endsWith(".json")) {
+        continue;
+      }
+
+      const stateFilePath = join(serviceStateDirectoryPath, entry);
+      const persistedService = await readPersistedService(stateFilePath);
+      if (persistedService === undefined || isProcessAlive(persistedService.ownerPid)) {
+        continue;
+      }
+
+      await stopPersistedService({
+        persistedService,
+        stateFilePath,
+      });
+      await rm(stateFilePath, {
+        force: true,
+      });
+    }
+  }
+}
+
+async function stopPersistedService(input: {
+  persistedService: PersistedRunnerService;
+  stateFilePath: string;
+}): Promise<void> {
+  const localStop = LocalStopCallbacksByStateFilePath.get(input.stateFilePath);
+  if (localStop !== undefined) {
+    await localStop();
+    LocalStopCallbacksByStateFilePath.delete(input.stateFilePath);
+    return;
+  }
+
+  if (input.persistedService.pid !== undefined && isProcessAlive(input.persistedService.pid)) {
+    process.kill(input.persistedService.pid, "SIGTERM");
+    return;
+  }
+
+  if (input.persistedService.containerId !== undefined) {
+    await stopContainerById(input.persistedService.containerId);
   }
 }
 
@@ -344,6 +398,63 @@ function readEndpoints(record: Record<string, unknown>, label: string): TestServ
 async function readDirectoryEntries(directoryPath: string): Promise<readonly string[]> {
   try {
     return await readdir(directoryPath);
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function findRunnerServiceStateDirectories(input: {
+  rootDirectoryPath: string;
+  maxDepth: number;
+}): Promise<readonly string[]> {
+  const directories: string[] = [];
+  await collectRunnerServiceStateDirectories({
+    directoryPath: input.rootDirectoryPath,
+    depth: 0,
+    maxDepth: input.maxDepth,
+    directories,
+  });
+  return directories;
+}
+
+async function collectRunnerServiceStateDirectories(input: {
+  directoryPath: string;
+  depth: number;
+  maxDepth: number;
+  directories: string[];
+}): Promise<void> {
+  if (input.depth > input.maxDepth) {
+    return;
+  }
+
+  const entries = await readDirectoryEntriesWithTypes(input.directoryPath);
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+
+    const directoryPath = join(input.directoryPath, entry.name);
+    if (entry.name === "services") {
+      input.directories.push(directoryPath);
+      continue;
+    }
+
+    await collectRunnerServiceStateDirectories({
+      directoryPath,
+      depth: input.depth + 1,
+      maxDepth: input.maxDepth,
+      directories: input.directories,
+    });
+  }
+}
+
+async function readDirectoryEntriesWithTypes(directoryPath: string): Promise<readonly Dirent[]> {
+  try {
+    return await readdir(directoryPath, { withFileTypes: true });
   } catch (error) {
     if (isNodeErrorCode(error, "ENOENT")) {
       return [];

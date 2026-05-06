@@ -1,10 +1,10 @@
-import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { stopRunnerServicePools } from "@mistle/test-harness";
+import { cleanupStaleRunnerServicePools, stopRunnerServicePools } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -92,6 +92,51 @@ describe("runner service pool", () => {
     ).rejects.toThrow("Timed out acquiring runner service pool lock");
 
     await firstAcquire;
+  }, 30_000);
+
+  it("stops services whose owner process died before global teardown", async () => {
+    coordinatorDirectoryPath = await mkdtemp(join(tmpdir(), "mistle-runner-service-pool-"));
+    const serverScriptPath = join(coordinatorDirectoryPath, "pooled-server.mjs");
+    const startupFilePath = join(coordinatorDirectoryPath, "startup.json");
+    await writeFile(serverScriptPath, createServerScript(), "utf8");
+
+    const server = spawn(process.execPath, [serverScriptPath], {
+      detached: true,
+      env: {
+        ...process.env,
+        STARTUP_FILE: startupFilePath,
+      },
+      stdio: "ignore",
+    });
+    server.unref();
+
+    const startup = await readServerStartupFile(startupFilePath);
+    const stateDirectoryPath = join(coordinatorDirectoryPath, "stale_run", "services");
+    const stateFilePath = join(stateDirectoryPath, `${encodeURIComponent(PoolKey)}.json`);
+    await mkdir(stateDirectoryPath, { recursive: true });
+    await writeFile(
+      stateFilePath,
+      `${JSON.stringify({
+        version: 1,
+        key: PoolKey,
+        endpoints: {
+          http: {
+            hostBaseUrl: startup.hostBaseUrl,
+          },
+        },
+        pid: startup.pid,
+        ownerPid: 999_999_999,
+        startedAt: Date.now(),
+      })}\n`,
+      "utf8",
+    );
+
+    await cleanupStaleRunnerServicePools({
+      coordinatorRootDir: coordinatorDirectoryPath,
+    });
+
+    await waitForProcessExit(startup.pid);
+    await expect(readFile(stateFilePath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   }, 30_000);
 });
 
@@ -350,6 +395,19 @@ async function waitForFile(filePath: string): Promise<void> {
   throw new Error(`Timed out waiting for file '${filePath}'.`);
 }
 
+async function waitForProcessExit(processId: number): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    if (!isProcessAlive(processId)) {
+      return;
+    }
+
+    await systemSleeper.sleep(StartupPollIntervalMs);
+  }
+
+  throw new Error(`Timed out waiting for process ${String(processId)} to exit.`);
+}
+
 function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
   const lines = stdout.trim().split("\n");
   const lastLine = lines.at(-1);
@@ -372,6 +430,50 @@ function parseAcquirerOutput(stdout: string): { hostBaseUrl: string } {
   };
 }
 
+async function readServerStartupFile(
+  startupFilePath: string,
+): Promise<{ hostBaseUrl: string; pid: number }> {
+  const deadline = Date.now() + 10_000;
+
+  while (Date.now() < deadline) {
+    try {
+      const raw = await readFile(startupFilePath, "utf8");
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== "object" || parsed === null) {
+        throw new Error("Invalid pooled server startup payload.");
+      }
+
+      const hostBaseUrl = Reflect.get(parsed, "hostBaseUrl");
+      const pid = Reflect.get(parsed, "pid");
+      if (typeof hostBaseUrl !== "string" || typeof pid !== "number") {
+        throw new Error("Invalid pooled server startup payload.");
+      }
+
+      return {
+        hostBaseUrl,
+        pid,
+      };
+    } catch (error) {
+      if (!isMissingFileError(error)) {
+        throw error;
+      }
+
+      await systemSleeper.sleep(StartupPollIntervalMs);
+    }
+  }
+
+  throw new Error("Timed out waiting for pooled server startup file.");
+}
+
 function isMissingFileError(error: unknown): boolean {
   return typeof error === "object" && error !== null && Reflect.get(error, "code") === "ENOENT";
+}
+
+function isProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    return typeof error === "object" && error !== null && Reflect.get(error, "code") === "EPERM";
+  }
 }

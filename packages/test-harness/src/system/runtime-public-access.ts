@@ -161,6 +161,7 @@ async function startRuntimePublicAccessProxy(input: {
       MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID: input.tunnelId,
       MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON: input.tunnelCredentialsJson,
       MISTLE_RUNTIME_PUBLIC_ACCESS_PUBLIC_HOSTNAMES: JSON.stringify(input.publicHostnames),
+      MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID: String(process.pid),
       MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH: readyPath,
       MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH: logPath,
       MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE: CloudflaredImageReference,
@@ -323,6 +324,10 @@ import { randomUUID } from "node:crypto";
 const DockerHostGatewayName = "host.docker.internal";
 const tunnelId = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_ID");
 const tunnelCredentialsJson = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_TUNNEL_CREDENTIALS_JSON");
+const ownerPid = Number(readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_OWNER_PID"));
+if (!Number.isSafeInteger(ownerPid) || ownerPid <= 0) {
+  throw new Error("Runtime public access proxy requires a positive owner pid.");
+}
 const readyPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_READY_PATH");
 const logPath = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_LOG_PATH");
 const cloudflaredImage = readRequiredEnv("MISTLE_RUNTIME_PUBLIC_ACCESS_CLOUDFLARED_IMAGE");
@@ -349,6 +354,12 @@ server.listen(0, "0.0.0.0", async () => {
 const logStream = createWriteStream(logPath, { flags: "a" });
 let cloudflared;
 let cloudflaredContainerName;
+const ownerWatchdog = setInterval(() => {
+  if (!isProcessAlive(ownerPid)) {
+    logStream.write("owner process " + String(ownerPid) + " is no longer alive; shutting down\n");
+    shutdown();
+  }
+}, 1000);
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
 
@@ -530,6 +541,7 @@ async function startCloudflared(proxyBaseUrl) {
 }
 
 function shutdown() {
+  clearInterval(ownerWatchdog);
   server.close();
   if (cloudflared !== undefined) {
     cloudflared.kill("SIGTERM");
@@ -539,6 +551,19 @@ function shutdown() {
   }
   logStream.end();
   process.exit(0);
+}
+
+function isProcessAlive(processId) {
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch (error) {
+    if (typeof error === "object" && error !== null && error.code === "EPERM") {
+      return true;
+    }
+
+    return false;
+  }
 }
 
 function readRequiredEnv(name) {
