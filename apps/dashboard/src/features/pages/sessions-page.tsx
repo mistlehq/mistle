@@ -9,35 +9,26 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   TextLink,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@mistle/ui";
-import { InfoIcon } from "@phosphor-icons/react";
+import { InfoIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { Link as RouterLink, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import type { LaunchableSandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { useLaunchableSandboxProfiles } from "../sandbox-profiles/use-launchable-sandbox-profiles.js";
 import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { resolveSessionTitleLabel } from "../sessions/session-title-presentation.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
-import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
-import { resolveUserDisplayName } from "../shared/user-display-name.js";
-import { useCachedRequiredSession } from "../shell/session-context.js";
+import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import {
   resolveSandboxStatusBadgeUi,
   type SandboxLifecycleStatus,
@@ -178,88 +169,26 @@ function resolveUpdatedLabel(input: {
   );
 }
 
-export function buildOptimisticSessions(input: {
-  launchedSessions: readonly {
-    profileId: string;
-    profileDisplayName: string;
-    profileVersion: number;
-    sandboxInstanceId: string;
-    createdAtIso: string;
-    status: SandboxLifecycleStatus;
-    failureCode: string | null;
-    failureMessage: string | null;
-  }[];
-  listedItems: readonly SandboxInstanceListItem[];
-  currentUserId: string;
-  currentUserDisplayName: string;
-}): SandboxInstanceListItem[] {
-  const listedInstanceIds = new Set(input.listedItems.map((item) => item.id));
-  const items: SandboxInstanceListItem[] = [];
-
-  for (const session of input.launchedSessions) {
-    if (listedInstanceIds.has(session.sandboxInstanceId)) {
-      continue;
-    }
-
-    items.push({
-      id: session.sandboxInstanceId,
-      title: null,
-      sandboxProfileId: session.profileId,
-      sandboxProfileDisplayName: session.profileDisplayName,
-      sandboxProfileVersion: session.profileVersion,
-      status: session.status,
-      startedBy: {
-        kind: "user",
-        id: input.currentUserId,
-        name: input.currentUserDisplayName,
-      },
-      source: "dashboard",
-      createdAt: session.createdAtIso,
-      updatedAt: session.createdAtIso,
-      failureCode: session.failureCode,
-      failureMessage: session.failureMessage,
-    });
-  }
-
-  return items;
-}
-
 export function resolveSessionResultsSummary(input: {
   listedSessionCount: number;
   totalResults: number;
-  optimisticSessionCount: number;
 }): {
   visibleCount: number;
   totalCount: number;
 } {
-  const visibleCount = input.listedSessionCount + input.optimisticSessionCount;
-
   return {
-    visibleCount,
-    totalCount: input.totalResults + input.optimisticSessionCount,
+    visibleCount: input.listedSessionCount,
+    totalCount: input.totalResults,
   };
 }
 
 export function SessionsPage(): React.JSX.Element {
-  const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Tradeoff: the selection intentionally snapshots the launchable profile, including activeVersion.
-  // This can lag behind a later refetch, but we prefer starting the exact version the picker
-  // validated at selection time over silently changing the selected launch target after selection.
-  const [selectedProfile, setSelectedProfile] = useState<LaunchableSandboxProfile | null>(null);
-  const {
-    launchedSessions,
-    startErrorMessage,
-    isStartingSession,
-    startSession,
-    clearStartErrorMessage,
-  } = useSandboxSessionLaunchState();
   const sandboxInstanceListLimit = parseListLimit(searchParams.get("limit"));
   const sandboxInstancesAfter = parseCursor(searchParams.get("after"));
   const sandboxInstancesBefore =
     sandboxInstancesAfter === null ? parseCursor(searchParams.get("before")) : null;
 
-  const selectableProfilesQuery = useLaunchableSandboxProfiles();
   const sandboxInstancesQuery = useQuery({
     queryKey: sandboxInstancesListQueryKey({
       limit: sandboxInstanceListLimit,
@@ -274,44 +203,7 @@ export function SessionsPage(): React.JSX.Element {
         signal,
       }),
   });
-  const selectableProfiles = selectableProfilesQuery.data?.items ?? [];
-  const selectedProfileVersion = selectedProfile?.activeVersion ?? null;
-
-  useEffect(() => {
-    if (
-      shouldClearSelectedProfile({
-        selectedProfile,
-        selectableProfiles,
-        isSelectableProfilesPending: selectableProfilesQuery.isPending,
-      })
-    ) {
-      clearStartErrorMessage();
-      setSelectedProfile(null);
-    }
-  }, [
-    clearStartErrorMessage,
-    selectableProfiles,
-    selectableProfilesQuery.isPending,
-    selectedProfile,
-  ]);
-
-  const selectedProfileDisplayText =
-    selectedProfile === null ? "Select sandbox profile" : selectedProfile.displayName;
-  const selectedProfileSelectValue = selectedProfile?.id ?? "";
-
-  const canStartSession =
-    selectedProfile !== null &&
-    selectedProfileVersion !== null &&
-    !selectableProfilesQuery.isPending &&
-    !isStartingSession;
-  const currentUserDisplayName = resolveUserDisplayName(session.user);
-  const optimisticSessions = buildOptimisticSessions({
-    launchedSessions,
-    listedItems: sandboxInstancesQuery.data?.items ?? [],
-    currentUserId: session.user.id,
-    currentUserDisplayName,
-  });
-  const displayedSessions = [...optimisticSessions, ...(sandboxInstancesQuery.data?.items ?? [])];
+  const displayedSessions = sandboxInstancesQuery.data?.items ?? [];
 
   function updatePagination(input: {
     nextLimit: number;
@@ -368,7 +260,7 @@ export function SessionsPage(): React.JSX.Element {
       })
     : null;
 
-  const isLoadingSessions = sandboxInstancesQuery.isPending && optimisticSessions.length === 0;
+  const isLoadingSessions = sandboxInstancesQuery.isPending;
 
   const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
@@ -380,81 +272,16 @@ export function SessionsPage(): React.JSX.Element {
       : resolveSessionResultsSummary({
           listedSessionCount: sandboxInstancesQuery.data.items.length,
           totalResults: sandboxInstancesQuery.data.totalResults,
-          optimisticSessionCount: optimisticSessions.length,
         });
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4">
-        <h1 className="text-xl font-semibold">Start a new session</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select
-            disabled={selectableProfilesQuery.isPending || selectableProfiles.length === 0}
-            onValueChange={(value) => {
-              clearStartErrorMessage();
-              if (value === null || value.length === 0) {
-                setSelectedProfile(null);
-                return;
-              }
-              setSelectedProfile(
-                selectableProfiles.find((profile) => profile.id === value) ?? null,
-              );
-            }}
-            value={selectedProfileSelectValue}
-          >
-            <SelectTrigger
-              aria-label="Sandbox profile"
-              className="min-w-56"
-              id="session-start-profile"
-            >
-              <SelectValue placeholder="Select sandbox profile">
-                {selectedProfileDisplayText}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {selectableProfiles.map((profile) => (
-                <SelectItem key={profile.id} value={profile.id}>
-                  {profile.displayName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            disabled={!canStartSession}
-            onClick={() => {
-              if (!canStartSession) {
-                return;
-              }
-
-              if (selectedProfile === null || selectedProfileVersion === null) {
-                return;
-              }
-
-              startSession({
-                profileId: selectedProfile.id,
-                profileDisplayName: selectedProfileDisplayText,
-                profileVersion: selectedProfileVersion,
-              });
-            }}
-            type="button"
-          >
-            {isStartingSession ? "Starting sandbox..." : "Start session"}
-          </Button>
-        </div>
-
-        {selectableProfilesQuery.isError ? (
-          <Notice title="Could not load sandbox profiles" variant="alert">
-            {resolveApiErrorMessage({
-              error: selectableProfilesQuery.error,
-              fallbackMessage: "Could not load sandbox profiles.",
-            })}
-          </Notice>
-        ) : null}
-        {startErrorMessage === null ? null : (
-          <Notice title="Session start failed" variant="alert">
-            {startErrorMessage}
-          </Notice>
-        )}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">Sessions</h1>
+        <Button render={<RouterLink to={SessionsRoutes.NEW} />}>
+          <PlusIcon aria-hidden className="size-4" />
+          New session
+        </Button>
       </div>
 
       <div className="flex flex-col gap-3">

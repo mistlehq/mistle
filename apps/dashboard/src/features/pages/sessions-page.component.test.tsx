@@ -11,9 +11,9 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import {
-  buildOptimisticSessions,
   resolveSessionResultsSummary,
   SessionsPage,
   shouldClearSelectedProfile,
@@ -98,55 +98,32 @@ function renderSessionsPage(input?: {
 }
 
 describe("SessionsPage", () => {
-  it("uses the authenticated user's display name for optimistic sessions", () => {
-    const optimisticSessions = buildOptimisticSessions({
-      launchedSessions: [
-        {
-          profileId: "sbp_profile_alpha",
-          profileDisplayName: "Alpha Profile",
-          profileVersion: 3,
-          sandboxInstanceId: "sbi_optimistic",
-          createdAtIso: "2026-03-10T00:00:00.000Z",
-          status: "starting",
-          failureCode: null,
-          failureMessage: null,
-        },
-      ],
-      listedItems: [],
-      currentUserId: "user-id",
-      currentUserDisplayName: "Mistle User",
-    });
-
-    expect(optimisticSessions).toStrictEqual([
-      {
-        id: "sbi_optimistic",
-        title: null,
-        sandboxProfileId: "sbp_profile_alpha",
-        sandboxProfileDisplayName: "Alpha Profile",
-        sandboxProfileVersion: 3,
-        status: "starting",
-        startedBy: {
-          kind: "user",
-          id: "user-id",
-          name: "Mistle User",
-        },
-        source: "dashboard",
-        createdAt: "2026-03-10T00:00:00.000Z",
-        updatedAt: "2026-03-10T00:00:00.000Z",
-        failureCode: null,
-        failureMessage: null,
-      },
-    ]);
-  });
-
-  it("renders sandbox launcher controls", async () => {
+  it("routes new session creation through the dedicated new session page", async () => {
     const queryClient = createSessionsPageQueryClient();
 
-    const rendered = renderSessionsPage({ queryClient });
+    function NewSessionRouteProbe(): React.JSX.Element {
+      const location = useLocation();
+      return <span>{location.pathname}</span>;
+    }
+
+    const rendered = renderSessionsPage({
+      queryClient,
+      initialEntries: [SessionsRoutes.INDEX],
+      routes: (
+        <Routes>
+          <Route element={<SessionsPage />} path={SessionsRoutes.INDEX} />
+          <Route element={<NewSessionRouteProbe />} path={SessionsRoutes.NEW} />
+        </Routes>
+      ),
+    });
 
     try {
-      expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
-      expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
+      expect(screen.queryByRole("combobox", { name: "Sandbox profile" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Start session" })).toBeNull();
+
+      fireEvent.click(screen.getByRole("link", { name: "New session" }));
+
+      expect(screen.getByText(SessionsRoutes.NEW)).toBeDefined();
     } finally {
       rendered.unmount();
       await queryClient.cancelQueries();
@@ -288,29 +265,27 @@ describe("SessionsPage", () => {
     expect(screen.getByText("Alpha Profile")).toBeDefined();
   });
 
-  it("counts optimistic sessions only in the visible results", () => {
+  it("uses listed sessions for the visible results", () => {
     expect(
       resolveSessionResultsSummary({
         listedSessionCount: 1,
         totalResults: 1,
-        optimisticSessionCount: 1,
       }),
     ).toStrictEqual({
-      visibleCount: 2,
-      totalCount: 2,
+      visibleCount: 1,
+      totalCount: 1,
     });
   });
 
-  it("counts optimistic sessions in the total on short pages", () => {
+  it("uses the listed total for short pages", () => {
     expect(
       resolveSessionResultsSummary({
         listedSessionCount: 1,
         totalResults: 21,
-        optimisticSessionCount: 1,
       }),
     ).toStrictEqual({
-      visibleCount: 2,
-      totalCount: 22,
+      visibleCount: 1,
+      totalCount: 21,
     });
   });
 
@@ -402,9 +377,9 @@ describe("SessionsPage", () => {
       queryClient,
     });
 
-    expect(within(rendered.container).getByRole("link").getAttribute("href")).toBe(
-      "/sessions/sbi_running",
-    );
+    expect(
+      within(rendered.container).getByRole("link", { name: "Untitled" }).getAttribute("href"),
+    ).toBe("/sessions/sbi_running");
   });
 
   it("renders failed sessions as non-navigable rows", () => {
@@ -428,7 +403,7 @@ describe("SessionsPage", () => {
       queryClient,
     });
 
-    expect(within(rendered.container).queryByRole("link")).toBeNull();
+    expect(within(rendered.container).queryByRole("link", { name: "Untitled" })).toBeNull();
     expect(rendered.container.querySelector('tr[aria-disabled="true"]')).not.toBeNull();
     expect(rendered.container.innerHTML).toContain("hover:bg-transparent");
   });
