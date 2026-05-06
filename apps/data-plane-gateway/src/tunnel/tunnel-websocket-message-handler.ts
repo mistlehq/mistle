@@ -143,6 +143,16 @@ export async function handleTunnelWebSocketMessage(input: {
       },
       sourceBootstrapSessionId: input.clientSessionId,
     });
+  } else if (translation.delivery.kind === "egressMalformed") {
+    input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({
+      message: translation.delivery.message,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: (message) => {
+        input.currentSocket.send(JSON.stringify(message));
+      },
+      sourceBootstrapSessionId: input.clientSessionId,
+      streamId: translation.delivery.streamId,
+    });
   } else if (translation.delivery.kind === "respond") {
     input.currentSocket.send(translation.delivery.payload);
   } else {

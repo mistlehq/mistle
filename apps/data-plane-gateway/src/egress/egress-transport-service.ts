@@ -57,6 +57,12 @@ type EgressStreamOutcome =
 
 type SendBootstrapMessage = (message: EgressTransportMessage) => void;
 
+type GatewayEgressStreamIdentity = {
+  sandboxInstanceId: string;
+  sourceBootstrapSessionId: string;
+  streamId: number;
+};
+
 type ActiveGatewayEgressStream = {
   attributes: Attributes;
   finished: boolean;
@@ -65,7 +71,10 @@ type ActiveGatewayEgressStream = {
   requestEnded: boolean;
   requestId: string;
   responseStarted: boolean;
+  responseStatusCode?: number;
+  sandboxInstanceId: string;
   sendBootstrapMessage: SendBootstrapMessage;
+  sourceBootstrapSessionId: string;
   socket?: Socket;
   span: Span;
   streamId: number;
@@ -124,8 +133,10 @@ function buildRequestPath(request: EgressHttpOpen["request"]): string {
   return request.query === undefined ? request.path : `${request.path}?${request.query}`;
 }
 
-function toStreamKey(input: { sandboxInstanceId: string; streamId: number }): string {
-  return `${input.sandboxInstanceId}:${String(input.streamId)}`;
+function toStreamKey(input: GatewayEgressStreamIdentity): string {
+  return [input.sandboxInstanceId, input.sourceBootstrapSessionId, String(input.streamId)].join(
+    ":",
+  );
 }
 
 function toUrl(input: EgressHttpOpen["request"]): URL {
@@ -180,9 +191,9 @@ function finishStream(input: {
   error?: Error;
   outcome: EgressStreamOutcome;
   stream: ActiveGatewayEgressStream;
-}): void {
+}): boolean {
   if (input.stream.finished) {
-    return;
+    return false;
   }
   input.stream.finished = true;
 
@@ -193,6 +204,11 @@ function finishStream(input: {
     "mistle.gateway.egress.response_body_bytes": input.stream.totalResponseBytes,
     "mistle.gateway.egress.stream_duration_ms": durationMs,
     "mistle.gateway.egress.outcome": input.outcome,
+    "mistle.gateway.egress.cancelled": input.outcome === "cancelled",
+    ...(input.stream.responseStatusCode === undefined
+      ? {}
+      : { "http.response.status_code": input.stream.responseStatusCode }),
+    ...(input.error === undefined ? {} : { "mistle.gateway.egress.failure_code": input.outcome }),
   };
   input.stream.span.setAttributes(attributes);
   if (input.error !== undefined) {
@@ -211,6 +227,7 @@ function finishStream(input: {
     outcome: input.outcome,
     ...(input.error === undefined ? {} : { error: input.error }),
   });
+  return true;
 }
 
 export class GatewayEgressTransportService {
@@ -235,36 +252,62 @@ export class GatewayEgressTransportService {
         return this.writeRequestBodyChunk({
           bytes: Buffer.from(input.message.bytes, "base64"),
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
           streamId: input.message.streamId,
         });
       case "egress.http.request.body.end":
         return this.endRequestBody({
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
           streamId: input.message.streamId,
         });
       case "egress.tcp.data":
         return this.writeUpgradedBytes({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.tcp.close":
         return this.closeUpgradedDirection({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.stream.cancel":
         return this.cancelStream({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.http.response.start":
       case "egress.http.response.body.chunk":
       case "egress.http.response.body.end":
       case "egress.stream.error":
-        throw new GatewayEgressForbiddenTunnelStateError(
-          `Bootstrap tunnel cannot send gateway-owned egress message '${input.message.type}'.`,
-        );
+        this.rejectForbiddenBootstrapMessage({
+          message: input.message,
+          sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        });
+        return true;
     }
+  }
+
+  public rejectMalformedBootstrapMessage(input: {
+    message: string;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): void {
+    this.sendStreamError({
+      code: "malformed_frame",
+      message: input.message,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.streamId,
+    });
   }
 
   public cancelStreamsForBootstrapSession(input: {
@@ -293,6 +336,7 @@ export class GatewayEgressTransportService {
   }): Promise<void> {
     const key = toStreamKey({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
     if (this.#activeStreamsByKey.has(key)) {
@@ -330,7 +374,9 @@ export class GatewayEgressTransportService {
       requestEnded: false,
       requestId: input.message.requestId,
       responseStarted: false,
+      sandboxInstanceId: input.sandboxInstanceId,
       sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       span,
       streamId: input.message.streamId,
       totalRequestBytes: 0,
@@ -364,11 +410,11 @@ export class GatewayEgressTransportService {
       });
     });
     upstreamRequest.on("error", (error) => {
+      const failureCode = stream.responseStarted ? "upstream_io_error" : "upstream_connect_failed";
       this.failActiveStream({
         error,
-        failureCode: "upstream_connect_failed",
+        failureCode,
         outcome: stream.responseStarted ? "upstream_io_error" : "upstream_connect_failed",
-        sandboxInstanceId: input.sandboxInstanceId,
         stream,
       });
     });
@@ -380,6 +426,7 @@ export class GatewayEgressTransportService {
     stream: ActiveGatewayEgressStream;
   }): void {
     input.stream.responseStarted = true;
+    input.stream.responseStatusCode = input.response.statusCode ?? 502;
     input.stream.sendBootstrapMessage({
       type: "egress.http.response.start",
       streamId: input.stream.streamId,
@@ -398,6 +445,10 @@ export class GatewayEgressTransportService {
     });
 
     input.response.on("data", (chunk: Buffer) => {
+      if (input.stream.finished) {
+        return;
+      }
+
       input.stream.totalResponseBytes += chunk.byteLength;
       EgressStreamBytes.add(chunk.byteLength, {
         ...input.stream.attributes,
@@ -411,9 +462,14 @@ export class GatewayEgressTransportService {
       } satisfies EgressHttpResponseBodyChunk);
     });
     input.response.on("end", () => {
+      if (input.stream.finished) {
+        return;
+      }
+
       this.#activeStreamsByKey.delete(
         toStreamKey({
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
           streamId: input.stream.streamId,
         }),
       );
@@ -421,18 +477,21 @@ export class GatewayEgressTransportService {
         type: "egress.http.response.body.end",
         streamId: input.stream.streamId,
       } satisfies EgressHttpResponseBodyEnd);
-      finishStream({
+      this.finishActiveStream({
         clockNowMs: Date.now(),
         outcome: "completed",
         stream: input.stream,
       });
     });
     input.response.on("error", (error) => {
+      if (input.stream.finished) {
+        return;
+      }
+
       this.failActiveStream({
         error,
         failureCode: "upstream_io_error",
         outcome: "upstream_io_error",
-        sandboxInstanceId: input.sandboxInstanceId,
         stream: input.stream,
       });
     });
@@ -446,6 +505,7 @@ export class GatewayEgressTransportService {
     stream: ActiveGatewayEgressStream;
   }): void {
     input.stream.responseStarted = true;
+    input.stream.responseStatusCode = input.response.statusCode ?? 101;
     input.stream.upgraded = true;
     input.stream.socket = input.socket;
     input.stream.sendBootstrapMessage({
@@ -471,6 +531,10 @@ export class GatewayEgressTransportService {
     }
 
     input.socket.on("data", (chunk: Buffer) => {
+      if (input.stream.finished) {
+        return;
+      }
+
       this.sendUpgradedBytes({
         bytes: chunk,
         direction: "response",
@@ -478,6 +542,10 @@ export class GatewayEgressTransportService {
       });
     });
     input.socket.on("end", () => {
+      if (input.stream.finished) {
+        return;
+      }
+
       input.stream.sendBootstrapMessage({
         type: "egress.tcp.close",
         streamId: input.stream.streamId,
@@ -485,24 +553,32 @@ export class GatewayEgressTransportService {
       } satisfies EgressTcpClose);
     });
     input.socket.on("close", () => {
+      if (input.stream.finished) {
+        return;
+      }
+
       this.#activeStreamsByKey.delete(
         toStreamKey({
           sandboxInstanceId: input.sandboxInstanceId,
+          sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
           streamId: input.stream.streamId,
         }),
       );
-      finishStream({
+      this.finishActiveStream({
         clockNowMs: Date.now(),
         outcome: "completed",
         stream: input.stream,
       });
     });
     input.socket.on("error", (error) => {
+      if (input.stream.finished) {
+        return;
+      }
+
       this.failActiveStream({
         error,
         failureCode: "upstream_io_error",
         outcome: "upstream_io_error",
-        sandboxInstanceId: input.sandboxInstanceId,
         stream: input.stream,
       });
     });
@@ -511,6 +587,7 @@ export class GatewayEgressTransportService {
   private writeRequestBodyChunk(input: {
     bytes: Buffer;
     sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
     streamId: number;
   }): boolean {
     const stream = this.getActiveStream(input);
@@ -532,7 +609,7 @@ export class GatewayEgressTransportService {
     return true;
   }
 
-  private endRequestBody(input: { sandboxInstanceId: string; streamId: number }): boolean {
+  private endRequestBody(input: GatewayEgressStreamIdentity): boolean {
     const stream = this.getActiveStream(input);
     if (stream === undefined) {
       return false;
@@ -549,9 +626,11 @@ export class GatewayEgressTransportService {
   private writeUpgradedBytes(input: {
     message: EgressTcpData;
     sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
   }): boolean {
     const stream = this.getActiveStream({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
     if (stream === undefined) {
@@ -576,9 +655,11 @@ export class GatewayEgressTransportService {
   private closeUpgradedDirection(input: {
     message: EgressTcpClose;
     sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
   }): boolean {
     const stream = this.getActiveStream({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
     if (stream === undefined) {
@@ -594,9 +675,14 @@ export class GatewayEgressTransportService {
     return true;
   }
 
-  private cancelStream(input: { message: EgressStreamCancel; sandboxInstanceId: string }): boolean {
+  private cancelStream(input: {
+    message: EgressStreamCancel;
+    sandboxInstanceId: string;
+    sourceBootstrapSessionId: string;
+  }): boolean {
     const stream = this.getActiveStream({
       sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     });
     if (stream === undefined) {
@@ -629,37 +715,110 @@ export class GatewayEgressTransportService {
     } satisfies EgressTcpData);
   }
 
-  private getActiveStream(input: {
-    sandboxInstanceId: string;
-    streamId: number;
-  }): ActiveGatewayEgressStream | undefined {
+  private getActiveStream(
+    input: GatewayEgressStreamIdentity,
+  ): ActiveGatewayEgressStream | undefined {
     return this.#activeStreamsByKey.get(toStreamKey(input));
+  }
+
+  private rejectForbiddenBootstrapMessage(input: {
+    message: Extract<
+      EgressTransportMessage,
+      {
+        type:
+          | "egress.http.response.start"
+          | "egress.http.response.body.chunk"
+          | "egress.http.response.body.end"
+          | "egress.stream.error";
+      }
+    >;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+  }): void {
+    const errorMessage = `Bootstrap tunnel cannot send gateway-owned egress message '${input.message.type}'.`;
+    const stream = this.getActiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+    if (stream === undefined) {
+      this.sendStreamError({
+        code: "forbidden_tunnel_state",
+        message: errorMessage,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return;
+    }
+
+    this.failActiveStream({
+      error: new GatewayEgressForbiddenTunnelStateError(errorMessage),
+      failureCode: "forbidden_tunnel_state",
+      outcome: "forbidden_tunnel_state",
+      stream,
+    });
   }
 
   private failActiveStream(input: {
     error: Error;
     failureCode: EgressStreamError["code"];
     outcome: EgressStreamOutcome;
-    sandboxInstanceId: string;
     stream: ActiveGatewayEgressStream;
   }): void {
+    if (input.stream.finished) {
+      return;
+    }
+
     this.#activeStreamsByKey.delete(
       toStreamKey({
-        sandboxInstanceId: input.sandboxInstanceId,
+        sandboxInstanceId: input.stream.sandboxInstanceId,
+        sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
         streamId: input.stream.streamId,
       }),
     );
-    input.stream.sendBootstrapMessage({
-      type: "egress.stream.error",
-      streamId: input.stream.streamId,
+    this.sendStreamError({
       code: input.failureCode,
       message: input.error.message,
-    } satisfies EgressStreamError);
+      sandboxInstanceId: input.stream.sandboxInstanceId,
+      sendBootstrapMessage: input.stream.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
+      streamId: input.stream.streamId,
+    });
     this.cancelActiveStream({
       error: input.error,
       outcome: input.outcome,
       stream: input.stream,
     });
+  }
+
+  private sendStreamError(input: {
+    code: EgressStreamError["code"];
+    message: string;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    streamId: number;
+  }): void {
+    logger.info(
+      {
+        event: "gateway_egress_stream_error",
+        failureCode: input.code,
+        matchedManagedRoute: false,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.streamId,
+      },
+      input.message,
+    );
+    input.sendBootstrapMessage({
+      type: "egress.stream.error",
+      streamId: input.streamId,
+      code: input.code,
+      message: input.message,
+    } satisfies EgressStreamError);
   }
 
   private cancelActiveStream(input: {
@@ -669,17 +828,51 @@ export class GatewayEgressTransportService {
   }): void {
     this.#activeStreamsByKey.delete(
       toStreamKey({
-        sandboxInstanceId: String(input.stream.attributes["mistle.sandbox.instance_id"]),
+        sandboxInstanceId: input.stream.sandboxInstanceId,
+        sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
         streamId: input.stream.streamId,
       }),
     );
-    input.stream.request.destroy();
-    input.stream.socket?.destroy();
-    finishStream({
+    this.finishActiveStream({
       clockNowMs: Date.now(),
       outcome: input.outcome,
       stream: input.stream,
       ...(input.error === undefined ? {} : { error: input.error }),
     });
+    input.stream.request.destroy();
+    input.stream.socket?.destroy();
+  }
+
+  private finishActiveStream(input: {
+    clockNowMs: number;
+    error?: Error;
+    outcome: EgressStreamOutcome;
+    stream: ActiveGatewayEgressStream;
+  }): void {
+    const finished = finishStream(input);
+    if (!finished) {
+      return;
+    }
+
+    logger.info(
+      {
+        event: "gateway_egress_passthrough",
+        durationMs: input.clockNowMs - input.stream.openedAtMs,
+        failureCode: input.error === undefined ? undefined : input.outcome,
+        host: input.stream.attributes["server.address"],
+        matchedManagedRoute: false,
+        method: input.stream.attributes["http.request.method"],
+        outcome: input.outcome,
+        path: input.stream.attributes["url.path"],
+        requestId: input.stream.requestId,
+        sandboxInstanceId: input.stream.sandboxInstanceId,
+        sourceBootstrapSessionId: input.stream.sourceBootstrapSessionId,
+        statusCode: input.stream.responseStatusCode,
+        streamId: input.stream.streamId,
+      },
+      input.error === undefined
+        ? "Gateway egress pass-through stream finished"
+        : "Gateway egress pass-through stream failed",
+    );
   }
 }

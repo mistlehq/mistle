@@ -57,6 +57,13 @@ type SimulatedUpgradeUpstream = {
   nextRequest: () => Promise<ReceivedHttpRequest>;
 };
 
+type SimulatedStreamingHttpUpstream = {
+  baseUrl: string;
+  close: () => Promise<void>;
+  nextRequest: () => Promise<ReceivedHttpRequest>;
+  nextResponseClosed: () => Promise<void>;
+};
+
 type WebSocketMessageQueue = {
   close: () => void;
   next: () => Promise<EgressTransportMessage>;
@@ -286,6 +293,184 @@ describe.concurrent("gateway egress transport integration", () => {
     },
     TestTimeoutMs,
   );
+
+  it(
+    "closes the upstream HTTP response when sandboxd cancels an egress stream",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const upstream = await startSimulatedStreamingHttpUpstream();
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        const upstreamUrl = new URL("/stream", upstream.baseUrl);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_cancel",
+            streamId: 13,
+            request: {
+              method: "GET",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: upstreamUrl.pathname,
+              headers: {},
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 13,
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for simulated streaming HTTP upstream request",
+            promise: upstream.nextRequest(),
+          }),
+        ).resolves.toEqual({
+          body: "",
+          headers: expect.any(Object),
+          method: "GET",
+          url: "/stream",
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for streaming HTTP response start",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.start",
+          streamId: 13,
+          status: 200,
+          headers: expect.objectContaining({
+            "content-type": ["text/plain; charset=utf-8"],
+          }),
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for streaming HTTP response body chunk",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.body.chunk",
+          streamId: 13,
+          bytes: Buffer.from("stream-start", "utf8").toString("base64"),
+          encoding: "base64",
+        });
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.stream.cancel",
+            streamId: 13,
+            reason: "caller stopped waiting",
+          }),
+        );
+
+        await withTimeout({
+          label: "waiting for simulated streaming HTTP upstream response to close",
+          promise: upstream.nextResponseClosed(),
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "returns a stream error for gateway-owned egress frames sent by sandboxd",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.response.start",
+            streamId: 14,
+            status: 200,
+            headers: {},
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for forbidden egress frame error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 14,
+          code: "forbidden_tunnel_state",
+          message:
+            "Bootstrap tunnel cannot send gateway-owned egress message 'egress.http.response.start'.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "returns a stream error for malformed egress frames with a stream id",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({ env, sandboxInstanceId });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 15,
+            bytes: "not-checked-here",
+            encoding: "plain",
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for malformed egress frame error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 15,
+          code: "malformed_frame",
+          message: "Malformed egress transport message 'egress.http.request.body.chunk'.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
 });
 
 async function insertSandboxInstanceRow(input: {
@@ -423,6 +608,66 @@ async function startSimulatedUpgradeUpstream(): Promise<SimulatedUpgradeUpstream
   };
 }
 
+async function startSimulatedStreamingHttpUpstream(): Promise<SimulatedStreamingHttpUpstream> {
+  const receivedRequests: ReceivedHttpRequest[] = [];
+  const waitingRequestResolvers: Array<(request: ReceivedHttpRequest) => void> = [];
+  const waitingCloseResolvers: Array<() => void> = [];
+  let closedResponseCount = 0;
+  const sockets = new Set<Duplex>();
+  const server = createServer((request, response) => {
+    sockets.add(request.socket);
+    request.socket.on("close", () => {
+      sockets.delete(request.socket);
+    });
+    response.on("close", () => {
+      const resolver = waitingCloseResolvers.shift();
+      if (resolver !== undefined) {
+        resolver();
+        return;
+      }
+
+      closedResponseCount += 1;
+    });
+    handleSimulatedStreamingHttpRequest({
+      receivedRequests,
+      request,
+      response,
+      waitingResolvers: waitingRequestResolvers,
+    });
+  });
+  const port = await listen(server);
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(port)}`,
+    close: async () => {
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      await closeServer(server);
+    },
+    nextRequest: async () => {
+      const request = receivedRequests.shift();
+      if (request !== undefined) {
+        return request;
+      }
+
+      return await new Promise<ReceivedHttpRequest>((resolve) => {
+        waitingRequestResolvers.push(resolve);
+      });
+    },
+    nextResponseClosed: async () => {
+      if (closedResponseCount > 0) {
+        closedResponseCount -= 1;
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        waitingCloseResolvers.push(resolve);
+      });
+    },
+  };
+}
+
 function handleSimulatedHttpRequest(input: {
   receivedRequests: ReceivedHttpRequest[];
   request: IncomingMessage;
@@ -451,6 +696,36 @@ function handleSimulatedHttpRequest(input: {
       "x-upstream-marker": "simulated-http",
     });
     input.response.end("hello from upstream");
+  });
+}
+
+function handleSimulatedStreamingHttpRequest(input: {
+  receivedRequests: ReceivedHttpRequest[];
+  request: IncomingMessage;
+  response: ServerResponse;
+  waitingResolvers: Array<(request: ReceivedHttpRequest) => void>;
+}): void {
+  const chunks: Buffer[] = [];
+  input.request.on("data", (chunk: Buffer) => {
+    chunks.push(chunk);
+  });
+  input.request.on("end", () => {
+    const receivedRequest = {
+      body: Buffer.concat(chunks).toString("utf8"),
+      headers: input.request.headers,
+      method: input.request.method ?? "",
+      url: input.request.url ?? "",
+    };
+    const resolver = input.waitingResolvers.shift();
+    if (resolver !== undefined) {
+      resolver(receivedRequest);
+    } else {
+      input.receivedRequests.push(receivedRequest);
+    }
+    input.response.writeHead(200, {
+      "content-type": "text/plain; charset=utf-8",
+    });
+    input.response.write("stream-start");
   });
 }
 

@@ -74,6 +74,11 @@ export type TunnelProtocolDelivery =
   | {
       kind: "egressTransport";
       message: EgressTransportMessage;
+    }
+  | {
+      kind: "egressMalformed";
+      message: string;
+      streamId: number;
     };
 
 export type TunnelProtocolTranslation = {
@@ -264,6 +269,43 @@ function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string
   return side === "connection"
     ? "Connection websocket binary payloads must be valid tunnel data frames."
     : "Bootstrap websocket binary payloads must be valid tunnel data frames.";
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseJsonObject(payload: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    return isJsonObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function parseMalformedEgressMessage(
+  payload: string,
+): { message: string; streamId: number } | undefined {
+  const parsed = parseJsonObject(payload);
+  if (parsed === undefined || typeof parsed.type !== "string") {
+    return undefined;
+  }
+  if (!parsed.type.startsWith("egress.")) {
+    return undefined;
+  }
+  if (
+    typeof parsed.streamId !== "number" ||
+    !Number.isInteger(parsed.streamId) ||
+    parsed.streamId <= 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    message: `Malformed egress transport message '${parsed.type}'.`,
+    streamId: parsed.streamId,
+  };
 }
 
 function createUnsupportedConnectionTelemetryMessageError(messageType: string): Error {
@@ -725,6 +767,17 @@ export class TunnelProtocolTranslator {
         delivery: {
           kind: "egressTransport",
           message: egressTransportMessage,
+        },
+      });
+    }
+
+    const malformedEgressMessage = parseMalformedEgressMessage(input.payload);
+    if (malformedEgressMessage !== undefined) {
+      return createTranslation({
+        delivery: {
+          kind: "egressMalformed",
+          message: malformedEgressMessage.message,
+          streamId: malformedEgressMessage.streamId,
         },
       });
     }
