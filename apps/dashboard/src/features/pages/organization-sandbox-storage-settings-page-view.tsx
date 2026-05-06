@@ -12,15 +12,15 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
+  Spinner,
 } from "@mistle/ui";
 
 import type {
   OrganizationSandboxStorageFormErrors,
   OrganizationSandboxStorageFormState,
 } from "../settings/organization/sandbox-storage-model.js";
-import { SaveActions } from "../settings/save-actions.js";
 import { FormPageSection, FormPageStack } from "../shared/form-page.js";
+import { SettingsSwitchField } from "../shared/settings-switch-field.js";
 
 const ArchilRegionOptions = [
   { value: "aws-us-east-1", label: "AWS - US East (N. Virginia)" },
@@ -32,12 +32,10 @@ const ArchilRegionOptions = [
 export type OrganizationSandboxStorageSettingsPageViewProps = {
   state: OrganizationSandboxStorageFormState;
   isSaving: boolean;
-  hasUnsavedChanges: boolean;
   saveErrorMessage: string | null;
   loadErrorMessage: string | null;
   visibleErrors: OrganizationSandboxStorageFormErrors;
-  onCancel: () => void;
-  onSave: () => Promise<void>;
+  onPersistentSandboxesEnabledChange: (enabled: boolean) => Promise<void> | void;
   onStateChange: (state: OrganizationSandboxStorageFormState) => void;
 };
 
@@ -64,40 +62,29 @@ export function OrganizationSandboxStorageSettingsPageView(
   }
 
   return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        void input.onSave();
-      }}
-    >
+    <div>
       <FormPageStack>
         <FormPageSection>
           <div className="flex flex-col gap-4 p-4">
             {input.saveErrorMessage === null ? null : (
               <Notice variant="alert">{input.saveErrorMessage}</Notice>
             )}
-            <Field orientation="horizontal">
-              <FieldHeader className="md:w-auto md:flex-1">
-                <FieldLabel htmlFor="persistent-sandboxes-enabled">
-                  Allow persistent sandboxes
-                </FieldLabel>
-                <FieldDescription>
-                  Allow this organization to use persistent sandbox storage.
-                </FieldDescription>
-              </FieldHeader>
-              <FieldContent>
-                <Switch
-                  checked={input.state.persistentSandboxesEnabled}
-                  id="persistent-sandboxes-enabled"
-                  onCheckedChange={(checked) => {
-                    input.onStateChange({
-                      ...input.state,
-                      persistentSandboxesEnabled: checked,
-                    });
-                  }}
-                />
-              </FieldContent>
-            </Field>
+            <SettingsSwitchField
+              checked={input.state.persistentSandboxesEnabled}
+              description="Allow this organization to use persistent sandbox storage."
+              disabled={input.isSaving}
+              id="persistent-sandboxes-enabled"
+              label="Allow persistent sandboxes"
+              onCheckedChange={(checked) => {
+                void input.onPersistentSandboxesEnabledChange(checked);
+              }}
+            />
+            {input.isSaving ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Spinner aria-hidden className="size-4" />
+                <span>Saving...</span>
+              </div>
+            ) : null}
 
             {input.state.persistentSandboxesEnabled ? (
               <>
@@ -326,17 +313,7 @@ export function OrganizationSandboxStorageSettingsPageView(
             ) : null}
           </div>
         </FormPageSection>
-        <SaveActions
-          cancelDisabled={!input.hasUnsavedChanges || input.isSaving}
-          onCancel={input.onCancel}
-          onSave={() => {
-            void input.onSave();
-          }}
-          saveDisabled={!input.hasUnsavedChanges || input.isSaving}
-          saveSuccess={false}
-          saving={input.isSaving}
-        />
       </FormPageStack>
-    </form>
+    </div>
   );
 }

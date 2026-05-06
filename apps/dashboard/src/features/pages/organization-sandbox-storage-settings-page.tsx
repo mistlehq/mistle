@@ -14,7 +14,6 @@ import {
   canManageOrganizationSandboxStorage,
   type OrganizationSandboxStorageFormErrors,
   type OrganizationSandboxStorageFormState,
-  sandboxStorageFormStatesEqual,
   validateOrganizationSandboxStorageFormState,
 } from "../settings/organization/sandbox-storage-model.js";
 import {
@@ -120,14 +119,10 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
   }
 
   const resolvedDraftState = draftState ?? createEmptyOrganizationSandboxStorageFormState();
-  const resolvedSavedState = savedState ?? createEmptyOrganizationSandboxStorageFormState();
+  const resolvedSavedState = savedState ?? resolvedDraftState;
   const visibleErrors: OrganizationSandboxStorageFormErrors = hasAttemptedSave
     ? validateOrganizationSandboxStorageFormState(resolvedDraftState)
     : {};
-  const hasUnsavedChanges = !sandboxStorageFormStatesEqual({
-    left: resolvedDraftState,
-    right: resolvedSavedState,
-  });
 
   if (
     organizationSandboxStorageSettingsQuery.isPending ||
@@ -143,7 +138,6 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
   return (
     <PageFrame width="form" description={description} title={title}>
       <OrganizationSandboxStorageSettingsPageView
-        hasUnsavedChanges={hasUnsavedChanges}
         isSaving={saveMutation.isPending}
         loadErrorMessage={
           organizationSandboxStorageSettingsQuery.isError
@@ -153,19 +147,24 @@ export function OrganizationSandboxStorageSettingsPage(): React.JSX.Element {
               })
             : null
         }
-        onCancel={() => {
-          setDraftState(resolvedSavedState);
-          setHasAttemptedSave(false);
-          setSaveErrorMessage(null);
-        }}
-        onSave={async () => {
-          const nextErrors = validateOrganizationSandboxStorageFormState(resolvedDraftState);
+        onPersistentSandboxesEnabledChange={async (enabled) => {
+          const nextState: OrganizationSandboxStorageFormState = {
+            ...resolvedDraftState,
+            persistentSandboxesEnabled: enabled,
+          };
+          const nextErrors = validateOrganizationSandboxStorageFormState(nextState);
+          setDraftState(nextState);
           setHasAttemptedSave(true);
+          setSaveErrorMessage(null);
           if (Object.keys(nextErrors).length > 0) {
             return;
           }
 
-          await saveMutation.mutateAsync(resolvedDraftState);
+          try {
+            await saveMutation.mutateAsync(nextState);
+          } catch {
+            setDraftState(resolvedSavedState);
+          }
         }}
         onStateChange={(nextState) => {
           setDraftState(nextState);

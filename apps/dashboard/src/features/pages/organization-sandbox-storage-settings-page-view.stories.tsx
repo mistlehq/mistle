@@ -39,12 +39,10 @@ const meta = {
   args: {
     state: ManagedState,
     isSaving: false,
-    hasUnsavedChanges: false,
     saveErrorMessage: null,
     loadErrorMessage: null,
     visibleErrors: {},
-    onCancel: () => {},
-    onSave: async () => {},
+    onPersistentSandboxesEnabledChange: async () => {},
     onStateChange: () => {},
   },
 } satisfies Meta<typeof OrganizationSandboxStorageSettingsPageView>;
@@ -64,7 +62,6 @@ export const LoadError: Story = {
 export const OrganizationOverrideEnabled: Story = {
   args: {
     state: OrganizationOverrideState,
-    hasUnsavedChanges: true,
   },
 };
 
@@ -91,7 +88,6 @@ export const ValidationErrors: Story = {
       accessKeyId: "",
       secretAccessKey: "",
     },
-    hasUnsavedChanges: true,
     visibleErrors: {
       region: "Region is required.",
       apiKey: "API key is required.",
@@ -106,7 +102,6 @@ export const ValidationErrors: Story = {
 export const SaveError: Story = {
   args: {
     state: OrganizationOverrideState,
-    hasUnsavedChanges: true,
     saveErrorMessage: "Could not save sandbox storage settings.",
   },
 };
@@ -115,6 +110,5 @@ export const Saving: Story = {
   args: {
     state: OrganizationOverrideState,
     isSaving: true,
-    hasUnsavedChanges: true,
   },
 };
