@@ -502,6 +502,7 @@ function DeleteProfileDialogHarness(input: {
       onDiscardChangesAndLeaveDraft={() => {}}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onSaveDraft={() => {}}
       onActiveSectionIdChange={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
@@ -550,6 +551,7 @@ function DraftActionsHarness(input: {
       }}
       onMakeChanges={() => {}}
       onPublish={() => {}}
+      onSaveDraft={() => {}}
       onActiveSectionIdChange={() => {}}
       onSaveProfileName={async () => {}}
       onViewActive={() => {}}
@@ -1837,7 +1839,30 @@ describe("SandboxProfileEditorPage", () => {
     renderSandboxProfileEditor();
 
     expect(screen.getByText("Viewing: Draft")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save draft" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Publish" })).toBeDefined();
+  });
+
+  it("enables explicit draft saving after setup script edits", async () => {
+    renderSandboxProfileEditor({
+      versionState: "draft",
+    });
+
+    const configurationsPanel = screen.getByRole("tabpanel", {
+      name: "Sandbox Profile",
+      hidden: false,
+    });
+    updateSetupScriptEditor({
+      editor: within(configurationsPanel).getByRole("textbox", {
+        name: "Setup script",
+      }),
+      value: "pnpm install\npnpm test",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save draft" })).toHaveProperty("disabled", false);
+    });
+    expect(screen.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
   });
 
   it("shows the editable draft persistence mode", () => {
@@ -1852,6 +1877,23 @@ describe("SandboxProfileEditorPage", () => {
 
     expect(persistenceSwitch.getAttribute("aria-checked")).toBe("true");
     expect(persistenceSwitch.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("marks the draft unsaved when persistence mode changes", async () => {
+    renderSandboxProfileEditor({
+      defaultPersistenceMode: "ephemeral",
+      versionState: "draft",
+    });
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "Use persistent sandboxes",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Save draft" })).toHaveProperty("disabled", false);
+    });
   });
 
   it("renders published profile persistence mode as read-only", () => {
@@ -1869,7 +1911,7 @@ describe("SandboxProfileEditorPage", () => {
     expect(screen.getByText("Yes")).toBeDefined();
   });
 
-  it("warns when profile persistence is enabled but organization persistence is disabled", () => {
+  it("hides profile persistence when organization persistence is disabled", () => {
     renderSandboxProfileEditor({
       defaultPersistenceMode: "persistent",
       persistentSandboxesEnabled: false,
@@ -1877,10 +1919,11 @@ describe("SandboxProfileEditorPage", () => {
     });
 
     expect(
-      screen.getByText(
-        "Organization persistence is disabled. Sessions from this profile will still be created in non-persistent mode.",
-      ),
-    ).toBeDefined();
+      screen.queryByRole("switch", {
+        name: "Use persistent sandboxes",
+      }),
+    ).toBeNull();
+    expect(screen.queryByText("Use persistent sandboxes:")).toBeNull();
   });
 
   it("does not offer discard for draft-only profiles", () => {

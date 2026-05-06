@@ -103,12 +103,13 @@ function IntegrationSelectionCell(input: {
   onIntegrationChange: (nextIntegrationId: string) => void;
   allowNone?: boolean;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const selectedIntegration = input.choices.find(
     (choice) => choice.id === input.selectedIntegrationId,
   );
 
-  if (input.disabled === true) {
+  if (input.readOnly === true) {
     return selectedIntegration === undefined ? (
       <div className={SandboxProfileIntegrationCellContentClassName}>
         <p className="text-muted-foreground text-sm">None</p>
@@ -120,6 +121,7 @@ function IntegrationSelectionCell(input: {
 
   return (
     <Select
+      disabled={input.disabled === true}
       onValueChange={(nextIntegrationId) => {
         if (nextIntegrationId === null) {
           return;
@@ -165,6 +167,7 @@ function ConnectionSelectionCell(input: {
   selectedConnectionId: string | undefined;
   onConnectionChange: (nextConnectionId: string) => void;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const selectedConnection = input.availableConnections.find(
     (connection) => connection.id === input.selectedConnectionId,
@@ -177,7 +180,7 @@ function ConnectionSelectionCell(input: {
     );
   }
 
-  if (input.disabled === true) {
+  if (input.readOnly === true) {
     return selectedConnection === undefined ? (
       <div className={SandboxProfileIntegrationCellContentClassName}>
         <p className="text-muted-foreground text-sm">Choose a connection</p>
@@ -189,6 +192,7 @@ function ConnectionSelectionCell(input: {
 
   return (
     <Select
+      disabled={input.disabled === true}
       onValueChange={(nextConnectionId) => {
         if (nextConnectionId === null) {
           return;
@@ -219,12 +223,14 @@ function ConnectionSelectionCell(input: {
 
 function RemoveIntegrationBindingButton(input: {
   label: string;
+  disabled?: boolean | undefined;
   onRemove: () => void;
 }): React.JSX.Element {
   return (
     <Button
       aria-label={input.label}
       className="h-7 w-7"
+      disabled={input.disabled === true}
       onClick={input.onRemove}
       type="button"
       variant="ghost"
@@ -451,8 +457,11 @@ export function SandboxProfileIntegrationsSetupSection(input: {
   onRemoveIntegrationBindingRow: (clientId: string) => void;
   onIntegrationSaveErrorDismiss: () => void;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const [isAddConnectorsDialogOpen, setIsAddConnectorsDialogOpen] = useState(false);
+  const controlsAreDisabled = input.disabled === true;
+  const isReadOnly = input.readOnly === true;
   const agentChoices = resolveKindChoices({
     kind: "agent",
     availableConnections: input.availableConnections,
@@ -647,7 +656,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
         </Notice>
       ) : null}
 
-      {hasUnresolvedRows && input.disabled !== true ? (
+      {hasUnresolvedRows && !isReadOnly ? (
         <Notice title="Some integrations need attention" variant="alert">
           Remove or replace integrations where the connection cannot be found.
         </Notice>
@@ -674,7 +683,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 })}
                 availableTargets={input.availableTargets}
                 onConnectionChange={(nextConnectionId) => {
-                  if (input.disabled === true) {
+                  if (controlsAreDisabled) {
                     return;
                   }
                   if (agentRow === null) {
@@ -696,7 +705,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   updateBindingConnection(agentRow, nextConnectionId);
                 }}
                 selectedConnectionId={agentRow?.connectionId}
-                disabled={input.disabled}
+                disabled={controlsAreDisabled}
+                readOnly={isReadOnly}
               />
             </ResponsiveFieldListCell>
             <ResponsiveFieldListCell
@@ -714,7 +724,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 <SandboxProfileBindingResourcesAndToolsCell
                   availableConnections={input.availableConnections}
                   availableTargets={input.availableTargets}
-                  disabled={input.disabled}
+                  disabled={controlsAreDisabled}
+                  readOnly={isReadOnly}
                   onRowChange={input.onIntegrationBindingRowChange}
                   row={agentRow}
                 />
@@ -728,9 +739,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
 
           <ResponsiveFieldListRow
             className={
-              gitIssue === null || gitRow === null || input.disabled === true
-                ? "py-4"
-                : "py-4 pr-10 md:pr-0"
+              gitIssue === null || gitRow === null || isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"
             }
             gapClassName="gap-6"
             gridClassName="md:items-start"
@@ -742,7 +751,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   ariaLabel="git provider integration"
                   choices={gitChoices}
                   onIntegrationChange={(nextTargetKey) => {
-                    if (input.disabled === true) {
+                    if (controlsAreDisabled) {
                       return;
                     }
                     if (nextTargetKey === NoIntegrationValue) {
@@ -758,7 +767,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                     });
                   }}
                   selectedIntegrationId={gitTargetKey ?? NoIntegrationValue}
-                  disabled={input.disabled}
+                  disabled={controlsAreDisabled}
+                  readOnly={isReadOnly}
                 />
               ) : (
                 <UnresolvedNoneCell />
@@ -778,7 +788,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   })}
                   availableTargets={input.availableTargets}
                   onConnectionChange={(nextConnectionId) => {
-                    if (input.disabled === true) {
+                    if (controlsAreDisabled) {
                       return;
                     }
                     if (gitRow === null) {
@@ -800,7 +810,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                     updateBindingConnection(gitRow, nextConnectionId);
                   }}
                   selectedConnectionId={gitRow?.connectionId}
-                  disabled={input.disabled}
+                  disabled={controlsAreDisabled}
+                  readOnly={isReadOnly}
                 />
               )}
             </ResponsiveFieldListCell>
@@ -819,7 +830,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                 <SandboxProfileBindingResourcesAndToolsCell
                   availableConnections={input.availableConnections}
                   availableTargets={input.availableTargets}
-                  disabled={input.disabled}
+                  disabled={controlsAreDisabled}
+                  readOnly={isReadOnly}
                   onRowChange={input.onIntegrationBindingRowChange}
                   row={gitRow}
                 />
@@ -829,10 +841,15 @@ export function SandboxProfileIntegrationsSetupSection(input: {
               className={SandboxProfileIntegrationActionCellClassName}
               columnKey="actions"
             >
-              {gitIssue === null || gitRow === null || input.disabled === true ? null : (
+              {gitIssue === null || gitRow === null || isReadOnly ? null : (
                 <RemoveIntegrationBindingButton
+                  disabled={controlsAreDisabled}
                   label="Remove git provider"
                   onRemove={() => {
+                    if (controlsAreDisabled) {
+                      return;
+                    }
+
                     input.onRemoveIntegrationBindingRow(gitRow.clientId);
                   }}
                 />
@@ -875,7 +892,7 @@ export function SandboxProfileIntegrationsSetupSection(input: {
 
             return (
               <ResponsiveFieldListRow
-                className={input.disabled === true ? "py-4" : "py-4 pr-10 md:pr-0"}
+                className={isReadOnly ? "py-4" : "py-4 pr-10 md:pr-0"}
                 gapClassName="gap-6"
                 gridClassName="md:items-start"
                 key={row.clientId}
@@ -905,13 +922,14 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                       })}
                       availableTargets={input.availableTargets}
                       onConnectionChange={(nextConnectionId) => {
-                        if (input.disabled === true) {
+                        if (controlsAreDisabled) {
                           return;
                         }
                         updateBindingConnection(row, nextConnectionId);
                       }}
                       selectedConnectionId={row.connectionId}
-                      disabled={input.disabled}
+                      disabled={controlsAreDisabled}
+                      readOnly={isReadOnly}
                     />
                   ) : (
                     <UnresolvedConnectionCell
@@ -926,7 +944,8 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   <SandboxProfileBindingResourcesAndToolsCell
                     availableConnections={input.availableConnections}
                     availableTargets={input.availableTargets}
-                    disabled={input.disabled}
+                    disabled={controlsAreDisabled}
+                    readOnly={isReadOnly}
                     onRowChange={input.onIntegrationBindingRowChange}
                     row={row}
                   />
@@ -935,10 +954,15 @@ export function SandboxProfileIntegrationsSetupSection(input: {
                   className={SandboxProfileIntegrationActionCellClassName}
                   columnKey="actions"
                 >
-                  {input.disabled === true ? null : (
+                  {isReadOnly ? null : (
                     <RemoveIntegrationBindingButton
+                      disabled={controlsAreDisabled}
                       label="Remove connector"
                       onRemove={() => {
+                        if (controlsAreDisabled) {
+                          return;
+                        }
+
                         input.onRemoveIntegrationBindingRow(row.clientId);
                       }}
                     />
@@ -950,11 +974,16 @@ export function SandboxProfileIntegrationsSetupSection(input: {
         </ResponsiveFieldList>
       </div>
 
-      {addConnectorChoices.length === 0 || input.disabled === true ? null : (
+      {addConnectorChoices.length === 0 || isReadOnly ? null : (
         <div className="max-w-5xl">
           <Button
             className="px-0 text-sm"
+            disabled={controlsAreDisabled}
             onClick={() => {
+              if (controlsAreDisabled) {
+                return;
+              }
+
               setIsAddConnectorsDialogOpen(true);
             }}
             type="button"

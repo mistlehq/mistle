@@ -30,6 +30,7 @@ export type IntegrationResourcePickerViewProps = {
   listState: IntegrationResourceListViewState;
   visibleItems: readonly IntegrationConnectionResource[];
   isRefreshing: boolean;
+  disabled?: boolean | undefined;
   refreshErrorMessage: string | null;
   emptyMessage: string;
   onSearchChange: (nextValue: string) => void;
@@ -111,10 +112,22 @@ function ComboboxLayout(input: {
   return (
     <Combobox<string, true>
       autoHighlight
+      disabled={input.props.disabled === true}
       inputValue={input.props.search}
       multiple
-      onInputValueChange={input.props.onSearchChange}
+      onInputValueChange={(nextValue) => {
+        if (input.props.disabled === true) {
+          return;
+        }
+
+        input.props.onSearchChange(nextValue);
+      }}
       onOpenChange={(open) => {
+        if (input.props.disabled === true) {
+          setIsOpen(false);
+          return;
+        }
+
         setIsOpen(open);
         if (open) {
           input.props.onFocus();
@@ -125,6 +138,10 @@ function ComboboxLayout(input: {
         input.props.onBlur();
       }}
       onValueChange={(value) => {
+        if (input.props.disabled === true) {
+          return;
+        }
+
         input.props.onSelectionChange(value);
       }}
       open={isOpen}
@@ -135,6 +152,10 @@ function ComboboxLayout(input: {
           <ComboboxChips
             className="w-full"
             onClick={() => {
+              if (input.props.disabled === true) {
+                return;
+              }
+
               setIsOpen(true);
             }}
           >
@@ -149,6 +170,7 @@ function ComboboxLayout(input: {
             <ComboboxChipsInput
               aria-label={input.props.label}
               className="min-w-28"
+              disabled={input.props.disabled === true}
               id={input.props.id}
               onFocus={input.props.onFocus}
               placeholder={
@@ -167,6 +189,7 @@ function ComboboxLayout(input: {
               <label className="hover:bg-muted text-foreground inline-flex min-w-0 items-center gap-2 rounded-sm px-2 py-1 text-sm">
                 <input
                   checked={input.allVisibleSelected}
+                  disabled={input.props.disabled === true}
                   onChange={() => {
                     input.props.onToggleAll();
                   }}
@@ -183,7 +206,7 @@ function ComboboxLayout(input: {
                 )}
                 <Button
                   aria-label={input.props.refreshLabel}
-                  disabled={input.props.isRefreshing}
+                  disabled={input.props.disabled === true || input.props.isRefreshing}
                   onClick={input.props.onRefresh}
                   size="icon-xs"
                   title={input.props.refreshTooltip}

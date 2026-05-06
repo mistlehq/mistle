@@ -1,4 +1,3 @@
-import { systemScheduler, type TimerHandle } from "@mistle/time";
 import {
   Button,
   ButtonGroup,
@@ -20,17 +19,13 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 
 import type { ChatEntry } from "../chat/chat-types.js";
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
-import {
-  clearPendingStatusTimeouts,
-  scheduleSavedStateReset,
-} from "../shared/auto-save-behavior.js";
 import {
   createIntegrationsEditorSectionStoryQueryClient,
   seedStoryIntegrationResources,
@@ -558,9 +553,6 @@ function SandboxProfileEditorPageStoryView(
   );
   const [setupScriptDraft, setSetupScriptDraft] = useState(input.setupScript ?? "");
   const [persistedSetupScript, setPersistedSetupScript] = useState(input.setupScript ?? "");
-  const [setupScriptSaveStatus, setSetupScriptSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "saved-fading"
-  >("idle");
   const [activeSectionId, setActiveSectionId] = useState<StorySectionId>(
     input.initialSectionId ?? "sandbox-profile",
   );
@@ -571,22 +563,10 @@ function SandboxProfileEditorPageStoryView(
   const [setupAssistantPanelOpen, setSetupAssistantPanelOpen] = useState(
     initialSetupAssistantPanelState !== "closed",
   );
-  const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
-  const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
 
   useEffect(() => {
     setIntegrationSaveErrorMessage(input.integrationSaveErrorMessage ?? null);
   }, [input.integrationSaveErrorMessage]);
-
-  useEffect(() => {
-    return () => {
-      clearPendingStatusTimeouts({
-        fadeEndTimeoutRef,
-        fadeStartTimeoutRef,
-        scheduler: systemScheduler,
-      });
-    };
-  }, []);
 
   async function handleProfileNameSave(nextValue: string): Promise<void> {
     setProfileName(nextValue);
@@ -594,30 +574,10 @@ function SandboxProfileEditorPageStoryView(
 
   function handleSetupScriptBlur(): void {
     if (setupScriptDraft === persistedSetupScript) {
-      setSetupScriptSaveStatus("idle");
       return;
     }
 
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler: systemScheduler,
-    });
     setPersistedSetupScript(setupScriptDraft);
-    setSetupScriptSaveStatus("saved");
-    scheduleSavedStateReset({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      onFadeEnd: () => {
-        setSetupScriptSaveStatus("idle");
-      },
-      onFadeStart: () => {
-        setSetupScriptSaveStatus("saved-fading");
-      },
-      scheduler: systemScheduler,
-      successFadeDurationMs: 700,
-      successVisibleDurationMs: 2200,
-    });
   }
 
   const isEditable =
@@ -671,6 +631,7 @@ function SandboxProfileEditorPageStoryView(
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
+      hasUnpersistedSetupScriptChanges={setupScriptDraft !== persistedSetupScript}
       isDeleteProfileDialogOpen={false}
       mode={mode}
       onConfirmDeleteProfile={() => {}}
@@ -678,6 +639,9 @@ function SandboxProfileEditorPageStoryView(
       onMakeChanges={() => {}}
       onDiscardChangesAndLeaveDraft={() => {}}
       onPublish={() => {}}
+      onSaveDraft={() => {
+        setPersistedSetupScript(setupScriptDraft);
+      }}
       onSaveProfileName={handleProfileNameSave}
       onActiveSectionIdChange={setActiveSectionId}
       onViewActive={() => {}}
@@ -752,7 +716,6 @@ function SandboxProfileEditorPageStoryView(
                     onChange={setSetupScriptDraft}
                     disabled={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
-                    saveStatus={setupScriptSaveStatus}
                     testControl={
                       <SetupScriptStoryControls
                         setupAssistantState={input.setupAssistantState}

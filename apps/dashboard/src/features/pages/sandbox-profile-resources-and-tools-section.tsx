@@ -56,6 +56,7 @@ function RepositoryResourcesPicker(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -154,7 +155,7 @@ function RepositoryResourcesPicker(input: {
     updateSelectedHandles([...selectedHandles, ...handlesToAdd]);
   }
 
-  if (input.disabled === true) {
+  if (input.readOnly === true) {
     return selectedHandles.length === 0 ? (
       <p className="text-muted-foreground text-sm">No repositories selected.</p>
     ) : (
@@ -173,6 +174,7 @@ function RepositoryResourcesPicker(input: {
 
   return (
     <IntegrationResourcePickerView
+      disabled={input.disabled === true}
       emptyMessage="No repositories available for this connection."
       id={`sandbox-profile-repositories-${input.connection.id}`}
       isRefreshing={refreshMutation.isPending}
@@ -226,6 +228,7 @@ function BindingToolsControl(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): ReactNode {
   const toolToggleModel = resolveBindingToolToggleModel({
     row: input.row,
@@ -322,6 +325,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   disabled?: boolean | undefined;
+  readOnly?: boolean | undefined;
 }): React.JSX.Element {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
@@ -366,6 +370,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
         <RepositoryResourcesPicker
           connection={connection}
           disabled={input.disabled}
+          readOnly={input.readOnly}
           onRowChange={input.onRowChange}
           row={input.row}
         />
@@ -386,6 +391,7 @@ export function SandboxProfileBindingResourcesAndToolsCell(input: {
         availableConnections={input.availableConnections}
         availableTargets={input.availableTargets}
         disabled={input.disabled}
+        readOnly={input.readOnly}
         onRowChange={input.onRowChange}
         row={input.row}
       />

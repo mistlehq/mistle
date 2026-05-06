@@ -14,10 +14,6 @@ import {
   putSandboxProfileVersionIntegrationBindings,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import {
-  AppShellLoadingIndicators,
-  createAppShellLoadingIndicatorMeta,
-} from "../shell/app-shell-loading-indicator-meta.js";
 import { resolveBindingConfigUiModel } from "./sandbox-profile-binding-config-editor.js";
 import type {
   IntegrationConnectionSummary,
@@ -218,6 +214,19 @@ function sandboxProfileBindingEditorRowsEqual(
   );
 }
 
+function sandboxProfileBindingEditorRowListsEqual(
+  left: readonly SandboxProfileBindingEditorRow[],
+  right: readonly SandboxProfileBindingEditorRow[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((leftRow, index) => {
+      const rightRow = right[index];
+      return rightRow !== undefined && sandboxProfileBindingEditorRowsEqual(leftRow, rightRow);
+    })
+  );
+}
+
 export function applySandboxProfileBindingEditorRowChanges(input: {
   rows: readonly SandboxProfileBindingEditorRow[];
   clientId: string;
@@ -381,29 +390,12 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
   }
 
   const putIntegrationBindingsMutation = useMutation({
-    meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.AUTOSAVE),
     mutationFn: async (mutationInput: { bindings: SubmittedBindingRecord[] }) =>
       putSandboxProfileVersionIntegrationBindings({
         profileId: input.profileId,
         version: input.version,
         bindings: mutationInput.bindings,
       }),
-    onSuccess: async (updatedBindings, mutationInput) => {
-      setIntegrationRows(
-        reconcileBindingsToEditorRows({
-          currentRows: integrationRowsRef.current,
-          submittedBindings: mutationInput.bindings,
-          bindings: updatedBindings.bindings,
-        }),
-      );
-      setIntegrationSaveError(null);
-      setHasUnsavedChanges(false);
-      setIntegrationRowErrorsByClientId({});
-      await input.invalidateVersionBindings({
-        profileId: input.profileId,
-        version: input.version,
-      });
-    },
     onError: (error: unknown) => {
       const issues = readInvalidBindingConfigIssues(error);
       if (issues !== null) {
@@ -486,7 +478,25 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
       .mutateAsync({
         bindings: parsedBindings,
       })
-      .then(() => true)
+      .then((updatedBindings) => {
+        if (!sandboxProfileBindingEditorRowListsEqual(integrationRowsRef.current, rowsToPersist)) {
+          setIntegrationSaveError(null);
+          setIntegrationRowErrorsByClientId({});
+          return false;
+        }
+
+        setIntegrationRows(
+          reconcileBindingsToEditorRows({
+            currentRows: integrationRowsRef.current,
+            submittedBindings: parsedBindings,
+            bindings: updatedBindings.bindings,
+          }),
+        );
+        setIntegrationSaveError(null);
+        setHasUnsavedChanges(false);
+        setIntegrationRowErrorsByClientId({});
+        return true;
+      })
       .catch(() => false)
       .finally(() => {
         if (pendingSavePromiseRef.current === savePromise) {
@@ -525,14 +535,13 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
     ];
     setIntegrationRows(nextRows);
     markIntegrationDirty();
-    return persistIntegrationRows(nextRows);
+    return true;
   }
 
   function onRemoveIntegrationBindingRow(clientId: string): void {
     const nextRows = integrationRows.filter((row) => row.clientId !== clientId);
     setIntegrationRows(nextRows);
     markIntegrationDirty({ clientId });
-    void persistIntegrationRows(nextRows);
   }
 
   function onIntegrationBindingRowChange(
@@ -550,7 +559,6 @@ export function useLoadedSandboxProfileIntegrationsState(input: {
 
     setIntegrationRows(nextRows);
     markIntegrationDirty({ clientId });
-    void persistIntegrationRows(nextRows);
   }
 
   return {

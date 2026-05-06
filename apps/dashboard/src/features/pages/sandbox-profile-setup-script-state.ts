@@ -1,4 +1,3 @@
-import { systemScheduler, type Scheduler, type TimerHandle } from "@mistle/time";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -7,17 +6,7 @@ import {
   getSandboxProfileVersionSetupScript,
   putSandboxProfileVersionSetupScript,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import {
-  clearPendingStatusTimeouts,
-  getErrorMessage,
-  scheduleSavedStateReset,
-} from "../shared/auto-save-behavior.js";
-import {
-  AppShellLoadingIndicators,
-  createAppShellLoadingIndicatorMeta,
-} from "../shell/app-shell-loading-indicator-meta.js";
-
-type AutoSaveStatus = "idle" | "saving" | "saved" | "saved-fading";
+import { getErrorMessage } from "../shared/auto-save-behavior.js";
 
 export function useSandboxProfileSetupScriptLoader(input: { profileId: string; version: number }): {
   setupScriptQuery: {
@@ -56,30 +45,20 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   version: number;
   setupScript: string | null;
   invalidateVersionSetupScript: (input: { profileId: string; version: number }) => Promise<void>;
-  scheduler?: Scheduler;
-  successVisibleDurationMs?: number;
-  successFadeDurationMs?: number;
 }): {
   draftValue: string;
   errorMessage: string | null;
-  saveStatus: AutoSaveStatus;
   hasUnsavedChanges: boolean;
   flushDraftChanges: () => Promise<boolean>;
   isSaving: boolean;
   onChange: (nextValue: string) => void;
   onBlur: () => void;
 } {
-  const scheduler = input.scheduler ?? systemScheduler;
-  const successVisibleDurationMs = input.successVisibleDurationMs ?? 2200;
-  const successFadeDurationMs = input.successFadeDurationMs ?? 700;
   const [draftValue, setDraftValue] = useState(input.setupScript ?? "");
   const [persistedValue, setPersistedValue] = useState(input.setupScript ?? "");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<AutoSaveStatus>("idle");
   const saveSequenceRef = useRef(0);
   const previousSetupScriptRef = useRef(input.setupScript);
-  const fadeStartTimeoutRef = useRef<TimerHandle | null>(null);
-  const fadeEndTimeoutRef = useRef<TimerHandle | null>(null);
   const pendingSavePromiseRef = useRef<Promise<boolean> | null>(null);
   const draftValueRef = useRef(draftValue);
   const persistedValueRef = useRef(persistedValue);
@@ -87,20 +66,12 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
   persistedValueRef.current = persistedValue;
 
   const saveMutation = useMutation({
-    meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.AUTOSAVE),
     mutationFn: async (setupScript: string | null) =>
       putSandboxProfileVersionSetupScript({
         profileId: input.profileId,
         version: input.version,
         setupScript,
       }),
-    onSuccess: async (response) => {
-      setPersistedValue(response.setupScript ?? "");
-      await input.invalidateVersionSetupScript({
-        profileId: input.profileId,
-        version: input.version,
-      });
-    },
   });
   const saveMutationIsPending = saveMutation.isPending;
   const saveMutationMutateAsync = saveMutation.mutateAsync;
@@ -114,42 +85,21 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     }
 
     saveSequenceRef.current += 1;
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler,
-    });
     setDraftValue(input.setupScript ?? "");
     setPersistedValue(input.setupScript ?? "");
     setErrorMessage(null);
-    setSaveStatus("idle");
-  }, [input.setupScript, scheduler]);
-
-  useEffect(() => {
-    return () => {
-      clearPendingStatusTimeouts({
-        fadeEndTimeoutRef,
-        fadeStartTimeoutRef,
-        scheduler,
-      });
-    };
-  }, [scheduler]);
+  }, [input.setupScript]);
 
   function clearFeedback(): void {
-    if (errorMessage === null && saveStatus === "idle") {
+    if (errorMessage === null) {
       return;
     }
 
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler,
-    });
     setErrorMessage(null);
-    setSaveStatus("idle");
   }
 
   function onChange(nextValue: string): void {
+    saveSequenceRef.current += 1;
     setDraftValue(nextValue);
     clearFeedback();
   }
@@ -168,36 +118,16 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
     const nextSetupScript = nextDraftValue.length === 0 ? null : nextDraftValue;
     const currentSaveSequence = saveSequenceRef.current + 1;
     saveSequenceRef.current = currentSaveSequence;
-    clearPendingStatusTimeouts({
-      fadeEndTimeoutRef,
-      fadeStartTimeoutRef,
-      scheduler,
-    });
     setErrorMessage(null);
-    setSaveStatus("saving");
 
     const savePromise = saveMutationMutateAsync(nextSetupScript)
       .then((response) => {
         if (saveSequenceRef.current !== currentSaveSequence) {
-          return true;
+          return false;
         }
 
         setDraftValue(response.setupScript ?? "");
         setPersistedValue(response.setupScript ?? "");
-        setSaveStatus("saved");
-        scheduleSavedStateReset({
-          fadeEndTimeoutRef,
-          fadeStartTimeoutRef,
-          onFadeEnd: () => {
-            setSaveStatus("idle");
-          },
-          onFadeStart: () => {
-            setSaveStatus("saved-fading");
-          },
-          scheduler,
-          successFadeDurationMs,
-          successVisibleDurationMs,
-        });
         return true;
       })
       .catch((error: unknown) => {
@@ -205,7 +135,6 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
           return false;
         }
 
-        setSaveStatus("idle");
         setErrorMessage(getErrorMessage(error));
         return false;
       })
@@ -216,26 +145,15 @@ export function useLoadedSandboxProfileSetupScriptState(input: {
       });
     pendingSavePromiseRef.current = savePromise;
     return savePromise;
-  }, [
-    saveMutationIsPending,
-    saveMutationMutateAsync,
-    scheduler,
-    successFadeDurationMs,
-    successVisibleDurationMs,
-  ]);
-
-  function onBlur(): void {
-    void saveCurrentDraft();
-  }
+  }, [saveMutationIsPending, saveMutationMutateAsync]);
 
   return {
     draftValue,
     errorMessage,
-    saveStatus,
     hasUnsavedChanges: draftValue !== persistedValue,
     flushDraftChanges: saveCurrentDraft,
     isSaving: saveMutation.isPending,
     onChange,
-    onBlur,
+    onBlur: () => {},
   };
 }
