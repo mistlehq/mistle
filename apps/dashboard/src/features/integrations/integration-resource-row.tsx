@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
   formatResourceLabel,
   formatResourceMetadata,
@@ -203,6 +204,7 @@ function LazyExpandedResourceItems(input: {
 }): React.JSX.Element {
   const resourceItemsQuery = useQuery({
     queryKey: ["settings", "integrations", "connection-resources", input.connectionId, input.kind],
+    meta: NoLoadingIndicatorMeta,
     queryFn: async ({ signal }) =>
       listIntegrationConnectionResources({
         connectionId: input.connectionId,

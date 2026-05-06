@@ -3,7 +3,11 @@ import { useIsFetching, useIsMutating } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigation } from "react-router";
 
-import { LoadingIndicators, resolveLoadingIndicator } from "../shared/loading-indicator-meta.js";
+import {
+  LoadingIndicators,
+  resolveLoadingIndicator,
+  shouldShowTopLoadingBarForQuery,
+} from "../shared/loading-indicator-meta.js";
 
 const TOP_LOADING_BAR_CONFIG = {
   initialProgressPercent: 8,
@@ -43,7 +47,10 @@ export function TopLoadingBar(): React.JSX.Element | null {
   const navigation = useNavigation();
   const activeFetchCount = useIsFetching({
     predicate: (query) =>
-      resolveLoadingIndicator(query.options.meta) === LoadingIndicators.TOP_LOADING_BAR,
+      shouldShowTopLoadingBarForQuery({
+        dataUpdatedAt: query.state.dataUpdatedAt,
+        meta: query.options.meta,
+      }),
   });
   const activeMutationCount = useIsMutating({
     predicate: (mutation) =>

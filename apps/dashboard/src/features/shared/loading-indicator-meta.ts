@@ -36,3 +36,13 @@ export function resolveLoadingIndicator(
 
   return LoadingIndicators.TOP_LOADING_BAR;
 }
+
+export function shouldShowTopLoadingBarForQuery(input: {
+  dataUpdatedAt: number;
+  meta: Record<string, unknown> | undefined;
+}): boolean {
+  return (
+    resolveLoadingIndicator(input.meta) === LoadingIndicators.TOP_LOADING_BAR &&
+    input.dataUpdatedAt === 0
+  );
+}

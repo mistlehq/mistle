@@ -33,20 +33,27 @@ async function waitForSchedulerDelay(delayMs: number): Promise<void> {
 }
 
 function QueryLoadingHarness(props: {
+  initialData?: string;
   indicator?: LoadingIndicator;
   promise: Promise<string>;
+  refetchInterval?: number;
 }): React.JSX.Element {
-  useQuery({
+  const meta =
+    props.indicator === undefined ? undefined : createLoadingIndicatorMeta(props.indicator);
+  const query = useQuery({
     queryKey: ["top-loading-bar-test"],
-    ...(props.indicator === undefined
-      ? {}
-      : {
-          meta: createLoadingIndicatorMeta(props.indicator),
-        }),
+    ...(meta === undefined ? {} : { meta }),
+    ...(props.initialData === undefined ? {} : { initialData: props.initialData }),
     queryFn: async () => props.promise,
+    ...(props.refetchInterval === undefined ? {} : { refetchInterval: props.refetchInterval }),
   });
 
-  return <TopLoadingBar />;
+  return (
+    <>
+      <span>{query.isFetching ? "fetching query" : "idle query"}</span>
+      <TopLoadingBar />
+    </>
+  );
 }
 
 function MutationLoadingHarness(props: {
@@ -171,6 +178,39 @@ describe("top-loading-bar", () => {
     await waitFor(() => {
       expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
     });
+
+    pendingQuery.resolve("ready");
+  });
+
+  it("does not render during query refetches after query data is loaded", async () => {
+    const queryClient = createTestQueryClient();
+    const pendingQuery = createDeferredPromise<string>();
+    const router = createMemoryRouter(
+      createRoutesFromElements(
+        <Route
+          element={
+            <QueryLoadingHarness
+              initialData="loaded"
+              promise={pendingQuery.promise}
+              refetchInterval={1_000}
+            />
+          }
+          path="/"
+        />,
+      ),
+      { initialEntries: ["/"] },
+    );
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("fetching query")).toBeTruthy();
+    await waitForSchedulerDelay(250);
+
+    expect(screen.queryByRole("progressbar", { name: "Loading" })).toBeNull();
 
     pendingQuery.resolve("ready");
   });
