@@ -48,7 +48,7 @@ describe("OrganizationSandboxStorageSettingsPageView", () => {
     });
   });
 
-  it("disables the persistent sandbox switch while saving", () => {
+  it("disables the persistent sandbox switch while saving without adding status text", () => {
     render(
       <OrganizationSandboxStorageSettingsPageView
         isSaving={true}
@@ -66,6 +66,6 @@ describe("OrganizationSandboxStorageSettingsPageView", () => {
         .getByRole("switch", { name: "Allow persistent sandboxes" })
         .hasAttribute("data-disabled"),
     ).toBe(true);
-    expect(screen.getByText("Saving...")).toBeTruthy();
+    expect(screen.queryByText("Saving...")).toBeNull();
   });
 });
