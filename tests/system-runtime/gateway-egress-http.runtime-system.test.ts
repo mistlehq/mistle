@@ -33,13 +33,18 @@ const it = createSystemTest({
 
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const SANDBOXD_EGRESS_PROXY_URL = "http://127.0.0.1:38513";
+const SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT = 38_514;
 const HTTP_REQUEST_BODY = "phase4a-gateway-egress-http-smoke";
+const TRANSPARENT_HTTP_REQUEST_BODY = "phase4c-transparent-gateway-egress-http-smoke";
 const WEBSOCKET_REQUEST_BODY = "phase4b-gateway-egress-websocket-smoke";
 const SECURE_WEBSOCKET_REQUEST_BODY = "phase4b-gateway-egress-secure-websocket-smoke";
+const TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY =
+  "phase4c-transparent-gateway-egress-secure-websocket-smoke";
 const HTTPS_SMOKE_URL = "https://example.com/";
 const SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_HTTP_AND_HTTPS_OK";
 const WEBSOCKET_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_WEBSOCKET_OK";
 const SECURE_WEBSOCKET_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_SECURE_WEBSOCKET_OK";
+const TRANSPARENT_SMOKE_MARKER = "MISTLE_GATEWAY_EGRESS_TRANSPARENT_OK";
 const execFileAsync = promisify(execFile);
 
 const HttpEchoResponseSchema = z
@@ -81,6 +86,8 @@ describe("runtime system gateway egress HTTP smoke", () => {
           email: "runtime-gateway-egress-http-smoke@example.com",
         });
         sandboxInstanceIdForCleanup = sandboxInstanceId;
+        const upstreamUrl = new URL(upstream.gatewayReachableBaseUrl);
+        const secureUpstreamUrl = new URL(secureUpstream.gatewayReachableBaseUrl);
 
         const result = await runSandboxExecCommandInSandbox({
           fixture,
@@ -129,9 +136,23 @@ describe("runtime system gateway egress HTTP smoke", () => {
                 secureWebsocketProxySmokeScript(),
                 "BASH",
               ].join("\n"),
+              [
+                `export TRANSPARENT_PROXY_PORT=${shellQuote(String(SANDBOXD_TRANSPARENT_EGRESS_PROXY_PORT))}`,
+                `export TRANSPARENT_HTTP_PORT=${shellQuote(upstreamUrl.port)}`,
+                `export TRANSPARENT_SECURE_PORT=${shellQuote(secureUpstreamUrl.port)}`,
+                `export TRANSPARENT_HTTP_URL=${shellQuote(`${upstream.gatewayReachableBaseUrl}/echo?case=transparent-http`)}`,
+                `export TRANSPARENT_HTTPS_URL=${shellQuote(`${secureUpstream.gatewayReachableBaseUrl.replace(/^wss:/u, "https:")}/secure?case=transparent-https`)}`,
+                `export TRANSPARENT_WSS_PATH=${shellQuote("/socket?case=transparent-wss")}`,
+                `export TRANSPARENT_HTTP_MESSAGE=${shellQuote(TRANSPARENT_HTTP_REQUEST_BODY)}`,
+                `export TRANSPARENT_WSS_MESSAGE=${shellQuote(TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY)}`,
+                "timeout 30 bash <<'BASH'",
+                transparentGatewaySmokeScript(),
+                "BASH",
+              ].join("\n"),
               `printf '%s\\n' ${shellQuote(SMOKE_MARKER)}`,
               `printf '%s\\n' ${shellQuote(WEBSOCKET_SMOKE_MARKER)}`,
               `printf '%s\\n' ${shellQuote(SECURE_WEBSOCKET_SMOKE_MARKER)}`,
+              `printf '%s\\n' ${shellQuote(TRANSPARENT_SMOKE_MARKER)}`,
             ].join("\n"),
           ],
           timeoutMs: 90_000,
@@ -151,7 +172,7 @@ describe("runtime system gateway egress HTTP smoke", () => {
           body: HTTP_REQUEST_BODY,
         });
         expect(result.stdout).toContain(SMOKE_MARKER);
-        expect(upstream.requests).toHaveLength(1);
+        expect(upstream.requests).toHaveLength(2);
         expect(upstream.requests[0]).toMatchObject({
           method: "POST",
           url: "/echo?case=http",
@@ -168,13 +189,37 @@ describe("runtime system gateway egress HTTP smoke", () => {
         expect(upstream.websocketExchanges[0]?.headers["x-mistle-egress-grant"]).toBeUndefined();
         expect(result.stdout).toContain(`WSS:echo:${SECURE_WEBSOCKET_REQUEST_BODY}`);
         expect(result.stdout).toContain(SECURE_WEBSOCKET_SMOKE_MARKER);
-        expect(secureUpstream.websocketExchanges).toHaveLength(1);
+        expect(secureUpstream.websocketExchanges).toHaveLength(2);
         expect(secureUpstream.websocketExchanges[0]).toMatchObject({
           url: "/socket?case=wss",
           message: SECURE_WEBSOCKET_REQUEST_BODY,
         });
         expect(
           secureUpstream.websocketExchanges[0]?.headers["x-mistle-egress-grant"],
+        ).toBeUndefined();
+        expect(result.stdout).toContain(TRANSPARENT_SMOKE_MARKER);
+        expect(upstream.requests[1]).toMatchObject({
+          method: "POST",
+          url: "/echo?case=transparent-http",
+          body: TRANSPARENT_HTTP_REQUEST_BODY,
+        });
+        expect(upstream.requests[1]?.headers["x-mistle-egress-grant"]).toBeUndefined();
+        expect(secureUpstream.requests).toHaveLength(1);
+        expect(secureUpstream.requests[0]).toMatchObject({
+          method: "GET",
+          url: "/secure?case=transparent-https",
+          body: "",
+        });
+        expect(secureUpstream.requests[0]?.headers["x-mistle-egress-grant"]).toBeUndefined();
+        expect(result.stdout).toContain(
+          `TRANSPARENT-WSS:echo:${TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY}`,
+        );
+        expect(secureUpstream.websocketExchanges[1]).toMatchObject({
+          url: "/socket?case=transparent-wss",
+          message: TRANSPARENT_SECURE_WEBSOCKET_REQUEST_BODY,
+        });
+        expect(
+          secureUpstream.websocketExchanges[1]?.headers["x-mistle-egress-grant"],
         ).toBeUndefined();
       } finally {
         https.globalAgent.options.ca = previousGlobalAgentCa;
@@ -265,15 +310,47 @@ async function startSimulatedHttpUpstream(): Promise<{
 async function startSimulatedSecureWebsocketUpstream(): Promise<{
   caCertificatePem: string;
   gatewayReachableBaseUrl: string;
+  requests: RecordedHttpRequest[];
   websocketExchanges: RecordedWebsocketExchange[];
   stop: () => Promise<void>;
 }> {
   const certificates = await createTestTlsCertificates();
+  const requests: RecordedHttpRequest[] = [];
   const websocketExchanges: RecordedWebsocketExchange[] = [];
-  const server = https.createServer({
-    cert: certificates.serverCertificatePem,
-    key: certificates.serverPrivateKeyPem,
-  });
+  const server = https.createServer(
+    {
+      cert: certificates.serverCertificatePem,
+      key: certificates.serverPrivateKeyPem,
+    },
+    (request, response) => {
+      const chunks: Buffer[] = [];
+      request.on("data", (chunk) => {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      });
+      request.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        const recordedRequest = {
+          method: request.method ?? "",
+          url: request.url ?? "",
+          headers: request.headers,
+          body,
+        };
+        requests.push(recordedRequest);
+
+        const responseBody = JSON.stringify({
+          ok: true,
+          method: recordedRequest.method,
+          url: recordedRequest.url,
+          body,
+        });
+        response.writeHead(200, {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(responseBody).toString(),
+        });
+        response.end(responseBody);
+      });
+    },
+  );
   server.on("upgrade", (request, socket) => {
     handleWebsocketUpgrade(request, socket, websocketExchanges);
   });
@@ -294,6 +371,7 @@ async function startSimulatedSecureWebsocketUpstream(): Promise<{
   return {
     caCertificatePem: certificates.caCertificatePem,
     gatewayReachableBaseUrl: `wss://127.0.0.1:${String(address.port)}`,
+    requests,
     websocketExchanges,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
@@ -512,5 +590,33 @@ function secureWebsocketProxySmokeScript(): string {
     "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
     'grep -a "echo:${WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
     "printf 'WSS:echo:%s\\n' \"${WSS_MESSAGE}\"",
+  ].join("\n");
+}
+
+function transparentGatewaySmokeScript(): string {
+  return [
+    "set -euo pipefail",
+    "cleanup_transparent_rules() {",
+    '  iptables -t nat -D OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_HTTP_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" 2>/dev/null || true',
+    '  iptables -t nat -D OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_SECURE_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" 2>/dev/null || true',
+    "}",
+    "trap cleanup_transparent_rules EXIT",
+    "cleanup_transparent_rules",
+    'iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_HTTP_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    'iptables -t nat -A OUTPUT -p tcp -d 127.0.0.1 --dport "${TRANSPARENT_SECURE_PORT}" -j REDIRECT --to-ports "${TRANSPARENT_PROXY_PORT}" || { id >&2; grep Cap /proc/self/status >&2; exit 1; }',
+    "unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY http_proxy https_proxy all_proxy no_proxy",
+    'curl -fsS -X POST -H "content-type: text/plain" --data "${TRANSPARENT_HTTP_MESSAGE}" "${TRANSPARENT_HTTP_URL}"',
+    "printf '\\n'",
+    'curl -fsS "${TRANSPARENT_HTTPS_URL}"',
+    "printf '\\n'",
+    'output_file="$(mktemp)"',
+    "{",
+    '  printf \'GET %s HTTP/1.1\\r\\nHost: 127.0.0.1:%s\\r\\nConnection: Upgrade\\r\\nUpgrade: websocket\\r\\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\\r\\nSec-WebSocket-Version: 13\\r\\n\\r\\n\' "${TRANSPARENT_WSS_PATH}" "${TRANSPARENT_SECURE_PORT}"',
+    "  sleep 0.2",
+    "  printf '%s' \"${TRANSPARENT_WSS_MESSAGE}\"",
+    '} | openssl s_client -connect "127.0.0.1:${TRANSPARENT_SECURE_PORT}" -servername "127.0.0.1" -quiet >"${output_file}" 2>/dev/null',
+    "grep -a 'HTTP/1.1 101' \"${output_file}\" >/dev/null || { printf 'unexpected transparent WSS response bytes:\\n' >&2; cat \"${output_file}\" >&2; exit 1; }",
+    'grep -a "echo:${TRANSPARENT_WSS_MESSAGE}" "${output_file}" >/dev/null || { printf \'unexpected transparent WSS echo bytes:\\n\' >&2; cat "${output_file}" >&2; exit 1; }',
+    "printf 'TRANSPARENT-WSS:echo:%s\\n' \"${TRANSPARENT_WSS_MESSAGE}\"",
   ].join("\n");
 }

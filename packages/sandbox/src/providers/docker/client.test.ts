@@ -15,4 +15,11 @@ describe("createDockerSandboxHostConfig", () => {
       NetworkMode: "mistle-sandbox-test",
     });
   });
+
+  it("adds NET_ADMIN without privileged mode when gateway proxy mode needs redirect rules", () => {
+    expect(createDockerSandboxHostConfig({ netAdmin: true })).toMatchObject({
+      CapAdd: ["NET_ADMIN"],
+    });
+    expect(createDockerSandboxHostConfig({ netAdmin: true }).Privileged).toBeUndefined();
+  });
 });

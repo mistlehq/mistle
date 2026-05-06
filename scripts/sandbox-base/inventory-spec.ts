@@ -157,6 +157,14 @@ export const SandboxBaseInventorySpec = {
       versionParser: parseSecondToken,
     },
     {
+      category: SandboxBaseToolCategories.DEBUGGING_AND_SYSTEM,
+      command: "iptables",
+      displayName: "iptables",
+      dockerfileAssertions: [aptPackage("iptables", SandboxBaseCommonStage)],
+      versionCommand: ["iptables", "--version"],
+      versionParser: parseIptablesVersion,
+    },
+    {
       category: SandboxBaseToolCategories.CLI_UTILITIES,
       command: "jq",
       displayName: "jq",
@@ -260,6 +268,10 @@ function parseTrailingVersion(output: string): string {
 
 function parseJqVersion(output: string): string {
   return parseFirstLine(output).replace(/^jq-/u, "");
+}
+
+function parseIptablesVersion(output: string): string {
+  return parseRequiredToken(output, 1).replace(/^v/u, "");
 }
 
 function parseGnuToolVersion(output: string): string {

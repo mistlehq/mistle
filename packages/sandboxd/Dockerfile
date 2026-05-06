@@ -17,6 +17,7 @@ RUN apt-get update \
     gawk \
     git \
     grep \
+    iptables \
     iproute2 \
     jq \
     less \

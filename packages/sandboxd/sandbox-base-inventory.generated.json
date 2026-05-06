@@ -100,6 +100,15 @@
     },
     {
       "category": {
+        "id": "debugging-and-system",
+        "title": "Debugging and system"
+      },
+      "command": "iptables",
+      "displayName": "iptables",
+      "version": "1.8.9"
+    },
+    {
+      "category": {
         "id": "cli-utilities",
         "title": "CLI utilities"
       },

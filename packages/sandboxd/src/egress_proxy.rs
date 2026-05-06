@@ -13,6 +13,8 @@ use std::fmt::{self, Display};
 use std::fs::{self, DirBuilder};
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::os::unix::fs::DirBuilderExt;
+#[cfg(target_os = "linux")]
+use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::process::Command;
@@ -44,8 +46,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::{mpsc as tokio_mpsc, oneshot};
-use tokio_rustls::TlsAcceptor;
-use tokio_rustls::rustls::ServerConfig;
+use tokio_rustls::rustls::{ServerConfig, server::Acceptor as RustlsServerAcceptor};
+use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 
 use crate::protocol::startup::StartupInput;
 use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
@@ -64,6 +66,8 @@ const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
 const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
 const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
+#[cfg(target_os = "linux")]
+const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -114,6 +118,7 @@ pub struct EgressProxy {
     routes: Arc<RwLock<Vec<EgressProxyRoute>>>,
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
+    transparent_server: Option<ActiveEgressProxyServer>,
     #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     proxy_ca_installation: ProxyCaInstallation,
@@ -175,6 +180,7 @@ enum EgressProxySupervisorCommand {
     ForceCurrentServerShutdown,
 }
 
+#[derive(Debug)]
 struct ActiveEgressProxyServer {
     shutdown_tx: Option<oneshot::Sender<()>>,
     server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
@@ -186,6 +192,19 @@ struct RequestTarget {
     authority: String,
     host: String,
     uri: Uri,
+}
+
+#[derive(Clone)]
+struct RequestTargetOverride {
+    scheme: &'static str,
+    default_authority: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TransparentProxyProtocol {
+    PlainHttp,
+    Tls,
+    Unsupported,
 }
 
 #[derive(Clone)]
@@ -705,6 +724,8 @@ impl EgressProxy {
             clock,
             next_request_id: Arc::new(AtomicU64::new(1)),
         };
+        let transparent_listener_address =
+            transparent_proxy_listener_address_for_forwarding_mode(&forwarding_mode)?;
 
         let runtime_env = match build_managed_proxy_env(
             listener_address,
@@ -728,7 +749,8 @@ impl EgressProxy {
         };
 
         supervisor_handle.mark_component_starting(SupervisedComponent::EgressProxy);
-        let mut active_server = spawn_active_egress_proxy_server(std_listener, state.clone());
+        let mut active_server =
+            spawn_active_egress_proxy_server(std_listener, state.clone(), run_proxy_server);
         if let Err(error) = wait_for_egress_proxy_health(
             listener_address,
             &mut active_server,
@@ -743,6 +765,76 @@ impl EgressProxy {
             return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
         }
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
+
+        let transparent_server = match transparent_listener_address {
+            Some(transparent_listener_address) => {
+                let transparent_listener =
+                    match bind_transparent_egress_proxy_listener(transparent_listener_address) {
+                        Ok(transparent_listener) => transparent_listener,
+                        Err(error) => {
+                            active_server.request_shutdown();
+                            let _ = active_server.join();
+                            let cleanup_suffix =
+                                cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                                    .err()
+                                    .map(|cleanup_error| {
+                                        format!(" cleanup also failed: {cleanup_error}")
+                                    })
+                                    .unwrap_or_default();
+                            return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+                        }
+                    };
+                let transparent_listener_address = match transparent_listener.local_addr() {
+                    Ok(transparent_listener_address) => transparent_listener_address,
+                    Err(error) => {
+                        active_server.request_shutdown();
+                        let _ = active_server.join();
+                        let cleanup_suffix =
+                            cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                                .err()
+                                .map(|cleanup_error| {
+                                    format!(" cleanup also failed: {cleanup_error}")
+                                })
+                                .unwrap_or_default();
+                        return Err(EgressProxyError::new(format!(
+                            "failed to inspect transparent egress proxy address: {error}{cleanup_suffix}"
+                        )));
+                    }
+                };
+                let mut transparent_server = spawn_active_egress_proxy_server(
+                    transparent_listener,
+                    state.clone(),
+                    run_transparent_proxy_server,
+                );
+                if let Err(error) = wait_for_egress_proxy_health(
+                    transparent_listener_address,
+                    &mut transparent_server,
+                    EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT,
+                ) {
+                    transparent_server.request_shutdown();
+                    let _ = transparent_server.join();
+                    active_server.request_shutdown();
+                    let _ = active_server.join();
+                    let cleanup_suffix =
+                        cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                            .err()
+                            .map(|cleanup_error| format!(" cleanup also failed: {cleanup_error}"))
+                            .unwrap_or_default();
+                    return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+                }
+                emit_egress_proxy_log(
+                    log_context.clock,
+                    log_context.sandbox_instance_id,
+                    "egress_proxy_transparent_listener_started",
+                    &[(
+                        "listenAddr",
+                        Value::String(transparent_listener_address.to_string()),
+                    )],
+                );
+                Some(transparent_server)
+            }
+            None => None,
+        };
 
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         #[cfg(any(test, debug_assertions))]
@@ -771,6 +863,7 @@ impl EgressProxy {
             routes,
             shutdown_requested,
             supervisor_thread: Some(supervisor_thread),
+            transparent_server,
             #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: Some(supervisor_command_sender),
             proxy_ca_installation,
@@ -894,6 +987,11 @@ impl EgressProxy {
             }
         }
 
+        if let Some(mut transparent_server) = self.transparent_server.take() {
+            transparent_server.request_shutdown();
+            transparent_server.join()?;
+        }
+
         cleanup_proxy_ca_installation(&self.proxy_ca_installation, log_context)?;
 
         self.supervisor_handle
@@ -910,11 +1008,16 @@ fn default_loopback_proxy_listener_address() -> SocketAddr {
 fn spawn_active_egress_proxy_server(
     std_listener: StdTcpListener,
     state: EgressProxyState,
+    server_runner: fn(
+        StdTcpListener,
+        oneshot::Receiver<()>,
+        EgressProxyState,
+    ) -> Result<(), EgressProxyError>,
 ) -> ActiveEgressProxyServer {
     let (shutdown_tx, shutdown_rx) = oneshot::channel();
     let (exit_sender, exit_receiver) = mpsc::channel();
     let server_thread = thread::spawn(move || {
-        let result = run_proxy_server(std_listener, shutdown_rx, state);
+        let result = server_runner(std_listener, shutdown_rx, state);
         let _ = exit_sender.send(result.clone());
         result
     });
@@ -1078,7 +1181,7 @@ fn restart_egress_proxy_after_backoff(
             }
         };
         let mut active_server =
-            spawn_active_egress_proxy_server(std_listener, config.state.clone());
+            spawn_active_egress_proxy_server(std_listener, config.state.clone(), run_proxy_server);
         match wait_for_egress_proxy_health(
             config.listener_address,
             &mut active_server,
@@ -1209,6 +1312,116 @@ fn bind_egress_proxy_listener(listener_address: SocketAddr) -> Result<StdTcpList
         .set_nonblocking(true)
         .map_err(|error| format!("failed to configure proxy listener: {error}"))?;
     Ok(std_listener)
+}
+
+fn bind_transparent_egress_proxy_listener(
+    listener_address: SocketAddr,
+) -> Result<StdTcpListener, String> {
+    let std_listener = StdTcpListener::bind(listener_address).map_err(|error| {
+        format!("failed to bind transparent egress proxy listener {listener_address}: {error}")
+    })?;
+    std_listener
+        .set_nonblocking(true)
+        .map_err(|error| format!("failed to configure transparent proxy listener: {error}"))?;
+    Ok(std_listener)
+}
+
+#[cfg(target_os = "linux")]
+fn recover_original_destination(
+    stream: &tokio::net::TcpStream,
+) -> Result<SocketAddr, EgressProxyError> {
+    let socket_fd = stream.as_raw_fd();
+    let (socket_level, socket_option) = match stream.local_addr() {
+        Ok(SocketAddr::V4(_)) => (nix::libc::SOL_IP, nix::libc::SO_ORIGINAL_DST),
+        Ok(SocketAddr::V6(_)) => (nix::libc::IPPROTO_IPV6, nix::libc::IP6T_SO_ORIGINAL_DST),
+        Err(error) => {
+            return Err(EgressProxyError::new(format!(
+                "failed to inspect transparent egress local address: {error}"
+            )));
+        }
+    };
+    let mut sockaddr = std::mem::MaybeUninit::<nix::libc::sockaddr_storage>::zeroed();
+    let mut sockaddr_length: nix::libc::socklen_t =
+        std::mem::size_of::<nix::libc::sockaddr_storage>()
+            .try_into()
+            .map_err(|_| EgressProxyError::new("sockaddr storage length does not fit socklen_t"))?;
+    let result = unsafe {
+        nix::libc::getsockopt(
+            socket_fd,
+            socket_level,
+            socket_option,
+            sockaddr.as_mut_ptr().cast(),
+            &mut sockaddr_length,
+        )
+    };
+    if result != 0 {
+        return Err(EgressProxyError::new(format!(
+            "failed to recover transparent egress original destination: {}",
+            std::io::Error::last_os_error()
+        )));
+    }
+
+    let sockaddr = unsafe { sockaddr.assume_init() };
+    socket_addr_from_sockaddr_storage(sockaddr, sockaddr_length)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn recover_original_destination(
+    _stream: &tokio::net::TcpStream,
+) -> Result<SocketAddr, EgressProxyError> {
+    Err(EgressProxyError::new(
+        "transparent egress original destination lookup requires Linux SO_ORIGINAL_DST",
+    ))
+}
+
+#[cfg(target_os = "linux")]
+fn socket_addr_from_sockaddr_storage(
+    sockaddr: nix::libc::sockaddr_storage,
+    sockaddr_length: nix::libc::socklen_t,
+) -> Result<SocketAddr, EgressProxyError> {
+    match sockaddr.ss_family.into() {
+        nix::libc::AF_INET => {
+            let expected_length = std::mem::size_of::<nix::libc::sockaddr_in>();
+            if usize::try_from(sockaddr_length)
+                .ok()
+                .is_none_or(|length| length < expected_length)
+            {
+                return Err(EgressProxyError::new(
+                    "SO_ORIGINAL_DST returned a truncated IPv4 socket address",
+                ));
+            }
+            let sockaddr_in = unsafe {
+                std::ptr::addr_of!(sockaddr)
+                    .cast::<nix::libc::sockaddr_in>()
+                    .read_unaligned()
+            };
+            let address = std::net::Ipv4Addr::from(u32::from_be(sockaddr_in.sin_addr.s_addr));
+            let port = u16::from_be(sockaddr_in.sin_port);
+            Ok(SocketAddr::from((address, port)))
+        }
+        nix::libc::AF_INET6 => {
+            let expected_length = std::mem::size_of::<nix::libc::sockaddr_in6>();
+            if usize::try_from(sockaddr_length)
+                .ok()
+                .is_none_or(|length| length < expected_length)
+            {
+                return Err(EgressProxyError::new(
+                    "SO_ORIGINAL_DST returned a truncated IPv6 socket address",
+                ));
+            }
+            let sockaddr_in6 = unsafe {
+                std::ptr::addr_of!(sockaddr)
+                    .cast::<nix::libc::sockaddr_in6>()
+                    .read_unaligned()
+            };
+            let address = std::net::Ipv6Addr::from(sockaddr_in6.sin6_addr.s6_addr);
+            let port = u16::from_be(sockaddr_in6.sin6_port);
+            Ok(SocketAddr::from((address, port)))
+        }
+        family => Err(EgressProxyError::new(format!(
+            "SO_ORIGINAL_DST returned unsupported socket family {family}"
+        ))),
+    }
 }
 
 fn build_proxy_route(
@@ -1428,6 +1641,31 @@ fn build_no_proxy_value(
     Ok(no_proxy_hosts.join(","))
 }
 
+fn transparent_proxy_listener_address_for_forwarding_mode(
+    forwarding_mode: &EgressProxyForwardingMode,
+) -> Result<Option<SocketAddr>, EgressProxyError> {
+    match forwarding_mode {
+        EgressProxyForwardingMode::TokenizerProxy { .. } => Ok(None),
+        EgressProxyForwardingMode::Gateway { .. } => {
+            #[cfg(target_os = "linux")]
+            {
+                Ok(Some(default_transparent_proxy_listener_address()))
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                Err(EgressProxyError::new(
+                    "transparent gateway egress requires Linux SO_ORIGINAL_DST support",
+                ))
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn default_transparent_proxy_listener_address() -> SocketAddr {
+    SocketAddr::from(([127, 0, 0, 1], DEFAULT_TRANSPARENT_PROXY_PORT))
+}
+
 fn run_proxy_server(
     std_listener: StdTcpListener,
     mut shutdown_rx: oneshot::Receiver<()>,
@@ -1467,10 +1705,178 @@ fn run_proxy_server(
     })
 }
 
+fn run_transparent_proxy_server(
+    std_listener: StdTcpListener,
+    mut shutdown_rx: oneshot::Receiver<()>,
+    state: EgressProxyState,
+) -> Result<(), EgressProxyError> {
+    let runtime = Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to start transparent egress proxy runtime: {error}"
+            ))
+        })?;
+
+    runtime.block_on(async move {
+        let listener = TcpListener::from_std(std_listener).map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to create transparent egress proxy listener: {error}"
+            ))
+        })?;
+
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => return Ok(()),
+                accept_result = listener.accept() => {
+                    let (stream, peer_address) = accept_result.map_err(|error| {
+                        EgressProxyError::new(format!("transparent egress proxy accept failed: {error}"))
+                    })?;
+                    let state = state.clone();
+                    tokio::spawn(async move {
+                        let log_state = state.clone();
+                        if let Err(error) = handle_transparent_proxy_connection(stream, peer_address, state).await {
+                            emit_egress_proxy_log(
+                                log_state.clock.as_ref(),
+                                &log_state.sandbox_instance_id,
+                                "egress_proxy_transparent_connection_failed",
+                                &[
+                                    ("peerAddr", Value::String(peer_address.to_string())),
+                                    ("error", Value::String(error.to_string())),
+                                ],
+                            );
+                        }
+                    });
+                }
+            }
+        }
+    })
+}
+
+async fn handle_transparent_proxy_connection(
+    stream: tokio::net::TcpStream,
+    peer_address: SocketAddr,
+    state: EgressProxyState,
+) -> Result<(), EgressProxyError> {
+    let original_destination = recover_original_destination(&stream)?;
+    let authority = original_destination.to_string();
+    let protocol = classify_transparent_proxy_stream(&stream).await?;
+    let mut fields = vec![
+        ("peerAddr", Value::String(peer_address.to_string())),
+        (
+            "originalDestination",
+            Value::String(original_destination.to_string()),
+        ),
+        (
+            "detectedProtocol",
+            Value::String(transparent_proxy_protocol_name(protocol).to_string()),
+        ),
+    ];
+    match protocol {
+        TransparentProxyProtocol::PlainHttp => {
+            fields.push(("scheme", Value::String("http".to_string())));
+            fields.push(("authority", Value::String(authority.clone())));
+            emit_egress_proxy_log(
+                state.clock.as_ref(),
+                &state.sandbox_instance_id,
+                "egress_proxy_transparent_connection_started",
+                &fields,
+            );
+            let target_override = RequestTargetOverride {
+                scheme: "http",
+                default_authority: authority,
+            };
+            let service = service_fn(move |request| {
+                handle_proxy_request(request, state.clone(), Some(target_override.clone()))
+            });
+            http1::Builder::new()
+                .serve_connection(TokioIo::new(stream), service)
+                .with_upgrades()
+                .await
+                .map_err(|error| {
+                    EgressProxyError::new(format!(
+                        "transparent plaintext HTTP connection failed: {error}"
+                    ))
+                })
+        }
+        TransparentProxyProtocol::Tls => {
+            fields.push(("scheme", Value::String("https".to_string())));
+            fields.push(("authority", Value::String(authority.clone())));
+            emit_egress_proxy_log(
+                state.clock.as_ref(),
+                &state.sandbox_instance_id,
+                "egress_proxy_transparent_connection_started",
+                &fields,
+            );
+            let tls_stream =
+                accept_transparent_tls_stream(stream, &authority, state.clone()).await?;
+            let target_override = RequestTargetOverride {
+                scheme: "https",
+                default_authority: authority,
+            };
+            let service = service_fn(move |request| {
+                handle_proxy_request(request, state.clone(), Some(target_override.clone()))
+            });
+            http1::Builder::new()
+                .serve_connection(TokioIo::new(tls_stream), service)
+                .with_upgrades()
+                .await
+                .map_err(|error| {
+                    EgressProxyError::new(format!(
+                        "transparent TLS HTTP connection failed: {error}"
+                    ))
+                })
+        }
+        TransparentProxyProtocol::Unsupported => {
+            emit_egress_proxy_log(
+                state.clock.as_ref(),
+                &state.sandbox_instance_id,
+                "egress_proxy_transparent_connection_unsupported",
+                &fields,
+            );
+            Ok(())
+        }
+    }
+}
+
+async fn classify_transparent_proxy_stream(
+    stream: &tokio::net::TcpStream,
+) -> Result<TransparentProxyProtocol, EgressProxyError> {
+    let mut first_byte = [0_u8; 1];
+    let byte_count = stream.peek(&mut first_byte).await.map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to inspect transparent egress proxy connection: {error}"
+        ))
+    })?;
+    if byte_count == 0 {
+        return Ok(TransparentProxyProtocol::Unsupported);
+    }
+    Ok(classify_transparent_proxy_first_byte(first_byte[0]))
+}
+
+fn classify_transparent_proxy_first_byte(first_byte: u8) -> TransparentProxyProtocol {
+    match first_byte {
+        0x16 => TransparentProxyProtocol::Tls,
+        b'A' | b'C' | b'D' | b'G' | b'H' | b'O' | b'P' | b'T' => {
+            TransparentProxyProtocol::PlainHttp
+        }
+        _ => TransparentProxyProtocol::Unsupported,
+    }
+}
+
+fn transparent_proxy_protocol_name(protocol: TransparentProxyProtocol) -> &'static str {
+    match protocol {
+        TransparentProxyProtocol::PlainHttp => "http",
+        TransparentProxyProtocol::Tls => "tls",
+        TransparentProxyProtocol::Unsupported => "unsupported",
+    }
+}
+
 async fn handle_proxy_request(
     mut request: Request<Incoming>,
     state: EgressProxyState,
-    tunneled_authority: Option<String>,
+    target_override: Option<RequestTargetOverride>,
 ) -> Result<Response<HyperBody>, Infallible> {
     if request.method() == Method::CONNECT {
         return Ok(handle_connect_request(request, state));
@@ -1479,8 +1885,7 @@ async fn handle_proxy_request(
     if is_websocket_upgrade_request(&request) {
         let downstream_upgrade = hyper::upgrade::on(&mut request);
         return Ok(
-            match forward_upgrade_request(request, state, tunneled_authority, downstream_upgrade)
-                .await
+            match forward_upgrade_request(request, state, target_override, downstream_upgrade).await
             {
                 Ok(response) => response,
                 Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
@@ -1489,7 +1894,7 @@ async fn handle_proxy_request(
     }
 
     Ok(
-        match forward_request(request, state, tunneled_authority).await {
+        match forward_request(request, state, target_override).await {
             Ok(response) => response,
             Err(error) => text_response(StatusCode::BAD_GATEWAY, error.to_string()),
         },
@@ -1545,8 +1950,12 @@ fn handle_connect_request(
         let Ok(tls_stream) = tls_acceptor.accept(TokioIo::new(upgraded)).await else {
             return;
         };
+        let target_override = RequestTargetOverride {
+            scheme: "https",
+            default_authority: authority,
+        };
         let service = service_fn(move |request| {
-            handle_proxy_request(request, state.clone(), Some(authority.clone()))
+            handle_proxy_request(request, state.clone(), Some(target_override.clone()))
         });
         let _ = http1::Builder::new()
             .serve_connection(TokioIo::new(tls_stream), service)
@@ -1563,12 +1972,12 @@ fn handle_connect_request(
 async fn forward_upgrade_request(
     request: Request<Incoming>,
     state: EgressProxyState,
-    tunneled_authority: Option<String>,
+    target_override: Option<RequestTargetOverride>,
     downstream_upgrade: hyper::upgrade::OnUpgrade,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
     let (parts, body) = request.into_parts();
     let request_method = parts.method.clone();
-    let request_target = resolve_request_target(&parts, tunneled_authority.as_deref())?;
+    let request_target = resolve_request_target(&parts, target_override.as_ref())?;
     let request_path_and_query = request_target
         .uri
         .path_and_query()
@@ -1882,11 +2291,11 @@ async fn forward_upgrade_request_through_gateway(
 async fn forward_request(
     request: Request<Incoming>,
     state: EgressProxyState,
-    tunneled_authority: Option<String>,
+    target_override: Option<RequestTargetOverride>,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
     let (parts, body) = request.into_parts();
     let request_method = parts.method.clone();
-    let request_target = resolve_request_target(&parts, tunneled_authority.as_deref())?;
+    let request_target = resolve_request_target(&parts, target_override.as_ref())?;
     let request_path_and_query = request_target
         .uri
         .path_and_query()
@@ -2289,37 +2698,32 @@ fn response_from_gateway_egress_response(
 
 fn resolve_request_target(
     request: &hyper::http::request::Parts,
-    tunneled_authority: Option<&str>,
+    target_override: Option<&RequestTargetOverride>,
 ) -> Result<RequestTarget, EgressProxyError> {
-    let authority = match tunneled_authority {
-        Some(tunneled_authority) => tunneled_authority.to_string(),
-        None => {
-            if let Some(authority) = request.uri.authority() {
-                authority.as_str().to_string()
-            } else if let Some(host) = request.headers.get(HOST) {
-                host.to_str()
-                    .map(|value| value.to_string())
-                    .map_err(|error| {
-                        EgressProxyError::new(format!(
-                            "proxied request host header is invalid: {error}"
-                        ))
-                    })?
-            } else {
-                return Err(EgressProxyError::new("proxied request is missing a host"));
-            }
-        }
-    };
-    let scheme = if tunneled_authority.is_some() {
-        "https"
+    let authority = if let Some(authority) = request.uri.authority() {
+        authority.as_str().to_string()
+    } else if let Some(host) = request.headers.get(HOST) {
+        host.to_str()
+            .map(|value| value.to_string())
+            .map_err(|error| {
+                EgressProxyError::new(format!("proxied request host header is invalid: {error}"))
+            })?
+    } else if let Some(target_override) = target_override {
+        target_override.default_authority.clone()
     } else {
-        request.uri.scheme_str().unwrap_or("http")
+        return Err(EgressProxyError::new("proxied request is missing a host"));
     };
+    let scheme = target_override.map_or_else(
+        || request.uri.scheme_str().unwrap_or("http"),
+        |target_override| target_override.scheme,
+    );
     let uri = match (
         request.uri.scheme(),
         request.uri.authority(),
-        tunneled_authority,
+        target_override,
     ) {
         (Some(_), Some(_), None) => request.uri.clone(),
+        (Some(_), Some(_), Some(_)) => request.uri.clone(),
         _ => build_direct_forward_uri(scheme, &authority, request.uri.path_and_query())?,
     };
 
@@ -2328,6 +2732,58 @@ fn resolve_request_target(
         authority,
         uri,
     })
+}
+
+async fn accept_transparent_tls_stream(
+    stream: tokio::net::TcpStream,
+    fallback_authority: &str,
+    state: EgressProxyState,
+) -> Result<tokio_rustls::server::TlsStream<tokio::net::TcpStream>, EgressProxyError> {
+    let lazy_acceptor = LazyConfigAcceptor::new(RustlsServerAcceptor::default(), stream);
+    let start_handshake = lazy_acceptor.await.map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to read transparent TLS client hello: {error}"
+        ))
+    })?;
+    let certificate_name = start_handshake
+        .client_hello()
+        .server_name()
+        .map_or_else(|| fallback_authority.to_string(), ToString::to_string);
+    let server_config = build_tls_server_config(
+        &certificate_name,
+        state.proxy_ca_certificate_pem.as_str(),
+        state.proxy_ca_private_key_pem.as_str(),
+        state.clock.as_ref(),
+    )?;
+    start_handshake
+        .into_stream(Arc::new(server_config))
+        .await
+        .map_err(|error| EgressProxyError::new(format!("transparent TLS MITM failed: {error}")))
+}
+
+fn build_tls_server_config(
+    authority: &str,
+    proxy_ca_certificate_pem: &str,
+    proxy_ca_private_key_pem: &str,
+    clock: &dyn Clock,
+) -> Result<ServerConfig, EgressProxyError> {
+    let issued_certificate = issue_proxy_leaf_certificate(
+        proxy_ca_certificate_pem.to_string(),
+        proxy_ca_private_key_pem.to_string(),
+        authority.to_string(),
+        clock,
+    )
+    .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let certificate_chain = load_certificate_chain(&issued_certificate.certificate_chain_pem)?;
+    let private_key = load_private_key(&issued_certificate.private_key_pem)?;
+    ServerConfig::builder()
+        .with_no_client_auth()
+        .with_single_cert(certificate_chain, private_key)
+        .map_err(|error| {
+            EgressProxyError::new(format!(
+                "failed to build local egress proxy certificate chain: {error}"
+            ))
+        })
 }
 
 fn build_direct_forward_uri(
@@ -2650,25 +3106,12 @@ fn build_tls_acceptor(
     proxy_ca_private_key_pem: &str,
     clock: &dyn Clock,
 ) -> Result<TlsAcceptor, EgressProxyError> {
-    let issued_certificate = issue_proxy_leaf_certificate(
-        proxy_ca_certificate_pem.to_string(),
-        proxy_ca_private_key_pem.to_string(),
-        authority.to_string(),
+    Ok(TlsAcceptor::from(Arc::new(build_tls_server_config(
+        authority,
+        proxy_ca_certificate_pem,
+        proxy_ca_private_key_pem,
         clock,
-    )
-    .map_err(|error| EgressProxyError::new(error.to_string()))?;
-    let certificate_chain = load_certificate_chain(&issued_certificate.certificate_chain_pem)?;
-    let private_key = load_private_key(&issued_certificate.private_key_pem)?;
-    let server_config = ServerConfig::builder()
-        .with_no_client_auth()
-        .with_single_cert(certificate_chain, private_key)
-        .map_err(|error| {
-            EgressProxyError::new(format!(
-                "failed to build local egress proxy certificate chain: {error}"
-            ))
-        })?;
-
-    Ok(TlsAcceptor::from(Arc::new(server_config)))
+    )?)))
 }
 
 fn load_certificate_chain(
@@ -2849,10 +3292,13 @@ mod tests {
     use std::thread;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+    #[cfg(target_os = "linux")]
+    use crate::egress_proxy::socket_addr_from_sockaddr_storage;
     use crate::egress_proxy::{
         EgressProxy, EgressProxyForwardingMode, EgressProxyRoute, ProxyCaConfig,
-        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME, build_direct_forward_uri, build_managed_proxy_env,
-        join_url_path, match_route, serialize_egress_proxy_log_line,
+        RequestTargetOverride, SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME, TransparentProxyProtocol,
+        build_direct_forward_uri, build_managed_proxy_env, classify_transparent_proxy_first_byte,
+        join_url_path, match_route, resolve_request_target, serialize_egress_proxy_log_line,
     };
     use crate::protocol::startup::{StartupInput, StartupMode};
     use crate::runtime::{
@@ -2979,6 +3425,137 @@ mod tests {
             direct_uri.to_string(),
             "https://tokenizer-proxy-dev_thomas.mistle.dev/tokenizer-proxy/egress/v1/responses?stream=true"
         );
+    }
+
+    #[test]
+    fn resolves_transparent_plaintext_http_targets_from_host_header() {
+        let request = hyper::Request::builder()
+            .method("GET")
+            .uri("/v1/models?limit=1")
+            .header("host", "api.openai.com")
+            .body(())
+            .expect("transparent request should build");
+        let (parts, ()) = request.into_parts();
+
+        let target = resolve_request_target(
+            &parts,
+            Some(&RequestTargetOverride {
+                scheme: "http",
+                default_authority: "203.0.113.10:80".to_string(),
+            }),
+        )
+        .expect("transparent HTTP target should resolve");
+
+        assert_eq!(target.authority, "api.openai.com");
+        assert_eq!(target.host, "api.openai.com");
+        assert_eq!(
+            target.uri.to_string(),
+            "http://api.openai.com/v1/models?limit=1"
+        );
+    }
+
+    #[test]
+    fn resolves_transparent_tls_targets_from_host_header() {
+        let request = hyper::Request::builder()
+            .method("GET")
+            .uri("/backend-api/codex/models")
+            .header("host", "chatgpt.com")
+            .body(())
+            .expect("transparent TLS request should build");
+        let (parts, ()) = request.into_parts();
+
+        let target = resolve_request_target(
+            &parts,
+            Some(&RequestTargetOverride {
+                scheme: "https",
+                default_authority: "203.0.113.20:443".to_string(),
+            }),
+        )
+        .expect("transparent TLS target should resolve");
+
+        assert_eq!(target.authority, "chatgpt.com");
+        assert_eq!(target.host, "chatgpt.com");
+        assert_eq!(
+            target.uri.to_string(),
+            "https://chatgpt.com/backend-api/codex/models"
+        );
+    }
+
+    #[test]
+    fn resolves_transparent_targets_from_original_destination_when_host_header_is_absent() {
+        let request = hyper::Request::builder()
+            .method("GET")
+            .uri("/v1/models?limit=1")
+            .body(())
+            .expect("transparent request should build");
+        let (parts, ()) = request.into_parts();
+
+        let target = resolve_request_target(
+            &parts,
+            Some(&RequestTargetOverride {
+                scheme: "http",
+                default_authority: "203.0.113.10:80".to_string(),
+            }),
+        )
+        .expect("transparent fallback target should resolve");
+
+        assert_eq!(target.authority, "203.0.113.10:80");
+        assert_eq!(target.host, "203.0.113.10");
+        assert_eq!(
+            target.uri.to_string(),
+            "http://203.0.113.10:80/v1/models?limit=1"
+        );
+    }
+
+    #[test]
+    fn classifies_transparent_proxy_protocol_from_first_byte() {
+        assert_eq!(
+            classify_transparent_proxy_first_byte(0x16),
+            TransparentProxyProtocol::Tls
+        );
+        assert_eq!(
+            classify_transparent_proxy_first_byte(b'G'),
+            TransparentProxyProtocol::PlainHttp
+        );
+        assert_eq!(
+            classify_transparent_proxy_first_byte(b'P'),
+            TransparentProxyProtocol::PlainHttp
+        );
+        assert_eq!(
+            classify_transparent_proxy_first_byte(0x00),
+            TransparentProxyProtocol::Unsupported
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn decodes_linux_original_destination_socket_addresses() {
+        let expected_address = std::net::Ipv4Addr::new(203, 0, 113, 10);
+        let sockaddr = nix::libc::sockaddr_in {
+            sin_family: nix::libc::AF_INET as nix::libc::sa_family_t,
+            sin_port: 443_u16.to_be(),
+            sin_addr: nix::libc::in_addr {
+                s_addr: u32::from(expected_address).to_be(),
+            },
+            sin_zero: [0; 8],
+        };
+        let mut storage = std::mem::MaybeUninit::<nix::libc::sockaddr_storage>::zeroed();
+        unsafe {
+            storage
+                .as_mut_ptr()
+                .cast::<nix::libc::sockaddr_in>()
+                .write(sockaddr);
+        }
+
+        let decoded = socket_addr_from_sockaddr_storage(
+            unsafe { storage.assume_init() },
+            std::mem::size_of::<nix::libc::sockaddr_in>()
+                .try_into()
+                .expect("sockaddr_in length should fit socklen_t"),
+        )
+        .expect("IPv4 original destination should decode");
+
+        assert_eq!(decoded, SocketAddr::from((expected_address, 443)));
     }
 
     #[test]
