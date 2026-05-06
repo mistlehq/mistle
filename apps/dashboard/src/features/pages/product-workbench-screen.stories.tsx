@@ -538,6 +538,7 @@ function MarketingHeroShell(input: {
           </div>
         }
         mainContent={input.children}
+        renderSidebarTrigger
         showHeader
         showHeaderLeadingContent
         sidebarContent={<MarketingHeroSidebar />}
