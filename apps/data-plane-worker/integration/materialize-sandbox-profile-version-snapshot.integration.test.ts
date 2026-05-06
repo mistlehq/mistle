@@ -95,6 +95,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
           db: env.dataPlaneDb,
           tables: env.dataPlaneTables,
           logger: dataPlaneWorkerLogger,
+          processEnv: {},
           sandboxAdapter: createSandboxAdapter({
             provider: SandboxProvider.DOCKER,
             docker: {

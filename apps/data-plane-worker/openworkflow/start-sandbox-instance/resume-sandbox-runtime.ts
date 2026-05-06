@@ -31,6 +31,7 @@ export function resolveResumeStartupMode(input: {
 export async function resumeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
+    processEnv: Readonly<Record<string, string | undefined>>;
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
@@ -60,6 +61,7 @@ export async function resumeSandboxRuntime(
     payload: encodeSandboxStartupInput(startupInput),
     env: createSandboxRuntimeEnv({
       config: ctx.config,
+      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });

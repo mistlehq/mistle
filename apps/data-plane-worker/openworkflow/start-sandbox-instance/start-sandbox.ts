@@ -50,6 +50,7 @@ function readGatewayProxyEnabled(env: Readonly<Record<string, string | undefined
 export async function startSandbox(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
+    processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
   },
   input: {
@@ -78,6 +79,7 @@ export async function startSandbox(
     },
     env: createSandboxRuntimeEnv({
       config: ctx.config,
+      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
     ...(input.storagePreparation === undefined

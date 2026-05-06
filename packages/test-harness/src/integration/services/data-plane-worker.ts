@@ -187,6 +187,7 @@ async function startRuntimeDataPlaneWorker(input: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
     dbPool: appDbPool.value,
+    processEnv: env,
   });
   const worker = await startHostedOpenWorkflowWorker({
     backendPool: workflowPool.value,

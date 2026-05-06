@@ -84,6 +84,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               return await resumeSandbox(
                 {
                   config: ctx.config,
+                  processEnv: ctx.processEnv,
                   sandboxAdapter: ctx.sandboxAdapter,
                 },
                 {
@@ -205,6 +206,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               await resumeSandboxRuntime(
                 {
                   config: ctx.config,
+                  processEnv: ctx.processEnv,
                   sandboxRuntimeControl: ctx.sandboxRuntimeControl,
                 },
                 {
@@ -695,6 +697,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           return startSandbox(
             {
               config: ctx.config,
+              processEnv: ctx.processEnv,
               sandboxAdapter: ctx.sandboxAdapter,
             },
             {
@@ -862,6 +865,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
           await initializeSandboxRuntime(
             {
               config: ctx.config,
+              processEnv: ctx.processEnv,
               sandboxRuntimeControl: ctx.sandboxRuntimeControl,
             },
             {

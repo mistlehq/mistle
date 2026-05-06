@@ -45,6 +45,7 @@ type MaterializeSnapshotWorkflowExecutionContext = Pick<
   | "db"
   | "tables"
   | "logger"
+  | "processEnv"
   | "sandboxAdapter"
   | "sandboxRuntimeControl"
 >;
@@ -314,6 +315,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       startSandbox(
         {
           config: ctx.config,
+          processEnv: ctx.processEnv,
           sandboxAdapter: ctx.sandboxAdapter,
         },
         {
@@ -347,6 +349,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
       await initializeSandboxRuntime(
         {
           config: ctx.config,
+          processEnv: ctx.processEnv,
           sandboxRuntimeControl: ctx.sandboxRuntimeControl,
         },
         {

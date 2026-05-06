@@ -6,6 +6,7 @@ import { createSandboxRuntimeEnv } from "../start-sandbox-instance/start-sandbox
 export async function resumeSandbox(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
+    processEnv: Readonly<Record<string, string | undefined>>;
     sandboxAdapter: SandboxAdapter;
   },
   input: {
@@ -21,6 +22,7 @@ export async function resumeSandbox(
     id: input.providerSandboxId,
     env: createSandboxRuntimeEnv({
       config: ctx.config,
+      processEnv: ctx.processEnv,
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });

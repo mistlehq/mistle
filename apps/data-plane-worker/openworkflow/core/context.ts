@@ -28,6 +28,7 @@ const DefaultTestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
 export type WorkflowContext = {
   config: DataPlaneWorkerRuntimeConfig;
+  processEnv: Readonly<Record<string, string | undefined>>;
   logger: MistleLogger;
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
@@ -78,9 +79,11 @@ async function createWorkflowContext(input?: {
   runtime?: OpenWorkflowRuntime;
   testIsolation?: WorkflowTestIsolation;
   dbPool?: Pool;
+  processEnv?: Readonly<Record<string, string | undefined>>;
 }): Promise<HostedWorkflowContext> {
   const { workerConfig } = input?.runtime ?? (await getOpenWorkflowRuntime());
   const config = createDataPlaneWorkerRuntimeConfig({ app: workerConfig });
+  const processEnv = input?.processEnv ?? process.env;
   const testIsolation = input?.testIsolation ?? readTestIsolationEnv();
   const dbPool =
     input?.dbPool ??
@@ -128,6 +131,7 @@ async function createWorkflowContext(input?: {
     return {
       context: {
         config,
+        processEnv,
         logger,
         db,
         tables,
@@ -218,6 +222,7 @@ export async function createHostedWorkflowContext(input: {
   runtime: OpenWorkflowRuntime;
   testIsolation: WorkflowTestIsolation;
   dbPool: Pool;
+  processEnv?: Readonly<Record<string, string | undefined>>;
 }): Promise<HostedWorkflowContext> {
   return createWorkflowContext(input);
 }

@@ -500,9 +500,12 @@ pub struct EgressHttpRequest {
     pub scheme: String,
     pub authority: String,
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub query: Option<String>,
     pub headers: RepeatedHeaderValues,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub original_destination: Option<EgressOriginalDestination>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub runtime_plan_revision: Option<String>,
 }
 

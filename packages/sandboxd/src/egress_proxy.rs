@@ -40,6 +40,7 @@ use rustls_pki_types::pem::PemObject;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use serde_json::{Map, Value};
 use tokio::io::copy_bidirectional;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::sync::{mpsc as tokio_mpsc, oneshot};
@@ -1565,27 +1566,33 @@ async fn forward_upgrade_request(
     tunneled_authority: Option<String>,
     downstream_upgrade: hyper::upgrade::OnUpgrade,
 ) -> Result<Response<HyperBody>, EgressProxyError> {
-    if matches!(
-        state.forwarding_mode,
-        EgressProxyForwardingMode::Gateway { .. }
-    ) {
-        return Err(EgressProxyError::new(
-            "gateway egress websocket upgrades are not supported before gateway egress streaming",
-        ));
-    }
     let (parts, body) = request.into_parts();
     let request_method = parts.method.clone();
     let request_target = resolve_request_target(&parts, tunneled_authority.as_deref())?;
     let request_path_and_query = request_target
         .uri
         .path_and_query()
-        .map_or("/", |path_and_query| path_and_query.as_str());
+        .map_or("/", |path_and_query| path_and_query.as_str())
+        .to_string();
     let route = match_state_route(
         &state,
         &request_target.host,
-        request_path_and_query,
+        &request_path_and_query,
         request_method.as_str(),
     )?;
+    if let EgressProxyForwardingMode::Gateway { forwarder } = &state.forwarding_mode {
+        let forwarder = forwarder.clone();
+        return forward_upgrade_request_through_gateway(
+            parts,
+            state,
+            request_target,
+            request_path_and_query,
+            route,
+            forwarder,
+            downstream_upgrade,
+        )
+        .await;
+    }
     let EgressProxyForwardingMode::TokenizerProxy {
         tokenizer_proxy_egress_base_url,
     } = &state.forwarding_mode
@@ -1597,7 +1604,7 @@ async fn forward_upgrade_request(
     let upstream_uri = match route {
         Some(_) => build_tokenizer_proxy_forward_uri(
             tokenizer_proxy_egress_base_url,
-            request_path_and_query,
+            &request_path_and_query,
         )?,
         None => request_target.uri.clone(),
     };
@@ -1610,7 +1617,7 @@ async fn forward_upgrade_request(
         method: request_method.to_string(),
         authority: request_target.authority.clone(),
         host: request_target.host.clone(),
-        path_and_query: request_path_and_query.to_string(),
+        path_and_query: request_path_and_query,
         route_mode: if route.is_some() { "managed" } else { "direct" },
         egress_rule_id: route
             .as_ref()
@@ -1746,6 +1753,128 @@ async fn forward_upgrade_request(
     response_builder.body(empty_body()).map_err(|error| {
         EgressProxyError::new(format!(
             "failed to build websocket upgrade response: {error}"
+        ))
+    })
+}
+
+async fn forward_upgrade_request_through_gateway(
+    parts: hyper::http::request::Parts,
+    state: EgressProxyState,
+    request_target: RequestTarget,
+    request_path_and_query: String,
+    route: Option<EgressProxyRoute>,
+    forwarder: GatewayEgressForwarder,
+    downstream_upgrade: hyper::upgrade::OnUpgrade,
+) -> Result<Response<HyperBody>, EgressProxyError> {
+    let request_method = parts.method.clone();
+    let request_context = Arc::new(EgressProxyRequestContext {
+        sandbox_instance_id: state.sandbox_instance_id.clone(),
+        request_id: format!(
+            "egp_{}",
+            state.next_request_id.fetch_add(1, Ordering::Relaxed)
+        ),
+        method: request_method.to_string(),
+        authority: request_target.authority.clone(),
+        host: request_target.host.clone(),
+        path_and_query: request_path_and_query,
+        route_mode: "gateway",
+        egress_rule_id: route
+            .as_ref()
+            .map(|matched_route| matched_route.egress_rule_id.clone()),
+        upstream_url: request_target.uri.to_string(),
+        started_at_ms: state.clock.now_ms(),
+        clock: state.clock.clone(),
+    });
+    let mut request_started_fields = request_context.common_fields();
+    request_started_fields.push(("upgrade", Value::String("websocket".to_string())));
+    emit_egress_proxy_log(
+        request_context.clock.as_ref(),
+        &request_context.sandbox_instance_id,
+        "egress_proxy_upgrade_started",
+        &request_started_fields,
+    );
+
+    let path = parts.uri.path().to_string();
+    let query = parts.uri.query().map(ToString::to_string);
+    let scheme = match request_target.uri.scheme_str().unwrap_or("http") {
+        "ws" => "http",
+        "wss" => "https",
+        scheme => scheme,
+    }
+    .to_string();
+    let headers =
+        repeated_headers_from_filtered_headers(filter_upgrade_request_headers(&parts.headers))?;
+    let tunnel_request = TunnelEgressHttpRequest {
+        request_id: request_context.request_id.clone(),
+        method: request_method.to_string(),
+        scheme,
+        authority: request_target.authority,
+        path,
+        query,
+        headers,
+    };
+
+    let exchange = forwarder
+        .open_http(tunnel_request)
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let (request_body_sender, response_receiver) = exchange.into_parts();
+    request_body_sender
+        .send_end()
+        .map_err(|error| EgressProxyError::new(error.to_string()))?;
+    let gateway_response =
+        tokio::task::spawn_blocking(move || response_receiver.recv_response_start())
+            .await
+            .map_err(|error| {
+                EgressProxyError::new(format!("gateway egress forwarding task failed: {error}"))
+            })?
+            .map_err(|error| EgressProxyError::new(error.to_string()))?;
+
+    let status = StatusCode::from_u16(gateway_response.status).map_err(|error| {
+        EgressProxyError::new(format!(
+            "gateway egress returned invalid websocket status '{}': {error}",
+            gateway_response.status
+        ))
+    })?;
+    if status != StatusCode::SWITCHING_PROTOCOLS {
+        return response_from_gateway_egress_response(gateway_response, request_context);
+    }
+
+    let mut response_builder = Response::builder().status(status);
+    for (header_name, header_value) in
+        filtered_upgrade_response_headers_from_repeated_headers(&gateway_response.headers)?
+    {
+        response_builder = response_builder.header(header_name, header_value);
+    }
+    response_builder = response_builder.header(
+        SANDBOX_EGRESS_REQUEST_ID_HEADER_NAME,
+        request_context.request_id.as_str(),
+    );
+
+    let tunnel_context = request_context.clone();
+    tokio::spawn(async move {
+        let tunnel_result = tunnel_gateway_upgrade(
+            downstream_upgrade,
+            request_body_sender,
+            gateway_response.body,
+        )
+        .await;
+
+        if let Err(error) = tunnel_result {
+            let mut fields = tunnel_context.common_fields();
+            fields.push(("outcome", Value::String("tunnel_failed".to_string())));
+            fields.push(("error", Value::String(error.to_string())));
+            emit_egress_proxy_log(
+                tunnel_context.clock.as_ref(),
+                &tunnel_context.sandbox_instance_id,
+                "egress_proxy_upgrade_failed",
+                &fields,
+            );
+        }
+    });
+
+    response_builder.body(empty_body()).map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to build gateway websocket upgrade response: {error}"
         ))
     })
 }
@@ -2046,6 +2175,68 @@ async fn stream_gateway_egress_request_body(
     request_body_sender
         .send_end()
         .map_err(|error| EgressProxyError::new(error.to_string()))
+}
+
+async fn tunnel_gateway_upgrade(
+    downstream_upgrade: hyper::upgrade::OnUpgrade,
+    request_body_sender: crate::tunnel::session::GatewayEgressHttpRequestBodySender,
+    mut gateway_response_body: tokio_mpsc::UnboundedReceiver<Result<Bytes, TunnelSessionError>>,
+) -> Result<(), EgressProxyError> {
+    let downstream = downstream_upgrade.await.map_err(|error| {
+        EgressProxyError::new(format!("failed to upgrade downstream websocket: {error}"))
+    })?;
+    let downstream = TokioIo::new(downstream);
+    let (mut downstream_reader, mut downstream_writer) = tokio::io::split(downstream);
+
+    let mut request_task = tokio::spawn(async move {
+        let mut buffer = vec![0_u8; 16 * 1024];
+        loop {
+            let byte_count = downstream_reader.read(&mut buffer).await.map_err(|error| {
+                EgressProxyError::new(format!(
+                    "failed to read downstream websocket bytes: {error}"
+                ))
+            })?;
+            if byte_count == 0 {
+                request_body_sender
+                    .close_upgraded_request()
+                    .map_err(|error| EgressProxyError::new(error.to_string()))?;
+                return Ok::<(), EgressProxyError>(());
+            }
+            request_body_sender
+                .send_upgraded_bytes(Bytes::copy_from_slice(&buffer[..byte_count]))
+                .map_err(|error| EgressProxyError::new(error.to_string()))?;
+        }
+    });
+
+    let mut response_task = tokio::spawn(async move {
+        while let Some(frame) = gateway_response_body.recv().await {
+            let bytes = frame.map_err(|error| EgressProxyError::new(error.to_string()))?;
+            if !bytes.is_empty() {
+                downstream_writer.write_all(&bytes).await.map_err(|error| {
+                    EgressProxyError::new(format!(
+                        "failed to write gateway websocket bytes downstream: {error}"
+                    ))
+                })?;
+            }
+        }
+        downstream_writer.shutdown().await.map_err(|error| {
+            EgressProxyError::new(format!("failed to close downstream websocket: {error}"))
+        })
+    });
+
+    tokio::select! {
+        request_result = &mut request_task => {
+            request_result
+                .map_err(|error| EgressProxyError::new(format!("gateway websocket request task failed: {error}")))??;
+            response_task.await
+                .map_err(|error| EgressProxyError::new(format!("gateway websocket response task failed: {error}")))?
+        }
+        response_result = &mut response_task => {
+            request_task.abort();
+            response_result
+                .map_err(|error| EgressProxyError::new(format!("gateway websocket response task failed: {error}")))?
+        }
+    }
 }
 
 fn response_from_gateway_egress_response(
@@ -2406,6 +2597,28 @@ fn filtered_response_headers_from_repeated_headers(
         }
     }
     Ok(filter_outbound_response_headers(&header_map))
+}
+
+fn filtered_upgrade_response_headers_from_repeated_headers(
+    headers: &BTreeMap<String, Vec<String>>,
+) -> Result<Vec<(HeaderName, HeaderValue)>, EgressProxyError> {
+    let mut header_map = hyper::HeaderMap::new();
+    for (name, values) in headers {
+        let header_name = HeaderName::from_bytes(name.as_bytes()).map_err(|error| {
+            EgressProxyError::new(format!(
+                "gateway egress upgrade response header name '{name}' is invalid: {error}"
+            ))
+        })?;
+        for value in values {
+            let header_value = HeaderValue::from_str(value).map_err(|error| {
+                EgressProxyError::new(format!(
+                    "gateway egress upgrade response header '{name}' has invalid value: {error}"
+                ))
+            })?;
+            header_map.append(header_name.clone(), header_value);
+        }
+    }
+    Ok(filter_upgrade_response_headers(&header_map))
 }
 
 fn filter_upgrade_response_headers(

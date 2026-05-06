@@ -68,10 +68,11 @@ use crate::tunnel::protocol::{
     CONNECT_ERROR_CODE_PROCESSES_STREAM_UNAVAILABLE, CONNECT_ERROR_CODE_PTY_SESSION_CREATE_FAILED,
     CONNECT_ERROR_CODE_PTY_SESSION_EXISTS, CONNECT_ERROR_CODE_PTY_SESSION_UNAVAILABLE,
     EgressHttpOpen, EgressHttpRequest, EgressHttpRequestBodyChunk, EgressHttpRequestBodyEnd,
-    EgressHttpResponseStart, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED,
-    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH, FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE,
-    FileUploadCompletedEventInput, PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY,
-    PAYLOAD_KIND_WEBSOCKET_TEXT, PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
+    EgressHttpResponseStart, EgressTcpClose, EgressTcpData,
+    FILE_UPLOAD_RESET_CODE_BYTE_COUNT_EXCEEDED, FILE_UPLOAD_RESET_CODE_BYTE_COUNT_MISMATCH,
+    FILE_UPLOAD_RESET_CODE_INVALID_FILE_TYPE, FileUploadCompletedEventInput,
+    PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_BINARY, PAYLOAD_KIND_WEBSOCKET_TEXT,
+    PORT_ACCESS_AUTHORIZE_REASON_PORT_UNREACHABLE,
     PORT_ACCESS_AUTHORIZE_REASON_UNSUPPORTED_PROTOCOL, RepeatedHeaderValues,
     STREAM_RESET_CODE_EXEC_COMMAND_FAILED, STREAM_RESET_CODE_INVALID_STREAM_CLOSE,
     STREAM_RESET_CODE_INVALID_STREAM_DATA, STREAM_RESET_CODE_INVALID_STREAM_SIGNAL,
@@ -217,6 +218,23 @@ impl GatewayEgressHttpRequestBodySender {
     pub fn send_end(&self) -> Result<(), TunnelSessionError> {
         self.request_sender
             .send(TunnelSessionRequest::EgressHttpRequestBodyEnd {
+                stream_id: self.stream_id,
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))
+    }
+
+    pub fn send_upgraded_bytes(&self, bytes: Bytes) -> Result<(), TunnelSessionError> {
+        self.request_sender
+            .send(TunnelSessionRequest::EgressTcpData {
+                bytes,
+                stream_id: self.stream_id,
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))
+    }
+
+    pub fn close_upgraded_request(&self) -> Result<(), TunnelSessionError> {
+        self.request_sender
+            .send(TunnelSessionRequest::EgressTcpClose {
                 stream_id: self.stream_id,
             })
             .map_err(|error| TunnelSessionError::Egress(error.to_string()))
@@ -526,6 +544,13 @@ enum TunnelSessionRequest {
         stream_id: u32,
     },
     EgressHttpRequestBodyEnd {
+        stream_id: u32,
+    },
+    EgressTcpData {
+        bytes: Bytes,
+        stream_id: u32,
+    },
+    EgressTcpClose {
         stream_id: u32,
     },
 }
@@ -4200,6 +4225,40 @@ fn handle_tunnel_session_request(
             write_tunnel_text(tunnel_writer_sender, body_end_payload)?;
             Ok(TunnelSessionControlFlow::Continue)
         }
+        TunnelSessionRequest::EgressTcpData { bytes, stream_id } => {
+            if !session_state
+                .pending_egress_http_requests
+                .contains_key(&stream_id)
+            {
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+            let data_payload = serde_json::to_string(&EgressTcpData {
+                message_type: "egress.tcp.data".to_string(),
+                stream_id,
+                direction: "request".to_string(),
+                bytes: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                encoding: "base64".to_string(),
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
+            write_tunnel_text(tunnel_writer_sender, data_payload)?;
+            Ok(TunnelSessionControlFlow::Continue)
+        }
+        TunnelSessionRequest::EgressTcpClose { stream_id } => {
+            if !session_state
+                .pending_egress_http_requests
+                .contains_key(&stream_id)
+            {
+                return Ok(TunnelSessionControlFlow::Continue);
+            }
+            let close_payload = serde_json::to_string(&EgressTcpClose {
+                message_type: "egress.tcp.close".to_string(),
+                stream_id,
+                direction: "request".to_string(),
+            })
+            .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
+            write_tunnel_text(tunnel_writer_sender, close_payload)?;
+            Ok(TunnelSessionControlFlow::Continue)
+        }
     }
 }
 
@@ -4749,16 +4808,81 @@ fn handle_egress_transport_message(
             )));
         }
         crate::tunnel::protocol::EgressTransportMessage::TcpData(message) => {
-            return Err(TunnelSessionError::Egress(format!(
-                "egress.tcp.data streamId {} is not supported before gateway egress tcp streaming",
-                message.stream_id
-            )));
+            if message.direction != "response" {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} must use response direction when sent to sandboxd",
+                    message.stream_id
+                )));
+            }
+            let Some(pending_request) = session_state
+                .pending_egress_http_requests
+                .get_mut(&message.stream_id)
+            else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} is not bound to a pending egress http request",
+                    message.stream_id
+                )));
+            };
+            let Some(response) = &pending_request.response else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} arrived before response start",
+                    message.stream_id
+                )));
+            };
+            if response.status != 101 {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} arrived for non-upgraded response status {}",
+                    message.stream_id, response.status
+                )));
+            }
+            if message.encoding != "base64" {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} used unsupported encoding '{}'",
+                    message.stream_id, message.encoding
+                )));
+            }
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(message.bytes.as_bytes())
+                .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
+            let Some(body_sender) = &pending_request.body_sender else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.data streamId {} arrived before response stream was attached",
+                    message.stream_id
+                )));
+            };
+            let _ = body_sender.send(Ok(Bytes::from(bytes)));
         }
         crate::tunnel::protocol::EgressTransportMessage::TcpClose(message) => {
-            return Err(TunnelSessionError::Egress(format!(
-                "egress.tcp.close streamId {} is not supported before gateway egress tcp streaming",
-                message.stream_id
-            )));
+            if message.direction != "response" {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.close streamId {} must use response direction when sent to sandboxd",
+                    message.stream_id
+                )));
+            }
+            let Some(pending_request) = session_state
+                .pending_egress_http_requests
+                .remove(&message.stream_id)
+            else {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.close streamId {} is not bound to a pending egress http request",
+                    message.stream_id
+                )));
+            };
+            let Some(response) = pending_request.response else {
+                if let Some(response_sender) = pending_request.response_sender {
+                    let _ = response_sender.send(Err(TunnelSessionError::Egress(format!(
+                        "egress.tcp.close streamId {} arrived before response start",
+                        message.stream_id
+                    ))));
+                }
+                return Ok(());
+            };
+            if response.status != 101 {
+                return Err(TunnelSessionError::Egress(format!(
+                    "egress.tcp.close streamId {} arrived for non-upgraded response status {}",
+                    message.stream_id, response.status
+                )));
+            }
         }
         crate::tunnel::protocol::EgressTransportMessage::StreamCancel(message) => {
             return Err(TunnelSessionError::Egress(format!(
@@ -5748,9 +5872,9 @@ mod tests {
     use crate::tunnel::protocol::{
         AGENT_STREAM_WINDOW_BYTES, EgressHttpRequestBodyChunk, EgressHttpRequestBodyEnd,
         EgressHttpResponseBodyChunk, EgressHttpResponseBodyEnd, EgressHttpResponseStart,
-        EgressStreamError, EgressTransportMessage, PAYLOAD_KIND_RAW_BYTES,
-        PAYLOAD_KIND_WEBSOCKET_TEXT, PortAccessTarget, PortsTcpClose, PortsTcpConnected,
-        PortsTcpOpen, PortsTransportMessage, StreamDataFrame, StreamSendWindow,
+        EgressStreamError, EgressTcpClose, EgressTcpData, EgressTransportMessage,
+        PAYLOAD_KIND_RAW_BYTES, PAYLOAD_KIND_WEBSOCKET_TEXT, PortAccessTarget, PortsTcpClose,
+        PortsTcpConnected, PortsTcpOpen, PortsTransportMessage, StreamDataFrame, StreamSendWindow,
         decode_stream_data_frame, encode_stream_data_frame, parse_egress_transport_message,
         parse_stream_control_message,
     };
@@ -5935,6 +6059,55 @@ mod tests {
             panic!("expected egress.http.request.body.end");
         };
         assert_eq!(stream_id, 93);
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::EgressTcpData {
+                bytes: Bytes::from_static(b"ping"),
+                stream_id: 93,
+            },
+            &tunnel_writer_sender,
+            &mut session_state,
+        )
+        .expect("egress tcp data should be written");
+        let tcp_data_payload = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        let tcp_data = parse_egress_transport_message(&tcp_data_payload.to_string())
+            .expect("tcp data should parse")
+            .expect("tcp data should be an egress transport message");
+        let EgressTransportMessage::TcpData(EgressTcpData {
+            bytes,
+            direction,
+            encoding,
+            stream_id,
+            ..
+        }) = tcp_data
+        else {
+            panic!("expected egress.tcp.data");
+        };
+        assert_eq!(stream_id, 93);
+        assert_eq!(direction, "request");
+        assert_eq!(encoding, "base64");
+        assert_eq!(bytes, "cGluZw==");
+
+        handle_tunnel_session_request(
+            TunnelSessionRequest::EgressTcpClose { stream_id: 93 },
+            &tunnel_writer_sender,
+            &mut session_state,
+        )
+        .expect("egress tcp close should be written");
+        let tcp_close_payload = read_writer_text_json(&mut tunnel_writer_receiver).await;
+        let tcp_close = parse_egress_transport_message(&tcp_close_payload.to_string())
+            .expect("tcp close should parse")
+            .expect("tcp close should be an egress transport message");
+        let EgressTransportMessage::TcpClose(EgressTcpClose {
+            direction,
+            stream_id,
+            ..
+        }) = tcp_close
+        else {
+            panic!("expected egress.tcp.close");
+        };
+        assert_eq!(stream_id, 93);
+        assert_eq!(direction, "request");
     }
 
     #[tokio::test]
@@ -6013,6 +6186,82 @@ mod tests {
         )
         .expect("response body end should complete pending egress request");
         assert!(session_state.pending_egress_http_requests.is_empty());
+    }
+
+    #[tokio::test]
+    async fn streams_pending_gateway_egress_upgraded_response_bytes_from_tcp_frames() {
+        let (response_sender, response_receiver) = mpsc::channel();
+        let mut session_state = TunnelSessionMutableState {
+            telemetry_relay: TelemetryRelay::default(),
+            pending_signing_requests: BTreeMap::new(),
+            pending_egress_http_requests: BTreeMap::from([(
+                94,
+                PendingEgressHttpRequest {
+                    response_sender: Some(response_sender),
+                    response: None,
+                    body_sender: None,
+                },
+            )]),
+            pending_agent_opens: BTreeMap::new(),
+            pending_exec_opens: BTreeMap::new(),
+            agent_streams: BTreeMap::new(),
+            port_access_http_streams: BTreeMap::new(),
+            port_access_tcp_streams: BTreeMap::new(),
+            processes_stream_send_windows: BTreeMap::new(),
+            last_processes_snapshot_at_ms: None,
+            pty_sessions: BTreeMap::new(),
+            file_uploads: BTreeMap::new(),
+        };
+
+        handle_egress_transport_message(
+            EgressTransportMessage::HttpResponseStart(EgressHttpResponseStart {
+                message_type: "egress.http.response.start".to_string(),
+                stream_id: 94,
+                status: 101,
+                headers: BTreeMap::from([("upgrade".to_string(), vec!["websocket".to_string()])]),
+            }),
+            &mut session_state,
+        )
+        .expect("upgrade response start should attach to pending egress request");
+        let mut response = response_receiver
+            .recv_timeout(Duration::from_secs(1))
+            .expect("upgraded egress response should be delivered")
+            .expect("upgraded egress response should succeed");
+        assert_eq!(response.status, 101);
+
+        handle_egress_transport_message(
+            EgressTransportMessage::TcpData(EgressTcpData {
+                message_type: "egress.tcp.data".to_string(),
+                stream_id: 94,
+                direction: "response".to_string(),
+                bytes: "cG9uZw==".to_string(),
+                encoding: "base64".to_string(),
+            }),
+            &mut session_state,
+        )
+        .expect("response tcp data should stream to upgraded body");
+        let streamed_chunk = response
+            .body
+            .recv()
+            .await
+            .expect("upgraded response chunk should be delivered")
+            .expect("upgraded response chunk should succeed");
+        assert_eq!(streamed_chunk, Bytes::from_static(b"pong"));
+
+        handle_egress_transport_message(
+            EgressTransportMessage::TcpClose(EgressTcpClose {
+                message_type: "egress.tcp.close".to_string(),
+                stream_id: 94,
+                direction: "response".to_string(),
+            }),
+            &mut session_state,
+        )
+        .expect("response tcp close should complete upgraded stream");
+        assert!(session_state.pending_egress_http_requests.is_empty());
+        assert!(
+            response.body.recv().await.is_none(),
+            "tcp close should close the upgraded response body"
+        );
     }
 
     #[test]
