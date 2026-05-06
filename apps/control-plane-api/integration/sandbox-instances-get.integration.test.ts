@@ -232,7 +232,6 @@ describe.concurrent("sandbox instances get integration", () => {
       sandboxInstanceId: "sbi_cp_get_setup_check_001",
       title: "Setup check run",
       purpose: SandboxInstancePurposes.SETUP_CHECK,
-      status: SandboxInstanceStatuses.PENDING,
     });
 
     const response = await env.controlPlaneApi.http.fetch(
@@ -266,8 +265,7 @@ async function insertSandboxInstance(
     organizationId: string;
     sandboxInstanceId: string;
     title: string | null;
-    purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
-    status?: typeof SandboxInstanceStatuses.PENDING | typeof SandboxInstanceStatuses.STOPPED;
+    purpose?: typeof SandboxInstancePurposes.SETUP_CHECK;
   },
 ): Promise<void> {
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
@@ -278,7 +276,7 @@ async function insertSandboxInstance(
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
     providerSandboxId: null,
-    status: input.status ?? SandboxInstanceStatuses.PENDING,
+    status: SandboxInstanceStatuses.PENDING,
     startedByKind: "user",
     startedById: "usr_cp_get",
     source: "dashboard",

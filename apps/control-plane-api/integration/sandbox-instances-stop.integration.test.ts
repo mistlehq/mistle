@@ -7,16 +7,11 @@ import {
   SandboxInstanceStatuses,
   type DataPlaneTables,
 } from "@mistle/db/data-plane";
-import { createDataPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import {
   createIntegrationTest,
   type IntegrationTestEnvironment,
 } from "@mistle/test-harness/integration";
-import { systemClock, systemSleeper } from "@mistle/time";
-import { StopSandboxInstanceWorkflowName } from "@mistle/workflow-registry/data-plane";
-import { sql } from "drizzle-orm";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
 import {
   SandboxInstancesConflictCodes,
@@ -24,20 +19,11 @@ import {
   SandboxInstancesNotFoundResponseSchema,
 } from "../src/sandbox-instances/index.js";
 import { stopSandboxInstanceResponseSchema } from "../src/sandbox-instances/stop-sandbox-instance/schema.js";
-
-const WorkflowRunPersistTimeoutMs = 30_000;
-const WorkflowRunPersistPollIntervalMs = 100;
+import { waitForQueuedUserStopWorkflowRun } from "./helpers/data-plane-workflows.js";
 
 const it = createIntegrationTest({
   services: ["control-plane-api", "data-plane-api"],
 });
-
-const UserStopWorkflowInputSchema = z
-  .object({
-    sandboxInstanceId: z.string().min(1),
-    stopReason: z.literal("user"),
-  })
-  .strict();
 
 describe.concurrent("sandbox instances stop integration", () => {
   it("queues a user stop workflow for setup-check sandboxes through the public route", async ({
@@ -77,12 +63,12 @@ describe.concurrent("sandbox instances stop integration", () => {
       workflowRunId: expect.any(String),
     });
 
-    const workflowRun = await waitForQueuedStopWorkflowRun({
+    const workflowRun = await waitForQueuedUserStopWorkflowRun({
       env,
       sandboxInstanceId: "sbi_cp_stop_setup_check",
     });
     expect(workflowRun.id).toBe(body.workflowRunId);
-    expect(UserStopWorkflowInputSchema.parse(workflowRun.input)).toEqual({
+    expect(workflowRun.input).toEqual({
       sandboxInstanceId: "sbi_cp_stop_setup_check",
       stopReason: "user",
     });
@@ -183,48 +169,4 @@ async function insertSandboxInstance(
   };
 
   await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(row);
-}
-
-type WorkflowRunRow = {
-  id: string;
-  input: unknown;
-};
-
-const WorkflowRunRowSchema = z
-  .object({
-    id: z.string(),
-    input: z.unknown(),
-  })
-  .strict();
-
-async function waitForQueuedStopWorkflowRun(input: {
-  env: IntegrationTestEnvironment;
-  sandboxInstanceId: string;
-}): Promise<WorkflowRunRow> {
-  const deadline = systemClock.nowMs() + WorkflowRunPersistTimeoutMs;
-  const namespaceId = createDataPlaneWorkflowNamespaceId(input.env.id);
-
-  while (systemClock.nowMs() < deadline) {
-    const result = await input.env.dataPlaneDb.execute(sql<WorkflowRunRow>`
-      select id, input
-      from data_plane_openworkflow.workflow_runs
-      where
-        namespace_id = ${namespaceId}
-        and workflow_name = ${StopSandboxInstanceWorkflowName}
-        and input->>'sandboxInstanceId' = ${input.sandboxInstanceId}
-      order by created_at asc
-      limit 1
-    `);
-
-    const row = result.rows[0];
-    if (row !== undefined) {
-      return WorkflowRunRowSchema.parse(row);
-    }
-
-    await systemSleeper.sleep(WorkflowRunPersistPollIntervalMs);
-  }
-
-  throw new Error(
-    `Timed out waiting for queued user stop workflow for sandbox '${input.sandboxInstanceId}'.`,
-  );
 }
