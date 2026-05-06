@@ -73,6 +73,35 @@ it("returns pending sandbox instances before provider provisioning begins", asyn
   });
 });
 
+it("returns setup-check-purpose sandbox instances by id", async ({ env }) => {
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: "sbi_integration_new_get_setup_check",
+      organizationId: "org_integration_new_get_setup_check",
+      sandboxProfileId: "sbp_integration_new_get_setup_check",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+      status: SandboxInstanceStatuses.PENDING,
+      providerSandboxId: null,
+      title: "Setup check",
+    }),
+  );
+
+  await expect(
+    clientFor(env).getSandboxInstance({
+      organizationId: "org_integration_new_get_setup_check",
+      instanceId: "sbi_integration_new_get_setup_check",
+    }),
+  ).resolves.toEqual({
+    id: "sbi_integration_new_get_setup_check",
+    title: "Setup check",
+    status: "pending",
+    connectable: false,
+    failureCode: null,
+    failureMessage: null,
+    runtimePlan: null,
+  });
+});
+
 it("marks ephemeral starting sandbox instances failed when provider inspection misses the runtime", async ({
   env,
 }) => {

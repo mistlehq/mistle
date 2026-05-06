@@ -9,8 +9,13 @@ import {
   type DataPlaneSandboxInstancesClient,
   type ReconcileSandboxInstanceInput,
   type StopSandboxInstanceInput,
+  type StopUserRequestedSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import {
+  SandboxInstancePurposes,
+  SandboxInstanceStatuses,
+  type DataPlaneTables,
+} from "@mistle/db/data-plane";
 import { createDataPlaneWorkflowNamespaceId } from "@mistle/db/test-environment";
 import {
   TestEnvironmentIdHeader,
@@ -49,6 +54,23 @@ const StopWorkflowIdempotencyKeySchema = z
     action: z.literal("stop"),
     stopReason: z.literal("idle"),
     expectedOwnerLeaseId: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+  })
+  .strict();
+
+const UserStopWorkflowInputSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    stopReason: z.literal("user"),
+  })
+  .strict();
+
+const UserStopWorkflowIdempotencyKeySchema = z
+  .object({
+    version: z.literal(1),
+    sandboxInstanceId: z.string().min(1),
+    action: z.literal("user_stop"),
+    organizationId: z.string().min(1),
     idempotencyKey: z.string().min(1),
   })
   .strict();
@@ -170,6 +192,142 @@ describe.concurrent("internal sandbox instance workflow queue integration", () =
       workflowInputForReconcile(workflowInput),
     );
   });
+
+  it("queues a user stop workflow for running setup-check sandbox instances", async ({ env }) => {
+    const workflowInput: StopUserRequestedSandboxInstanceInput = {
+      organizationId: "org_dp_api_workflow_user_stop",
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop",
+      idempotencyKey: "dashboard-user-stop-integration-new",
+    };
+
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop",
+      purpose: SandboxInstancePurposes.SETUP_CHECK,
+    });
+
+    const firstResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
+    const secondResponse = await clientFor(env).stopUserRequestedSandboxInstance(workflowInput);
+
+    expect(firstResponse).toEqual({
+      status: "accepted",
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      workflowRunId: expect.any(String),
+    });
+    expect(secondResponse).toEqual(firstResponse);
+
+    const workflowRuns = await waitForQueuedWorkflowRuns({
+      env,
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      workflowName: StopSandboxInstanceWorkflowName,
+    });
+
+    expect(workflowRuns).toHaveLength(1);
+    expect(workflowRuns[0]).toEqual({
+      id: firstResponse.workflowRunId,
+      namespace_id: createDataPlaneWorkflowNamespaceId(env.id),
+      workflow_name: StopSandboxInstanceWorkflowName,
+      status: "pending",
+      input: workflowInputForUserStop(workflowInput),
+      output: null,
+      idempotency_key: JSON.stringify({
+        version: 1,
+        sandboxInstanceId: workflowInput.sandboxInstanceId,
+        action: "user_stop",
+        organizationId: workflowInput.organizationId,
+        idempotencyKey: workflowInput.idempotencyKey,
+      }),
+    });
+    expect(UserStopWorkflowInputSchema.parse(workflowRuns[0]?.input)).toEqual(
+      workflowInputForUserStop(workflowInput),
+    );
+    expect(
+      UserStopWorkflowIdempotencyKeySchema.parse(
+        JSON.parse(workflowRuns[0]?.idempotency_key ?? ""),
+      ),
+    ).toEqual({
+      version: 1,
+      sandboxInstanceId: workflowInput.sandboxInstanceId,
+      action: "user_stop",
+      organizationId: workflowInput.organizationId,
+      idempotencyKey: workflowInput.idempotencyKey,
+    });
+  });
+
+  it("rejects user stop workflows for session sandbox instances", async ({ env }) => {
+    await insertRunningSandboxInstance(env, {
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+      organizationId: "org_dp_api_workflow_user_stop_session",
+      sandboxProfileId: "sbp_dp_api_workflow_user_stop_session",
+      purpose: SandboxInstancePurposes.SESSION,
+    });
+
+    await expect(
+      clientFor(env).stopUserRequestedSandboxInstance({
+        organizationId: "org_dp_api_workflow_user_stop_session",
+        sandboxInstanceId: "sbi_dp_api_workflow_user_stop_session",
+        idempotencyKey: "dashboard-user-stop-session-integration-new",
+      }),
+    ).rejects.toMatchObject({
+      status: 409,
+    });
+  });
+
+  it("returns terminal user stop statuses without queueing duplicate workflows", async ({
+    env,
+  }) => {
+    await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values([
+      sandboxInstanceRow({
+        id: "sbi_dp_api_workflow_user_stop_stopped",
+        organizationId: "org_dp_api_workflow_user_stop_terminal",
+        sandboxProfileId: "sbp_dp_api_workflow_user_stop_stopped",
+        status: SandboxInstanceStatuses.STOPPED,
+        purpose: SandboxInstancePurposes.SETUP_CHECK,
+      }),
+      sandboxInstanceRow({
+        id: "sbi_dp_api_workflow_user_stop_failed",
+        organizationId: "org_dp_api_workflow_user_stop_terminal",
+        sandboxProfileId: "sbp_dp_api_workflow_user_stop_failed",
+        status: SandboxInstanceStatuses.FAILED,
+        purpose: SandboxInstancePurposes.SETUP_CHECK,
+      }),
+    ]);
+
+    await expect(
+      clientFor(env).stopUserRequestedSandboxInstance({
+        organizationId: "org_dp_api_workflow_user_stop_terminal",
+        sandboxInstanceId: "sbi_dp_api_workflow_user_stop_stopped",
+        idempotencyKey: "dashboard-user-stop-stopped-integration-new",
+      }),
+    ).resolves.toEqual({
+      status: "already_stopped",
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_stopped",
+      workflowRunId: null,
+    });
+    await expect(
+      clientFor(env).stopUserRequestedSandboxInstance({
+        organizationId: "org_dp_api_workflow_user_stop_terminal",
+        sandboxInstanceId: "sbi_dp_api_workflow_user_stop_failed",
+        idempotencyKey: "dashboard-user-stop-failed-integration-new",
+      }),
+    ).resolves.toEqual({
+      status: "already_terminal",
+      sandboxInstanceId: "sbi_dp_api_workflow_user_stop_failed",
+      workflowRunId: null,
+    });
+
+    await expect(
+      countQueuedWorkflowRuns({
+        env,
+        sandboxInstanceIds: [
+          "sbi_dp_api_workflow_user_stop_stopped",
+          "sbi_dp_api_workflow_user_stop_failed",
+        ],
+        workflowName: StopSandboxInstanceWorkflowName,
+      }),
+    ).resolves.toBe(0);
+  });
 });
 
 function clientFor(env: IntegrationTestEnvironment): DataPlaneSandboxInstancesClient {
@@ -187,20 +345,43 @@ async function insertRunningSandboxInstance(
     sandboxInstanceId: string;
     organizationId: string;
     sandboxProfileId: string;
+    purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
   },
 ): Promise<void> {
-  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values({
-    id: input.sandboxInstanceId,
+  await env.dataPlaneDb.insert(env.dataPlaneTables.sandboxInstances).values(
+    sandboxInstanceRow({
+      id: input.sandboxInstanceId,
+      organizationId: input.organizationId,
+      sandboxProfileId: input.sandboxProfileId,
+      status: SandboxInstanceStatuses.RUNNING,
+      ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+    }),
+  );
+}
+
+function sandboxInstanceRow(input: {
+  id: string;
+  organizationId: string;
+  sandboxProfileId: string;
+  status:
+    | typeof SandboxInstanceStatuses.RUNNING
+    | typeof SandboxInstanceStatuses.STOPPED
+    | typeof SandboxInstanceStatuses.FAILED;
+  purpose?: typeof SandboxInstancePurposes.SESSION | typeof SandboxInstancePurposes.SETUP_CHECK;
+}): DataPlaneTables["sandboxInstances"]["$inferInsert"] {
+  return {
+    id: input.id,
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
-    providerSandboxId: `provider-${input.sandboxInstanceId}`,
-    status: SandboxInstanceStatuses.RUNNING,
+    providerSandboxId: `provider-${input.id}`,
+    status: input.status,
     startedByKind: "user",
     startedById: "usr_dp_api_workflow",
     source: "dashboard",
-  });
+    ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
+  };
 }
 
 type WorkflowRunRow = {
@@ -256,6 +437,30 @@ async function waitForQueuedWorkflowRuns(input: {
   );
 }
 
+async function countQueuedWorkflowRuns(input: {
+  env: IntegrationTestEnvironment;
+  sandboxInstanceIds: readonly string[];
+  workflowName: string;
+}): Promise<number> {
+  const namespaceId = createDataPlaneWorkflowNamespaceId(input.env.id);
+  let count = 0;
+
+  for (const sandboxInstanceId of input.sandboxInstanceIds) {
+    const result = await input.env.dataPlaneDb.execute(sql<{ count: string }>`
+      select count(*)::text as count
+      from data_plane_openworkflow.workflow_runs
+      where
+        namespace_id = ${namespaceId}
+        and workflow_name = ${input.workflowName}
+        and input->>'sandboxInstanceId' = ${sandboxInstanceId}
+    `);
+
+    count += Number(result.rows[0]?.count ?? "0");
+  }
+
+  return count;
+}
+
 function workflowInputForStop(input: StopSandboxInstanceInput) {
   return {
     sandboxInstanceId: input.sandboxInstanceId,
@@ -269,6 +474,13 @@ function workflowInputForReconcile(input: ReconcileSandboxInstanceInput) {
     sandboxInstanceId: input.sandboxInstanceId,
     reason: input.reason,
     expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+  };
+}
+
+function workflowInputForUserStop(input: StopUserRequestedSandboxInstanceInput) {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: "user" as const,
   };
 }
 

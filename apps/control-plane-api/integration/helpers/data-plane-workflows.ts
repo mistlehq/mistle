@@ -28,6 +28,7 @@ const MaterializeWorkflowRunInputSchema = z.looseObject({
 const StartWorkflowRunInputSchema = z.looseObject({
   sandboxInstanceId: z.string().min(1),
   actingUserId: z.string().min(1).optional(),
+  purpose: z.enum(["session", "snapshot", "setup_check"]).optional(),
   persistenceMode: z.enum([
     SandboxInstancePersistenceModes.EPHEMERAL,
     SandboxInstancePersistenceModes.PERSISTENT,

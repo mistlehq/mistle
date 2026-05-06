@@ -19,6 +19,7 @@ import {
   StartSandboxProfileInstanceConflictResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
   StartSandboxProfileInstanceResponseSchema,
+  StartSandboxProfileSetupScriptTestRunResponseSchema,
 } from "../src/sandbox-profiles/index.js";
 import { waitForQueuedStartWorkflowInput } from "./helpers/data-plane-workflows.js";
 import {
@@ -210,6 +211,143 @@ describe.concurrent("sandbox profile version start instance integration", () => 
     expect(response.status).toBe(400);
     const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
     expect(body.code).toBe("AGENT_RUNTIME_REQUIRED");
+  });
+
+  it("returns 400 when the setup script test run body is blank", async ({ env }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-blank@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_script_test_blank",
+        organizationId: session.organizationId,
+        displayName: "Setup Script Test Blank Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_script_test_blank",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_blank/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "   \n\t",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("returns 404 when the setup script test run profile belongs to another organization", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-org@example.com",
+    });
+    const otherSession = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-org-other@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_script_test_other_org",
+        organizationId: otherSession.organizationId,
+        displayName: "Other Organization Setup Script Test Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_script_test_other_org",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_other_org/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "pnpm install",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(404);
+    const body = StartSandboxProfileInstanceNotFoundResponseSchema.parse(await response.json());
+    expect(body.code).toBe("PROFILE_NOT_FOUND");
+  });
+
+  it("queues setup script test runs from the base image without setup script or agent bindings", async ({
+    env,
+  }) => {
+    const session = await env.auth.createSession({
+      email: "integration-new-sandbox-profile-setup-script-test-launch@example.com",
+    });
+
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfiles).values(
+      sandboxProfileRow({
+        id: "sbp_setup_script_test_launch",
+        organizationId: session.organizationId,
+        displayName: "Setup Script Test Launch Profile",
+        createdAt: "2026-04-24T00:00:00.000Z",
+      }),
+    );
+    await env.controlPlaneDb.insert(env.controlPlaneTables.sandboxProfileVersions).values(
+      sandboxProfileVersionRow({
+        sandboxProfileId: "sbp_setup_script_test_launch",
+        version: 1,
+        state: SandboxProfileVersionStates.DRAFT,
+        setupScript: "echo persisted setup script",
+      }),
+    );
+
+    const response = await env.controlPlaneApi.http.fetch(
+      "/v1/sandbox/profiles/sbp_setup_script_test_launch/versions/1/setup-script/test-runs",
+      {
+        method: "POST",
+        headers: {
+          cookie: session.cookie,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          setupScript: "echo visible editor setup script",
+          idempotencyKey: "setup-script-test-launch-001",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(201);
+    const body = StartSandboxProfileSetupScriptTestRunResponseSchema.parse(await response.json());
+    const queuedWorkflowInput = await waitForQueuedStartWorkflowInput({
+      env,
+      sandboxInstanceId: body.sandboxInstanceId,
+    });
+
+    expect(queuedWorkflowInput.purpose).toBe("setup_check");
+    expect(queuedWorkflowInput.persistenceMode).toBe(SandboxInstancePersistenceModes.EPHEMERAL);
+    expect(queuedWorkflowInput.image?.kind).toBe("base");
+    expect(queuedWorkflowInput.runtimePlan.image.source).toBe("base");
+    expect(queuedWorkflowInput.runtimePlan.agentRuntimes).toHaveLength(0);
+    expect(queuedWorkflowInput.runtimePlan).not.toHaveProperty("setupScript");
   });
 
   it("queues launches for usable published versions from the stored snapshot image", async ({
