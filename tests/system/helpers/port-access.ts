@@ -11,11 +11,12 @@ import { systemScheduler, systemSleeper } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 import { z } from "zod";
 
-import type { AuthenticatedSession, SystemTestFixture } from "../system-test-context.js";
+import type { CodexSandboxAuthenticatedSession, CodexSandboxFixture } from "./codex-sandbox.js";
 
 const OpenAiTargetKey = "openai-default";
 const OpenAiConnectionMethodId = "api-key";
 const OpenAiApiKey = "sk-system-port-access";
+const TestEnvironmentIdHeader = "x-mistle-test-environment-id";
 
 export const SandboxReadyTimeoutMs = 3 * 60_000;
 export const BootstrapReadyTimeoutMs = 30_000;
@@ -67,6 +68,8 @@ const SandboxBindingsResponseSchema = z.object({
 });
 
 type PortAccessBootstrap = z.infer<typeof PortAccessResponseSchema>;
+type PortAccessRequest = CodexSandboxFixture["request"];
+type PortAccessRequestInit = NonNullable<Parameters<PortAccessRequest>[1]>;
 
 type QueuedControlMessage =
   | {
@@ -120,6 +123,33 @@ function shellQuote(input: string): string {
   return `'${input.replaceAll("'", `'\\''`)}'`;
 }
 
+function applyBaseUrlQueryParams(input: { baseUrl: URL; url: URL }): URL {
+  for (const [key, value] of input.baseUrl.searchParams) {
+    if (!input.url.searchParams.has(key)) {
+      input.url.searchParams.append(key, value);
+    }
+  }
+
+  return input.url;
+}
+
+function resolveUrlWithoutBaseQuery(input: { baseUrl: string; path: string }): URL {
+  const baseUrl = new URL(input.baseUrl);
+  baseUrl.search = "";
+  return new URL(input.path, baseUrl);
+}
+
+export function readGatewayBaseUrlRequestHeaders(baseUrl: string): Record<string, string> {
+  const environmentId = new URL(baseUrl).searchParams.get(TestEnvironmentIdHeader);
+  if (environmentId === null) {
+    return {};
+  }
+
+  return {
+    [TestEnvironmentIdHeader]: environmentId,
+  };
+}
+
 function extractCookiePair(setCookieHeader: string): string {
   const [cookiePair] = setCookieHeader.split(";");
   if (cookiePair === undefined || cookiePair.length === 0) {
@@ -153,9 +183,9 @@ function enqueueControlMessage(pump: ControlMessagePump, queued: QueuedControlMe
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: PortAccessRequest;
   path: string;
-  init: RequestInit;
+  init: PortAccessRequestInit;
   expectedStatus: number;
   description: string;
   schema: TSchema;
@@ -213,8 +243,8 @@ export async function waitForCondition<T>(input: {
 }
 
 export async function createOpenAiConnection(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   displayName: string;
 }): Promise<string> {
   const connection = await requestJsonOrThrow({
@@ -246,8 +276,8 @@ export async function createOpenAiConnection(input: {
 }
 
 export async function createSandboxProfile(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   displayName: string;
 }): Promise<string> {
   const profile = await requestJsonOrThrow({
@@ -272,8 +302,8 @@ export async function createSandboxProfile(input: {
 }
 
 export async function updateSandboxBindings(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   sandboxProfileId: string;
   bindings: unknown[];
 }): Promise<void> {
@@ -297,8 +327,8 @@ export async function updateSandboxBindings(input: {
 }
 
 export async function startSandboxInstance(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   sandboxProfileId: string;
 }): Promise<string> {
   const startedInstance = await requestJsonOrThrow({
@@ -319,8 +349,8 @@ export async function startSandboxInstance(input: {
 }
 
 export async function waitForSandboxInstanceRunning(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
 }): Promise<void> {
   await waitForCondition({
@@ -365,8 +395,8 @@ export async function waitForSandboxInstanceRunning(input: {
 }
 
 export async function mintConnectionToken(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
 }): Promise<z.infer<typeof SandboxInstanceConnectionTokenResponseSchema>> {
   return await requestJsonOrThrow({
@@ -385,8 +415,8 @@ export async function mintConnectionToken(input: {
 }
 
 export async function mintPortAccess(input: {
-  fixture: Pick<SystemTestFixture, "request">;
-  session: AuthenticatedSession;
+  fixture: Pick<CodexSandboxFixture, "request">;
+  session: CodexSandboxAuthenticatedSession;
   sandboxInstanceId: string;
   port: number;
 }): Promise<PortAccessBootstrap> {
@@ -423,14 +453,17 @@ export function resolveGatewayTunnelWebSocketUrl(input: {
   mintedUrl.hostname = gatewayBaseUrl.hostname;
   mintedUrl.port = gatewayBaseUrl.port;
 
-  return mintedUrl.toString();
+  return applyBaseUrlQueryParams({ baseUrl: gatewayBaseUrl, url: mintedUrl }).toString();
 }
 
 export function resolvePortAccessWebSocketUrl(input: {
   gatewayBaseUrl: string;
   path: string;
 }): string {
-  const url = new URL(input.path, input.gatewayBaseUrl);
+  const url = resolveUrlWithoutBaseQuery({
+    baseUrl: input.gatewayBaseUrl,
+    path: input.path,
+  });
   if (url.protocol === "http:") {
     url.protocol = "ws:";
   } else if (url.protocol === "https:") {
@@ -799,14 +832,21 @@ export async function sendGatewayHttpRequest(input: {
   headers: IncomingHttpHeaders;
   status: number;
 }> {
-  const url = new URL(input.path, input.baseUrl);
+  const url = resolveUrlWithoutBaseQuery({
+    baseUrl: input.baseUrl,
+    path: input.path,
+  });
+  const requestHeaders = {
+    ...readGatewayBaseUrlRequestHeaders(input.baseUrl),
+    ...input.headers,
+  };
 
   return await new Promise((resolve, reject) => {
     const request = httpRequest(
       url,
       {
         method: input.method,
-        headers: input.headers,
+        headers: requestHeaders,
       },
       (response) => {
         const chunks: Buffer[] = [];
@@ -833,7 +873,7 @@ export async function sendGatewayHttpRequest(input: {
 }
 
 export async function bootstrapPortAccess(input: {
-  fixture: Pick<SystemTestFixture, "dataPlaneGatewayBaseUrl">;
+  fixture: Pick<CodexSandboxFixture, "dataPlaneGatewayBaseUrl">;
   bootstrap: PortAccessBootstrap;
 }): Promise<string> {
   return await waitForCondition({
