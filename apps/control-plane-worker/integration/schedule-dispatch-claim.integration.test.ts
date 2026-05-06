@@ -236,6 +236,67 @@ describe("control-plane worker schedule dispatch claims", () => {
     );
   });
 
+  it("fast-forwards skipped-late interval backlog to the catch-up window boundary", async ({
+    env,
+  }) => {
+    await seedOrganizationAndAutomation({
+      env,
+      organizationId: "org_integration_new_schedule_late_interval",
+      automationId: "atm_integration_new_schedule_late_interval",
+    });
+    await seedAutomationSchedule({
+      env,
+      scheduleId: "sch_integration_new_schedule_late_interval",
+      organizationId: "org_integration_new_schedule_late_interval",
+      automationId: "atm_integration_new_schedule_late_interval",
+      cronExpression: "* * * * *",
+      nextScheduledAt: "2026-03-01T00:00:00.000Z",
+    });
+
+    const result = await dispatchDueSchedules(
+      { db: env.controlPlaneDb },
+      {
+        cutoffMinute: new Date("2026-04-01T00:00:00.000Z"),
+      },
+    );
+
+    expect(result.pendingScheduledActionIds).toHaveLength(1);
+    expect(result.claimedScheduleCount).toBe(2);
+    expect(result.createdScheduledActionCount).toBe(2);
+    expect(result.skippedLateCount).toBe(1);
+    expect(result.backlogFastForwardedCount).toBe(1);
+    expect(result.reachedMaxBatches).toBe(false);
+
+    const persistedActions = await env.controlPlaneDb.query.scheduledActions.findMany({
+      where: (table, { eq }) => eq(table.scheduleId, "sch_integration_new_schedule_late_interval"),
+      orderBy: (table, { asc }) => [asc(table.scheduledAt)],
+    });
+    expect(persistedActions).toEqual([
+      expect.objectContaining({
+        scheduleId: "sch_integration_new_schedule_late_interval",
+        scheduledAt: "2026-03-01 00:00:00+00",
+        skippedFromScheduledAt: "2026-03-01 00:00:00+00",
+        skippedUntilScheduledAt: "2026-03-30 23:59:00+00",
+        status: ScheduledActionStatuses.SKIPPED_LATE,
+      }),
+      expect.objectContaining({
+        scheduleId: "sch_integration_new_schedule_late_interval",
+        scheduledAt: "2026-04-01 00:00:00+00",
+        status: ScheduledActionStatuses.PENDING,
+      }),
+    ]);
+
+    const persistedSchedule = await env.controlPlaneDb.query.schedules.findFirst({
+      where: (table, { eq }) => eq(table.id, "sch_integration_new_schedule_late_interval"),
+    });
+    expect(persistedSchedule).toEqual(
+      expect.objectContaining({
+        lastScheduledAt: "2026-04-01 00:00:00+00",
+        nextScheduledAt: "2026-04-01 00:01:00+00",
+      }),
+    );
+  });
+
   it("disables finite schedules when there is no future occurrence within endAt", async ({
     env,
   }) => {

@@ -1,5 +1,7 @@
 import { Cron } from "croner";
 
+const CronResolutionMs = 60 * 1000;
+
 export type ScheduledLocalSlot = Readonly<{
   localScheduledDate: string;
   localScheduledTime: string;
@@ -17,18 +19,20 @@ export type FindNextScheduleOccurrenceInput = Readonly<{
   endAt?: Date | null;
 }>;
 
+export type FindPreviousScheduleOccurrenceInput = Readonly<{
+  cronExpression: string;
+  timezone: string;
+  before: Date;
+  endAt?: Date | null;
+}>;
+
 export function findNextScheduleOccurrence(
   input: FindNextScheduleOccurrenceInput,
 ): ScheduleOccurrence | null {
-  validateScheduleCronExpression(input.cronExpression);
-  validateIanaTimezone(input.timezone);
-
-  const cron = new Cron(input.cronExpression, {
-    mode: "5-part",
-    paused: true,
+  const cron = createPausedScheduleCron({
+    cronExpression: input.cronExpression,
     timezone: input.timezone,
   });
-
   const nextRun = cron.nextRun(input.after);
   if (nextRun === null) {
     return null;
@@ -42,13 +46,53 @@ export function findNextScheduleOccurrence(
     return null;
   }
 
-  return {
-    scheduledAt: new Date(nextRun.getTime()),
-    ...getScheduledLocalSlot({
-      scheduledAt: nextRun,
-      timezone: input.timezone,
-    }),
-  };
+  return createScheduleOccurrence({
+    scheduledAt: nextRun,
+    timezone: input.timezone,
+  });
+}
+
+export function findPreviousScheduleOccurrence(
+  input: FindPreviousScheduleOccurrenceInput,
+): ScheduleOccurrence | null {
+  const cron = createPausedScheduleCron({
+    cronExpression: input.cronExpression,
+    timezone: input.timezone,
+  });
+  const reference =
+    input.endAt !== undefined &&
+    input.endAt !== null &&
+    input.endAt.getTime() < input.before.getTime()
+      ? new Date(input.endAt.getTime() + CronResolutionMs)
+      : input.before;
+  const previousRun = cron
+    .previousRuns(2, reference)
+    .find(
+      (run) =>
+        run.getTime() < input.before.getTime() &&
+        (input.endAt === undefined ||
+          input.endAt === null ||
+          run.getTime() <= input.endAt.getTime()),
+    );
+  if (previousRun === undefined) {
+    return null;
+  }
+
+  return createScheduleOccurrence({
+    scheduledAt: previousRun,
+    timezone: input.timezone,
+  });
+}
+
+function createPausedScheduleCron(input: { cronExpression: string; timezone: string }): Cron {
+  validateScheduleCronExpression(input.cronExpression);
+  validateIanaTimezone(input.timezone);
+
+  return new Cron(input.cronExpression, {
+    mode: "5-part",
+    paused: true,
+    timezone: input.timezone,
+  });
 }
 
 export function getScheduledLocalSlot(input: {
@@ -76,6 +120,16 @@ export function getScheduledLocalSlot(input: {
   return {
     localScheduledDate: `${year}-${month}-${day}`,
     localScheduledTime: `${hour}:${minute}`,
+  };
+}
+
+function createScheduleOccurrence(input: {
+  scheduledAt: Date;
+  timezone: string;
+}): ScheduleOccurrence {
+  return {
+    scheduledAt: new Date(input.scheduledAt.getTime()),
+    ...getScheduledLocalSlot(input),
   };
 }
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findNextScheduleOccurrence,
+  findPreviousScheduleOccurrence,
   getScheduledLocalSlot,
   validateIanaTimezone,
   validateScheduleCronExpression,
@@ -30,6 +31,35 @@ describe("@mistle/time recurrence", () => {
     });
 
     expect(occurrence?.scheduledAt.toISOString()).toBe("2026-04-29T01:00:00.000Z");
+  });
+
+  it("returns the previous scheduled instant before a boundary", () => {
+    const occurrence = findPreviousScheduleOccurrence({
+      before: new Date("2026-04-28T01:30:00.000Z"),
+      cronExpression: "*/10 * * * *",
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:20:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:20",
+    });
+  });
+
+  it("caps previous scheduled occurrence lookup at the end bound", () => {
+    const occurrence = findPreviousScheduleOccurrence({
+      before: new Date("2026-04-28T01:30:00.000Z"),
+      cronExpression: "* * * * *",
+      endAt: new Date("2026-04-28T01:00:00.000Z"),
+      timezone: "Asia/Singapore",
+    });
+
+    expect(occurrence).toEqual({
+      scheduledAt: new Date("2026-04-28T01:00:00.000Z"),
+      localScheduledDate: "2026-04-28",
+      localScheduledTime: "09:00",
+    });
   });
 
   it("returns null when the next occurrence is after the end bound", () => {

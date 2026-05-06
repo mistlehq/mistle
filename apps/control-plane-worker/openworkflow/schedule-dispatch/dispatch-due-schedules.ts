@@ -6,7 +6,11 @@ import {
   ScheduleTargetTypes,
   getControlPlaneDatabaseSchema,
 } from "@mistle/db/control-plane";
-import { findNextScheduleOccurrence, getScheduledLocalSlot } from "@mistle/time";
+import {
+  findNextScheduleOccurrence,
+  findPreviousScheduleOccurrence,
+  getScheduledLocalSlot,
+} from "@mistle/time";
 import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import { recordMissingScheduleTarget } from "./telemetry.js";
@@ -432,26 +436,19 @@ function resolveSkippedLateRange(input: {
 } {
   const catchUpThreshold = new Date(input.cutoffMinute.getTime() - CatchUpWindowMs);
   const endAt = input.schedule.endAt === null ? null : new Date(input.schedule.endAt);
-  let skippedUntilScheduledAt = input.scheduledAt;
-  let nextOccurrence = findNextScheduleOccurrence({
+  const skippedUntilOccurrence = findPreviousScheduleOccurrence({
+    before: catchUpThreshold,
+    cronExpression: input.schedule.cronExpression,
+    endAt,
+    timezone: input.schedule.timezone,
+  });
+  const skippedUntilScheduledAt = skippedUntilOccurrence?.scheduledAt ?? input.scheduledAt;
+  const nextOccurrence = findNextScheduleOccurrence({
     after: skippedUntilScheduledAt,
     cronExpression: input.schedule.cronExpression,
     endAt,
     timezone: input.schedule.timezone,
   });
-
-  while (
-    nextOccurrence !== null &&
-    nextOccurrence.scheduledAt.getTime() < catchUpThreshold.getTime()
-  ) {
-    skippedUntilScheduledAt = nextOccurrence.scheduledAt;
-    nextOccurrence = findNextScheduleOccurrence({
-      after: skippedUntilScheduledAt,
-      cronExpression: input.schedule.cronExpression,
-      endAt,
-      timezone: input.schedule.timezone,
-    });
-  }
 
   return {
     skippedUntilScheduledAt,
