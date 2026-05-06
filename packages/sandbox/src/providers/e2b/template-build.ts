@@ -2,7 +2,7 @@ import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { systemClock, systemSleeper } from "@mistle/time";
-import { Template, type BuildInfo, type ConnectionOpts, type LogEntry } from "e2b";
+import { Template, TemplateError, type BuildInfo, type ConnectionOpts, type LogEntry } from "e2b";
 
 import { E2BClientOperationIds, mapE2BClientError } from "./client-errors.js";
 import { E2BDefaultTemplateCpuCount, E2BDefaultTemplateMemoryMb } from "./schemas.js";
@@ -29,6 +29,8 @@ export type EnsureE2BTemplateAliasResult = {
 
 const E2BTemplateAliasLockPollIntervalMs = 1_000;
 const E2BTemplateAliasLockTimeoutMs = 30 * 60_000;
+const E2BTemplateAliasDuplicateRacePollIntervalMs = 1_000;
+const E2BTemplateAliasDuplicateRaceTimeoutMs = 10 * 60_000;
 
 export async function ensureE2BTemplateAlias(
   input: EnsureE2BTemplateAliasInput,
@@ -95,18 +97,78 @@ async function resolveOrBuildE2BTemplateAlias(input: {
   }
 
   const template = Template().fromImage(input.baseRef);
-  const buildInfo = await Template.build(template, input.startRef, {
-    ...input.connectionOptions,
-    cpuCount: input.cpuCount,
-    memoryMB: input.memoryMb,
-    ...(input.onBuildLogs === undefined ? {} : { onBuildLogs: input.onBuildLogs }),
-  });
+  let buildInfo: BuildInfo;
+  try {
+    buildInfo = await Template.build(template, input.startRef, {
+      ...input.connectionOptions,
+      cpuCount: input.cpuCount,
+      memoryMB: input.memoryMb,
+      ...(input.onBuildLogs === undefined ? {} : { onBuildLogs: input.onBuildLogs }),
+    });
+  } catch (error) {
+    if (!isE2BTemplateAliasDuplicateRaceError(error)) {
+      throw error;
+    }
+
+    const aliasBecameReady = await waitForDuplicateCreatedE2BTemplateAlias({
+      alias: input.alias,
+      connectionOptions: input.connectionOptions,
+    });
+    if (!aliasBecameReady) {
+      throw new Error(
+        `E2B template alias '${input.alias}' was created concurrently but did not become ready with tag '${E2BTemplateDefaultTag}' before timeout.`,
+        {
+          cause: error,
+        },
+      );
+    }
+
+    return {
+      alias: input.startRef,
+      templateExists: true,
+    };
+  }
 
   return {
     alias: input.startRef,
     templateExists,
     buildInfo,
   };
+}
+
+export function isE2BTemplateAliasDuplicateRaceError(error: unknown): boolean {
+  if (!(error instanceof TemplateError)) {
+    return false;
+  }
+
+  return (
+    error.message.includes("duplicate key value violates unique constraint") &&
+    error.message.includes("idx_env_aliases_alias_namespace_unique")
+  );
+}
+
+async function waitForDuplicateCreatedE2BTemplateAlias(input: {
+  alias: string;
+  connectionOptions: ConnectionOpts;
+}): Promise<boolean> {
+  const deadline = systemClock.nowMs() + E2BTemplateAliasDuplicateRaceTimeoutMs;
+
+  while (systemClock.nowMs() < deadline) {
+    if (
+      (await Template.exists(input.alias, input.connectionOptions)) &&
+      (await templateHasTag({
+        alias: input.alias,
+        connectionOptions: input.connectionOptions,
+        tag: E2BTemplateDefaultTag,
+      }))
+    ) {
+      return true;
+    }
+
+    await systemSleeper.sleep(E2BTemplateAliasDuplicateRacePollIntervalMs);
+  }
+
+  return false;
 }
 
 export async function withE2BTemplateAliasLock<T>(
