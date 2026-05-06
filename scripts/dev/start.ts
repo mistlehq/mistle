@@ -28,6 +28,7 @@ const SANDBOX_BASE_IMAGE_REGISTRY_TAG = getLocalDevDockerRegistrySandboxBaseImag
 const SANDBOX_BASE_DOCKERFILE_PATH = "packages/sandboxd/Dockerfile";
 const SANDBOX_BASE_CACHE_DIR = resolve(REPO_ROOT, ".local", "sandbox-base");
 const SANDBOX_BASE_CACHE_KEY_PATH = resolve(SANDBOX_BASE_CACHE_DIR, ".cache-key");
+const GATEWAY_PROXY_FLAG = "--gateway-proxy";
 
 const SANDBOX_BASE_BUILD_INPUT_PATHS: readonly string[] = [
   "packages/sandboxd",
@@ -58,6 +59,17 @@ type RunInput = {
 };
 
 type SandboxProvider = "docker" | "e2b";
+
+function readDevStartOptions(): { gatewayProxyEnabled: boolean } {
+  const args = process.argv.slice(2);
+  const unknownArgs = args.filter((arg) => arg !== GATEWAY_PROXY_FLAG);
+  if (unknownArgs.length > 0) {
+    throw new Error(`Unsupported dev start option(s): ${unknownArgs.join(", ")}`);
+  }
+  return {
+    gatewayProxyEnabled: args.includes(GATEWAY_PROXY_FLAG),
+  };
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -389,6 +401,7 @@ function dockerImageExists(imageTag: string): boolean {
 }
 
 async function start(): Promise<void> {
+  const options = readDevStartOptions();
   const sandboxProvider = readSandboxProvider(DEV_CONFIG_PATH);
   const infraSummary =
     sandboxProvider === "docker"
@@ -424,6 +437,7 @@ async function start(): Promise<void> {
     TOKENIZER_PROXY_TUNNEL_HOSTNAME: tokenizerProxyTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
     MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL: controlPlaneApiPublicUrl,
+    ...(options.gatewayProxyEnabled ? { GATEWAY_PROXY_ENABLED: "1" } : {}),
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -557,6 +571,9 @@ async function start(): Promise<void> {
   console.log(`- data-plane-gateway: ${dataPlaneGatewayPublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneGatewayPublicUrl}/tunnel`);
   console.log(`- tokenizer-proxy: ${tokenizerProxyPublicUrl}`);
+  if (options.gatewayProxyEnabled) {
+    console.log("- gateway proxy mode: enabled");
+  }
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
   if (sandboxProvider === "docker") {

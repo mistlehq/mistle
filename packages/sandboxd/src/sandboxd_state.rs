@@ -41,8 +41,8 @@ use crate::startup_diagnostics::{
 use crate::supervision::{SandboxdHealthSnapshot, SandboxdSupervisorHandle, SupervisedComponent};
 use crate::time::{Clock, Sleeper};
 use crate::tunnel::session::{
-    TunnelSession, TunnelSessionError, TunnelSigningRequest, TunnelSigningResponse,
-    derive_sandbox_instance_id,
+    GatewayEgressForwarder, TunnelSession, TunnelSessionError, TunnelSigningRequest,
+    TunnelSigningResponse, derive_sandbox_instance_id,
 };
 
 /// Describes why the initialized daemon runtime failed to start or stop.
@@ -105,6 +105,7 @@ impl fmt::Display for SandboxdStateError {
 impl std::error::Error for SandboxdStateError {}
 
 const TOKENIZER_PROXY_EGRESS_BASE_URL_ENV: &str = "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
+const GATEWAY_PROXY_ENABLED_ENV: &str = "GATEWAY_PROXY_ENABLED";
 pub(crate) const GLOBAL_GIT_CONFIG_ENV_NAME: &str = "GIT_CONFIG_GLOBAL";
 pub(crate) const DEFAULT_GLOBAL_GIT_CONFIG_PATH: &str = "/root/.gitconfig";
 const SETUP_SCRIPT_WORKING_DIRECTORY: &str = "/root";
@@ -131,6 +132,7 @@ pub struct SandboxdState {
     runtime_readiness_manager: Arc<Mutex<RuntimeReadinessManager>>,
     agent_endpoint_url: Option<String>,
     runtime_env: BTreeMap<String, String>,
+    gateway_egress_forwarder: Option<GatewayEgressForwarder>,
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
     tunnel_session: Option<TunnelSession>,
@@ -170,6 +172,11 @@ impl SandboxdState {
             clock.clone(),
             collect_tracked_components(&runtime_plan),
         );
+        let gateway_egress_forwarder = if gateway_proxy_enabled()? {
+            Some(GatewayEgressForwarder::new())
+        } else {
+            None
+        };
         let execution_mode = startup_input.execution_mode;
         record_operation_phase_started(&diagnostics_logger, "apply_git_identity");
         if !startup_input.is_snapshot() {
@@ -200,6 +207,7 @@ impl SandboxdState {
             &runtime_plan,
             startup_input,
             &tokenizer_proxy_egress_base_url,
+            gateway_egress_forwarder.clone(),
             clock.clone(),
             supervisor_handle.clone(),
         )
@@ -271,6 +279,7 @@ impl SandboxdState {
                 runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
                 agent_endpoint_url: None,
                 runtime_env,
+                gateway_egress_forwarder,
                 clock,
                 sleeper,
                 tunnel_session: None,
@@ -373,29 +382,31 @@ impl SandboxdState {
         ));
 
         record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
-        let tunnel_session = Some(
-            TunnelSession::start_with_supervisor(
-                startup_input,
-                keepalive_manager.clone(),
-                runtime_readiness_manager.clone(),
-                agent_endpoint_url.clone(),
-                runtime_env.clone(),
-                clock.clone(),
-                sleeper.clone(),
-                supervisor_handle.clone(),
-            )
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "start_tunnel_session",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
-                );
-                SandboxdStateError::StartTunnelSession(error.to_string())
-            })?,
-        );
+        let tunnel_session = TunnelSession::start_with_supervisor(
+            startup_input,
+            keepalive_manager.clone(),
+            runtime_readiness_manager.clone(),
+            agent_endpoint_url.clone(),
+            runtime_env.clone(),
+            clock.clone(),
+            sleeper.clone(),
+            supervisor_handle.clone(),
+        )
+        .map_err(|error| {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "start_tunnel_session",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                )]),
+            );
+            SandboxdStateError::StartTunnelSession(error.to_string())
+        })?;
+        if let Some(forwarder) = &gateway_egress_forwarder {
+            tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+        let tunnel_session = Some(tunnel_session);
         record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
         let codex_coordination_shutdown_requested = Arc::new(AtomicBool::new(false));
         let codex_coordination_thread = match (
@@ -430,6 +441,7 @@ impl SandboxdState {
             runtime_readiness_manager,
             agent_endpoint_url,
             runtime_env,
+            gateway_egress_forwarder,
             clock,
             sleeper,
             tunnel_session,
@@ -482,29 +494,31 @@ impl SandboxdState {
             };
 
         record_operation_phase_started(&diagnostics_logger, "start_tunnel_session");
-        self.tunnel_session = Some(
-            TunnelSession::start_with_supervisor(
-                startup_input,
-                self.keepalive_manager.clone(),
-                self.runtime_readiness_manager.clone(),
-                agent_endpoint_url,
-                self.runtime_env.clone(),
-                self.clock.clone(),
-                self.sleeper.clone(),
-                self.supervisor_handle.clone(),
-            )
-            .map_err(|error| {
-                record_operation_phase_failure(
-                    &diagnostics_logger,
-                    "start_tunnel_session",
-                    BTreeMap::from([(
-                        "error".to_string(),
-                        startup_diagnostics_string(error.to_string()),
-                    )]),
-                );
-                SandboxdStateError::StartTunnelSession(error.to_string())
-            })?,
-        );
+        let tunnel_session = TunnelSession::start_with_supervisor(
+            startup_input,
+            self.keepalive_manager.clone(),
+            self.runtime_readiness_manager.clone(),
+            agent_endpoint_url,
+            self.runtime_env.clone(),
+            self.clock.clone(),
+            self.sleeper.clone(),
+            self.supervisor_handle.clone(),
+        )
+        .map_err(|error| {
+            record_operation_phase_failure(
+                &diagnostics_logger,
+                "start_tunnel_session",
+                BTreeMap::from([(
+                    "error".to_string(),
+                    startup_diagnostics_string(error.to_string()),
+                )]),
+            );
+            SandboxdStateError::StartTunnelSession(error.to_string())
+        })?;
+        if let Some(forwarder) = &self.gateway_egress_forwarder {
+            tunnel_session.attach_gateway_egress_forwarder(forwarder);
+        }
+        self.tunnel_session = Some(tunnel_session);
         record_operation_phase_completed(&diagnostics_logger, "start_tunnel_session");
 
         Ok(())
@@ -1137,6 +1151,20 @@ fn resolve_tokenizer_proxy_egress_base_url() -> Result<String, SandboxdStateErro
             "required sandbox env '{TOKENIZER_PROXY_EGRESS_BASE_URL_ENV}' is missing"
         ))
     })
+}
+
+fn gateway_proxy_enabled() -> Result<bool, SandboxdStateError> {
+    match std::env::var(GATEWAY_PROXY_ENABLED_ENV) {
+        Ok(value) if value == "1" => Ok(true),
+        Ok(value) if value.is_empty() => Ok(false),
+        Ok(value) => Err(SandboxdStateError::StartEgressProxy(format!(
+            "{GATEWAY_PROXY_ENABLED_ENV} must be '1' when set, got '{value}'"
+        ))),
+        Err(std::env::VarError::NotPresent) => Ok(false),
+        Err(error) => Err(SandboxdStateError::StartEgressProxy(format!(
+            "failed to read {GATEWAY_PROXY_ENABLED_ENV}: {error}"
+        ))),
+    }
 }
 
 fn collect_runtime_environment(
