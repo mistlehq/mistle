@@ -10,7 +10,7 @@ import {
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, resumeSandboxInstance } from "../sessions/sessions-service.js";
 import type { SandboxInstanceStatusResult } from "../sessions/sessions-service.js";
-import { LoadingIndicators, createLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { resolveInitialSessionConnectInput } from "./session-initial-connect-policy.js";
 import { type MainPanelTransitionState } from "./session-main-panel-handoff-state.js";
 import type { SessionStartupState } from "./session-startup-status.js";
@@ -115,7 +115,7 @@ export function useSessionWorkbenchLifecycleState(input: {
       input.sandboxInstanceId === null
         ? (["sandbox-instance-status", null] as const)
         : sandboxInstanceStatusQueryKey(input.sandboxInstanceId),
-    meta: createLoadingIndicatorMeta(LoadingIndicators.NONE),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async ({ signal }) => {
       if (input.sandboxInstanceId === null) {
         throw new Error("Session id is required.");

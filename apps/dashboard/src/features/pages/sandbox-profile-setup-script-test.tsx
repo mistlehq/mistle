@@ -26,6 +26,7 @@ import { startSandboxProfileSetupScriptTestRun } from "../sandbox-profiles/sandb
 import { sandboxInstanceStatusQueryKey } from "../sessions/sessions-query-keys.js";
 import { getSandboxInstanceStatus, stopSandboxInstance } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import {
   SandboxBaseRuntimeShell,
   SandboxBaseRuntimeWorkingDirectory,
@@ -464,6 +465,7 @@ export function useSandboxProfileSetupScriptTestRun(
     [closePty],
   );
   const startMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async (request: SetupScriptTestRunRequest) =>
       startSandboxProfileSetupScriptTestRun({
         idempotencyKey: crypto.randomUUID(),
@@ -498,6 +500,7 @@ export function useSandboxProfileSetupScriptTestRun(
       startedRun === null
         ? ["sandbox-instance-status", "setup-script-test", null]
         : sandboxInstanceStatusQueryKey(startedRun.sandboxInstanceId),
+    meta: NoLoadingIndicatorMeta,
     queryFn: async ({ signal }) => {
       if (startedRun === null) {
         throw new Error("Setup script test sandbox instance id is required.");

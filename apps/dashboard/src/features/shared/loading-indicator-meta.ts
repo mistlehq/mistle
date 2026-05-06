@@ -20,6 +20,8 @@ export function createLoadingIndicatorMeta(indicator: LoadingIndicator): Loading
   };
 }
 
+export const NoLoadingIndicatorMeta = createLoadingIndicatorMeta(LoadingIndicators.NONE);
+
 export function resolveLoadingIndicator(
   meta: Record<string, unknown> | undefined,
 ): LoadingIndicator {

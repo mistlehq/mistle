@@ -89,6 +89,7 @@ import {
   organizationSandboxStorageSettingsQueryKey,
 } from "../settings/organization/sandbox-storage-service.js";
 import { AutoSaveTitleHeading } from "../shared/auto-save-inline-heading.js";
+import { NoLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { PageFrame, resolvePageFrameText } from "../shared/page-frame.js";
 import { SettingsSwitchField } from "../shared/settings-switch-field.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -1134,6 +1135,7 @@ function ReadySandboxProfileEditorPage(input: {
     [input.profileId],
   );
   const startSetupAssistantMutation = useMutation({
+    meta: NoLoadingIndicatorMeta,
     mutationFn: async () =>
       startSandboxProfileSetupAssistant({
         idempotencyKey: crypto.randomUUID(),
