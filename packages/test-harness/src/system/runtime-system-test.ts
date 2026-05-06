@@ -254,6 +254,10 @@ function readPublicAccessHostname(serviceId: ServiceId): string {
   return readRequiredEnv(envVar);
 }
 
+function readRuntimePublicAccessHostnames(): readonly string[] {
+  return [...new Set([...PublicAccessHostnameEnvVars.values()].map(readRequiredEnv))].sort();
+}
+
 async function startPublicAccess(input: {
   input: CreateSystemTestInput;
   environment: TestEnvironment<ServiceId>;
@@ -266,6 +270,7 @@ async function startPublicAccess(input: {
     environmentId: input.environment.id,
     tunnelId: readRequiredEnv("CLOUDFLARE_TUNNEL_ID"),
     tunnelCredentialsJson: readRequiredEnv("CLOUDFLARE_TUNNEL_CREDENTIALS_JSON"),
+    publicHostnames: readRuntimePublicAccessHostnames(),
     ingressRules: input.input.publicAccess.services.map((serviceId) => {
       const service = input.environment.services.get(serviceId);
       const httpEndpoint = service.endpoints.http;

@@ -25,6 +25,7 @@ export async function startRuntimeCloudflaredTunnel(input: {
   environmentId: string;
   tunnelId: string;
   tunnelCredentialsJson: string;
+  publicHostnames: readonly string[];
   ingressRules: ReadonlyArray<{
     publicHostname: string;
     localBaseUrl: string;
@@ -44,7 +45,7 @@ export async function startRuntimeCloudflaredTunnel(input: {
   const proxy = await acquireRuntimePublicAccessProxy({
     tunnelId: input.tunnelId,
     tunnelCredentialsJson: input.tunnelCredentialsJson,
-    publicHostnames: input.ingressRules.map((rule) => rule.publicHostname),
+    publicHostnames: input.publicHostnames,
   });
   const registered = await registerRuntimePublicAccessRoutes({
     proxy,
@@ -76,11 +77,11 @@ async function acquireRuntimePublicAccessProxy(input: {
   publicHostnames: readonly string[];
 }): Promise<RuntimePublicAccessProxy> {
   const runnerPoolSession = resolveRunnerPoolSession(process.env);
-  const publicHostnames = [...new Set(input.publicHostnames)].sort();
+  const publicHostnames = normalizeRuntimePublicAccessHostnames(input.publicHostnames);
   const proxy = await acquireRunnerServicePoolLease({
     runId: runnerPoolSession.runId,
     coordinatorDir: runnerPoolSession.coordinatorDir,
-    key: `runtime-public-access:${input.tunnelId}:${publicHostnames.join(",")}`,
+    key: createRuntimePublicAccessProxyPoolKey({ tunnelId: input.tunnelId }),
     lockTimeoutMs: RuntimePublicAccessProxyPoolLockTimeoutMs,
     start: async () =>
       startRuntimePublicAccessProxy({
@@ -112,6 +113,21 @@ async function acquireRuntimePublicAccessProxy(input: {
   });
 
   return proxy;
+}
+
+export function createRuntimePublicAccessProxyPoolKey(input: { tunnelId: string }): string {
+  return `runtime-public-access:${input.tunnelId}`;
+}
+
+export function normalizeRuntimePublicAccessHostnames(
+  publicHostnames: readonly string[],
+): readonly string[] {
+  const normalized = [...new Set(publicHostnames)].sort();
+  if (normalized.length === 0 || normalized.some((publicHostname) => publicHostname.length === 0)) {
+    throw new Error("Runtime public access proxy requires at least one public hostname.");
+  }
+
+  return normalized;
 }
 
 async function startRuntimePublicAccessProxy(input: {
