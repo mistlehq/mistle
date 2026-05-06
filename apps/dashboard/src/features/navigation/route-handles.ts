@@ -172,6 +172,7 @@ export const ROUTE_HANDLES = {
     },
   },
   sessions: {
+    appShellInsetOwner: "child",
     breadcrumb: "Sessions",
     title: "Sessions",
     description: "",

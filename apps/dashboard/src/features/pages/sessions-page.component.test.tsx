@@ -11,6 +11,7 @@ import { createTestQueryClient } from "../../test-support/query-client.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { resolveSandboxStatusBadgeUi } from "./sandbox-status-presentation.js";
 import { SessionsPage } from "./sessions-page.js";
@@ -116,6 +117,29 @@ describe("SessionsPage", () => {
     expect(markup).toContain(">Sandbox profile<");
     expect(markup).toContain(">Created<");
     expect(markup).toContain(">Updated<");
+  });
+
+  it("renders the shell sidebar trigger in the sessions page header", async () => {
+    const queryClient = createSessionsPageQueryClient();
+    const rendered = renderSessionsPage({
+      queryClient,
+      routes: (
+        <PageHeaderSidebarTriggerProvider value={<button type="button">Toggle Sidebar</button>}>
+          <SessionsPage />
+        </PageHeaderSidebarTriggerProvider>
+      ),
+    });
+
+    try {
+      const trigger = screen.getByRole("button", { name: "Toggle Sidebar" });
+      const heading = screen.getByRole("heading", { name: "Sessions" });
+
+      expect(trigger.compareDocumentPosition(heading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    } finally {
+      rendered.unmount();
+      await queryClient.cancelQueries();
+      queryClient.clear();
+    }
   });
 
   it("keeps a single horizontally scrollable table layout", () => {

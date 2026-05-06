@@ -10,6 +10,7 @@ import {
   useSidebar,
 } from "@mistle/ui";
 
+import { PageHeaderSidebarTriggerProvider } from "../shared/page-header-sidebar-trigger-context.js";
 import { shouldRenderSidebarTrigger } from "../shared/sidebar-trigger-visibility.js";
 
 const DASHBOARD_SIDEBAR_WIDTH = "14rem";
@@ -54,22 +55,38 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
             : "from-background to-muted/20 min-h-svh bg-linear-to-b"
         }
       >
-        {input.topLoadingBar}
-        <AppShellSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
-        <div className={contentContainerClassName}>
-          <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
-        </div>
+        <PageHeaderSidebarTriggerProvider
+          value={
+            <AppShellPageHeaderSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
+          }
+        >
+          {input.topLoadingBar}
+          <AppShellMobileSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
+          <div className={contentContainerClassName}>
+            <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
+          </div>
+        </PageHeaderSidebarTriggerProvider>
       </SidebarInset>
     </SidebarProvider>
   );
 }
 
-function AppShellSidebarTrigger(input: {
+function AppShellPageHeaderSidebarTrigger(input: {
+  renderSidebarTrigger: boolean;
+}): React.JSX.Element | null {
+  const { isMobile, state } = useSidebar();
+  const shouldShowSidebarTrigger = input.renderSidebarTrigger && !isMobile && state === "collapsed";
+
+  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1 shrink-0" /> : null;
+}
+
+function AppShellMobileSidebarTrigger(input: {
   renderSidebarTrigger: boolean;
 }): React.JSX.Element | null {
   const { isMobile, openMobile, state } = useSidebar();
   const shouldShowSidebarTrigger =
     input.renderSidebarTrigger &&
+    isMobile &&
     shouldRenderSidebarTrigger({
       isMobile,
       openMobile,

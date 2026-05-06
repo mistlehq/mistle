@@ -25,6 +25,7 @@ import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { formatCompactRelativeOrDate } from "../shared/date-formatters.js";
+import { PageFrame } from "../shared/page-frame.js";
 import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { SessionsRoutes } from "../shell/app-shell-sessions-sidebar-mode.js";
@@ -239,15 +240,15 @@ export function SessionsPage(): React.JSX.Element {
   const nextPageDisabled = sandboxInstancesQuery.isPending;
   const previousPageDisabled = sandboxInstancesQuery.isPending;
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Sessions</h1>
+    <PageFrame
+      headerActions={
         <Button render={<RouterLink to={SessionsRoutes.NEW} />}>
           <PlusIcon aria-hidden className="size-4" />
           New session
         </Button>
-      </div>
-
+      }
+      title="Sessions"
+    >
       <div className="flex flex-col gap-3">
         {listErrorMessage === null ? null : (
           <Notice title="Could not load sandbox instances" variant="alert">
@@ -255,115 +256,113 @@ export function SessionsPage(): React.JSX.Element {
           </Notice>
         )}
 
-        <div className="flex flex-col gap-3">
-          <Table className="min-w-[40rem] table-fixed">
-            <TableHeader className="bg-muted/60">
-              <TableRow className="h-9 border-b">
-                <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Sessions
-                </TableHead>
-                <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Sandbox profile
-                </TableHead>
-                <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
-                  Started by
-                </TableHead>
-                <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                  Created
-                </TableHead>
-                <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
-                  Updated
-                </TableHead>
+        <Table className="min-w-[40rem] table-fixed">
+          <TableHeader className="bg-muted/60">
+            <TableRow className="h-9 border-b">
+              <TableHead className="text-foreground w-[36%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                Sessions
+              </TableHead>
+              <TableHead className="text-foreground w-[20%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                Sandbox profile
+              </TableHead>
+              <TableHead className="text-foreground w-[18%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                Started by
+              </TableHead>
+              <TableHead className="text-foreground w-[14%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                Created
+              </TableHead>
+              <TableHead className="text-right text-foreground w-[12%] py-2 text-[11px] font-semibold tracking-[0.08em] uppercase whitespace-nowrap">
+                Updated
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {!isLoadingSessions && !hasSessions ? (
+              <TableRow>
+                <TableCell className="text-muted-foreground" colSpan={5}>
+                  No sessions yet.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!isLoadingSessions && !hasSessions ? (
-                <TableRow>
-                  <TableCell className="text-muted-foreground" colSpan={5}>
-                    No sessions yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                displayedSessions.map((session) => {
-                  const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
+            ) : (
+              displayedSessions.map((session) => {
+                const isNavigable = isSessionPageNavigableSandboxStatus(session.status);
 
-                  return (
-                    <TableRow
-                      className={
-                        isNavigable
-                          ? "group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
-                          : "group/session-row hover:bg-transparent"
-                      }
-                      key={session.id}
-                      {...(isNavigable ? {} : { "aria-disabled": true })}
-                    >
-                      <TableCell className="max-w-0 align-top whitespace-normal">
-                        <div className="flex min-w-0">
-                          <SessionTitleCell
-                            title={resolveSessionTitleLabel(session.title)}
-                            {...(isNavigable
-                              ? {
-                                  href: `/sessions/${encodeURIComponent(session.id)}`,
-                                }
-                              : {})}
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top text-sm whitespace-normal">
-                        <span className="break-words text-sm text-muted-foreground">
-                          {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
-                        </span>
-                      </TableCell>
-                      <TableCell className="align-top text-sm whitespace-normal">
-                        <span className="break-words text-sm text-foreground/80">
-                          {formatStartedByLabel(session.startedBy)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="align-top whitespace-nowrap">
-                        <span className="text-muted-foreground text-sm">
-                          {formatCompactRelativeOrDate(session.createdAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="align-top text-right whitespace-nowrap">
-                        <div className="flex justify-end">
-                          {resolveUpdatedLabel({
-                            status: session.status,
-                            updatedAt: session.updatedAt,
-                            failureMessage: session.failureMessage,
-                          })}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
+                return (
+                  <TableRow
+                    className={
+                      isNavigable
+                        ? "group/session-row focus-within:bg-muted/50 hover:bg-muted/50"
+                        : "group/session-row hover:bg-transparent"
+                    }
+                    key={session.id}
+                    {...(isNavigable ? {} : { "aria-disabled": true })}
+                  >
+                    <TableCell className="max-w-0 align-top whitespace-normal">
+                      <div className="flex min-w-0">
+                        <SessionTitleCell
+                          title={resolveSessionTitleLabel(session.title)}
+                          {...(isNavigable
+                            ? {
+                                href: `/sessions/${encodeURIComponent(session.id)}`,
+                              }
+                            : {})}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="align-top text-sm whitespace-normal">
+                      <span className="break-words text-sm text-muted-foreground">
+                        {session.sandboxProfileDisplayName ?? session.sandboxProfileId}
+                      </span>
+                    </TableCell>
+                    <TableCell className="align-top text-sm whitespace-normal">
+                      <span className="break-words text-sm text-foreground/80">
+                        {formatStartedByLabel(session.startedBy)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="align-top whitespace-nowrap">
+                      <span className="text-muted-foreground text-sm">
+                        {formatCompactRelativeOrDate(session.createdAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="align-top text-right whitespace-nowrap">
+                      <div className="flex justify-end">
+                        {resolveUpdatedLabel({
+                          status: session.status,
+                          updatedAt: session.updatedAt,
+                          failureMessage: session.failureMessage,
+                        })}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
 
-          <TableListingFooter
-            resultsCount={
-              sandboxInstancesQuery.data === undefined ? null : (
-                <p className="text-muted-foreground text-sm">
-                  Showing {sandboxInstancesQuery.data.items.length} of{" "}
-                  {sandboxInstancesQuery.data.totalResults}
-                </p>
-              )
-            }
-            pagination={
-              !hasNextPage && !hasPreviousPage ? null : (
-                <TablePagination
-                  hasNextPage={hasNextPage}
-                  hasPreviousPage={hasPreviousPage}
-                  nextPageDisabled={nextPageDisabled}
-                  onNextPage={goToNextPage}
-                  onPreviousPage={goToPreviousPage}
-                  previousPageDisabled={previousPageDisabled}
-                />
-              )
-            }
-          />
-        </div>
+        <TableListingFooter
+          resultsCount={
+            sandboxInstancesQuery.data === undefined ? null : (
+              <p className="text-muted-foreground text-sm">
+                Showing {sandboxInstancesQuery.data.items.length} of{" "}
+                {sandboxInstancesQuery.data.totalResults}
+              </p>
+            )
+          }
+          pagination={
+            !hasNextPage && !hasPreviousPage ? null : (
+              <TablePagination
+                hasNextPage={hasNextPage}
+                hasPreviousPage={hasPreviousPage}
+                nextPageDisabled={nextPageDisabled}
+                onNextPage={goToNextPage}
+                onPreviousPage={goToPreviousPage}
+                previousPageDisabled={previousPageDisabled}
+              />
+            )
+          }
+        />
       </div>
-    </div>
+    </PageFrame>
   );
 }

@@ -2,6 +2,7 @@ import { cn } from "@mistle/ui";
 
 import type { AppPageMeta } from "../navigation/route-meta.js";
 import { FormPageHeader } from "./form-page.js";
+import { usePageHeaderSidebarTrigger } from "./page-header-sidebar-trigger-context.js";
 
 export type PageFrameWidth = "form" | "full" | "normal";
 export type PageFrameVariant = "default" | "tabbed";
@@ -49,6 +50,7 @@ function shouldRenderPageFrameHeader(input: Omit<PageFrameProps, "children">): b
 
 export function PageFrame(input: PageFrameProps): React.JSX.Element {
   const variant = input.variant ?? "default";
+  const pageHeaderSidebarTrigger = usePageHeaderSidebarTrigger();
   const shouldRenderHeader = shouldRenderPageFrameHeader(input);
   const hasBreadcrumbs = input.breadcrumbs !== undefined && input.breadcrumbs !== null;
   const contentClassName = resolvePageFrameContentClassName(input.width ?? "full");
@@ -62,6 +64,7 @@ export function PageFrame(input: PageFrameProps): React.JSX.Element {
               actions={input.headerActions}
               description={input.description}
               icon={input.headerIcon}
+              leadingControl={pageHeaderSidebarTrigger}
               title={input.title}
               titleSlot={input.titleSlot}
             />

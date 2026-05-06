@@ -29,6 +29,7 @@ export type FormPageHeaderProps = {
   actions?: ReactNode;
   description?: ReactNode;
   icon?: ReactNode;
+  leadingControl?: ReactNode;
   title?: ReactNode;
   titleSlot?: ReactNode;
 };
@@ -37,6 +38,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
   const hasDescription = input.description !== undefined && input.description !== null;
   const hasActions = input.actions !== undefined && input.actions !== null;
   const hasIcon = input.icon !== undefined && input.icon !== null;
+  const hasLeadingControl = input.leadingControl !== undefined && input.leadingControl !== null;
   const hasTitle =
     typeof input.title === "string"
       ? input.title.trim().length > 0
@@ -46,6 +48,7 @@ export function FormPageHeader(input: FormPageHeaderProps): React.JSX.Element {
   return (
     <div className="flex items-start justify-between gap-3" data-slot="page-header">
       <div className={cn("flex min-w-0 flex-1 gap-3", hasIcon ? "items-center" : "items-start")}>
+        {hasLeadingControl ? input.leadingControl : null}
         {hasIcon ? <div className="shrink-0">{input.icon}</div> : null}
         <div className="min-w-0 flex-1">
           <div className={cn("flex flex-col", hasIcon ? "gap-0" : "gap-1")}>

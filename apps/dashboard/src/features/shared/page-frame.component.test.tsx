@@ -4,6 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { PageFrame } from "./page-frame.js";
+import { PageHeaderSidebarTriggerProvider } from "./page-header-sidebar-trigger-context.js";
 
 describe("PageFrame", () => {
   it("renders a centered constrained layout for the form page frame", () => {
@@ -110,5 +111,20 @@ describe("PageFrame", () => {
       expect(constrainedContainer.className).toContain("mx-auto");
       expect(constrainedContainer.className).toContain("w-full");
     }
+  });
+
+  it("renders the shell sidebar trigger as a page header leading control", () => {
+    render(
+      <PageHeaderSidebarTriggerProvider value={<button type="button">Toggle Sidebar</button>}>
+        <PageFrame title="Generic page">
+          <div>Contained content</div>
+        </PageFrame>
+      </PageHeaderSidebarTriggerProvider>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Toggle Sidebar" });
+    const title = screen.getByRole("heading", { name: "Generic page" });
+
+    expect(trigger.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });
