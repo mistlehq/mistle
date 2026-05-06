@@ -8,6 +8,7 @@ import { systemSleeper } from "@mistle/time";
 import { z } from "zod";
 
 import { CodexConversationProviderInitializeClientInfo } from "../../../packages/integrations-definitions/src/agent-runtimes/codex/initialize-client-info.js";
+import type { SandboxRuntimeStateSnapshot } from "../../../packages/sandbox-runtime-contract/src/runtime-state.js";
 import { ExecStreamClient } from "../../../packages/sandbox-session-client/src/exec-stream-client.js";
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
 import { PtyStreamClient } from "../../../packages/sandbox-session-client/src/pty-stream-client.js";
@@ -131,14 +132,7 @@ export type CodexSandboxAuthenticatedSession = {
   userId: string;
 };
 
-export type CodexSandboxRuntimeState = {
-  attachment: {
-    ownerLeaseId: string;
-  } | null;
-  runtime: {
-    ready: boolean;
-  };
-};
+export type CodexSandboxRuntimeState = SandboxRuntimeStateSnapshot;
 
 export type CodexSandboxHttpResponse = {
   status: number;
