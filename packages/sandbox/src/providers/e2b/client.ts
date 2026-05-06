@@ -60,7 +60,6 @@ const DaemonReadinessPollIntervalMs = 100;
 const DaemonReadinessPollAttempts = 100;
 // E2B treats `timeoutMs: 0` as "disable request lifetime timeout".
 const E2BCommandTimeoutDisabledMs = 0;
-const E2BInitCommandTimeoutMs = 2 * 60 * 1000;
 const E2BCreateSandboxMinIntervalMs = 1_500;
 const E2BTransientRetryAttempts = 3;
 const E2BTransientRetryDelayMs = 1_000;
@@ -350,6 +349,20 @@ export function createE2BDaemonCommandOptions(env: Readonly<Record<string, strin
   };
 }
 
+export function createE2BStartupCommandOptions(): {
+  background: true;
+  stdin: true;
+  timeoutMs: 0;
+  user: "root";
+} {
+  return {
+    background: true,
+    stdin: true,
+    timeoutMs: E2BCommandTimeoutDisabledMs,
+    user: "root",
+  };
+}
+
 export class E2BApiClient implements E2BClient {
   readonly #connectionOptions: ConnectionOpts;
   readonly #startRateLimiter: E2BStartRateLimiter;
@@ -633,10 +646,7 @@ export class E2BApiClient implements E2BClient {
     },
   ): Promise<void> {
     const handle = await sandbox.commands.run(input.command, {
-      background: true,
-      stdin: true,
-      timeoutMs: E2BInitCommandTimeoutMs,
-      user: "root",
+      ...createE2BStartupCommandOptions(),
     });
 
     try {

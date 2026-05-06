@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { E2BClientError, E2BClientErrorCodes, E2BClientOperationIds } from "./client-errors.js";
 import {
   createE2BDaemonCommandOptions,
+  createE2BStartupCommandOptions,
   E2BStartRateLimiter,
   isE2BTemplateStartRefNotReadyError,
   isTransientE2BSourceError,
@@ -70,6 +71,17 @@ describe("createE2BDaemonCommandOptions", () => {
 
     expect(options).toEqual({
       background: true,
+      timeoutMs: 0,
+      user: "root",
+    });
+  });
+});
+
+describe("createE2BStartupCommandOptions", () => {
+  it("disables E2B command timeout for sandboxd startup payload commands", () => {
+    expect(createE2BStartupCommandOptions()).toEqual({
+      background: true,
+      stdin: true,
       timeoutMs: 0,
       user: "root",
     });
