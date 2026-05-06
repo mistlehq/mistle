@@ -11,6 +11,7 @@ import {
   SlackWebhookEventOptions,
   WebhookAutomationFormStoryHarness,
 } from "../automations/webhook-automation-form.stories.js";
+import { noopRespondToServerRequest } from "../chat/components/chat-story-support.js";
 import {
   IntegrationConnectionDetailView,
   type IntegrationConnectionDetailViewProps,
@@ -19,6 +20,10 @@ import {
   createGitHubAppDetailViewStoryProps,
   createSlackDetailViewStoryProps,
 } from "../integrations/integration-story-harness.js";
+import {
+  CodexFixtureSessionEntriesWithExploringGroup,
+  SessionComposerFixtureProps,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
 import type { OrganizationSandboxStorageFormState } from "../settings/organization/sandbox-storage-model.js";
 import { NewSessionPageStory } from "./new-session-page.stories.js";
 import {
@@ -48,7 +53,22 @@ import {
   SandboxProfileEditorPageStory,
   StoryBindings,
 } from "./sandbox-profile-editor-story-support.js";
+import { SessionConversationBottomPanel } from "./session-conversation-pane.js";
+import {
+  buildPendingSessionDiffCommentSummaryLabel,
+  buildPendingSessionDiffCommentSummaryTitle,
+  type PendingSessionDiffComment,
+} from "./session-diff-comment.js";
+import { SessionDiffPanel } from "./session-diff-panel.js";
+import { SessionPortAccessPopover } from "./session-port-access-popover.js";
+import {
+  createStorySessionMainContent,
+  renderSessionWorkbenchStory,
+  renderSessionWorkbenchStoryWithChrome,
+} from "./session-story-support.js";
+import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { buildStoryLaunchableSandboxProfile } from "./sessions-page.story-fixtures.js";
+import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 const IdentityLinkingProviders: OrganizationIdentityLinkingProviderRow[] = [
   {
@@ -142,6 +162,292 @@ const OrganizationSandboxStorageState: OrganizationSandboxStorageFormState = {
 
 function DocsProductScreen(input: { children: React.ReactNode }): React.JSX.Element {
   return <div className="min-h-screen bg-background">{input.children}</div>;
+}
+
+function DocsSessionScreen(input: {
+  children: React.ReactNode;
+  height: number;
+  name: string;
+  width: number;
+}): React.JSX.Element {
+  return (
+    <div className="min-h-screen bg-background p-0">
+      <div
+        data-docs-screenshot={input.name}
+        className="overflow-hidden bg-background"
+        style={{
+          width: input.width,
+          height: input.height,
+        }}
+      >
+        {input.children}
+      </div>
+    </div>
+  );
+}
+
+const DocsSessionBranchPatch = [
+  "diff --git a/apps/dashboard/src/features/pages/session-workbench-page.tsx b/apps/dashboard/src/features/pages/session-workbench-page.tsx",
+  "index 39a2c8d..9f5a741 100644",
+  "--- a/apps/dashboard/src/features/pages/session-workbench-page.tsx",
+  "+++ b/apps/dashboard/src/features/pages/session-workbench-page.tsx",
+  "@@ -385,6 +390,7 @@ function SessionWorkbenchPageContent(input: {",
+  "             cwd={workbench.primaryRepositoryState.selectedRepositoryPath}",
+  "             isVisible={workbench.terminalPanelState.isVisible}",
+  "             sandboxInstanceId={input.sandboxInstanceId}",
+  "+            onWorkspaceEmpty={workbench.terminalPanelState.closePanel}",
+  "           />",
+  "         }",
+  "diff --git a/apps/dashboard/src/features/pages/session-port-access-popover.tsx b/apps/dashboard/src/features/pages/session-port-access-popover.tsx",
+  "new file mode 100644",
+  "index 0000000..be14c7a",
+  "--- /dev/null",
+  "+++ b/apps/dashboard/src/features/pages/session-port-access-popover.tsx",
+  "@@ -0,0 +1,7 @@",
+  '+import { CpuIcon } from "@phosphor-icons/react";',
+  "+",
+  "+export function SessionPortAccessPopover(): React.JSX.Element {",
+  '+  return <CpuIcon className="size-4" />;',
+  "+}",
+  "",
+].join("\n");
+
+const DocsSessionPortAccessState = {
+  buttonDisabledReason: null,
+  errorMessage: null,
+  isLoadingProcesses: false,
+  isOpeningProcessKey: null,
+  isPanelOpen: true,
+  observedAt: null,
+  openProcess: async () => {
+    return;
+  },
+  processes: [
+    {
+      pid: 4321,
+      command: "pnpm dev --host 127.0.0.1 --port 5173",
+      listeners: [
+        {
+          bindAddress: "127.0.0.1",
+          port: 5173,
+        },
+      ],
+    },
+    {
+      pid: 4388,
+      command: "pnpm docs:dev",
+      listeners: [
+        {
+          bindAddress: "127.0.0.1",
+          port: 3333,
+        },
+      ],
+    },
+  ],
+  setPanelOpen: () => {
+    return;
+  },
+} satisfies SessionPortAccessState;
+
+const DocsSessionPortAccessClosedState = {
+  ...DocsSessionPortAccessState,
+  isPanelOpen: false,
+} satisfies SessionPortAccessState;
+
+const DocsSessionPendingDiffComments = [
+  {
+    id: "docs-session-comment-1",
+    anchor: {
+      previousLineText: "             sandboxInstanceId={input.sandboxInstanceId}",
+      lineText: "+            onWorkspaceEmpty={workbench.terminalPanelState.closePanel}",
+      nextLineText: "           />",
+    },
+    body: "This should stay tied to the terminal panel state so closing the last tab hides the bottom workspace.",
+    filePath: "apps/dashboard/src/features/pages/session-workbench-page.tsx",
+    lineNumber: 393,
+    repositoryPath: "/root/mistle",
+    side: "additions",
+    status: {
+      kind: "current",
+    },
+  },
+] satisfies readonly PendingSessionDiffComment[];
+
+function buildDocsPendingDiffCommentSummary(
+  comments: readonly PendingSessionDiffComment[],
+): NonNullable<typeof SessionComposerFixtureProps.pendingDiffCommentSummary> | null {
+  if (comments.length === 0) {
+    return null;
+  }
+
+  return {
+    count: comments.length,
+    label: buildPendingSessionDiffCommentSummaryLabel(comments.length),
+    title: buildPendingSessionDiffCommentSummaryTitle(comments),
+  };
+}
+
+function DocsSessionConversationBottomPanel(input?: {
+  pendingDiffComments?: readonly PendingSessionDiffComment[];
+}): React.JSX.Element {
+  const pendingDiffComments = input?.pendingDiffComments ?? [];
+
+  return (
+    <SessionConversationBottomPanel
+      chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
+      composerViewModel={{
+        ...SessionComposerFixtureProps,
+        composerText: "Review the current changes and call out anything risky before we commit.",
+        pendingDiffCommentSummary: buildDocsPendingDiffCommentSummary(pendingDiffComments),
+      }}
+      isRespondingToServerRequest={false}
+      onRespondToServerRequest={noopRespondToServerRequest}
+      serverRequestPanelEntries={[]}
+      showWorkingIndicator={false}
+      statusMessage={null}
+    />
+  );
+}
+
+function DocsSessionDiffPanel(input?: {
+  pendingComments?: readonly PendingSessionDiffComment[];
+}): React.JSX.Element {
+  return (
+    <SessionDiffPanel
+      patch={DocsSessionBranchPatch}
+      pendingComments={input?.pendingComments ?? []}
+      repositoryPath="/root/mistle"
+      summaryLabel="Compared with origin/main"
+      title="Current changes"
+    />
+  );
+}
+
+function SessionWorkbenchOverviewStory(): React.JSX.Element {
+  return (
+    <DocsSessionScreen name="session-workbench-overview" width={1280} height={760}>
+      {renderSessionWorkbenchStoryWithChrome({
+        title: "Fix duplicate checkout charges on retry",
+        children: renderSessionWorkbenchStory({
+          isSecondaryPanelVisible: true,
+          mainContent: createStorySessionMainContent({
+            serverRequestPanelEntries: [],
+          }),
+          primaryBottomPanel: <DocsSessionConversationBottomPanel />,
+          secondaryPanel: <DocsSessionDiffPanel />,
+        }),
+      })}
+    </DocsSessionScreen>
+  );
+}
+
+function SessionCodeDiffStory(): React.JSX.Element {
+  return (
+    <DocsSessionScreen name="session-code-diffs" width={1280} height={760}>
+      {renderSessionWorkbenchStoryWithChrome({
+        title: "Review session changes",
+        headerActions: <DocsSessionHeaderActions isDiffVisible />,
+        children: renderSessionWorkbenchStory({
+          isSecondaryPanelVisible: true,
+          mainContent: createStorySessionMainContent({
+            serverRequestPanelEntries: [],
+          }),
+          primaryBottomPanel: (
+            <DocsSessionConversationBottomPanel
+              pendingDiffComments={DocsSessionPendingDiffComments}
+            />
+          ),
+          secondaryPanel: <DocsSessionDiffPanel pendingComments={DocsSessionPendingDiffComments} />,
+        }),
+      })}
+    </DocsSessionScreen>
+  );
+}
+
+function SessionPortAccessStory(): React.JSX.Element {
+  return (
+    <DocsSessionScreen name="session-port-access" width={1280} height={320}>
+      {renderSessionWorkbenchStoryWithChrome({
+        title: "Preview local dashboard server",
+        headerActions: <DocsSessionHeaderActions portAccessState={DocsSessionPortAccessState} />,
+        children: renderSessionWorkbenchStory({
+          mainContent: <div className="h-full bg-stone-50" />,
+          mainContentLayout: { scroll: "contained", width: "full" },
+          primaryBottomPanel: null,
+        }),
+      })}
+    </DocsSessionScreen>
+  );
+}
+
+function DocsSessionHeaderActions(input: {
+  isDiffVisible?: boolean;
+  portAccessState?: SessionPortAccessState;
+}): React.JSX.Element {
+  const headerButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-stone-100";
+  const pressedButtonClassName = "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300";
+
+  return (
+    <SessionWorkbenchHeaderActions
+      cliControl={{
+        ariaLabel: "TUI",
+        className: headerButtonClassName,
+        disabled: false,
+        onClick: () => {
+          return;
+        },
+        pressed: false,
+        title: "Open Codex TUI",
+      }}
+      diffControl={{
+        ariaLabel: input.isDiffVisible === true ? "Changes" : "Open changes",
+        className: input.isDiffVisible === true ? pressedButtonClassName : headerButtonClassName,
+        disabled: false,
+        onClick: () => {
+          return;
+        },
+        pressed: input.isDiffVisible === true,
+        title: input.isDiffVisible === true ? "Changes" : "Open changes",
+      }}
+      portAccessControl={
+        <SessionPortAccessPopover
+          state={input.portAccessState ?? DocsSessionPortAccessClosedState}
+        />
+      }
+      repositoryControl={{
+        ariaLabel: "Primary repository",
+        onValueChange: () => {
+          return;
+        },
+        options: [
+          {
+            value: "/root/mistle",
+            label: "mistle",
+          },
+          {
+            value: "/root/mistle-docs",
+            label: "mistle-docs",
+          },
+        ],
+        selectedValue: "/root/mistle",
+        title: "Primary repository",
+      }}
+      status={{
+        kind: "connected",
+        label: "Connected",
+      }}
+      terminalControl={{
+        ariaLabel: "Open terminal",
+        className: headerButtonClassName,
+        disabled: false,
+        onClick: () => {
+          return;
+        },
+        pressed: false,
+        title: "Open terminal",
+      }}
+    />
+  );
 }
 
 function IdentityLinkingOrganizationSettingsStory(): React.JSX.Element {
@@ -368,6 +674,18 @@ export const SandboxProfileSnapshotReady: Story = {
 
 export const NewSessionCreation: Story = {
   render: NewSessionCreationStory,
+};
+
+export const SessionWorkbenchOverview: Story = {
+  render: SessionWorkbenchOverviewStory,
+};
+
+export const SessionCodeDiff: Story = {
+  render: SessionCodeDiffStory,
+};
+
+export const SessionPortAccess: Story = {
+  render: SessionPortAccessStory,
 };
 
 export const EventAutomation: Story = {
