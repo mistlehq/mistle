@@ -5,14 +5,13 @@ import { Outlet, useLocation, useNavigate } from "react-router";
 import { authClient } from "../../lib/auth/client.js";
 import { AUTH_SWITCH_ORGANIZATION_PATH } from "../auth/auth-switch-organization-page.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { useAppHeaderLeadingModel, useAppPageMeta } from "../navigation/route-meta.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import { useOrganizationLogoQuery } from "../organizations/organization-logo-query.js";
 import { resolveSettingsBackDestination, SETTINGS_DEFAULT_PATH } from "../settings/model.js";
 import {
   createOrganizationLogoContentPath,
   createSingletonImageContentUrl,
 } from "../shared/singleton-image.js";
-import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
 import {
@@ -34,9 +33,7 @@ import { useOrganizationSummary } from "./use-organization-summary.js";
 export function AppShell(): React.JSX.Element {
   const organizationSummary = useOrganizationSummary();
   const organizationLogoQuery = useOrganizationLogoQuery(organizationSummary.activeOrganizationId);
-  const headerLeadingModel = useAppHeaderLeadingModel();
   const pageMeta = useAppPageMeta();
-  const autosaveIndicator = useAppShellAutosaveIndicator();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
@@ -229,15 +226,5 @@ export function AppShell(): React.JSX.Element {
     },
   });
 
-  return (
-    <AppShellView
-      headerLeadingContent={
-        headerLeadingModel.kind === "custom" ? <>{headerLeadingModel.content}</> : null
-      }
-      headerActions={null}
-      autosaveIndicator={autosaveIndicator}
-      mainContent={<Outlet />}
-      {...appShellFrame}
-    />
-  );
+  return <AppShellView mainContent={<Outlet />} {...appShellFrame} />;
 }

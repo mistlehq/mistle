@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { AppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
+import { AutosaveIndicator } from "./autosave-indicator.js";
 
 const meta = {
-  title: "Dashboard/Shell/AutosaveIndicator",
-  component: AppShellAutosaveIndicator,
+  title: "Dashboard/Shared/AutosaveIndicator",
+  component: AutosaveIndicator,
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof AppShellAutosaveIndicator>;
+} satisfies Meta<typeof AutosaveIndicator>;
 
 export default meta;
 
@@ -27,7 +27,7 @@ function HeaderPreview(input: { children: React.ReactNode }): React.JSX.Element 
 export const Saving: Story = {
   render: () => (
     <HeaderPreview>
-      <AppShellAutosaveIndicator />
+      <AutosaveIndicator />
     </HeaderPreview>
   ),
 };

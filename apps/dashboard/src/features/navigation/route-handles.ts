@@ -212,7 +212,6 @@ export const ROUTE_HANDLES = {
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileEditor: {
-    appShellHeaderVisible: true,
     appShellInsetOwner: "child",
     breadcrumb: "Sandbox Profile",
     title: "Edit profile",

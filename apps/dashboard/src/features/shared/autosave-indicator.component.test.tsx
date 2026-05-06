@@ -5,11 +5,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
-import { useAppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
-import {
-  AppShellLoadingIndicators,
-  createAppShellLoadingIndicatorMeta,
-} from "./app-shell-loading-indicator-meta.js";
+import { useAutosaveIndicator } from "./autosave-indicator.js";
+import { LoadingIndicators, createLoadingIndicatorMeta } from "./loading-indicator-meta.js";
 
 function createDeferredPromise<T>() {
   let resolve: (value: T) => void = () => {};
@@ -24,7 +21,7 @@ function createDeferredPromise<T>() {
 }
 
 function AutosaveIndicatorHarness(input: { children: React.ReactNode }): React.JSX.Element {
-  const autosaveIndicator = useAppShellAutosaveIndicator({
+  const autosaveIndicator = useAutosaveIndicator({
     minimumVisibleMs: 0,
     showDelayMs: 0,
   });
@@ -44,7 +41,7 @@ function MutationHarness(input: {
   const mutation = useMutation({
     ...(input.autosave
       ? {
-          meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.AUTOSAVE),
+          meta: createLoadingIndicatorMeta(LoadingIndicators.AUTOSAVE),
         }
       : {}),
     mutationFn: async () => input.promise,
@@ -64,7 +61,7 @@ function MutationHarness(input: {
   );
 }
 
-describe("useAppShellAutosaveIndicator", () => {
+describe("useAutosaveIndicator", () => {
   it("renders while autosave mutations are pending", async () => {
     const queryClient = createTestQueryClient();
     const pendingMutation = createDeferredPromise<string>();

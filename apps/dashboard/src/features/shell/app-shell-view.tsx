@@ -22,16 +22,11 @@ export interface AppShellViewProps {
   sidebarHeaderContent: React.ReactNode;
   sidebarContent: React.ReactNode;
   sidebarFooterContent: React.ReactNode;
-  headerLeadingContent: React.ReactNode | null;
   contentInsetOwner: "app-shell" | "child";
-  autosaveIndicator: React.ReactNode | null;
-  headerActions: React.ReactNode | null;
   mainContent: React.ReactNode;
   renderSidebarTrigger: boolean;
-  showHeader: boolean;
   topLoadingBar: React.ReactNode;
   viewportMode: "document" | "workspace";
-  showHeaderLeadingContent: boolean;
 }
 
 export function AppShellView(input: AppShellViewProps): React.JSX.Element {
@@ -39,12 +34,6 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
     contentInsetOwner: input.contentInsetOwner,
     viewportMode: input.viewportMode,
   });
-  const shouldRenderHeaderContent =
-    input.showHeader &&
-    (input.showHeaderLeadingContent ||
-      input.headerActions !== null ||
-      input.autosaveIndicator !== null);
-
   return (
     <SidebarProvider style={SidebarWidthStyle}>
       <Sidebar>
@@ -66,7 +55,7 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
         }
       >
         {input.topLoadingBar}
-        <AppShellStickyHeader {...input} showHeaderContent={shouldRenderHeaderContent} />
+        <AppShellSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
         <div className={contentContainerClassName}>
           <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
         </div>
@@ -75,18 +64,9 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
   );
 }
 
-function AppShellStickyHeader(
-  input: Pick<
-    AppShellViewProps,
-    | "autosaveIndicator"
-    | "headerLeadingContent"
-    | "headerActions"
-    | "renderSidebarTrigger"
-    | "showHeaderLeadingContent"
-  > & {
-    showHeaderContent: boolean;
-  },
-): React.JSX.Element | null {
+function AppShellSidebarTrigger(input: {
+  renderSidebarTrigger: boolean;
+}): React.JSX.Element | null {
   const { isMobile, openMobile, state } = useSidebar();
   const shouldShowSidebarTrigger =
     input.renderSidebarTrigger &&
@@ -95,42 +75,16 @@ function AppShellStickyHeader(
       openMobile,
       sidebarState: state,
     });
-  const hasHeaderTrailingContent = input.headerActions !== null || input.autosaveIndicator !== null;
 
-  if (
-    !shouldRenderAppShellStickyHeader({
-      hasHeaderContent: input.showHeaderContent,
-      hasSidebarTrigger: shouldShowSidebarTrigger,
-    })
-  ) {
+  if (!shouldShowSidebarTrigger) {
     return null;
   }
 
   return (
-    <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
-      {shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1" /> : null}
-      {input.showHeaderContent && input.showHeaderLeadingContent ? (
-        <div className={`${shouldShowSidebarTrigger ? "ml-2" : ""} min-w-0 flex-1`}>
-          {input.headerLeadingContent}
-        </div>
-      ) : (
-        <div className="flex-1" />
-      )}
-      {input.showHeaderContent && hasHeaderTrailingContent ? (
-        <div className="ml-4 flex shrink-0 items-center gap-2">
-          {input.headerActions}
-          {input.autosaveIndicator}
-        </div>
-      ) : null}
-    </header>
+    <div className="pointer-events-none fixed top-3 left-3 z-20">
+      <SidebarTrigger className="bg-background/90 pointer-events-auto shadow-sm backdrop-blur-sm" />
+    </div>
   );
-}
-
-export function shouldRenderAppShellStickyHeader(input: {
-  hasHeaderContent: boolean;
-  hasSidebarTrigger: boolean;
-}): boolean {
-  return input.hasHeaderContent || input.hasSidebarTrigger;
 }
 
 function resolveContentContainerClassName(input: {

@@ -8,10 +8,10 @@ import { describe, expect, it } from "vitest";
 
 import { createTestQueryClient } from "../../test-support/query-client.js";
 import {
-  type AppShellLoadingIndicator,
-  AppShellLoadingIndicators,
-  createAppShellLoadingIndicatorMeta,
-} from "./app-shell-loading-indicator-meta.js";
+  type LoadingIndicator,
+  LoadingIndicators,
+  createLoadingIndicatorMeta,
+} from "../shared/loading-indicator-meta.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
 function createDeferredPromise<T>() {
@@ -33,7 +33,7 @@ async function waitForSchedulerDelay(delayMs: number): Promise<void> {
 }
 
 function QueryLoadingHarness(props: {
-  indicator?: AppShellLoadingIndicator;
+  indicator?: LoadingIndicator;
   promise: Promise<string>;
 }): React.JSX.Element {
   useQuery({
@@ -41,7 +41,7 @@ function QueryLoadingHarness(props: {
     ...(props.indicator === undefined
       ? {}
       : {
-          meta: createAppShellLoadingIndicatorMeta(props.indicator),
+          meta: createLoadingIndicatorMeta(props.indicator),
         }),
     queryFn: async () => props.promise,
   });
@@ -50,14 +50,14 @@ function QueryLoadingHarness(props: {
 }
 
 function MutationLoadingHarness(props: {
-  indicator?: AppShellLoadingIndicator;
+  indicator?: LoadingIndicator;
   promise: Promise<string>;
 }): React.JSX.Element {
   const mutation = useMutation({
     ...(props.indicator === undefined
       ? {}
       : {
-          meta: createAppShellLoadingIndicatorMeta(props.indicator),
+          meta: createLoadingIndicatorMeta(props.indicator),
         }),
     mutationFn: async () => props.promise,
   });
@@ -152,7 +152,7 @@ describe("top-loading-bar", () => {
         <Route
           element={
             <QueryLoadingHarness
-              indicator={AppShellLoadingIndicators.NONE}
+              indicator={LoadingIndicators.NONE}
               promise={pendingQuery.promise}
             />
           }
@@ -210,7 +210,7 @@ describe("top-loading-bar", () => {
         <Route
           element={
             <MutationLoadingHarness
-              indicator={AppShellLoadingIndicators.NONE}
+              indicator={LoadingIndicators.NONE}
               promise={pendingMutation.promise}
             />
           }

@@ -155,8 +155,6 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     activeOrganizationId: "org_123",
     organizationName: "Mistle Labs",
     pageMeta: {
-      appShellHeaderLeadingVisible: false,
-      appShellHeaderVisible: false,
       appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
       appShellViewportMode: "document",
       title: null,
@@ -206,15 +204,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     },
   });
 
-  return (
-    <AppShellView
-      {...appShellFrame}
-      autosaveIndicator={null}
-      headerLeadingContent={null}
-      headerActions={null}
-      mainContent={<Outlet />}
-    />
-  );
+  return <AppShellView {...appShellFrame} mainContent={<Outlet />} />;
 }
 
 function SessionDetailStoryPage(): React.JSX.Element {

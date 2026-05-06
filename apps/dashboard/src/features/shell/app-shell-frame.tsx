@@ -49,8 +49,6 @@ export type AppShellFrame = Pick<
   React.ComponentProps<typeof AppShellView>,
   | "contentInsetOwner"
   | "renderSidebarTrigger"
-  | "showHeader"
-  | "showHeaderLeadingContent"
   | "sidebarContent"
   | "sidebarFooterContent"
   | "sidebarHeaderClassName"
@@ -91,8 +89,6 @@ export function resolveAppShellFrame(input: {
     return {
       contentInsetOwner: "child",
       renderSidebarTrigger: true,
-      showHeader: input.pageMeta.appShellHeaderVisible,
-      showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
       sidebarContent: <SettingsSectionNav />,
       sidebarFooterContent: <ErrorNotice message={input.signOutError} />,
       sidebarHeaderClassName: "pb-0",
@@ -105,8 +101,6 @@ export function resolveAppShellFrame(input: {
   return {
     contentInsetOwner: input.pageMeta.appShellInsetOwner,
     renderSidebarTrigger: !input.inSessionDetail,
-    showHeader: input.pageMeta.appShellHeaderVisible,
-    showHeaderLeadingContent: input.pageMeta.appShellHeaderLeadingVisible,
     sidebarContent: showDedicatedSessionsSidebar ? (
       <div className="animate-in fade-in-0 duration-200">
         <SessionsSidebarHeader

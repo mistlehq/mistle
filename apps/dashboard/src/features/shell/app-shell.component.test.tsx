@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { SessionsShellSidebar } from "../navigation/sessions-shell-sidebar.js";
 import { resolveAppShellFrame } from "./app-shell-frame.js";
 import { resolveAppShellRouteState } from "./app-shell-route-state.js";
-import { shouldRenderAppShellStickyHeader } from "./app-shell-view.js";
 
 describe("resolveAppShellFrame", () => {
   it("uses the dedicated sessions sidebar only when the toggle is enabled on sessions routes", () => {
@@ -32,8 +31,6 @@ describe("resolveAppShellFrame", () => {
       activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
-        appShellHeaderLeadingVisible: true,
-        appShellHeaderVisible: true,
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         title: "Sessions",
@@ -89,8 +86,6 @@ describe("resolveAppShellFrame", () => {
       activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
-        appShellHeaderLeadingVisible: true,
-        appShellHeaderVisible: true,
         appShellInsetOwner: "app-shell",
         appShellViewportMode: "document",
         title: "Sessions",
@@ -111,7 +106,7 @@ describe("resolveAppShellFrame", () => {
     expect(frame.renderSidebarTrigger).toBe(false);
   });
 
-  it("keeps the app shell header hidden when route metadata does not opt in", () => {
+  it("keeps the sidebar trigger available for non-session-detail pages", () => {
     const locationPathname = "/integrations";
     const routeState = resolveAppShellRouteState(locationPathname);
     const frame = resolveAppShellFrame({
@@ -136,8 +131,6 @@ describe("resolveAppShellFrame", () => {
       activeOrganizationId: "org_123",
       organizationName: "Acme",
       pageMeta: {
-        appShellHeaderLeadingVisible: false,
-        appShellHeaderVisible: false,
         appShellInsetOwner: "child",
         appShellViewportMode: "document",
         title: "Integrations",
@@ -149,28 +142,6 @@ describe("resolveAppShellFrame", () => {
       onShowSessionsSidebarChange: () => {},
     });
 
-    expect(frame.showHeader).toBe(false);
-    expect(frame.showHeaderLeadingContent).toBe(false);
     expect(frame.renderSidebarTrigger).toBe(true);
-  });
-});
-
-describe("app shell sticky header visibility", () => {
-  it("keeps the sticky header available when only the sidebar trigger is needed", () => {
-    expect(
-      shouldRenderAppShellStickyHeader({
-        hasHeaderContent: false,
-        hasSidebarTrigger: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("omits the sticky header when neither header content nor sidebar trigger is needed", () => {
-    expect(
-      shouldRenderAppShellStickyHeader({
-        hasHeaderContent: false,
-        hasSidebarTrigger: false,
-      }),
-    ).toBe(false);
   });
 });

@@ -5,7 +5,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import { Badge } from "@mistle/ui";
 import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useEffect, useState } from "react";
@@ -13,7 +12,6 @@ import { MemoryRouter, NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
 import { SessionsNavToggleItem } from "../navigation/sessions-nav-toggle-item.js";
-import { AppShellAutosaveIndicator } from "./app-shell-autosave-indicator.js";
 import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 
@@ -153,29 +151,11 @@ const meta = {
   component: AppShellViewStory,
   tags: ["autodocs"],
   argTypes: {
-    headerLeadingContent: {
-      control: false,
-      description:
-        "Optional leading header content shown when `showHeaderLeadingContent` is enabled.",
-    },
-    showHeader: {
-      control: "boolean",
-      description:
-        "Toggles route-owned sticky header content. The sidebar trigger can still render shell chrome when enabled.",
-    },
     contentInsetOwner: {
       control: "inline-radio",
       description:
         "`app-shell` means AppShellView provides the outer page inset. `child` means the page or child shell owns outer spacing and framing.",
       options: ["app-shell", "child"],
-    },
-    headerActions: {
-      control: false,
-      description: "Optional header actions rendered on the right side of the sticky header.",
-    },
-    autosaveIndicator: {
-      control: false,
-      description: "Optional shell-owned autosave indicator rendered after page header actions.",
     },
     locationPathname: {
       control: "text",
@@ -187,12 +167,7 @@ const meta = {
     },
     renderSidebarTrigger: {
       control: "boolean",
-      description:
-        "Allows the shell sticky header to render the sidebar trigger when navigation access is not owned by child content.",
-    },
-    showHeaderLeadingContent: {
-      control: "boolean",
-      description: "Toggles whether the header-leading region is shown in the sticky header.",
+      description: "Allows the shell to render the standalone sidebar trigger.",
     },
     showSessionsSidebar: {
       control: "boolean",
@@ -231,13 +206,8 @@ const meta = {
       include: [
         "contentInsetOwner",
         "viewportMode",
-        "showHeader",
-        "showHeaderLeadingContent",
         "showSessionsSidebar",
         "locationPathname",
-        "headerLeadingContent",
-        "headerActions",
-        "autosaveIndicator",
         "mainContent",
         "renderSidebarTrigger",
         "sidebarHeaderContent",
@@ -249,14 +219,7 @@ const meta = {
     },
   },
   args: {
-    autosaveIndicator: null,
-    headerLeadingContent: <p className="truncate text-sm">Sessions / Storybook Session</p>,
     contentInsetOwner: "app-shell",
-    headerActions: (
-      <Badge className="bg-emerald-600 text-white hover:bg-emerald-600/90" variant="secondary">
-        Connected
-      </Badge>
-    ),
     locationPathname: "/sessions",
     mainContent: (
       <div className="rounded-xl border bg-card p-6 shadow-xs">
@@ -267,8 +230,6 @@ const meta = {
       </div>
     ),
     renderSidebarTrigger: true,
-    showHeader: true,
-    showHeaderLeadingContent: true,
     showSessionsSidebar: false,
     sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,
@@ -296,9 +257,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
-
-export const WithAutosaveIndicator: Story = {
-  args: {
-    autosaveIndicator: <AppShellAutosaveIndicator />,
-  },
-};

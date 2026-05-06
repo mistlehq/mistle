@@ -176,7 +176,6 @@ describe("route handles", () => {
 
   it("defines sandbox profile published and draft breadcrumbs", () => {
     expect(ROUTE_HANDLES.sandboxProfilesDetail.breadcrumb).toBe("Profile");
-    expect(ROUTE_HANDLES.sandboxProfileEditor.appShellHeaderVisible).toBe(true);
     expect(ROUTE_HANDLES.sandboxProfilePublished.breadcrumb).toBe("Published");
     expect(ROUTE_HANDLES.sandboxProfileDraft.breadcrumb).toBe("Draft");
     expect(ROUTE_HANDLES.sandboxProfilePublished).not.toHaveProperty("pageBreadcrumb");
@@ -185,8 +184,6 @@ describe("route handles", () => {
   });
 
   it("keeps session detail out of the app shell header and hides breadcrumbs", () => {
-    expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("appShellHeaderLeadingVisible");
-    expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("appShellHeaderVisible");
     expect(ROUTE_HANDLES.sessionsDetail.hideBreadcrumb).toBe(true);
     expect(ROUTE_HANDLES.sessionsDetail).not.toHaveProperty("header");
   });

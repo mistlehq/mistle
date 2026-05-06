@@ -9,12 +9,9 @@ import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/se
 import { AppShellView } from "../shell/app-shell-view.js";
 import { SessionConversationMainContent } from "./session-conversation-pane.js";
 import { SessionDiffPanel } from "./session-diff-panel.js";
-import { SessionPortAccessPopover } from "./session-port-access-popover.js";
 import { createStorySessionBottomPanel, StorySandboxInstanceId } from "./session-story-support.js";
-import { SessionWorkbenchHeaderActions } from "./session-workbench-header-actions.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 import { buildSandboxInstanceListItemFixture } from "./sessions-page.story-fixtures.js";
-import type { SessionPortAccessState } from "./use-session-port-access.js";
 
 type ProductWorkbenchVariant = "diff" | "compact";
 
@@ -380,106 +377,8 @@ const MarketingHeroSessions = [
   }),
 ];
 
-const MarketingHeroPortAccessState = {
-  buttonDisabledReason: null,
-  errorMessage: null,
-  isLoadingProcesses: false,
-  isOpeningProcessKey: null,
-  isPanelOpen: false,
-  observedAt: "2026-05-05T01:24:00.000Z",
-  openProcess: async () => {
-    return;
-  },
-  processes: [
-    {
-      command: "pnpm dev --host 127.0.0.1 --port 3000",
-      listeners: [
-        {
-          bindAddress: "127.0.0.1",
-          port: 3000,
-        },
-      ],
-      pid: 6402,
-    },
-    {
-      command: "vite dev --host 127.0.0.1 --port 5173",
-      listeners: [
-        {
-          bindAddress: "127.0.0.1",
-          port: 5173,
-        },
-      ],
-      pid: 4321,
-    },
-  ],
-  setPanelOpen: noop,
-} satisfies SessionPortAccessState;
-
 function noop(): void {
   return;
-}
-
-function createHeaderButtonControl(input: {
-  active: boolean;
-  ariaLabel: string;
-  title: string;
-}): React.ComponentProps<typeof SessionWorkbenchHeaderActions>["cliControl"] {
-  return {
-    ariaLabel: input.ariaLabel,
-    className: input.active
-      ? "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300"
-      : "bg-transparent text-foreground shadow-none hover:bg-stone-100",
-    disabled: false,
-    onClick: noop,
-    pressed: input.active,
-    title: input.title,
-  };
-}
-
-function MarketingHeroHeaderActions(input: {
-  variant: ProductWorkbenchVariant;
-}): React.JSX.Element {
-  const showDiff = input.variant === "diff";
-
-  return (
-    <SessionWorkbenchHeaderActions
-      cliControl={createHeaderButtonControl({
-        active: false,
-        ariaLabel: "Codex TUI",
-        title: "Open Codex TUI",
-      })}
-      diffControl={createHeaderButtonControl({
-        active: showDiff,
-        ariaLabel: showDiff ? "Changes" : "Open changes",
-        title: showDiff ? "Changes" : "Open changes",
-      })}
-      extraActions={<SessionPortAccessPopover state={MarketingHeroPortAccessState} />}
-      repositoryControl={{
-        ariaLabel: "Primary repository",
-        onValueChange: noop,
-        options: [
-          {
-            label: "acme/storefront",
-            value: "/workspace/acme-store",
-          },
-          {
-            label: "acme/billing-api",
-            value: "/workspace/acme-billing",
-          },
-        ],
-        selectedValue: "/workspace/acme-store",
-      }}
-      status={{
-        kind: "connected",
-        label: "Connected",
-      }}
-      terminalControl={createHeaderButtonControl({
-        active: false,
-        ariaLabel: "Open terminal",
-        title: "Open terminal",
-      })}
-    />
-  );
 }
 
 function MarketingHeroConversation(): React.JSX.Element {
@@ -520,27 +419,13 @@ function MarketingHeroSidebar(): React.JSX.Element {
   );
 }
 
-function MarketingHeroShell(input: {
-  children: React.ReactNode;
-  variant: ProductWorkbenchVariant;
-}): React.JSX.Element {
+function MarketingHeroShell(input: { children: React.ReactNode }): React.JSX.Element {
   return (
     <MemoryRouter initialEntries={["/sessions/sbi_checkout_retry"]}>
       <AppShellView
-        autosaveIndicator={null}
         contentInsetOwner="child"
-        headerActions={<MarketingHeroHeaderActions variant={input.variant} />}
-        headerLeadingContent={
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              Fix duplicate checkout charges on retry
-            </p>
-          </div>
-        }
         mainContent={input.children}
-        renderSidebarTrigger
-        showHeader
-        showHeaderLeadingContent
+        renderSidebarTrigger={false}
         sidebarContent={<MarketingHeroSidebar />}
         sidebarFooterContent={null}
         sidebarHeaderContent={null}
@@ -555,7 +440,7 @@ function MarketingProductWorkbenchStory(input: ProductWorkbenchStoryArgs): React
   const showDiff = input.variant === "diff";
 
   return (
-    <MarketingHeroShell variant={input.variant}>
+    <MarketingHeroShell>
       <SessionWorkbenchPageView
         alert={null}
         bottomPanel={null}
