@@ -5,7 +5,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@mistle/ui";
-import { CpuIcon, HouseIcon, LightningIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
+import { HouseIcon, LightningIcon, PackageIcon, PuzzlePieceIcon } from "@phosphor-icons/react";
 import { NavLink } from "react-router";
 
 import { ErrorNotice } from "../auth/error-notice.js";
@@ -28,7 +28,7 @@ function SandboxProfilesNavIcon(props: {
   className?: string;
   "aria-hidden"?: boolean;
 }): React.JSX.Element {
-  return <CpuIcon {...props} />;
+  return <PackageIcon {...props} />;
 }
 
 function AutomationsNavIcon(props: {

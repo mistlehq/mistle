@@ -1,3 +1,5 @@
+import { Button } from "@mistle/ui";
+import { CpuIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
 import { SessionWorkbenchStoryChrome } from "./session-story-support.js";
@@ -99,6 +101,18 @@ export function SessionWorkbenchHeaderActionsStoryHarness(
               title: "Open changes",
             }}
             {...(repositoryControl === undefined ? {} : { repositoryControl })}
+            portAccessControl={
+              <Button
+                aria-label="Open processes"
+                className={StoryActionButtonControl.className}
+                size="icon-sm"
+                title="Show running processes"
+                type="button"
+                variant="ghost"
+              >
+                <CpuIcon className="size-4" />
+              </Button>
+            }
             status={createHeaderStatus(input.status)}
             terminalControl={{
               ...StoryActionButtonControl,

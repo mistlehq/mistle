@@ -38,6 +38,7 @@ const StoryRepositoryOptions = [
   { value: "/root/mistle", label: "mistle" },
   { value: "/root/mistle-docs", label: "mistle-docs" },
 ] satisfies ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
+const StorySelectedRepositoryValue = "/root/mistle";
 const StoryHeaderButtonClassName = "bg-transparent text-foreground shadow-none hover:bg-stone-100";
 const StoryHeaderButtonPressedClassName =
   "bg-stone-200 text-stone-950 shadow-none hover:bg-stone-300";
@@ -189,13 +190,12 @@ export function SessionWorkbenchStoryHeaderActions(
   input: SessionWorkbenchStoryHeaderActionsProps,
 ): React.JSX.Element {
   const [selectedRepositoryValue, setSelectedRepositoryValue] = useState<string | null>(
-    StoryRepositoryOptions[1]?.value ?? null,
+    StorySelectedRepositoryValue,
   );
   const [isPortAccessPanelOpen, setPortAccessPanelOpen] = useState(false);
   const headerStatusUi = input.headerStatusUi ?? {
     label: "Connected",
     variant: "secondary",
-    className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
   };
   const isCliVisible = input.isCliVisible ?? false;
   const isDiffVisible = input.isDiffVisible ?? false;
