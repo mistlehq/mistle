@@ -919,6 +919,45 @@ describe.concurrent("tokenizer proxy egress credentials", () => {
     }
   });
 
+  it("forwards websocket upgrades with test isolation carried by the egress path prefix", async ({
+    env,
+  }) => {
+    const upstreamService = await startWebSocketUpstream({
+      host: "127.0.0.1",
+      path: "/v1/responses?stream=true",
+    });
+    const uniqueId = createUniqueId();
+
+    try {
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId,
+      });
+      const egressGrant = await mintDatadogEgressGrant({
+        binding,
+        jti: `egress_rule_${uniqueId}`,
+        upstreamBaseUrl: upstreamService.baseUrl,
+        authInjectionType: "bearer",
+        authInjectionTarget: "authorization",
+        allowedMethods: ["GET"],
+        allowedPathPrefixes: ["/v1"],
+      });
+
+      const message = await performUpgradeRequest({
+        baseUrl: env.tokenizerProxy.hostBaseUrl,
+        path: `/__test-environments/${encodeURIComponent(env.id)}/tokenizer-proxy/egress/v1/responses?stream=true`,
+        headers: {
+          [EgressRequestHeaders.GRANT]: egressGrant,
+        },
+      });
+
+      expect(message).toBe("pong\n");
+      expect(upstreamService.capturedAuthorizationHeader()).toBe("Bearer datadog-api-key");
+    } finally {
+      await upstreamService.stop();
+    }
+  });
+
   it("resolves linked-principal credentials for websocket upgrades", async ({ env }) => {
     const upstreamService = await startWebSocketUpstream({
       host: "127.0.0.1",

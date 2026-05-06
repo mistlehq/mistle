@@ -41,7 +41,10 @@ export function service(
   return {
     id: ServiceIds.DATA_PLANE_API,
     infra,
-    serviceReferences: [ServiceIds.CONTROL_PLANE_API],
+    serviceReferences:
+      options.sandbox === undefined
+        ? [ServiceIds.CONTROL_PLANE_API]
+        : [ServiceIds.CONTROL_PLANE_API, ServiceIds.TOKENIZER_PROXY],
     endpoints: {
       http: {
         host: Host,
@@ -72,6 +75,9 @@ function start(input: {
         port: endpoint.port,
         postgres,
         gatewayBaseUrl: peer.url(ServiceIds.DATA_PLANE_GATEWAY),
+        tokenizerProxyBaseUrl:
+          input.sandbox === undefined ? undefined : peer.url(ServiceIds.TOKENIZER_PROXY),
+        environmentId: startInput.environmentId,
         controlPlaneBaseUrl: peer.url(ServiceIds.CONTROL_PLANE_API),
         sandbox: input.sandbox,
       }),
@@ -102,6 +108,8 @@ function config(input: {
   port: number;
   postgres: ResolvedTestInfra;
   gatewayBaseUrl: string;
+  tokenizerProxyBaseUrl: string | undefined;
+  environmentId: string;
   controlPlaneBaseUrl: string;
   sandbox: IntegrationSandboxOptions | undefined;
 }): DataPlaneApiConfig {
@@ -128,11 +136,15 @@ function config(input: {
     sandbox: {
       provider: input.sandbox?.provider ?? "docker",
       egress: {
-        tokenSecret: "integration-egress-token-secret",
-        tokenIssuer: "mistle",
-        tokenAudience: "tokenizer-proxy",
+        tokenSecret: "integration-new-egress-token-secret",
+        tokenIssuer: "integration-new-data-plane-worker",
+        tokenAudience: "integration-new-tokenizer-proxy",
       },
-      tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+      tokenizerProxyEgressBaseUrl: createSandboxTokenizerProxyEgressUrl({
+        baseUrl: input.tokenizerProxyBaseUrl,
+        environmentId: input.environmentId,
+        sandbox: input.sandbox,
+      }),
       ...(input.sandbox?.provider === "e2b"
         ? {
             e2b: requireE2BOptions(input.sandbox),
@@ -153,6 +165,41 @@ function config(input: {
       testEnvironmentIdHeader: TestEnvironmentIdHeader,
     },
   };
+}
+
+function createSandboxTokenizerProxyEgressUrl(input: {
+  baseUrl: string | undefined;
+  environmentId: string;
+  sandbox: IntegrationSandboxOptions | undefined;
+}): string {
+  if (input.sandbox === undefined) {
+    return "http://127.0.0.1:5004/tokenizer-proxy/egress";
+  }
+  if (input.baseUrl === undefined) {
+    throw new Error("Sandbox-enabled data-plane-api requires tokenizer-proxy service access.");
+  }
+
+  const url = new URL(
+    `/__test-environments/${encodeURIComponent(input.environmentId)}/tokenizer-proxy/egress`,
+    input.sandbox.provider === "e2b"
+      ? readPublicTokenizerProxyBaseUrl(input.sandbox)
+      : input.baseUrl,
+  );
+
+  if (input.sandbox.provider === "docker") {
+    url.hostname = "host.docker.internal";
+  }
+
+  return url.toString().replace(/\/$/u, "");
+}
+
+function readPublicTokenizerProxyBaseUrl(input: IntegrationSandboxOptions): string {
+  const publicTokenizerProxyBaseUrl = input.publicServiceBaseUrls?.get(ServiceIds.TOKENIZER_PROXY);
+  if (publicTokenizerProxyBaseUrl === undefined) {
+    throw new Error("E2B sandbox refresh requires public access for tokenizer-proxy.");
+  }
+
+  return publicTokenizerProxyBaseUrl;
 }
 
 function requireE2BOptions(input: IntegrationSandboxOptions): {

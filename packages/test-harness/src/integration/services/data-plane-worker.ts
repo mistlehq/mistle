@@ -298,7 +298,10 @@ async function createSandboxReachableEndpoints(input: {
     url: input.peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
     environmentId: input.environmentId,
   });
-  const tokenizerProxyEgressUrl = input.peer.url(ServiceIds.TOKENIZER_PROXY);
+  const tokenizerProxyEgressUrl = createTokenizerProxyEgressUrl({
+    baseUrl: input.peer.url(ServiceIds.TOKENIZER_PROXY),
+    environmentId: input.environmentId,
+  });
   if (input.sandbox?.provider === "e2b") {
     return createPublicSandboxReachableEndpoints({
       environmentId: input.environmentId,
@@ -346,9 +349,10 @@ function createPublicSandboxReachableEndpoints(input: {
       url: createPublicGatewayWsUrl(publicGatewayBaseUrl),
       environmentId: input.environmentId,
     }),
-    tokenizerProxyEgressUrl: new URL("/tokenizer-proxy/egress", publicTokenizerProxyBaseUrl)
-      .toString()
-      .replace(/\/$/u, ""),
+    tokenizerProxyEgressUrl: createTokenizerProxyEgressUrl({
+      baseUrl: publicTokenizerProxyBaseUrl,
+      environmentId: input.environmentId,
+    }),
   };
 }
 
@@ -394,6 +398,15 @@ function withTestEnvironmentIdQueryParam(input: { url: string; environmentId: st
   const url = new URL(input.url);
   url.searchParams.set(TestEnvironmentIdHeader, input.environmentId);
   return url.toString();
+}
+
+function createTokenizerProxyEgressUrl(input: { baseUrl: string; environmentId: string }): string {
+  return new URL(
+    `/__test-environments/${encodeURIComponent(input.environmentId)}/tokenizer-proxy/egress`,
+    input.baseUrl,
+  )
+    .toString()
+    .replace(/\/$/u, "");
 }
 
 function createHostDockerInternalUrl(value: string): string {

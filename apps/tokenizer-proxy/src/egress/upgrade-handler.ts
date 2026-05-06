@@ -6,7 +6,11 @@ import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-clien
 import type { EgressGrantConfig } from "@mistle/sandbox-egress-auth";
 
 import { logger } from "../logger.js";
-import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
+import {
+  EGRESS_BASE_PATH,
+  TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX,
+  EgressRequestHeaders,
+} from "./constants.js";
 import { CredentialCache, type CachedCredential } from "./credential-cache.js";
 import {
   authorizeEgressGrant,
@@ -58,20 +62,50 @@ function readOptionalHeader(headers: IncomingHttpHeaders, headerName: string): s
 
 function readTestEnvironmentId(input: {
   headers: IncomingHttpHeaders;
+  requestUrl: string;
   testEnvironmentIdHeader: string | undefined;
 }): string | undefined {
   if (input.testEnvironmentIdHeader === undefined) {
     return undefined;
   }
 
-  const testEnvironmentId = readOptionalHeader(input.headers, input.testEnvironmentIdHeader);
+  const requestUrl = new URL(input.requestUrl, "http://tokenizer-proxy.internal");
+  const testEnvironmentId =
+    readOptionalHeader(input.headers, input.testEnvironmentIdHeader) ??
+    readOptionalQuery(requestUrl, input.testEnvironmentIdHeader) ??
+    readTestEnvironmentIdFromPath(requestUrl.pathname);
   if (testEnvironmentId === undefined) {
     throw new Error(
-      `Expected '${input.testEnvironmentIdHeader}' header for isolated tokenizer-proxy websocket upgrade.`,
+      `Expected '${input.testEnvironmentIdHeader}' header, query parameter, or path prefix for isolated tokenizer-proxy websocket upgrade.`,
     );
   }
 
   return testEnvironmentId;
+}
+
+function readOptionalQuery(url: URL, name: string): string | undefined {
+  const value = url.searchParams.get(name);
+  if (value === null) {
+    return undefined;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length === 0 ? undefined : trimmedValue;
+}
+
+function readTestEnvironmentIdFromPath(requestPath: string): string | undefined {
+  const prefix = `${TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX}/`;
+  if (!requestPath.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+
+  return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
 }
 
 function joinPath(basePath: string, suffixPath: string): string {
@@ -94,12 +128,40 @@ function resolveTargetPath(requestUrl: string): string {
   }
 
   if (!requestPath.startsWith(`${EGRESS_BASE_PATH}/`)) {
-    throw new Error(
-      `Egress request path '${requestPath}' is outside egress scope '${EGRESS_BASE_PATH}'.`,
-    );
+    return resolveTestEnvironmentTargetPath(requestPath);
   }
 
   return requestPath.slice(EGRESS_BASE_PATH.length);
+}
+
+function resolveTestEnvironmentTargetPath(requestPath: string): string {
+  const prefix = `${TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX}/`;
+  if (!requestPath.startsWith(prefix)) {
+    throwEgressScopeError(requestPath);
+  }
+
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    throwEgressScopeError(requestPath);
+  }
+
+  const pathWithoutEnvironmentId = pathWithoutPrefix.slice(separatorIndex);
+  if (pathWithoutEnvironmentId === EGRESS_BASE_PATH) {
+    return "/";
+  }
+
+  if (!pathWithoutEnvironmentId.startsWith(`${EGRESS_BASE_PATH}/`)) {
+    throwEgressScopeError(requestPath);
+  }
+
+  return pathWithoutEnvironmentId.slice(EGRESS_BASE_PATH.length);
+}
+
+function throwEgressScopeError(requestPath: string): never {
+  throw new Error(
+    `Egress request path '${requestPath}' is outside egress scope '${EGRESS_BASE_PATH}'.`,
+  );
 }
 
 function normalizePath(path: string): string {
@@ -599,6 +661,7 @@ export function createEgressProxyUpgradeHandler(input: CreateEgressProxyUpgradeH
       try {
         testEnvironmentId = readTestEnvironmentId({
           headers: request.headers,
+          requestUrl,
           testEnvironmentIdHeader: input.testEnvironmentIdHeader,
         });
       } catch (error) {

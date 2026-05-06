@@ -1,3 +1,4 @@
+import { installInMemoryTracing } from "@mistle/telemetry/testing.js";
 import { Worker } from "openworkflow";
 import { BackendPostgres } from "openworkflow/postgres";
 import type { Sql } from "postgres";
@@ -36,6 +37,8 @@ type ContextRunner = <Result>(callback: () => Promise<Result>) => Promise<Result
 export async function startHostedOpenWorkflowWorker(
   input: StartHostedOpenWorkflowWorkerInput,
 ): Promise<HostedOpenWorkflowWorker> {
+  installInMemoryTracing();
+
   const backend = BackendPostgres.fromPool(input.backendPool, {
     namespaceId: input.namespaceId,
     schema: input.schema,

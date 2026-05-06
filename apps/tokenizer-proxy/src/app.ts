@@ -5,6 +5,9 @@ import { Hono } from "hono";
 import {
   EGRESS_BASE_PATH,
   EGRESS_WILDCARD_BASE_PATH,
+  TEST_ENVIRONMENT_EGRESS_BASE_PATH_PATTERN,
+  TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX,
+  TEST_ENVIRONMENT_EGRESS_WILDCARD_BASE_PATH_PATTERN,
   CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
   CREDENTIAL_CACHE_MAX_ENTRIES,
   CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
@@ -65,7 +68,11 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
   });
 
   app.use("*", async (ctx, next) => {
-    const testEnvironmentId = readTestEnvironmentId(config, (name) => ctx.req.header(name));
+    const testEnvironmentId = readTestEnvironmentId(config, {
+      readHeader: (name) => ctx.req.header(name),
+      readQuery: (name) => ctx.req.query(name),
+      requestPath: ctx.req.path,
+    });
     ctx.set("config", config);
     ctx.set("internalAuthServiceToken", config.internalAuth.serviceToken);
     if (testEnvironmentId !== undefined) {
@@ -76,6 +83,8 @@ export function createAppComponents(config: TokenizerProxyConfig): TokenizerProx
 
   app.all(EGRESS_BASE_PATH, egressProxyHandler);
   app.all(EGRESS_WILDCARD_BASE_PATH, egressProxyHandler);
+  app.all(TEST_ENVIRONMENT_EGRESS_BASE_PATH_PATTERN, egressProxyHandler);
+  app.all(TEST_ENVIRONMENT_EGRESS_WILDCARD_BASE_PATH_PATTERN, egressProxyHandler);
 
   return {
     app,
@@ -89,19 +98,41 @@ export function createApp(config: TokenizerProxyConfig): TokenizerProxyApp {
 
 function readTestEnvironmentId(
   config: TokenizerProxyConfig,
-  readHeader: (name: string) => string | undefined,
+  input: {
+    readHeader: (name: string) => string | undefined;
+    readQuery: (name: string) => string | undefined;
+    requestPath: string;
+  },
 ): string | undefined {
   const testIsolation = config.__dangerouslyEnableTestIsolation;
   if (testIsolation === undefined) {
     return undefined;
   }
 
-  const testEnvironmentId = readHeader(testIsolation.testEnvironmentIdHeader);
+  const testEnvironmentId =
+    input.readHeader(testIsolation.testEnvironmentIdHeader) ??
+    input.readQuery(testIsolation.testEnvironmentIdHeader) ??
+    readTestEnvironmentIdFromPath(input.requestPath);
   if (testEnvironmentId === undefined || testEnvironmentId.length === 0) {
     throw new Error(
-      `Expected '${testIsolation.testEnvironmentIdHeader}' header for isolated tokenizer-proxy request.`,
+      `Expected '${testIsolation.testEnvironmentIdHeader}' header or query parameter for isolated tokenizer-proxy request.`,
     );
   }
 
   return testEnvironmentId;
+}
+
+function readTestEnvironmentIdFromPath(requestPath: string): string | undefined {
+  const prefix = `${TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX}/`;
+  if (!requestPath.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+
+  return decodeURIComponent(pathWithoutPrefix.slice(0, separatorIndex));
 }

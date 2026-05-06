@@ -13,7 +13,11 @@ import type { Context } from "hono";
 
 import { logger } from "../logger.js";
 import type { AppContextBindings } from "../types.js";
-import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
+import {
+  EGRESS_BASE_PATH,
+  TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX,
+  EgressRequestHeaders,
+} from "./constants.js";
 import { CredentialCache, type CachedCredential } from "./credential-cache.js";
 import {
   authorizeEgressGrant,
@@ -155,10 +159,34 @@ function resolveTargetPath(requestPath: string): string | undefined {
   }
 
   if (!requestPath.startsWith(`${EGRESS_BASE_PATH}/`)) {
-    return undefined;
+    return resolveTestEnvironmentTargetPath(requestPath);
   }
 
   return requestPath.slice(EGRESS_BASE_PATH.length);
+}
+
+function resolveTestEnvironmentTargetPath(requestPath: string): string | undefined {
+  const prefix = `${TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX}/`;
+  if (!requestPath.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const pathWithoutPrefix = requestPath.slice(prefix.length);
+  const separatorIndex = pathWithoutPrefix.indexOf("/");
+  if (separatorIndex <= 0) {
+    return undefined;
+  }
+
+  const pathWithoutEnvironmentId = pathWithoutPrefix.slice(separatorIndex);
+  if (pathWithoutEnvironmentId === EGRESS_BASE_PATH) {
+    return "/";
+  }
+
+  if (!pathWithoutEnvironmentId.startsWith(`${EGRESS_BASE_PATH}/`)) {
+    return undefined;
+  }
+
+  return pathWithoutEnvironmentId.slice(EGRESS_BASE_PATH.length);
 }
 
 function resolveRequestTargetPath(ctx: Context<AppContextBindings>): string {

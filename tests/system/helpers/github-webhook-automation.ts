@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { getControlPlaneDatabaseSchema, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
   AgentStreamClient,
@@ -7,14 +8,18 @@ import {
   readCodexThread,
   resumeCodexThread,
 } from "@mistle/integrations-definitions/agent-runtimes/codex/server";
-import { buildIntegrationWebhookCallbackUrl } from "@mistle/integrations-definitions/server";
+import {
+  buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata,
+  buildIntegrationWebhookCallbackUrl,
+} from "@mistle/integrations-definitions/server";
 import { readTestContext, writeTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { createNodeSandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/node.js";
+import type { SandboxSessionRuntime } from "../../../packages/sandbox-session-client/src/runtime.js";
 import { SandboxSessionTransport } from "../../../packages/sandbox-session-client/src/transport.js";
-import type { AuthenticatedSession, SystemTestFixture } from "../system-test-context.js";
 import {
   readGitHubAppWebhookConfig,
   resolveGitHubAppInstallationId,
@@ -61,6 +66,7 @@ const IntegrationWebhookSourceResponseSchema = z.looseObject({
   targetKey: z.string().min(1),
   integrationConnectionId: z.string().min(1),
   endpointKey: z.string().min(1),
+  providerMetadata: z.record(z.string(), z.unknown()).optional(),
   callbackUrl: z.string().min(1).optional(),
 });
 
@@ -72,11 +78,9 @@ const WebhookAutomationResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
 
-const StartRedirectConnectionResponseSchema = z
-  .object({
-    authorizationUrl: z.url(),
-  })
-  .strict();
+const StartRedirectConnectionResponseSchema = z.looseObject({
+  authorizationUrl: z.url(),
+});
 
 const RefreshIntegrationConnectionResourcesResponseSchema = z
   .object({
@@ -119,6 +123,14 @@ const GitHubIssueCommentListResponseSchema = z.array(GitHubIssueCommentResponseS
 type GitHubIssueComment = z.infer<typeof GitHubIssueCommentResponseSchema>;
 type CodexThreadReadResult = Awaited<ReturnType<typeof readCodexThread>>;
 type GitHubWebhookSource = z.infer<typeof IntegrationWebhookSourceResponseSchema>;
+
+const GitHubIssueCommentWebhookCapabilitiesProviderMetadata =
+  buildGitHubAppManifestWebhookTriggerCapabilitiesProviderMetadata({
+    default_events: ["issue_comment"],
+    default_permissions: {
+      issues: "read",
+    },
+  });
 type CodexNotification = Parameters<CodexJsonRpcClient["onNotification"]>[0] extends (
   notification: infer T,
 ) => void
@@ -134,6 +146,34 @@ type ObservedCodexTurnCompletion = {
   turnId: string;
   status: string;
   errorMessage: string | null;
+};
+
+export type AuthenticatedSession = {
+  cookie: string;
+  organizationId: string;
+  userId: string;
+};
+
+export type GitHubWebhookRequestInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  redirect?: "follow" | "manual" | "error";
+};
+
+export type GitHubWebhookHttpResponse = {
+  status: number;
+  text: () => Promise<string>;
+};
+
+export type GitHubWebhookAutomationFixture = {
+  authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
+  request: (path: string, init?: GitHubWebhookRequestInit) => Promise<GitHubWebhookHttpResponse>;
+  db: ControlPlaneDatabase;
+  dataPlaneGatewayBaseUrl: string;
+  testContextId?: string;
+  testEnvironmentId?: string;
+  createSessionRuntime?: () => SandboxSessionRuntime;
 };
 
 export type GitHubRepository = {
@@ -174,8 +214,11 @@ type SharedGitHubWebhookAutomationHarness = {
   };
 };
 
-let sharedGitHubWebhookHarnessPromise: Promise<SharedGitHubWebhookAutomationHarness> | null = null;
 export const SharedGitHubWebhookHarnessContextId = "system-github-webhook-harness";
+const sharedGitHubWebhookHarnessPromises = new Map<
+  string,
+  Promise<SharedGitHubWebhookAutomationHarness>
+>();
 export const SharedGitHubWebhookHarnessContextSchema = z
   .object({
     originalWebhookConfig: z
@@ -235,6 +278,25 @@ export function requireGitHubWebhookAutomationEnv(name: (typeof RequiredEnvNames
   }
 
   return value;
+}
+
+function getSharedGitHubWebhookHarnessContextId(fixture: GitHubWebhookAutomationFixture): string {
+  return fixture.testContextId === undefined
+    ? SharedGitHubWebhookHarnessContextId
+    : `${SharedGitHubWebhookHarnessContextId}-${fixture.testContextId}`;
+}
+
+function withPublicRequestTestEnvironmentId(input: {
+  url: string;
+  testEnvironmentId: string | undefined;
+}): string {
+  if (input.testEnvironmentId === undefined) {
+    return input.url;
+  }
+
+  const url = new URL(input.url);
+  url.searchParams.set("x-mistle-test-environment-id", input.testEnvironmentId);
+  return url.toString();
 }
 
 export function parseGitHubRepository(input: string): GitHubRepository {
@@ -317,7 +379,7 @@ function formatDiagnosticError(error: unknown): string {
 }
 
 async function buildWebhookDeliveryDiagnostics(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   githubWebhookSource: GitHubWebhookSource;
   payloadMarker: string;
   issueNumber: number;
@@ -359,7 +421,7 @@ async function buildWebhookDeliveryDiagnostics(input: {
 }
 
 async function buildAutomationRunFailureDiagnostics(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   automationRunId: string;
   conversationId: string | null;
 }): Promise<string> {
@@ -403,7 +465,7 @@ async function buildAutomationRunFailureDiagnostics(input: {
 }
 
 async function readAutomationConversationRouteDiagnostics(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   conversationId: string;
 }) {
   return await input.fixture.db.query.automationConversationRoutes.findMany({
@@ -413,9 +475,11 @@ async function readAutomationConversationRouteDiagnostics(input: {
   });
 }
 
-async function readSharedGitHubWebhookAutomationHarnessFromContext(): Promise<SharedGitHubWebhookAutomationHarness | null> {
+async function readSharedGitHubWebhookAutomationHarnessFromContext(input: {
+  fixture: GitHubWebhookAutomationFixture;
+}): Promise<SharedGitHubWebhookAutomationHarness | null> {
   const persisted = await readTestContext({
-    id: SharedGitHubWebhookHarnessContextId,
+    id: getSharedGitHubWebhookHarnessContextId(input.fixture),
     schema: SharedGitHubWebhookHarnessContextSchema,
   }).catch(() => null);
 
@@ -443,9 +507,9 @@ async function readSharedGitHubWebhookAutomationHarnessFromContext(): Promise<Sh
 }
 
 async function requestJsonOrThrow<TSchema extends z.ZodType>(input: {
-  request: (path: string, init?: RequestInit) => Promise<Response>;
+  request: GitHubWebhookAutomationFixture["request"];
   path: string;
-  init: RequestInit;
+  init: GitHubWebhookRequestInit;
   expectedStatus: number;
   description: string;
   schema: TSchema;
@@ -676,7 +740,7 @@ export async function waitForCodexTurnCompleted(input: {
 }
 
 export async function triggerGitHubWebhookAutomationFollowUp(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   conversation: GitHubWebhookAutomationConversation;
   followUpMarker: string;
 }): Promise<GitHubWebhookAutomationFollowUp> {
@@ -1154,7 +1218,7 @@ export async function waitForCodexAssistantMessageText(input: {
 }
 
 async function createOpenAiConnection(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   openAiApiKey: string;
 }): Promise<string> {
@@ -1187,7 +1251,7 @@ async function createOpenAiConnection(input: {
 }
 
 async function createSandboxProfile(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
 }): Promise<string> {
   const sandboxProfile = await requestJsonOrThrow({
@@ -1212,7 +1276,7 @@ async function createSandboxProfile(input: {
 }
 
 async function putSandboxBindings(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   sandboxProfileId: string;
   bindings: unknown[];
@@ -1240,7 +1304,7 @@ async function putSandboxBindings(input: {
 }
 
 async function createGitHubConnection(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   githubAppId: string;
   githubAppSlug: string;
@@ -1283,7 +1347,7 @@ async function createGitHubConnection(input: {
 }
 
 async function completeGitHubInstallation(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   githubConnectionId: string;
   githubInstallationId: string;
@@ -1348,7 +1412,7 @@ async function completeGitHubInstallation(input: {
 }
 
 async function refreshGitHubRepositoryResource(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   githubConnectionId: string;
   repository: GitHubRepository;
@@ -1406,7 +1470,7 @@ async function refreshGitHubRepositoryResource(input: {
 }
 
 async function readGitHubWebhookSource(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   githubConnectionId: string;
 }): Promise<GitHubWebhookSource> {
@@ -1438,8 +1502,26 @@ async function readGitHubWebhookSource(input: {
   return githubWebhookSource;
 }
 
+async function ensureGitHubWebhookSourceSupportsIssueComments(input: {
+  fixture: GitHubWebhookAutomationFixture;
+  githubWebhookSource: GitHubWebhookSource;
+}): Promise<void> {
+  const tables = getControlPlaneDatabaseSchema(input.fixture.db);
+
+  await input.fixture.db
+    .update(tables.integrationWebhookSources)
+    .set({
+      providerMetadata: {
+        ...(input.githubWebhookSource.providerMetadata ?? {}),
+        ...GitHubIssueCommentWebhookCapabilitiesProviderMetadata,
+      },
+      updatedAt: sql`now()`,
+    })
+    .where(eq(tables.integrationWebhookSources.id, input.githubWebhookSource.id));
+}
+
 async function createWebhookAutomation(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   session: AuthenticatedSession;
   githubWebhookSource: GitHubWebhookSource;
   sandboxProfileId: string;
@@ -1488,7 +1570,7 @@ async function createWebhookAutomation(input: {
 }
 
 async function createSharedGitHubWebhookAutomationHarness(
-  fixture: SystemTestFixture,
+  fixture: GitHubWebhookAutomationFixture,
 ): Promise<SharedGitHubWebhookAutomationHarness> {
   const repository = parseGitHubRepository(
     requireGitHubWebhookAutomationEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"),
@@ -1553,10 +1635,13 @@ async function createSharedGitHubWebhookAutomationHarness(
     });
 
     originalGitHubAppWebhookConfig = await readGitHubAppWebhookConfig();
-    const expectedWebhookCallbackUrl = buildIntegrationWebhookCallbackUrl({
-      controlPlaneBaseUrl: `https://${publicHostname}`,
-      targetKey: GitHubTargetKey,
-      endpointKey: githubWebhookSource.endpointKey,
+    const expectedWebhookCallbackUrl = withPublicRequestTestEnvironmentId({
+      url: buildIntegrationWebhookCallbackUrl({
+        controlPlaneBaseUrl: `https://${publicHostname}`,
+        targetKey: GitHubTargetKey,
+        endpointKey: githubWebhookSource.endpointKey,
+      }),
+      testEnvironmentId: fixture.testEnvironmentId,
     });
     await updateGitHubAppWebhookConfig({
       url: expectedWebhookCallbackUrl,
@@ -1569,7 +1654,7 @@ async function createSharedGitHubWebhookAutomationHarness(
     });
     await waitForGitHubAppWebhookUrl(expectedWebhookCallbackUrl);
     await writeTestContext({
-      id: SharedGitHubWebhookHarnessContextId,
+      id: getSharedGitHubWebhookHarnessContextId(fixture),
       value: {
         originalWebhookConfig: {
           url: originalGitHubAppWebhookConfig.url,
@@ -1622,27 +1707,34 @@ async function createSharedGitHubWebhookAutomationHarness(
 }
 
 export async function getSharedGitHubWebhookAutomationHarness(
-  fixture: SystemTestFixture,
+  fixture: GitHubWebhookAutomationFixture,
 ): Promise<SharedGitHubWebhookAutomationHarness> {
-  if (sharedGitHubWebhookHarnessPromise === null) {
-    sharedGitHubWebhookHarnessPromise = (async () => {
-      const persistedHarness = await readSharedGitHubWebhookAutomationHarnessFromContext();
-      if (persistedHarness !== null) {
-        return persistedHarness;
-      }
-
-      return await createSharedGitHubWebhookAutomationHarness(fixture);
-    })().catch((error) => {
-      sharedGitHubWebhookHarnessPromise = null;
-      throw error;
-    });
+  const contextId = getSharedGitHubWebhookHarnessContextId(fixture);
+  const existingPromise = sharedGitHubWebhookHarnessPromises.get(contextId);
+  if (existingPromise !== undefined) {
+    return await existingPromise;
   }
 
-  return await sharedGitHubWebhookHarnessPromise;
+  const harnessPromise = (async () => {
+    const persistedHarness = await readSharedGitHubWebhookAutomationHarnessFromContext({
+      fixture,
+    });
+    if (persistedHarness !== null) {
+      return persistedHarness;
+    }
+
+    return await createSharedGitHubWebhookAutomationHarness(fixture);
+  })().catch((error) => {
+    sharedGitHubWebhookHarnessPromises.delete(contextId);
+    throw error;
+  });
+  sharedGitHubWebhookHarnessPromises.set(contextId, harnessPromise);
+
+  return await harnessPromise;
 }
 
 export async function startGitHubWebhookAutomationConversation(input: {
-  fixture: SystemTestFixture;
+  fixture: GitHubWebhookAutomationFixture;
   automationInstructions?: string;
 }): Promise<GitHubWebhookAutomationConversation> {
   const openAiApiKey = requireGitHubWebhookAutomationEnv("MISTLE_TEST_OPENAI_API_KEY");
@@ -1716,7 +1808,7 @@ export async function startGitHubWebhookAutomationConversation(input: {
     });
 
     sessionTransport = new SandboxSessionTransport({
-      runtime: createNodeSandboxSessionRuntime(),
+      runtime: input.fixture.createSessionRuntime?.() ?? createNodeSandboxSessionRuntime(),
     });
     await sessionTransport.connect({
       connectionUrl: resolveGatewayWebSocketUrl({
@@ -1801,6 +1893,11 @@ export async function startGitHubWebhookAutomationConversation(input: {
       ],
     });
 
+    await ensureGitHubWebhookSourceSupportsIssueComments({
+      fixture: input.fixture,
+      githubWebhookSource,
+    });
+
     await createWebhookAutomation({
       fixture: input.fixture,
       session,
@@ -1837,7 +1934,9 @@ export async function startGitHubWebhookAutomationConversation(input: {
     }
 
     let webhookEvent: Awaited<
-      ReturnType<SystemTestFixture["db"]["query"]["integrationWebhookEvents"]["findMany"]>
+      ReturnType<
+        GitHubWebhookAutomationFixture["db"]["query"]["integrationWebhookEvents"]["findMany"]
+      >
     >[number];
     try {
       webhookEvent = await waitForCondition({

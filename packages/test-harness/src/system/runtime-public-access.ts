@@ -387,12 +387,13 @@ async function handleRequest(request, response) {
     return;
   }
 
-  const targetUrl = new URL(request.url ?? "/", target);
+  const targetUrl = new URL(request.url ?? "/", target.localBaseUrl);
   const proxyRequest = http.request(targetUrl, {
     method: request.method,
     headers: {
       ...request.headers,
       host: targetUrl.host,
+      "x-mistle-test-environment-id": target.environmentId,
     },
   }, (proxyResponse) => {
     response.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
@@ -412,13 +413,16 @@ function handleUpgrade(request, socket, head) {
     return;
   }
 
-  const targetUrl = new URL(request.url ?? "/", target);
+  const targetUrl = new URL(request.url ?? "/", target.localBaseUrl);
   const targetSocket = net.connect({
     host: targetUrl.hostname,
     port: Number(targetUrl.port),
   });
   targetSocket.once("connect", () => {
-    const headers = Object.entries(request.headers)
+    const headers = Object.entries({
+      ...request.headers,
+      "x-mistle-test-environment-id": target.environmentId,
+    })
       .map(([name, value]) => name + ": " + (Array.isArray(value) ? value.join(", ") : value ?? ""))
       .join("\r\n");
     targetSocket.write((request.method ?? "GET") + " " + targetUrl.pathname + targetUrl.search + " HTTP/" + request.httpVersion + "\r\n" + headers + "\r\n\r\n");
@@ -440,7 +444,14 @@ function resolveTarget(request) {
   if (host.length === 0 || environmentId.length === 0) {
     return undefined;
   }
-  return routes.get(createRouteKey(host, environmentId));
+  const localBaseUrl = routes.get(createRouteKey(host, environmentId));
+  if (localBaseUrl === undefined) {
+    return undefined;
+  }
+  return {
+    environmentId,
+    localBaseUrl,
+  };
 }
 
 function createRouteKey(hostname, environmentId) {

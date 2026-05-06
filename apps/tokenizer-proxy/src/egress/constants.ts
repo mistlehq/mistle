@@ -1,5 +1,10 @@
 export const EGRESS_BASE_PATH = "/tokenizer-proxy/egress";
 export const EGRESS_WILDCARD_BASE_PATH = "/tokenizer-proxy/egress/*";
+export const TEST_ENVIRONMENT_EGRESS_BASE_PATH_PREFIX = "/__test-environments";
+export const TEST_ENVIRONMENT_EGRESS_BASE_PATH_PATTERN =
+  "/__test-environments/:testEnvironmentId/tokenizer-proxy/egress";
+export const TEST_ENVIRONMENT_EGRESS_WILDCARD_BASE_PATH_PATTERN =
+  "/__test-environments/:testEnvironmentId/tokenizer-proxy/egress/*";
 
 export const EgressRequestHeaders = {
   GRANT: "X-Mistle-Egress-Grant",

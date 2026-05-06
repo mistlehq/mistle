@@ -116,7 +116,10 @@ function start(input: {
               controlPlaneBaseUrl: endpoint.hostBaseUrl,
               controlPlanePort: endpoint.port,
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+              gatewayWsUrl: withTestEnvironmentIdQueryParam({
+                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+                environmentId: startInput.environmentId,
+              }),
               postgres: resolvedPostgres,
               sandboxBaseImageRef: readSandboxBaseImageRef({
                 sandbox: input.sandbox,
@@ -128,7 +131,10 @@ function start(input: {
               controlPlaneBaseUrl: endpoint.hostBaseUrl,
               controlPlanePort: endpoint.port,
               dataPlaneBaseUrl: peer.url(ServiceIds.DATA_PLANE_API),
-              gatewayWsUrl: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+              gatewayWsUrl: withTestEnvironmentIdQueryParam({
+                url: peer.ws(ServiceIds.DATA_PLANE_GATEWAY, "/tunnel/sandbox"),
+                environmentId: startInput.environmentId,
+              }),
               postgres: resolvedPostgres,
               sandboxBaseImageRef: readSandboxBaseImageRef({
                 sandbox: input.sandbox,
@@ -159,6 +165,12 @@ function start(input: {
       stop: runtime.stop,
     };
   };
+}
+
+function withTestEnvironmentIdQueryParam(input: { url: string; environmentId: string }): string {
+  const url = new URL(input.url);
+  url.searchParams.set(TestEnvironmentIdHeader, input.environmentId);
+  return url.toString();
 }
 
 function config(input: {

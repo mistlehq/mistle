@@ -1473,7 +1473,15 @@ fn resolve_tokenizer_proxy_forward_url(
         tokenizer_proxy_url.path(),
         forward_url.path(),
     ));
-    tokenizer_proxy_url.set_query(forward_url.query());
+    let tokenizer_proxy_query = tokenizer_proxy_url.query().map(str::to_string);
+    let forward_query = forward_url.query();
+    let resolved_query = match (tokenizer_proxy_query, forward_query) {
+        (Some(base_query), Some(forward_query)) => Some(format!("{base_query}&{forward_query}")),
+        (Some(base_query), None) => Some(base_query),
+        (None, Some(forward_query)) => Some(forward_query.to_string()),
+        (None, None) => None,
+    };
+    tokenizer_proxy_url.set_query(resolved_query.as_deref());
     tokenizer_proxy_url.set_fragment(None);
 
     Ok(tokenizer_proxy_url.to_string())
@@ -1553,9 +1561,9 @@ mod tests {
         DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY,
         SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, apply_runtime_startup_overrides,
         build_setup_script_environment, collect_runtime_environment,
-        merge_managed_runtime_environment, run_setup_script, run_setup_script_in_directory,
-        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
-        spawn_runtime_readiness_projection_thread,
+        merge_managed_runtime_environment, resolve_tokenizer_proxy_forward_url, run_setup_script,
+        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
+        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
     use crate::test_support::TestEnvVarGuard;
@@ -1861,6 +1869,34 @@ supports_websockets = false
         assert_eq!(
             workspace_source_egress_grant_token,
             &Some("signed-github-egress-grant".to_string())
+        );
+    }
+
+    #[test]
+    fn preserves_tokenizer_proxy_query_when_rewriting_workspace_source_urls() {
+        let clone_url = resolve_tokenizer_proxy_forward_url(
+            "http://127.0.0.1:5205/tokenizer-proxy/egress?x-mistle-test-environment-id=test_env_123",
+            "https://github.com/mistlehq/private-repo.git",
+        )
+        .expect("tokenizer proxy URL should resolve");
+
+        assert_eq!(
+            clone_url,
+            "http://127.0.0.1:5205/tokenizer-proxy/egress/mistlehq/private-repo.git?x-mistle-test-environment-id=test_env_123",
+        );
+    }
+
+    #[test]
+    fn preserves_tokenizer_proxy_path_prefix_when_rewriting_workspace_source_urls() {
+        let clone_url = resolve_tokenizer_proxy_forward_url(
+            "http://127.0.0.1:5205/__test-environments/test_env_123/tokenizer-proxy/egress",
+            "https://github.com/mistlehq/private-repo.git",
+        )
+        .expect("tokenizer proxy URL should resolve");
+
+        assert_eq!(
+            clone_url,
+            "http://127.0.0.1:5205/__test-environments/test_env_123/tokenizer-proxy/egress/mistlehq/private-repo.git",
         );
     }
 
