@@ -4,10 +4,7 @@ import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-quer
 import { useState } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 
-import {
-  AppShellLoadingIndicators,
-  createAppShellLoadingIndicatorMeta,
-} from "./app-shell-loading-indicator-meta.js";
+import { LoadingIndicators, createLoadingIndicatorMeta } from "../shared/loading-indicator-meta.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
 
 type DeferredQuery = {
@@ -62,7 +59,7 @@ function TopLoadingBarHarness(): React.JSX.Element {
 
   useQuery({
     enabled: isActive,
-    meta: createAppShellLoadingIndicatorMeta(AppShellLoadingIndicators.TOP_LOADING_BAR),
+    meta: createLoadingIndicatorMeta(LoadingIndicators.TOP_LOADING_BAR),
     queryFn: async () => deferredQuery.promise,
     queryKey: ["storybook-top-loading-bar", loadId],
   });
