@@ -81,6 +81,9 @@ const ControlPlaneOpenWorkflowSchema = "control_plane_openworkflow";
 const DataPlaneOpenWorkflowSchema = "data_plane_openworkflow";
 const MigrationLockPollIntervalMs = 50;
 const MigrationLockTimeoutMs = 120_000;
+const PostgresCleanupRetryDelayMs = 100;
+const PostgresCleanupMaxAttempts = 3;
+const PostgresDeadlockDetectedCode = "40P01";
 const PostgresMigrationCoordinatorRootDirectoryPath = join(
   tmpdir(),
   "mistle-test-harness",
@@ -694,6 +697,7 @@ function createResolvedPostgresInfra(input: {
       await dropPostgresLogicalSchemas({
         requirement: input.requirement,
         lease: input.lease,
+        environmentId: input.environmentId,
         controlPlaneSchemaName: input.resolved.controlPlaneSchemaName,
         dataPlaneSchemaName: input.resolved.dataPlaneSchemaName,
         timings: cleanupTimings,
@@ -1584,6 +1588,7 @@ function createLogicalMigrationTrackingSchemaName(schemaName: string): string {
 async function dropPostgresLogicalSchemas(input: {
   requirement: TestInfraRequirement;
   lease: SharedPostgresLease;
+  environmentId: string;
   controlPlaneSchemaName: string;
   dataPlaneSchemaName: string;
   timings: Map<string, number>;
@@ -1592,6 +1597,7 @@ async function dropPostgresLogicalSchemas(input: {
     await measure(input.timings, "drop-control-plane-schema", async () =>
       dropPostgresSchemas({
         lease: input.lease,
+        environmentId: input.environmentId,
         schemaNames: [
           input.controlPlaneSchemaName,
           createLogicalMigrationTrackingSchemaName(input.controlPlaneSchemaName),
@@ -1605,6 +1611,7 @@ async function dropPostgresLogicalSchemas(input: {
     await measure(input.timings, "drop-data-plane-schema", async () =>
       dropPostgresSchemas({
         lease: input.lease,
+        environmentId: input.environmentId,
         schemaNames: [
           input.dataPlaneSchemaName,
           createLogicalMigrationTrackingSchemaName(input.dataPlaneSchemaName),
@@ -1790,6 +1797,10 @@ function isNodeErrorCode(error: unknown, code: string): boolean {
   return isRecord(error) && error["code"] === code;
 }
 
+function isPostgresErrorCode(error: unknown, code: string): boolean {
+  return isRecord(error) && error["code"] === code;
+}
+
 function isProcessAlive(processId: number): boolean {
   try {
     process.kill(processId, 0);
@@ -1811,37 +1822,124 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function dropPostgresSchemas(input: {
   lease: SharedPostgresLease;
+  environmentId: string;
   schemaNames: readonly string[];
 }): Promise<void> {
-  await runPostgresAdminCommand({
-    containerId: input.lease.infra.postgres.runtimeMetadata.postgresContainerId,
-    username: input.lease.infra.postgres.postgres.username,
-    databaseName: input.lease.infra.postgres.postgres.databaseName,
-    sql: input.schemaNames
-      .map((schemaName) => `drop schema if exists ${quoteSqlIdentifier(schemaName)} cascade`)
-      .join(";"),
+  const client = new Client({
+    connectionString: createDatabaseUrl({
+      username: input.lease.infra.postgres.postgres.username,
+      password: input.lease.infra.postgres.postgres.password,
+      host: input.lease.infra.postgres.postgres.host,
+      port: input.lease.infra.postgres.postgres.port,
+      databaseName: input.lease.infra.postgres.postgres.databaseName,
+      applicationName: createPostgresCleanupApplicationName(input.environmentId),
+    }),
   });
+
+  await client.connect();
+  try {
+    for (const schemaName of input.schemaNames) {
+      await dropPostgresSchemaWithRetry({
+        client,
+        schemaName,
+      });
+    }
+  } finally {
+    await client.end();
+  }
 }
 
-async function runPostgresAdminCommand(input: {
-  containerId: string;
-  username: string;
-  databaseName?: string;
-  sql: string;
+async function dropPostgresSchemaWithRetry(input: {
+  client: Client;
+  schemaName: string;
 }): Promise<void> {
-  await execFileAsync("docker", [
-    "exec",
-    input.containerId,
-    "psql",
-    "-U",
-    input.username,
-    "-d",
-    input.databaseName ?? "postgres",
-    "-v",
-    "ON_ERROR_STOP=1",
-    "-c",
-    input.sql,
-  ]);
+  let lastDiagnostics: readonly PostgresActivityDiagnostic[] = [];
+
+  for (let attempt = 1; attempt <= PostgresCleanupMaxAttempts; attempt += 1) {
+    try {
+      await input.client.query(
+        `drop schema if exists ${quoteSqlIdentifier(input.schemaName)} cascade`,
+      );
+      return;
+    } catch (error) {
+      if (!isPostgresErrorCode(error, PostgresDeadlockDetectedCode)) {
+        throw error;
+      }
+
+      lastDiagnostics = await readPostgresActivityDiagnostics({
+        client: input.client,
+        schemaName: input.schemaName,
+      });
+
+      if (attempt === PostgresCleanupMaxAttempts) {
+        throw new Error(
+          `Deadlock while dropping Postgres test schema '${input.schemaName}' after ${String(
+            PostgresCleanupMaxAttempts,
+          )} attempts. Lock diagnostics: ${JSON.stringify(lastDiagnostics)}`,
+          {
+            cause: error,
+          },
+        );
+      }
+
+      await systemSleeper.sleep(PostgresCleanupRetryDelayMs * attempt);
+    }
+  }
+}
+
+type PostgresActivityDiagnostic = {
+  pid: number;
+  applicationName: string | null;
+  state: string | null;
+  waitEventType: string | null;
+  waitEvent: string | null;
+  query: string | null;
+};
+
+async function readPostgresActivityDiagnostics(input: {
+  client: Client;
+  schemaName: string;
+}): Promise<readonly PostgresActivityDiagnostic[]> {
+  const result = await input.client.query<PostgresActivityDiagnostic>(
+    `
+      with target_namespaces as (
+        select oid
+        from pg_namespace
+        where nspname = $1
+      ),
+      target_relations as (
+        select oid
+        from pg_class
+        where relnamespace in (select oid from target_namespaces)
+      ),
+      target_pids as (
+        select distinct pg_locks.pid
+        from pg_locks
+        where pg_locks.pid <> pg_backend_pid()
+          and (
+            (
+              pg_locks.locktype = 'object'
+              and pg_locks.classid = 'pg_namespace'::regclass
+              and pg_locks.objid in (select oid from target_namespaces)
+            )
+            or pg_locks.relation in (select oid from target_relations)
+          )
+      )
+      select
+        pg_stat_activity.pid,
+        pg_stat_activity.application_name as "applicationName",
+        pg_stat_activity.state,
+        pg_stat_activity.wait_event_type as "waitEventType",
+        pg_stat_activity.wait_event as "waitEvent",
+        left(pg_stat_activity.query, 500) as query
+      from pg_stat_activity
+      where pg_stat_activity.pid in (select pid from target_pids)
+      order by pg_stat_activity.pid
+    `,
+    [input.schemaName],
+  );
+
+  return result.rows;
 }
 
 function createDatabaseUrl(input: {
@@ -1850,8 +1948,22 @@ function createDatabaseUrl(input: {
   host: string;
   port: number;
   databaseName: string;
+  applicationName?: string;
 }): string {
-  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
+  const url = new URL(
+    `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(
+      input.password,
+    )}@${input.host}:${String(input.port)}/${input.databaseName}`,
+  );
+  if (input.applicationName !== undefined) {
+    url.searchParams.set("application_name", input.applicationName);
+  }
+
+  return url.toString();
+}
+
+export function createPostgresCleanupApplicationName(environmentId: string): string {
+  return `mistle_test_cleanup_${createSafeIdentifier(environmentId)}`;
 }
 
 function quoteSqlIdentifier(identifier: string): string {

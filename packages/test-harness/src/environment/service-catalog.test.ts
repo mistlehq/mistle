@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createTestExtraInfra, createTestRegistry } from "./service-catalog.js";
+import {
+  createPostgresCleanupApplicationName,
+  createTestExtraInfra,
+  createTestRegistry,
+} from "./service-catalog.js";
 import { createDataPlaneTestSchemaName } from "./test-isolation.js";
 
 describe("createTestRegistry", () => {
@@ -99,5 +103,14 @@ describe("createTestRegistry", () => {
     );
 
     expect(schemaName.length).toBeLessThanOrEqual(63);
+  });
+
+  it("keeps Postgres cleanup application names below the Postgres identifier limit", () => {
+    const applicationName = createPostgresCleanupApplicationName(
+      "test_env_596504dee50c4663b35c_b2c6f6b2c3_eede8a34",
+    );
+
+    expect(applicationName).toMatch(/^mistle_test_cleanup_test_env_[a-z0-9_]+$/u);
+    expect(applicationName.length).toBeLessThanOrEqual(63);
   });
 });

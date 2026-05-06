@@ -56,9 +56,6 @@ export function service(
   infra: readonly TestInfraRequirement[],
   options: IntegrationServiceOptions,
 ): TestServiceDefinition {
-  const requiresEnvironmentScope =
-    options.sandbox !== undefined || infra.some((requirement) => requirement.id === InfraIds.OTLP);
-
   return {
     id: ServiceIds.DATA_PLANE_GATEWAY,
     infra,
@@ -68,7 +65,7 @@ export function service(
         host: Host,
       },
     },
-    ...(requiresEnvironmentScope ? { poolScope: "environment" } : {}),
+    poolScope: "environment",
     supportedModes: ["runtime"],
     healthCheck: async (runtime) => httpHealth(runtime, ServiceIds.DATA_PLANE_GATEWAY),
     start: start({
