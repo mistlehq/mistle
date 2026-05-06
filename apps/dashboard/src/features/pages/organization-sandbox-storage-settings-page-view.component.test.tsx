@@ -39,6 +39,7 @@ describe("OrganizationSandboxStorageSettingsPageView", () => {
     );
 
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Experimental" })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("switch", { name: "Allow persistent sandboxes" }));
 

@@ -69,16 +69,22 @@ export function OrganizationSandboxStorageSettingsPageView(
             {input.saveErrorMessage === null ? null : (
               <Notice variant="alert">{input.saveErrorMessage}</Notice>
             )}
-            <SettingsSwitchField
-              checked={input.state.persistentSandboxesEnabled}
-              description="Allow this organization to use persistent sandbox storage."
-              disabled={input.isSaving}
-              id="persistent-sandboxes-enabled"
-              label="Allow persistent sandboxes"
-              onCheckedChange={(checked) => {
-                void input.onPersistentSandboxesEnabledChange(checked);
-              }}
-            />
+            <div className="flex max-w-5xl flex-col gap-2">
+              <h2 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                Experimental
+              </h2>
+              <SettingsSwitchField
+                checked={input.state.persistentSandboxesEnabled}
+                description="Allow this organization to use persistent sandbox storage."
+                disabled={input.isSaving}
+                framed
+                id="persistent-sandboxes-enabled"
+                label="Allow persistent sandboxes"
+                onCheckedChange={(checked) => {
+                  void input.onPersistentSandboxesEnabledChange(checked);
+                }}
+              />
+            </div>
             {input.isSaving ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Spinner aria-hidden className="size-4" />
