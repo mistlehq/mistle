@@ -997,19 +997,17 @@ describe("SandboxProfileEditorPage", () => {
     if (hourlyBreakdown === null) {
       throw new Error("Expected hourly cron breakdown to resolve.");
     }
-    expect(formatCronExpressionBreakdownDiagram(hourlyBreakdown)).toContain("| hour: every hour");
-    expect(formatCronExpressionBreakdownDiagram(hourlyBreakdown)).toContain("minute: at minute 15");
+    const hourlyDiagram = formatCronExpressionBreakdownDiagram(hourlyBreakdown);
+    expect(hourlyDiagram).toContain("| hour: every hour");
+    expect(hourlyDiagram).toContain("minute: at minute 15");
 
     const intervalBreakdown = resolveCronExpressionBreakdown("*/30 9-17 * * 1-5");
-    expect(intervalBreakdown).toMatchObject({
-      dayOfWeek: "Monday-Friday",
-    });
     if (intervalBreakdown === null) {
       throw new Error("Expected interval cron breakdown to resolve.");
     }
-    expect(formatCronExpressionBreakdownDiagram(intervalBreakdown)).toContain(
-      "minute: every 30 minutes",
-    );
+    expect(intervalBreakdown.dayOfWeek).toBe("Monday-Friday");
+    const intervalDiagram = formatCronExpressionBreakdownDiagram(intervalBreakdown);
+    expect(intervalDiagram).toContain("minute: every 30 minutes");
 
     expect(resolveCronExpressionBreakdown("not a cron expression")).toBeNull();
   });

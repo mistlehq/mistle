@@ -11,9 +11,10 @@ import { and, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import { recordMissingScheduleTarget } from "./telemetry.js";
 
-const CatchUpWindowMs = 24 * 60 * 60 * 1000;
+const MinuteMs = 60 * 1000;
+const CatchUpWindowMs = 24 * 60 * MinuteMs;
 const ClaimBatchSize = 500;
-const MaxDueRangeIterations = 26 * 60;
+const MaxDueRangeIterations = Math.ceil(CatchUpWindowMs / MinuteMs) + 60;
 const MaxBatchesPerDispatch = 100;
 
 type ClaimedScheduleRow = {
