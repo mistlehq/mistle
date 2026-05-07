@@ -20,6 +20,7 @@ import {
 } from "./session-composer/index.js";
 import {
   useFollowStreamingAtBottomScrollBehavior,
+  useInitialConversationBottomScrollBehavior,
   usePinnedTurnToTopScrollBehavior,
   type SessionConversationScrollBehavior,
 } from "./session-conversation-scroll-behavior.js";
@@ -28,6 +29,8 @@ type SessionConversationMainContentProps = {
   activeTurnId: string | null;
   isTurnInProgress: boolean;
   pendingTurnId: string | null;
+  autoScrollToBottomOnInitialLoad?: boolean;
+  initialBottomScrollResetKey?: string | null;
   scrollBehavior?: SessionConversationScrollBehavior;
   chatEntries: readonly ChatEntry[];
   onUserMessageAction?: (actionId: string) => void;
@@ -62,6 +65,8 @@ export function SessionConversationMainContent({
   activeTurnId,
   isTurnInProgress,
   pendingTurnId,
+  autoScrollToBottomOnInitialLoad = false,
+  initialBottomScrollResetKey = null,
   scrollBehavior = "pin-active-turn-to-top",
   chatEntries,
   onUserMessageAction,
@@ -81,6 +86,13 @@ export function SessionConversationMainContent({
   useFollowStreamingAtBottomScrollBehavior({
     chatEntries,
     enabled: scrollBehavior === "follow-streaming-at-bottom",
+    scrollContainerRef,
+  });
+  useInitialConversationBottomScrollBehavior({
+    chatEntries,
+    contentRootRef: pinnedTurnScrollBehavior.threadRootRef,
+    enabled: autoScrollToBottomOnInitialLoad,
+    resetKey: initialBottomScrollResetKey,
     scrollContainerRef,
   });
 

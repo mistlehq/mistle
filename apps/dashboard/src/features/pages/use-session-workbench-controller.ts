@@ -108,6 +108,7 @@ type SessionWorkbenchState = {
 };
 
 type SessionConversationPaneState = {
+  activeThreadId: string | null;
   chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
   dismissUserMessageAction: ReturnType<
     typeof useCodexSessionState
@@ -358,6 +359,7 @@ export function useSessionWorkbenchController(input: {
       },
     },
     conversationPane: {
+      activeThreadId: sessionSnapshot?.activeThreadId ?? null,
       chatState: chat.chatState,
       dismissUserMessageAction: chat.dismissUserMessageAction,
       composerStateInput: {

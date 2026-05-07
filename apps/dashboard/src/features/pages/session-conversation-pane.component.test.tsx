@@ -12,6 +12,7 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import { useMemo, useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 
+import type { ChatEntry } from "../chat/chat-types.js";
 import { SessionComposerFixtureProps } from "../session-agents/codex/fixtures/session-fixtures.js";
 import { useSessionComposerAttachmentControl } from "./session-composer/index.js";
 import {
@@ -43,6 +44,32 @@ const UploadedImageFixture: UploadedSandboxFile = {
 
 function createImageFile(): File {
   return new File([new Uint8Array([1, 2, 3, 4])], "screenshot.png", { type: "image/png" });
+}
+
+function createCompletedConversationEntries(
+  turns: ReadonlyArray<{
+    assistantText: string;
+    turnId: string;
+    userText: string;
+  }>,
+): readonly ChatEntry[] {
+  return turns.flatMap((turn) => [
+    {
+      id: `${turn.turnId}:user`,
+      turnId: turn.turnId,
+      kind: "user-message",
+      status: "completed",
+      text: turn.userText,
+    },
+    {
+      id: `${turn.turnId}:assistant`,
+      turnId: turn.turnId,
+      kind: "assistant-message",
+      phase: null,
+      status: "completed",
+      text: turn.assistantText,
+    },
+  ]);
 }
 
 function RenderedComposerPaneHarness(input: {
@@ -264,6 +291,8 @@ function QueuedPromptComposerHarness(): React.JSX.Element {
 
 function ConversationScrollHarness(input: {
   activeTurnId: string | null;
+  autoScrollToBottomOnInitialLoad?: boolean;
+  initialBottomScrollResetKey?: string | null;
   isTurnInProgress?: boolean;
   pendingTurnId: string | null;
   scrollBehavior?: React.ComponentProps<typeof SessionConversationMainContent>["scrollBehavior"];
@@ -282,6 +311,12 @@ function ConversationScrollHarness(input: {
         pendingTurnId={input.pendingTurnId}
         scrollContainerRef={scrollContainerRef}
         serverRequestPanelEntries={[]}
+        {...(input.autoScrollToBottomOnInitialLoad === undefined
+          ? {}
+          : { autoScrollToBottomOnInitialLoad: input.autoScrollToBottomOnInitialLoad })}
+        {...(input.initialBottomScrollResetKey === undefined
+          ? {}
+          : { initialBottomScrollResetKey: input.initialBottomScrollResetKey })}
         {...(input.scrollBehavior === undefined ? {} : { scrollBehavior: input.scrollBehavior })}
       />
     </div>
@@ -371,6 +406,18 @@ function defineScrollContainerMetrics(
   });
 }
 
+function defineScrollContainerScrollHeight(
+  scrollContainerElement: HTMLDivElement,
+  input: {
+    scrollHeight: () => number;
+  },
+): void {
+  Object.defineProperty(scrollContainerElement, "scrollHeight", {
+    configurable: true,
+    get: input.scrollHeight,
+  });
+}
+
 function renderConversationScrollScenario(
   input: React.ComponentProps<typeof ConversationScrollHarness>,
 ): {
@@ -389,6 +436,16 @@ function renderConversationScrollScenario(
     },
     scrollContainerElement,
   };
+}
+
+async function waitForNestedAnimationFrame(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        resolve();
+      });
+    });
+  });
 }
 
 describe("SessionConversationBottomPanel", () => {
@@ -547,6 +604,183 @@ describe("SessionConversationBottomPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("started-prompts").textContent).toBe("");
     });
+  });
+
+  it("scrolls an initially loaded long conversation to the bottom once", async () => {
+    const initialEntries = createCompletedConversationEntries([
+      { turnId: "turn-1", userText: "Earlier turn", assistantText: "Earlier response" },
+      { turnId: "turn-2", userText: "Newest turn", assistantText: "Newest response" },
+    ]);
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight: 1200,
+      scrollTop: 0,
+      top: 100,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: [...initialEntries],
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(800);
+    });
+  });
+
+  it("does not scroll again after the initial loaded conversation scroll has applied", async () => {
+    const initialEntries = createCompletedConversationEntries([
+      { turnId: "turn-1", userText: "Earlier turn", assistantText: "Earlier response" },
+    ]);
+    const nextEntries = [
+      ...initialEntries,
+      ...createCompletedConversationEntries([
+        { turnId: "turn-2", userText: "Follow-up turn", assistantText: "Follow-up response" },
+      ]),
+    ];
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    let scrollHeight = 1000;
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight,
+      scrollTop: 0,
+      top: 100,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: [...initialEntries],
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(600);
+    });
+
+    scrollContainerElement.scrollTop = 120;
+    scrollHeight = 1400;
+    defineScrollContainerScrollHeight(scrollContainerElement, {
+      scrollHeight: () => scrollHeight,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: nextEntries,
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitForNestedAnimationFrame();
+    expect(scrollContainerElement.scrollTop).toBe(120);
+  });
+
+  it("scrolls a new initially loaded conversation after the reset key changes", async () => {
+    const initialEntries = createCompletedConversationEntries([
+      { turnId: "thread-1-turn", userText: "Thread one", assistantText: "Thread one response" },
+    ]);
+    const nextEntries = createCompletedConversationEntries([
+      { turnId: "thread-2-turn", userText: "Thread two", assistantText: "Thread two response" },
+    ]);
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: initialEntries,
+      initialBottomScrollResetKey: "thread-1",
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    let scrollHeight = 1000;
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight,
+      scrollTop: 0,
+      top: 100,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: [...initialEntries],
+      initialBottomScrollResetKey: "thread-1",
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(600);
+    });
+
+    scrollContainerElement.scrollTop = 0;
+    scrollHeight = 1400;
+    defineScrollContainerScrollHeight(scrollContainerElement, {
+      scrollHeight: () => scrollHeight,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: true,
+      chatEntries: nextEntries,
+      initialBottomScrollResetKey: "thread-2",
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitFor(() => {
+      expect(scrollContainerElement.scrollTop).toBe(1000);
+    });
+  });
+
+  it("leaves the initial scroll position alone when initial bottom scrolling is disabled", async () => {
+    const initialEntries = createCompletedConversationEntries([
+      { turnId: "turn-1", userText: "Earlier turn", assistantText: "Earlier response" },
+    ]);
+    const { rerenderConversation, scrollContainerElement } = renderConversationScrollScenario({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: false,
+      chatEntries: initialEntries,
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    defineScrollContainerMetrics(scrollContainerElement, {
+      clientHeight: 400,
+      scrollHeight: 1200,
+      scrollTop: 0,
+      top: 100,
+    });
+
+    rerenderConversation({
+      activeTurnId: null,
+      autoScrollToBottomOnInitialLoad: false,
+      chatEntries: [...initialEntries],
+      pendingTurnId: null,
+      scrollBehavior: "none",
+    });
+
+    await waitForNestedAnimationFrame();
+    expect(scrollContainerElement.scrollTop).toBe(0);
   });
 
   it("pins a newly started turn to the top of the conversation scroll container", async () => {

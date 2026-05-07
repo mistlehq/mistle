@@ -57,6 +57,8 @@ const StoryPortAccessProcesses = [
 
 export type SessionConversationStoryArgs = {
   activeTurnId: React.ComponentProps<typeof SessionConversationMainContent>["activeTurnId"];
+  autoScrollToBottomOnInitialLoad: boolean;
+  initialBottomScrollResetKey: string | null;
   isTurnInProgress: React.ComponentProps<typeof SessionConversationMainContent>["isTurnInProgress"];
   pendingTurnId: React.ComponentProps<typeof SessionConversationMainContent>["pendingTurnId"];
   chatEntries: React.ComponentProps<typeof SessionConversationMainContent>["chatEntries"];
@@ -74,6 +76,8 @@ export type SessionConversationStoryArgs = {
 
 export const StorySessionConversationPaneArgs = {
   activeTurnId: null,
+  autoScrollToBottomOnInitialLoad: false,
+  initialBottomScrollResetKey: "storybook-thread",
   isTurnInProgress: false,
   pendingTurnId: null,
   chatEntries: CodexFixtureSessionEntriesWithExploringGroup,
@@ -291,6 +295,7 @@ export function renderSessionWorkbenchStory(input: {
   isSecondaryPanelVisible?: boolean;
   isBottomPanelVisible?: boolean;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
+  mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   mainContent: React.ReactNode;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel?: React.ReactNode;
@@ -298,6 +303,10 @@ export function renderSessionWorkbenchStory(input: {
 }): React.JSX.Element {
   const mainContentLayoutProps =
     input.mainContentLayout === undefined ? {} : { mainContentLayout: input.mainContentLayout };
+  const mainContentScrollContainerRefProps =
+    input.mainContentScrollContainerRef === undefined
+      ? {}
+      : { mainContentScrollContainerRef: input.mainContentScrollContainerRef };
 
   return (
     <SessionWorkbenchPageView
@@ -306,6 +315,7 @@ export function renderSessionWorkbenchStory(input: {
       isBottomPanelVisible={input.isBottomPanelVisible ?? false}
       isSecondaryPanelVisible={input.isSecondaryPanelVisible ?? false}
       mainContent={input.mainContent}
+      {...mainContentScrollContainerRefProps}
       primaryBottomPanel={input.primaryBottomPanel}
       secondaryPanel={input.secondaryPanel ?? <></>}
       sandboxInstanceId={input.sandboxInstanceId ?? StorySandboxInstanceId}
@@ -365,6 +375,7 @@ export function renderSessionWorkbenchContentStory(input: {
   isSecondaryPanelVisible?: boolean;
   mainContent: React.ReactNode;
   mainContentLayout?: React.ComponentProps<typeof SessionWorkbenchPageView>["mainContentLayout"];
+  mainContentScrollContainerRef?: React.Ref<HTMLDivElement>;
   primaryBottomPanel: React.ReactNode;
   secondaryPanel?: React.ReactNode;
   sandboxInstanceId?: string | null;

@@ -9,6 +9,7 @@ export type SessionConversationScrollBehavior =
 
 const PinnedTurnTopInsetPx = 12;
 const ScrollFollowBottomThresholdPx = 24;
+const InitialBottomScrollMaxFrameAttempts = 30;
 
 function findPinnedTurnElement(input: {
   pinnedTurnId: string | null;
@@ -393,4 +394,102 @@ export function useFollowStreamingAtBottomScrollBehavior(input: {
       cancelAnimationFrame(nestedAnimationFrameId);
     };
   }, [input.chatEntries, input.enabled, hasStreamingEntries, input.scrollContainerRef]);
+}
+
+export function useInitialConversationBottomScrollBehavior(input: {
+  chatEntries: readonly ChatEntry[];
+  contentRootRef: RefObject<HTMLDivElement | null>;
+  enabled: boolean;
+  resetKey: string | null;
+  scrollContainerRef: RefObject<HTMLDivElement | null> | undefined;
+}): void {
+  const hasAppliedInitialBottomScrollRef = useRef(false);
+  const appliedResetKeyRef = useRef<string | null>(input.resetKey);
+
+  if (appliedResetKeyRef.current !== input.resetKey) {
+    appliedResetKeyRef.current = input.resetKey;
+    hasAppliedInitialBottomScrollRef.current = false;
+  }
+
+  useLayoutEffect(() => {
+    if (!input.enabled) {
+      return;
+    }
+
+    if (hasAppliedInitialBottomScrollRef.current) {
+      return;
+    }
+
+    if (input.chatEntries.length === 0) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let frameAttemptCount = 0;
+    const scrollToBottomIfReady = (): boolean => {
+      if (hasAppliedInitialBottomScrollRef.current) {
+        return true;
+      }
+
+      const scrollContainerElement = input.scrollContainerRef?.current ?? null;
+      if (scrollContainerElement === null) {
+        return false;
+      }
+
+      if (scrollContainerElement.scrollHeight <= scrollContainerElement.clientHeight) {
+        return false;
+      }
+
+      scrollContainerToBottom(scrollContainerElement);
+      hasAppliedInitialBottomScrollRef.current = true;
+      return true;
+    };
+    const requestNextFrameAttempt = (): void => {
+      animationFrameId = requestAnimationFrame(() => {
+        if (scrollToBottomIfReady()) {
+          return;
+        }
+
+        frameAttemptCount += 1;
+        if (frameAttemptCount < InitialBottomScrollMaxFrameAttempts) {
+          requestNextFrameAttempt();
+        }
+      });
+    };
+
+    if (!scrollToBottomIfReady()) {
+      requestNextFrameAttempt();
+    }
+
+    if (typeof ResizeObserver === "undefined") {
+      return () => {
+        cancelAnimationFrame(animationFrameId);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      scrollToBottomIfReady();
+    });
+
+    const scrollContainerElement = input.scrollContainerRef?.current ?? null;
+    if (scrollContainerElement !== null) {
+      resizeObserver.observe(scrollContainerElement);
+    }
+
+    const contentRootElement = input.contentRootRef.current;
+    if (contentRootElement !== null) {
+      resizeObserver.observe(contentRootElement);
+    }
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+    };
+  }, [
+    input.chatEntries,
+    input.contentRootRef,
+    input.enabled,
+    input.resetKey,
+    input.scrollContainerRef,
+  ]);
 }

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import type React from "react";
+import { useRef } from "react";
 
+import type { ChatEntry } from "../chat/chat-types.js";
 import {
   CodexFixtureChatThreadEntriesWithFileAttachment,
   CodexFixtureChatThreadEntriesWithMixedAttachments,
@@ -33,6 +35,33 @@ import {
   renderSessionWorkbenchContentStory,
 } from "./session-story-support.js";
 
+const InitialLoadAutoScrollEntries = Array.from({ length: 18 }, (_, index): ChatEntry[] => {
+  const turnNumber = index + 1;
+  const paddedTurnNumber = String(turnNumber).padStart(2, "0");
+
+  return [
+    {
+      id: `initial-load-user-${paddedTurnNumber}`,
+      turnId: `initial-load-turn-${paddedTurnNumber}`,
+      kind: "user-message",
+      status: "completed",
+      text: `Turn ${paddedTurnNumber}: continue the implementation review and keep the context from the previous turn.`,
+    },
+    {
+      id: `initial-load-assistant-${paddedTurnNumber}`,
+      turnId: `initial-load-turn-${paddedTurnNumber}`,
+      kind: "assistant-message",
+      phase: null,
+      status: "completed",
+      text: [
+        `Turn ${paddedTurnNumber} response.`,
+        "I checked the relevant files, carried forward the open questions, and kept the next steps scoped to the current session.",
+        "The remaining work is to keep the next patch narrow, verify the dashboard path directly, and call out any test gap before handing it back.",
+      ].join("\n\n"),
+    },
+  ];
+}).flat();
+
 const meta = {
   title: "Dashboard/Sessions/SessionWorkbench/ConversationPane",
   component: SessionConversationMainContent,
@@ -50,8 +79,32 @@ const meta = {
   args: SessionConversationPanePlaygroundBaseArgs,
   decorators: [
     function StoryDecorator(Story, context): React.JSX.Element {
+      const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+      const shouldRenderConversationWithScrollRef = context.args.autoScrollToBottomOnInitialLoad;
+
       return renderSessionWorkbenchContentStory({
-        mainContent: <Story />,
+        mainContent: shouldRenderConversationWithScrollRef ? (
+          <SessionConversationMainContent
+            activeTurnId={context.args.activeTurnId}
+            autoScrollToBottomOnInitialLoad={context.args.autoScrollToBottomOnInitialLoad}
+            chatEntries={context.args.chatEntries}
+            initialBottomScrollResetKey={context.args.initialBottomScrollResetKey}
+            isRespondingToServerRequest={context.args.isRespondingToServerRequest}
+            isTurnInProgress={context.args.isTurnInProgress}
+            onRespondToServerRequest={context.args.onRespondToServerRequest}
+            pendingTurnId={context.args.pendingTurnId}
+            scrollContainerRef={scrollContainerRef}
+            serverRequestPanelEntries={context.args.serverRequestPanelEntries}
+            {...(context.args.scrollBehavior === undefined
+              ? {}
+              : { scrollBehavior: context.args.scrollBehavior })}
+          />
+        ) : (
+          <Story />
+        ),
+        ...(shouldRenderConversationWithScrollRef
+          ? { mainContentScrollContainerRef: scrollContainerRef }
+          : {}),
         primaryBottomPanel: createStorySessionBottomPanel(context.args),
       });
     },
@@ -134,6 +187,15 @@ export const WithWorkingFooter: Story = {
     activeTurnId: "turn-2",
     isTurnInProgress: true,
     showWorkingIndicator: true,
+  },
+};
+
+export const InitialLoadAutoScroll: Story = {
+  args: {
+    autoScrollToBottomOnInitialLoad: true,
+    chatEntries: InitialLoadAutoScrollEntries,
+    initialBottomScrollResetKey: "storybook-initial-load",
+    serverRequestPanelEntries: [],
   },
 };
 

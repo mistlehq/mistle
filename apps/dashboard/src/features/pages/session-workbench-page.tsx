@@ -413,6 +413,11 @@ function SessionWorkbenchPageContent(input: {
             activeTurnId: conversationPane.chatState.activeTurnId,
             isTurnInProgress: conversationPane.chatState.status === "inProgress",
             pendingTurnId: conversationPane.chatState.pendingTurnId,
+            autoScrollToBottomOnInitialLoad: true,
+            initialBottomScrollResetKey: [
+              input.sandboxInstanceId,
+              conversationPane.activeThreadId ?? "no-thread",
+            ].join(":"),
             scrollBehavior: "follow-streaming-at-bottom",
             chatEntries: conversationPane.chatState.entries,
             onUserMessageAction: conversationPane.dismissUserMessageAction,
@@ -483,6 +488,8 @@ type PrimaryPanelConversationContent = Pick<
   | "activeTurnId"
   | "isTurnInProgress"
   | "pendingTurnId"
+  | "autoScrollToBottomOnInitialLoad"
+  | "initialBottomScrollResetKey"
   | "scrollBehavior"
   | "chatEntries"
   | "onUserMessageAction"
