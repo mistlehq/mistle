@@ -113,8 +113,8 @@ describe("PageFrame", () => {
     }
   });
 
-  it("renders the shell sidebar trigger as a page header leading control", () => {
-    render(
+  it("renders the shell sidebar trigger before the page header title", () => {
+    const { container } = render(
       <PageHeaderSidebarTriggerProvider
         value={{
           control: <button type="button">Toggle Sidebar</button>,
@@ -130,7 +130,36 @@ describe("PageFrame", () => {
     const trigger = screen.getByRole("button", { name: "Toggle Sidebar" });
     const title = screen.getByRole("heading", { name: "Generic page" });
 
+    expect(container.querySelector('[data-slot="page-frame-header-toolbar"]')).toBeDefined();
     expect(trigger.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("only lets the sidebar trigger occupy form header row space while constrained content is near the shell edge", () => {
+    const { container } = render(
+      <PageHeaderSidebarTriggerProvider
+        value={{
+          control: <button type="button">Toggle Sidebar</button>,
+          isVisible: true,
+        }}
+      >
+        <PageFrame title="Profile" width="form">
+          <div>Contained content</div>
+        </PageFrame>
+      </PageHeaderSidebarTriggerProvider>,
+    );
+
+    const toolbar = container.querySelector('[data-slot="page-frame-header-toolbar"]');
+    const trigger = container.querySelector('[data-slot="page-frame-header-trigger"]');
+    const header = container.querySelector('[data-slot="page-frame-header-content"]');
+
+    expect(toolbar?.className).toContain("flex");
+    expect(toolbar?.className).toContain("min-[47rem]:block");
+    expect(trigger?.className).toContain("shrink-0");
+    expect(trigger?.className).toContain("min-[47rem]:absolute");
+    expect(trigger?.className).toContain("min-[47rem]:left-0");
+    expect(header?.className).toContain("flex-1");
+    expect(header?.className).toContain("min-[47rem]:mx-auto");
+    expect(header?.className).toContain("min-[47rem]:max-w-2xl");
   });
 
   it("renders the shell sidebar trigger for breadcrumb-only page frames", () => {
