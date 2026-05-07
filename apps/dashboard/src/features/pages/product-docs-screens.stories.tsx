@@ -528,6 +528,17 @@ function SandboxProfileSetupScriptStory(): React.JSX.Element {
   );
 }
 
+function SandboxProfileSetupAssistantStory(): React.JSX.Element {
+  return (
+    <SandboxProfileEditorPageStory
+      {...DefaultSandboxProfileEditorStoryArgs}
+      initialBindings={[StoryBindings[0], StoryBindings[1]]}
+      setupAssistantPanelState="proposed-script"
+      setupAssistantState="available"
+    />
+  );
+}
+
 function SandboxProfileSnapshotReadyStory(): React.JSX.Element {
   return (
     <SandboxProfileEditorPageStory
@@ -666,6 +677,10 @@ export const SandboxProfileDraft: Story = {
 
 export const SandboxProfileSetupScript: Story = {
   render: SandboxProfileSetupScriptStory,
+};
+
+export const SandboxProfileSetupAssistant: Story = {
+  render: SandboxProfileSetupAssistantStory,
 };
 
 export const SandboxProfileSnapshotReady: Story = {

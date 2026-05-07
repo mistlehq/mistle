@@ -84,6 +84,28 @@ To experiment with a setup script:
 
 Setup script testing is only available while editing a draft, and only after the script has content.
 
+## Use Setup Assistant
+
+Setup Assistant opens an agent workspace beside the setup script editor so you can draft or fix the script with the same profile context visible.
+
+To use Setup Assistant:
+
+1. Open a sandbox profile draft.
+2. Add an agent integration binding to the profile.
+3. Select **Setup Assistant** from the setup script controls.
+4. Ask the assistant to write a new setup script or fix the current script.
+5. Apply the final script back to the setup script field.
+6. Run **Test setup script** before publishing the profile version.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-setup-assistant.png"
+    alt="Sandbox profile setup script editor with the Setup Assistant panel open"
+  />
+</Frame>
+
+Setup Assistant is only available while editing a draft profile version, and it requires an agent integration binding. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
+
 ## Snapshots
 
 When a profile version is published, Mistle can prepare a snapshot for that version. The snapshot captures the prepared environment so new sessions can start from the profile-specific image instead of rebuilding from the shared base image every time.
