@@ -1,3 +1,4 @@
+import type { ValkeyClient } from "@mistle/cache";
 import { z } from "zod";
 
 import { logger } from "../../logger.js";
@@ -5,7 +6,6 @@ import type {
   SandboxRuntimeAttachment,
   SandboxRuntimeAttachmentStore,
 } from "../sandbox-runtime-attachment-store.js";
-import type { ValkeyClient } from "../valkey-client.js";
 
 const SandboxRuntimeAttachmentRecordSchema = z
   .object({

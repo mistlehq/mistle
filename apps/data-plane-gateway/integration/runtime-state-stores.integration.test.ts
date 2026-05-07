@@ -4,21 +4,69 @@
 
 import { randomUUID } from "node:crypto";
 
+import { Cache, ValkeyCacheAdapter, closeValkeyClient, createValkeyClient } from "@mistle/cache";
+import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import { createIntegrationTest } from "@mistle/test-harness/integration";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 
+import { ActiveSandboxRuntimePlanCache } from "../src/egress/active-runtime-plan-cache.js";
 import { ValkeySandboxKeepaliveStore } from "../src/runtime-state/adapters/valkey-sandbox-keepalive-store.js";
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
-import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 
 const it = createIntegrationTest({
   services: ["data-plane-gateway"],
 });
 
 describe.concurrent("runtime-state store integrations", () => {
+  it("caches immutable sandbox runtime plans in valkey", async ({ env }) => {
+    const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
+    const client = createValkeyClient({
+      url: env.dataPlaneGatewayRuntimeState.valkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const cache = new ActiveSandboxRuntimePlanCache(
+        new Cache({
+          adapter: new ValkeyCacheAdapter(client, keyPrefix),
+        }),
+      );
+      const runtimePlan = createRuntimePlan();
+
+      await cache.set({
+        sandboxInstanceId: "sbi_runtime_plan_cache_it",
+        runtimePlan: {
+          organizationId: "org_runtime_plan_cache_it",
+          providerSandboxId: "provider-runtime-plan-cache-it",
+          runtimePlan,
+          runtimePlanRevision: 1,
+          sandboxInstanceStatus: "running",
+        },
+      });
+
+      await expect(
+        cache.get({
+          sandboxInstanceId: "sbi_runtime_plan_cache_it",
+        }),
+      ).resolves.toEqual({
+        organizationId: "org_runtime_plan_cache_it",
+        providerSandboxId: "provider-runtime-plan-cache-it",
+        runtimePlan,
+        runtimePlanRevision: 1,
+        sandboxInstanceStatus: "running",
+      });
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
   it("expires attachment records when their TTL elapses", async ({ env }) => {
     const keyPrefix = createRuntimeStateKeyPrefix(env.dataPlaneGatewayRuntimeState.keyPrefix);
     const client = createValkeyClient({
@@ -481,6 +529,22 @@ describe.concurrent("runtime-state store integrations", () => {
 
 function createRuntimeStateKeyPrefix(environmentKeyPrefix: string): string {
   return `${environmentKeyPrefix}runtime-state-store:${randomUUID()}`;
+}
+
+function createRuntimePlan(): CompiledRuntimePlan {
+  return {
+    sandboxProfileId: "sbp_runtime_plan_cache_it",
+    version: 1,
+    image: {
+      source: "base",
+      imageRef: "sandbox-base",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    workspaceSources: [],
+    runtimeClients: [],
+    agentRuntimes: [],
+  };
 }
 
 async function deleteKeysByPrefix(input: {

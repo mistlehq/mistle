@@ -2,6 +2,7 @@ import { request as requestHttp, type ClientRequest, type IncomingMessage } from
 import { request as requestHttps } from "node:https";
 import type { Socket } from "node:net";
 
+import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import {
   type EgressHttpOpen,
   type EgressStreamError,
@@ -16,6 +17,15 @@ import {
 import { metrics, trace, SpanStatusCode, type Attributes, type Span } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
+import type { ActiveSandboxRuntimePlanRepository } from "./active-runtime-plan-cache.js";
+import {
+  InvalidActiveSandboxRuntimePlanError,
+  loadActiveSandboxRuntimePlan,
+} from "./active-runtime-plan-loader.js";
+import {
+  classifyRuntimePlanEgressRoute,
+  type GatewayEgressRouteClassification,
+} from "./runtime-plan-route-classifier.js";
 
 const HopByHopHeaderNames = new Set([
   "keep-alive",
@@ -51,6 +61,9 @@ type EgressStreamOutcome =
   | "upgraded"
   | "completed"
   | "cancelled"
+  | "managed_route_deferred"
+  | "managed_route_ambiguous"
+  | "runtime_plan_state_failed"
   | "upstream_connect_failed"
   | "upstream_handshake_failed"
   | "upstream_io_error"
@@ -83,6 +96,11 @@ type ActiveGatewayEgressStream = {
   totalRequestBytes: number;
   totalResponseBytes: number;
   upgraded: boolean;
+};
+
+type ManagedRouteAuthorizationFailure = {
+  code: "acting_user_required";
+  message: string;
 };
 
 export class GatewayEgressForbiddenTunnelStateError extends Error {
@@ -157,18 +175,39 @@ function decodeValidatedBase64(payload: string): Buffer | undefined {
 }
 
 function buildStreamAttributes(input: {
+  classification: GatewayEgressRouteClassification;
   open: EgressHttpOpen;
+  organizationId: string;
+  runtimePlanRevision: number;
   sandboxInstanceId: string;
+  sandboxInstanceStatus: string;
   sourceBootstrapSessionId: string;
   url: URL;
 }): Attributes {
+  const matchedRoute =
+    input.classification.kind === "matched" ? input.classification.route : undefined;
   return {
-    "mistle.gateway.egress.authorization_result": "passthrough",
+    "mistle.gateway.egress.authorization_result": "not_required",
+    "mistle.gateway.egress.classification_result": input.classification.kind,
+    ...(matchedRoute === undefined
+      ? {}
+      : {
+          "mistle.gateway.egress.managed_route_id": matchedRoute.egressRuleId,
+        }),
     "mistle.gateway.egress.request_id": input.open.requestId,
+    ...(input.open.request.runtimePlanRevision === undefined
+      ? {}
+      : {
+          "mistle.gateway.egress.sandbox_runtime_plan_revision":
+            input.open.request.runtimePlanRevision,
+        }),
+    "mistle.gateway.egress.runtime_plan_revision": input.runtimePlanRevision,
     "mistle.gateway.egress.stream_id": input.open.streamId,
     "mistle.gateway.egress.transport": "http",
     "mistle.sandbox.instance_id": input.sandboxInstanceId,
+    "mistle.sandbox.instance_status": input.sandboxInstanceStatus,
     "mistle.sandbox.tunnel.bootstrap_session_id": input.sourceBootstrapSessionId,
+    "mistle.tenant.organization_id": input.organizationId,
     "http.request.method": input.open.request.method,
     "server.address": input.url.hostname,
     "server.port": input.url.port,
@@ -245,45 +284,51 @@ function finishStream(input: {
 
 export class GatewayEgressTransportService {
   readonly #activeStreamsByKey = new Map<string, ActiveGatewayEgressStream>();
+  readonly #openingStreamsByKey = new Map<string, Promise<void>>();
+
+  public constructor(private readonly activeRuntimePlanCache: ActiveSandboxRuntimePlanRepository) {}
 
   public async handleBootstrapTransportMessage(input: {
+    db: DataPlaneDatabase;
     message: EgressTransportMessage;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
+    tables: DataPlaneTables;
   }): Promise<boolean> {
     switch (input.message.type) {
       case "egress.http.open":
-        await this.openHttpStream({
+        return await this.startOpeningHttpStream({
+          db: input.db,
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
           sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+          tables: input.tables,
         });
-        return true;
       case "egress.http.request.body.chunk":
-        return this.writeRequestBodyChunk({
+        return await this.writeRequestBodyChunk({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
           sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.http.request.body.end":
-        return this.endRequestBody({
+        return await this.endRequestBody({
           sandboxInstanceId: input.sandboxInstanceId,
           sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
           streamId: input.message.streamId,
         });
       case "egress.tcp.data":
-        return this.writeUpgradedBytes({
+        return await this.writeUpgradedBytes({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
           sendBootstrapMessage: input.sendBootstrapMessage,
           sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         });
       case "egress.tcp.close":
-        return this.closeUpgradedDirection({
+        return await this.closeUpgradedDirection({
           message: input.message,
           sandboxInstanceId: input.sandboxInstanceId,
           sendBootstrapMessage: input.sendBootstrapMessage,
@@ -345,10 +390,12 @@ export class GatewayEgressTransportService {
   }
 
   private async openHttpStream(input: {
+    db: DataPlaneDatabase;
     message: EgressHttpOpen;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
+    tables: DataPlaneTables;
   }): Promise<void> {
     const key = toStreamKey({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -367,9 +414,94 @@ export class GatewayEgressTransportService {
     }
 
     const url = toUrl(input.message.request);
+    let activeRuntimePlan: Awaited<ReturnType<typeof loadActiveSandboxRuntimePlan>>;
+    try {
+      activeRuntimePlan = await loadActiveSandboxRuntimePlan({
+        cache: this.activeRuntimePlanCache,
+        db: input.db,
+        sandboxInstanceId: input.sandboxInstanceId,
+        tables: input.tables,
+      });
+    } catch (error) {
+      if (error instanceof InvalidActiveSandboxRuntimePlanError) {
+        this.rejectInvalidRuntimePlanStateFailure({
+          error,
+          message: input.message,
+          sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+          url,
+        });
+        return;
+      }
+
+      throw error;
+    }
+
+    if (activeRuntimePlan === null) {
+      this.rejectMissingActiveRuntimePlanState({
+        message: input.message,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        url,
+      });
+      return;
+    }
+
+    const classification = classifyRuntimePlanEgressRoute({
+      authority: input.message.request.authority,
+      method: input.message.request.method,
+      path: input.message.request.path,
+      runtimePlan: activeRuntimePlan.runtimePlan,
+    });
+    if (classification.kind === "ambiguous") {
+      this.rejectManagedRouteAmbiguity({
+        classification,
+        message: input.message,
+        runtimePlanRevision: activeRuntimePlan.runtimePlanRevision,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        url,
+      });
+      return;
+    }
+    if (classification.kind === "matched") {
+      const authorizationFailure = authorizeMatchedManagedRoute(classification.route);
+      if (authorizationFailure !== undefined) {
+        this.rejectManagedRouteAuthorizationFailure({
+          authorizationFailure,
+          classification,
+          message: input.message,
+          runtimePlanRevision: activeRuntimePlan.runtimePlanRevision,
+          sandboxInstanceId: input.sandboxInstanceId,
+          sendBootstrapMessage: input.sendBootstrapMessage,
+          sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+          url,
+        });
+        return;
+      }
+
+      this.rejectManagedRouteUntilCredentialInjectionIsEnabled({
+        classification,
+        message: input.message,
+        runtimePlanRevision: activeRuntimePlan.runtimePlanRevision,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        url,
+      });
+      return;
+    }
+
     const attributes = buildStreamAttributes({
+      classification,
       open: input.message,
+      organizationId: activeRuntimePlan.organizationId,
+      runtimePlanRevision: activeRuntimePlan.runtimePlanRevision,
       sandboxInstanceId: input.sandboxInstanceId,
+      sandboxInstanceStatus: activeRuntimePlan.sandboxInstanceStatus,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       url,
     });
@@ -439,6 +571,39 @@ export class GatewayEgressTransportService {
         stream,
       });
     });
+  }
+
+  private async startOpeningHttpStream(input: {
+    db: DataPlaneDatabase;
+    message: EgressHttpOpen;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    tables: DataPlaneTables;
+  }): Promise<boolean> {
+    const streamIdentity = {
+      sandboxInstanceId: input.sandboxInstanceId,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    };
+    const key = toStreamKey(streamIdentity);
+    if (this.#activeStreamsByKey.has(key) || this.#openingStreamsByKey.has(key)) {
+      this.rejectForbiddenStreamState({
+        message: `Egress stream '${String(input.message.streamId)}' is already active.`,
+        sandboxInstanceId: input.sandboxInstanceId,
+        sendBootstrapMessage: input.sendBootstrapMessage,
+        sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+        streamId: input.message.streamId,
+      });
+      return true;
+    }
+
+    const openingStream = this.openHttpStream(input).finally(() => {
+      this.#openingStreamsByKey.delete(key);
+    });
+    this.#openingStreamsByKey.set(key, openingStream);
+    await openingStream;
+    return true;
   }
 
   private handleUpstreamResponse(input: {
@@ -605,17 +770,18 @@ export class GatewayEgressTransportService {
     });
   }
 
-  private writeRequestBodyChunk(input: {
+  private async writeRequestBodyChunk(input: {
     message: Extract<EgressTransportMessage, { type: "egress.http.request.body.chunk" }>;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
-  }): boolean {
+  }): Promise<boolean> {
     const streamIdentity = {
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
     };
+    await this.waitForOpeningStream(streamIdentity);
     const stream = this.getActiveStream(streamIdentity);
     if (stream === undefined) {
       this.rejectForbiddenStreamState({
@@ -659,11 +825,12 @@ export class GatewayEgressTransportService {
     return true;
   }
 
-  private endRequestBody(
+  private async endRequestBody(
     input: GatewayEgressStreamIdentity & {
       sendBootstrapMessage: SendBootstrapMessage;
     },
-  ): boolean {
+  ): Promise<boolean> {
+    await this.waitForOpeningStream(input);
     const stream = this.getActiveStream(input);
     if (stream === undefined) {
       this.rejectForbiddenStreamState({
@@ -684,17 +851,19 @@ export class GatewayEgressTransportService {
     return true;
   }
 
-  private writeUpgradedBytes(input: {
+  private async writeUpgradedBytes(input: {
     message: EgressTcpData;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
-  }): boolean {
-    const stream = this.getActiveStream({
+  }): Promise<boolean> {
+    const streamIdentity = {
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
-    });
+    };
+    await this.waitForOpeningStream(streamIdentity);
+    const stream = this.getActiveStream(streamIdentity);
     if (stream === undefined) {
       this.rejectForbiddenStreamState({
         message: `Egress stream '${String(input.message.streamId)}' is not active.`,
@@ -737,17 +906,19 @@ export class GatewayEgressTransportService {
     return true;
   }
 
-  private closeUpgradedDirection(input: {
+  private async closeUpgradedDirection(input: {
     message: EgressTcpClose;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
     sourceBootstrapSessionId: string;
-  }): boolean {
-    const stream = this.getActiveStream({
+  }): Promise<boolean> {
+    const streamIdentity = {
       sandboxInstanceId: input.sandboxInstanceId,
       sourceBootstrapSessionId: input.sourceBootstrapSessionId,
       streamId: input.message.streamId,
-    });
+    };
+    await this.waitForOpeningStream(streamIdentity);
+    const stream = this.getActiveStream(streamIdentity);
     if (stream === undefined) {
       this.rejectForbiddenStreamState({
         message: `Egress stream '${String(input.message.streamId)}' is not active.`,
@@ -818,6 +989,15 @@ export class GatewayEgressTransportService {
     input: GatewayEgressStreamIdentity,
   ): ActiveGatewayEgressStream | undefined {
     return this.#activeStreamsByKey.get(toStreamKey(input));
+  }
+
+  private async waitForOpeningStream(input: GatewayEgressStreamIdentity): Promise<void> {
+    const openingStream = this.#openingStreamsByKey.get(toStreamKey(input));
+    if (openingStream === undefined) {
+      return;
+    }
+
+    await openingStream;
   }
 
   private rejectForbiddenBootstrapMessage(input: {
@@ -927,6 +1107,7 @@ export class GatewayEgressTransportService {
 
   private sendStreamError(input: {
     code: EgressStreamError["code"];
+    eventAttributes?: Record<string, string | number | boolean | null | undefined>;
     message: string;
     sandboxInstanceId: string;
     sendBootstrapMessage: SendBootstrapMessage;
@@ -935,9 +1116,9 @@ export class GatewayEgressTransportService {
   }): void {
     logger.info(
       {
+        ...input.eventAttributes,
         event: "gateway_egress_stream_error",
         failureCode: input.code,
-        matchedManagedRoute: false,
         sandboxInstanceId: input.sandboxInstanceId,
         sourceBootstrapSessionId: input.sourceBootstrapSessionId,
         streamId: input.streamId,
@@ -1006,4 +1187,180 @@ export class GatewayEgressTransportService {
         : "Gateway egress pass-through stream failed",
     );
   }
+
+  private rejectMissingActiveRuntimePlanState(input: {
+    message: EgressHttpOpen;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    url: URL;
+  }): void {
+    this.sendStreamError({
+      code: "forbidden_tunnel_state",
+      eventAttributes: {
+        authorizationResult: "denied",
+        classificationResult: "runtime_plan_unavailable",
+        host: input.url.hostname,
+        matchedManagedRoute: false,
+        method: input.message.request.method,
+        path: input.url.pathname,
+        requestId: input.message.requestId,
+      },
+      message: `Sandbox instance '${input.sandboxInstanceId}' was not found with an active runtime plan while authorizing gateway egress.`,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+  }
+
+  private rejectInvalidRuntimePlanStateFailure(input: {
+    error: InvalidActiveSandboxRuntimePlanError;
+    message: EgressHttpOpen;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    url: URL;
+  }): void {
+    this.sendStreamError({
+      code: "forbidden_tunnel_state",
+      eventAttributes: {
+        authorizationResult: "denied",
+        classificationResult: "runtime_plan_invalid",
+        host: input.url.hostname,
+        matchedManagedRoute: false,
+        method: input.message.request.method,
+        path: input.url.pathname,
+        requestId: input.message.requestId,
+        runtimePlanError: input.error.message,
+        runtimePlanRevision: input.error.details.runtimePlanRevision,
+      },
+      message: `Sandbox instance '${input.sandboxInstanceId}' has an invalid active runtime plan for gateway egress.`,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+  }
+
+  private rejectManagedRouteAmbiguity(input: {
+    classification: Extract<GatewayEgressRouteClassification, { kind: "ambiguous" }>;
+    message: EgressHttpOpen;
+    runtimePlanRevision: number;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    url: URL;
+  }): void {
+    const routeIds = input.classification.routes.map((route) => route.egressRuleId);
+    this.sendStreamError({
+      code: "forbidden_tunnel_state",
+      eventAttributes: {
+        authorizationResult: "denied",
+        classificationResult: "ambiguous",
+        host: input.url.hostname,
+        matchedManagedRoute: true,
+        method: input.message.request.method,
+        path: input.url.pathname,
+        requestId: input.message.requestId,
+        runtimePlanRevision: input.runtimePlanRevision,
+        routeIds: routeIds.join(","),
+      },
+      message: `Multiple managed egress routes matched ${input.message.request.method} ${input.message.request.authority}${input.message.request.path}: ${routeIds.join(", ")}.`,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+  }
+
+  private rejectManagedRouteUntilCredentialInjectionIsEnabled(input: {
+    classification: Extract<GatewayEgressRouteClassification, { kind: "matched" }>;
+    message: EgressHttpOpen;
+    runtimePlanRevision: number;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    url: URL;
+  }): void {
+    this.sendStreamError({
+      code: "forbidden_tunnel_state",
+      eventAttributes: {
+        authorizationResult: "deferred",
+        classificationResult: "matched",
+        host: input.url.hostname,
+        managedRouteId: input.classification.route.egressRuleId,
+        matchedManagedRoute: true,
+        method: input.message.request.method,
+        path: input.url.pathname,
+        requestId: input.message.requestId,
+        runtimePlanRevision: input.runtimePlanRevision,
+      },
+      message: `Managed egress route '${input.classification.route.egressRuleId}' matched, but gateway credential injection is not enabled yet.`,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+  }
+
+  private rejectManagedRouteAuthorizationFailure(input: {
+    authorizationFailure: ManagedRouteAuthorizationFailure;
+    classification: Extract<GatewayEgressRouteClassification, { kind: "matched" }>;
+    message: EgressHttpOpen;
+    runtimePlanRevision: number;
+    sandboxInstanceId: string;
+    sendBootstrapMessage: SendBootstrapMessage;
+    sourceBootstrapSessionId: string;
+    url: URL;
+  }): void {
+    this.sendStreamError({
+      code: "forbidden_tunnel_state",
+      eventAttributes: {
+        authorizationFailureCode: input.authorizationFailure.code,
+        authorizationResult: "denied",
+        classificationResult: "matched",
+        host: input.url.hostname,
+        managedRouteId: input.classification.route.egressRuleId,
+        matchedManagedRoute: true,
+        method: input.message.request.method,
+        path: input.url.pathname,
+        requestId: input.message.requestId,
+        runtimePlanRevision: input.runtimePlanRevision,
+      },
+      message: input.authorizationFailure.message,
+      sandboxInstanceId: input.sandboxInstanceId,
+      sendBootstrapMessage: input.sendBootstrapMessage,
+      sourceBootstrapSessionId: input.sourceBootstrapSessionId,
+      streamId: input.message.streamId,
+    });
+  }
+}
+
+function authorizeMatchedManagedRoute(
+  route: Extract<GatewayEgressRouteClassification, { kind: "matched" }>["route"],
+): ManagedRouteAuthorizationFailure | undefined {
+  if (
+    route.credentialResolver.kind === "linked_principal" &&
+    route.credentialResolver.actingUserRequired
+  ) {
+    return {
+      code: "acting_user_required",
+      message: `Managed egress route '${route.egressRuleId}' requires acting-user context, but gateway egress did not receive one.`,
+    };
+  }
+
+  const actingUserRequiredAdditionalHeader = route.additionalCredentialHeaders?.find(
+    (header) =>
+      header.credentialResolver.kind === "linked_principal" &&
+      header.credentialResolver.actingUserRequired,
+  );
+  if (actingUserRequiredAdditionalHeader !== undefined) {
+    return {
+      code: "acting_user_required",
+      message: `Managed egress route '${route.egressRuleId}' additional credential header '${actingUserRequiredAdditionalHeader.header}' requires acting-user context, but gateway egress did not receive one.`,
+    };
+  }
+
+  return undefined;
 }

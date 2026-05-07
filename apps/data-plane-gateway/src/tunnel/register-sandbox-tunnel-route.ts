@@ -325,6 +325,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     : {}),
                   clientSessionId: relaySessionId,
                   currentSocket: ws,
+                  db: ctx.get("db"),
                   gatewayEgressTransportService: input.gatewayEgressTransportService,
                   handleSigningDelivery: async (delivery) => {
                     const result =
@@ -352,6 +353,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   relayCoordinator: input.relayCoordinator,
                   sandboxInstanceId,
                   sourcePeerSide,
+                  tables: ctx.get("tables"),
                   ...(testEnvironmentId === undefined ? {} : { testEnvironmentId }),
                   tunnelProtocolTranslator,
                 });

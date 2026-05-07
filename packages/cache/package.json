@@ -1,0 +1,39 @@
+{
+  "name": "@mistle/cache",
+  "private": true,
+  "files": [
+    "dist/**",
+    "*.js"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*.ts",
+      "node": "./dist/*.js",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run -c vitest.config.ts",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@mistle/time": "workspace:*",
+    "redis": "^5.12.1"
+  },
+  "devDependencies": {
+    "@mistle/test-harness": "workspace:*"
+  }
+}

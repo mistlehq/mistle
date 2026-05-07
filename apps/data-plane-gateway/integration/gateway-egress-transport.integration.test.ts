@@ -8,6 +8,7 @@ import type { Duplex } from "node:stream";
 
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import {
   parseEgressTransportMessage,
   type EgressTransportMessage,
@@ -72,7 +73,7 @@ type WebSocketMessageQueue = {
 
 describe.concurrent("gateway egress transport integration", () => {
   it(
-    "forwards unmatched HTTP requests upstream without adding Mistle credential headers",
+    "forwards unmatched HTTP requests upstream without trusting sandbox-authored runtime plan revision",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({ env, sandboxInstanceId });
@@ -97,6 +98,7 @@ describe.concurrent("gateway egress transport integration", () => {
               authority: upstreamUrl.host,
               path: upstreamUrl.pathname,
               query: upstreamUrl.search.slice(1),
+              runtimePlanRevision: "sandbox-authored-revision",
               headers: {
                 "content-type": ["text/plain; charset=utf-8"],
                 "x-request-marker": ["egress-http"],
@@ -175,6 +177,199 @@ describe.concurrent("gateway egress transport integration", () => {
         messageQueue.close();
         await closeIfOpen(bootstrapSocket);
         await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "rejects matched managed routes before credential injection is implemented",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              egressRuleId: "egress_rule_openai",
+              hosts: ["api.openai.com"],
+              pathPrefixes: ["/v1"],
+              methods: ["POST"],
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_managed_route",
+            streamId: 20,
+            request: {
+              method: "POST",
+              scheme: "https",
+              authority: "api.openai.com",
+              path: "/v1/responses",
+              headers: {},
+            },
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for managed route deferred egress error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 20,
+          code: "forbidden_tunnel_state",
+          message:
+            "Managed egress route 'egress_rule_openai' matched, but gateway credential injection is not enabled yet.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "rejects matched managed routes that require missing acting-user context",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              credentialResolver: {
+                kind: "linked_principal",
+                providerFamily: "github",
+                actingUserRequired: true,
+                resolutionMode: "required",
+              },
+              egressRuleId: "egress_rule_github_linked",
+              hosts: ["api.github.com"],
+              pathPrefixes: ["/"],
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_linked_principal",
+            streamId: 22,
+            request: {
+              method: "GET",
+              scheme: "https",
+              authority: "api.github.com",
+              path: "/repos/mistlehq/mistle",
+              headers: {},
+            },
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for linked principal authorization egress error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 22,
+          code: "forbidden_tunnel_state",
+          message:
+            "Managed egress route 'egress_rule_github_linked' requires acting-user context, but gateway egress did not receive one.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "rejects requests that match multiple persisted managed routes",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              egressRuleId: "egress_rule_openai_broad",
+              hosts: ["api.openai.com"],
+              pathPrefixes: ["/"],
+            }),
+            createRoute({
+              egressRuleId: "egress_rule_openai_responses",
+              hosts: ["api.openai.com"],
+              pathPrefixes: ["/v1/responses"],
+              methods: ["POST"],
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_ambiguous_route",
+            streamId: 21,
+            request: {
+              method: "POST",
+              scheme: "https",
+              authority: "api.openai.com",
+              path: "/v1/responses",
+              headers: {},
+            },
+          }),
+        );
+
+        await expect(
+          withTimeout({
+            label: "waiting for ambiguous managed route egress error",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.stream.error",
+          streamId: 21,
+          code: "forbidden_tunnel_state",
+          message:
+            "Multiple managed egress routes matched POST api.openai.com/v1/responses: egress_rule_openai_broad, egress_rule_openai_responses.",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
       }
     },
     TestTimeoutMs,
@@ -726,6 +921,7 @@ describe.concurrent("gateway egress transport integration", () => {
 
 async function insertSandboxInstanceRow(input: {
   env: IntegrationTestEnvironment;
+  runtimePlan?: CompiledRuntimePlan;
   sandboxInstanceId: string;
 }): Promise<void> {
   await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
@@ -740,6 +936,67 @@ async function insertSandboxInstanceRow(input: {
     startedById: "workflow_integration_gateway_egress_transport",
     source: "webhook",
   });
+
+  await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstanceRuntimePlans).values({
+    sandboxInstanceId: input.sandboxInstanceId,
+    revision: 1,
+    compiledRuntimePlan: input.runtimePlan ?? createRuntimePlan({ egressRoutes: [] }),
+    compiledFromProfileId: "sbp_integration_gateway_egress_transport",
+    compiledFromProfileVersion: 1,
+  });
+}
+
+function createRuntimePlan(input: {
+  egressRoutes: CompiledRuntimePlan["egressRoutes"];
+}): CompiledRuntimePlan {
+  return {
+    sandboxProfileId: "sbp_integration_gateway_egress_transport",
+    version: 1,
+    image: {
+      source: "base",
+      imageRef: "sandbox-base",
+    },
+    egressRoutes: input.egressRoutes,
+    artifacts: [],
+    workspaceSources: [],
+    runtimeClients: [],
+    agentRuntimes: [],
+  };
+}
+
+function createRoute(input: {
+  credentialResolver?: CompiledRuntimePlan["egressRoutes"][number]["credentialResolver"];
+  egressRuleId: string;
+  hosts: string[];
+  pathPrefixes?: string[];
+  methods?: string[];
+}): CompiledRuntimePlan["egressRoutes"][number] {
+  return {
+    egressRuleId: input.egressRuleId,
+    bindingId: `bind_${input.egressRuleId}`,
+    familyId: "openai",
+    variantId: "openai-default",
+    match: {
+      hosts: input.hosts,
+      ...(input.pathPrefixes === undefined ? {} : { pathPrefixes: input.pathPrefixes }),
+      ...(input.methods === undefined ? {} : { methods: input.methods }),
+    },
+    upstream: {
+      baseUrl: `https://${input.hosts[0]}`,
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    credentialResolver: {
+      kind: "integration_connection",
+      connectionId: "ic_openai",
+      secretType: "api_token",
+    },
+    ...(input.credentialResolver === undefined
+      ? {}
+      : { credentialResolver: input.credentialResolver }),
+  };
 }
 
 async function connectBootstrapSocket(input: {

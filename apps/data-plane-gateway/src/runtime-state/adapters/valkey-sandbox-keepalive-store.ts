@@ -1,6 +1,7 @@
+import type { ValkeyClient } from "@mistle/cache";
+
 import { logger } from "../../logger.js";
 import type { SandboxKeepaliveSource, SandboxKeepaliveStore } from "../sandbox-keepalive-store.js";
-import type { ValkeyClient } from "../valkey-client.js";
 
 type SandboxKeepaliveRecord = {
   sandboxInstanceId: string;

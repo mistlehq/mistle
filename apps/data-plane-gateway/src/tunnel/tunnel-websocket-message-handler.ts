@@ -1,3 +1,4 @@
+import type { DataPlaneDatabase, DataPlaneTables } from "@mistle/db/data-plane";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
 import type { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
@@ -62,6 +63,7 @@ export async function handleTunnelWebSocketMessage(input: {
   bootstrapOwnerLeaseId?: string;
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
+  db: DataPlaneDatabase;
   gatewayEgressTransportService: GatewayEgressTransportService;
   handleSigningDelivery?: ((delivery: SigningDelivery) => Promise<void>) | undefined;
   sandboxKeepaliveRepository: SandboxKeepaliveRepository;
@@ -72,6 +74,7 @@ export async function handleTunnelWebSocketMessage(input: {
   relayCoordinator: TunnelRelayCoordinator;
   sandboxInstanceId: string;
   sourcePeerSide: RelayPeerSide;
+  tables: DataPlaneTables;
   testEnvironmentId?: string;
   tunnelProtocolTranslator: TunnelProtocolTranslator;
 }): Promise<void> {
@@ -136,12 +139,14 @@ export async function handleTunnelWebSocketMessage(input: {
     await input.handleSigningDelivery(translation.delivery);
   } else if (translation.delivery.kind === "egressTransport") {
     await input.gatewayEgressTransportService.handleBootstrapTransportMessage({
+      db: input.db,
       message: translation.delivery.message,
       sandboxInstanceId: input.sandboxInstanceId,
       sendBootstrapMessage: (message) => {
         input.currentSocket.send(JSON.stringify(message));
       },
       sourceBootstrapSessionId: input.clientSessionId,
+      tables: input.tables,
     });
   } else if (translation.delivery.kind === "egressMalformed") {
     input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({

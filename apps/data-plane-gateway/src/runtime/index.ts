@@ -1,4 +1,13 @@
 import { createNodeWebSocket } from "@hono/node-ws";
+import {
+  Cache,
+  InMemoryCacheAdapter,
+  ValkeyCacheAdapter,
+  closeValkeyClient,
+  connectValkeyClient,
+  createValkeyClient,
+  type ValkeyClient,
+} from "@mistle/cache";
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
@@ -13,8 +22,10 @@ import {
   DefaultDataPlaneGatewayLifecycleDurations,
   SandboxInstanceDeadlineService,
 } from "../deadlines/sandbox-instance-deadline-service.js";
+import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { logger } from "../logger.js";
 import { createPortAccessNodeEntrypoint } from "../publishing/port-access-node-entrypoint.js";
 import { PortAccessTransportService } from "../publishing/port-access-transport.js";
 import { PortsTargetAuthorizeService } from "../publishing/ports-target-authorize-service.js";
@@ -28,12 +39,6 @@ import { ValkeySandboxKeepaliveStore } from "../runtime-state/adapters/valkey-sa
 import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeReadinessStore } from "../runtime-state/adapters/valkey-sandbox-runtime-readiness-store.js";
-import {
-  connectValkeyClient,
-  createValkeyClient,
-  type ValkeyClient,
-  closeValkeyClient,
-} from "../runtime-state/valkey-client.js";
 import { installPortAccessUpgradeEntrypoint, startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -116,12 +121,18 @@ export function createDataPlaneGatewayRuntime(
   let sandboxRuntimeAttachmentStore:
     | InMemorySandboxRuntimeAttachmentStore
     | ValkeySandboxRuntimeAttachmentStore;
+  let activeRuntimePlanCache: ActiveSandboxRuntimePlanCache;
 
   if (config.app.runtimeState.backend === "memory") {
     sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
     sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
     sandboxRuntimeReadinessStore = new InMemorySandboxRuntimeReadinessStore();
     sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+    activeRuntimePlanCache = new ActiveSandboxRuntimePlanCache(
+      new Cache({
+        adapter: new InMemoryCacheAdapter(),
+      }),
+    );
   } else {
     const valkeyConfig = config.app.runtimeState.valkey;
     if (valkeyConfig === undefined) {
@@ -131,6 +142,14 @@ export function createDataPlaneGatewayRuntime(
     }
 
     valkeyClient = createValkeyClient({
+      onError: (error) => {
+        logger.error(
+          {
+            err: error,
+          },
+          "Valkey runtime-state client error",
+        );
+      },
       url: valkeyConfig.url,
     });
     hasValkeyClient = true;
@@ -144,6 +163,11 @@ export function createDataPlaneGatewayRuntime(
     sandboxRuntimeAttachmentStore = new ValkeySandboxRuntimeAttachmentStore(
       valkeyClient,
       valkeyConfig.keyPrefix,
+    );
+    activeRuntimePlanCache = new ActiveSandboxRuntimePlanCache(
+      new Cache({
+        adapter: new ValkeyCacheAdapter(valkeyClient, valkeyConfig.keyPrefix),
+      }),
     );
   }
   const activeBootstrapSessionStore = createAttachmentBackedActiveBootstrapSessionStore(
@@ -179,7 +203,7 @@ export function createDataPlaneGatewayRuntime(
       scheduler: systemScheduler,
     },
   );
-  const gatewayEgressTransportService = new GatewayEgressTransportService();
+  const gatewayEgressTransportService = new GatewayEgressTransportService(activeRuntimePlanCache);
   const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,

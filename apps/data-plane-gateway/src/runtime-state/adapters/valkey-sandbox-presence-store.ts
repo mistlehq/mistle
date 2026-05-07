@@ -1,9 +1,10 @@
+import type { ValkeyClient } from "@mistle/cache";
+
 import { logger } from "../../logger.js";
 import type {
   SandboxPresenceLeaseSource,
   SandboxPresenceStore,
 } from "../sandbox-presence-store.js";
-import type { ValkeyClient } from "../valkey-client.js";
 
 type SandboxPresenceLeaseRecord = {
   sandboxInstanceId: string;
