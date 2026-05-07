@@ -147,6 +147,9 @@ export async function handleTunnelWebSocketMessage(input: {
       },
       sourceBootstrapSessionId: input.clientSessionId,
       tables: input.tables,
+      ...(input.testEnvironmentId === undefined
+        ? {}
+        : { testEnvironmentId: input.testEnvironmentId }),
     });
   } else if (translation.delivery.kind === "egressMalformed") {
     input.gatewayEgressTransportService.rejectMalformedBootstrapMessage({

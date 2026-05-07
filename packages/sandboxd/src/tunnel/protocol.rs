@@ -507,6 +507,8 @@ pub struct EgressHttpRequest {
     pub original_destination: Option<EgressOriginalDestination>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runtime_plan_revision: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub acting_user_id: Option<String>,
 }
 
 /// Outbound `egress.http.open` sent from sandboxd to the gateway.
@@ -2106,6 +2108,10 @@ fn validate_egress_http_request(
     validate_optional_non_empty(
         &request.runtime_plan_revision,
         &format!("{message_type} request runtimePlanRevision"),
+    )?;
+    validate_optional_non_empty(
+        &request.acting_user_id,
+        &format!("{message_type} request actingUserId"),
     )
 }
 
@@ -2224,6 +2230,9 @@ fn validate_egress_stream_error(message: &EgressStreamError) -> Result<(), Tunne
         && message.code != "upstream_connect_failed"
         && message.code != "upstream_handshake_failed"
         && message.code != "upstream_io_error"
+        && message.code != "credential_injection_failed"
+        && message.code != "credential_resolution_failed"
+        && message.code != "request_middleware_failed"
         && message.code != "tunnel_cancelled"
         && message.code != "forbidden_tunnel_state"
     {
@@ -2786,7 +2795,7 @@ mod tests {
         );
 
         let invalid_error_code = parse_egress_transport_message(
-            r#"{"type":"egress.stream.error","streamId":71,"code":"credential_resolution_failed","message":"not part of transport contract"}"#,
+            r#"{"type":"egress.stream.error","streamId":71,"code":"not_part_of_transport_contract","message":"not part of transport contract"}"#,
         );
         assert!(
             invalid_error_code

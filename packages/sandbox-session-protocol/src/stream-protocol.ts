@@ -253,6 +253,9 @@ const EgressStreamErrorCodeSchema = z.enum([
   "upstream_connect_failed",
   "upstream_handshake_failed",
   "upstream_io_error",
+  "credential_injection_failed",
+  "credential_resolution_failed",
+  "request_middleware_failed",
   "tunnel_cancelled",
   "forbidden_tunnel_state",
 ]);
@@ -271,6 +274,7 @@ const EgressHttpRequestSchema = z.object({
   headers: RepeatedHeaderValuesSchema,
   originalDestination: EgressOriginalDestinationSchema.optional(),
   runtimePlanRevision: NonEmptyStringSchema.optional(),
+  actingUserId: NonEmptyStringSchema.optional(),
 });
 
 const EgressHttpOpenSchema = z.object({

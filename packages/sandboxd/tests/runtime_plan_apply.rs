@@ -34,6 +34,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,
@@ -495,6 +496,7 @@ fn applies_typed_exec_artifact_install_steps() {
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,
@@ -547,6 +549,7 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,
@@ -621,6 +624,7 @@ fn create_runtime_plan_apply_input(
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,

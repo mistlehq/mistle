@@ -82,6 +82,7 @@ pub struct StartupInput {
     pub tunnel_exchange_token: String,
     pub tunnel_gateway_ws_url: String,
     pub runtime_plan: serde_json::Value,
+    pub acting_user_id: Option<String>,
     pub egress_grant_by_rule_id: BTreeMap<String, String>,
     pub git_identity: Option<GitIdentity>,
     #[serde(default)]

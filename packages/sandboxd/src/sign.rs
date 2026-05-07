@@ -450,6 +450,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,

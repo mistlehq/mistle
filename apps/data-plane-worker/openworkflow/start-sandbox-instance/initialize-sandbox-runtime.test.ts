@@ -6,6 +6,15 @@ import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { createSandboxStartupInput } from "./initialize-sandbox-runtime.js";
 import { SandboxStartupModes } from "./sandbox-startup-input.js";
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  const [, payload] = token.split(".");
+  if (payload === undefined) {
+    throw new Error("Expected JWT payload segment.");
+  }
+
+  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+}
+
 function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
   const sandbox: DataPlaneWorkerRuntimeConfig["sandbox"] = {
     provider: SandboxProvider.DOCKER,
@@ -59,7 +68,9 @@ function createTestRuntimeConfig(): DataPlaneWorkerRuntimeConfig {
   };
 }
 
-function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
+function createRuntimePlan(input?: {
+  egressRoutes?: StartSandboxInstanceWorkflowInput["runtimePlan"]["egressRoutes"];
+}): StartSandboxInstanceWorkflowInput["runtimePlan"] {
   return {
     sandboxProfileId: "sbp_runtime_plan_001",
     version: 1,
@@ -67,7 +78,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
       source: "base",
       imageRef: "registry:3",
     },
-    egressRoutes: [],
+    egressRoutes: input?.egressRoutes ?? [],
     artifacts: [],
     workspaceSources: [],
     runtimeClients: [],
@@ -94,6 +105,75 @@ describe("createSandboxStartupInput", () => {
     });
 
     expect(startupInput.transparentProxy).toBeUndefined();
+  });
+
+  it("keeps acting-user context out of legacy sandbox startup input when gateway proxy mode is disabled", async () => {
+    const startupInput = await createSandboxStartupInput({
+      config: createTestRuntimeConfig(),
+      organizationId: "org_123",
+      sandboxInstanceId: "sbi_123",
+      startupMode: SandboxStartupModes.EXISTING,
+      runtimePlan: createRuntimePlan({
+        egressRoutes: [
+          {
+            egressRuleId: "egress_rule_1",
+            bindingId: "ibd_1",
+            familyId: "github",
+            variantId: "github-cloud",
+            match: {
+              hosts: ["api.github.com"],
+            },
+            upstream: {
+              baseUrl: "https://api.github.com",
+            },
+            authInjection: {
+              type: "bearer",
+              target: "authorization",
+            },
+            credentialResolver: {
+              kind: "linked_principal",
+              providerFamily: "github",
+              actingUserRequired: true,
+              resolutionMode: "required",
+            },
+          },
+        ],
+      }),
+      actingUserId: "usr_123",
+      processEnv: {},
+    });
+
+    expect(startupInput.actingUserId).toBeUndefined();
+    const egressGrant = startupInput.egressGrantByRuleId.egress_rule_1;
+    if (egressGrant === undefined) {
+      throw new Error("Expected test runtime plan to include egress_rule_1 grant.");
+    }
+    expect(decodeJwtPayload(egressGrant)).toMatchObject({
+      actingUserId: "usr_123",
+    });
+  });
+
+  it("includes acting-user context in gateway proxy startup input when the workflow has one", async () => {
+    const startupInput = await createSandboxStartupInput({
+      config: createTestRuntimeConfig(),
+      organizationId: "org_123",
+      sandboxInstanceId: "sbi_123",
+      startupMode: SandboxStartupModes.EXISTING,
+      runtimePlan: createRuntimePlan(),
+      actingUserId: "usr_123",
+      sandboxAdapter: createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+        docker: {
+          socketPath: "/var/run/docker.sock",
+          networkName: "mistle-sandbox-dev",
+        },
+      }),
+      processEnv: {
+        GATEWAY_PROXY_ENABLED: "1",
+      },
+    });
+
+    expect(startupInput.actingUserId).toBe("usr_123");
   });
 
   it("includes provider and runtime transparent proxy exclusions in gateway proxy development mode", async () => {

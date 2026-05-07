@@ -23,6 +23,7 @@ import {
   SandboxInstanceDeadlineService,
 } from "../deadlines/sandbox-instance-deadline-service.js";
 import { ActiveSandboxRuntimePlanCache } from "../egress/active-runtime-plan-cache.js";
+import { CredentialCache } from "../egress/credential-cache.js";
 import { GatewayEgressTransportService } from "../egress/egress-transport-service.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { logger } from "../logger.js";
@@ -122,6 +123,7 @@ export function createDataPlaneGatewayRuntime(
     | InMemorySandboxRuntimeAttachmentStore
     | ValkeySandboxRuntimeAttachmentStore;
   let activeRuntimePlanCache: ActiveSandboxRuntimePlanCache;
+  let credentialCache: CredentialCache;
 
   if (config.app.runtimeState.backend === "memory") {
     sandboxKeepaliveStore = new InMemorySandboxKeepaliveStore(systemClock);
@@ -133,6 +135,14 @@ export function createDataPlaneGatewayRuntime(
         adapter: new InMemoryCacheAdapter(),
       }),
     );
+    credentialCache = new CredentialCache({
+      cache: new Cache({
+        adapter: new InMemoryCacheAdapter(),
+      }),
+      defaultTtlSeconds: 300,
+      refreshSkewSeconds: 30,
+      now: () => Date.now(),
+    });
   } else {
     const valkeyConfig = config.app.runtimeState.valkey;
     if (valkeyConfig === undefined) {
@@ -169,6 +179,14 @@ export function createDataPlaneGatewayRuntime(
         adapter: new ValkeyCacheAdapter(valkeyClient, valkeyConfig.keyPrefix),
       }),
     );
+    credentialCache = new CredentialCache({
+      cache: new Cache({
+        adapter: new ValkeyCacheAdapter(valkeyClient, valkeyConfig.keyPrefix),
+      }),
+      defaultTtlSeconds: 300,
+      refreshSkewSeconds: 30,
+      now: () => Date.now(),
+    });
   }
   const activeBootstrapSessionStore = createAttachmentBackedActiveBootstrapSessionStore(
     sandboxRuntimeAttachmentStore,
@@ -203,7 +221,21 @@ export function createDataPlaneGatewayRuntime(
       scheduler: systemScheduler,
     },
   );
-  const gatewayEgressTransportService = new GatewayEgressTransportService(activeRuntimePlanCache);
+  const gatewayEgressTransportService = new GatewayEgressTransportService(
+    activeRuntimePlanCache,
+    config.app.controlPlaneApi.publicBaseUrl,
+    new ControlPlaneInternalClient({
+      baseUrl: config.app.controlPlaneApi.baseUrl,
+      internalAuthServiceToken: config.app.internalAuth.serviceToken,
+      ...(config.app.__dangerouslyEnableTestIsolation === undefined
+        ? {}
+        : {
+            testEnvironmentIdHeader:
+              config.app.__dangerouslyEnableTestIsolation.testEnvironmentIdHeader,
+          }),
+    }),
+    credentialCache,
+  );
   const portAccessNodeEntrypoint = createPortAccessNodeEntrypoint({
     bootstrapTokenConfig: {
       tokenSecret: config.app.sandbox.publish.access.tokenSecret,

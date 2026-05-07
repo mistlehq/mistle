@@ -18,6 +18,7 @@ fn applies_typed_mise_install_steps() {
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,
@@ -74,6 +75,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
         bootstrap_token: "bootstrap-token-value".to_string(),
         tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
         tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+        acting_user_id: None,
         runtime_plan: serde_json::json!({
           "sandboxProfileId": "sbp_123",
           "version": 1,

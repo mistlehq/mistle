@@ -130,6 +130,7 @@ mod tests {
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -186,6 +187,7 @@ mod tests {
                 bootstrap_token: "bootstrap-token".to_string(),
                 tunnel_exchange_token: "exchange-token".to_string(),
                 tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+            acting_user_id: None,
                 runtime_plan: serde_json::json!({
                     "sandboxProfileId": "sbp_123",
                     "version": 1,
@@ -230,6 +232,7 @@ mod tests {
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -299,6 +302,7 @@ mod tests {
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5003/tunnel/sandbox".to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,

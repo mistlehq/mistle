@@ -5030,6 +5030,7 @@ mod tests {
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "exchange-token".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:4500/tunnel/sandbox/sandbox-123".to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({}),
             egress_grant_by_rule_id: BTreeMap::from([(
                 "egress-rule-1".to_string(),

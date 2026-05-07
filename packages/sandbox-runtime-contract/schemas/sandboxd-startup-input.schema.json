@@ -1203,6 +1203,10 @@
       ],
       "additionalProperties": false
     },
+    "actingUserId": {
+      "type": "string",
+      "minLength": 1
+    },
     "egressGrantByRuleId": {
       "type": "object",
       "propertyNames": {

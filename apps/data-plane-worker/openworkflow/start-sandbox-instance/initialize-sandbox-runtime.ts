@@ -114,6 +114,8 @@ export async function createSandboxStartupInput(input: {
           sandboxAdapter: input.sandboxAdapter,
           tunnelGatewayWsUrl,
         });
+  const gatewayProxyStartupActingUserId =
+    transparentProxy === undefined ? undefined : input.actingUserId;
 
   return {
     startupMode: input.startupMode,
@@ -122,6 +124,9 @@ export async function createSandboxStartupInput(input: {
     tunnelExchangeToken,
     tunnelGatewayWsUrl,
     runtimePlan: input.runtimePlan,
+    ...(gatewayProxyStartupActingUserId === undefined
+      ? {}
+      : { actingUserId: gatewayProxyStartupActingUserId }),
     egressGrantByRuleId,
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
     ...(transparentProxy === undefined ? {} : { transparentProxy }),

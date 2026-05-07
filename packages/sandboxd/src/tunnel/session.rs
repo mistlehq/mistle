@@ -776,6 +776,7 @@ impl TunnelSession {
                 attachment_root,
                 sandbox_instance_id,
                 gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
+                acting_user_id: startup_input.acting_user_id.clone(),
                 transparent_passthrough_socket_mark: startup_transparent_passthrough_socket_mark(
                     startup_input,
                 ),
@@ -952,6 +953,7 @@ struct TunnelSessionRuntime {
     attachment_root: PathBuf,
     sandbox_instance_id: String,
     gateway_ws_url: String,
+    acting_user_id: Option<String>,
     transparent_passthrough_socket_mark: Option<u32>,
     shutdown_requested: Arc<AtomicBool>,
     clock: Arc<dyn Clock>,
@@ -965,6 +967,7 @@ struct TunnelSessionLoopContext<'a> {
     runtime_env: &'a BTreeMap<String, String>,
     sandbox_instance_id: &'a str,
     gateway_ws_url: &'a str,
+    acting_user_id: Option<&'a str>,
     clock: &'a dyn Clock,
     sleeper: &'a dyn Sleeper,
     supervisor_handle: &'a SandboxdSupervisorHandle,
@@ -1805,6 +1808,7 @@ async fn run_connected_tunnel_session(
         runtime_env: &runtime.runtime_env,
         sandbox_instance_id: &runtime.sandbox_instance_id,
         gateway_ws_url: &runtime.gateway_ws_url,
+        acting_user_id: runtime.acting_user_id.as_deref(),
         clock: runtime.clock.as_ref(),
         sleeper: runtime.sleeper.as_ref(),
         supervisor_handle: &runtime.supervisor_handle,
@@ -2028,9 +2032,12 @@ async fn run_connected_tunnel_session(
                 )
                 .await
             }
-            ConnectedTunnelSessionLoopItem::Request(request) => {
-                handle_tunnel_session_request(request, &tunnel_writer_sender, &mut session_state)
-            }
+            ConnectedTunnelSessionLoopItem::Request(request) => handle_tunnel_session_request(
+                request,
+                &tunnel_writer_sender,
+                loop_context.acting_user_id,
+                &mut session_state,
+            ),
         };
 
         match control_flow_result {
@@ -4133,6 +4140,7 @@ async fn handle_tunnel_session_event(
 fn handle_tunnel_session_request(
     request: TunnelSessionRequest,
     tunnel_writer_sender: &mpsc::UnboundedSender<TunnelWriterMessage>,
+    acting_user_id: Option<&str>,
     session_state: &mut TunnelSessionMutableState,
 ) -> Result<TunnelSessionControlFlow, TunnelSessionError> {
     match request {
@@ -4217,6 +4225,7 @@ fn handle_tunnel_session_request(
                     headers: request.headers,
                     original_destination: None,
                     runtime_plan_revision: None,
+                    acting_user_id: acting_user_id.map(str::to_string),
                 },
             })
             .map_err(|error| TunnelSessionError::Egress(error.to_string()))?;
@@ -6066,12 +6075,14 @@ mod tests {
                 stream_id: 93,
             },
             &tunnel_writer_sender,
+            Some("usr_123"),
             &mut session_state,
         )
         .expect("egress open request should be written");
         let open = read_writer_text_json(&mut tunnel_writer_receiver).await;
         assert_eq!(open["type"], "egress.http.open");
         assert_eq!(open["streamId"], 93);
+        assert_eq!(open["request"]["actingUserId"], "usr_123");
 
         handle_tunnel_session_request(
             TunnelSessionRequest::EgressHttpRequestBodyChunk {
@@ -6079,6 +6090,7 @@ mod tests {
                 stream_id: 93,
             },
             &tunnel_writer_sender,
+            None,
             &mut session_state,
         )
         .expect("egress request body chunk should be written");
@@ -6102,6 +6114,7 @@ mod tests {
         handle_tunnel_session_request(
             TunnelSessionRequest::EgressHttpRequestBodyEnd { stream_id: 93 },
             &tunnel_writer_sender,
+            None,
             &mut session_state,
         )
         .expect("egress request body end should be written");
@@ -6123,6 +6136,7 @@ mod tests {
                 stream_id: 93,
             },
             &tunnel_writer_sender,
+            None,
             &mut session_state,
         )
         .expect("egress tcp data should be written");
@@ -6148,6 +6162,7 @@ mod tests {
         handle_tunnel_session_request(
             TunnelSessionRequest::EgressTcpClose { stream_id: 93 },
             &tunnel_writer_sender,
+            None,
             &mut session_state,
         )
         .expect("egress tcp close should be written");
@@ -6408,6 +6423,7 @@ mod tests {
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            acting_user_id: None,
             clock: &clock,
             sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
@@ -6483,6 +6499,7 @@ mod tests {
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            acting_user_id: None,
             clock: &clock,
             sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
@@ -6851,6 +6868,7 @@ mod tests {
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            acting_user_id: None,
             clock: &clock,
             sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
@@ -6929,6 +6947,7 @@ mod tests {
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            acting_user_id: None,
             clock: &clock,
             sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
@@ -7018,6 +7037,7 @@ mod tests {
             runtime_env: &runtime_env,
             sandbox_instance_id: "sbi_test",
             gateway_ws_url: "ws://127.0.0.1:3300/bootstrap",
+            acting_user_id: None,
             clock: &clock,
             sleeper: &sleeper,
             supervisor_handle: &supervisor_handle,
@@ -7690,6 +7710,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8046,6 +8067,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8287,6 +8309,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8398,6 +8421,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8518,6 +8542,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8643,6 +8668,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8732,6 +8758,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -8831,6 +8858,7 @@ mod tests {
             bootstrap_token: "bootstrap-token".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token".to_string(),
             tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
+            acting_user_id: None,
             runtime_plan: json!({}),
             egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
@@ -8986,6 +9014,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -9084,6 +9113,7 @@ mod tests {
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_tunnel_session".to_string(),
             gateway_ws_url: bootstrap_url.clone(),
+            acting_user_id: None,
             transparent_passthrough_socket_mark: None,
             shutdown_requested,
             clock: panic_clock.clone(),
@@ -9240,6 +9270,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-initial".to_string(),
             tunnel_exchange_token: "exchange-token-initial".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -9349,6 +9380,7 @@ mod tests {
                 bootstrap_token: "bootstrap-token-initial".to_string(),
                 tunnel_exchange_token: "exchange-token-initial".to_string(),
                 tunnel_gateway_ws_url: bootstrap_url,
+                acting_user_id: None,
                 runtime_plan: serde_json::json!({
                     "sandboxProfileId": "sbp_123",
                     "version": 1,
@@ -9557,6 +9589,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -9701,6 +9734,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -9912,6 +9946,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10116,6 +10151,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10243,6 +10279,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10446,6 +10483,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10586,6 +10624,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10736,6 +10775,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,
@@ -10928,6 +10968,7 @@ mod tests {
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: bootstrap_url,
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "sandboxProfileId": "sbp_123",
                 "version": 1,

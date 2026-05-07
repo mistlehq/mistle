@@ -1718,6 +1718,7 @@ supports_websockets = false
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: "ws://127.0.0.1:5000/bootstrap".to_string(),
+            acting_user_id: None,
             runtime_plan: serde_json::json!({
                 "egressRoutes": [
                     {
@@ -2491,6 +2492,7 @@ supports_websockets = false
             bootstrap_token: "bootstrap-token-value".to_string(),
             tunnel_exchange_token: "tunnel-exchange-token-value".to_string(),
             tunnel_gateway_ws_url: tunnel_gateway_ws_url.to_string(),
+            acting_user_id: None,
             runtime_plan,
             egress_grant_by_rule_id: BTreeMap::new(),
             git_identity,

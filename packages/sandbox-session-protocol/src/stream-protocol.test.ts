@@ -1193,6 +1193,7 @@ describe("egress transport message parser", () => {
               port: 443,
             },
             runtimePlanRevision: "rpr_123",
+            actingUserId: "usr_123",
           },
         }),
       ),
@@ -1214,6 +1215,7 @@ describe("egress transport message parser", () => {
           port: 443,
         },
         runtimePlanRevision: "rpr_123",
+        actingUserId: "usr_123",
       },
     });
 
@@ -1430,7 +1432,7 @@ describe("egress transport message parser", () => {
         JSON.stringify({
           type: "egress.stream.error",
           streamId: 71,
-          code: "credential_resolution_failed",
+          code: "not_part_of_transport_contract",
           message: "not part of transport contract",
         }),
       ),

@@ -80,6 +80,7 @@ export const DataPlaneGatewayDataPlaneApiConfigSchema = z
 export const DataPlaneGatewayControlPlaneApiConfigSchema = z
   .object({
     baseUrl: HttpBaseUrlSchema,
+    publicBaseUrl: HttpBaseUrlSchema,
   })
   .strict();
 

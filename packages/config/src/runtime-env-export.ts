@@ -233,6 +233,10 @@ const DataPlaneGatewayResourceRuntimeEnvExports: readonly RuntimeEnvExportDescri
     path: ["controlPlaneApi", "baseUrl"],
     envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_INTERNAL_URL",
   },
+  {
+    path: ["controlPlaneApi", "publicBaseUrl"],
+    envVar: "MISTLE_SERVICES_CONTROL_PLANE_API_PUBLIC_URL",
+  },
 ];
 
 function readFirstArchilMountField(root: unknown, field: string): unknown {

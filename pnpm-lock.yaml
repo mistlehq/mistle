@@ -537,6 +537,9 @@ importers:
       '@mistle/gateway-tunnel-auth':
         specifier: workspace:*
         version: link:../../packages/gateway-tunnel-auth
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../../packages/integrations-definitions
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -561,6 +564,15 @@ importers:
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
+      '@smithy/hash-node':
+        specifier: ^4.2.14
+        version: 4.2.14
+      '@smithy/protocol-http':
+        specifier: ^5.3.14
+        version: 5.3.14
+      '@smithy/signature-v4':
+        specifier: ^5.3.13
+        version: 5.3.14
       hono:
         specifier: ^4.12.14
         version: 4.12.14

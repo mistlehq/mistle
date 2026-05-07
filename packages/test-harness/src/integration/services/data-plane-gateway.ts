@@ -176,6 +176,7 @@ function config(input: {
     },
     controlPlaneApi: {
       baseUrl: input.controlPlaneBaseUrl,
+      publicBaseUrl: input.controlPlaneBaseUrl,
     },
     internalAuth: {
       serviceToken: "integration-new-internal-service-token",

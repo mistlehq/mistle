@@ -65,6 +65,7 @@ fn daemon_applies_startup_input_after_init_submission() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        acting_user_id: None,
         transparent_proxy: None,
     };
 

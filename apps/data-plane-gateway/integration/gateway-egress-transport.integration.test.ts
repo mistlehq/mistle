@@ -6,8 +6,19 @@ import { randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 
+import {
+  IntegrationBindingKinds,
+  OrganizationIdentityLinkProviderConfigStatus,
+  UserExternalPrincipalCredentialSecretKinds,
+} from "@mistle/db/control-plane";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import {
+  AwsConnectionMethodIds,
+  AwsCredentialResolverKeys,
+  AwsCredentialSecretTypes,
+  AwsCredentialSlotKeys,
+} from "@mistle/integrations-definitions";
 import type { CompiledRuntimePlan } from "@mistle/sandbox-runtime-contract";
 import {
   parseEgressTransportMessage,
@@ -24,6 +35,14 @@ import { describe, expect } from "vitest";
 import WebSocket, { type RawData } from "ws";
 
 import {
+  createGitHubIdentityConnection,
+  insertPrincipalCredentialSecret,
+  seedGitHubLinkedPrincipal,
+  seedIdentityProviderConfig,
+  seedPrincipalCredential,
+  upsertGitHubIdentityTarget,
+} from "../../control-plane-api/integration/helpers/identity-linking.js";
+import {
   closeWebSocket,
   connectSandboxTunnelWebSocket,
   sendWebSocketMessage,
@@ -37,7 +56,7 @@ const StepTimeoutMs = 5_000;
 const TestTimeoutMs = 40_000;
 
 const it = createIntegrationTest({
-  services: ["data-plane-api", "data-plane-gateway"],
+  services: ["control-plane-api", "data-plane-api", "data-plane-gateway"],
 });
 
 type ReceivedHttpRequest = {
@@ -183,19 +202,47 @@ describe.concurrent("gateway egress transport integration", () => {
   );
 
   it(
-    "rejects matched managed routes before credential injection is implemented",
+    "resolves integration credentials for matched managed routes before forwarding upstream",
     async ({ env }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId: randomUUID().replaceAll("-", ""),
+      });
+      const upstreamUrl = new URL("/mcp", upstream.baseUrl);
       await insertSandboxInstanceRow({
         env,
         sandboxInstanceId,
         runtimePlan: createRuntimePlan({
           egressRoutes: [
             createRoute({
-              egressRuleId: "egress_rule_openai",
-              hosts: ["api.openai.com"],
-              pathPrefixes: ["/v1"],
+              additionalCredentialHeaders: [
+                {
+                  header: "dd_application_key",
+                  credentialResolver: {
+                    kind: "integration_connection",
+                    connectionId: binding.connectionId,
+                    secretType: "api_key",
+                    slotKey: "datadog.datadog-default.api-key.application-key",
+                  },
+                },
+              ],
+              authInjection: {
+                type: "header",
+                target: "dd_api_key",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_datadog",
+              familyId: "datadog",
+              hosts: [upstreamUrl.hostname],
+              pathPrefixes: ["/mcp"],
               methods: ["POST"],
+              secretType: "api_key",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "datadog-default",
             }),
           ],
         }),
@@ -215,29 +262,422 @@ describe.concurrent("gateway egress transport integration", () => {
             streamId: 20,
             request: {
               method: "POST",
-              scheme: "https",
-              authority: "api.openai.com",
-              path: "/v1/responses",
-              headers: {},
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: "/mcp",
+              headers: {
+                "content-type": ["text/plain"],
+                "x-sandbox-header": ["preserved"],
+              },
             },
           }),
         );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 20,
+            bytes: Buffer.from("managed-body", "utf8").toString("base64"),
+            encoding: "base64",
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 20,
+          }),
+        );
+
+        const request = await withTimeout({
+          label: "waiting for managed egress upstream request",
+          promise: upstream.nextRequest(),
+        });
+
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/mcp");
+        expect(request.body).toBe("managed-body");
+        expect(request.headers["dd_api_key"]).toBe("datadog-api-key");
+        expect(request.headers["dd_application_key"]).toBe("datadog-application-key");
+        expect(request.headers["x-sandbox-header"]).toBe("preserved");
 
         await expect(
           withTimeout({
-            label: "waiting for managed route deferred egress error",
+            label: "waiting for managed route response start",
             promise: messageQueue.next(),
           }),
         ).resolves.toEqual({
-          type: "egress.stream.error",
+          type: "egress.http.response.start",
           streamId: 20,
-          code: "forbidden_tunnel_state",
-          message:
-            "Managed egress route 'egress_rule_openai' matched, but gateway credential injection is not enabled yet.",
+          status: 202,
+          headers: expect.objectContaining({
+            "content-type": ["text/plain; charset=utf-8"],
+            "x-upstream-marker": ["simulated-http"],
+          }),
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for managed route response body",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.body.chunk",
+          streamId: 20,
+          bytes: Buffer.from("hello from upstream", "utf8").toString("base64"),
+          encoding: "base64",
+        });
+        await expect(
+          withTimeout({
+            label: "waiting for managed route response end",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.body.end",
+          streamId: 20,
         });
       } finally {
         messageQueue.close();
         await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "resolves linked-principal credentials for matched managed routes before forwarding upstream",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const uniqueId = randomUUID().replaceAll("-", "");
+      const linkedPrincipal = await createGitHubLinkedPrincipal({
+        env,
+        uniqueId,
+      });
+      const upstreamUrl = new URL("/linked", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: linkedPrincipal.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "bearer",
+                target: "authorization",
+              },
+              bindingId: `ibd_${uniqueId}_github_linked`,
+              credentialResolver: {
+                kind: "linked_principal",
+                providerFamily: "github",
+                actingUserRequired: true,
+                resolutionMode: "required",
+                credentialKind: "github_app_user_access_token",
+              },
+              egressRuleId: "egress_rule_github_linked_success",
+              familyId: "github",
+              hosts: [upstreamUrl.hostname],
+              methods: ["GET"],
+              pathPrefixes: ["/linked"],
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "github-cloud",
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_linked_principal_success",
+            streamId: 24,
+            request: {
+              method: "GET",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: "/linked",
+              actingUserId: linkedPrincipal.userId,
+              headers: {},
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 24,
+          }),
+        );
+
+        const request = await withTimeout({
+          label: "waiting for linked-principal managed egress upstream request",
+          promise: upstream.nextRequest(),
+        });
+
+        expect(request.method).toBe("GET");
+        expect(request.url).toBe("/linked");
+        expect(request.headers.authorization).toBe("Bearer ghu-gateway-egress-linked-token");
+
+        await expect(
+          withTimeout({
+            label: "waiting for linked-principal response start",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toMatchObject({
+          type: "egress.http.response.start",
+          streamId: 24,
+          status: 202,
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "signs matched AWS SigV4 managed routes with resolved session credentials",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const simulatedSts = await startSimulatedAwsSts();
+      const uniqueId = randomUUID().replaceAll("-", "");
+      const binding = await createAwsEgressBinding({
+        env,
+        uniqueId,
+        stsEndpointUrl: simulatedSts.baseUrl,
+      });
+      const upstreamUrl = new URL("/", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        organizationId: binding.organizationId,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "aws_sigv4",
+                service: "secretsmanager",
+                region: "us-east-1",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_aws_sigv4",
+              familyId: "aws",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/"],
+              secretType: AwsCredentialSecretTypes.AWS_SECRET_ACCESS_KEY,
+              slotKey: AwsCredentialSlotKeys.SECRET_ACCESS_KEY,
+              resolverKey: AwsCredentialResolverKeys.ASSUME_ROLE_SESSION,
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "aws-cli-default",
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_aws_sigv4",
+            streamId: 25,
+            request: {
+              method: "POST",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: "/",
+              headers: {
+                "content-type": ["application/json"],
+              },
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 25,
+            bytes: Buffer.from(JSON.stringify({ requestIndex: 1 }), "utf8").toString("base64"),
+            encoding: "base64",
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 25,
+          }),
+        );
+
+        const request = await withTimeout({
+          label: "waiting for AWS SigV4 managed egress upstream request",
+          promise: upstream.nextRequest(),
+        });
+        const authorizationHeader = request.headers.authorization;
+
+        expect(typeof authorizationHeader).toBe("string");
+        expect(authorizationHeader).toContain("AWS4-HMAC-SHA256");
+        expect(authorizationHeader).toContain("Credential=ASIAEXAMPLEACCESS/");
+        expect(authorizationHeader).toContain("/us-east-1/secretsmanager/aws4_request");
+        expect(authorizationHeader).toContain("SignedHeaders=");
+        expect(authorizationHeader).toContain("host");
+        expect(authorizationHeader).toContain("x-amz-content-sha256");
+        expect(authorizationHeader).toContain("x-amz-date");
+        expect(authorizationHeader).toContain("x-amz-security-token");
+        expect(request.headers["x-amz-security-token"]).toBe("example-session-token");
+        expect(request.headers["x-amz-date"]).toBeDefined();
+        expect(request.headers["x-amz-content-sha256"]).toBeDefined();
+        expect(simulatedSts.assumeRoleRequests()).toEqual([
+          expect.objectContaining({
+            roleArn: "arn:aws:iam::123456789012:role/mistle-integration-new",
+          }),
+        ]);
+        expect(simulatedSts.assumeRoleRequests()[0]?.roleSessionName).toMatch(/^mistle-/u);
+
+        await expect(
+          withTimeout({
+            label: "waiting for AWS SigV4 response start",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toMatchObject({
+          type: "egress.http.response.start",
+          streamId: 25,
+          status: 202,
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await Promise.all([upstream.close(), simulatedSts.stop()]);
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "applies managed route request middleware before forwarding upstream",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedHttpUpstream();
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId: randomUUID().replaceAll("-", ""),
+      });
+      const upstreamUrl = new URL("/api/chat.postMessage", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "header",
+                target: "authorization",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_slack",
+              familyId: "slack",
+              hosts: [upstreamUrl.hostname],
+              methods: ["POST"],
+              pathPrefixes: ["/api/chat.postMessage"],
+              requestMiddleware: ["append-session-link-to-slack-text"],
+              secretType: "api_key",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "slack-default",
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_request_middleware",
+            streamId: 23,
+            request: {
+              method: "POST",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: "/api/chat.postMessage",
+              headers: {
+                "content-type": ["application/json"],
+              },
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.chunk",
+            streamId: 23,
+            bytes: Buffer.from(
+              JSON.stringify({ channel: "C123", text: "hello from gateway" }),
+              "utf8",
+            ).toString("base64"),
+            encoding: "base64",
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 23,
+          }),
+        );
+
+        const request = await withTimeout({
+          label: "waiting for request-middleware upstream request",
+          promise: upstream.nextRequest(),
+        });
+        const body: unknown = JSON.parse(request.body);
+
+        expect(request.method).toBe("POST");
+        expect(request.url).toBe("/api/chat.postMessage");
+        expect(request.headers.authorization).toBe("datadog-api-key");
+        expect(body).toEqual({
+          channel: "C123",
+          text: expect.stringContaining(`/p/sessions/${sandboxInstanceId}`),
+        });
+
+        await expect(
+          withTimeout({
+            label: "waiting for request-middleware response start",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toMatchObject({
+          type: "egress.http.response.start",
+          streamId: 23,
+          status: 202,
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
       }
     },
     TestTimeoutMs,
@@ -480,6 +920,138 @@ describe.concurrent("gateway egress transport integration", () => {
           type: "egress.tcp.close",
           streamId: 12,
           direction: "response",
+        });
+      } finally {
+        messageQueue.close();
+        await closeIfOpen(bootstrapSocket);
+        await upstream.close();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "forwards matched managed HTTP upgrades with resolved credentials and sanitized proxy headers",
+    async ({ env }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const upstream = await startSimulatedUpgradeUpstream();
+      const binding = await createDatadogBinding({
+        env,
+        uniqueId: randomUUID().replaceAll("-", ""),
+      });
+      const upstreamUrl = new URL("/managed-socket", upstream.baseUrl);
+      await insertSandboxInstanceRow({
+        env,
+        sandboxInstanceId,
+        runtimePlan: createRuntimePlan({
+          egressRoutes: [
+            createRoute({
+              authInjection: {
+                type: "header",
+                target: "dd_api_key",
+              },
+              bindingId: binding.bindingId,
+              connectionId: binding.connectionId,
+              egressRuleId: "egress_rule_managed_websocket_datadog",
+              familyId: "datadog",
+              hosts: [upstreamUrl.hostname],
+              pathPrefixes: [upstreamUrl.pathname],
+              methods: ["GET"],
+              secretType: "api_key",
+              slotKey: "datadog.datadog-default.api-key.api-key",
+              upstreamBaseUrl: upstream.baseUrl,
+              variantId: "datadog-default",
+            }),
+          ],
+        }),
+      });
+      const bootstrapSocket = await connectBootstrapSocket({
+        env,
+        sandboxInstanceId,
+      });
+      const messageQueue = createWebSocketMessageQueue(bootstrapSocket);
+
+      try {
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.open",
+            requestId: "req_gateway_egress_managed_upgrade",
+            streamId: 13,
+            request: {
+              method: "GET",
+              scheme: "http",
+              authority: upstreamUrl.host,
+              path: upstreamUrl.pathname,
+              headers: {
+                "cf-ray": ["ray-from-sandbox"],
+                connection: ["Upgrade"],
+                "proxy-authorization": ["Basic should-not-forward"],
+                upgrade: ["websocket"],
+                "sec-websocket-key": ["dGhlIHNhbXBsZSBub25jZQ=="],
+                "sec-websocket-version": ["13"],
+                "x-forwarded-for": ["203.0.113.10"],
+              },
+            },
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.http.request.body.end",
+            streamId: 13,
+          }),
+        );
+
+        const request = await withTimeout({
+          label: "waiting for managed upgrade upstream request",
+          promise: upstream.nextRequest(),
+        });
+        expect(request.method).toBe("GET");
+        expect(request.url).toBe("/managed-socket");
+        expect(request.headers.connection).toBe("Upgrade");
+        expect(request.headers.upgrade).toBe("websocket");
+        expect(request.headers.dd_api_key).toBe("datadog-api-key");
+        expect(request.headers["cf-ray"]).toBeUndefined();
+        expect(request.headers["proxy-authorization"]).toBeUndefined();
+        expect(request.headers["x-forwarded-for"]).toBeUndefined();
+
+        await expect(
+          withTimeout({
+            label: "waiting for managed egress upgrade response start",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.http.response.start",
+          streamId: 13,
+          status: 101,
+          headers: expect.objectContaining({
+            connection: ["Upgrade"],
+            upgrade: ["websocket"],
+          }),
+        });
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "egress.tcp.data",
+            streamId: 13,
+            direction: "request",
+            bytes: Buffer.from("managed-ping", "utf8").toString("base64"),
+            encoding: "base64",
+          }),
+        );
+        await expect(
+          withTimeout({
+            label: "waiting for managed egress upgraded response bytes",
+            promise: messageQueue.next(),
+          }),
+        ).resolves.toEqual({
+          type: "egress.tcp.data",
+          streamId: 13,
+          direction: "response",
+          bytes: Buffer.from("echo:managed-ping", "utf8").toString("base64"),
+          encoding: "base64",
         });
       } finally {
         messageQueue.close();
@@ -921,12 +1493,13 @@ describe.concurrent("gateway egress transport integration", () => {
 
 async function insertSandboxInstanceRow(input: {
   env: IntegrationTestEnvironment;
+  organizationId?: string;
   runtimePlan?: CompiledRuntimePlan;
   sandboxInstanceId: string;
 }): Promise<void> {
   await input.env.dataPlaneDb.insert(input.env.dataPlaneTables.sandboxInstances).values({
     id: input.sandboxInstanceId,
-    organizationId: "org_integration_gateway_egress_transport",
+    organizationId: input.organizationId ?? "org_integration_gateway_egress_transport",
     sandboxProfileId: "sbp_integration_gateway_egress_transport",
     sandboxProfileVersion: 1,
     runtimeProvider: "docker",
@@ -965,38 +1538,347 @@ function createRuntimePlan(input: {
 }
 
 function createRoute(input: {
+  additionalCredentialHeaders?: CompiledRuntimePlan["egressRoutes"][number]["additionalCredentialHeaders"];
+  authInjection?: CompiledRuntimePlan["egressRoutes"][number]["authInjection"];
+  bindingId?: string;
+  connectionId?: string;
   credentialResolver?: CompiledRuntimePlan["egressRoutes"][number]["credentialResolver"];
   egressRuleId: string;
+  familyId?: string;
   hosts: string[];
   pathPrefixes?: string[];
   methods?: string[];
+  requestMiddleware?: CompiledRuntimePlan["egressRoutes"][number]["requestMiddleware"];
+  resolverKey?: string;
+  secretType?: string;
+  slotKey?: string;
+  upstreamBaseUrl?: string;
+  variantId?: string;
 }): CompiledRuntimePlan["egressRoutes"][number] {
   return {
     egressRuleId: input.egressRuleId,
-    bindingId: `bind_${input.egressRuleId}`,
-    familyId: "openai",
-    variantId: "openai-default",
+    bindingId: input.bindingId ?? `bind_${input.egressRuleId}`,
+    familyId: input.familyId ?? "openai",
+    variantId: input.variantId ?? "openai-default",
     match: {
       hosts: input.hosts,
       ...(input.pathPrefixes === undefined ? {} : { pathPrefixes: input.pathPrefixes }),
       ...(input.methods === undefined ? {} : { methods: input.methods }),
     },
     upstream: {
-      baseUrl: `https://${input.hosts[0]}`,
+      baseUrl: input.upstreamBaseUrl ?? `https://${input.hosts[0]}`,
     },
-    authInjection: {
+    authInjection: input.authInjection ?? {
       type: "bearer",
       target: "authorization",
     },
     credentialResolver: {
       kind: "integration_connection",
-      connectionId: "ic_openai",
-      secretType: "api_token",
+      connectionId: input.connectionId ?? "ic_openai",
+      secretType: input.secretType ?? "api_token",
+      ...(input.slotKey === undefined ? {} : { slotKey: input.slotKey }),
+      ...(input.resolverKey === undefined ? {} : { resolverKey: input.resolverKey }),
     },
+    ...(input.additionalCredentialHeaders === undefined
+      ? {}
+      : { additionalCredentialHeaders: input.additionalCredentialHeaders }),
     ...(input.credentialResolver === undefined
       ? {}
       : { credentialResolver: input.credentialResolver }),
+    ...(input.requestMiddleware === undefined
+      ? {}
+      : { requestMiddleware: input.requestMiddleware }),
   };
+}
+
+async function createGitHubLinkedPrincipal(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+}): Promise<{
+  organizationId: string;
+  userId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}-github-linked-principal@example.com`,
+  });
+  const targetKey = `github_${input.uniqueId}`;
+
+  await upsertGitHubIdentityTarget(input.env, {
+    targetKey,
+  });
+
+  const connectionId = await createGitHubIdentityConnection(input.env, {
+    displayName: "Gateway egress linked principal GitHub App",
+    session,
+    targetKey,
+  });
+  const providerConfigId = `ilp_${input.uniqueId}`;
+  const principalId = `uep_${input.uniqueId}`;
+  const credentialId = `upc_${input.uniqueId}`;
+
+  await seedIdentityProviderConfig(input.env, {
+    configId: providerConfigId,
+    connectionId,
+    organizationId: session.organizationId,
+    providerFamily: "github",
+    status: OrganizationIdentityLinkProviderConfigStatus.ACTIVE,
+    targetKey,
+    userId: session.userId,
+  });
+  await seedGitHubLinkedPrincipal(input.env, {
+    organizationId: session.organizationId,
+    userId: session.userId,
+    principalId,
+    providerConfigId,
+    connectionId,
+    providerSubjectId: "12345",
+    profile: {
+      login: "mistle-user",
+    },
+  });
+  await seedPrincipalCredential(input.env, {
+    credentialId,
+    organizationId: session.organizationId,
+    principalId,
+    providerFamily: "github",
+    credentialKind: "github_app_user_access_token",
+    accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+    refreshTokenExpiresAt: "2030-06-01T00:00:00.000Z",
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: session.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+    plaintext: "ghu-gateway-egress-linked-token",
+  });
+  await insertPrincipalCredentialSecret(input.env, {
+    organizationId: session.organizationId,
+    credentialId,
+    secretKind: UserExternalPrincipalCredentialSecretKinds.OAUTH2_REFRESH_TOKEN,
+    plaintext: "ghr-gateway-egress-refresh-token",
+  });
+
+  return {
+    organizationId: session.organizationId,
+    userId: session.userId,
+  };
+}
+
+async function createAwsEgressBinding(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+  stsEndpointUrl: string;
+}): Promise<{
+  bindingId: string;
+  connectionId: string;
+  organizationId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}-aws-egress@example.com`,
+  });
+  const targetKey = `aws_${input.uniqueId}`;
+  const sandboxProfileId = `sbp_${input.uniqueId}_aws`;
+  const bindingId = `ibd_${input.uniqueId}_aws`;
+
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey,
+      familyId: "aws",
+      variantId: "aws-cli-default",
+      enabled: true,
+      config: {
+        sts_endpoint_url: input.stsEndpointUrl,
+      },
+    })
+    .onConflictDoUpdate({
+      target: input.env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: "aws",
+        variantId: "aws-cli-default",
+        enabled: true,
+        config: {
+          sts_endpoint_url: input.stsEndpointUrl,
+        },
+      },
+    });
+
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${encodeURIComponent(targetKey)}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: session.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Gateway egress AWS AssumeRole connection",
+        methodId: AwsConnectionMethodIds.AWS_ASSUME_ROLE,
+        config: {
+          connection_method: AwsConnectionMethodIds.AWS_ASSUME_ROLE,
+          accessKeyId: "AKIAEXAMPLE",
+          roleArn: "arn:aws:iam::123456789012:role/mistle-integration-new",
+          durationSeconds: 3600,
+        },
+        secrets: {
+          secretAccessKey: "aws-secret-access-key-value",
+        },
+      }),
+    },
+  );
+
+  if (response.status !== 201) {
+    throw new Error(`Expected AWS connection creation status 201, got ${String(response.status)}.`);
+  }
+  const connectionId = readConnectionId(await response.json());
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+    id: sandboxProfileId,
+    organizationId: session.organizationId,
+    displayName: "Gateway egress AWS integration profile",
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId,
+      version: 1,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      connectionId,
+      kind: IntegrationBindingKinds.CONNECTOR,
+      config: {
+        services: ["secretsmanager"],
+        regions: ["us-east-1"],
+        defaultRegion: "us-east-1",
+        tools: [],
+      },
+    });
+
+  return {
+    bindingId,
+    connectionId,
+    organizationId: session.organizationId,
+  };
+}
+
+async function createDatadogBinding(input: {
+  env: IntegrationTestEnvironment;
+  uniqueId: string;
+}): Promise<{
+  bindingId: string;
+  connectionId: string;
+}> {
+  const session = await input.env.auth.createSession({
+    email: `${input.uniqueId}@example.com`,
+  });
+  const targetKey = `datadog_${input.uniqueId}`;
+  const bindingId = `ibd_${input.uniqueId}`;
+  const sandboxProfileId = `sbp_${input.uniqueId}`;
+  const connectionId = await createDatadogConnection({
+    cookie: session.cookie,
+    env: input.env,
+    targetKey,
+  });
+
+  await input.env.controlPlaneDb.insert(input.env.controlPlaneTables.sandboxProfiles).values({
+    id: sandboxProfileId,
+    organizationId: session.organizationId,
+    displayName: "Gateway egress Datadog integration profile",
+  });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersions)
+    .values({
+      sandboxProfileId,
+      version: 1,
+    });
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.sandboxProfileVersionIntegrationBindings)
+    .values({
+      id: bindingId,
+      sandboxProfileId,
+      sandboxProfileVersion: 1,
+      connectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {},
+    });
+
+  return {
+    bindingId,
+    connectionId,
+  };
+}
+
+async function createDatadogConnection(input: {
+  cookie: string;
+  env: IntegrationTestEnvironment;
+  targetKey: string;
+}): Promise<string> {
+  await input.env.controlPlaneDb
+    .insert(input.env.controlPlaneTables.integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "datadog",
+      variantId: "datadog-default",
+      enabled: true,
+      config: {},
+    })
+    .onConflictDoUpdate({
+      target: input.env.controlPlaneTables.integrationTargets.targetKey,
+      set: {
+        familyId: "datadog",
+        variantId: "datadog-default",
+        enabled: true,
+        config: {},
+      },
+    });
+
+  const response = await input.env.controlPlaneApi.http.fetch(
+    `/v1/integration/connections/${input.targetKey}/form`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: input.cookie,
+      },
+      body: JSON.stringify({
+        displayName: "Gateway egress Datadog connection",
+        methodId: "api-key",
+        config: {
+          connection_method: "api-key",
+        },
+        secrets: {
+          apiKey: "datadog-api-key",
+          applicationKey: "datadog-application-key",
+        },
+      }),
+    },
+  );
+
+  if (response.status !== 201) {
+    throw new Error(
+      `Expected Datadog connection creation status 201, got ${String(response.status)}.`,
+    );
+  }
+
+  return readConnectionId(await response.json());
+}
+
+function readConnectionId(responseBody: unknown): string {
+  if (
+    typeof responseBody === "object" &&
+    responseBody !== null &&
+    "id" in responseBody &&
+    typeof responseBody.id === "string"
+  ) {
+    return responseBody.id;
+  }
+
+  throw new Error("Expected integration connection response body to include id.");
 }
 
 async function connectBootstrapSocket(input: {
@@ -1265,6 +2147,90 @@ function handleSimulatedStreamingHttpRequest(input: {
     });
     input.response.write("stream-start");
   });
+}
+
+type SimulatedAwsAssumeRoleRequest = {
+  roleArn: string;
+  roleSessionName: string;
+};
+
+async function startSimulatedAwsSts(): Promise<{
+  baseUrl: string;
+  assumeRoleRequests: () => SimulatedAwsAssumeRoleRequest[];
+  stop: () => Promise<void>;
+}> {
+  const assumeRoleRequests: SimulatedAwsAssumeRoleRequest[] = [];
+  const server = createServer((request, response) => {
+    void (async () => {
+      if (request.method !== "POST" || request.url !== "/") {
+        response.statusCode = 404;
+        response.end("not found");
+        return;
+      }
+
+      const body = new URLSearchParams(await readRequestBody(request));
+      const action = body.get("Action");
+      const roleArn = body.get("RoleArn");
+      const roleSessionName = body.get("RoleSessionName");
+      if (action !== "AssumeRole" || roleArn === null || roleSessionName === null) {
+        response.statusCode = 400;
+        response.end("invalid AssumeRole request");
+        return;
+      }
+
+      assumeRoleRequests.push({
+        roleArn,
+        roleSessionName,
+      });
+
+      // AWS STS uses the Query API. `AssumeRole` returns temporary credentials
+      // under `AssumeRoleResult/Credentials`.
+      // Source: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+      response.statusCode = 200;
+      response.setHeader("content-type", "text/xml");
+      response.end(`<?xml version="1.0" encoding="UTF-8"?>
+<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <AssumeRoleResult>
+    <Credentials>
+      <AccessKeyId>ASIAEXAMPLEACCESS</AccessKeyId>
+      <SecretAccessKey>example-secret-access-key</SecretAccessKey>
+      <SessionToken>example-session-token</SessionToken>
+      <Expiration>2099-01-01T00:00:00Z</Expiration>
+    </Credentials>
+  </AssumeRoleResult>
+  <ResponseMetadata>
+    <RequestId>gateway-egress-aws-sts</RequestId>
+  </ResponseMetadata>
+</AssumeRoleResponse>`);
+    })().catch((error: unknown) => {
+      response.statusCode = 500;
+      response.setHeader("content-type", "text/plain");
+      response.end(error instanceof Error ? error.message : "simulated AWS STS failed");
+    });
+  });
+  const port = await listen(server);
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(port)}`,
+    assumeRoleRequests: () => [...assumeRoleRequests],
+    stop: async () => {
+      await closeServer(server);
+    },
+  };
+}
+
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk, "utf8"));
+      continue;
+    }
+
+    chunks.push(chunk);
+  }
+
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 function createWebSocketBaseUrl(httpBaseUrl: string): string {

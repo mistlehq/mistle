@@ -360,6 +360,7 @@ export function selectDataPlaneGatewayConfig(config: Config): DataPlaneGatewayCo
     },
     controlPlaneApi: {
       baseUrl: config.services.control_plane_api.internal_url,
+      publicBaseUrl: config.services.control_plane_api.public_url,
     },
     internalAuth: {
       serviceToken: config.internal_auth.shared_token.token,
