@@ -74,7 +74,9 @@ describe("app routing breadcrumb integration", () => {
   const settingsRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
       <Route element={<Outlet />} handle={ROUTE_HANDLES.settings} path="settings">
-        <Route element={<PageHarness />} handle={ROUTE_HANDLES.settingsPersonal} path="personal" />
+        <Route element={<Outlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
+          <Route element={<PageHarness />} handle={ROUTE_HANDLES.settingsProfile} path="profile" />
+        </Route>
         <Route element={<Outlet />} handle={ROUTE_HANDLES.settingsOrganization} path="organization">
           <Route
             element={<PageHarness />}
@@ -184,12 +186,12 @@ describe("app routing breadcrumb integration", () => {
 
   it("does not render page breadcrumbs for settings routes", async () => {
     const router = createMemoryRouter(settingsRoutes, {
-      initialEntries: ["/settings/personal"],
+      initialEntries: ["/settings/account/profile"],
     });
     let markup = renderRoutingMarkup(router);
 
     expectMarkupNotToContainBreadcrumbs(markup);
-    expectMarkupToContainMetaTitle(markup, "Personal");
+    expectMarkupToContainMetaTitle(markup, "Profile");
     expectMarkupToContainEmptyMetaDescription(markup);
 
     await router.navigate("/settings/organization/members");

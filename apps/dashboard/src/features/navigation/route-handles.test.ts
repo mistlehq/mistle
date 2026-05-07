@@ -129,8 +129,8 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.scheduledAutomationsDetail.description).toBe("");
     expect(ROUTE_HANDLES.scheduledAutomationsDetail.appShellInsetOwner).toBe("child");
 
-    expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
-    expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
+    expect(ROUTE_HANDLES.settingsProfile.title).toBe("Profile");
+    expect(ROUTE_HANDLES.settingsProfile.description).toBe("");
 
     expect(ROUTE_HANDLES.settingsOrganizationGeneral.title).toBe("General");
     expect(ROUTE_HANDLES.settingsOrganizationGeneral.description).toBe("");

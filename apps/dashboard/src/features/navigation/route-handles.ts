@@ -290,12 +290,6 @@ export const ROUTE_HANDLES = {
     title: "Settings",
     description: "Manage personal and organization settings.",
   },
-  settingsPersonal: {
-    sidebarTriggerOwner: "page-frame",
-    breadcrumb: "Personal",
-    title: "Personal",
-    description: "",
-  },
   settingsAccount: {
     sidebarTriggerOwner: "none",
     breadcrumb: "Account",
@@ -345,7 +339,7 @@ export const ROUTE_HANDLES = {
 } as const satisfies Record<string, AppRouteHandle>;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
-  "settingsPersonal",
+  "settingsProfile",
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
   "settingsOrganizationIdentityLinking",
@@ -356,7 +350,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
 export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   [Key in (typeof SETTINGS_PAGE_ROUTE_HANDLE_KEYS)[number]]: SettingsPageRouteHandle;
 } = {
-  settingsPersonal: ROUTE_HANDLES.settingsPersonal,
+  settingsProfile: ROUTE_HANDLES.settingsProfile,
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationIdentityLinking: ROUTE_HANDLES.settingsOrganizationIdentityLinking,

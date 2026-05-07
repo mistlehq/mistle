@@ -214,7 +214,7 @@ export const APP_SHELL_ROUTE_MANIFEST = [
           },
           {
             element: "profileSettings",
-            handle: ROUTE_HANDLES.settingsPersonal,
+            handle: ROUTE_HANDLES.settingsProfile,
             path: "profile",
           },
         ],
