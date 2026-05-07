@@ -169,6 +169,10 @@ const meta = {
       control: "boolean",
       description: "Allows the shell to render the standalone sidebar trigger.",
     },
+    sidebarDefaultOpen: {
+      control: "boolean",
+      description: "Initial sidebar open state for visualizing collapsed shell layouts.",
+    },
     showSessionsSidebar: {
       control: "boolean",
       description: "Toggles the real Sessions sidebar mode switch rendered in the sidebar menu.",
@@ -210,6 +214,7 @@ const meta = {
         "locationPathname",
         "mainContent",
         "renderSidebarTrigger",
+        "sidebarDefaultOpen",
         "sidebarHeaderContent",
         "sidebarContent",
         "sidebarFooterContent",
@@ -230,6 +235,7 @@ const meta = {
       </div>
     ),
     renderSidebarTrigger: true,
+    sidebarDefaultOpen: true,
     showSessionsSidebar: false,
     sidebarContent: null,
     sidebarFooterContent: <ErrorNotice message={null} />,

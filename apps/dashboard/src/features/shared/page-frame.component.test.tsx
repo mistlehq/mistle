@@ -104,13 +104,15 @@ describe("PageFrame", () => {
       </PageFrame>,
     );
 
-    const constrainedContainers = container.querySelectorAll(".max-w-5xl");
+    const header = container.querySelector('[data-slot="page-frame-header-content"]');
+    const content = screen.getByText("Contained content").parentElement;
 
-    expect(constrainedContainers).toHaveLength(2);
-    for (const constrainedContainer of constrainedContainers) {
-      expect(constrainedContainer.className).toContain("mx-auto");
-      expect(constrainedContainer.className).toContain("w-full");
-    }
+    expect(header?.className).toContain("min-[69rem]:mx-auto");
+    expect(header?.className).toContain("min-[69rem]:w-full");
+    expect(header?.className).toContain("min-[69rem]:max-w-5xl");
+    expect(content?.className).toContain("mx-auto");
+    expect(content?.className).toContain("w-full");
+    expect(content?.className).toContain("max-w-5xl");
   });
 
   it("renders the shell sidebar trigger before the page header title", () => {
@@ -130,7 +132,7 @@ describe("PageFrame", () => {
     const trigger = screen.getByRole("button", { name: "Toggle Sidebar" });
     const title = screen.getByRole("heading", { name: "Generic page" });
 
-    expect(container.querySelector('[data-slot="page-frame-header-toolbar"]')).toBeDefined();
+    expect(container.querySelector('[data-slot="page-frame-header-layout"]')).toBeDefined();
     expect(trigger.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
@@ -148,14 +150,16 @@ describe("PageFrame", () => {
       </PageHeaderSidebarTriggerProvider>,
     );
 
-    const toolbar = container.querySelector('[data-slot="page-frame-header-toolbar"]');
+    const layout = container.querySelector('[data-slot="page-frame-header-layout"]');
     const trigger = container.querySelector('[data-slot="page-frame-header-trigger"]');
     const header = container.querySelector('[data-slot="page-frame-header-content"]');
 
-    expect(toolbar?.className).toContain("flex");
-    expect(toolbar?.className).toContain("min-[47rem]:block");
+    expect(layout?.className).toContain("flex");
+    expect(layout?.className).toContain("items-start");
+    expect(layout?.className).toContain("min-[47rem]:block");
     expect(trigger?.className).toContain("shrink-0");
     expect(trigger?.className).toContain("min-[47rem]:absolute");
+    expect(trigger?.className).toContain("min-[47rem]:top-0");
     expect(trigger?.className).toContain("min-[47rem]:left-0");
     expect(header?.className).toContain("flex-1");
     expect(header?.className).toContain("min-[47rem]:mx-auto");
@@ -183,7 +187,7 @@ describe("PageFrame", () => {
     expect(screen.queryByRole("heading")).toBeNull();
   });
 
-  it("renders the shell sidebar trigger in the breadcrumbs toolbar when breadcrumbs and a page header exist", () => {
+  it("renders the shell sidebar trigger before breadcrumbs when breadcrumbs and a page header exist", () => {
     render(
       <PageHeaderSidebarTriggerProvider
         value={{
@@ -208,7 +212,7 @@ describe("PageFrame", () => {
     expect(breadcrumbs.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it("only lets the sidebar trigger occupy breadcrumb row space while constrained content is near the shell edge", () => {
+  it("only lets the sidebar trigger occupy header shell space while constrained content is near the shell edge", () => {
     const { container } = render(
       <PageHeaderSidebarTriggerProvider
         value={{
@@ -226,18 +230,22 @@ describe("PageFrame", () => {
       </PageHeaderSidebarTriggerProvider>,
     );
 
-    const toolbar = container.querySelector('[data-slot="page-frame-breadcrumb-toolbar"]');
-    const trigger = container.querySelector('[data-slot="page-frame-breadcrumb-trigger"]');
+    const layout = container.querySelector('[data-slot="page-frame-header-layout"]');
+    const trigger = container.querySelector('[data-slot="page-frame-header-trigger"]');
+    const header = container.querySelector('[data-slot="page-frame-header-content"]');
     const breadcrumbs = container.querySelector('[data-slot="page-frame-breadcrumb-content"]');
 
-    expect(toolbar?.className).toContain("flex");
-    expect(toolbar?.className).toContain("min-[69rem]:block");
+    expect(layout?.className).toContain("flex");
+    expect(layout?.className).toContain("items-start");
+    expect(layout?.className).toContain("min-[69rem]:block");
     expect(trigger?.className).toContain("shrink-0");
     expect(trigger?.className).toContain("min-[69rem]:absolute");
+    expect(trigger?.className).toContain("min-[69rem]:top-0");
     expect(trigger?.className).toContain("min-[69rem]:left-0");
-    expect(breadcrumbs?.className).toContain("flex-1");
-    expect(breadcrumbs?.className).toContain("min-[69rem]:mx-auto");
-    expect(breadcrumbs?.className).toContain("min-[69rem]:max-w-5xl");
+    expect(header?.className).toContain("flex-1");
+    expect(header?.className).toContain("min-[69rem]:mx-auto");
+    expect(header?.className).toContain("min-[69rem]:max-w-5xl");
+    expect(breadcrumbs).toBeDefined();
   });
 
   it("does not render an empty page header when the shell sidebar trigger is hidden", () => {
