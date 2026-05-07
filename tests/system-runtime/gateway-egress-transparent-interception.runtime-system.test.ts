@@ -40,11 +40,13 @@ const TRANSPARENT_INTERCEPTION_MARKER = "MISTLE_TRANSPARENT_INTERCEPTION_OK";
 const LOOPBACK_DIRECT_MARKER = "MISTLE_TRANSPARENT_LOOPBACK_DIRECT_OK";
 const COMMAND_CONTROL_MARKER = "MISTLE_TRANSPARENT_COMMAND_CONTROL_OK";
 const TRANSPARENT_COUNTER_MARKER = "MISTLE_TRANSPARENT_COUNTER_OBSERVED";
+const TRANSPARENT_DIRECT_TLS_CLIENT_MARKER = "MISTLE_TRANSPARENT_DIRECT_TLS_CLIENT_OK";
 const HTTPS_TRANSPARENT_SMOKE_URL = "https://example.com/";
+const HTTPS_TRANSPARENT_SMOKE_HOST = "example.com";
 
 describe("runtime system gateway transparent egress interception", () => {
   dockerIt(
-    "installs provider packet rules and preserves opaque TCP passthrough [docker]",
+    "installs provider packet rules and preserves transparent HTTPS plus opaque TCP passthrough [docker]",
     async ({ system }) => {
       await runTransparentInterceptionScenario({
         system,
@@ -55,7 +57,7 @@ describe("runtime system gateway transparent egress interception", () => {
   );
 
   e2bIt(
-    "installs provider packet rules and preserves opaque TCP passthrough [e2b]",
+    "installs provider packet rules and preserves transparent HTTPS while command traffic stays reachable [e2b]",
     async ({ system }) => {
       await runTransparentInterceptionScenario({
         system,
@@ -102,6 +104,7 @@ async function runTransparentInterceptionScenario(input: {
       expect(smokeResult.stdout).toContain(LOOPBACK_DIRECT_MARKER);
     }
     expect(smokeResult.stdout).toContain(TRANSPARENT_INTERCEPTION_MARKER);
+    expect(smokeResult.stdout).toContain(TRANSPARENT_DIRECT_TLS_CLIENT_MARKER);
     expect(smokeResult.stdout).toContain(TRANSPARENT_COUNTER_MARKER);
     expect(smokeResult.stdout).toContain(COMMAND_CONTROL_MARKER);
   } finally {
@@ -171,6 +174,7 @@ function transparentOpaqueTcpInterceptionSmokeScript(): string {
     "die \"unexpected transparent response: $response\" unless $response eq 'transparent:opaque';",
     "PERL",
     `printf '%s\\n' ${shellQuote(TRANSPARENT_INTERCEPTION_MARKER)}`,
+    transparentDirectTlsClientInterceptionScript(),
     transparentCounterAssertionScript(),
     `printf '%s\\n' ${shellQuote(COMMAND_CONTROL_MARKER)}`,
   ].join("\n");
@@ -189,8 +193,29 @@ function transparentHttpsInterceptionSmokeScript(): string {
       "| grep -q 'Example Domain'",
     ].join(" "),
     `printf '%s\\n' ${shellQuote(TRANSPARENT_INTERCEPTION_MARKER)}`,
+    transparentDirectTlsClientInterceptionScript(),
     transparentCounterAssertionScript(),
     `printf '%s\\n' ${shellQuote(COMMAND_CONTROL_MARKER)}`,
+  ].join("\n");
+}
+
+function transparentDirectTlsClientInterceptionScript(): string {
+  return [
+    [
+      `printf 'GET / HTTP/1.1\\r\\nHost: ${HTTPS_TRANSPARENT_SMOKE_HOST}\\r\\nConnection: close\\r\\n\\r\\n'`,
+      "|",
+      "openssl",
+      "s_client",
+      "-quiet",
+      "-verify_return_error",
+      "-connect",
+      `${HTTPS_TRANSPARENT_SMOKE_HOST}:443`,
+      "-servername",
+      HTTPS_TRANSPARENT_SMOKE_HOST,
+      "2>/tmp/mistle-transparent-openssl-stderr.txt",
+      "| grep -q 'Example Domain'",
+    ].join(" "),
+    `printf '%s\\n' ${shellQuote(TRANSPARENT_DIRECT_TLS_CLIENT_MARKER)}`,
   ].join("\n");
 }
 
