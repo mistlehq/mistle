@@ -30,6 +30,7 @@ export type AcquireRunnerServicePoolLeaseInput = {
   healthCheck: (service: TestServiceRuntime) => Promise<void>;
   coordinatorDir?: string;
   lockTimeoutMs?: number;
+  releaseLocalServiceOnLastLease?: boolean;
 };
 
 export type StopRunnerServicePoolsInput = {
@@ -52,6 +53,7 @@ type PersistedRunnerService = {
 };
 
 const LocalStopCallbacksByStateFilePath = new Map<string, () => Promise<void>>();
+const LocalLeaseCountsByStateFilePath = new Map<string, number>();
 
 export async function acquireRunnerServicePoolLease(
   input: AcquireRunnerServicePoolLeaseInput,
@@ -69,13 +71,18 @@ export async function acquireRunnerServicePoolLease(
         existingService !== undefined &&
         (await isPersistedServiceHealthy(input, existingService))
       ) {
+        const release =
+          input.releaseLocalServiceOnLastLease === true
+            ? acquireLocalServiceLease(paths.stateFilePath)
+            : async () => {};
+
         return {
           endpoints: existingService.endpoints,
           ...(existingService.pid === undefined ? {} : { pid: existingService.pid }),
           ...(existingService.containerId === undefined
             ? {}
             : { containerId: existingService.containerId }),
-          release: async () => {},
+          release,
         };
       }
 
@@ -97,6 +104,10 @@ export async function acquireRunnerServicePoolLease(
       await input.healthCheck(startedService);
       await writeJsonFile(paths.stateFilePath, persistedService);
       LocalStopCallbacksByStateFilePath.set(paths.stateFilePath, startedService.stop);
+      const release =
+        input.releaseLocalServiceOnLastLease === true
+          ? acquireLocalServiceLease(paths.stateFilePath)
+          : async () => {};
 
       return {
         endpoints: startedService.endpoints,
@@ -104,10 +115,45 @@ export async function acquireRunnerServicePoolLease(
         ...(startedService.containerId === undefined
           ? {}
           : { containerId: startedService.containerId }),
-        release: async () => {},
+        release,
       };
     },
   );
+}
+
+function acquireLocalServiceLease(stateFilePath: string): () => Promise<void> {
+  let released = false;
+  LocalLeaseCountsByStateFilePath.set(
+    stateFilePath,
+    (LocalLeaseCountsByStateFilePath.get(stateFilePath) ?? 0) + 1,
+  );
+
+  return async () => {
+    if (released) {
+      return;
+    }
+    released = true;
+
+    const nextLeaseCount = (LocalLeaseCountsByStateFilePath.get(stateFilePath) ?? 1) - 1;
+    if (nextLeaseCount > 0) {
+      LocalLeaseCountsByStateFilePath.set(stateFilePath, nextLeaseCount);
+      return;
+    }
+
+    LocalLeaseCountsByStateFilePath.delete(stateFilePath);
+    const localStop = LocalStopCallbacksByStateFilePath.get(stateFilePath);
+    if (localStop === undefined) {
+      throw new Error(
+        `Cannot release pooled local test service without a local stop callback for '${stateFilePath}'.`,
+      );
+    }
+
+    await localStop();
+    LocalStopCallbacksByStateFilePath.delete(stateFilePath);
+    await rm(stateFilePath, {
+      force: true,
+    });
+  };
 }
 
 export async function stopRunnerServicePools(input: StopRunnerServicePoolsInput): Promise<void> {
@@ -179,6 +225,7 @@ async function stopPersistedService(input: {
   if (localStop !== undefined) {
     await localStop();
     LocalStopCallbacksByStateFilePath.delete(input.stateFilePath);
+    LocalLeaseCountsByStateFilePath.delete(input.stateFilePath);
     return;
   }
 

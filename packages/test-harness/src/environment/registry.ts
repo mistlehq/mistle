@@ -101,6 +101,7 @@ function createPooledServiceDefinition(input: {
           environmentId: startInput.environmentId,
         }),
         healthCheck: input.service.healthCheck,
+        releaseLocalServiceOnLastLease: startInput.mode === "runtime",
         start: async () => {
           const startedService = await input.service.start(startInput);
           return {

@@ -510,6 +510,50 @@ describe("startTestEnvironment", () => {
     await environment.stop();
   });
 
+  it("stops pooled runtime services when each environment is stopped", async () => {
+    await withRunnerPoolEnvironment(async () => {
+      const startEvents: string[] = [];
+      const cleanupEvents: string[] = [];
+      const postgresProvisioner = createPostgresProvisioner(cleanupEvents);
+      const postgresRequirement = createPostgresRequirement(postgresProvisioner);
+      const registry = createServiceRegistry({
+        services: {
+          "control-plane-api": createService({
+            id: "control-plane-api",
+            requirement: postgresRequirement,
+            startEvents,
+            cleanupEvents,
+          }),
+        },
+      });
+
+      const firstEnvironment = await startTestEnvironment({
+        id: "env_pooled_runtime_a",
+        registry,
+        services: [{ service: "control-plane-api", mode: "runtime" }],
+      });
+      await firstEnvironment.stop();
+
+      const secondEnvironment = await startTestEnvironment({
+        id: "env_pooled_runtime_b",
+        registry,
+        services: [{ service: "control-plane-api", mode: "runtime" }],
+      });
+      await secondEnvironment.stop();
+
+      expect(startEvents).toEqual([
+        "control-plane-api:env_pooled_runtime_a:postgres.control-plane",
+        "control-plane-api:env_pooled_runtime_b:postgres.control-plane",
+      ]);
+      expect(cleanupEvents).toEqual([
+        "service:control-plane-api",
+        "infra:postgres.control-plane",
+        "service:control-plane-api",
+        "infra:postgres.control-plane",
+      ]);
+    });
+  });
+
   it("pools environment-scoped services by environment id", async () => {
     await withRunnerPoolEnvironment(async () => {
       const startEvents: string[] = [];
