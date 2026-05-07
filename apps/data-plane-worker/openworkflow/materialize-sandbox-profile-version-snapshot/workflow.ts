@@ -350,6 +350,7 @@ export async function executeMaterializeSandboxProfileVersionSnapshot(input: {
         {
           config: ctx.config,
           processEnv: ctx.processEnv,
+          sandboxAdapter: ctx.sandboxAdapter,
           sandboxRuntimeControl: ctx.sandboxRuntimeControl,
         },
         {

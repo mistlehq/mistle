@@ -97,6 +97,7 @@ fn applies_runtime_plan_artifacts_workspace_sources_and_runtime_files() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -524,6 +525,7 @@ fn applies_typed_exec_artifact_install_steps() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -588,6 +590,7 @@ fn accepts_runtime_plan_egress_routes_with_additional_headers_and_slot_key_crede
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -640,6 +643,7 @@ fn create_runtime_plan_apply_input(
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     }
 }
 

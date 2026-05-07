@@ -65,6 +65,7 @@ fn daemon_applies_startup_input_after_init_submission() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     let server = control::start_control_server_with_health_endpoint(

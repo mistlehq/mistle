@@ -378,6 +378,7 @@ mod tests {
             }),
             egress_grant_by_rule_id: BTreeMap::new(),
             git_identity: None,
+            transparent_proxy: None,
         };
 
         match RuntimeAdapterRegistry.start(

@@ -9,6 +9,8 @@ import {
   SandboxdExecutionModes,
   SandboxdInitResponseSchema,
   SandboxdStartupInputSchema,
+  SandboxdTransparentProxyBypassKinds,
+  SandboxdTransparentProxyExclusionKinds,
 } from "./startup.js";
 
 const startupInitResponseSchemaJson: unknown = JSON.parse(
@@ -123,6 +125,52 @@ describe("startup contracts", () => {
           actingUserId: "usr_123",
           grant: "grant-token",
         },
+      },
+    });
+  });
+
+  it("accepts startup input with optional transparent proxy configuration", () => {
+    expect(
+      SandboxdStartupInputSchema.parse({
+        ...startupInputFixture,
+        transparentProxy: {
+          passthroughBypass: {
+            kind: SandboxdTransparentProxyBypassKinds.SOCKET_MARK,
+            mark: 38_514,
+          },
+          exclusions: [
+            {
+              kind: SandboxdTransparentProxyExclusionKinds.CIDR,
+              value: "169.254.0.0/16",
+              reason: "provider metadata traffic must stay direct",
+            },
+            {
+              kind: SandboxdTransparentProxyExclusionKinds.HOST,
+              value: "host.docker.internal",
+              reason: "Docker host traffic must stay direct",
+            },
+          ],
+        },
+      }),
+    ).toEqual({
+      ...startupInputFixture,
+      transparentProxy: {
+        passthroughBypass: {
+          kind: SandboxdTransparentProxyBypassKinds.SOCKET_MARK,
+          mark: 38_514,
+        },
+        exclusions: [
+          {
+            kind: SandboxdTransparentProxyExclusionKinds.CIDR,
+            value: "169.254.0.0/16",
+            reason: "provider metadata traffic must stay direct",
+          },
+          {
+            kind: SandboxdTransparentProxyExclusionKinds.HOST,
+            value: "host.docker.internal",
+            reason: "Docker host traffic must stay direct",
+          },
+        ],
       },
     });
   });

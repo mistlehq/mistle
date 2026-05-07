@@ -38,6 +38,41 @@ pub struct GitIdentity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransparentProxyBypassKind {
+    SocketMark,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TransparentProxyBypass {
+    pub kind: TransparentProxyBypassKind,
+    pub mark: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransparentProxyExclusionKind {
+    Cidr,
+    Host,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TransparentProxyExclusion {
+    pub kind: TransparentProxyExclusionKind,
+    pub value: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TransparentProxyConfiguration {
+    pub passthrough_bypass: TransparentProxyBypass,
+    pub exclusions: Vec<TransparentProxyExclusion>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StartupInput {
     pub startup_mode: StartupMode,
@@ -49,6 +84,8 @@ pub struct StartupInput {
     pub runtime_plan: serde_json::Value,
     pub egress_grant_by_rule_id: BTreeMap<String, String>,
     pub git_identity: Option<GitIdentity>,
+    #[serde(default)]
+    pub transparent_proxy: Option<TransparentProxyConfiguration>,
 }
 
 impl StartupInput {

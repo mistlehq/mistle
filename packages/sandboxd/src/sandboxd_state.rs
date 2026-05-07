@@ -1809,6 +1809,7 @@ supports_websockets = false
                 ),
             ]),
             git_identity: None,
+            transparent_proxy: None,
         };
         let original_config = runtime_plan
             .runtime_clients
@@ -2493,6 +2494,7 @@ supports_websockets = false
             runtime_plan,
             egress_grant_by_rule_id: BTreeMap::new(),
             git_identity,
+            transparent_proxy: None,
         }
     }
 

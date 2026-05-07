@@ -1271,6 +1271,74 @@
       },
       "required": ["name", "email"],
       "additionalProperties": false
+    },
+    "transparentProxy": {
+      "type": "object",
+      "properties": {
+        "passthroughBypass": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "socket_mark"
+            },
+            "mark": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": ["kind", "mark"],
+          "additionalProperties": false
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "cidr"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["kind", "value", "reason"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "host"
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["kind", "value", "reason"],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": ["passthroughBypass", "exclusions"],
+      "additionalProperties": false
     }
   },
   "required": [

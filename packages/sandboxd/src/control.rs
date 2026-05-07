@@ -1755,6 +1755,7 @@ mod tests {
             }),
             egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
+            transparent_proxy: None,
         };
 
         submit_init(&socket_path, &startup_input)
@@ -1930,6 +1931,7 @@ mod tests {
             }),
             egress_grant_by_rule_id: std::collections::BTreeMap::new(),
             git_identity: None,
+            transparent_proxy: None,
         }
     }
 
@@ -1967,6 +1969,7 @@ mod tests {
                     grant: "grant-token".to_string(),
                 }),
             }),
+            transparent_proxy: None,
         }
     }
 

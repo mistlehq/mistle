@@ -47,6 +47,50 @@ export const SandboxdGitIdentitySchema = z
 
 export type SandboxdGitIdentity = z.infer<typeof SandboxdGitIdentitySchema>;
 
+export const SandboxdTransparentProxyBypassKinds = {
+  SOCKET_MARK: "socket_mark",
+} as const;
+
+export const SandboxdTransparentProxyBypassSchema = z
+  .object({
+    kind: z.literal(SandboxdTransparentProxyBypassKinds.SOCKET_MARK),
+    mark: z.number().int().min(1),
+  })
+  .strict();
+
+export const SandboxdTransparentProxyExclusionKinds = {
+  CIDR: "cidr",
+  HOST: "host",
+} as const;
+
+export const SandboxdTransparentProxyExclusionSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal(SandboxdTransparentProxyExclusionKinds.CIDR),
+      value: z.string().min(1),
+      reason: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal(SandboxdTransparentProxyExclusionKinds.HOST),
+      value: z.string().min(1),
+      reason: z.string().min(1),
+    })
+    .strict(),
+]);
+
+export const SandboxdTransparentProxyConfigurationSchema = z
+  .object({
+    passthroughBypass: SandboxdTransparentProxyBypassSchema,
+    exclusions: z.array(SandboxdTransparentProxyExclusionSchema),
+  })
+  .strict();
+
+export type SandboxdTransparentProxyConfiguration = z.infer<
+  typeof SandboxdTransparentProxyConfigurationSchema
+>;
+
 export const SandboxdStartupInputSchema = z
   .object({
     startupMode: SandboxdStartupModeSchema,
@@ -57,6 +101,7 @@ export const SandboxdStartupInputSchema = z
     runtimePlan: CompiledRuntimePlanSchema,
     egressGrantByRuleId: z.record(z.string(), z.string().min(1)),
     gitIdentity: SandboxdGitIdentitySchema.optional(),
+    transparentProxy: SandboxdTransparentProxyConfigurationSchema.optional(),
   })
   .strict();
 

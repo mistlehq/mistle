@@ -1,4 +1,4 @@
-import { SandboxProvider, type SandboxRuntimeControl } from "@mistle/sandbox";
+import { SandboxProvider, type SandboxAdapter, type SandboxRuntimeControl } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
@@ -32,6 +32,7 @@ export async function resumeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     processEnv: Readonly<Record<string, string | undefined>>;
+    sandboxAdapter: SandboxAdapter;
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
@@ -54,6 +55,8 @@ export async function resumeSandboxRuntime(
     runtimePlan: input.runtimePlan,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+    sandboxAdapter: ctx.sandboxAdapter,
+    processEnv: ctx.processEnv,
   });
 
   await ctx.sandboxRuntimeControl.resume({

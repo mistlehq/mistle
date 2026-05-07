@@ -149,6 +149,7 @@ mod tests {
                 email: "mistle-user@example.com".to_string(),
                 signing: None,
             }),
+            transparent_proxy: None,
         }, &global_git_config_path)
         .expect("git identity should apply successfully");
 
@@ -204,6 +205,7 @@ mod tests {
                     email: "mistle-user@example.com".to_string(),
                     signing: None,
                 }),
+                transparent_proxy: None,
             },
             &explicit_git_config_path,
         )
@@ -255,6 +257,7 @@ mod tests {
                     grant: "grant-token".to_string(),
                 }),
             }),
+            transparent_proxy: None,
         }, &global_git_config_path)
         .expect("git identity should apply successfully");
 
@@ -315,6 +318,7 @@ mod tests {
                 email: "mistle-user@example.com".to_string(),
                 signing: None,
             }),
+            transparent_proxy: None,
         }, &global_git_config_path)
         .expect("git identity should apply successfully");
 

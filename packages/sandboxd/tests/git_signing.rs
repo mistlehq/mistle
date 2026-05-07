@@ -504,6 +504,7 @@ fn valid_signing_startup_input(tunnel_gateway_ws_url: &str, signer_program: &str
                 grant: "grant-token".to_string(),
             }),
         }),
+        transparent_proxy: None,
     }
 }
 

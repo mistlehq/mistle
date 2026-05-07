@@ -207,6 +207,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 {
                   config: ctx.config,
                   processEnv: ctx.processEnv,
+                  sandboxAdapter: ctx.sandboxAdapter,
                   sandboxRuntimeControl: ctx.sandboxRuntimeControl,
                 },
                 {
@@ -866,6 +867,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               config: ctx.config,
               processEnv: ctx.processEnv,
+              sandboxAdapter: ctx.sandboxAdapter,
               sandboxRuntimeControl: ctx.sandboxRuntimeControl,
             },
             {

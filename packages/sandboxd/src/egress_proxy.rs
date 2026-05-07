@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::convert::Infallible;
 use std::fmt::{self, Display};
 use std::fs::{self, DirBuilder};
-use std::net::{SocketAddr, TcpListener as StdTcpListener};
+use std::net::{IpAddr, SocketAddr, TcpListener as StdTcpListener, ToSocketAddrs};
 use std::os::unix::fs::DirBuilderExt;
 #[cfg(target_os = "linux")]
 use std::os::unix::io::AsRawFd;
@@ -49,7 +49,10 @@ use tokio::sync::{mpsc as tokio_mpsc, oneshot};
 use tokio_rustls::rustls::{ServerConfig, server::Acceptor as RustlsServerAcceptor};
 use tokio_rustls::{LazyConfigAcceptor, TlsAcceptor};
 
-use crate::protocol::startup::StartupInput;
+use crate::protocol::startup::{
+    StartupInput, TransparentProxyBypassKind, TransparentProxyConfiguration,
+    TransparentProxyExclusionKind,
+};
 use crate::proxy_ca::{generate_proxy_ca, issue_proxy_leaf_certificate};
 use crate::runtime::{CompiledEgressRoute, CompiledRuntimePlan};
 use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -66,10 +69,10 @@ const RUNTIME_PROXY_CA_TRUST_STORE_PATH: &str =
 const SYSTEM_CA_CERT_BUNDLE_PATH: &str = "/etc/ssl/certs/ca-certificates.crt";
 const UPDATE_CA_CERTIFICATES_COMMAND: &str = "update-ca-certificates";
 const DEFAULT_LOOPBACK_PROXY_PORT: u16 = 38_513;
-#[cfg(target_os = "linux")]
 const DEFAULT_TRANSPARENT_PROXY_PORT: u16 = 38_514;
 #[cfg(target_os = "linux")]
 const TRANSPARENT_PASSTHROUGH_SOCKET_MARK: u32 = 38_514;
+const TRANSPARENT_NFTABLES_TABLE_NAME: &str = "mistle_transparent_egress";
 const EGRESS_PROXY_HEALTHCHECK_INTERVAL: Duration = Duration::from_millis(250);
 const EGRESS_PROXY_STARTUP_HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 const EGRESS_PROXY_RESTART_BACKOFF_MS: [u64; 6] = [0, 250, 500, 1000, 2000, 5000];
@@ -121,6 +124,7 @@ pub struct EgressProxy {
     shutdown_requested: Arc<AtomicBool>,
     supervisor_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     transparent_server: Option<ActiveEgressProxyServer>,
+    transparent_packet_rules: Option<TransparentPacketRules>,
     #[cfg(any(test, debug_assertions))]
     supervisor_command_sender: Option<mpsc::Sender<EgressProxySupervisorCommand>>,
     proxy_ca_installation: ProxyCaInstallation,
@@ -187,6 +191,19 @@ struct ActiveEgressProxyServer {
     shutdown_tx: Option<oneshot::Sender<()>>,
     server_thread: Option<JoinHandle<Result<(), EgressProxyError>>>,
     exit_receiver: mpsc::Receiver<Result<(), EgressProxyError>>,
+}
+
+#[derive(Debug)]
+struct TransparentPacketRules {
+    table_name: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NftablesRulePlan {
+    table_name: &'static str,
+    listener_port: u16,
+    passthrough_mark: u32,
+    excluded_ipv4_cidrs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -619,7 +636,7 @@ impl EgressProxy {
         clock: Arc<dyn Clock>,
         supervisor_handle: SandboxdSupervisorHandle,
     ) -> Result<Option<Self>, EgressProxyError> {
-        if runtime_plan.egress_routes.is_empty() {
+        if runtime_plan.egress_routes.is_empty() && startup_input.transparent_proxy.is_none() {
             return Ok(None);
         }
         let log_clock = clock.clone();
@@ -769,7 +786,7 @@ impl EgressProxy {
         }
         supervisor_handle.mark_component_healthy(SupervisedComponent::EgressProxy);
 
-        let transparent_server = match transparent_listener_address {
+        let mut transparent_server = match transparent_listener_address {
             Some(transparent_listener_address) => {
                 let transparent_listener =
                     match bind_transparent_egress_proxy_listener(transparent_listener_address) {
@@ -839,6 +856,49 @@ impl EgressProxy {
             None => None,
         };
 
+        let transparent_packet_rules = if transparent_server.is_some() {
+            match startup_input.transparent_proxy.as_ref() {
+                Some(configuration) => {
+                    match TransparentPacketRules::install(
+                        configuration,
+                        DEFAULT_TRANSPARENT_PROXY_PORT,
+                    ) {
+                        Ok(packet_rules) => {
+                            emit_egress_proxy_log(
+                                log_context.clock,
+                                log_context.sandbox_instance_id,
+                                "egress_proxy_transparent_packet_rules_installed",
+                                &[(
+                                    "tableName",
+                                    Value::String(TRANSPARENT_NFTABLES_TABLE_NAME.to_string()),
+                                )],
+                            );
+                            Some(packet_rules)
+                        }
+                        Err(error) => {
+                            if let Some(mut server) = transparent_server.take() {
+                                server.request_shutdown();
+                                let _ = server.join();
+                            }
+                            active_server.request_shutdown();
+                            let _ = active_server.join();
+                            let cleanup_suffix =
+                                cleanup_proxy_ca_installation(&proxy_ca_installation, log_context)
+                                    .err()
+                                    .map(|cleanup_error| {
+                                        format!(" cleanup also failed: {cleanup_error}")
+                                    })
+                                    .unwrap_or_default();
+                            return Err(EgressProxyError::new(format!("{error}{cleanup_suffix}")));
+                        }
+                    }
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+
         let shutdown_requested = Arc::new(AtomicBool::new(false));
         #[cfg(any(test, debug_assertions))]
         let (supervisor_command_sender, supervisor_command_receiver) = mpsc::channel();
@@ -870,6 +930,7 @@ impl EgressProxy {
             #[cfg(any(test, debug_assertions))]
             supervisor_command_sender: Some(supervisor_command_sender),
             proxy_ca_installation,
+            transparent_packet_rules,
             supervisor_handle,
         }))
     }
@@ -978,6 +1039,11 @@ impl EgressProxy {
         };
         self.shutdown_requested.store(true, Ordering::Relaxed);
 
+        let packet_rules_cleanup_result = self
+            .transparent_packet_rules
+            .take()
+            .map(|packet_rules| packet_rules.cleanup());
+
         if let Some(supervisor_thread) = self.supervisor_thread.take() {
             match supervisor_thread.join() {
                 Ok(Ok(())) => {}
@@ -995,6 +1061,9 @@ impl EgressProxy {
             transparent_server.join()?;
         }
 
+        if let Some(cleanup_result) = packet_rules_cleanup_result {
+            cleanup_result?;
+        }
         cleanup_proxy_ca_installation(&self.proxy_ca_installation, log_context)?;
 
         self.supervisor_handle
@@ -1212,6 +1281,238 @@ fn normalize_egress_proxy_exit_result(
         Ok(()) => EgressProxyError::new("local egress proxy thread returned unexpectedly"),
         Err(error) => error,
     }
+}
+
+impl TransparentPacketRules {
+    fn install(
+        configuration: &TransparentProxyConfiguration,
+        listener_port: u16,
+    ) -> Result<Self, EgressProxyError> {
+        let plan = build_nftables_rule_plan(configuration, listener_port)?;
+        cleanup_transparent_nftables_table(plan.table_name)?;
+        for command in build_nftables_install_commands(&plan) {
+            run_nft_command(&command)?;
+        }
+        Ok(Self {
+            table_name: plan.table_name,
+        })
+    }
+
+    fn cleanup(&self) -> Result<(), EgressProxyError> {
+        cleanup_transparent_nftables_table(self.table_name)
+    }
+}
+
+fn build_nftables_rule_plan(
+    configuration: &TransparentProxyConfiguration,
+    listener_port: u16,
+) -> Result<NftablesRulePlan, EgressProxyError> {
+    if configuration.passthrough_bypass.kind != TransparentProxyBypassKind::SocketMark {
+        return Err(EgressProxyError::new(
+            "transparent proxy packet rules require socket-mark passthrough bypass",
+        ));
+    }
+    if configuration.passthrough_bypass.mark == 0 {
+        return Err(EgressProxyError::new(
+            "transparent proxy socket-mark bypass value must be non-zero",
+        ));
+    }
+
+    let mut excluded_ipv4_cidrs = Vec::new();
+    for exclusion in &configuration.exclusions {
+        match exclusion.kind {
+            TransparentProxyExclusionKind::Cidr => {
+                if let Some(ipv4_cidr) = normalize_ipv4_cidr(&exclusion.value)? {
+                    excluded_ipv4_cidrs.push(ipv4_cidr);
+                }
+            }
+            TransparentProxyExclusionKind::Host => {
+                excluded_ipv4_cidrs.extend(resolve_host_exclusion_ipv4_cidrs(&exclusion.value)?);
+            }
+        }
+    }
+    excluded_ipv4_cidrs.sort();
+    excluded_ipv4_cidrs.dedup();
+
+    Ok(NftablesRulePlan {
+        table_name: TRANSPARENT_NFTABLES_TABLE_NAME,
+        listener_port,
+        passthrough_mark: configuration.passthrough_bypass.mark,
+        excluded_ipv4_cidrs,
+    })
+}
+
+fn normalize_ipv4_cidr(value: &str) -> Result<Option<String>, EgressProxyError> {
+    let (address, prefix) = value.split_once('/').ok_or_else(|| {
+        EgressProxyError::new(format!(
+            "transparent proxy CIDR exclusion '{value}' is missing a prefix length"
+        ))
+    })?;
+    let prefix_length = prefix.parse::<u8>().map_err(|error| {
+        EgressProxyError::new(format!(
+            "transparent proxy CIDR exclusion '{value}' has invalid prefix length: {error}"
+        ))
+    })?;
+    let ip_address = address.parse::<IpAddr>().map_err(|error| {
+        EgressProxyError::new(format!(
+            "transparent proxy CIDR exclusion '{value}' has invalid IP address: {error}"
+        ))
+    })?;
+
+    match ip_address {
+        IpAddr::V4(ipv4_address) => {
+            if prefix_length > 32 {
+                return Err(EgressProxyError::new(format!(
+                    "transparent proxy IPv4 CIDR exclusion '{value}' has prefix length greater than 32"
+                )));
+            }
+            Ok(Some(format!("{ipv4_address}/{prefix_length}")))
+        }
+        IpAddr::V6(_) => {
+            if prefix_length > 128 {
+                return Err(EgressProxyError::new(format!(
+                    "transparent proxy IPv6 CIDR exclusion '{value}' has prefix length greater than 128"
+                )));
+            }
+            Ok(None)
+        }
+    }
+}
+
+fn resolve_host_exclusion_ipv4_cidrs(host: &str) -> Result<Vec<String>, EgressProxyError> {
+    let socket_addresses = (host, 0).to_socket_addrs().map_err(|error| {
+        EgressProxyError::new(format!(
+            "failed to resolve transparent proxy host exclusion '{host}': {error}"
+        ))
+    })?;
+    let mut cidrs = socket_addresses
+        .filter_map(|socket_address| match socket_address.ip() {
+            IpAddr::V4(ipv4_address) => Some(format!("{ipv4_address}/32")),
+            IpAddr::V6(_) => None,
+        })
+        .collect::<Vec<_>>();
+    cidrs.sort();
+    cidrs.dedup();
+    if cidrs.is_empty() {
+        return Err(EgressProxyError::new(format!(
+            "transparent proxy host exclusion '{host}' did not resolve to an IPv4 address"
+        )));
+    }
+    Ok(cidrs)
+}
+
+fn build_nftables_install_commands(plan: &NftablesRulePlan) -> Vec<Vec<String>> {
+    let mut commands = vec![
+        vec![
+            "add".to_string(),
+            "table".to_string(),
+            "ip".to_string(),
+            plan.table_name.to_string(),
+        ],
+        vec![
+            "add".to_string(),
+            "chain".to_string(),
+            "ip".to_string(),
+            plan.table_name.to_string(),
+            "output".to_string(),
+            "{".to_string(),
+            "type".to_string(),
+            "nat".to_string(),
+            "hook".to_string(),
+            "output".to_string(),
+            "priority".to_string(),
+            "-100".to_string(),
+            ";".to_string(),
+            "policy".to_string(),
+            "accept".to_string(),
+            ";".to_string(),
+            "}".to_string(),
+        ],
+        vec![
+            "add".to_string(),
+            "rule".to_string(),
+            "ip".to_string(),
+            plan.table_name.to_string(),
+            "output".to_string(),
+            "meta".to_string(),
+            "mark".to_string(),
+            plan.passthrough_mark.to_string(),
+            "return".to_string(),
+        ],
+    ];
+
+    commands.extend(plan.excluded_ipv4_cidrs.iter().map(|cidr| {
+        vec![
+            "add".to_string(),
+            "rule".to_string(),
+            "ip".to_string(),
+            plan.table_name.to_string(),
+            "output".to_string(),
+            "ip".to_string(),
+            "daddr".to_string(),
+            cidr.clone(),
+            "return".to_string(),
+        ]
+    }));
+
+    commands.push(vec![
+        "add".to_string(),
+        "rule".to_string(),
+        "ip".to_string(),
+        plan.table_name.to_string(),
+        "output".to_string(),
+        "tcp".to_string(),
+        "dport".to_string(),
+        "1-65535".to_string(),
+        "redirect".to_string(),
+        "to".to_string(),
+        format!(":{}", plan.listener_port),
+    ]);
+
+    commands
+}
+
+fn run_nft_command(arguments: &[String]) -> Result<(), EgressProxyError> {
+    let output = Command::new("nft")
+        .args(arguments)
+        .output()
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to execute nft command: {error}"))
+        })?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    Err(EgressProxyError::new(format!(
+        "nft command failed with status {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    )))
+}
+
+fn cleanup_transparent_nftables_table(table_name: &str) -> Result<(), EgressProxyError> {
+    let output = Command::new("nft")
+        .args(["delete", "table", "ip", table_name])
+        .output()
+        .map_err(|error| {
+            EgressProxyError::new(format!("failed to execute nft cleanup command: {error}"))
+        })?;
+    if output.status.success() || nft_delete_table_error_is_absent(&output.stderr) {
+        return Ok(());
+    }
+
+    Err(EgressProxyError::new(format!(
+        "nft cleanup command failed with status {}: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr).trim()
+    )))
+}
+
+fn nft_delete_table_error_is_absent(stderr: &[u8]) -> bool {
+    let stderr_text = String::from_utf8_lossy(stderr);
+    stderr_text.contains("No such file or directory")
+        || stderr_text.contains("No such table")
+        || stderr_text.contains("does not exist")
 }
 
 fn wait_for_egress_proxy_health(
@@ -3394,7 +3695,16 @@ mod tests {
         build_direct_forward_uri, build_managed_proxy_env, classify_transparent_proxy_first_byte,
         join_url_path, match_route, resolve_request_target, serialize_egress_proxy_log_line,
     };
+    #[cfg(target_os = "linux")]
+    use crate::egress_proxy::{
+        TRANSPARENT_NFTABLES_TABLE_NAME, build_nftables_install_commands, build_nftables_rule_plan,
+    };
     use crate::protocol::startup::{StartupInput, StartupMode};
+    #[cfg(target_os = "linux")]
+    use crate::protocol::startup::{
+        TransparentProxyBypass, TransparentProxyBypassKind, TransparentProxyConfiguration,
+        TransparentProxyExclusion, TransparentProxyExclusionKind,
+    };
     use crate::runtime::{
         CompiledEgressRoute, CompiledEgressRouteAuthInjection,
         CompiledEgressRouteAuthInjectionType, CompiledEgressRouteCredentialResolver,
@@ -3618,6 +3928,106 @@ mod tests {
         assert_eq!(
             classify_transparent_proxy_first_byte(0x00),
             TransparentProxyProtocol::Unsupported
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn builds_nftables_transparent_proxy_rules_with_bypass_exclusions_before_redirect() {
+        let configuration = TransparentProxyConfiguration {
+            passthrough_bypass: TransparentProxyBypass {
+                kind: TransparentProxyBypassKind::SocketMark,
+                mark: 38_514,
+            },
+            exclusions: vec![
+                TransparentProxyExclusion {
+                    kind: TransparentProxyExclusionKind::Cidr,
+                    value: "169.254.0.0/16".to_string(),
+                    reason: "provider metadata traffic must stay direct".to_string(),
+                },
+                TransparentProxyExclusion {
+                    kind: TransparentProxyExclusionKind::Cidr,
+                    value: "192.0.2.0/24".to_string(),
+                    reason: "provider control traffic must stay direct".to_string(),
+                },
+            ],
+        };
+
+        let plan = build_nftables_rule_plan(&configuration, 38_514)
+            .expect("transparent nftables plan should build");
+        let commands = build_nftables_install_commands(&plan);
+
+        assert_eq!(plan.table_name, TRANSPARENT_NFTABLES_TABLE_NAME);
+        assert_eq!(
+            commands,
+            vec![
+                vec!["add", "table", "ip", "mistle_transparent_egress"],
+                vec![
+                    "add",
+                    "chain",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "{",
+                    "type",
+                    "nat",
+                    "hook",
+                    "output",
+                    "priority",
+                    "-100",
+                    ";",
+                    "policy",
+                    "accept",
+                    ";",
+                    "}",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "meta",
+                    "mark",
+                    "38514",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "ip",
+                    "daddr",
+                    "169.254.0.0/16",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "ip",
+                    "daddr",
+                    "192.0.2.0/24",
+                    "return",
+                ],
+                vec![
+                    "add",
+                    "rule",
+                    "ip",
+                    "mistle_transparent_egress",
+                    "output",
+                    "tcp",
+                    "dport",
+                    "1-65535",
+                    "redirect",
+                    "to",
+                    ":38514",
+                ],
+            ]
         );
     }
 
@@ -4626,6 +5036,7 @@ mod tests {
                 grant.to_string(),
             )]),
             git_identity: None,
+            transparent_proxy: None,
         }
     }
 

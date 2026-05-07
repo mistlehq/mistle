@@ -46,6 +46,7 @@ fn applies_typed_mise_install_steps() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)
@@ -114,6 +115,7 @@ fn applies_github_release_artifact_install_steps_from_pinned_public_release() {
         }),
         egress_grant_by_rule_id: BTreeMap::new(),
         git_identity: None,
+        transparent_proxy: None,
     };
 
     runtime::apply_runtime_plan(&startup_input)

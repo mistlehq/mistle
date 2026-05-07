@@ -1,6 +1,7 @@
 import {
   SandboxdExecutionModes,
   type SandboxdStartupInput,
+  type SandboxdTransparentProxyConfiguration,
 } from "@mistle/sandbox-runtime-contract";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
@@ -34,6 +35,7 @@ export type SandboxStartupInput = {
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   egressGrantByRuleId: Record<string, string>;
   gitIdentity?: SandboxdStartupInput["gitIdentity"];
+  transparentProxy?: SandboxdTransparentProxyConfiguration;
 };
 
 export function createSandboxTunnelGatewayWsUrl(input: {

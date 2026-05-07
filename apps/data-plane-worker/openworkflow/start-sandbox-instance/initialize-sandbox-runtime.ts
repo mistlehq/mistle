@@ -1,7 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
-import type { SandboxRuntimeControl } from "@mistle/sandbox";
+import {
+  createRuntimeDestinationTransparentProxyExclusions,
+  type SandboxAdapter,
+  type SandboxRuntimeControl,
+} from "@mistle/sandbox";
+import {
+  SandboxdTransparentProxyBypassKinds,
+  type SandboxdTransparentProxyConfiguration,
+} from "@mistle/sandbox-runtime-contract";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
@@ -15,6 +23,8 @@ import {
 import { createSigningGrant } from "./signing-grant.js";
 import { createSandboxRuntimeEnv } from "./start-sandbox.js";
 
+const GatewayProxyEnabledEnv = "GATEWAY_PROXY_ENABLED";
+
 export async function createSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   organizationId: string;
@@ -24,6 +34,8 @@ export async function createSandboxStartupInput(input: {
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   actingUserId?: StartSandboxInstanceWorkflowInput["actingUserId"];
   gitIdentity?: StartSandboxInstanceWorkflowInput["gitIdentity"];
+  sandboxAdapter?: SandboxAdapter;
+  processEnv?: Readonly<Record<string, string | undefined>>;
 }): Promise<SandboxStartupInput> {
   const bootstrapTokenJti = randomUUID();
   const tunnelExchangeTokenJti = randomUUID();
@@ -93,6 +105,16 @@ export async function createSandboxStartupInput(input: {
     };
   }
 
+  const transparentProxy =
+    input.sandboxAdapter === undefined
+      ? undefined
+      : createTransparentProxyStartupConfiguration({
+          config: input.config,
+          processEnv: input.processEnv ?? process.env,
+          sandboxAdapter: input.sandboxAdapter,
+          tunnelGatewayWsUrl,
+        });
+
   return {
     startupMode: input.startupMode,
     ...(input.executionMode === undefined ? {} : { executionMode: input.executionMode }),
@@ -102,6 +124,7 @@ export async function createSandboxStartupInput(input: {
     runtimePlan: input.runtimePlan,
     egressGrantByRuleId,
     ...(gitIdentity === undefined ? {} : { gitIdentity }),
+    ...(transparentProxy === undefined ? {} : { transparentProxy }),
   };
 }
 
@@ -109,6 +132,7 @@ export async function initializeSandboxRuntime(
   ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     processEnv: Readonly<Record<string, string | undefined>>;
+    sandboxAdapter: SandboxAdapter;
     sandboxRuntimeControl: SandboxRuntimeControl;
   },
   input: {
@@ -131,6 +155,8 @@ export async function initializeSandboxRuntime(
     runtimePlan: input.runtimePlan,
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
+    sandboxAdapter: ctx.sandboxAdapter,
+    processEnv: ctx.processEnv,
   });
 
   await ctx.sandboxRuntimeControl.init({
@@ -142,4 +168,48 @@ export async function initializeSandboxRuntime(
       sandboxInstanceId: input.sandboxInstanceId,
     }),
   });
+}
+
+function createTransparentProxyStartupConfiguration(input: {
+  config: DataPlaneWorkerRuntimeConfig;
+  processEnv: Readonly<Record<string, string | undefined>>;
+  sandboxAdapter: SandboxAdapter;
+  tunnelGatewayWsUrl: string;
+}): SandboxdTransparentProxyConfiguration | undefined {
+  if (!readGatewayProxyEnabled(input.processEnv)) {
+    return undefined;
+  }
+
+  const providerConfiguration = input.sandboxAdapter.getTransparentProxyConfiguration();
+  if (!providerConfiguration.supported) {
+    throw new Error(
+      `Sandbox provider '${providerConfiguration.provider}' does not support transparent proxying.`,
+    );
+  }
+
+  return {
+    passthroughBypass: {
+      kind: SandboxdTransparentProxyBypassKinds.SOCKET_MARK,
+      mark: providerConfiguration.passthroughBypass.mark,
+    },
+    exclusions: [
+      ...providerConfiguration.exclusions,
+      ...createRuntimeDestinationTransparentProxyExclusions({
+        dnsServerIps: [],
+        gatewayTunnelUrl: input.tunnelGatewayWsUrl,
+        tokenizerProxyEgressUrl: input.config.app.sandbox.tokenizerProxyEgressBaseUrl,
+      }),
+    ],
+  };
+}
+
+function readGatewayProxyEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+  const value = env[GatewayProxyEnabledEnv];
+  if (value === undefined || value === "") {
+    return false;
+  }
+  if (value === "1") {
+    return true;
+  }
+  throw new Error(`${GatewayProxyEnabledEnv} must be '1' when set.`);
 }

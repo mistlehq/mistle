@@ -267,6 +267,28 @@ const SandboxStartupInputSchema = z.object({
         .optional(),
     })
     .optional(),
+  transparentProxy: z
+    .object({
+      passthroughBypass: z.object({
+        kind: z.literal("socket_mark"),
+        mark: z.number().int().positive(),
+      }),
+      exclusions: z.array(
+        z.discriminatedUnion("kind", [
+          z.object({
+            kind: z.literal("cidr"),
+            value: z.string().min(1),
+            reason: z.string().min(1),
+          }),
+          z.object({
+            kind: z.literal("host"),
+            value: z.string().min(1),
+            reason: z.string().min(1),
+          }),
+        ]),
+      ),
+    })
+    .optional(),
 });
 
 function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
@@ -429,6 +451,55 @@ describe("encodeSandboxStartupInput", () => {
         actingUserId: "usr_123",
         grant: "grant-token-value",
       },
+    });
+  });
+
+  it("encodes optional transparent proxy configuration when present", () => {
+    const encoded = encodeSandboxStartupInput({
+      startupMode: SandboxStartupModes.NEW,
+      bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+      egressGrantByRuleId: {},
+      transparentProxy: {
+        passthroughBypass: {
+          kind: "socket_mark",
+          mark: 38_514,
+        },
+        exclusions: [
+          {
+            kind: "cidr",
+            value: "169.254.0.0/16",
+            reason: "provider metadata traffic must stay direct",
+          },
+          {
+            kind: "host",
+            value: "host.docker.internal",
+            reason: "Docker host traffic must stay direct",
+          },
+        ],
+      },
+    });
+
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(Decoder.decode(encoded).trimEnd()));
+    expect(decoded.transparentProxy).toEqual({
+      passthroughBypass: {
+        kind: "socket_mark",
+        mark: 38_514,
+      },
+      exclusions: [
+        {
+          kind: "cidr",
+          value: "169.254.0.0/16",
+          reason: "provider metadata traffic must stay direct",
+        },
+        {
+          kind: "host",
+          value: "host.docker.internal",
+          reason: "Docker host traffic must stay direct",
+        },
+      ],
     });
   });
 

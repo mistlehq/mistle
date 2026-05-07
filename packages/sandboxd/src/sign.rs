@@ -481,6 +481,7 @@ mod tests {
                     None
                 },
             }),
+            transparent_proxy: None,
         }
     }
 
