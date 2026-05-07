@@ -25,6 +25,15 @@ describe("buildSetupAssistantCollaborationModeSettings", () => {
       developerInstructions: SetupAssistantDeveloperInstructions,
     });
   });
+
+  it("requires setup scripts to use non-interactive commands", () => {
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "The setup script runs non-interactively when creating a snapshot",
+    );
+    expect(SetupAssistantDeveloperInstructions).toContain(
+      "Write commands with explicit non-interactive flags or environment variables",
+    );
+  });
 });
 
 describe("buildSetupAssistantInitialComposerText", () => {
