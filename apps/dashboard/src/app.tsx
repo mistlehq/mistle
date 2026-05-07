@@ -5,7 +5,6 @@ import {
   Outlet,
   Route,
   RouterProvider,
-  useLocation,
 } from "react-router";
 
 import { APP_SHELL_ROUTE_MANIFEST } from "./app-route-manifest.js";
@@ -127,8 +126,6 @@ function renderAppRouteElement(element: AppRouteElementKey): React.JSX.Element {
       return <IntegrationConnectionEditPage />;
     case "integrationConnectionSetup":
       return <IntegrationConnectionSetupPage />;
-    case "legacyOrganizationIntegrationsRedirect":
-      return <LegacyOrganizationIntegrationsRedirect />;
     case "newSession":
       return <NewSessionPage />;
     case "organizationGeneralSettings":
@@ -170,23 +167,4 @@ function renderAppRouteElement(element: AppRouteElementKey): React.JSX.Element {
     case "webhookAutomationEditorEdit":
       return <WebhookAutomationEditorPage mode="edit" />;
   }
-}
-
-function LegacyOrganizationIntegrationsRedirect(): React.JSX.Element {
-  const location = useLocation();
-  const legacyPrefix = "/settings/organization/integrations";
-  const pathname = location.pathname.startsWith(legacyPrefix)
-    ? `/integrations${location.pathname.slice(legacyPrefix.length)}`
-    : "/integrations";
-
-  return (
-    <Navigate
-      replace
-      to={{
-        pathname,
-        search: location.search,
-        hash: location.hash,
-      }}
-    />
-  );
 }

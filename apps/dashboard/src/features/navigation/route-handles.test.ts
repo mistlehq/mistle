@@ -26,19 +26,6 @@ describe("route handles", () => {
     expect(invalidHandleNames).toEqual([]);
   });
 
-  it("preserves the legacy organization integrations redirect route", () => {
-    const legacyIntegrationsRoute = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).find(
-      (route) => route.path === "/settings/organization/integrations/*",
-    );
-
-    expect(legacyIntegrationsRoute).toEqual({
-      handle: ROUTE_HANDLES.settingsOrganization,
-      handleName: "settingsOrganization",
-      isRedirect: true,
-      path: "/settings/organization/integrations/*",
-    });
-  });
-
   it("requires every durable app-shell leaf route to declare a mounted sidebar trigger owner", () => {
     const invalidShellLeafRoutes = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).filter(
       (route) => {

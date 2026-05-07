@@ -8,7 +8,6 @@ export type AppRouteElementKey =
   | "integrationConnectionCreate"
   | "integrationConnectionEdit"
   | "integrationConnectionSetup"
-  | "legacyOrganizationIntegrationsRedirect"
   | "newSession"
   | "organizationGeneralSettings"
   | "organizationIdentityLinkingSettings"
@@ -249,11 +248,6 @@ export const APP_SHELL_ROUTE_MANIFEST = [
             element: "organizationSandboxStorageSettings",
             handle: ROUTE_HANDLES.settingsOrganizationSandboxes,
             path: "sandboxes",
-          },
-          {
-            element: "legacyOrganizationIntegrationsRedirect",
-            path: "integrations/*",
-            redirect: true,
           },
         ],
       },
