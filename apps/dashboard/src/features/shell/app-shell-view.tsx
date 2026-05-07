@@ -55,52 +55,39 @@ export function AppShellView(input: AppShellViewProps): React.JSX.Element {
             : "from-background to-muted/20 min-h-svh bg-linear-to-b"
         }
       >
-        <PageHeaderSidebarTriggerProvider
-          value={
-            <AppShellPageHeaderSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
-          }
-        >
+        <AppShellPageHeaderSidebarTriggerProvider renderSidebarTrigger={input.renderSidebarTrigger}>
           {input.topLoadingBar}
-          <AppShellMobileSidebarTrigger renderSidebarTrigger={input.renderSidebarTrigger} />
           <div className={contentContainerClassName}>
             <div className="min-w-0 min-h-0 flex-1">{input.mainContent}</div>
           </div>
-        </PageHeaderSidebarTriggerProvider>
+        </AppShellPageHeaderSidebarTriggerProvider>
       </SidebarInset>
     </SidebarProvider>
   );
 }
 
-function AppShellPageHeaderSidebarTrigger(input: {
+function AppShellPageHeaderSidebarTriggerProvider(input: {
+  children: React.ReactNode;
   renderSidebarTrigger: boolean;
-}): React.JSX.Element | null {
-  const { isMobile, state } = useSidebar();
-  const shouldShowSidebarTrigger = input.renderSidebarTrigger && !isMobile && state === "collapsed";
-
-  return shouldShowSidebarTrigger ? <SidebarTrigger className="-ml-1 shrink-0" /> : null;
-}
-
-function AppShellMobileSidebarTrigger(input: {
-  renderSidebarTrigger: boolean;
-}): React.JSX.Element | null {
+}): React.JSX.Element {
   const { isMobile, openMobile, state } = useSidebar();
   const shouldShowSidebarTrigger =
     input.renderSidebarTrigger &&
-    isMobile &&
     shouldRenderSidebarTrigger({
       isMobile,
       openMobile,
       sidebarState: state,
     });
 
-  if (!shouldShowSidebarTrigger) {
-    return null;
-  }
-
   return (
-    <div className="pointer-events-none fixed top-3 left-3 z-20">
-      <SidebarTrigger className="bg-background/90 pointer-events-auto shadow-sm backdrop-blur-sm" />
-    </div>
+    <PageHeaderSidebarTriggerProvider
+      value={{
+        control: <SidebarTrigger className="-ml-1 shrink-0" />,
+        isVisible: shouldShowSidebarTrigger,
+      }}
+    >
+      {input.children}
+    </PageHeaderSidebarTriggerProvider>
   );
 }
 

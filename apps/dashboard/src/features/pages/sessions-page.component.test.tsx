@@ -124,7 +124,12 @@ describe("SessionsPage", () => {
     const rendered = renderSessionsPage({
       queryClient,
       routes: (
-        <PageHeaderSidebarTriggerProvider value={<button type="button">Toggle Sidebar</button>}>
+        <PageHeaderSidebarTriggerProvider
+          value={{
+            control: <button type="button">Toggle Sidebar</button>,
+            isVisible: true,
+          }}
+        >
           <SessionsPage />
         </PageHeaderSidebarTriggerProvider>
       ),

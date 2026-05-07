@@ -12,6 +12,7 @@ import {
 } from "react-router";
 
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
+import { useAppPageMeta } from "../navigation/route-meta.js";
 import type { LaunchableSandboxProfilesResult } from "../sandbox-profiles/sandbox-profiles-types.js";
 import type { SandboxInstancesListResult } from "../sessions/sessions-types.js";
 import { resolveAppShellFrame } from "../shell/app-shell-frame.js";
@@ -21,7 +22,6 @@ import {
   resolveLocationHref,
   resolveSidebarModeDisableNavigationTarget,
   resolveSidebarModeEnableNavigationTarget,
-  SessionsRoutes,
 } from "../shell/app-shell-sessions-sidebar-mode.js";
 import { AppShellView } from "../shell/app-shell-view.js";
 import { NewSessionPage } from "./new-session-page.js";
@@ -133,6 +133,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     input.initialShowSessionsSidebar === true,
   );
   const routeState = resolveAppShellRouteState(location.pathname);
+  const pageMeta = useAppPageMeta();
   const appShellFrame = resolveAppShellFrame({
     handleBackToApp: () => {},
     handleNavigateToSettings: () => {},
@@ -154,13 +155,7 @@ function SessionsStoryShell(input: { initialShowSessionsSidebar?: boolean }): Re
     organizationImageUrl: null,
     activeOrganizationId: "org_123",
     organizationName: "Mistle Labs",
-    pageMeta: {
-      appShellInsetOwner: location.pathname === SessionsRoutes.NEW ? "child" : "app-shell",
-      appShellViewportMode: "document",
-      title: null,
-      headerIcon: null,
-      supportingText: null,
-    },
+    pageMeta,
     signOutError: null,
     showSessionsSidebar,
     onShowSessionsSidebarChange: (checked) => {
