@@ -9,6 +9,7 @@ import {
 import {
   createRuntimeSystemServiceOptions,
   resolveRuntimeSystemIntegrationConfigPathInContainer,
+  selectE2BProviderSandboxIdsCreatedByTest,
 } from "./runtime-system-test.js";
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
@@ -72,6 +73,22 @@ describe("createRuntimeSystemServiceOptions", () => {
         gatewayProxy: true,
       },
     });
+  });
+});
+
+describe("selectE2BProviderSandboxIdsCreatedByTest", () => {
+  it("returns only provider sandbox ids created after the runtime system test baseline", () => {
+    expect(
+      selectE2BProviderSandboxIdsCreatedByTest({
+        baselineProviderSandboxIds: new Set(["provider-before", "provider-shared"]),
+        currentProviderSandboxIds: new Set([
+          "provider-new-b",
+          "provider-before",
+          "provider-new-a",
+          "provider-shared",
+        ]),
+      }),
+    ).toEqual(["provider-new-a", "provider-new-b"]);
   });
 });
 

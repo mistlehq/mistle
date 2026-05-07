@@ -11,8 +11,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 
+import { runCleanupTasks, type CleanupTask } from "../cleanup/index.js";
 import { MISTLE_TEST_COORDINATOR_DIR_ENV } from "../environment/runner-pool-session.js";
 import { createDockerSandboxProviderInfra } from "../environment/service-catalog.js";
 import type { TestEnvironment, TestInfraRequirement } from "../environment/types.js";
@@ -119,15 +122,31 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
         environment: integrationEnvironment,
         configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
       });
+      const cleanupTasks: CleanupTask[] = [];
+      const e2bProviderSandboxCleanup = await createE2BProviderSandboxCleanup({
+        input,
+        environment: integrationEnvironment,
+      });
+      if (e2bProviderSandboxCleanup !== undefined) {
+        cleanupTasks.push(e2bProviderSandboxCleanup);
+      }
       const publicAccessTunnel = await startPublicAccess({
         input,
         environment,
       });
-      if (publicAccessTunnel === undefined) {
+      if (publicAccessTunnel !== undefined) {
+        cleanupTasks.push(publicAccessTunnel.stop);
+      }
+      if (cleanupTasks.length === 0) {
         return undefined;
       }
 
-      return publicAccessTunnel.stop;
+      return async () => {
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "runtime system test cleanup",
+        });
+      };
     },
   });
 
@@ -258,6 +277,90 @@ function readPublicAccessHostname(serviceId: ServiceId): string {
   }
 
   return readRequiredEnv(envVar);
+}
+
+async function createE2BProviderSandboxCleanup(input: {
+  input: CreateSystemTestInput;
+  environment: IntegrationTestEnvironment;
+}): Promise<CleanupTask | undefined> {
+  if (input.input.sandbox?.provider !== "e2b") {
+    return undefined;
+  }
+
+  const dataPlaneDb = input.environment.dataPlaneDb;
+  const baselineProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+  const sandboxAdapter = createSandboxAdapter({
+    provider: SandboxProvider.E2B,
+    e2b: createE2BSandboxConfig(readE2BOptions()),
+  });
+
+  return async () => {
+    const currentProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+    const providerSandboxIds = selectE2BProviderSandboxIdsCreatedByTest({
+      baselineProviderSandboxIds,
+      currentProviderSandboxIds,
+    });
+
+    await Promise.all(
+      providerSandboxIds.map(async (providerSandboxId) => {
+        await sandboxAdapter.destroy({
+          id: providerSandboxId,
+        });
+      }),
+    );
+  };
+}
+
+async function listPersistedProviderSandboxIds(
+  dataPlaneDb: DataPlaneDatabase,
+): Promise<ReadonlySet<string>> {
+  const sandboxInstances = await dataPlaneDb.query.sandboxInstances.findMany({
+    columns: {
+      providerSandboxId: true,
+    },
+  });
+
+  return new Set(
+    sandboxInstances
+      .map((sandboxInstance) => sandboxInstance.providerSandboxId)
+      .filter((providerSandboxId): providerSandboxId is string => providerSandboxId !== null),
+  );
+}
+
+export function selectE2BProviderSandboxIdsCreatedByTest(input: {
+  baselineProviderSandboxIds: ReadonlySet<string>;
+  currentProviderSandboxIds: ReadonlySet<string>;
+}): string[] {
+  return [...input.currentProviderSandboxIds]
+    .filter((providerSandboxId) => !input.baselineProviderSandboxIds.has(providerSandboxId))
+    .sort();
+}
+
+function createE2BSandboxConfig(input: ReturnType<typeof readE2BOptions>): {
+  apiKey: string;
+  domain?: string;
+  cpuCount?: number;
+  memoryMb?: number;
+} {
+  return {
+    apiKey: input.apiKey,
+    ...(input.domain === undefined ? {} : { domain: input.domain }),
+    ...(input.cpuCount === undefined
+      ? {}
+      : { cpuCount: parsePositiveIntegerEnvValue("MISTLE_SANDBOX_E2B_CPU_COUNT", input.cpuCount) }),
+    ...(input.memoryMb === undefined
+      ? {}
+      : { memoryMb: parsePositiveIntegerEnvValue("MISTLE_SANDBOX_E2B_MEMORY_MB", input.memoryMb) }),
+  };
+}
+
+function parsePositiveIntegerEnvValue(envVar: string, value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`Expected ${envVar} to be a positive integer.`);
+  }
+
+  return parsed;
 }
 
 function readRuntimePublicAccessHostnames(): readonly string[] {
