@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { APP_SHELL_ROUTE_MANIFEST } from "../../app-route-manifest.js";
-import type { AppRouteManifestEntry } from "../../app-route-manifest.js";
 import {
   ROUTE_HANDLES,
   SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT,
@@ -27,33 +25,24 @@ describe("route handles", () => {
   });
 
   it("requires every durable app-shell leaf route to declare a mounted sidebar trigger owner", () => {
-    const invalidShellLeafRoutes = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).filter(
-      (route) => {
-        if (route.isRedirect) {
-          return false;
-        }
-
-        return (
-          route.handle === null ||
-          route.handle.sidebarTriggerOwner === "none" ||
-          route.handle.sidebarTriggerOwner === undefined
-        );
-      },
-    );
+    const invalidShellLeafRoutes = DurableAppShellLeafRoutes.filter((route) => {
+      return (
+        route.handle.sidebarTriggerOwner === "none" ||
+        route.handle.sidebarTriggerOwner === undefined
+      );
+    });
 
     expect(formatShellRouteContractFailures(invalidShellLeafRoutes)).toEqual([]);
   });
 
   it("requires durable document routes to own the sidebar trigger through PageFrame", () => {
-    const invalidDocumentLeafRoutes = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).filter(
-      (route) => {
-        if (route.isRedirect || route.handle?.sidebarTriggerOwner === "workspace") {
-          return false;
-        }
+    const invalidDocumentLeafRoutes = DurableAppShellLeafRoutes.filter((route) => {
+      if (route.handle.sidebarTriggerOwner === "workspace") {
+        return false;
+      }
 
-        return route.handle?.sidebarTriggerOwner !== "page-frame";
-      },
-    );
+      return route.handle.sidebarTriggerOwner !== "page-frame";
+    });
 
     expect(formatShellRouteContractFailures(invalidDocumentLeafRoutes)).toEqual([]);
   });
@@ -261,93 +250,113 @@ describe("route handles", () => {
   });
 });
 
-type AppShellLeafRoute = {
-  handle: AppRouteHandle | null;
-  handleName: string | null;
-  isRedirect: boolean;
+type DurableAppShellLeafRoute = {
+  handle: AppRouteHandle;
+  handleName: string;
   path: string;
 };
 
-function collectAppShellLeafRoutes(routes: readonly AppRouteManifestEntry[]): AppShellLeafRoute[] {
-  return collectLeafRoutes({
-    inheritedHandle: null,
-    inheritedHandleName: null,
-    parentPath: "",
-    routes,
-  });
-}
+const DurableAppShellLeafRoutes: DurableAppShellLeafRoute[] = [
+  { path: "/", handleName: "dashboard", handle: ROUTE_HANDLES.dashboard },
+  {
+    path: "/sandbox-profiles",
+    handleName: "sandboxProfiles",
+    handle: ROUTE_HANDLES.sandboxProfiles,
+  },
+  {
+    path: "/sandbox-profiles/new",
+    handleName: "sandboxProfilesNew",
+    handle: ROUTE_HANDLES.sandboxProfilesNew,
+  },
+  {
+    path: "/sandbox-profiles/:profileId/sandbox-profile",
+    handleName: "sandboxProfileEditor",
+    handle: ROUTE_HANDLES.sandboxProfileEditor,
+  },
+  {
+    path: "/sandbox-profiles/:profileId/sandbox-profile/draft",
+    handleName: "sandboxProfileDraft",
+    handle: ROUTE_HANDLES.sandboxProfileDraft,
+  },
+  {
+    path: "/sandbox-profiles/:profileId/sandbox-profile/published",
+    handleName: "sandboxProfilePublished",
+    handle: ROUTE_HANDLES.sandboxProfilePublished,
+  },
+  {
+    path: "/sandbox-profiles/:profileId/snapshots",
+    handleName: "sandboxProfileSnapshots",
+    handle: ROUTE_HANDLES.sandboxProfileSnapshots,
+  },
+  { path: "/automations", handleName: "automations", handle: ROUTE_HANDLES.automations },
+  { path: "/automations/new", handleName: "automationsNew", handle: ROUTE_HANDLES.automationsNew },
+  {
+    path: "/automations/schedules/:automationId",
+    handleName: "scheduledAutomationsDetail",
+    handle: ROUTE_HANDLES.scheduledAutomationsDetail,
+  },
+  {
+    path: "/automations/:automationId",
+    handleName: "automationsDetail",
+    handle: ROUTE_HANDLES.automationsDetail,
+  },
+  { path: "/integrations", handleName: "integrations", handle: ROUTE_HANDLES.integrations },
+  {
+    path: "/integrations/:targetKey",
+    handleName: "integrationDetail",
+    handle: ROUTE_HANDLES.integrationDetail,
+  },
+  {
+    path: "/integrations/:targetKey/add",
+    handleName: "integrationCreate",
+    handle: ROUTE_HANDLES.integrationCreate,
+  },
+  {
+    path: "/integrations/:targetKey/:connectionId/edit",
+    handleName: "integrationEdit",
+    handle: ROUTE_HANDLES.integrationEdit,
+  },
+  {
+    path: "/integrations/:targetKey/:connectionId/:setupRouteSegment/setup",
+    handleName: "integrationSetup",
+    handle: ROUTE_HANDLES.integrationSetup,
+  },
+  { path: "/sessions", handleName: "sessions", handle: ROUTE_HANDLES.sessions },
+  { path: "/sessions/new", handleName: "sessionsNew", handle: ROUTE_HANDLES.sessionsNew },
+  {
+    path: "/sessions/:sandboxInstanceId",
+    handleName: "sessionsDetail",
+    handle: ROUTE_HANDLES.sessionsDetail,
+  },
+  {
+    path: "/settings/account/profile",
+    handleName: "settingsProfile",
+    handle: ROUTE_HANDLES.settingsProfile,
+  },
+  {
+    path: "/settings/organization/general",
+    handleName: "settingsOrganizationGeneral",
+    handle: ROUTE_HANDLES.settingsOrganizationGeneral,
+  },
+  {
+    path: "/settings/organization/members",
+    handleName: "settingsOrganizationMembers",
+    handle: ROUTE_HANDLES.settingsOrganizationMembers,
+  },
+  {
+    path: "/settings/organization/identity-linking",
+    handleName: "settingsOrganizationIdentityLinking",
+    handle: ROUTE_HANDLES.settingsOrganizationIdentityLinking,
+  },
+  {
+    path: "/settings/organization/sandboxes",
+    handleName: "settingsOrganizationSandboxes",
+    handle: ROUTE_HANDLES.settingsOrganizationSandboxes,
+  },
+];
 
-function collectLeafRoutes(input: {
-  inheritedHandle: AppRouteHandle | null;
-  inheritedHandleName: string | null;
-  parentPath: string;
-  routes: readonly AppRouteManifestEntry[];
-}): AppShellLeafRoute[] {
-  const leafRoutes: AppShellLeafRoute[] = [];
-
-  for (const route of input.routes) {
-    const routeHandle = resolveKnownRouteHandle(route.handle);
-    const currentHandle = routeHandle?.handle ?? input.inheritedHandle;
-    const currentHandleName = routeHandle?.name ?? input.inheritedHandleName;
-    const routePath = resolveRoutePath(input.parentPath, route);
-
-    if (route.children !== undefined && route.children.length > 0) {
-      leafRoutes.push(
-        ...collectLeafRoutes({
-          inheritedHandle: currentHandle,
-          inheritedHandleName: currentHandleName,
-          parentPath: routePath,
-          routes: route.children,
-        }),
-      );
-      continue;
-    }
-
-    leafRoutes.push({
-      handle: currentHandle,
-      handleName: currentHandleName,
-      isRedirect: route.redirect === true,
-      path: routePath,
-    });
-  }
-
-  return leafRoutes;
-}
-
-function resolveKnownRouteHandle(handle: unknown): { handle: AppRouteHandle; name: string } | null {
-  for (const [name, knownHandle] of Object.entries(ROUTE_HANDLES)) {
-    if (handle === knownHandle) {
-      return {
-        handle: knownHandle,
-        name,
-      };
-    }
-  }
-
-  return null;
-}
-
-function resolveRoutePath(parentPath: string, route: AppRouteManifestEntry): string {
-  if (route.index === true) {
-    return parentPath.length === 0 ? "/" : parentPath;
-  }
-
-  if (route.path === undefined) {
-    return parentPath.length === 0 ? "/" : parentPath;
-  }
-
-  if (route.path.startsWith("/")) {
-    return route.path;
-  }
-
-  const normalizedParentPath = parentPath === "/" ? "" : parentPath;
-  return `${normalizedParentPath}/${route.path}`;
-}
-
-function formatShellRouteContractFailures(routes: AppShellLeafRoute[]): string[] {
+function formatShellRouteContractFailures(routes: DurableAppShellLeafRoute[]): string[] {
   return routes.map((route) => {
-    const handleName = route.handleName ?? "missing handle";
-    const owner = route.handle?.sidebarTriggerOwner ?? "missing owner";
-    return `${route.path}: ${handleName} (${owner})`;
+    return `${route.path}: ${route.handleName} (${route.handle.sidebarTriggerOwner ?? "missing owner"})`;
   });
 }

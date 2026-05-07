@@ -7,14 +7,13 @@ import {
   RouterProvider,
 } from "react-router";
 
-import { APP_SHELL_ROUTE_MANIFEST } from "./app-route-manifest.js";
-import type { AppRouteElementKey, AppRouteManifestEntry } from "./app-route-manifest.js";
 import { AuthLoginCallbackPage } from "./features/auth/auth-login-callback-page.js";
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import {
   AUTH_SWITCH_ORGANIZATION_PATH,
   AuthSwitchOrganizationPage,
 } from "./features/auth/auth-switch-organization-page.js";
+import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationCreatePage } from "./features/pages/automation-create-page.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
 import { HomePage } from "./features/pages/home-page.js";
@@ -68,7 +67,136 @@ export const APP_ROUTES = createRoutesFromElements(
     />
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        {renderAppRoutes(APP_SHELL_ROUTE_MANIFEST)}
+        <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
+        <Route
+          element={<RouteOutlet />}
+          handle={ROUTE_HANDLES.sandboxProfiles}
+          path="sandbox-profiles"
+        >
+          <Route element={<SandboxProfilesPage />} index />
+          <Route
+            element={<SandboxProfileEditorPage mode="create" />}
+            handle={ROUTE_HANDLES.sandboxProfilesNew}
+            path="new"
+          />
+          <Route
+            element={<SandboxProfileEditorShell />}
+            handle={ROUTE_HANDLES.sandboxProfilesDetail}
+            path=":profileId"
+          >
+            <Route element={<SandboxProfileDefaultRedirect />} index />
+            <Route element={<SandboxProfileEditorPage mode="edit" />}>
+              <Route handle={ROUTE_HANDLES.sandboxProfileEditor} path="sandbox-profile">
+                <Route element={<RouteOutlet />} index />
+                <Route
+                  element={<RouteOutlet />}
+                  handle={ROUTE_HANDLES.sandboxProfileDraft}
+                  path="draft"
+                />
+                <Route
+                  element={<RouteOutlet />}
+                  handle={ROUTE_HANDLES.sandboxProfilePublished}
+                  path="published"
+                />
+              </Route>
+              <Route
+                element={<RouteOutlet />}
+                handle={ROUTE_HANDLES.sandboxProfileSnapshots}
+                path="snapshots"
+              />
+            </Route>
+          </Route>
+        </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
+          <Route element={<AutomationsPage />} index />
+          <Route
+            element={<AutomationCreatePage />}
+            handle={ROUTE_HANDLES.automationsNew}
+            path="new"
+          />
+          <Route
+            element={<Navigate replace to="/automations/new?type=scheduled" />}
+            path="schedules/new"
+          />
+          <Route
+            element={<ScheduledAutomationEditorPage mode="edit" />}
+            handle={ROUTE_HANDLES.scheduledAutomationsDetail}
+            path="schedules/:automationId"
+          />
+          <Route
+            element={<WebhookAutomationEditorPage mode="edit" />}
+            handle={ROUTE_HANDLES.automationsDetail}
+            path=":automationId"
+          />
+        </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.integrations} path="integrations">
+          <Route element={<OrganizationIntegrationsSettingsPage />} index />
+          <Route handle={ROUTE_HANDLES.integrationDetail} path=":targetKey">
+            <Route element={<OrganizationIntegrationsSettingsPage />} index />
+            <Route
+              element={<IntegrationConnectionCreatePage />}
+              handle={ROUTE_HANDLES.integrationCreate}
+              path="add"
+            />
+            <Route
+              element={<IntegrationConnectionEditPage />}
+              handle={ROUTE_HANDLES.integrationEdit}
+              path=":connectionId/edit"
+            />
+            <Route
+              element={<IntegrationConnectionSetupPage />}
+              handle={ROUTE_HANDLES.integrationSetup}
+              path=":connectionId/:setupRouteSegment/setup"
+            />
+          </Route>
+        </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
+          <Route element={<SessionsPage />} index />
+          <Route element={<NewSessionPage />} handle={ROUTE_HANDLES.sessionsNew} path="new" />
+          <Route
+            element={<SessionWorkbenchPage />}
+            handle={ROUTE_HANDLES.sessionsDetail}
+            path=":sandboxInstanceId"
+          />
+        </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settings} path="settings">
+          <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
+          <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
+            <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
+            <Route
+              element={<ProfileSettingsPage />}
+              handle={ROUTE_HANDLES.settingsProfile}
+              path="profile"
+            />
+          </Route>
+          <Route
+            element={<RouteOutlet />}
+            handle={ROUTE_HANDLES.settingsOrganization}
+            path="organization"
+          >
+            <Route element={<Navigate replace to="/settings/organization/general" />} index />
+            <Route
+              element={<OrganizationGeneralSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationGeneral}
+              path="general"
+            />
+            <Route
+              element={<OrganizationMembersSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationMembers}
+              path="members"
+            />
+            <Route
+              element={<OrganizationIdentityLinkingSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationIdentityLinking}
+              path="identity-linking"
+            />
+            <Route
+              element={<OrganizationSandboxStorageSettingsPage />}
+              handle={ROUTE_HANDLES.settingsOrganizationSandboxes}
+              path="sandboxes"
+            />
+          </Route>
+        </Route>
       </Route>
     </Route>
     <Route element={<Navigate replace to="/" />} path="*" />
@@ -79,92 +207,4 @@ const appRouter = createBrowserRouter(APP_ROUTES);
 
 function RouteOutlet(): React.JSX.Element {
   return <Outlet />;
-}
-
-function renderAppRoutes(routes: readonly AppRouteManifestEntry[]): React.JSX.Element[] {
-  return routes.map(renderAppRoute);
-}
-
-function renderAppRoute(route: AppRouteManifestEntry): React.JSX.Element {
-  const children =
-    route.children === undefined || route.children.length === 0
-      ? undefined
-      : renderAppRoutes(route.children);
-  const element = renderAppRouteElement(route.element);
-  const key = resolveAppRouteKey(route);
-
-  if (route.index === true) {
-    return <Route element={element} handle={route.handle} index key={key} />;
-  }
-
-  return (
-    <Route element={element} handle={route.handle} key={key} path={route.path}>
-      {children}
-    </Route>
-  );
-}
-
-function resolveAppRouteKey(route: AppRouteManifestEntry): string {
-  if (route.index === true) {
-    return `${route.element}:index`;
-  }
-
-  return `${route.element}:${route.path ?? ""}`;
-}
-
-function renderAppRouteElement(element: AppRouteElementKey): React.JSX.Element {
-  switch (element) {
-    case "automationCreate":
-      return <AutomationCreatePage />;
-    case "automations":
-      return <AutomationsPage />;
-    case "home":
-      return <HomePage />;
-    case "integrationConnectionCreate":
-      return <IntegrationConnectionCreatePage />;
-    case "integrationConnectionEdit":
-      return <IntegrationConnectionEditPage />;
-    case "integrationConnectionSetup":
-      return <IntegrationConnectionSetupPage />;
-    case "newSession":
-      return <NewSessionPage />;
-    case "organizationGeneralSettings":
-      return <OrganizationGeneralSettingsPage />;
-    case "organizationIdentityLinkingSettings":
-      return <OrganizationIdentityLinkingSettingsPage />;
-    case "organizationIntegrationsSettings":
-      return <OrganizationIntegrationsSettingsPage />;
-    case "organizationMembersSettings":
-      return <OrganizationMembersSettingsPage />;
-    case "organizationSandboxStorageSettings":
-      return <OrganizationSandboxStorageSettingsPage />;
-    case "profileSettings":
-      return <ProfileSettingsPage />;
-    case "routeOutlet":
-      return <RouteOutlet />;
-    case "sandboxProfileDefaultRedirect":
-      return <SandboxProfileDefaultRedirect />;
-    case "sandboxProfileEditorCreate":
-      return <SandboxProfileEditorPage mode="create" />;
-    case "sandboxProfileEditorEdit":
-      return <SandboxProfileEditorPage mode="edit" />;
-    case "sandboxProfileEditorShell":
-      return <SandboxProfileEditorShell />;
-    case "sandboxProfiles":
-      return <SandboxProfilesPage />;
-    case "scheduledAutomationCreateRedirect":
-      return <Navigate replace to="/automations/new?type=scheduled" />;
-    case "scheduledAutomationEditorEdit":
-      return <ScheduledAutomationEditorPage mode="edit" />;
-    case "sessionWorkbench":
-      return <SessionWorkbenchPage />;
-    case "sessions":
-      return <SessionsPage />;
-    case "settingsDefaultRedirect":
-      return <Navigate replace to={SETTINGS_DEFAULT_PATH} />;
-    case "settingsOrganizationGeneralRedirect":
-      return <Navigate replace to="/settings/organization/general" />;
-    case "webhookAutomationEditorEdit":
-      return <WebhookAutomationEditorPage mode="edit" />;
-  }
 }
