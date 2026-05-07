@@ -36,7 +36,7 @@ use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use serde::Deserialize;
 use serde_json::Value;
-use tokio::net::{TcpStream, lookup_host};
+use tokio::net::{TcpSocket, TcpStream, lookup_host};
 use tokio::runtime::Builder;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle as TokioJoinHandle;
@@ -48,7 +48,7 @@ use url::Url;
 
 use crate::cgroups::{DEFAULT_CGROUP_ROOT, UserScopePaths, is_scope_populated};
 use crate::keepalive::KeepaliveManager;
-use crate::protocol::startup::StartupInput;
+use crate::protocol::startup::{StartupInput, TransparentProxyBypassKind};
 use crate::pty::{
     DEFAULT_PTY_TERMINATE_POLL_INTERVAL, DEFAULT_PTY_TERMINATE_TIMEOUT_MS, PtyEvent, PtySession,
     PtySpawnRequest, start_scoped_pty_session,
@@ -776,6 +776,9 @@ impl TunnelSession {
                 attachment_root,
                 sandbox_instance_id,
                 gateway_ws_url: startup_input.tunnel_gateway_ws_url.clone(),
+                transparent_passthrough_socket_mark: startup_transparent_passthrough_socket_mark(
+                    startup_input,
+                ),
                 shutdown_requested,
                 clock,
                 sleeper,
@@ -949,6 +952,7 @@ struct TunnelSessionRuntime {
     attachment_root: PathBuf,
     sandbox_instance_id: String,
     gateway_ws_url: String,
+    transparent_passthrough_socket_mark: Option<u32>,
     shutdown_requested: Arc<AtomicBool>,
     clock: Arc<dyn Clock>,
     sleeper: Arc<dyn Sleeper>,
@@ -1550,35 +1554,39 @@ async fn run_tunnel_supervisor(
     startup_result_sender: std::sync::mpsc::Sender<Result<(), TunnelSessionError>>,
 ) -> Result<(), TunnelSessionError> {
     let initial_connected_url = resolve_bootstrap_tunnel_url(gateway_ws_url, bootstrap_token)?;
-    let (bootstrap_socket, _) =
-        match connect_bootstrap_websocket(initial_connected_url.as_str()).await {
-            Ok(value) => value,
-            Err(startup_error) => {
-                let startup_error_text = startup_error.to_string();
-                update_tunnel_supervision_details(
-                    &runtime.supervisor_handle,
-                    gateway_ws_url,
-                    Some("bootstrap_connect_failed"),
-                    Some(1),
-                    None,
-                );
-                runtime.supervisor_handle.mark_component_restarting(
-                    SupervisedComponent::TunnelSession,
-                    startup_error_text.clone(),
-                );
-                runtime.supervisor_handle.emit_component_healthcheck_failed(
-                    SupervisedComponent::TunnelSession,
-                    "bootstrap_connect_failed",
-                    startup_error_text.clone(),
-                    "bootstrap_connection",
-                    &[],
-                );
-                let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
-                    startup_error_text,
-                )));
-                return Err(startup_error);
-            }
-        };
+    let (bootstrap_socket, _) = match connect_bootstrap_websocket(
+        initial_connected_url.as_str(),
+        runtime.transparent_passthrough_socket_mark,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(startup_error) => {
+            let startup_error_text = startup_error.to_string();
+            update_tunnel_supervision_details(
+                &runtime.supervisor_handle,
+                gateway_ws_url,
+                Some("bootstrap_connect_failed"),
+                Some(1),
+                None,
+            );
+            runtime.supervisor_handle.mark_component_restarting(
+                SupervisedComponent::TunnelSession,
+                startup_error_text.clone(),
+            );
+            runtime.supervisor_handle.emit_component_healthcheck_failed(
+                SupervisedComponent::TunnelSession,
+                "bootstrap_connect_failed",
+                startup_error_text.clone(),
+                "bootstrap_connection",
+                &[],
+            );
+            let _ = startup_result_sender.send(Err(TunnelSessionError::ConfigureTunnelSocket(
+                startup_error_text,
+            )));
+            return Err(startup_error);
+        }
+    };
     let mut current_tunnel_exchange_token = tunnel_exchange_token.to_string();
 
     let mut request_receiver = request_receiver;
@@ -2212,7 +2220,12 @@ async fn reconnect_bootstrap_tunnel(
                     gateway_ws_url,
                     exchange.bootstrap_token.as_str(),
                 )?;
-                match connect_bootstrap_websocket(connected_url.as_str()).await {
+                match connect_bootstrap_websocket(
+                    connected_url.as_str(),
+                    runtime.transparent_passthrough_socket_mark,
+                )
+                .await
+                {
                     Ok((bootstrap_socket, _)) => {
                         return Ok(Some(bootstrap_socket));
                     }
@@ -2475,6 +2488,7 @@ type TunnelWebSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 async fn connect_bootstrap_websocket(
     connected_url: &str,
+    transparent_passthrough_socket_mark: Option<u32>,
 ) -> Result<
     (
         TunnelWebSocket,
@@ -2530,7 +2544,7 @@ async fn connect_bootstrap_websocket(
     for address in resolved_addresses {
         let socket = match timeout(
             DEFAULT_BOOTSTRAP_TUNNEL_CONNECT_TIMEOUT,
-            TcpStream::connect(address),
+            connect_bootstrap_tcp_socket(address, transparent_passthrough_socket_mark),
         )
         .await
         {
@@ -2577,6 +2591,45 @@ async fn connect_bootstrap_websocket(
             )
         },
     ))
+}
+
+async fn connect_bootstrap_tcp_socket(
+    address: SocketAddr,
+    transparent_passthrough_socket_mark: Option<u32>,
+) -> Result<TcpStream, std::io::Error> {
+    let socket = match address {
+        SocketAddr::V4(_) => TcpSocket::new_v4()?,
+        SocketAddr::V6(_) => TcpSocket::new_v6()?,
+    };
+    if let Some(mark) = transparent_passthrough_socket_mark {
+        configure_bootstrap_transparent_passthrough_socket(&socket, mark)?;
+    }
+
+    socket.connect(address).await
+}
+
+#[cfg(target_os = "linux")]
+fn configure_bootstrap_transparent_passthrough_socket(
+    socket: &TcpSocket,
+    mark: u32,
+) -> Result<(), std::io::Error> {
+    nix::sys::socket::setsockopt(socket, nix::sys::socket::sockopt::Mark, &mark)
+        .map_err(std::io::Error::other)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn configure_bootstrap_transparent_passthrough_socket(
+    _socket: &TcpSocket,
+    _mark: u32,
+) -> Result<(), std::io::Error> {
+    Ok(())
+}
+
+fn startup_transparent_passthrough_socket_mark(startup_input: &StartupInput) -> Option<u32> {
+    let transparent_proxy = startup_input.transparent_proxy.as_ref()?;
+    match transparent_proxy.passthrough_bypass.kind {
+        TransparentProxyBypassKind::SocketMark => Some(transparent_proxy.passthrough_bypass.mark),
+    }
 }
 
 fn spawn_bootstrap_socket_task(
@@ -5838,7 +5891,8 @@ mod tests {
         handle_tunnel_control_message, handle_tunnel_session_event, handle_tunnel_session_request,
         prioritize_ipv4_socket_addresses, publish_pty_input_latency_warning,
         publish_pty_session_summary, resolve_bootstrap_tunnel_url, resolve_tunnel_exchange_url,
-        run_connected_tunnel_session_catching_panics, sync_pty_scope_keepalive,
+        run_connected_tunnel_session_catching_panics, startup_transparent_passthrough_socket_mark,
+        sync_pty_scope_keepalive,
     };
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -5863,7 +5917,10 @@ mod tests {
     };
 
     use crate::keepalive::KeepaliveManager;
-    use crate::protocol::startup::{StartupInput, StartupMode};
+    use crate::protocol::startup::{
+        StartupInput, StartupMode, TransparentProxyBypass, TransparentProxyBypassKind,
+        TransparentProxyConfiguration,
+    };
     use crate::runtime::adapters::RuntimeAdapterRegistry;
     use crate::runtime::readiness::RuntimeReadinessManager;
     use crate::supervision::{SandboxdSupervisorHandle, SupervisedComponent};
@@ -8767,6 +8824,32 @@ mod tests {
     }
 
     #[test]
+    fn derives_transparent_passthrough_socket_mark_for_bootstrap_tunnel() {
+        let startup_input = StartupInput {
+            startup_mode: StartupMode::New,
+            execution_mode: crate::protocol::startup::StartupExecutionMode::Session,
+            bootstrap_token: "bootstrap-token".to_string(),
+            tunnel_exchange_token: "tunnel-exchange-token".to_string(),
+            tunnel_gateway_ws_url: "wss://gateway.example.test/tunnel/sandbox/sbi_123".to_string(),
+            runtime_plan: json!({}),
+            egress_grant_by_rule_id: BTreeMap::new(),
+            git_identity: None,
+            transparent_proxy: Some(TransparentProxyConfiguration {
+                passthrough_bypass: TransparentProxyBypass {
+                    kind: TransparentProxyBypassKind::SocketMark,
+                    mark: 38_514,
+                },
+                exclusions: Vec::new(),
+            }),
+        };
+
+        assert_eq!(
+            startup_transparent_passthrough_socket_mark(&startup_input),
+            Some(38_514)
+        );
+    }
+
+    #[test]
     fn reconnects_after_bootstrap_websocket_loss_and_rolls_exchange_token_forward() {
         let bootstrap_listener =
             TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
@@ -9001,6 +9084,7 @@ mod tests {
             attachment_root: PathBuf::from(DEFAULT_ATTACHMENT_ROOT),
             sandbox_instance_id: "sbi_tunnel_session".to_string(),
             gateway_ws_url: bootstrap_url.clone(),
+            transparent_passthrough_socket_mark: None,
             shutdown_requested,
             clock: panic_clock.clone(),
             sleeper: Arc::new(ThreadSleeper),
@@ -9015,7 +9099,7 @@ mod tests {
         let (startup_result_sender, startup_result_receiver) =
             std::sync::mpsc::channel::<Result<(), TunnelSessionError>>();
         let session_result = runtime_builder.block_on(async {
-            let (bootstrap_socket, _) = connect_bootstrap_websocket(connected_url.as_str())
+            let (bootstrap_socket, _) = connect_bootstrap_websocket(connected_url.as_str(), None)
                 .await
                 .expect("bootstrap websocket should connect");
             let (_request_sender, mut request_receiver) = tokio::sync::mpsc::unbounded_channel();
