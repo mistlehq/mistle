@@ -61,6 +61,28 @@ Use setup scripts to:
 
 Keep setup scripts deterministic and explicit. A session should not depend on manual setup that is not captured in the profile.
 
+## Use Setup Assistant
+
+Setup Assistant opens an agent workspace beside the setup script editor so you can draft or fix the script with the same profile context visible.
+
+To use Setup Assistant:
+
+1. Open a sandbox profile draft.
+2. Make sure the profile includes an agent integration binding.
+3. Select **Setup Assistant** from the setup script controls.
+4. Ask the assistant to write a new setup script or fix the current script.
+5. Update the setup script field with the final script.
+6. Run **Test setup script** before publishing the profile version.
+
+<Frame>
+  <img
+    src="/images/product-screens/sandbox-profile-setup-assistant.png"
+    alt="Sandbox profile setup script editor with the Setup Assistant panel open"
+  />
+</Frame>
+
+Setup Assistant is only available while editing a draft profile version, and it requires an agent integration binding. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
+
 ## Experiment With Setup Scripts
 
 Setup script changes are made on draft profile versions. Published versions are read-only.
@@ -83,28 +105,6 @@ To experiment with a setup script:
 </Frame>
 
 Setup script testing is only available while editing a draft, and only after the script has content.
-
-## Use Setup Assistant
-
-Setup Assistant opens an agent workspace beside the setup script editor so you can draft or fix the script with the same profile context visible.
-
-To use Setup Assistant:
-
-1. Open a sandbox profile draft.
-2. Add an agent integration binding to the profile.
-3. Select **Setup Assistant** from the setup script controls.
-4. Ask the assistant to write a new setup script or fix the current script.
-5. Apply the final script back to the setup script field.
-6. Run **Test setup script** before publishing the profile version.
-
-<Frame>
-  <img
-    src="/images/product-screens/sandbox-profile-setup-assistant.png"
-    alt="Sandbox profile setup script editor with the Setup Assistant panel open"
-  />
-</Frame>
-
-Setup Assistant is only available while editing a draft profile version, and it requires an agent integration binding. The assistant sandbox starts from the base image so the recommended script does not depend on state created only inside the assistant session.
 
 ## Snapshots
 
