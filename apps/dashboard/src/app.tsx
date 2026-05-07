@@ -5,6 +5,7 @@ import {
   Outlet,
   Route,
   RouterProvider,
+  useLocation,
 } from "react-router";
 
 import { APP_SHELL_ROUTE_MANIFEST } from "./app-route-manifest.js";
@@ -90,47 +91,15 @@ function renderAppRoute(route: AppRouteManifestEntry): React.JSX.Element {
     route.children === undefined || route.children.length === 0
       ? undefined
       : renderAppRoutes(route.children);
+  const element = renderAppRouteElement(route.element);
+  const key = resolveAppRouteKey(route);
 
   if (route.index === true) {
-    if (route.handle === undefined) {
-      return (
-        <Route
-          element={renderAppRouteElement(route.element)}
-          index
-          key={resolveAppRouteKey(route)}
-        />
-      );
-    }
-
-    return (
-      <Route
-        element={renderAppRouteElement(route.element)}
-        handle={route.handle}
-        index
-        key={resolveAppRouteKey(route)}
-      />
-    );
-  }
-
-  if (route.handle === undefined) {
-    return (
-      <Route
-        element={renderAppRouteElement(route.element)}
-        key={resolveAppRouteKey(route)}
-        path={route.path}
-      >
-        {children}
-      </Route>
-    );
+    return <Route element={element} handle={route.handle} index key={key} />;
   }
 
   return (
-    <Route
-      element={renderAppRouteElement(route.element)}
-      handle={route.handle}
-      key={resolveAppRouteKey(route)}
-      path={route.path}
-    >
+    <Route element={element} handle={route.handle} key={key} path={route.path}>
       {children}
     </Route>
   );
@@ -158,6 +127,8 @@ function renderAppRouteElement(element: AppRouteElementKey): React.JSX.Element {
       return <IntegrationConnectionEditPage />;
     case "integrationConnectionSetup":
       return <IntegrationConnectionSetupPage />;
+    case "legacyOrganizationIntegrationsRedirect":
+      return <LegacyOrganizationIntegrationsRedirect />;
     case "newSession":
       return <NewSessionPage />;
     case "organizationGeneralSettings":
@@ -199,4 +170,23 @@ function renderAppRouteElement(element: AppRouteElementKey): React.JSX.Element {
     case "webhookAutomationEditorEdit":
       return <WebhookAutomationEditorPage mode="edit" />;
   }
+}
+
+function LegacyOrganizationIntegrationsRedirect(): React.JSX.Element {
+  const location = useLocation();
+  const legacyPrefix = "/settings/organization/integrations";
+  const pathname = location.pathname.startsWith(legacyPrefix)
+    ? `/integrations${location.pathname.slice(legacyPrefix.length)}`
+    : "/integrations";
+
+  return (
+    <Navigate
+      replace
+      to={{
+        pathname,
+        search: location.search,
+        hash: location.hash,
+      }}
+    />
+  );
 }

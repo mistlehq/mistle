@@ -14,12 +14,29 @@ describe("route handles", () => {
     const invalidHandleNames: string[] = [];
 
     for (const [handleName, handle] of Object.entries(ROUTE_HANDLES)) {
-      if (!["none", "page-frame", "workspace"].includes(handle.sidebarTriggerOwner)) {
+      if (
+        handle.sidebarTriggerOwner !== "none" &&
+        handle.sidebarTriggerOwner !== "page-frame" &&
+        handle.sidebarTriggerOwner !== "workspace"
+      ) {
         invalidHandleNames.push(handleName);
       }
     }
 
     expect(invalidHandleNames).toEqual([]);
+  });
+
+  it("preserves the legacy organization integrations redirect route", () => {
+    const legacyIntegrationsRoute = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).find(
+      (route) => route.path === "/settings/organization/integrations/*",
+    );
+
+    expect(legacyIntegrationsRoute).toEqual({
+      handle: ROUTE_HANDLES.settingsOrganization,
+      handleName: "settingsOrganization",
+      isRedirect: true,
+      path: "/settings/organization/integrations/*",
+    });
   });
 
   it("requires every durable app-shell leaf route to declare a mounted sidebar trigger owner", () => {
