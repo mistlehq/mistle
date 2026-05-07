@@ -94,6 +94,7 @@ const SandboxBaseImageTarget = "sandbox-base-system-tests";
 const SandboxBaseImageHashInputs = ["packages/sandboxd"];
 const SandboxBaseImageLockPollIntervalMs = 1_000;
 const SandboxBaseImageLockTimeoutMs = 30 * 60_000;
+const DockerSocketPath = "/var/run/docker.sock";
 const PublicAccessHostnameEnvVars = new Map<ServiceId, string>([
   [ServiceIds.CONTROL_PLANE_API, "CONTROL_PLANE_API_TUNNEL_HOSTNAME"],
   [ServiceIds.DATA_PLANE_GATEWAY, "DATA_PLANE_API_TUNNEL_HOSTNAME"],
@@ -123,6 +124,13 @@ export function createSystemTest(input: CreateSystemTestInput = {}) {
         configPathInContainer: resolveRuntimeSystemIntegrationConfigPathInContainer(input),
       });
       const cleanupTasks: CleanupTask[] = [];
+      const dockerProviderSandboxCleanup = await createDockerProviderSandboxCleanup({
+        input,
+        environment: integrationEnvironment,
+      });
+      if (dockerProviderSandboxCleanup !== undefined) {
+        cleanupTasks.push(dockerProviderSandboxCleanup);
+      }
       const e2bProviderSandboxCleanup = await createE2BProviderSandboxCleanup({
         input,
         environment: integrationEnvironment,
@@ -279,6 +287,40 @@ function readPublicAccessHostname(serviceId: ServiceId): string {
   return readRequiredEnv(envVar);
 }
 
+async function createDockerProviderSandboxCleanup(input: {
+  input: CreateSystemTestInput;
+  environment: IntegrationTestEnvironment;
+}): Promise<CleanupTask | undefined> {
+  if (input.input.sandbox?.provider !== "docker") {
+    return undefined;
+  }
+
+  const dataPlaneDb = input.environment.dataPlaneDb;
+  const baselineProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+  const sandboxAdapter = createSandboxAdapter({
+    provider: SandboxProvider.DOCKER,
+    docker: {
+      socketPath: DockerSocketPath,
+    },
+  });
+
+  return async () => {
+    const currentProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
+    const providerSandboxIds = selectProviderSandboxIdsCreatedByTest({
+      baselineProviderSandboxIds,
+      currentProviderSandboxIds,
+    });
+
+    await Promise.all(
+      providerSandboxIds.map(async (providerSandboxId) => {
+        await sandboxAdapter.destroy({
+          id: providerSandboxId,
+        });
+      }),
+    );
+  };
+}
+
 async function createE2BProviderSandboxCleanup(input: {
   input: CreateSystemTestInput;
   environment: IntegrationTestEnvironment;
@@ -296,7 +338,7 @@ async function createE2BProviderSandboxCleanup(input: {
 
   return async () => {
     const currentProviderSandboxIds = await listPersistedProviderSandboxIds(dataPlaneDb);
-    const providerSandboxIds = selectE2BProviderSandboxIdsCreatedByTest({
+    const providerSandboxIds = selectProviderSandboxIdsCreatedByTest({
       baselineProviderSandboxIds,
       currentProviderSandboxIds,
     });
@@ -327,7 +369,7 @@ async function listPersistedProviderSandboxIds(
   );
 }
 
-export function selectE2BProviderSandboxIdsCreatedByTest(input: {
+export function selectProviderSandboxIdsCreatedByTest(input: {
   baselineProviderSandboxIds: ReadonlySet<string>;
   currentProviderSandboxIds: ReadonlySet<string>;
 }): string[] {

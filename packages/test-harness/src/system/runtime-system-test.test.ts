@@ -9,7 +9,7 @@ import {
 import {
   createRuntimeSystemServiceOptions,
   resolveRuntimeSystemIntegrationConfigPathInContainer,
-  selectE2BProviderSandboxIdsCreatedByTest,
+  selectProviderSandboxIdsCreatedByTest,
 } from "./runtime-system-test.js";
 
 describe("resolveRuntimeSystemIntegrationConfigPathInContainer", () => {
@@ -76,10 +76,10 @@ describe("createRuntimeSystemServiceOptions", () => {
   });
 });
 
-describe("selectE2BProviderSandboxIdsCreatedByTest", () => {
+describe("selectProviderSandboxIdsCreatedByTest", () => {
   it("returns only provider sandbox ids created after the runtime system test baseline", () => {
     expect(
-      selectE2BProviderSandboxIdsCreatedByTest({
+      selectProviderSandboxIdsCreatedByTest({
         baselineProviderSandboxIds: new Set(["provider-before", "provider-shared"]),
         currentProviderSandboxIds: new Set([
           "provider-new-b",
