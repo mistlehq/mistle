@@ -15,6 +15,7 @@ export type AppRouteHeaderHandle = {
 export type AppRouteHandle = {
   appShellInsetOwner?: "app-shell" | "child";
   appShellViewportMode?: "document" | "workspace";
+  sidebarTriggerOwner?: "none" | "page-frame" | "workspace";
   breadcrumbIcon?: RouteNodeValue;
   breadcrumb?: RouteTextValue;
   breadcrumbTo?: RouteHrefValue;
@@ -135,6 +136,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const parsedHandle: AppRouteHandle = {};
   const appShellInsetOwner = handle["appShellInsetOwner"];
   const appShellViewportMode = handle["appShellViewportMode"];
+  const sidebarTriggerOwner = handle["sidebarTriggerOwner"];
   const breadcrumb = handle["breadcrumb"];
   const breadcrumbIcon = handle["breadcrumbIcon"];
   const breadcrumbTo = handle["breadcrumbTo"];
@@ -152,6 +154,14 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
 
   if (appShellViewportMode === "document" || appShellViewportMode === "workspace") {
     parsedHandle.appShellViewportMode = appShellViewportMode;
+  }
+
+  if (
+    sidebarTriggerOwner === "none" ||
+    sidebarTriggerOwner === "page-frame" ||
+    sidebarTriggerOwner === "workspace"
+  ) {
+    parsedHandle.sidebarTriggerOwner = sidebarTriggerOwner;
   }
 
   if (isRouteTextValue(breadcrumb)) {
@@ -198,6 +208,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   if (
     parsedHandle.appShellInsetOwner === undefined &&
     parsedHandle.appShellViewportMode === undefined &&
+    parsedHandle.sidebarTriggerOwner === undefined &&
     parsedHandle.breadcrumbIcon === undefined &&
     parsedHandle.breadcrumb === undefined &&
     parsedHandle.breadcrumbTo === undefined &&

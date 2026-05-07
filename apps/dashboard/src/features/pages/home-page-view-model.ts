@@ -44,7 +44,7 @@ function createBaseSteps(): HomeChecklistStep[] {
       description:
         "Integrations provide the models, tools, and external systems your agents can use, like OpenAI, GitHub, and Slack.",
       status: "upcoming",
-      href: "/settings/organization/integrations",
+      href: "/integrations",
       actionLabel: "Add integrations",
     },
     {
@@ -149,7 +149,7 @@ export const HomePageStoryModels = {
           title: "Add a webhook integration",
           description:
             "Automations respond to events from tools like GitHub, Slack, or Jira, so you need a webhook-capable integration before you can create one.",
-          href: "/settings/organization/integrations",
+          href: "/integrations",
           actionLabel: "Add integrations",
         },
       },

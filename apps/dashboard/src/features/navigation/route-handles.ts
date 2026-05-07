@@ -127,18 +127,21 @@ function resolveAutomationDetailBreadcrumb(_input: RouteTextResolverInput): stri
 export const ROUTE_HANDLES = {
   dashboard: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Home",
     title: "Home",
     description: "",
   },
   integrations: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Integrations",
     title: "Integrations",
     description: "",
   },
   integrationDetail: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: resolveIntegrationDetailTitle,
     breadcrumbIcon: resolveIntegrationBreadcrumbIcon,
     pageBreadcrumbVisible: true,
@@ -149,6 +152,7 @@ export const ROUTE_HANDLES = {
   },
   integrationCreate: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Add",
     title: resolveIntegrationCreateTitle,
     header: {
@@ -157,6 +161,7 @@ export const ROUTE_HANDLES = {
   },
   integrationEdit: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Edit",
     title: resolveIntegrationEditTitle,
     header: {
@@ -165,6 +170,7 @@ export const ROUTE_HANDLES = {
   },
   integrationSetup: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Setup",
     title: resolveIntegrationAppSetupTitle,
     header: {
@@ -173,34 +179,40 @@ export const ROUTE_HANDLES = {
   },
   sessions: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Sessions",
     title: "Sessions",
     description: "",
   },
   sessionsNew: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "New",
     title: "New session",
     description: "Start a sandbox-backed session from a sandbox profile.",
   },
   sessionsDetail: {
+    sidebarTriggerOwner: "workspace",
     hideBreadcrumb: true,
     title: "Session",
     description: "Interact with one sandbox-backed Codex session.",
   },
   experimentalTerminal: {
+    sidebarTriggerOwner: "none",
     breadcrumb: "Experimental terminal",
     title: "Experimental terminal",
     description: "",
   },
   sandboxProfiles: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Sandbox Profiles",
     title: "Sandbox Profiles",
     description: "Manage sandbox profile configuration.",
   },
   sandboxProfilesNew: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Create",
     pageBreadcrumbVisible: true,
     title: "Create",
@@ -208,42 +220,49 @@ export const ROUTE_HANDLES = {
   },
   sandboxProfilesDetail: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Profile",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileEditor: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Sandbox Profile",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfilePublished: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Published",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileDraft: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Draft",
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
   },
   sandboxProfileSnapshots: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Snapshots",
     title: "Edit profile",
     description: "Manage sandbox profile snapshots.",
   },
   automations: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Automations",
     title: "Automations",
     description: "Manage automations.",
   },
   automationsNew: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Create",
     pageBreadcrumbVisible: true,
     title: "Create automation",
@@ -251,6 +270,7 @@ export const ROUTE_HANDLES = {
   },
   automationsDetail: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: resolveAutomationDetailBreadcrumb,
     pageBreadcrumbVisible: true,
     title: "",
@@ -258,55 +278,66 @@ export const ROUTE_HANDLES = {
   },
   scheduledAutomationsDetail: {
     appShellInsetOwner: "child",
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: resolveAutomationDetailBreadcrumb,
     title: "",
     description: "",
   },
   settings: {
+    sidebarTriggerOwner: "none",
     breadcrumb: "Settings",
     breadcrumbClickable: false,
     title: "Settings",
     description: "Manage personal and organization settings.",
   },
   settingsPersonal: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Personal",
     title: "Personal",
     description: "",
   },
   settingsAccount: {
+    sidebarTriggerOwner: "none",
     breadcrumb: "Account",
     breadcrumbClickable: false,
   },
   settingsProfile: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Profile",
     title: "Profile",
     description: "",
   },
   settingsOrganization: {
+    sidebarTriggerOwner: "none",
     breadcrumb: "Organization",
     breadcrumbTo: "/settings/organization/general",
   },
   settingsOrganizationGeneral: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "General",
     title: "General",
     description: "",
   },
   settingsOrganizationMembers: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Members",
     title: "Members",
     description: "",
   },
   settingsOrganizationIdentityLinking: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Identity Linking",
     title: "Identity Linking",
     description: "Configure the provider apps users will use to link their identities to Mistle.",
   },
   settingsOrganizationSandboxes: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Sandboxes",
     title: "Sandboxes",
     description: "Configure organization-wide sandbox settings.",
   },
   settingsOrganizationIntegrations: {
+    sidebarTriggerOwner: "page-frame",
     breadcrumb: "Integrations",
     title: "Integrations",
     description: "",

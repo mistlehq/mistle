@@ -1,12 +1,67 @@
 import { describe, expect, it } from "vitest";
 
+import { APP_SHELL_ROUTE_MANIFEST } from "../../app-route-manifest.js";
+import type { AppRouteManifestEntry } from "../../app-route-manifest.js";
 import {
   ROUTE_HANDLES,
   SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT,
   SETTINGS_PAGE_ROUTE_HANDLE_KEYS,
 } from "./route-handles.js";
+import type { AppRouteHandle } from "./route-meta.js";
 
 describe("route handles", () => {
+  it("requires every route handle to declare sidebar trigger ownership", () => {
+    const invalidHandleNames: string[] = [];
+
+    for (const [handleName, handle] of Object.entries(ROUTE_HANDLES)) {
+      if (!["none", "page-frame", "workspace"].includes(handle.sidebarTriggerOwner)) {
+        invalidHandleNames.push(handleName);
+      }
+    }
+
+    expect(invalidHandleNames).toEqual([]);
+  });
+
+  it("requires every durable app-shell leaf route to declare a mounted sidebar trigger owner", () => {
+    const invalidShellLeafRoutes = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).filter(
+      (route) => {
+        if (route.isRedirect) {
+          return false;
+        }
+
+        return (
+          route.handle === null ||
+          route.handle.sidebarTriggerOwner === "none" ||
+          route.handle.sidebarTriggerOwner === undefined
+        );
+      },
+    );
+
+    expect(formatShellRouteContractFailures(invalidShellLeafRoutes)).toEqual([]);
+  });
+
+  it("requires durable document routes to own the sidebar trigger through PageFrame", () => {
+    const invalidDocumentLeafRoutes = collectAppShellLeafRoutes(APP_SHELL_ROUTE_MANIFEST).filter(
+      (route) => {
+        if (route.isRedirect || route.handle?.sidebarTriggerOwner === "workspace") {
+          return false;
+        }
+
+        return route.handle?.sidebarTriggerOwner !== "page-frame";
+      },
+    );
+
+    expect(formatShellRouteContractFailures(invalidDocumentLeafRoutes)).toEqual([]);
+  });
+
+  it("documents non-PageFrame sidebar trigger ownership exceptions", () => {
+    expect(ROUTE_HANDLES.sessionsDetail.sidebarTriggerOwner).toBe("workspace");
+    expect(ROUTE_HANDLES.experimentalTerminal.sidebarTriggerOwner).toBe("none");
+    expect(ROUTE_HANDLES.settings.sidebarTriggerOwner).toBe("none");
+    expect(ROUTE_HANDLES.settingsAccount.sidebarTriggerOwner).toBe("none");
+    expect(ROUTE_HANDLES.settingsOrganization.sidebarTriggerOwner).toBe("none");
+  });
+
   it("defines titles and descriptions for settings leaf pages", () => {
     expect(ROUTE_HANDLES.dashboard.title).toBe("Home");
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
@@ -201,3 +256,94 @@ describe("route handles", () => {
     expect(detailBreadcrumb({ params: {} })).toBe("Edit");
   });
 });
+
+type AppShellLeafRoute = {
+  handle: AppRouteHandle | null;
+  handleName: string | null;
+  isRedirect: boolean;
+  path: string;
+};
+
+function collectAppShellLeafRoutes(routes: readonly AppRouteManifestEntry[]): AppShellLeafRoute[] {
+  return collectLeafRoutes({
+    inheritedHandle: null,
+    inheritedHandleName: null,
+    parentPath: "",
+    routes,
+  });
+}
+
+function collectLeafRoutes(input: {
+  inheritedHandle: AppRouteHandle | null;
+  inheritedHandleName: string | null;
+  parentPath: string;
+  routes: readonly AppRouteManifestEntry[];
+}): AppShellLeafRoute[] {
+  const leafRoutes: AppShellLeafRoute[] = [];
+
+  for (const route of input.routes) {
+    const routeHandle = resolveKnownRouteHandle(route.handle);
+    const currentHandle = routeHandle?.handle ?? input.inheritedHandle;
+    const currentHandleName = routeHandle?.name ?? input.inheritedHandleName;
+    const routePath = resolveRoutePath(input.parentPath, route);
+
+    if (route.children !== undefined && route.children.length > 0) {
+      leafRoutes.push(
+        ...collectLeafRoutes({
+          inheritedHandle: currentHandle,
+          inheritedHandleName: currentHandleName,
+          parentPath: routePath,
+          routes: route.children,
+        }),
+      );
+      continue;
+    }
+
+    leafRoutes.push({
+      handle: currentHandle,
+      handleName: currentHandleName,
+      isRedirect: route.redirect === true,
+      path: routePath,
+    });
+  }
+
+  return leafRoutes;
+}
+
+function resolveKnownRouteHandle(handle: unknown): { handle: AppRouteHandle; name: string } | null {
+  for (const [name, knownHandle] of Object.entries(ROUTE_HANDLES)) {
+    if (handle === knownHandle) {
+      return {
+        handle: knownHandle,
+        name,
+      };
+    }
+  }
+
+  return null;
+}
+
+function resolveRoutePath(parentPath: string, route: AppRouteManifestEntry): string {
+  if (route.index === true) {
+    return parentPath.length === 0 ? "/" : parentPath;
+  }
+
+  if (route.path === undefined) {
+    return parentPath.length === 0 ? "/" : parentPath;
+  }
+
+  if (route.path.startsWith("/")) {
+    return route.path;
+  }
+
+  const normalizedParentPath = parentPath === "/" ? "" : parentPath;
+  return `${normalizedParentPath}/${route.path}`;
+}
+
+function formatShellRouteContractFailures(routes: AppShellLeafRoute[]): string[] {
+  return routes.map((route) => {
+    const handleName = route.handleName ?? "missing handle";
+    const owner = route.handle?.sidebarTriggerOwner ?? "missing owner";
+    return `${route.path}: ${handleName} (${owner})`;
+  });
+}

@@ -37,6 +37,6 @@ describe("HomePageView", () => {
 
     expect(actionButton.hasAttribute("disabled")).toBe(false);
     fireEvent.click(actionButton);
-    expect(navigatedHref).toBe("/settings/organization/integrations");
+    expect(navigatedHref).toBe("/integrations");
   });
 });
