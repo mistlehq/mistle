@@ -23,6 +23,8 @@ When a user starts a session, Mistle selects the requested sandbox profile versi
 
 If the profile version has a usable snapshot, the sandbox can start from that prepared image. This avoids repeating setup work that was already captured by the profile snapshot.
 
+When a repository is selected at session start, Mistle uses it as the agent's startup working directory. That working directory determines which repo-local instructions and skills the agent sees when the session begins.
+
 ## Start A Session
 
 To start interactive agent work:
@@ -30,7 +32,7 @@ To start interactive agent work:
 1. Open **Sessions**.
 2. Create a new session.
 3. Choose the sandbox profile for the work.
-4. Choose the repository or workspace when the profile provides options.
+4. Choose the repository or workspace where the agent should start.
 5. Describe the task for the agent.
 6. Start the session.
 
@@ -67,9 +69,13 @@ The header controls expose the active sandbox and repository state:
 
 ## Choose The Primary Repository
 
-Profiles can expose one or more repositories or workspaces. Use the **Primary repository** selector to choose the workspace for the current turn.
+Profiles can expose one or more repositories or workspaces. Use the **Primary repository** selector to choose the working directory for the current turn.
 
-Mistle uses the selected repository when it opens terminals, loads code diffs, and prepares repository-specific chat context. If a session does not have a repository, repository-dependent controls show an unavailable state instead of guessing which directory to use.
+The primary repository sets where new agent threads, the Codex TUI, terminals, repository status checks, and code diffs run. Set it to the repository where the agent should do the work.
+
+This matters because repo-local instructions and skills are discovered from the working directory. Choosing the wrong repository can start the agent without the project-specific guidance it needs.
+
+If a session does not have a repository, repository-dependent controls show an unavailable state instead of guessing which directory to use.
 
 ## Chat And TUI
 
