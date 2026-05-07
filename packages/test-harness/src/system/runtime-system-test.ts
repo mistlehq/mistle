@@ -289,6 +289,9 @@ async function startPublicAccess(input: {
       return {
         publicHostname: readPublicAccessHostname(serviceId),
         localBaseUrl: httpEndpoint.hostBaseUrl,
+        ...(serviceId === ServiceIds.DATA_PLANE_GATEWAY
+          ? { upgradeProbePath: "/tunnel/sandbox/sbi_runtime_public_access_probe" }
+          : {}),
       };
     }),
   });

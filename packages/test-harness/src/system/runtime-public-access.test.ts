@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createRuntimePublicAccessProxyPoolKey,
   createRuntimePublicAccessRouteHealthUrl,
+  createRuntimePublicAccessRouteUpgradeProbeUrl,
+  isRuntimePublicAccessUpgradeProbeReadyStatus,
   normalizeRuntimePublicAccessHostnames,
   readRuntimePublicAccessEnvironmentIdFromPath,
 } from "./runtime-public-access.js";
@@ -42,6 +44,32 @@ describe("createRuntimePublicAccessRouteHealthUrl", () => {
         publicHostname: "gateway.example.com",
       }).toString(),
     ).toBe("https://gateway.example.com/__healthz?x-mistle-test-environment-id=test_env_123");
+  });
+});
+
+describe("createRuntimePublicAccessRouteUpgradeProbeUrl", () => {
+  it("targets the environment-scoped websocket route used by E2B bootstrap tunnels", () => {
+    expect(
+      createRuntimePublicAccessRouteUpgradeProbeUrl({
+        environmentId: "test_env_123",
+        publicHostname: "gateway.example.com",
+        upgradeProbePath: "/tunnel/sandbox/sbi_runtime_public_access_probe",
+      }).toString(),
+    ).toBe(
+      "wss://gateway.example.com/tunnel/sandbox/sbi_runtime_public_access_probe?x-mistle-test-environment-id=test_env_123",
+    );
+  });
+});
+
+describe("isRuntimePublicAccessUpgradeProbeReadyStatus", () => {
+  it("treats gateway application responses as ready while routing failures keep polling", () => {
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(101)).toBe(true);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(400)).toBe(true);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(401)).toBe(true);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(403)).toBe(true);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(404)).toBe(false);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(502)).toBe(false);
+    expect(isRuntimePublicAccessUpgradeProbeReadyStatus(503)).toBe(false);
   });
 });
 

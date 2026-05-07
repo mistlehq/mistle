@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { connect as connectTls } from "node:tls";
 
 import { systemSleeper } from "@mistle/time";
 
@@ -16,10 +17,17 @@ const RuntimePublicAccessTunnelLabel = "mistle.runtime-public-access.tunnel-id";
 const RuntimePublicAccessProxyReadyTimeoutMs = 30_000;
 const RuntimePublicAccessProxyPoolLockTimeoutMs = 240_000;
 const RuntimePublicAccessRouteReadyTimeoutMs = 30_000;
+const RuntimePublicAccessUpgradeProbeTimeoutMs = 5_000;
 
 export type RuntimePublicAccessTunnel = {
   publicBaseUrls: ReadonlyMap<string, string>;
   stop: () => Promise<void>;
+};
+
+export type RuntimePublicAccessIngressRule = {
+  publicHostname: string;
+  localBaseUrl: string;
+  upgradeProbePath?: string;
 };
 
 export async function startRuntimeCloudflaredTunnel(input: {
@@ -27,10 +35,7 @@ export async function startRuntimeCloudflaredTunnel(input: {
   tunnelId: string;
   tunnelCredentialsJson: string;
   publicHostnames: readonly string[];
-  ingressRules: ReadonlyArray<{
-    publicHostname: string;
-    localBaseUrl: string;
-  }>;
+  ingressRules: readonly RuntimePublicAccessIngressRule[];
 }): Promise<RuntimePublicAccessTunnel> {
   if (input.ingressRules.length === 0) {
     throw new Error("Runtime Cloudflare public access requires at least one ingress rule.");
@@ -270,10 +275,7 @@ async function readRuntimePublicAccessProxyReady(
 async function registerRuntimePublicAccessRoutes(input: {
   proxy: RuntimePublicAccessProxy;
   environmentId: string;
-  ingressRules: ReadonlyArray<{
-    publicHostname: string;
-    localBaseUrl: string;
-  }>;
+  ingressRules: readonly RuntimePublicAccessIngressRule[];
 }): Promise<boolean> {
   const endpoint = input.proxy.endpoints.http;
   if (endpoint === undefined) {
@@ -332,20 +334,27 @@ async function unregisterRuntimePublicAccessRoutes(input: {
 async function waitForRuntimePublicAccessRoutesReady(input: {
   proxy: RuntimePublicAccessProxy;
   environmentId: string;
-  ingressRules: ReadonlyArray<{
-    publicHostname: string;
-    localBaseUrl: string;
-  }>;
+  ingressRules: readonly RuntimePublicAccessIngressRule[];
   timeoutMs: number;
 }): Promise<void> {
   const startedAt = Date.now();
   for (const rule of input.ingressRules) {
+    const remainingTimeoutMs = Math.max(0, input.timeoutMs - (Date.now() - startedAt));
     await waitForRuntimePublicAccessRouteReady({
       proxy: input.proxy,
       environmentId: input.environmentId,
       publicHostname: rule.publicHostname,
-      timeoutMs: Math.max(0, input.timeoutMs - (Date.now() - startedAt)),
+      timeoutMs: remainingTimeoutMs,
     });
+    if (rule.upgradeProbePath !== undefined) {
+      await waitForRuntimePublicAccessUpgradeRouteReady({
+        proxy: input.proxy,
+        environmentId: input.environmentId,
+        publicHostname: rule.publicHostname,
+        upgradeProbePath: rule.upgradeProbePath,
+        timeoutMs: Math.max(0, input.timeoutMs - (Date.now() - startedAt)),
+      });
+    }
   }
 }
 
@@ -422,6 +431,182 @@ async function waitForRuntimePublicAccessRouteReady(input: {
   );
 }
 
+type RuntimePublicAccessUpgradeProbeOutcome =
+  | {
+      kind: "connect_error";
+      errorName: string;
+      errorMessage: string;
+    }
+  | {
+      kind: "http";
+      status: number;
+      statusText: string;
+      rawStatusLine: string;
+    };
+
+async function waitForRuntimePublicAccessUpgradeRouteReady(input: {
+  proxy: RuntimePublicAccessProxy;
+  environmentId: string;
+  publicHostname: string;
+  upgradeProbePath: string;
+  timeoutMs: number;
+}): Promise<void> {
+  const startedAt = Date.now();
+  const upgradeProbeUrl = createRuntimePublicAccessRouteUpgradeProbeUrl(input);
+  let attemptCount = 0;
+  let lastProbeOutcome: RuntimePublicAccessUpgradeProbeOutcome | undefined;
+  while (Date.now() - startedAt < input.timeoutMs) {
+    attemptCount += 1;
+    try {
+      const response = await probeRuntimePublicAccessUpgradeRoute({
+        url: upgradeProbeUrl,
+        timeoutMs: RuntimePublicAccessUpgradeProbeTimeoutMs,
+      });
+      lastProbeOutcome = {
+        kind: "http",
+        status: response.status,
+        statusText: response.statusText,
+        rawStatusLine: response.rawStatusLine,
+      };
+      if (isRuntimePublicAccessUpgradeProbeReadyStatus(response.status)) {
+        console.info(
+          JSON.stringify({
+            event: "runtime_public_access.upgrade_route_ready",
+            environmentId: input.environmentId,
+            publicHostname: input.publicHostname,
+            upgradeProbeUrl: upgradeProbeUrl.toString(),
+            status: response.status,
+            rawStatusLine: response.rawStatusLine,
+            attemptCount,
+            elapsedMs: Date.now() - startedAt,
+          }),
+        );
+        return;
+      }
+    } catch (error) {
+      lastProbeOutcome = {
+        kind: "connect_error",
+        errorName: error instanceof Error ? error.name : "Error",
+        errorMessage: error instanceof Error ? error.message : String(error),
+      };
+    }
+
+    await systemSleeper.sleep(CloudflaredTunnelPollIntervalMs);
+  }
+
+  const proxyDiagnostics = await readRuntimePublicAccessProxyDiagnostics(input.proxy);
+  throw new Error(
+    `Timed out waiting for runtime Cloudflare public access upgrade route at ${upgradeProbeUrl.toString()} after ${String(input.timeoutMs)}ms. Diagnostics: ${JSON.stringify(
+      {
+        environmentId: input.environmentId,
+        publicHostname: input.publicHostname,
+        upgradeProbeUrl: upgradeProbeUrl.toString(),
+        attemptCount,
+        lastProbeOutcome,
+        proxyDiagnostics,
+      },
+    )}`,
+  );
+}
+
+function probeRuntimePublicAccessUpgradeRoute(input: {
+  url: URL;
+  timeoutMs: number;
+}): Promise<{ status: number; statusText: string; rawStatusLine: string }> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let responseBytes = "";
+    const socket = connectTls({
+      host: input.url.hostname,
+      port: input.url.port.length === 0 ? 443 : Number(input.url.port),
+      servername: input.url.hostname,
+      timeout: input.timeoutMs,
+    });
+
+    const settle = (callback: () => void) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      socket.destroy();
+      callback();
+    };
+
+    socket.on("secureConnect", () => {
+      socket.write(createWebSocketUpgradeProbeRequest(input.url));
+    });
+    socket.on("data", (chunk) => {
+      responseBytes += chunk.toString("utf8");
+      const lineEndIndex = responseBytes.indexOf("\r\n");
+      if (lineEndIndex < 0) {
+        return;
+      }
+
+      const rawStatusLine = responseBytes.slice(0, lineEndIndex);
+      const parsed = parseHttpStatusLine(rawStatusLine);
+      if (parsed === undefined) {
+        settle(() =>
+          reject(
+            new Error(`Invalid runtime public access upgrade probe response: ${rawStatusLine}`),
+          ),
+        );
+        return;
+      }
+
+      settle(() =>
+        resolve({
+          ...parsed,
+          rawStatusLine,
+        }),
+      );
+    });
+    socket.on("timeout", () => {
+      settle(() =>
+        reject(
+          new Error(
+            `Timed out waiting for runtime public access upgrade probe response from ${input.url.toString()}.`,
+          ),
+        ),
+      );
+    });
+    socket.on("error", (error) => {
+      settle(() => reject(error));
+    });
+  });
+}
+
+function createWebSocketUpgradeProbeRequest(url: URL): string {
+  return [
+    `GET ${url.pathname}${url.search} HTTP/1.1`,
+    `Host: ${url.host}`,
+    "Connection: Upgrade",
+    "Upgrade: websocket",
+    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+    "Sec-WebSocket-Version: 13",
+    "",
+    "",
+  ].join("\r\n");
+}
+
+function parseHttpStatusLine(
+  statusLine: string,
+): { status: number; statusText: string } | undefined {
+  const match = /^HTTP\/\d(?:\.\d)? (?<status>\d{3})(?: (?<statusText>.*))?$/.exec(statusLine);
+  const status = match?.groups?.status;
+  if (status === undefined) {
+    return undefined;
+  }
+
+  return {
+    status: Number(status),
+    statusText: match?.groups?.statusText ?? "",
+  };
+}
+
+export function isRuntimePublicAccessUpgradeProbeReadyStatus(status: number): boolean {
+  return status === 101 || status === 400 || status === 401 || status === 403;
+}
+
 async function readResponseBodyPreview(response: Response): Promise<string> {
   const body = await response.text().catch((error: unknown) => {
     return `<<failed to read response body: ${
@@ -473,6 +658,16 @@ export function createRuntimePublicAccessRouteHealthUrl(input: {
   return url;
 }
 
+export function createRuntimePublicAccessRouteUpgradeProbeUrl(input: {
+  environmentId: string;
+  publicHostname: string;
+  upgradeProbePath: string;
+}): URL {
+  const url = new URL(input.upgradeProbePath, `wss://${input.publicHostname}`);
+  url.searchParams.set("x-mistle-test-environment-id", input.environmentId);
+  return url;
+}
+
 export function readRuntimePublicAccessEnvironmentIdFromPath(
   requestPath: string,
 ): string | undefined {
@@ -520,6 +715,7 @@ if (!Array.isArray(publicHostnames) || publicHostnames.some((value) => typeof va
 }
 
 const routes = new Map();
+const recentUpgradeFailures = [];
 const server = http.createServer(handleRequest);
 server.on("upgrade", handleUpgrade);
 server.listen(0, "0.0.0.0", async () => {
@@ -560,6 +756,7 @@ async function handleRequest(request, response) {
       cloudflaredContainerName,
       cloudflaredPid: cloudflared?.pid,
       routeCount: routes.size,
+      recentUpgradeFailures,
       routes: Array.from(routes.entries()).map(([key, localBaseUrl]) => {
         const separatorIndex = key.lastIndexOf(":");
         return {
@@ -641,7 +838,14 @@ async function handleRequest(request, response) {
 function handleUpgrade(request, socket, head) {
   const target = resolveTarget(request);
   if (target === undefined) {
-    socket.end("HTTP/1.1 404 Not Found\r\n\r\n");
+    const routeContext = readRouteContext(request);
+    recordUpgradeFailure({
+      reason: "route_missing",
+      host: routeContext.host,
+      environmentId: routeContext.environmentId,
+      requestUrl: request.url ?? "",
+    });
+    endSocketResponse(socket, 404, "Not Found", "No runtime public access route registered.");
     return;
   }
 
@@ -663,9 +867,43 @@ function handleUpgrade(request, socket, head) {
     }
     socket.pipe(targetSocket);
     targetSocket.pipe(socket);
-  }).catch(() => {
-    socket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+  }).catch((error) => {
+    recordUpgradeFailure({
+      reason: "target_connect_failed",
+      host: String(request.headers.host ?? "").split(":")[0],
+      environmentId: target.environmentId,
+      requestUrl: request.url ?? "",
+      targetHost: targetUrl.hostname,
+      targetPort: targetUrl.port,
+      errorName: error instanceof Error ? error.name : "Error",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    endSocketResponse(socket, 502, "Bad Gateway", "Runtime public access upgrade target failed to connect.");
   });
+}
+
+function endSocketResponse(socket, status, statusText, body) {
+  socket.end(
+    "HTTP/1.1 " + String(status) + " " + statusText + "\r\n" +
+      "content-type: text/plain; charset=utf-8\r\n" +
+      "content-length: " + String(Buffer.byteLength(body, "utf8")) + "\r\n" +
+      "connection: close\r\n" +
+      "\r\n" +
+      body,
+  );
+}
+
+function recordUpgradeFailure(event) {
+  const failure = {
+    event: "runtime_public_access.upgrade_failed",
+    timestamp: new Date().toISOString(),
+    ...event,
+  };
+  recentUpgradeFailures.push(failure);
+  while (recentUpgradeFailures.length > 50) {
+    recentUpgradeFailures.shift();
+  }
+  logStream.write(JSON.stringify(failure) + "\n");
 }
 
 function connectUpgradeTarget(input) {
@@ -694,19 +932,28 @@ function connectUpgradeTarget(input) {
 }
 
 function resolveTarget(request) {
-  const host = String(request.headers.host ?? "").split(":")[0];
-  const requestUrl = new URL(request.url ?? "/", "http://" + host);
-  const environmentId = String(request.headers["x-mistle-test-environment-id"] ?? requestUrl.searchParams.get("x-mistle-test-environment-id") ?? readEnvironmentIdFromPath(requestUrl.pathname) ?? "");
-  if (host.length === 0 || environmentId.length === 0) {
+  const routeContext = readRouteContext(request);
+  if (routeContext.host.length === 0 || routeContext.environmentId.length === 0) {
     return undefined;
   }
-  const localBaseUrl = routes.get(createRouteKey(host, environmentId));
+  const localBaseUrl = routes.get(createRouteKey(routeContext.host, routeContext.environmentId));
   if (localBaseUrl === undefined) {
     return undefined;
   }
   return {
-    environmentId,
+    environmentId: routeContext.environmentId,
     localBaseUrl,
+  };
+}
+
+function readRouteContext(request) {
+  const host = String(request.headers.host ?? "").split(":")[0];
+  const requestUrl = new URL(request.url ?? "/", "http://" + host);
+  const environmentId = String(request.headers["x-mistle-test-environment-id"] ?? requestUrl.searchParams.get("x-mistle-test-environment-id") ?? readEnvironmentIdFromPath(requestUrl.pathname) ?? "");
+  return {
+    host,
+    environmentId,
+    requestUrl,
   };
 }
 
