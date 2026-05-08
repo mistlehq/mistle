@@ -69,11 +69,11 @@ function toUnavailableSelectedOption(input: {
   };
 }
 
-function findContainingRepositoryOption(input: {
+function hasContainingRepositoryOption(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string;
-}): SessionWorkbenchHeaderRepositoryOption | undefined {
-  return input.repositoryOptions.find(
+}): boolean {
+  return input.repositoryOptions.some(
     (option) =>
       input.selectedRepositoryPath.startsWith(`${option.value}/`) &&
       input.selectedRepositoryPath.length > option.value.length + 1,
@@ -113,11 +113,11 @@ function resolveUnavailableRepositoryErrorMessage(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string;
 }): string {
-  const containingRepositoryOption = findContainingRepositoryOption({
+  const hasContainingRepository = hasContainingRepositoryOption({
     repositoryOptions: input.repositoryOptions,
     selectedRepositoryPath: input.selectedRepositoryPath,
   });
-  if (containingRepositoryOption !== undefined) {
+  if (hasContainingRepository) {
     return `Codex is running in ${input.selectedRepositoryPath}, which is not a selectable repository root.`;
   }
 
