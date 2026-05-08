@@ -184,41 +184,40 @@ impl SandboxdState {
                 })?;
         }
         record_operation_phase_completed(&diagnostics_logger, "apply_git_identity");
-        if !uses_pre_materialized_snapshot {
-            record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
-            runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
-                record_runtime_plan_apply_failure(&diagnostics_logger, &error);
-                SandboxdStateError::ApplyRuntimePlan(error.to_string())
+
+        let start_snapshot_gateway_egress_before_runtime_plan =
+            startup_input.is_snapshot() && gateway_egress_forwarder.is_some();
+        let mut egress_proxy: Option<EgressProxy>;
+        let runtime_env: BTreeMap<String, String>;
+        let mut snapshot_tunnel_session: Option<TunnelSession> = None;
+
+        if start_snapshot_gateway_egress_before_runtime_plan {
+            record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
+            egress_proxy = EgressProxy::start(
+                &runtime_plan,
+                startup_input,
+                gateway_egress_forwarder.clone(),
+                clock.clone(),
+                supervisor_handle.clone(),
+            )
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_egress_proxy",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartEgressProxy(error.to_string())
             })?;
-            record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
-        }
-        record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
-        let mut egress_proxy = EgressProxy::start(
-            &runtime_plan,
-            startup_input,
-            gateway_egress_forwarder.clone(),
-            clock.clone(),
-            supervisor_handle.clone(),
-        )
-        .map_err(|error| {
-            record_operation_phase_failure(
-                &diagnostics_logger,
-                "start_egress_proxy",
-                BTreeMap::from([(
-                    "error".to_string(),
-                    startup_diagnostics_string(error.to_string()),
-                )]),
-            );
-            SandboxdStateError::StartEgressProxy(error.to_string())
-        })?;
-        record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
-        let runtime_env = collect_runtime_environment(&runtime_plan)
-            .map_err(SandboxdStateError::StartRuntimeProcesses)?;
-        let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
-            .map_err(SandboxdStateError::StartRuntimeProcesses)?;
-        let mut snapshot_tunnel_session = if startup_input.is_snapshot()
-            && gateway_egress_forwarder.is_some()
-        {
+            record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
+            let base_runtime_env = collect_runtime_environment(&runtime_plan)
+                .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+            runtime_env =
+                merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref())
+                    .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+
             let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
             let runtime_readiness_manager =
                 Arc::new(Mutex::new(RuntimeReadinessManager::default()));
@@ -248,10 +247,78 @@ impl SandboxdState {
                 tunnel_session.attach_gateway_egress_forwarder(forwarder);
             }
             record_operation_phase_completed(&diagnostics_logger, "start_snapshot_tunnel_session");
-            Some(tunnel_session)
+            snapshot_tunnel_session = Some(tunnel_session);
+
+            if !uses_pre_materialized_snapshot {
+                record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
+                match runtime::apply_compiled_runtime_plan(&runtime_plan) {
+                    Ok(()) => {
+                        record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+                    }
+                    Err(error) => {
+                        record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+                        if let Some(tunnel_session) = snapshot_tunnel_session.take() {
+                            close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
+                        }
+                        if let Some(egress_proxy) = egress_proxy.take() {
+                            record_operation_phase_started(
+                                &diagnostics_logger,
+                                "stop_egress_proxy_after_runtime_plan_failure",
+                            );
+                            match egress_proxy.close() {
+                                Ok(()) => record_operation_phase_completed(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_runtime_plan_failure",
+                                ),
+                                Err(close_error) => record_operation_phase_failure(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_runtime_plan_failure",
+                                    BTreeMap::from([(
+                                        "error".to_string(),
+                                        startup_diagnostics_string(close_error.to_string()),
+                                    )]),
+                                ),
+                            }
+                        }
+                        return Err(SandboxdStateError::ApplyRuntimePlan(error.to_string()));
+                    }
+                }
+            }
         } else {
-            None
-        };
+            if !uses_pre_materialized_snapshot {
+                record_operation_phase_started(&diagnostics_logger, "apply_runtime_plan");
+                runtime::apply_compiled_runtime_plan(&runtime_plan).map_err(|error| {
+                    record_runtime_plan_apply_failure(&diagnostics_logger, &error);
+                    SandboxdStateError::ApplyRuntimePlan(error.to_string())
+                })?;
+                record_operation_phase_completed(&diagnostics_logger, "apply_runtime_plan");
+            }
+            record_operation_phase_started(&diagnostics_logger, "start_egress_proxy");
+            egress_proxy = EgressProxy::start(
+                &runtime_plan,
+                startup_input,
+                gateway_egress_forwarder.clone(),
+                clock.clone(),
+                supervisor_handle.clone(),
+            )
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_egress_proxy",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartEgressProxy(error.to_string())
+            })?;
+            record_operation_phase_completed(&diagnostics_logger, "start_egress_proxy");
+            let base_runtime_env = collect_runtime_environment(&runtime_plan)
+                .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+            runtime_env =
+                merge_managed_runtime_environment(base_runtime_env, egress_proxy.as_ref())
+                    .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+        }
         if !uses_pre_materialized_snapshot {
             record_operation_phase_started(&diagnostics_logger, "run_setup_script");
             match run_setup_script(
@@ -1411,6 +1478,7 @@ fn build_setup_script_environment(
 #[cfg(test)]
 mod tests {
     use std::collections::{BTreeMap, BTreeSet};
+    use std::fs;
     use std::net::TcpListener;
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
@@ -1434,8 +1502,9 @@ mod tests {
         run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
         spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
     };
+    use crate::startup_diagnostics::{StartupDiagnosticsLogger, StartupOperation};
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
-    use crate::test_support::TestEnvVarGuard;
+    use crate::test_support::TestEnvVarsGuard;
     use crate::time::{SystemClock, ThreadSleeper};
     use tungstenite::{Message, WebSocket, accept};
 
@@ -1954,7 +2023,22 @@ mod tests {
 
     #[test]
     fn snapshot_materialization_gateway_proxy_uses_temporary_bootstrap_tunnel_for_setup() {
-        let _env_guard = TestEnvVarGuard::set(GATEWAY_PROXY_ENABLED_ENV, "1");
+        let log_dir = std::env::temp_dir().join(format!(
+            "mistle-snapshot-materialization-gateway-log-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&log_dir);
+        fs::create_dir_all(&log_dir).expect("startup diagnostics log dir should be creatable");
+        let _env_guard = TestEnvVarsGuard::set([
+            (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
+            (
+                "MISTLE_SANDBOXD_OPERATION_LOG_DIR",
+                log_dir.to_string_lossy().to_string(),
+            ),
+        ]);
         let output_path = std::env::temp_dir().join(format!(
             "mistle-snapshot-materialization-gateway-output-{}",
             SystemTime::now()
@@ -2029,7 +2113,10 @@ mod tests {
             Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
             Arc::new(SystemClock),
             Arc::new(ThreadSleeper),
-            None,
+            Some(
+                StartupDiagnosticsLogger::initialize(StartupOperation::Init, &bootstrap_url)
+                    .expect("startup diagnostics logger should initialize"),
+            ),
         )
         .expect("snapshot materialization init should use temporary gateway tunnel for setup");
 
@@ -2052,7 +2139,29 @@ mod tests {
             .expect("runtime-plan artifact install should write its output file");
         assert_eq!(output, "snapshot-gateway");
 
+        let init_log = fs::read_to_string(log_dir.join("init.log"))
+            .expect("startup diagnostics init log should be readable");
+        let phases = init_log
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter(|event| event["event"] == "sandbox_init_phase_started")
+            .filter_map(|event| event["phase"].as_str().map(ToOwned::to_owned))
+            .collect::<Vec<_>>();
+        let start_tunnel_index = phases
+            .iter()
+            .position(|phase| phase == "start_snapshot_tunnel_session")
+            .expect("snapshot tunnel phase should be recorded");
+        let apply_runtime_plan_index = phases
+            .iter()
+            .position(|phase| phase == "apply_runtime_plan")
+            .expect("runtime plan phase should be recorded");
+        assert!(
+            start_tunnel_index < apply_runtime_plan_index,
+            "snapshot gateway tunnel must start before runtime plan materialization; phases: {phases:?}"
+        );
+
         let _ = std::fs::remove_file(output_path);
+        let _ = fs::remove_dir_all(log_dir);
     }
 
     #[test]
