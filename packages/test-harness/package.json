@@ -46,7 +46,7 @@
     "postgres": "3.4.9",
     "redis": "^5.12.1",
     "testcontainers": "^11.14.0",
-    "undici": "^7.24.6",
+    "undici": "^8.2.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
