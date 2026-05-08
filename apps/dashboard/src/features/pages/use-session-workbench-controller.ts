@@ -291,9 +291,7 @@ export function useSessionWorkbenchController(input: {
 
       await chat.startTurn({
         ...turnInput,
-        cwd: resolvePrimaryRepositoryTurnStartCwd({
-          selectedRepositoryPath: primaryRepositoryState.selectedRepositoryPath,
-        }),
+        cwd: resolvePrimaryRepositoryTurnStartCwd(primaryRepositoryState.selectedRepositoryPath),
       });
 
       if (!shouldGenerateSessionTitle || sandboxInstanceId === null) {

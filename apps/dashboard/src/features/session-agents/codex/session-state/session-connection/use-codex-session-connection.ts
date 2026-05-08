@@ -149,9 +149,8 @@ export function useCodexSessionConnection(input: {
 
   const updateActiveThread = useCallback(
     (activeThreadInput: ActiveCodexThreadUpdate): void => {
-      const threadId = activeThreadInput.threadId;
-      input.threadIdRef.current = threadId;
-      reconnectTargetThreadIdRef.current = threadId;
+      input.threadIdRef.current = activeThreadInput.threadId;
+      reconnectTargetThreadIdRef.current = activeThreadInput.threadId;
       setSessionSnapshot((currentSession) => {
         if (currentSession === null) {
           return currentSession;
@@ -159,8 +158,7 @@ export function useCodexSessionConnection(input: {
 
         return updateConnectedCodexSessionActiveThread({
           currentSession,
-          threadId,
-          ...(activeThreadInput.cwd === undefined ? {} : { cwd: activeThreadInput.cwd }),
+          ...activeThreadInput,
         });
       });
     },

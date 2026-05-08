@@ -124,10 +124,10 @@ function resolveUnavailableRepositoryErrorMessage(input: {
   return "The selected repository is no longer available in this sandbox.";
 }
 
-export function resolvePrimaryRepositoryTurnStartCwd(input: {
-  selectedRepositoryPath: string | null;
-}): string {
-  return input.selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
+export function resolvePrimaryRepositoryTurnStartCwd(
+  selectedRepositoryPath: string | null,
+): string {
+  return selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
 }
 
 function resolveSelectedRepositoryPathFromCwd(input: {

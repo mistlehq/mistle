@@ -116,19 +116,11 @@ describe("session primary repository policy", () => {
   });
 
   it("uses the selected repository as the Codex turn cwd", () => {
-    expect(
-      resolvePrimaryRepositoryTurnStartCwd({
-        selectedRepositoryPath: "/root/acme/repo-2",
-      }),
-    ).toBe("/root/acme/repo-2");
+    expect(resolvePrimaryRepositoryTurnStartCwd("/root/acme/repo-2")).toBe("/root/acme/repo-2");
   });
 
   it("uses the workspace root as the Codex turn cwd when None is selected", () => {
-    expect(
-      resolvePrimaryRepositoryTurnStartCwd({
-        selectedRepositoryPath: null,
-      }),
-    ).toBe(DefaultSandboxWorkspaceDir);
+    expect(resolvePrimaryRepositoryTurnStartCwd(null)).toBe(DefaultSandboxWorkspaceDir);
   });
 
   it("restores the selected repository from the resumed Codex thread cwd before the launch primary repository", () => {
