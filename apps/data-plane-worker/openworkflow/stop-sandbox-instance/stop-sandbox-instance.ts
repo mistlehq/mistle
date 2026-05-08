@@ -8,7 +8,6 @@ import {
   type SandboxInstancePurpose,
   type SandboxInstanceProvider,
 } from "@mistle/db/data-plane";
-import type { SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock } from "@mistle/time";
 import type { SandboxStopReason } from "@mistle/workflow-registry/data-plane";
@@ -18,6 +17,7 @@ import type {
   SandboxRuntimeStateSnapshot,
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import type { SandboxRuntimeProviderResolver } from "../core/sandbox-runtime-adapter.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
@@ -157,7 +157,7 @@ export async function stopSandboxInstance(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -199,6 +199,9 @@ export async function stopSandboxInstance(
     stopReason: input.stopReason,
     purpose: sandboxInstanceState.purpose,
   });
+  const sandboxRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
+    provider: sandboxInstanceState.runtimeProvider,
+  });
 
   if (
     !(await isSandboxStopStillPermitted({
@@ -222,7 +225,7 @@ export async function stopSandboxInstance(
         tables: ctx.tables,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
         config: ctx.config,
-        sandboxAdapter: ctx.sandboxAdapter,
+        sandboxAdapter: sandboxRuntime.sandboxAdapter,
       },
       {
         sandboxInstanceId: input.sandboxInstanceId,

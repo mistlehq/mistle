@@ -9,7 +9,6 @@ import {
 } from "@mistle/db/data-plane";
 import { createDataPlaneTestSchemaName } from "@mistle/db/test-environment";
 import type { MistleLogger } from "@mistle/logging";
-import type { SandboxAdapter, SandboxRuntimeControl } from "@mistle/sandbox";
 import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
 import { Pool } from "pg";
 
@@ -19,8 +18,8 @@ import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runt
 import { createDataPlaneWorkerRuntimeConfig, type DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime, type OpenWorkflowRuntime } from "./runtime.js";
 import {
-  createSandboxRuntimeAdapter,
-  createSandboxRuntimeControl,
+  createConfigBackedSandboxRuntimeProviderResolver,
+  type SandboxRuntimeProviderResolver,
 } from "./sandbox-runtime-adapter.js";
 import { DataPlaneWorkerTunnelTokenDurations } from "./tunnel-token-durations.js";
 
@@ -33,8 +32,7 @@ export type WorkflowContext = {
   db: DataPlaneDatabase;
   tables: DataPlaneTables;
   dbPool: Pool;
-  sandboxAdapter: SandboxAdapter;
-  sandboxRuntimeControl: SandboxRuntimeControl;
+  sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
   runtimeStateReader: SandboxRuntimeStateReader;
   controlPlaneInternalClient: ControlPlaneInternalClient;
   tunnelReadinessPolicy: {
@@ -91,11 +89,11 @@ async function createWorkflowContext(input?: {
       connectionString: workerConfig.database.url,
     });
   const ownsDbPool = input?.dbPool === undefined;
-  let sandboxRuntimeControl: SandboxRuntimeControl | undefined;
+  let sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver | undefined;
 
   try {
-    sandboxRuntimeControl = createSandboxRuntimeControl(config);
-    const hostedSandboxRuntimeControl = sandboxRuntimeControl;
+    sandboxRuntimeProviderResolver = createConfigBackedSandboxRuntimeProviderResolver(config);
+    const hostedSandboxRuntimeProviderResolver = sandboxRuntimeProviderResolver;
     const controlPlaneInternalClient =
       testIsolation === undefined
         ? new ControlPlaneInternalClient({
@@ -136,8 +134,7 @@ async function createWorkflowContext(input?: {
         db,
         tables,
         dbPool,
-        sandboxAdapter: createSandboxRuntimeAdapter(config),
-        sandboxRuntimeControl,
+        sandboxRuntimeProviderResolver,
         runtimeStateReader,
         controlPlaneInternalClient,
         tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(),
@@ -145,14 +142,14 @@ async function createWorkflowContext(input?: {
         sleeper: systemSleeper,
       },
       close: async () => {
-        await hostedSandboxRuntimeControl.close();
+        await hostedSandboxRuntimeProviderResolver.close();
         if (ownsDbPool) {
           await dbPool.end();
         }
       },
     };
   } catch (error) {
-    await sandboxRuntimeControl?.close();
+    await sandboxRuntimeProviderResolver?.close();
     if (ownsDbPool) {
       await dbPool.end();
     }
@@ -206,7 +203,7 @@ export async function closeWorkflowContext(): Promise<void> {
 
   closeWorkflowContextPromise = (async () => {
     const context = await contextPromise;
-    await context.sandboxRuntimeControl.close();
+    await context.sandboxRuntimeProviderResolver.close();
     await context.dbPool.end();
     workflowContextPromise = undefined;
     closeWorkflowContextPromise = undefined;

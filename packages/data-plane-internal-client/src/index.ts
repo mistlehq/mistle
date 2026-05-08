@@ -61,6 +61,9 @@ export type StartSandboxInstanceInput = {
     kind: "base" | "snapshot";
     provider?: SandboxProvider;
   };
+  sandboxRuntimeProvider?: {
+    provider: SandboxProvider;
+  };
   idempotencyKey?: string;
 };
 export type StartSandboxInstanceAcceptedResponse =

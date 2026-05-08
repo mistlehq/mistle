@@ -57,6 +57,28 @@ function createSandboxInstanceId(): string {
   return typeid("sbi").toString();
 }
 
+function resolveSandboxRuntimeProvider(input: {
+  requestedProvider?: StartSandboxInstanceInput["sandboxRuntimeProvider"];
+  configuredProvider: DataPlaneApiConfig["sandbox"]["provider"];
+}): {
+  provider: DataPlaneApiConfig["sandbox"]["provider"];
+} {
+  if (input.requestedProvider === undefined) {
+    return {
+      provider: input.configuredProvider,
+    };
+  }
+
+  if (input.requestedProvider.provider !== input.configuredProvider) {
+    throw new BadRequestError(
+      "SANDBOX_RUNTIME_PROVIDER_UNAVAILABLE",
+      `Sandbox runtime provider '${input.requestedProvider.provider}' is not available in this deployment.`,
+    );
+  }
+
+  return input.requestedProvider;
+}
+
 export function resolveSandboxInstancePersistenceMode(input: {
   organizationId: string;
   purpose: SandboxInstancePurpose;
@@ -127,11 +149,15 @@ export async function startSandboxInstance(
   input: StartSandboxInstanceInput,
 ): Promise<StartSandboxInstanceAcceptedResponse> {
   const { sandboxInstances } = ctx.tables;
+  const sandboxRuntimeProvider = resolveSandboxRuntimeProvider({
+    requestedProvider: input.sandboxRuntimeProvider,
+    configuredProvider: ctx.sandboxProvider,
+  });
   const persistenceMode = resolveSandboxInstancePersistenceMode({
     organizationId: input.organizationId,
     purpose: input.purpose,
     effectivePersistenceMode: input.persistenceMode,
-    sandboxProvider: ctx.sandboxProvider,
+    sandboxProvider: sandboxRuntimeProvider.provider,
     configuredStorageBackend: ctx.sandboxStorageBackend,
   });
 
@@ -147,6 +173,7 @@ export async function startSandboxInstance(
     ...(input.actingUserId === undefined ? {} : { actingUserId: input.actingUserId }),
     source: input.source,
     image: input.image,
+    sandboxRuntimeProvider,
     ...(input.gitIdentity === undefined ? {} : { gitIdentity: input.gitIdentity }),
   };
 
@@ -171,7 +198,7 @@ export async function startSandboxInstance(
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
-      runtimeProvider: ctx.sandboxProvider,
+      runtimeProvider: sandboxRuntimeProvider.provider,
       providerSandboxId: null,
       computeGeneration: 1,
       status: SandboxInstanceStatuses.PENDING,

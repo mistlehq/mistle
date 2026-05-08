@@ -479,6 +479,10 @@ export interface paths {
             };
             sandboxProfileId: string;
             sandboxProfileVersion: number;
+            sandboxRuntimeProvider?: {
+              /** @enum {string} */
+              provider: "docker" | "e2b";
+            };
             /** @enum {string} */
             source: "dashboard" | "webhook" | "schedule" | "system";
             startedBy: {
@@ -1595,6 +1599,10 @@ export interface paths {
             sandboxInstanceId: string;
             sandboxProfileId: string;
             sandboxProfileVersion: number;
+            sandboxRuntimeProvider?: {
+              /** @enum {string} */
+              provider: "docker" | "e2b";
+            };
             snapshotJobId: string;
           };
         };

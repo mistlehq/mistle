@@ -57,6 +57,17 @@
                     },
                     "required": ["imageId", "createdAt", "kind"],
                     "additionalProperties": false
+                  },
+                  "sandboxRuntimeProvider": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
+                      }
+                    },
+                    "required": ["provider"],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -1437,6 +1448,17 @@
                       }
                     },
                     "required": ["imageId", "kind"],
+                    "additionalProperties": false
+                  },
+                  "sandboxRuntimeProvider": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "enum": ["docker", "e2b"]
+                      }
+                    },
+                    "required": ["provider"],
                     "additionalProperties": false
                   }
                 },

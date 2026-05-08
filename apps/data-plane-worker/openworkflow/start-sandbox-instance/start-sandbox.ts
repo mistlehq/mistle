@@ -33,6 +33,7 @@ export async function startSandbox(
   input: {
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
+    runtimeProvider: SandboxProvider;
     storagePreparation?: SandboxStartStoragePreparation;
   },
 ): Promise<{
@@ -46,7 +47,7 @@ export async function startSandbox(
         (() => {
           throw new Error("Snapshot launch image is missing its provider.");
         })())
-      : ctx.config.sandbox.provider;
+      : input.runtimeProvider;
 
   const startedSandbox = await ctx.sandboxAdapter.start({
     image: {

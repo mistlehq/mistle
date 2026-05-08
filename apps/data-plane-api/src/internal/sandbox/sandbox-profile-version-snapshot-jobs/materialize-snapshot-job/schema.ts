@@ -1,5 +1,11 @@
 import { z } from "@hono/zod-openapi";
 
+const SandboxRuntimeProviderSelectionSchema = z
+  .object({
+    provider: z.enum(["docker", "e2b"]),
+  })
+  .strict();
+
 export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
   .object({
     snapshotJobId: z.string().min(1),
@@ -14,6 +20,7 @@ export const MaterializeSandboxProfileVersionSnapshotJobRequestSchema = z
         kind: z.literal("base"),
       })
       .strict(),
+    sandboxRuntimeProvider: SandboxRuntimeProviderSelectionSchema.optional(),
   })
   .strict();
 

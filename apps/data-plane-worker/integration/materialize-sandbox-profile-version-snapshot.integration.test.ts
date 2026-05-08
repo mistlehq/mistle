@@ -8,11 +8,7 @@ import {
   SandboxProfileVersionSnapshotJobTriggers,
   SandboxProfileVersionStates,
 } from "@mistle/db/control-plane";
-import {
-  createSandboxAdapter,
-  createSandboxRuntimeControl,
-  SandboxProvider,
-} from "@mistle/sandbox";
+import { SandboxProvider } from "@mistle/sandbox";
 import {
   createIntegrationTest,
   TestEnvironmentIdHeader,
@@ -25,6 +21,7 @@ import {
   createDataPlaneWorkerRuntimeConfig,
   type DataPlaneWorkerConfig,
 } from "../openworkflow/core/config.js";
+import { createConfigBackedSandboxRuntimeProviderResolver } from "../openworkflow/core/sandbox-runtime-adapter.js";
 import {
   executeMaterializeSandboxProfileVersionSnapshot,
   type SnapshotWorkflowStepRunner,
@@ -80,12 +77,8 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
     const runtimeConfig = createDataPlaneWorkerRuntimeConfig({
       app: createWorkerConfig(env),
     });
-    const sandboxRuntimeControl = createSandboxRuntimeControl({
-      provider: SandboxProvider.DOCKER,
-      docker: {
-        socketPath: DockerSocketPath,
-      },
-    });
+    const sandboxRuntimeProviderResolver =
+      createConfigBackedSandboxRuntimeProviderResolver(runtimeConfig);
 
     try {
       const output = await executeMaterializeSandboxProfileVersionSnapshot({
@@ -96,13 +89,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
           tables: env.dataPlaneTables,
           logger: dataPlaneWorkerLogger,
           processEnv: {},
-          sandboxAdapter: createSandboxAdapter({
-            provider: SandboxProvider.DOCKER,
-            docker: {
-              socketPath: DockerSocketPath,
-            },
-          }),
-          sandboxRuntimeControl,
+          sandboxRuntimeProviderResolver,
         },
         workflowInput: {
           snapshotJobId,
@@ -114,6 +101,9 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
             imageId: "integration-new-snapshot-claim-loss-image",
             createdAt: new Date().toISOString(),
             kind: "base",
+          },
+          sandboxRuntimeProvider: {
+            provider: SandboxProvider.DOCKER,
           },
         },
         workflowRunId,
@@ -142,7 +132,7 @@ describe.concurrent("data-plane worker snapshot materialization", () => {
         }),
       ).resolves.toBeUndefined();
     } finally {
-      await sandboxRuntimeControl.close();
+      await sandboxRuntimeProviderResolver.close();
     }
   });
 });

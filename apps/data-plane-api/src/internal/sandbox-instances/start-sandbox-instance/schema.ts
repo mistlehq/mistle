@@ -1,6 +1,12 @@
 import { z } from "@hono/zod-openapi";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
+const SandboxRuntimeProviderSelectionSchema = z
+  .object({
+    provider: z.enum(["docker", "e2b"]),
+  })
+  .strict();
+
 export const StartSandboxInstanceInputSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -44,6 +50,7 @@ export const StartSandboxInstanceInputSchema = z
         provider: z.enum(["docker", "e2b"]).optional(),
       })
       .strict(),
+    sandboxRuntimeProvider: SandboxRuntimeProviderSelectionSchema.optional(),
   })
   .strict();
 

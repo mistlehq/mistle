@@ -71,6 +71,9 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
     }
 
     const resumableSandboxState = resumableSandboxInstance;
+    const sandboxRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
+      provider: resumableSandboxState.runtimeProvider,
+    });
 
     await step.run({ name: "mark-sandbox-instance-starting" }, async () => {
       await markSandboxInstanceStarting({
@@ -92,7 +95,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 {
                   config: ctx.config,
                   processEnv: ctx.processEnv,
-                  sandboxAdapter: ctx.sandboxAdapter,
+                  sandboxAdapter: sandboxRuntime.sandboxAdapter,
                 },
                 {
                   sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
@@ -121,8 +124,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                   tables: ctx.tables,
                   controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                   workerConfig: ctx.config.app,
-                  configuredSandboxProvider: ctx.config.sandbox.provider,
-                  sandboxAdapter: ctx.sandboxAdapter,
+                  configuredSandboxProvider: sandboxRuntime.provider,
+                  sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   storageBackend: ctx.config.sandbox.storage?.backend,
                 },
                 {
@@ -152,7 +155,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -215,8 +218,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 {
                   config: ctx.config,
                   processEnv: ctx.processEnv,
-                  sandboxAdapter: ctx.sandboxAdapter,
-                  sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+                  sandboxAdapter: sandboxRuntime.sandboxAdapter,
+                  sandboxRuntimeControl: sandboxRuntime.sandboxRuntimeControl,
                 },
                 {
                   organizationId: resumableSandboxState.organizationId,
@@ -238,7 +241,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             });
             await emitSandboxStartupDiagnostics({
               logger,
-              sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+              sandboxRuntimeControl: sandboxRuntime.sandboxRuntimeControl,
               providerSandboxId: resumedRuntime.providerSandboxId,
               sandboxInstanceId: resumedRuntime.sandboxInstanceId,
               runtimeProvider: resumedRuntime.runtimeProvider,
@@ -255,7 +258,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -347,7 +350,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -416,7 +419,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -502,7 +505,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -689,8 +692,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
-              configuredSandboxProvider: ctx.config.sandbox.provider,
-              sandboxAdapter: ctx.sandboxAdapter,
+              configuredSandboxProvider: sandboxRuntime.provider,
+              sandboxAdapter: sandboxRuntime.sandboxAdapter,
               storageBackend: ctx.config.sandbox.storage?.backend,
             },
             {
@@ -711,11 +714,12 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               config: ctx.config,
               processEnv: ctx.processEnv,
-              sandboxAdapter: ctx.sandboxAdapter,
+              sandboxAdapter: sandboxRuntime.sandboxAdapter,
             },
             {
               sandboxInstanceId: resumableSandboxState.sandboxInstanceId,
               image: replacementImage,
+              runtimeProvider: sandboxRuntime.provider,
               storagePreparation,
             },
           );
@@ -752,8 +756,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
               tables: ctx.tables,
               controlPlaneInternalClient: ctx.controlPlaneInternalClient,
               workerConfig: ctx.config.app,
-              configuredSandboxProvider: ctx.config.sandbox.provider,
-              sandboxAdapter: ctx.sandboxAdapter,
+              configuredSandboxProvider: sandboxRuntime.provider,
+              sandboxAdapter: sandboxRuntime.sandboxAdapter,
               storageBackend: ctx.config.sandbox.storage?.backend,
             },
             {
@@ -811,7 +815,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: sandboxRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -880,8 +884,8 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
             {
               config: ctx.config,
               processEnv: ctx.processEnv,
-              sandboxAdapter: ctx.sandboxAdapter,
-              sandboxRuntimeControl: ctx.sandboxRuntimeControl,
+              sandboxAdapter: sandboxRuntime.sandboxAdapter,
+              sandboxRuntimeControl: sandboxRuntime.sandboxRuntimeControl,
             },
             {
               organizationId: resumableSandboxState.organizationId,
@@ -939,7 +943,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: sandboxRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1065,7 +1069,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: sandboxRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1168,7 +1172,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: sandboxRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1288,7 +1292,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                 tables: ctx.tables,
                 controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                 config: ctx.config,
-                sandboxAdapter: ctx.sandboxAdapter,
+                sandboxAdapter: sandboxRuntime.sandboxAdapter,
               },
               {
                 sandboxInstanceId: input.sandboxInstanceId,
@@ -1404,7 +1408,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
                     tables: ctx.tables,
                     controlPlaneInternalClient: ctx.controlPlaneInternalClient,
                     config: ctx.config,
-                    sandboxAdapter: ctx.sandboxAdapter,
+                    sandboxAdapter: sandboxRuntime.sandboxAdapter,
                   },
                   {
                     sandboxInstanceId: input.sandboxInstanceId,
@@ -1474,7 +1478,7 @@ export const ResumeSandboxInstanceWorkflow = defineTracedDataPlaneWorkflow(
       const replacedProviderSandboxId = resumableSandboxState.providerSandboxId;
       try {
         await step.run({ name: "cleanup-replaced-sandbox-compute" }, async () => {
-          await ctx.sandboxAdapter.destroy({
+          await sandboxRuntime.sandboxAdapter.destroy({
             id: replacedProviderSandboxId,
           });
         });

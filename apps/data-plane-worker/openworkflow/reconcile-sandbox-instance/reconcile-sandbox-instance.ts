@@ -19,6 +19,7 @@ import type {
   SandboxRuntimeStateSnapshot,
 } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import type { SandboxRuntimeProviderResolver } from "../core/sandbox-runtime-adapter.js";
 import { stopSandbox } from "../shared/stop-sandbox.js";
 import { determineDisconnectReconciliationAction } from "./disconnect-reconciliation-policy.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
@@ -329,7 +330,7 @@ export async function reconcileSandboxInstance(
     db: DataPlaneDatabase;
     tables: DataPlaneTables;
     controlPlaneInternalClient: ControlPlaneInternalClient;
-    sandboxAdapter: SandboxAdapter;
+    sandboxRuntimeProviderResolver: SandboxRuntimeProviderResolver;
     runtimeStateReader: SandboxRuntimeStateReader;
     clock: Clock;
   },
@@ -364,6 +365,9 @@ export async function reconcileSandboxInstance(
       outcome: "already_terminal",
     };
   }
+  const sandboxRuntime = await ctx.sandboxRuntimeProviderResolver.resolve({
+    provider: sandboxInstance.runtimeProvider,
+  });
 
   if (
     !(await isDisconnectReconciliationStillPermitted({
@@ -380,7 +384,7 @@ export async function reconcileSandboxInstance(
   }
 
   const providerState = await inspectProviderStateOrMissing({
-    sandboxAdapter: ctx.sandboxAdapter,
+    sandboxAdapter: sandboxRuntime.sandboxAdapter,
     providerSandboxId: sandboxInstance.providerSandboxId,
   });
   const action = determineDisconnectReconciliationAction({
@@ -477,7 +481,7 @@ export async function reconcileSandboxInstance(
       return stopProviderSandboxOrMarkMissing({
         config: ctx.config,
         controlPlaneInternalClient: ctx.controlPlaneInternalClient,
-        sandboxAdapter: ctx.sandboxAdapter,
+        sandboxAdapter: sandboxRuntime.sandboxAdapter,
         db: ctx.db,
         tables: ctx.tables,
         runtimeStateReader: ctx.runtimeStateReader,

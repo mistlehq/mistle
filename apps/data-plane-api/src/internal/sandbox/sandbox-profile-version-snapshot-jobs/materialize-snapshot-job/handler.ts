@@ -7,11 +7,13 @@ import { route } from "./route.js";
 
 const routeHandler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
   const openWorkflow = ctx.get("resources").openWorkflow;
+  const sandboxProvider = ctx.get("sandboxProvider");
   const body = ctx.req.valid("json");
 
   const response = await requestSandboxProfileVersionSnapshotMaterialization(
     {
       openWorkflow,
+      sandboxProvider,
     },
     body,
   );
