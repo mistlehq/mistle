@@ -21,7 +21,7 @@ import { type MainPanelTransitionState } from "./session-main-panel-handoff-stat
 import {
   resolveInitialSelectedRepositoryPath,
   resolvePrimaryRepositoryTurnStartCwd,
-  resolveSessionWorkbenchCwd,
+  resolveSessionTerminalCwd,
 } from "./session-primary-repository-policy.js";
 import type { SessionStartupState } from "./session-startup-status.js";
 import {
@@ -219,7 +219,7 @@ export function useSessionWorkbenchController(input: {
   });
   const selectedRepositoryPath = primaryRepositoryState.selectedRepositoryPath;
   selectedRepositoryPathRef.current = selectedRepositoryPath;
-  const terminalCwd = resolveSessionWorkbenchCwd({
+  const terminalCwd = resolveSessionTerminalCwd({
     activeThreadCwd,
     selectedRepositoryPath,
   });

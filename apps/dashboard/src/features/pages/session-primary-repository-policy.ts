@@ -130,7 +130,7 @@ export function resolvePrimaryRepositoryTurnStartCwd(
   return selectedRepositoryPath ?? DefaultSandboxWorkspaceDir;
 }
 
-export function resolveSessionWorkbenchCwd(input: {
+export function resolveSessionTerminalCwd(input: {
   activeThreadCwd: string | null | undefined;
   selectedRepositoryPath: string | null;
 }): string {
