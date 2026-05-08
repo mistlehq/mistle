@@ -1,6 +1,8 @@
 import {
   IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
   type AnyIntegrationDefinition,
+  type IntegrationWebhookTriggerCapabilities,
+  type IntegrationWebhookTriggerProviderPermissionRequirement,
 } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 
@@ -54,6 +56,77 @@ function getDefinitionOrThrow(input: {
   }
 
   return definition;
+}
+
+function createPermissionKey(
+  input: IntegrationWebhookTriggerProviderPermissionRequirement,
+): string {
+  return `${input.permission}:${input.access ?? ""}`;
+}
+
+function collectSupportedWebhookCapabilityEvents(
+  definition: AnyIntegrationDefinition,
+): ReadonlySet<string> {
+  const events = new Set<string>();
+
+  for (const eventDefinition of definition.supportedWebhookEvents ?? []) {
+    events.add(eventDefinition.providerEventType);
+
+    for (const requirementSet of eventDefinition.requirements?.anyOf ?? []) {
+      if (requirementSet.event !== undefined) {
+        events.add(requirementSet.event);
+      }
+    }
+  }
+
+  return events;
+}
+
+function collectSupportedWebhookCapabilityPermissionKeys(
+  definition: AnyIntegrationDefinition,
+): ReadonlySet<string> {
+  const permissionKeys = new Set<string>();
+
+  for (const eventDefinition of definition.supportedWebhookEvents ?? []) {
+    for (const requirementSet of eventDefinition.requirements?.anyOf ?? []) {
+      for (const permission of requirementSet.permissions ?? []) {
+        permissionKeys.add(createPermissionKey(permission));
+      }
+    }
+  }
+
+  return permissionKeys;
+}
+
+export function createStoryWebhookTriggerCapabilitiesProviderMetadata(input: {
+  definition: AnyIntegrationDefinition;
+  events?: readonly string[];
+  permissions?: readonly IntegrationWebhookTriggerProviderPermissionRequirement[];
+}): Record<string, IntegrationWebhookTriggerCapabilities> {
+  const supportedEvents = collectSupportedWebhookCapabilityEvents(input.definition);
+  for (const event of input.events ?? []) {
+    if (!supportedEvents.has(event)) {
+      throw new Error(
+        `Story webhook capability event '${event}' is not referenced by '${input.definition.familyId}/${input.definition.variantId}' supported webhook events.`,
+      );
+    }
+  }
+
+  const supportedPermissionKeys = collectSupportedWebhookCapabilityPermissionKeys(input.definition);
+  for (const permission of input.permissions ?? []) {
+    if (!supportedPermissionKeys.has(createPermissionKey(permission))) {
+      throw new Error(
+        `Story webhook capability permission '${permission.permission}' is not referenced by '${input.definition.familyId}/${input.definition.variantId}' supported webhook events.`,
+      );
+    }
+  }
+
+  return {
+    [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+      ...(input.events === undefined ? {} : { events: [...input.events] }),
+      ...(input.permissions === undefined ? {} : { permissions: [...input.permissions] }),
+    },
+  };
 }
 
 function resolveAuthMethodOrThrow(input: StoryAuthMethodSpec): StoryResolvedAuthMethod {
@@ -548,16 +621,15 @@ export function createGitHubAppDetailViewStoryProps(): IntegrationConnectionDeta
               endpointKey: "github-cloud",
               id: "iws_01densegithubsource",
               integrationConnectionId: connectionId,
-              providerMetadata: {
-                [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-                  events: ["issues", "pull_request", "check_suite"],
-                  permissions: [
-                    { permission: "issues", access: "read" },
-                    { permission: "pull_requests", access: "read" },
-                    { permission: "checks", access: "read" },
-                  ],
-                },
-              },
+              providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+                definition,
+                events: ["issues", "pull_request", "check_suite"],
+                permissions: [
+                  { permission: "issues", access: "read" },
+                  { permission: "pull_requests", access: "read" },
+                  { permission: "checks", access: "read" },
+                ],
+              }),
               status: "active",
               targetKey: "github-cloud",
               updatedAt: "2026-04-13T15:37:00.000Z",
@@ -876,15 +948,17 @@ export function createGitHubEnterpriseServerDetailViewStoryProps(): IntegrationC
         endpointKey: "github-enterprise-server",
         id: "iws_ghes_123",
         integrationConnectionId: "icn_github_ghes_dense",
-        providerMetadata: {
-          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-            events: ["issues", "pull_request"],
-            permissions: [
-              { permission: "issues", access: "read" },
-              { permission: "pull_requests", access: "read" },
-            ],
-          },
-        },
+        providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+          definition: getDefinitionOrThrow({
+            familyId: "github",
+            variantId: "github-enterprise-server",
+          }),
+          events: ["issues", "pull_request"],
+          permissions: [
+            { permission: "issues", access: "read" },
+            { permission: "pull_requests", access: "read" },
+          ],
+        }),
         status: "active",
         targetKey: "github-enterprise-server",
         updatedAt: DenseStoryLastSyncedAt,
@@ -925,10 +999,14 @@ export function createJiraDetailViewStoryProps(): IntegrationConnectionDetailVie
             "comment_created",
             "comment_updated",
           ],
-          [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
+          ...createStoryWebhookTriggerCapabilitiesProviderMetadata({
+            definition: getDefinitionOrThrow({
+              familyId: "jira",
+              variantId: "jira-default",
+            }),
             events: ["jira:issue_created", "jira:issue_updated", "comment_created"],
             permissions: [{ permission: "read:jira-work" }, { permission: "manage:jira-webhook" }],
-          },
+          }),
         },
         remoteRegistrationId: "10001",
         status: "active",
@@ -1075,15 +1153,11 @@ export function createSlackDetailViewStoryProps(): IntegrationConnectionDetailVi
           endpointKey: connection.endpointKey,
           id: connection.webhookSourceId,
           integrationConnectionId: connection.connectionId,
-          providerMetadata: {
-            [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-              events: ["message.channels", "app_mention"],
-              permissions: [
-                { permission: "channels:history" },
-                { permission: "app_mentions:read" },
-              ],
-            },
-          },
+          providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+            definition,
+            events: ["message.channels", "app_mention"],
+            permissions: [{ permission: "channels:history" }, { permission: "app_mentions:read" }],
+          }),
           status: "active",
           targetKey: "slack-default",
           updatedAt: DenseStoryLastSyncedAt,

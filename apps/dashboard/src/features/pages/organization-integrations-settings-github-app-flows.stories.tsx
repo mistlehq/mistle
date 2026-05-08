@@ -1,7 +1,4 @@
-import {
-  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
-  type AnyIntegrationDefinition,
-} from "@mistle/integrations-core";
+import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,7 +15,10 @@ import { z } from "zod";
 import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
-import { createGitHubAppDetailViewStoryProps } from "../integrations/integration-story-harness.js";
+import {
+  createGitHubAppDetailViewStoryProps,
+  createStoryWebhookTriggerCapabilitiesProviderMetadata,
+} from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -150,16 +150,15 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     callbackUrl:
       "https://control-plane.example.com/p/integration/webhooks/github-cloud/eps_github_story",
     status: "active",
-    providerMetadata: {
-      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-        events: ["issues", "pull_request", "check_suite"],
-        permissions: [
-          { permission: "issues", access: "read" },
-          { permission: "pull_requests", access: "read" },
-          { permission: "checks", access: "read" },
-        ],
-      },
-    },
+    providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+      definition: GitHubDefinition,
+      events: ["issues", "pull_request", "check_suite"],
+      permissions: [
+        { permission: "issues", access: "read" },
+        { permission: "pull_requests", access: "read" },
+        { permission: "checks", access: "read" },
+      ],
+    }),
     createdAt: "2026-04-23T00:00:00.000Z",
     updatedAt: "2026-04-23T00:00:00.000Z",
   };

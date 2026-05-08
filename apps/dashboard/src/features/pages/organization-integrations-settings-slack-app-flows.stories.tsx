@@ -1,7 +1,4 @@
-import {
-  IntegrationWebhookTriggerCapabilitiesProviderMetadataKey,
-  type AnyIntegrationDefinition,
-} from "@mistle/integrations-core";
+import type { AnyIntegrationDefinition } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,7 +15,10 @@ import { z } from "zod";
 import { resetDashboardConfigForTest } from "../../config.js";
 import { withDashboardCenteredStory, withDashboardPageStory } from "../../storybook/decorators.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
-import { createSlackDetailViewStoryProps } from "../integrations/integration-story-harness.js";
+import {
+  createSlackDetailViewStoryProps,
+  createStoryWebhookTriggerCapabilitiesProviderMetadata,
+} from "../integrations/integration-story-harness.js";
 import type {
   IntegrationConnection,
   IntegrationTarget,
@@ -150,12 +150,11 @@ function createWebhookSourceFixture(): IntegrationWebhookSource {
     callbackUrl:
       "https://control-plane.example.com/p/integration/webhooks/slack-default/eps_slack_story",
     status: "active",
-    providerMetadata: {
-      [IntegrationWebhookTriggerCapabilitiesProviderMetadataKey]: {
-        events: ["message.channels", "app_mention"],
-        permissions: [{ permission: "channels:history" }, { permission: "app_mentions:read" }],
-      },
-    },
+    providerMetadata: createStoryWebhookTriggerCapabilitiesProviderMetadata({
+      definition: SlackDefinition,
+      events: ["message.channels", "app_mention"],
+      permissions: [{ permission: "channels:history" }, { permission: "app_mentions:read" }],
+    }),
     createdAt: "2026-04-26T00:00:00.000Z",
     updatedAt: "2026-04-26T00:00:00.000Z",
   };
