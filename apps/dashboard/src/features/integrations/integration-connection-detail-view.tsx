@@ -120,7 +120,7 @@ export type IntegrationConnectionDetailViewProps = {
         showWebhookSources: boolean;
       }
     | undefined;
-  webhookEventsSyncAction?: (input: { connectionId: string }) => ReactNode;
+  renderWebhookSourceActions?: (input: { connectionId: string }) => ReactNode;
   webhookSourceStateByConnectionId?: ReadonlyMap<string, IntegrationWebhookSourceSectionState>;
 };
 
@@ -332,9 +332,9 @@ export function IntegrationConnectionDetailView(
               ? {}
               : { resourceItemsByKey: props.resourceItemsByKey })}
             {...(props.webhookPolicy === undefined ? {} : { webhookPolicy: props.webhookPolicy })}
-            {...(props.webhookEventsSyncAction === undefined
+            {...(props.renderWebhookSourceActions === undefined
               ? {}
-              : { webhookEventsSyncAction: props.webhookEventsSyncAction })}
+              : { renderWebhookSourceActions: props.renderWebhookSourceActions })}
             {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
             {...(props.selectedConnectionBody === undefined
               ? {}
@@ -368,7 +368,7 @@ function ConnectionDetailPane(input: {
   selectedConnectionNotice?: ReactNode;
   supportedWebhookEvents?: readonly IntegrationWebhookEventDefinition[];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
-  webhookEventsSyncAction?: IntegrationConnectionDetailViewProps["webhookEventsSyncAction"];
+  renderWebhookSourceActions?: IntegrationConnectionDetailViewProps["renderWebhookSourceActions"];
   webhookPolicy?: IntegrationConnectionDetailViewProps["webhookPolicy"];
   webhookSourceState?: IntegrationWebhookSourceSectionState;
 }): React.JSX.Element {
@@ -386,7 +386,7 @@ function ConnectionDetailPane(input: {
           connectionId: input.connection.id,
           onCreateWebhookSource: input.onCreateWebhookSource,
           onDeleteWebhookSource: input.onDeleteWebhookSource,
-          syncAction: input.webhookEventsSyncAction,
+          renderWebhookSourceActions: input.renderWebhookSourceActions,
           uiState: viewState.webhookSectionUiState,
           webhookSourceState,
         });
@@ -702,11 +702,12 @@ function resolveWebhookSectionAction(input: {
   onDeleteWebhookSource:
     | ((input: { connectionId: string; webhookSourceId: string }) => void)
     | undefined;
-  syncAction: IntegrationConnectionDetailViewProps["webhookEventsSyncAction"];
+  renderWebhookSourceActions: IntegrationConnectionDetailViewProps["renderWebhookSourceActions"];
   uiState: WebhookSectionUiState;
   webhookSourceState: IntegrationWebhookSourceSectionState;
 }): ReactNode {
-  const syncAction = input.syncAction?.({ connectionId: input.connectionId }) ?? null;
+  const webhookSourceActions =
+    input.renderWebhookSourceActions?.({ connectionId: input.connectionId }) ?? null;
   const webhookManagementAction = resolveWebhookManagementAction({
     connectionId: input.connectionId,
     onCreateWebhookSource: input.onCreateWebhookSource,
@@ -715,17 +716,17 @@ function resolveWebhookSectionAction(input: {
     webhookSourceState: input.webhookSourceState,
   });
 
-  if (syncAction === null) {
+  if (webhookSourceActions === null) {
     return webhookManagementAction;
   }
 
   if (webhookManagementAction === null) {
-    return syncAction;
+    return webhookSourceActions;
   }
 
   return (
     <div className="flex flex-wrap justify-end gap-2">
-      {syncAction}
+      {webhookSourceActions}
       {webhookManagementAction}
     </div>
   );

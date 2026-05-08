@@ -28,7 +28,7 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { refreshIntegrationWebhookTriggerCapabilities } from "../integrations/integrations-service.js";
-import { useSlackWebhookEventsSyncFlow } from "../integrations/slack-webhook-events-sync-flow.js";
+import { useSlackWebhookSourceActions } from "../integrations/slack-webhook-source-actions.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
@@ -565,7 +565,7 @@ function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
       });
     },
   });
-  const slackWebhookEventsSyncFlow = useSlackWebhookEventsSyncFlow({
+  const slackWebhookSourceActions = useSlackWebhookSourceActions({
     connections: storyConnections,
     refreshTriggerCapabilities: (payload, options) => {
       refreshMutation.mutate(payload, {
@@ -596,10 +596,10 @@ function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
         <IntegrationConnectionDetailView
           {...storyProps}
           connections={storyProps.connections.slice(0, 1)}
-          webhookEventsSyncAction={slackWebhookEventsSyncFlow.webhookEventsSyncAction}
+          renderWebhookSourceActions={slackWebhookSourceActions.renderWebhookSourceActions}
           webhookSourceStateByConnectionId={webhookSourceStateByConnectionId}
         />
-        {slackWebhookEventsSyncFlow.dialog}
+        {slackWebhookSourceActions.dialog}
       </div>
     </StoryQueryClientProvider>
   );

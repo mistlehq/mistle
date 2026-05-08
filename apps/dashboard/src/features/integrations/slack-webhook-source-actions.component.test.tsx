@@ -6,11 +6,11 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
 import type { IntegrationConnection } from "./integrations-service.js";
-import { useSlackWebhookEventsSyncFlow } from "./slack-webhook-events-sync-flow.js";
+import { useSlackWebhookSourceActions } from "./slack-webhook-source-actions.js";
 
 function SlackWebhookEventsSyncFlowHarness(input: { connection: IntegrationConnection }) {
   const [syncedValue, setSyncedValue] = useState<string | null>(null);
-  const flow = useSlackWebhookEventsSyncFlow({
+  const flow = useSlackWebhookSourceActions({
     connections: [input.connection],
     refreshTriggerCapabilities: (payload, options) => {
       setSyncedValue(`${payload.connectionId}:${String(payload.body["appConfigToken"])}`);
@@ -22,7 +22,7 @@ function SlackWebhookEventsSyncFlowHarness(input: { connection: IntegrationConne
 
   return (
     <>
-      {flow.webhookEventsSyncAction({ connectionId: input.connection.id })}
+      {flow.renderWebhookSourceActions({ connectionId: input.connection.id })}
       {syncedValue === null ? null : <p>Synced {syncedValue}</p>}
       {flow.dialog}
     </>
@@ -53,7 +53,7 @@ function createConnection(input: {
   };
 }
 
-describe("useSlackWebhookEventsSyncFlow", () => {
+describe("useSlackWebhookSourceActions", () => {
   it("syncs Slack webhook events through the provider-specific dialog", () => {
     render(<SlackWebhookEventsSyncFlowHarness connection={createConnection({ appId: "A123" })} />);
 

@@ -2,22 +2,22 @@ import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browse
 import { Button } from "@mistle/ui";
 import { useCallback, useState, type ReactNode } from "react";
 
-import type { IntegrationWebhookEventsSyncFlowRefresh } from "./integration-webhook-events-sync-flow-types.js";
+import type { IntegrationWebhookSourceActionsRefreshTriggerCapabilities } from "./integration-webhook-source-actions-types.js";
 import type { IntegrationConnection } from "./integrations-service.js";
 import { SlackWebhookEventsSyncDialog } from "./slack-webhook-events-sync-dialog.js";
 
-export function useSlackWebhookEventsSyncFlow(input: {
+export function useSlackWebhookSourceActions(input: {
   connections: readonly IntegrationConnection[];
-  refreshTriggerCapabilities: IntegrationWebhookEventsSyncFlowRefresh;
+  refreshTriggerCapabilities: IntegrationWebhookSourceActionsRefreshTriggerCapabilities;
   refreshTriggerCapabilitiesError: { connectionId: string; message: string } | null;
   refreshingTriggerCapabilitiesConnectionId: string | null;
 }): {
   dialog: ReactNode;
-  webhookEventsSyncAction: (input: { connectionId: string }) => ReactNode;
+  renderWebhookSourceActions: (input: { connectionId: string }) => ReactNode;
 } {
   const [syncConnectionId, setSyncConnectionId] = useState<string | null>(null);
 
-  const webhookEventsSyncAction = useCallback(
+  const renderWebhookSourceActions = useCallback(
     (actionInput: { connectionId: string }): ReactNode => {
       const connection =
         input.connections.find((candidate) => candidate.id === actionInput.connectionId) ?? null;
@@ -75,7 +75,7 @@ export function useSlackWebhookEventsSyncFlow(input: {
         }}
       />
     ),
-    webhookEventsSyncAction,
+    renderWebhookSourceActions,
   };
 }
 

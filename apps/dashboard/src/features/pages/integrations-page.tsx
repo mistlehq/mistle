@@ -12,7 +12,7 @@ import {
   resolveInstalledIntegrationConnectionNotice,
   type IntegrationConnectionNotice,
 } from "../integrations/integration-connection-notices.js";
-import { useIntegrationWebhookEventsSyncFlow } from "../integrations/integration-webhook-events-sync-flow.js";
+import { useIntegrationWebhookSourceActions } from "../integrations/integration-webhook-source-actions.js";
 import {
   ManagedWebhookSetupResultSchema,
   type IntegrationConnectionMethod,
@@ -159,7 +159,7 @@ export function IntegrationsPage() {
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
   });
-  const webhookEventsSyncFlow = useIntegrationWebhookEventsSyncFlow({
+  const webhookSourceActions = useIntegrationWebhookSourceActions({
     connections: directoryState.selectedDetailConnections,
     refreshTriggerCapabilities: webhookSourceState.refreshTriggerCapabilities,
     refreshTriggerCapabilitiesError: webhookSourceState.refreshTriggerCapabilitiesError,
@@ -315,7 +315,7 @@ export function IntegrationsPage() {
             webhookSourceId,
           });
         }}
-        webhookEventsSyncAction={webhookEventsSyncFlow.webhookEventsSyncAction}
+        renderWebhookSourceActions={webhookSourceActions.renderWebhookSourceActions}
         webhookPolicy={selectedWebhookPolicy}
         titleEditor={connectionEditors.titleEditor}
       />
@@ -329,7 +329,7 @@ export function IntegrationsPage() {
         <>
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
           <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />
-          {webhookEventsSyncFlow.dialog}
+          {webhookSourceActions.dialog}
         </>
       }
       detailSurface={detailSurface}
