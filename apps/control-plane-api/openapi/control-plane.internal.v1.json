@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Mistle Control Plane Internal API",
-    "version": "0.5.1"
+    "version": "0.5.2"
   },
   "components": {
     "schemas": {
