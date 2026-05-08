@@ -31,10 +31,15 @@ type QueuedSteerRequest = {
   status: "queued" | "sending";
 };
 
+export type TurnCwdCommit = {
+  threadId: string;
+  cwd: string;
+};
+
 export function resolveTurnCwdCommit(input: {
   threadId: string;
   cwd?: string;
-}): { threadId: string; cwd: string } | null {
+}): TurnCwdCommit | null {
   if (input.cwd === undefined) {
     return null;
   }
@@ -87,7 +92,7 @@ function buildTurnRequest(input: {
 export function useCodexChatController(input: {
   rpcClientRef: RefObject<CodexJsonRpcClient | null>;
   threadIdRef: RefObject<string | null>;
-  onTurnCwdCommitted: (input: { threadId: string; cwd: string }) => void;
+  onTurnCwdCommitted: (input: TurnCwdCommit) => void;
   setSessionErrorMessage: (message: string | null) => void;
 }) {
   const [chatState, dispatchChatAction] = useReducer(

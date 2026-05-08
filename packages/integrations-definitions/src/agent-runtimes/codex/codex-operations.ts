@@ -21,7 +21,7 @@ const ThreadResponseSchema = z.looseObject({
   }),
 });
 
-const ThreadStartResponseSchema = ThreadResponseSchema.extend({
+const ThreadSessionResponseSchema = ThreadResponseSchema.extend({
   cwd: z.string().min(1),
 });
 
@@ -196,7 +196,7 @@ export function parseCodexThreadSessionResponse(input: {
   method: "thread/start" | "thread/resume" | "thread/fork";
   response: unknown;
 }): { threadId: string; cwd: string } {
-  const parsedResponse = ThreadStartResponseSchema.safeParse(input.response);
+  const parsedResponse = ThreadSessionResponseSchema.safeParse(input.response);
   if (!parsedResponse.success) {
     throw new Error(
       `${input.method} response payload is invalid. Payload: ${JSON.stringify(input.response)}`,

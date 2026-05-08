@@ -73,16 +73,21 @@ export type CodexSessionConnectionLifecycleState = {
   reportLifecycleErrorMessage: (message: string) => void;
 };
 
-export type CodexSessionConnectionStateResult = {
-  lifecycle: CodexSessionConnectionLifecycleState;
-  updateActiveThread: (input: { threadId: string | null; cwd?: string }) => void;
-};
-
-export function updateConnectedCodexSessionActiveThread(input: {
-  currentSession: ConnectedCodexSession;
+export type ActiveCodexThreadUpdate = {
   threadId: string | null;
   cwd?: string;
-}): ConnectedCodexSession {
+};
+
+export type CodexSessionConnectionStateResult = {
+  lifecycle: CodexSessionConnectionLifecycleState;
+  updateActiveThread: (input: ActiveCodexThreadUpdate) => void;
+};
+
+export function updateConnectedCodexSessionActiveThread(
+  input: {
+    currentSession: ConnectedCodexSession;
+  } & ActiveCodexThreadUpdate,
+): ConnectedCodexSession {
   if (input.threadId === null) {
     return {
       ...input.currentSession,
@@ -143,7 +148,7 @@ export function useCodexSessionConnection(input: {
   const reconnectTargetThreadIdRef = useRef<string | null>(null);
 
   const updateActiveThread = useCallback(
-    (activeThreadInput: { threadId: string | null; cwd?: string }): void => {
+    (activeThreadInput: ActiveCodexThreadUpdate): void => {
       const threadId = activeThreadInput.threadId;
       input.threadIdRef.current = threadId;
       reconnectTargetThreadIdRef.current = threadId;
