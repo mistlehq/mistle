@@ -882,6 +882,9 @@ async fn initialize_session(
                     "name": CODEX_INITIALIZE_CLIENT_NAME,
                     "title": INITIALIZE_CLIENT_TITLE,
                     "version": INITIALIZE_CLIENT_VERSION
+                },
+                "capabilities": {
+                    "experimentalApi": true
                 }
             }
         }),

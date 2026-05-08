@@ -280,7 +280,7 @@ fn decodes_typed_artifact_install_steps() {
                 "release": {
                   "kind": "tag",
                   "match": "exact",
-                  "tag": "rust-v0.128.0"
+                  "tag": "rust-v0.129.0"
                 },
                 "asset": {
                   "kind": "by_arch",

@@ -1460,6 +1460,10 @@ where
         initialize_request["params"]["clientInfo"]["name"],
         Value::String(CODEX_INITIALIZE_CLIENT_NAME.to_string())
     );
+    assert_eq!(
+        initialize_request["params"]["capabilities"]["experimentalApi"],
+        Value::Bool(true)
+    );
     manager_socket
         .send(Message::Text(
             json!({
