@@ -525,7 +525,7 @@ function DeleteProfileDialogHarness(input: {
 
 function DraftActionsHarness(input: {
   hasUnpersistedIntegrationChanges?: boolean;
-  versionActionError?: string | null;
+  draftSaveError?: string | null;
 }): JSX.Element {
   const [discarded, setDiscarded] = useState(false);
 
@@ -537,6 +537,7 @@ function DraftActionsHarness(input: {
       deleteProfileAutomationUsagesIsPending={false}
       deleteProfileError={null}
       deleteProfileIsPending={false}
+      draftSaveError={input.draftSaveError ?? null}
       hasUnpersistedIntegrationChanges={input.hasUnpersistedIntegrationChanges ?? false}
       isDeleteProfileDialogOpen={false}
       mode={{
@@ -566,7 +567,7 @@ function DraftActionsHarness(input: {
           label: "Sandbox Profile",
         },
       ]}
-      versionActionError={input.versionActionError ?? null}
+      versionActionError={null}
       versionActionIsPending={false}
     />
   );
@@ -591,7 +592,7 @@ function renderDeleteProfileDialogHarness(input: {
 
 function renderDraftActionsHarness(input?: {
   hasUnpersistedIntegrationChanges?: boolean;
-  versionActionError?: string | null;
+  draftSaveError?: string | null;
 }): void {
   const router = createMemoryRouter(
     createRoutesFromElements(<Route element={<DraftActionsHarness {...input} />} path="/" />),
@@ -1967,13 +1968,13 @@ describe("SandboxProfileEditorPage", () => {
     );
   });
 
-  it("surfaces draft save failures before publishing as a page-level action error", () => {
+  it("surfaces draft save failures inside the sandbox profile tab", () => {
     renderDraftActionsHarness({
-      versionActionError: "Could not save draft changes before publishing.",
+      draftSaveError: "Saving draft failed. Please try again later.",
     });
 
-    expect(screen.getByText("Profile version action failed")).toBeDefined();
-    expect(screen.getByText("Could not save draft changes before publishing.")).toBeDefined();
+    expect(screen.queryByText("Profile version action failed")).toBeNull();
+    expect(screen.getByText("Saving draft failed. Please try again later.")).toBeDefined();
   });
 
   it("shows draft actions for draft profiles with a published version", () => {

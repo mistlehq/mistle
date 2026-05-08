@@ -36,6 +36,6 @@ set -euo pipefail
 pnpm install
 pnpm dev:bootstrap
 pnpm lint`,
-    versionActionErrorMessage: "Could not save draft changes. Check your changes and try again.",
+    draftSaveErrorMessage: "Saving draft failed. Please try again later.",
   },
 };

@@ -105,7 +105,7 @@ export type SandboxProfileEditorPageStoryArgs = {
     directoryErrorMessage?: string;
     kind: "error";
   };
-  versionActionErrorMessage?: string;
+  draftSaveErrorMessage?: string;
   initialBindings?: readonly {
     id: string;
     connectionId: string;
@@ -636,7 +636,8 @@ function SandboxProfileEditorPageStoryView(
       onViewDraft={() => {}}
       profileName={profileName}
       profileNameFallback={profileName}
-      versionActionError={input.versionActionErrorMessage ?? null}
+      draftSaveError={input.draftSaveErrorMessage ?? null}
+      versionActionError={null}
       versionActionIsPending={false}
       renderSectionPanel={(sectionId) => {
         if (sectionId === "sandbox-profile") {

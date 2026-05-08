@@ -1406,7 +1406,8 @@ function ReadySandboxProfileEditorPage(input: {
       profileNameFallback={metaState.pageTitle}
       publishRequestIsPending={publishRequestIsPending}
       saveDraftRequestIsPending={saveDraftRequestIsPending}
-      versionActionError={publishFlushError ?? input.versionActionError}
+      draftSaveError={publishFlushError}
+      versionActionError={input.versionActionError}
       versionActionIsPending={input.versionActionIsPending}
       isDeleteProfileDialogOpen={input.isDeleteProfileDialogOpen}
       renderSectionPanel={(sectionId) => (
@@ -1972,7 +1973,7 @@ function createSandboxProfileEditorSections(input: {
   );
 }
 
-const DraftSaveErrorMessage = "Could not save draft changes. Check your changes and try again.";
+const DraftSaveErrorMessage = "Saving draft failed. Please try again later.";
 
 function DeleteSandboxProfileDialog(input: {
   automationUsages: readonly WebhookAutomationSandboxProfileUsage[];
@@ -2063,6 +2064,7 @@ export function SandboxProfileEditorView(input: {
   deleteProfileAutomationUsagesIsPending: boolean;
   deleteProfileError: string | null;
   deleteProfileIsPending: boolean;
+  draftSaveError?: string | null;
   versionActionError: string | null;
   versionActionIsPending: boolean;
   publishRequestIsPending?: boolean;
@@ -2177,6 +2179,9 @@ export function SandboxProfileEditorView(input: {
                   saveDraftRequestIsPending={input.saveDraftRequestIsPending === true}
                   versionActionIsPending={input.versionActionIsPending}
                 />
+                {input.draftSaveError === undefined || input.draftSaveError === null ? null : (
+                  <Notice variant="alert">{input.draftSaveError}</Notice>
+                )}
                 {input.renderSectionPanel(sectionId)}
               </SandboxProfileEditorHorizontalTabContent>
             ) : (
