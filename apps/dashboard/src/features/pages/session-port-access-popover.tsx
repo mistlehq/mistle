@@ -134,7 +134,7 @@ export function SessionPortAccessPopover(input: {
           <CpuIcon className="size-4" />
           <span className="truncate">Processes</span>
         </SheetTrigger>
-        <SheetContent className="max-h-[85dvh] gap-0 p-0" side="bottom">
+        <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
           <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
             <SheetTitle>Processes</SheetTitle>
             <SheetDescription>
@@ -188,7 +188,7 @@ export function SessionPortAccessSheet(input: {
 
   return (
     <Sheet onOpenChange={input.state.setPanelOpen} open={input.state.isPanelOpen}>
-      <SheetContent className="max-h-[85dvh] gap-0 p-0" side="bottom">
+      <SheetContent className="!h-[100dvh] max-h-[100dvh] gap-0 p-0" side="bottom">
         <SheetHeader className="shrink-0 border-b border-stone-200 px-4 py-3 pr-12 text-left">
           <SheetTitle>Processes</SheetTitle>
           <SheetDescription>Select a process to open its HTTP port in a new tab.</SheetDescription>
