@@ -1,4 +1,13 @@
-import { Button } from "@mistle/ui";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@mistle/ui";
+
+const DisabledPaginationLinkClassName =
+  "aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 export function TablePagination(input: {
   hasPreviousPage: boolean;
@@ -13,24 +22,49 @@ export function TablePagination(input: {
     return null;
   }
 
+  const isPreviousDisabled = !input.hasPreviousPage || input.previousPageDisabled === true;
+  const isNextDisabled = !input.hasNextPage || input.nextPageDisabled === true;
+
+  function handlePreviousPageClick(event: React.MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    if (isPreviousDisabled) {
+      return;
+    }
+
+    input.onPreviousPage();
+  }
+
+  function handleNextPageClick(event: React.MouseEvent<HTMLAnchorElement>): void {
+    event.preventDefault();
+    if (isNextDisabled) {
+      return;
+    }
+
+    input.onNextPage();
+  }
+
   return (
-    <div className="flex items-center justify-end gap-2">
-      <Button
-        disabled={!input.hasPreviousPage || input.previousPageDisabled === true}
-        onClick={input.onPreviousPage}
-        type="button"
-        variant="outline"
-      >
-        Previous
-      </Button>
-      <Button
-        disabled={!input.hasNextPage || input.nextPageDisabled === true}
-        onClick={input.onNextPage}
-        type="button"
-        variant="outline"
-      >
-        Next
-      </Button>
-    </div>
+    <Pagination className="mx-0 w-auto justify-end">
+      <PaginationContent>
+        <PaginationItem>
+          <PaginationPrevious
+            aria-disabled={isPreviousDisabled}
+            className={DisabledPaginationLinkClassName}
+            href="#"
+            onClick={handlePreviousPageClick}
+            tabIndex={isPreviousDisabled ? -1 : undefined}
+          />
+        </PaginationItem>
+        <PaginationItem>
+          <PaginationNext
+            aria-disabled={isNextDisabled}
+            className={DisabledPaginationLinkClassName}
+            href="#"
+            onClick={handleNextPageClick}
+            tabIndex={isNextDisabled ? -1 : undefined}
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
   );
 }

@@ -80,8 +80,12 @@ describe("OrganizationMembersSettingsPageView", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")).toBe(true);
-    expect(screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Go to previous page" }).getAttribute("aria-disabled"),
+    ).toBe("true");
+    expect(
+      screen.getByRole("button", { name: "Go to next page" }).getAttribute("aria-disabled"),
+    ).toBe("true");
   });
 
   it("shows a non-blocking notice when a refetch fails after data has loaded", () => {

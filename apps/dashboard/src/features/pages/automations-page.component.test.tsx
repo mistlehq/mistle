@@ -131,8 +131,7 @@ describe("AutomationsPage", () => {
     );
 
     expect(screen.getByRole("button", { name: "Single automation" })).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
   it("renders event and schedule automations from the unified list", () => {

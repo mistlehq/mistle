@@ -205,8 +205,7 @@ describe("SessionsPage", () => {
 
     expect(screen.getByText("Single session")).toBeDefined();
     expect(screen.getByText("Profile metadata")).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Previous" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next" })).toBeNull();
+    expect(screen.queryByLabelText("pagination")).toBeNull();
   });
 
   it("truncates long session titles in the list so the full value can be shown in a tooltip", () => {
