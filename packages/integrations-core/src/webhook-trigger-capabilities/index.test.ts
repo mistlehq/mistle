@@ -130,7 +130,7 @@ describe("webhook trigger capabilities", () => {
     });
   });
 
-  it("returns every supported event with enabled status from current capabilities", () => {
+  it("returns every supported event with status from current capabilities", () => {
     const events = resolveWebhookTriggerCapabilityEvents({
       capabilities: {
         events: ["pull_request"],

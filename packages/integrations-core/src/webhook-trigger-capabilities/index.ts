@@ -154,7 +154,7 @@ export function hasWebhookTriggerPermissionCapability(input: {
 
 function isRequirementSetSatisfied(input: {
   capabilities: IntegrationWebhookTriggerCapabilities;
-  requirementSet: IntegrationWebhookTriggerRequirements["anyOf"][number];
+  requirementSet: IntegrationWebhookTriggerRequirementSet;
 }): boolean {
   if (
     input.requirementSet.event !== undefined &&
