@@ -1,3 +1,4 @@
+import { installResponsiveBreakpointTestVariables } from "@mistle/ui/test-support/responsive-breakpoints.js";
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
 
@@ -68,9 +69,7 @@ Object.assign(import.meta.env, {
 });
 
 if (typeof document !== "undefined" && typeof window !== "undefined") {
-  document.documentElement.style.setProperty("--breakpoint-sm", "40rem");
-  document.documentElement.style.setProperty("--breakpoint-md", "48rem");
-  document.documentElement.style.fontSize = "16px";
+  installResponsiveBreakpointTestVariables({ document });
 
   Object.defineProperty(window, "matchMedia", {
     configurable: true,

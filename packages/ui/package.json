@@ -8,6 +8,12 @@
       "default": "./src/index.ts"
     },
     "./styles.css": "./src/styles.css",
+    "./test-support/responsive-breakpoints.js": {
+      "types": "./src/test-support/responsive-breakpoints.ts",
+      "node": "./src/test-support/responsive-breakpoints.ts",
+      "import": "./src/test-support/responsive-breakpoints.ts",
+      "default": "./src/test-support/responsive-breakpoints.ts"
+    },
     "./*.js": {
       "types": "./src/*",
       "node": "./dist/*.js",
