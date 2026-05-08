@@ -1,6 +1,6 @@
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { SlackConnectionMethodId } from "@mistle/integrations-definitions/browser";
-import { Button, Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
+import { Notice, NoticeAutoHideDurationsMs } from "@mistle/ui";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -17,7 +17,7 @@ import {
   type ManagedWebhookSetupResult,
 } from "../integrations/integrations-service-shared.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
-import { SlackWebhookEventsSyncDialog } from "../integrations/slack-webhook-events-sync-dialog.js";
+import { useSlackWebhookEventsSyncFlow } from "../integrations/slack-webhook-events-sync-flow.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
 import { renderIntegrationConnectionSetupPane } from "./integration-connection-setup-pane-registry.js";
 import {
@@ -119,14 +119,6 @@ function resolveUrlConnectionNotice(input: {
   return null;
 }
 
-function supportsSlackWebhookEventsSync(connection: IntegrationConnection | null): boolean {
-  return (
-    connection?.connectionMethodId === SlackConnectionMethodId &&
-    typeof connection.config?.["app_id"] === "string" &&
-    connection.config["app_id"].trim().length > 0
-  );
-}
-
 function resolveRouteStateConnectionNotice(input: {
   connectionMethods: readonly IntegrationConnectionMethod[] | undefined;
   detailConnectionId: string | null;
@@ -196,9 +188,6 @@ export function IntegrationsPage() {
   const params = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [urlConnectionNotice, setUrlConnectionNotice] = useState<ConnectionNotice | null>(null);
-  const [webhookEventsSyncConnectionId, setWebhookEventsSyncConnectionId] = useState<string | null>(
-    null,
-  );
   useRequiredOrganizationId();
   const detailTargetKey = params["targetKey"] ?? null;
   const detailConnectionId = searchParams.get("connectionId");
@@ -214,6 +203,13 @@ export function IntegrationsPage() {
   });
   const webhookSourceState = useIntegrationWebhookSourceState({
     detailConnections: directoryState.selectedDetailConnections,
+  });
+  const slackWebhookEventsSyncFlow = useSlackWebhookEventsSyncFlow({
+    connections: directoryState.selectedDetailConnections,
+    refreshTriggerCapabilities: webhookSourceState.refreshTriggerCapabilities,
+    refreshTriggerCapabilitiesError: webhookSourceState.refreshTriggerCapabilitiesError,
+    refreshingTriggerCapabilitiesConnectionId:
+      webhookSourceState.refreshingTriggerCapabilitiesConnectionId,
   });
   const githubAppInstallationStateByConnectionId = buildGitHubAppInstallationStateByConnectionId({
     connections: directoryState.selectedDetailConnections,
@@ -364,28 +360,7 @@ export function IntegrationsPage() {
             webhookSourceId,
           });
         }}
-        webhookEventsSyncAction={({ connectionId }) => {
-          const connection =
-            directoryState.selectedDetailConnections.find(
-              (candidate) => candidate.id === connectionId,
-            ) ?? null;
-          if (!supportsSlackWebhookEventsSync(connection)) {
-            return null;
-          }
-
-          return (
-            <Button
-              onClick={() => {
-                setWebhookEventsSyncConnectionId(connectionId);
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Sync webhook events
-            </Button>
-          );
-        }}
+        webhookEventsSyncAction={slackWebhookEventsSyncFlow.webhookEventsSyncAction}
         webhookPolicy={selectedWebhookPolicy}
         titleEditor={connectionEditors.titleEditor}
       />
@@ -399,41 +374,7 @@ export function IntegrationsPage() {
         <>
           <IntegrationConnectionApiKeyDialog {...connectionEditors.apiKeyDialog} />
           <DeleteIntegrationConnectionDialog {...connectionEditors.deleteDialog} />
-          <SlackWebhookEventsSyncDialog
-            errorMessage={
-              webhookSourceState.refreshTriggerCapabilitiesError?.connectionId ===
-              webhookEventsSyncConnectionId
-                ? webhookSourceState.refreshTriggerCapabilitiesError.message
-                : null
-            }
-            isOpen={webhookEventsSyncConnectionId !== null}
-            isPending={
-              webhookSourceState.refreshingTriggerCapabilitiesConnectionId ===
-              webhookEventsSyncConnectionId
-            }
-            onOpenChange={(open) => {
-              if (!open) {
-                setWebhookEventsSyncConnectionId(null);
-              }
-            }}
-            onSync={(appConfigToken) => {
-              if (webhookEventsSyncConnectionId === null) {
-                throw new Error("Slack webhook events sync requires an integration connection.");
-              }
-
-              webhookSourceState.refreshTriggerCapabilities(
-                {
-                  appConfigToken,
-                  connectionId: webhookEventsSyncConnectionId,
-                },
-                {
-                  onSuccess: () => {
-                    setWebhookEventsSyncConnectionId(null);
-                  },
-                },
-              );
-            }}
-          />
+          {slackWebhookEventsSyncFlow.dialog}
         </>
       }
       detailSurface={detailSurface}

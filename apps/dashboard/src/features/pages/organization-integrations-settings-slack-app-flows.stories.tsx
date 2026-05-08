@@ -3,14 +3,8 @@ import {
   type AnyIntegrationDefinition,
 } from "@mistle/integrations-core";
 import { createBrowserIntegrationRegistry } from "@mistle/integrations-definitions/browser";
-import { Button } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
   createMemoryRouter,
@@ -34,7 +28,7 @@ import type {
   IntegrationWebhookSource,
 } from "../integrations/integrations-service.js";
 import { refreshIntegrationWebhookTriggerCapabilities } from "../integrations/integrations-service.js";
-import { SlackWebhookEventsSyncDialog } from "../integrations/slack-webhook-events-sync-dialog.js";
+import { useSlackWebhookEventsSyncFlow } from "../integrations/slack-webhook-events-sync-flow.js";
 import { ROUTE_HANDLES } from "../navigation/route-handles.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { IntegrationConnectionCreatePage } from "./integration-connection-create-page.js";
@@ -506,48 +500,6 @@ export function SlackAppSetupPageStory(input: {
   );
 }
 
-function SlackConnectedWebhookVerifiedRefreshStoryContent(input: {
-  connectionId: string;
-  isOpen: boolean;
-  onRefreshed?: (source: IntegrationWebhookSource) => void;
-  onOpenChange: (open: boolean) => void;
-}): React.JSX.Element {
-  const queryClient = useQueryClient();
-  const refreshMutation = useMutation({
-    mutationFn: (appConfigToken: string) =>
-      refreshIntegrationWebhookTriggerCapabilities({
-        appConfigToken,
-        connectionId: input.connectionId,
-      }),
-    onSuccess: (source) => {
-      input.onRefreshed?.(source);
-      queryClient.setQueryData(["integration-webhook-sources", input.connectionId], [source]);
-      void queryClient.invalidateQueries({
-        queryKey: ["integration-webhook-sources", input.connectionId],
-      });
-      input.onOpenChange(false);
-    },
-  });
-
-  return (
-    <SlackWebhookEventsSyncDialog
-      errorMessage={
-        refreshMutation.isError
-          ? refreshMutation.error instanceof Error
-            ? refreshMutation.error.message
-            : "Could not sync webhook events."
-          : null
-      }
-      isOpen={input.isOpen}
-      isPending={refreshMutation.isPending}
-      onOpenChange={input.onOpenChange}
-      onSync={(appConfigToken) => {
-        refreshMutation.mutate(appConfigToken);
-      }}
-    />
-  );
-}
-
 function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
   configureDashboardRuntimeForStory();
   const storyProps = createSlackDetailViewStoryProps();
@@ -567,33 +519,76 @@ function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
   const [webhookSources, setWebhookSources] = useState<readonly IntegrationWebhookSource[]>(
     () => initialWebhookSources,
   );
-  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
   const webhookSourceStateByConnectionId = new Map(storyProps.webhookSourceStateByConnectionId);
   webhookSourceStateByConnectionId.set(selectedConnection.id, {
     ...initialWebhookSourceState,
     items: webhookSources,
   });
+  const storyConnections = storyProps.connections.map((connection) => ({
+    id: connection.id,
+    targetKey: "slack-default",
+    displayName: connection.displayName,
+    status: "active",
+    connectionMethodId: "slack-bot-token",
+    connectionMethodLabel: "Slack app",
+    config: {
+      connection_method: "slack-bot-token",
+      client_id: "3555487893074.10993991013813",
+      app_id: "A0123456789",
+    },
+    configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
+    supportsWebhookSources: true,
+    createdAt: "2026-04-26T00:00:00.000Z",
+    updatedAt: "2026-04-26T00:00:00.000Z",
+  })) satisfies readonly IntegrationConnection[];
   const [queryClient] = useState(() =>
     createStoryQueryClient({
-      connections: storyProps.connections.map((connection) => ({
-        id: connection.id,
-        targetKey: "slack-default",
-        displayName: connection.displayName,
-        status: "active",
-        connectionMethodId: "slack-bot-token",
-        connectionMethodLabel: "Slack app",
-        config: {
-          connection_method: "slack-bot-token",
-          client_id: "3555487893074.10993991013813",
-          app_id: "A0123456789",
-        },
-        configuredSecretNames: ["botToken", "clientSecret", "signingSecret"],
-        createdAt: "2026-04-26T00:00:00.000Z",
-        updatedAt: "2026-04-26T00:00:00.000Z",
-      })),
+      connections: storyConnections,
       webhookSources,
     }),
   );
+  const refreshMutation = useMutation({
+    mutationFn: (payload: { appConfigToken: string; connectionId: string }) =>
+      refreshIntegrationWebhookTriggerCapabilities(payload),
+    onSuccess: (source) => {
+      setWebhookSources((currentSources) =>
+        currentSources.map((currentSource) =>
+          currentSource.id === source.id ? source : currentSource,
+        ),
+      );
+      queryClient.setQueryData(
+        ["integration-webhook-sources", source.integrationConnectionId],
+        [source],
+      );
+      void queryClient.invalidateQueries({
+        queryKey: ["integration-webhook-sources", source.integrationConnectionId],
+      });
+    },
+  });
+  const slackWebhookEventsSyncFlow = useSlackWebhookEventsSyncFlow({
+    connections: storyConnections,
+    refreshTriggerCapabilities: (payload, options) => {
+      refreshMutation.mutate(payload, {
+        onSuccess: () => {
+          options?.onSuccess?.();
+        },
+      });
+    },
+    refreshTriggerCapabilitiesError:
+      refreshMutation.isError && refreshMutation.variables !== undefined
+        ? {
+            connectionId: refreshMutation.variables.connectionId,
+            message:
+              refreshMutation.error instanceof Error
+                ? refreshMutation.error.message
+                : "Could not sync webhook events.",
+          }
+        : null,
+    refreshingTriggerCapabilitiesConnectionId:
+      refreshMutation.isPending && refreshMutation.variables !== undefined
+        ? refreshMutation.variables.connectionId
+        : null,
+  });
 
   return (
     <StoryQueryClientProvider queryClient={queryClient}>
@@ -601,30 +596,10 @@ function SlackConnectedWebhookVerifiedRefreshStory(): React.JSX.Element {
         <IntegrationConnectionDetailView
           {...storyProps}
           connections={storyProps.connections.slice(0, 1)}
-          webhookEventsSyncAction={() => (
-            <Button
-              onClick={() => setIsSyncDialogOpen(true)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Sync webhook events
-            </Button>
-          )}
+          webhookEventsSyncAction={slackWebhookEventsSyncFlow.webhookEventsSyncAction}
           webhookSourceStateByConnectionId={webhookSourceStateByConnectionId}
         />
-        <SlackConnectedWebhookVerifiedRefreshStoryContent
-          connectionId={selectedConnection.id}
-          isOpen={isSyncDialogOpen}
-          onRefreshed={(source) => {
-            setWebhookSources((currentSources) =>
-              currentSources.map((currentSource) =>
-                currentSource.id === source.id ? source : currentSource,
-              ),
-            );
-          }}
-          onOpenChange={setIsSyncDialogOpen}
-        />
+        {slackWebhookEventsSyncFlow.dialog}
       </div>
     </StoryQueryClientProvider>
   );
