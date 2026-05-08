@@ -227,25 +227,94 @@ impl SandboxdState {
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
         let runtime_env = merge_managed_runtime_environment(runtime_env, egress_proxy.as_ref())
             .map_err(SandboxdStateError::StartRuntimeProcesses)?;
+        let mut snapshot_tunnel_session = if startup_input.is_snapshot()
+            && gateway_egress_forwarder.is_some()
+        {
+            let keepalive_manager = Arc::new(Mutex::new(KeepaliveManager::default()));
+            let runtime_readiness_manager =
+                Arc::new(Mutex::new(RuntimeReadinessManager::default()));
+            record_operation_phase_started(&diagnostics_logger, "start_snapshot_tunnel_session");
+            let tunnel_session = TunnelSession::start_with_supervisor(
+                startup_input,
+                keepalive_manager,
+                runtime_readiness_manager,
+                None,
+                runtime_env.clone(),
+                clock.clone(),
+                sleeper.clone(),
+                supervisor_handle.clone(),
+            )
+            .map_err(|error| {
+                record_operation_phase_failure(
+                    &diagnostics_logger,
+                    "start_snapshot_tunnel_session",
+                    BTreeMap::from([(
+                        "error".to_string(),
+                        startup_diagnostics_string(error.to_string()),
+                    )]),
+                );
+                SandboxdStateError::StartTunnelSession(error.to_string())
+            })?;
+            if let Some(forwarder) = &gateway_egress_forwarder {
+                tunnel_session.attach_gateway_egress_forwarder(forwarder);
+            }
+            record_operation_phase_completed(&diagnostics_logger, "start_snapshot_tunnel_session");
+            Some(tunnel_session)
+        } else {
+            None
+        };
         if !uses_pre_materialized_snapshot {
             record_operation_phase_started(&diagnostics_logger, "run_setup_script");
-            run_setup_script(
+            match run_setup_script(
                 &runtime_plan,
                 &runtime_env,
                 clock.as_ref(),
                 sleeper.as_ref(),
-            )
-            .map_err(|error| {
-                record_setup_script_failure(&diagnostics_logger, &error);
-                SandboxdStateError::RunSetupScript(error.message)
-            })?;
-            record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
+            ) {
+                Ok(()) => {
+                    record_operation_phase_completed(&diagnostics_logger, "run_setup_script");
+                }
+                Err(error) => {
+                    record_setup_script_failure(&diagnostics_logger, &error);
+                    if startup_input.is_snapshot() {
+                        if let Some(tunnel_session) = snapshot_tunnel_session.take() {
+                            close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
+                        }
+                        if let Some(egress_proxy) = egress_proxy.take() {
+                            record_operation_phase_started(
+                                &diagnostics_logger,
+                                "stop_egress_proxy_after_setup_failure",
+                            );
+                            match egress_proxy.close() {
+                                Ok(()) => record_operation_phase_completed(
+                                    &diagnostics_logger,
+                                    "stop_egress_proxy_after_setup_failure",
+                                ),
+                                Err(close_error) => {
+                                    record_operation_phase_failure(
+                                        &diagnostics_logger,
+                                        "stop_egress_proxy_after_setup_failure",
+                                        BTreeMap::from([(
+                                            "error".to_string(),
+                                            startup_diagnostics_string(close_error.to_string()),
+                                        )]),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    return Err(SandboxdStateError::RunSetupScript(error.message));
+                }
+            }
         }
         if startup_input.is_snapshot() {
             // Snapshot materialization captures image-layer state only. Later session launches may
             // mount persistent storage at paths like /root and /etc/codex, which would shadow any
             // image contents there, so snapshot workflows must stop here and run on ephemeral
             // sandboxes without session runtime resources or persistent mounts.
+            if let Some(tunnel_session) = snapshot_tunnel_session.take() {
+                close_snapshot_tunnel_session(tunnel_session, &diagnostics_logger);
+            }
             record_operation_phase_started(&diagnostics_logger, "stop_egress_proxy");
             if let Some(egress_proxy) = egress_proxy.take() {
                 egress_proxy.close().map_err(|error| {
@@ -279,7 +348,7 @@ impl SandboxdState {
                 runtime_readiness_manager: Arc::new(Mutex::new(RuntimeReadinessManager::default())),
                 agent_endpoint_url: None,
                 runtime_env,
-                gateway_egress_forwarder,
+                gateway_egress_forwarder: None,
                 clock,
                 sleeper,
                 tunnel_session: None,
@@ -1167,6 +1236,15 @@ fn gateway_proxy_enabled() -> Result<bool, SandboxdStateError> {
     }
 }
 
+fn close_snapshot_tunnel_session(
+    tunnel_session: TunnelSession,
+    diagnostics_logger: &Option<StartupDiagnosticsLogger>,
+) {
+    record_operation_phase_started(diagnostics_logger, "stop_snapshot_tunnel_session");
+    tunnel_session.close();
+    record_operation_phase_completed(diagnostics_logger, "stop_snapshot_tunnel_session");
+}
+
 fn collect_runtime_environment(
     runtime_plan: &runtime::CompiledRuntimePlan,
 ) -> Result<BTreeMap<String, String>, String> {
@@ -1558,16 +1636,18 @@ mod tests {
         RuntimeExecCommand,
     };
     use crate::sandboxd_state::{
-        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GLOBAL_GIT_CONFIG_ENV_NAME, SETUP_SCRIPT_WORKING_DIRECTORY,
-        SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, apply_runtime_startup_overrides,
-        build_setup_script_environment, collect_runtime_environment,
-        merge_managed_runtime_environment, resolve_tokenizer_proxy_forward_url, run_setup_script,
-        run_setup_script_in_directory, scrub_snapshot_runtime_artifacts_at_paths,
-        spawn_codex_coordination_thread, spawn_runtime_readiness_projection_thread,
+        DEFAULT_GLOBAL_GIT_CONFIG_PATH, GATEWAY_PROXY_ENABLED_ENV, GLOBAL_GIT_CONFIG_ENV_NAME,
+        SETUP_SCRIPT_WORKING_DIRECTORY, SandboxdState, TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
+        apply_runtime_startup_overrides, build_setup_script_environment,
+        collect_runtime_environment, merge_managed_runtime_environment,
+        resolve_tokenizer_proxy_forward_url, run_setup_script, run_setup_script_in_directory,
+        scrub_snapshot_runtime_artifacts_at_paths, spawn_codex_coordination_thread,
+        spawn_runtime_readiness_projection_thread,
     };
     use crate::supervision::{ComponentHealthState, SandboxdSupervisorHandle, SupervisedComponent};
-    use crate::test_support::TestEnvVarGuard;
+    use crate::test_support::{TestEnvVarGuard, TestEnvVarsGuard};
     use crate::time::{SystemClock, ThreadSleeper};
+    use tungstenite::{Message, WebSocket, accept};
 
     #[test]
     fn preserves_codex_runtime_client_config_while_rewriting_workspace_sources() {
@@ -2418,6 +2498,115 @@ supports_websockets = false
     }
 
     #[test]
+    fn snapshot_materialization_gateway_proxy_uses_temporary_bootstrap_tunnel_for_setup() {
+        let _env_guard = TestEnvVarsGuard::set([
+            (
+                TOKENIZER_PROXY_EGRESS_BASE_URL_ENV,
+                "http://127.0.0.1:5205".to_string(),
+            ),
+            (GATEWAY_PROXY_ENABLED_ENV, "1".to_string()),
+        ]);
+        let output_path = std::env::temp_dir().join(format!(
+            "mistle-snapshot-materialization-gateway-output-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .expect("system time should be after unix epoch")
+                .as_nanos()
+        ));
+        let bootstrap_listener =
+            TcpListener::bind("127.0.0.1:0").expect("bootstrap listener should bind");
+        let bootstrap_url = format!(
+            "ws://127.0.0.1:{}/tunnel/sandbox/sbi_snapshot_tunnel",
+            bootstrap_listener
+                .local_addr()
+                .expect("bootstrap listener should expose an address")
+                .port()
+        );
+        let gateway_thread = thread::spawn(move || {
+            let (stream, _) = bootstrap_listener
+                .accept()
+                .expect("snapshot gateway should accept the bootstrap tunnel");
+            let mut websocket = accept(stream).expect("snapshot gateway handshake should succeed");
+
+            let telemetry_open = read_websocket_json_text_message(&mut websocket);
+            assert_eq!(telemetry_open["type"], "telemetry.open");
+
+            loop {
+                match websocket.read() {
+                    Ok(Message::Close(_)) => break,
+                    Ok(_) => {}
+                    Err(_) => break,
+                }
+            }
+        });
+
+        let state = SandboxdState::initialize(
+            &build_startup_input(
+                StartupMode::New,
+                StartupExecutionMode::Snapshot,
+                &bootstrap_url,
+                serde_json::json!({
+                    "image": {
+                        "source": "base",
+                        "imageRef": "registry.example.test/base:latest"
+                    },
+                    "egressRoutes": [],
+                    "artifacts": [
+                        {
+                            "artifactKey": "artifact_1",
+                            "name": "artifact one",
+                            "lifecycle": {
+                                "install": [
+                                    {
+                                        "op": "exec",
+                                        "command": {
+                                            "args": [
+                                                "sh",
+                                                "-c",
+                                                format!("printf snapshot-gateway > {}", output_path.display())
+                                            ]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "workspaceSources": [],
+                    "runtimeClients": [],
+                    "agentRuntimes": []
+                }),
+                None,
+            ),
+            Path::new(DEFAULT_GLOBAL_GIT_CONFIG_PATH),
+            Arc::new(SystemClock),
+            Arc::new(ThreadSleeper),
+            None,
+        )
+        .expect("snapshot materialization init should use temporary gateway tunnel for setup");
+
+        gateway_thread
+            .join()
+            .expect("snapshot gateway thread should exit after tunnel shutdown");
+        assert_eq!(state.execution_mode, StartupExecutionMode::Snapshot);
+        assert!(state.process_manager.is_none());
+        assert!(state.runtime_adapters.adapters().is_empty());
+        assert!(state.tunnel_session.is_none());
+        assert!(state.egress_proxy.is_none());
+        assert!(state.gateway_egress_forwarder.is_none());
+        let tunnel_snapshot = state
+            .supervisor_handle
+            .component_snapshot(SupervisedComponent::TunnelSession)
+            .expect("tunnel session should be tracked");
+        assert_eq!(tunnel_snapshot.state, ComponentHealthState::Stopped);
+
+        let output = std::fs::read_to_string(&output_path)
+            .expect("runtime-plan artifact install should write its output file");
+        assert_eq!(output, "snapshot-gateway");
+
+        let _ = std::fs::remove_file(output_path);
+    }
+
+    #[test]
     fn snapshot_materialization_state_rejects_resume() {
         let _tokenizer_proxy_env_guard =
             TestEnvVarGuard::set(TOKENIZER_PROXY_EGRESS_BASE_URL_ENV, "http://127.0.0.1:5205");
@@ -2454,6 +2643,27 @@ supports_websockets = false
             error.to_string(),
             "failed to start bootstrap tunnel session: snapshot materialization sandboxes do not support resume"
         );
+    }
+
+    fn read_websocket_json_text_message<S>(socket: &mut WebSocket<S>) -> serde_json::Value
+    where
+        S: std::io::Read + std::io::Write,
+    {
+        loop {
+            match socket.read().expect("websocket message should be readable") {
+                Message::Text(payload) => {
+                    return serde_json::from_str(&payload)
+                        .expect("websocket text payload should be json");
+                }
+                Message::Ping(payload) => socket
+                    .send(Message::Pong(payload))
+                    .expect("pong should be sent"),
+                Message::Close(frame) => {
+                    panic!("websocket closed before json message: {frame:?}");
+                }
+                _ => {}
+            }
+        }
     }
 
     fn minimal_runtime_plan_json() -> serde_json::Value {
