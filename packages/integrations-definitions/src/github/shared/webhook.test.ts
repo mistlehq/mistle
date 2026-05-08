@@ -2,14 +2,18 @@ import type { IntegrationConnection } from "@mistle/integrations-core";
 import GitHubWebhookDefinitions from "@octokit/webhooks-examples/api.github.com/index.json" with { type: "json" };
 import { sign } from "@octokit/webhooks-methods";
 import type {
+  CheckSuiteCompletedEvent,
   IssueCommentCreatedEvent,
+  IssuesOpenedEvent,
   PullRequestOpenedEvent,
+  PullRequestReviewSubmittedEvent,
   PushEvent,
   PullRequestReviewCommentCreatedEvent,
   WebhookEventName,
 } from "@octokit/webhooks-types";
 import { describe, expect, it } from "vitest";
 
+import { GitHubSupportedWebhookEvents } from "./supported-webhook-events.js";
 import { GitHubWebhookHandler } from "./webhook.server.js";
 
 const encoder = new TextEncoder();
@@ -25,10 +29,19 @@ type WebhookDefinitionShape = {
   examples: ReadonlyArray<unknown>;
 };
 
+type PushPayloadWithHeadCommit = PushEvent &
+  InstallationContext & {
+    head_commit: {
+      timestamp: string;
+    };
+  };
+
 const IssueCommentEventName: WebhookEventName = "issue_comment";
 const PullRequestReviewCommentEventName: WebhookEventName = "pull_request_review_comment";
 const PullRequestEventName: WebhookEventName = "pull_request";
+const PullRequestReviewEventName: WebhookEventName = "pull_request_review";
 const PushEventName: WebhookEventName = "push";
+const CheckSuiteEventName: WebhookEventName = "check_suite";
 
 function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
@@ -117,6 +130,17 @@ function isWebhookDefinitionShape(input: unknown): input is WebhookDefinitionSha
   );
 }
 
+function hasPushHeadCommit(input: unknown): input is PushPayloadWithHeadCommit {
+  return (
+    hasInstallationContext(input) &&
+    "head_commit" in input &&
+    typeof input.head_commit === "object" &&
+    input.head_commit !== null &&
+    "timestamp" in input.head_commit &&
+    typeof input.head_commit.timestamp === "string"
+  );
+}
+
 function resolveWebhookDefinition(name: WebhookEventName): WebhookDefinitionShape {
   const definition = GitHubWebhookDefinitions.find(
     (candidate) => isWebhookDefinitionShape(candidate) && candidate.name === name,
@@ -145,6 +169,20 @@ function resolveIssueCommentCreatedPayload(): IssueCommentCreatedEvent & Install
   return example;
 }
 
+function resolveIssuesOpenedPayload(): IssuesOpenedEvent & InstallationContext {
+  const definition = resolveWebhookDefinition("issues");
+  const example = definition.examples.find(
+    (candidate): candidate is IssuesOpenedEvent =>
+      hasAction(candidate) && candidate.action === "opened",
+  );
+
+  if (example === undefined) {
+    throw new Error("Missing GitHub webhook example for event issues.opened");
+  }
+
+  return withInstallation(example);
+}
+
 function resolvePullRequestReviewCommentCreatedPayload(): PullRequestReviewCommentCreatedEvent &
   InstallationContext {
   const definition = resolveWebhookDefinition(PullRequestReviewCommentEventName);
@@ -156,6 +194,23 @@ function resolvePullRequestReviewCommentCreatedPayload(): PullRequestReviewComme
   if (example === undefined) {
     throw new Error(
       "Missing GitHub webhook example with installation for event pull_request_review_comment.created",
+    );
+  }
+
+  return example;
+}
+
+function resolvePullRequestReviewSubmittedPayload(): PullRequestReviewSubmittedEvent &
+  InstallationContext {
+  const definition = resolveWebhookDefinition(PullRequestReviewEventName);
+  const example = definition.examples.find(
+    (candidate): candidate is PullRequestReviewSubmittedEvent & InstallationContext =>
+      hasAction(candidate) && candidate.action === "submitted" && hasInstallationContext(candidate),
+  );
+
+  if (example === undefined) {
+    throw new Error(
+      "Missing GitHub webhook example with installation for event pull_request_review.submitted",
     );
   }
 
@@ -178,14 +233,30 @@ function resolvePullRequestOpenedPayload(): PullRequestOpenedEvent & Installatio
   return example;
 }
 
-function resolvePushPayload(): PushEvent & InstallationContext {
-  const definition = resolveWebhookDefinition(PushEventName);
+function resolveCheckSuiteCompletedPayload(): CheckSuiteCompletedEvent & InstallationContext {
+  const definition = resolveWebhookDefinition(CheckSuiteEventName);
   const example = definition.examples.find(
-    (candidate): candidate is PushEvent & InstallationContext => hasInstallationContext(candidate),
+    (candidate): candidate is CheckSuiteCompletedEvent =>
+      hasAction(candidate) && candidate.action === "completed",
   );
 
   if (example === undefined) {
-    throw new Error("Missing GitHub webhook example with installation for event push");
+    throw new Error("Missing GitHub webhook example for event check_suite.completed");
+  }
+
+  return withInstallation(example);
+}
+
+function resolvePushPayload(): PushPayloadWithHeadCommit {
+  const definition = resolveWebhookDefinition(PushEventName);
+  const example = definition.examples.find((candidate): candidate is PushPayloadWithHeadCommit =>
+    hasPushHeadCommit(candidate),
+  );
+
+  if (example === undefined) {
+    throw new Error(
+      "Missing GitHub webhook example with installation and head_commit for event push",
+    );
   }
 
   return example;
@@ -198,27 +269,241 @@ function withoutInstallation<TPayload extends InstallationContext>(
   return rest;
 }
 
+function withInstallation<TPayload extends object>(
+  payload: TPayload,
+): TPayload & InstallationContext {
+  return {
+    ...payload,
+    installation: {
+      id: IssueCommentCreatedPayload.installation.id,
+    },
+  };
+}
+
+function createMinimalGitHubPayload(input: {
+  action?: string;
+  body: Record<string, unknown>;
+}): Record<string, unknown> & InstallationContext {
+  return {
+    ...(input.action === undefined ? {} : { action: input.action }),
+    installation: {
+      id: IssueCommentCreatedPayload.installation.id,
+    },
+    repository: {
+      full_name: "mistlehq/mistle",
+    },
+    sender: {
+      login: "octocat",
+    },
+    ...input.body,
+  };
+}
+
+function sortedStrings(input: ReadonlyArray<string>): string[] {
+  return [...input].sort();
+}
+
+function requireStringValue(input: { label: string; value: string | null | undefined }): string {
+  if (typeof input.value === "string" && input.value.length > 0) {
+    return input.value;
+  }
+
+  throw new Error(`Expected ${input.label} to be a non-empty string.`);
+}
+
 const IssueCommentCreatedPayload: IssueCommentCreatedEvent & InstallationContext =
   resolveIssueCommentCreatedPayload();
+
+const IssuesOpenedPayload: IssuesOpenedEvent & InstallationContext = resolveIssuesOpenedPayload();
 
 const PullRequestReviewCommentCreatedPayload: PullRequestReviewCommentCreatedEvent &
   InstallationContext = resolvePullRequestReviewCommentCreatedPayload();
 
+const PullRequestReviewSubmittedPayload: PullRequestReviewSubmittedEvent & InstallationContext =
+  resolvePullRequestReviewSubmittedPayload();
+
 const PullRequestOpenedPayload: PullRequestOpenedEvent & InstallationContext =
   resolvePullRequestOpenedPayload();
-const IssuesOpenedPayload: Record<string, unknown> & InstallationContext = {
-  action: "opened",
-  installation: {
-    id: IssueCommentCreatedPayload.installation.id,
+
+const IssuesClosedPayload = createMinimalGitHubPayload({
+  action: "closed",
+  body: {
+    issue: {
+      id: 1102,
+      number: 43,
+      closed_at: "2026-04-02T17:42:43Z",
+    },
   },
-  issue: {
-    number: 42,
+});
+
+const IssuesReopenedPayload = createMinimalGitHubPayload({
+  action: "reopened",
+  body: {
+    issue: {
+      id: 1103,
+      number: 44,
+      updated_at: "2026-04-02T17:43:43Z",
+    },
   },
-  repository: {
-    full_name: "mistlehq/mistle",
+});
+
+const PullRequestClosedPayload = createMinimalGitHubPayload({
+  action: "closed",
+  body: {
+    number: 45,
+    pull_request: {
+      id: 2102,
+      number: 45,
+      closed_at: "2026-04-02T17:44:43Z",
+    },
   },
-};
-const PushPayload: PushEvent & InstallationContext = resolvePushPayload();
+});
+
+const PullRequestReopenedPayload = createMinimalGitHubPayload({
+  action: "reopened",
+  body: {
+    number: 46,
+    pull_request: {
+      id: 2103,
+      number: 46,
+      updated_at: "2026-04-02T17:45:43Z",
+    },
+  },
+});
+
+const PullRequestSynchronizePayload = createMinimalGitHubPayload({
+  action: "synchronize",
+  body: {
+    number: 47,
+    after: "8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f",
+    pull_request: {
+      id: 2104,
+      number: 47,
+      updated_at: "2026-04-02T17:46:43Z",
+    },
+  },
+});
+
+const PushPayload: PushPayloadWithHeadCommit = resolvePushPayload();
+const CheckSuiteCompletedPayload: CheckSuiteCompletedEvent & InstallationContext =
+  resolveCheckSuiteCompletedPayload();
+
+const SupportedGitHubOrderingCases: ReadonlyArray<{
+  providerEventType: WebhookEventName;
+  eventType: string;
+  deliveryId: string;
+  payload: unknown;
+  expectedOccurredAt: string;
+  expectedOrderingIdentifier: string;
+}> = [
+  {
+    providerEventType: "issues",
+    eventType: "github.issues.opened",
+    deliveryId: "delivery_issues_opened",
+    payload: IssuesOpenedPayload,
+    expectedOccurredAt: IssuesOpenedPayload.issue.created_at,
+    expectedOrderingIdentifier: IssuesOpenedPayload.issue.id.toString().padStart(20, "0"),
+  },
+  {
+    providerEventType: "issues",
+    eventType: "github.issues.closed",
+    deliveryId: "delivery_issues_closed",
+    payload: IssuesClosedPayload,
+    expectedOccurredAt: "2026-04-02T17:42:43Z",
+    expectedOrderingIdentifier: "00000000000000001102",
+  },
+  {
+    providerEventType: "issues",
+    eventType: "github.issues.reopened",
+    deliveryId: "delivery_issues_reopened",
+    payload: IssuesReopenedPayload,
+    expectedOccurredAt: "2026-04-02T17:43:43Z",
+    expectedOrderingIdentifier: "00000000000000001103",
+  },
+  {
+    providerEventType: "issue_comment",
+    eventType: "github.issue_comment.created",
+    deliveryId: "delivery_issue_comment_created",
+    payload: IssueCommentCreatedPayload,
+    expectedOccurredAt: IssueCommentCreatedPayload.comment.created_at,
+    expectedOrderingIdentifier: IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0"),
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.opened",
+    deliveryId: "delivery_pull_request_opened",
+    payload: PullRequestOpenedPayload,
+    expectedOccurredAt: PullRequestOpenedPayload.pull_request.created_at,
+    expectedOrderingIdentifier: PullRequestOpenedPayload.pull_request.id
+      .toString()
+      .padStart(20, "0"),
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.closed",
+    deliveryId: "delivery_pull_request_closed",
+    payload: PullRequestClosedPayload,
+    expectedOccurredAt: "2026-04-02T17:44:43Z",
+    expectedOrderingIdentifier: "00000000000000002102",
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.reopened",
+    deliveryId: "delivery_pull_request_reopened",
+    payload: PullRequestReopenedPayload,
+    expectedOccurredAt: "2026-04-02T17:45:43Z",
+    expectedOrderingIdentifier: "00000000000000002103",
+  },
+  {
+    providerEventType: "pull_request",
+    eventType: "github.pull_request.synchronize",
+    deliveryId: "delivery_pull_request_synchronize",
+    payload: PullRequestSynchronizePayload,
+    expectedOccurredAt: "2026-04-02T17:46:43Z",
+    expectedOrderingIdentifier: "8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f8f2f",
+  },
+  {
+    providerEventType: "pull_request_review",
+    eventType: "github.pull_request_review.submitted",
+    deliveryId: "delivery_pull_request_review_submitted",
+    payload: PullRequestReviewSubmittedPayload,
+    expectedOccurredAt: requireStringValue({
+      label: "pull_request_review.submitted review.submitted_at",
+      value: PullRequestReviewSubmittedPayload.review.submitted_at,
+    }),
+    expectedOrderingIdentifier: PullRequestReviewSubmittedPayload.review.id
+      .toString()
+      .padStart(20, "0"),
+  },
+  {
+    providerEventType: "pull_request_review_comment",
+    eventType: "github.pull_request_review_comment.created",
+    deliveryId: "delivery_pull_request_review_comment_created",
+    payload: PullRequestReviewCommentCreatedPayload,
+    expectedOccurredAt: PullRequestReviewCommentCreatedPayload.comment.created_at,
+    expectedOrderingIdentifier: PullRequestReviewCommentCreatedPayload.comment.id
+      .toString()
+      .padStart(20, "0"),
+  },
+  {
+    providerEventType: "push",
+    eventType: "github.push.pushed",
+    deliveryId: "delivery_push",
+    payload: PushPayload,
+    expectedOccurredAt: PushPayload.head_commit.timestamp,
+    expectedOrderingIdentifier: PushPayload.after,
+  },
+  {
+    providerEventType: "check_suite",
+    eventType: "github.check_suite.completed",
+    deliveryId: "delivery_check_suite_completed",
+    payload: CheckSuiteCompletedPayload,
+    expectedOccurredAt: CheckSuiteCompletedPayload.check_suite.updated_at,
+    expectedOrderingIdentifier: CheckSuiteCompletedPayload.check_suite.id
+      .toString()
+      .padStart(20, "0"),
+  },
+];
 
 describe("GitHubWebhookHandler", () => {
   it("verifies webhook signature with webhookSecret", async () => {
@@ -313,6 +598,36 @@ describe("GitHubWebhookHandler", () => {
       throw new Error("Expected GitHub webhook request resolution to produce an event.");
     }
     expect(resolved.event.payload).toEqual(IssueCommentCreatedPayload);
+  });
+
+  it("derives source order keys for every supported GitHub automation event", async () => {
+    expect(
+      sortedStrings(SupportedGitHubOrderingCases.map((testCase) => testCase.eventType)),
+    ).toEqual(sortedStrings(GitHubSupportedWebhookEvents.map((event) => event.eventType)));
+
+    for (const testCase of SupportedGitHubOrderingCases) {
+      const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
+        targetKey: "github_cloud",
+        target: createGitHubCloudTargetConfig(),
+        headers: {
+          "x-github-event": testCase.providerEventType,
+          "x-github-delivery": testCase.deliveryId,
+        },
+        rawBody: encodePayload(testCase.payload),
+      });
+
+      expect(resolved).toMatchObject({
+        kind: "event",
+        event: {
+          externalEventId: testCase.deliveryId,
+          externalDeliveryId: testCase.deliveryId,
+          providerEventType: testCase.providerEventType,
+          eventType: testCase.eventType,
+          occurredAt: testCase.expectedOccurredAt,
+          sourceOrderKey: `${testCase.expectedOccurredAt}#${testCase.expectedOrderingIdentifier}`,
+        },
+      });
+    }
   });
 
   it("resolves matching connection by installation id", async () => {

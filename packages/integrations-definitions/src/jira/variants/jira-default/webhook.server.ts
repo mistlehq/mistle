@@ -1,10 +1,11 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import type {
-  IntegrationConnection,
-  IntegrationWebhookHandler,
-  IntegrationWebhookResolveConnectionResult,
-  IntegrationWebhookVerifyResult,
+import {
+  createIntegrationWebhookSourceOrderKey,
+  type IntegrationConnection,
+  type IntegrationWebhookHandler,
+  type IntegrationWebhookResolveConnectionResult,
+  type IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 
 import {
@@ -192,7 +193,10 @@ function resolveSourceOrderKey(input: {
     return undefined;
   }
 
-  return `${occurredAt}#${orderingIdentifier}`;
+  return createIntegrationWebhookSourceOrderKey({
+    occurredAt,
+    orderingIdentifier,
+  });
 }
 
 function resolvePathRoutedConnection(

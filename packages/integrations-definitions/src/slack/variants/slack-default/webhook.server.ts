@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { buildUrlWithPath } from "@mistle/http";
-import type {
-  IntegrationConnection,
-  IntegrationWebhookEvent,
-  IntegrationWebhookHandler,
-  IntegrationWebhookResolveConnectionResult,
-  IntegrationWebhookVerifyResult,
+import {
+  createIntegrationWebhookSourceOrderKey,
+  type IntegrationConnection,
+  type IntegrationWebhookEvent,
+  type IntegrationWebhookHandler,
+  type IntegrationWebhookResolveConnectionResult,
+  type IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 
 import { SlackThreadRootTimestampField } from "./normalized-event-fields.js";
@@ -352,7 +353,10 @@ function resolveSlackSourceOrderKey(payload: Record<string, unknown>): string | 
     return undefined;
   }
 
-  return `${occurredAt}#${eventTimestamp.trim()}`;
+  return createIntegrationWebhookSourceOrderKey({
+    occurredAt,
+    orderingIdentifier: eventTimestamp,
+  });
 }
 
 function resolvePathRoutedConnection(

@@ -172,6 +172,43 @@ describe("webhook helpers", () => {
     });
   });
 
+  it("rejects advertised automation webhook events without source order keys", async () => {
+    await expect(
+      verifyAndResolveWebhookRequestOrThrow({
+        definition: {
+          familyId: "github",
+          variantId: "github-cloud",
+          supportedWebhookEvents: [
+            {
+              eventType: "github.issue_comment.created",
+              providerEventType: "issue_comment",
+              displayName: "Issue comment created",
+            },
+          ],
+          webhookHandler: createWebhookHandler(),
+        },
+        targetKey: "github_cloud",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        connections: [CandidateConnection],
+        resolveConnectionSecrets: () => ({}),
+        headers: {
+          "x-event": "issue_comment",
+        },
+        rawBody: new TextEncoder().encode('{"ok":true}'),
+      }),
+    ).rejects.toMatchObject({
+      code: WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
+      message:
+        "Webhook event 'github.issue_comment.created' from integration 'github/github-cloud' is advertised for automations but is missing sourceOrderKey.",
+    });
+  });
+
   it("throws when webhook verification fails", async () => {
     await expect(
       verifyAndResolveWebhookRequestOrThrow({

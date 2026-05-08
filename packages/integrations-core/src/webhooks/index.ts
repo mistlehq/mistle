@@ -7,6 +7,8 @@ import type {
   IntegrationConnection,
   IntegrationDefinition,
   IntegrationTarget,
+  IntegrationWebhookEvent,
+  IntegrationWebhookEventDefinition,
   IntegrationWebhookHandler,
   IntegrationWebhookHeaders,
   IntegrationWebhookRequestResolution,
@@ -65,8 +67,12 @@ export type WebhookDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionSecrets = Record<string, string>,
-> = Pick<IntegrationDefinition, "familyId" | "variantId"> & {
+> = Pick<IntegrationDefinition, "familyId" | "variantId" | "supportedWebhookEvents"> & {
   webhookHandler?: IntegrationWebhookHandler<TTargetConfig, TTargetSecrets, TConnectionSecrets>;
+};
+
+type WebhookSourceOrderDefinition = Pick<IntegrationDefinition, "familyId" | "variantId"> & {
+  supportedWebhookEvents?: ReadonlyArray<IntegrationWebhookEventDefinition> | undefined;
 };
 
 export function getWebhookHandlerOrThrow<
@@ -84,6 +90,53 @@ export function getWebhookHandlerOrThrow<
   throw createWebhookError(
     WebhookErrorCodes.WEBHOOK_HANDLER_NOT_CONFIGURED,
     `Integration '${input.familyId}/${input.variantId}' does not define a webhook handler.`,
+  );
+}
+
+export function createIntegrationWebhookSourceOrderKey(input: {
+  occurredAt: string;
+  orderingIdentifier: string;
+}): string {
+  const occurredAt = input.occurredAt.trim();
+  const orderingIdentifier = input.orderingIdentifier.trim();
+  if (occurredAt.length === 0) {
+    throw createWebhookError(
+      WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
+      "Webhook source order key requires a non-empty occurrence timestamp.",
+    );
+  }
+
+  if (orderingIdentifier.length === 0) {
+    throw createWebhookError(
+      WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
+      "Webhook source order key requires a non-empty ordering identifier.",
+    );
+  }
+
+  return `${occurredAt}#${orderingIdentifier}`;
+}
+
+function assertSupportedWebhookEventHasSourceOrderKey(input: {
+  definition: WebhookSourceOrderDefinition;
+  event: IntegrationWebhookEvent;
+}): void {
+  const supportedWebhookEvents = input.definition.supportedWebhookEvents;
+  if (
+    supportedWebhookEvents === undefined ||
+    !supportedWebhookEvents.some(
+      (supportedEvent) => supportedEvent.eventType === input.event.eventType,
+    )
+  ) {
+    return;
+  }
+
+  if (input.event.sourceOrderKey !== undefined && input.event.sourceOrderKey.trim().length > 0) {
+    return;
+  }
+
+  throw createWebhookError(
+    WebhookErrorCodes.WEBHOOK_SOURCE_ORDER_KEY_MISSING,
+    `Webhook event '${input.event.eventType}' from integration '${input.definition.familyId}/${input.definition.variantId}' is advertised for automations but is missing sourceOrderKey.`,
   );
 }
 
@@ -211,6 +264,11 @@ export async function verifyAndResolveWebhookRequestOrThrow<
           headers: input.headers,
           rawBody: input.rawBody,
         });
+
+  assertSupportedWebhookEventHasSourceOrderKey({
+    definition: input.definition,
+    event: enrichedWebhookEvent,
+  });
 
   if (webhookRequest.kind === "response") {
     return {

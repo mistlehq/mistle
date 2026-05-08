@@ -1,7 +1,8 @@
-import type {
-  IntegrationWebhookHandler,
-  IntegrationWebhookResolveConnectionResult,
-  IntegrationWebhookVerifyResult,
+import {
+  createIntegrationWebhookSourceOrderKey,
+  type IntegrationWebhookHandler,
+  type IntegrationWebhookResolveConnectionResult,
+  type IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 import { verify } from "@octokit/webhooks-methods";
 
@@ -152,25 +153,258 @@ function resolveTimestampField(input: Record<string, unknown>, key: string): str
   return Number.isNaN(Date.parse(normalizedValue)) ? null : normalizedValue;
 }
 
-function resolveCommentOrdering(input: Record<string, unknown>): {
-  occurredAt?: string;
-  sourceOrderKey?: string;
-} {
-  const comment = input.comment;
-  if (!isRecord(comment)) {
-    return {};
+type GitHubEventOrdering = {
+  occurredAt: string;
+  sourceOrderKey: string;
+};
+
+function requireRecordField(input: {
+  payload: Record<string, unknown>;
+  key: string;
+  eventType: string;
+}): Record<string, unknown> {
+  const value = input.payload[input.key];
+  if (isRecord(value)) {
+    return value;
   }
 
-  const occurredAt = resolveTimestampField(comment, "created_at");
-  const commentId = resolveNumericIdentifier(comment, "id");
-  if (occurredAt === null || commentId === null) {
-    return {};
+  throw new Error(`GitHub webhook event '${input.eventType}' is missing payload.${input.key}.`);
+}
+
+function requireTimestampField(input: {
+  record: Record<string, unknown>;
+  key: string;
+  eventType: string;
+}): string {
+  const timestamp = resolveTimestampField(input.record, input.key);
+  if (timestamp !== null) {
+    return timestamp;
   }
+
+  throw new Error(
+    `GitHub webhook event '${input.eventType}' is missing timestamp field '${input.key}'.`,
+  );
+}
+
+function requireOrderingIdentifier(input: {
+  record: Record<string, unknown>;
+  key: string;
+  eventType: string;
+}): string {
+  const identifier = resolveNumericIdentifier(input.record, input.key);
+  if (identifier !== null) {
+    return identifier;
+  }
+
+  throw new Error(
+    `GitHub webhook event '${input.eventType}' is missing ordering identifier '${input.key}'.`,
+  );
+}
+
+function requireStringField(input: {
+  record: Record<string, unknown>;
+  key: string;
+  eventType: string;
+}): string {
+  const value = input.record[input.key];
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  throw new Error(
+    `GitHub webhook event '${input.eventType}' is missing string field '${input.key}'.`,
+  );
+}
+
+function resolveRecordOrdering(input: {
+  record: Record<string, unknown>;
+  timestampField: string;
+  identifierField: string;
+  eventType: string;
+}): GitHubEventOrdering {
+  const occurredAt = requireTimestampField({
+    record: input.record,
+    key: input.timestampField,
+    eventType: input.eventType,
+  });
+  const orderingIdentifier = requireOrderingIdentifier({
+    record: input.record,
+    key: input.identifierField,
+    eventType: input.eventType,
+  });
 
   return {
     occurredAt,
-    sourceOrderKey: `${occurredAt}#${commentId}`,
+    sourceOrderKey: createIntegrationWebhookSourceOrderKey({
+      occurredAt,
+      orderingIdentifier,
+    }),
   };
+}
+
+function resolvePayloadRecordOrdering(input: {
+  payload: Record<string, unknown>;
+  payloadKey: string;
+  timestampField: string;
+  identifierField: string;
+  eventType: string;
+}): GitHubEventOrdering {
+  return resolveRecordOrdering({
+    record: requireRecordField({
+      payload: input.payload,
+      key: input.payloadKey,
+      eventType: input.eventType,
+    }),
+    timestampField: input.timestampField,
+    identifierField: input.identifierField,
+    eventType: input.eventType,
+  });
+}
+
+function resolvePushOrdering(input: {
+  payload: Record<string, unknown>;
+  eventType: string;
+}): GitHubEventOrdering {
+  const headCommit = requireRecordField({
+    payload: input.payload,
+    key: "head_commit",
+    eventType: input.eventType,
+  });
+  const occurredAt = requireTimestampField({
+    record: headCommit,
+    key: "timestamp",
+    eventType: input.eventType,
+  });
+  const orderingIdentifier = requireStringField({
+    record: input.payload,
+    key: "after",
+    eventType: input.eventType,
+  });
+
+  return {
+    occurredAt,
+    sourceOrderKey: createIntegrationWebhookSourceOrderKey({
+      occurredAt,
+      orderingIdentifier,
+    }),
+  };
+}
+
+function resolveGitHubEventOrdering(input: {
+  eventType: string;
+  payload: Record<string, unknown>;
+}): GitHubEventOrdering | undefined {
+  switch (input.eventType) {
+    case "github.issues.opened":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "issue",
+        timestampField: "created_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.issues.closed":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "issue",
+        timestampField: "closed_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.issues.reopened":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "issue",
+        timestampField: "updated_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.issue_comment.created":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "comment",
+        timestampField: "created_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request.opened":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "pull_request",
+        timestampField: "created_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request.closed":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "pull_request",
+        timestampField: "closed_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request.reopened":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "pull_request",
+        timestampField: "updated_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request.synchronize": {
+      const pullRequest = requireRecordField({
+        payload: input.payload,
+        key: "pull_request",
+        eventType: input.eventType,
+      });
+      const occurredAt = requireTimestampField({
+        record: pullRequest,
+        key: "updated_at",
+        eventType: input.eventType,
+      });
+      const orderingIdentifier = requireStringField({
+        record: input.payload,
+        key: "after",
+        eventType: input.eventType,
+      });
+
+      return {
+        occurredAt,
+        sourceOrderKey: createIntegrationWebhookSourceOrderKey({
+          occurredAt,
+          orderingIdentifier,
+        }),
+      };
+    }
+    case "github.pull_request_review.submitted":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "review",
+        timestampField: "submitted_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.pull_request_review_comment.created":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "comment",
+        timestampField: "created_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    case "github.push.pushed":
+      return resolvePushOrdering(input);
+    case "github.check_suite.completed":
+      return resolvePayloadRecordOrdering({
+        payload: input.payload,
+        payloadKey: "check_suite",
+        timestampField: "updated_at",
+        identifierField: "id",
+        eventType: input.eventType,
+      });
+    default:
+      return undefined;
+  }
 }
 
 function sanitizeEventSegment(input: string): string {
@@ -217,9 +451,16 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const payload = parseJsonPayload(input.rawBody);
     const providerEventType = resolveProviderEventType(input.headers);
     const action = resolveCanonicalAction({ providerEventType, payload });
+    const eventType = resolveEventType({
+      providerEventType,
+      action,
+    });
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
-    const ordering = resolveCommentOrdering(payload);
+    const ordering = resolveGitHubEventOrdering({
+      eventType,
+      payload,
+    });
 
     return {
       kind: "event",
@@ -227,15 +468,10 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
         externalEventId: deliveryId,
         externalDeliveryId: deliveryId,
         providerEventType,
-        eventType: resolveEventType({
-          providerEventType,
-          action,
-        }),
+        eventType,
         payload,
-        ...(ordering.occurredAt === undefined ? {} : { occurredAt: ordering.occurredAt }),
-        ...(ordering.sourceOrderKey === undefined
-          ? {}
-          : { sourceOrderKey: ordering.sourceOrderKey }),
+        ...(ordering === undefined ? {} : { occurredAt: ordering.occurredAt }),
+        ...(ordering === undefined ? {} : { sourceOrderKey: ordering.sourceOrderKey }),
       },
     };
   },
