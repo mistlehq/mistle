@@ -74,11 +74,6 @@ describe("session primary repository policy", () => {
         { value: "/root/acme/repo-1", label: "acme/repo-1 (unavailable)" },
         { value: "/root/acme/repo-2", label: "acme/repo-2" },
       ],
-      selection: {
-        kind: "unavailable",
-        path: "/root/acme/repo-1",
-        option: { value: "/root/acme/repo-1", label: "acme/repo-1 (unavailable)" },
-      },
     });
   });
 
@@ -104,14 +99,6 @@ describe("session primary repository policy", () => {
         { value: "/root/acme/repo-1", label: "acme/repo-1" },
         { value: "/root/acme/repo-2", label: "acme/repo-2" },
       ],
-      selection: {
-        kind: "unavailable",
-        path: "/root/acme/repo-1/packages/app",
-        option: {
-          value: "/root/acme/repo-1/packages/app",
-          label: "acme/repo-1/packages/app (unavailable)",
-        },
-      },
     });
   });
 

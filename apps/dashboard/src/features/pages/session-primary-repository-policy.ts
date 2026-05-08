@@ -2,7 +2,7 @@ import { DefaultSandboxWorkspaceDir } from "@mistle/integrations-core";
 
 import type { SessionWorkbenchHeaderRepositoryOption } from "./session-workbench-header-actions.js";
 
-export type SessionPrimaryRepositorySelection =
+type SessionPrimaryRepositorySelection =
   | { kind: "none" }
   | { kind: "available"; path: string }
   | { kind: "unavailable"; path: string; option: SessionWorkbenchHeaderRepositoryOption };
@@ -80,7 +80,7 @@ function hasContainingRepositoryOption(input: {
   );
 }
 
-export function resolvePrimaryRepositorySelection(input: {
+function resolvePrimaryRepositorySelection(input: {
   repositoryOptions: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
   selectedRepositoryPath: string | null;
   workspaceRoot?: string;
@@ -161,7 +161,6 @@ export function resolvePrimaryRepositoryPresentation(input: {
 }): {
   errorMessage: string | null;
   options: ReadonlyArray<SessionWorkbenchHeaderRepositoryOption>;
-  selection: SessionPrimaryRepositorySelection;
 } {
   const selection =
     input.queryState === "loaded" || input.queryState === "error"
@@ -187,6 +186,5 @@ export function resolvePrimaryRepositoryPresentation(input: {
       ...(selection.kind === "unavailable" ? [selection.option] : []),
       ...input.repositoryOptions,
     ],
-    selection,
   };
 }
