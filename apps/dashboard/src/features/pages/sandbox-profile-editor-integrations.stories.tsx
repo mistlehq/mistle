@@ -37,12 +37,6 @@ const StoryConnectionsWithoutGitProviders = StoryIntegrationConnections.filter(
   (connection) => !StoryGitProviderTargetKeys.has(connection.targetKey),
 );
 
-export const DraftSaveFailure: Story = {
-  args: {
-    integrationSaveErrorMessage: "Could not save sandbox profile integrations.",
-  },
-};
-
 export const ResourcesAndToolsLoadError: Story = {
   args: {
     integrationsSectionState: {

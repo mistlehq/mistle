@@ -19,7 +19,7 @@ import {
   WarningCircleIcon,
 } from "@phosphor-icons/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
 
 import type { ChatEntry } from "../chat/chat-types.js";
@@ -105,7 +105,6 @@ export type SandboxProfileEditorPageStoryArgs = {
     directoryErrorMessage?: string;
     kind: "error";
   };
-  integrationSaveErrorMessage?: string;
   versionActionErrorMessage?: string;
   initialBindings?: readonly {
     id: string;
@@ -115,7 +114,6 @@ export type SandboxProfileEditorPageStoryArgs = {
   }[];
   setupScript: string | null;
   setupScriptDraft?: string;
-  setupScriptSaveErrorMessage?: string;
   setupAssistantPanelState?: "closed" | "starting" | "ready" | "proposed-script";
   setupAssistantErrorMessage?: string;
   setupAssistantState?: "available" | "starting" | "disabled";
@@ -551,9 +549,6 @@ function SandboxProfileEditorPageStoryView(
   const [integrationRows, setIntegrationRows] = useState<readonly SandboxProfileBindingEditorRow[]>(
     () => mapBindingsToEditorRows(input.initialBindings ?? StoryBindings),
   );
-  const [integrationSaveErrorMessage, setIntegrationSaveErrorMessage] = useState(
-    input.integrationSaveErrorMessage ?? null,
-  );
   const [setupScriptDraft, setSetupScriptDraft] = useState(
     input.setupScriptDraft ?? input.setupScript ?? "",
   );
@@ -568,10 +563,6 @@ function SandboxProfileEditorPageStoryView(
   const [setupAssistantPanelOpen, setSetupAssistantPanelOpen] = useState(
     initialSetupAssistantPanelState !== "closed",
   );
-
-  useEffect(() => {
-    setIntegrationSaveErrorMessage(input.integrationSaveErrorMessage ?? null);
-  }, [input.integrationSaveErrorMessage]);
 
   async function handleProfileNameSave(nextValue: string): Promise<void> {
     setProfileName(nextValue);
@@ -672,7 +663,7 @@ function SandboxProfileEditorPageStoryView(
                     isPending: false,
                   }}
                   integrationRows={integrationRows}
-                  integrationSaveError={integrationSaveErrorMessage}
+                  integrationSaveError={null}
                   disabled={!isEditable}
                   onAddIntegrationBindingRow={async (nextBinding) => {
                     setIntegrationRows((currentRows) => [
@@ -698,9 +689,7 @@ function SandboxProfileEditorPageStoryView(
                       currentRows.filter((row) => row.clientId !== clientId),
                     );
                   }}
-                  onIntegrationSaveErrorDismiss={() => {
-                    setIntegrationSaveErrorMessage(null);
-                  }}
+                  onIntegrationSaveErrorDismiss={() => {}}
                 />
               </SandboxProfilePanelSection>
               <SandboxProfilePanelSection>
@@ -709,7 +698,6 @@ function SandboxProfileEditorPageStoryView(
                     <Notice variant="alert">{input.setupAssistantErrorMessage}</Notice>
                   )}
                   <SandboxProfileSetupScriptPanel
-                    errorMessage={input.setupScriptSaveErrorMessage ?? null}
                     onChange={setSetupScriptDraft}
                     disabled={!isEditable}
                     repositoryHandles={resolveSandboxBaseRepositoryHandles(integrationRows)}
