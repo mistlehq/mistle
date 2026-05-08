@@ -4,6 +4,7 @@ import {
   parseWebhookTriggerCapabilitiesProviderMetadata,
   resolveWebhookTriggerCapabilityEvents,
   type IntegrationWebhookEventDefinition,
+  type IntegrationWebhookTriggerCapabilities,
   type IntegrationWebhookTriggerCapabilityEvent,
   type IntegrationWebhookTriggerProviderPermissionRequirement,
   type IntegrationWebhookTriggerRequirementSet,
@@ -854,6 +855,7 @@ function WebhookSourcesSection(input: {
           </Notice>
           {input.supportedWebhookEvents.length === 0 ? null : (
             <WebhookTriggerCapabilityEventList
+              capabilities={undefined}
               events={resolveWebhookTriggerCapabilityEvents({
                 capabilities: undefined,
                 supportedWebhookEvents: input.supportedWebhookEvents,
@@ -896,8 +898,11 @@ function WebhookSourceCard(input: {
     input.onDeleteWebhookSource !== undefined &&
     input.source.remoteRegistrationId !== undefined;
   const registeredEventLabels = resolveWebhookRegisteredEventLabels(input.source.providerMetadata);
+  const webhookTriggerCapabilities = parseWebhookTriggerCapabilitiesProviderMetadata(
+    input.source.providerMetadata,
+  );
   const webhookTriggerCapabilityEvents = resolveWebhookTriggerCapabilityEvents({
-    capabilities: parseWebhookTriggerCapabilitiesProviderMetadata(input.source.providerMetadata),
+    capabilities: webhookTriggerCapabilities,
     supportedWebhookEvents: input.supportedWebhookEvents,
   });
   const shouldShowHeaderText = !input.hideDeleteAction && input.source.displayName !== "";
@@ -961,7 +966,10 @@ function WebhookSourceCard(input: {
           <CopyableValue label="Webhook URL" value={input.source.callbackUrl} />
         )}
         {webhookTriggerCapabilityEvents.length === 0 ? null : (
-          <WebhookTriggerCapabilityEventList events={webhookTriggerCapabilityEvents} />
+          <WebhookTriggerCapabilityEventList
+            capabilities={webhookTriggerCapabilities}
+            events={webhookTriggerCapabilityEvents}
+          />
         )}
       </div>
     </div>
@@ -969,6 +977,7 @@ function WebhookSourceCard(input: {
 }
 
 function WebhookTriggerCapabilityEventList(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   events: readonly IntegrationWebhookTriggerCapabilityEvent[];
 }): React.JSX.Element {
   return (
@@ -976,7 +985,11 @@ function WebhookTriggerCapabilityEventList(input: {
       <DetailLabel as="p">Webhook events</DetailLabel>
       <div className="divide-border overflow-hidden rounded-md border">
         {input.events.map((event) => (
-          <WebhookTriggerCapabilityEventRow event={event} key={event.eventDefinition.eventType} />
+          <WebhookTriggerCapabilityEventRow
+            capabilities={input.capabilities}
+            event={event}
+            key={event.eventDefinition.eventType}
+          />
         ))}
       </div>
     </div>
@@ -984,6 +997,7 @@ function WebhookTriggerCapabilityEventList(input: {
 }
 
 function WebhookTriggerCapabilityEventRow(input: {
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   event: IntegrationWebhookTriggerCapabilityEvent;
 }): React.JSX.Element {
   const providerRequirementSets =
@@ -1014,7 +1028,7 @@ function WebhookTriggerCapabilityEventRow(input: {
         <div className="mt-2 flex flex-col gap-1.5">
           {providerRequirementSets.map((requirementSet, index) => (
             <WebhookTriggerProviderRequirementSet
-              capabilities={input.event.capabilities}
+              capabilities={input.capabilities}
               index={index}
               key={formatRequirementSetKey(requirementSet, index)}
               requirementSet={requirementSet}
@@ -1028,7 +1042,7 @@ function WebhookTriggerCapabilityEventRow(input: {
 }
 
 function WebhookTriggerProviderRequirementSet(input: {
-  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   index: number;
   requirementSet: IntegrationWebhookTriggerRequirementSet;
   showAlternativeLabel: boolean;
@@ -1053,11 +1067,11 @@ function WebhookTriggerProviderRequirementSet(input: {
 }
 
 function WebhookTriggerProviderEventsRequirement(input: {
-  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   events: readonly string[];
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   if (input.events.length === 0) {
-    return <WebhookTriggerProviderRequirementChipGroup items={[]} label="Events" />;
+    return null;
   }
 
   return (
@@ -1086,25 +1100,21 @@ function WebhookTriggerProviderRequirementChipGroup(input: {
   return (
     <div className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-2 text-xs">
       <span className="text-muted-foreground">{input.label}</span>
-      {input.items.length === 0 ? (
-        <span className="text-muted-foreground">None required</span>
-      ) : (
-        <div className="flex min-w-0 flex-wrap gap-1.5">
-          {input.items.map((item) => (
-            <WebhookTriggerProviderRequirementChip
-              isPresent={item.isPresent}
-              key={item.id}
-              value={item.value}
-            />
-          ))}
-        </div>
-      )}
+      <div className="flex min-w-0 flex-wrap gap-1.5">
+        {input.items.map((item) => (
+          <WebhookTriggerProviderRequirementChip
+            isPresent={item.isPresent}
+            key={item.id}
+            value={item.value}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
 function WebhookTriggerProviderPermissionsRequirement(input: {
-  capabilities: IntegrationWebhookTriggerCapabilityEvent["capabilities"];
+  capabilities: IntegrationWebhookTriggerCapabilities | undefined;
   permissions: readonly IntegrationWebhookTriggerProviderPermissionRequirement[];
 }): React.JSX.Element {
   return (

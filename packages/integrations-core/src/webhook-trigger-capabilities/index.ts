@@ -11,7 +11,6 @@ export type IntegrationWebhookTriggerCapabilityEventStatus = "enabled" | "not_en
 
 export type IntegrationWebhookTriggerCapabilityEvent = {
   eventDefinition: IntegrationWebhookEventDefinition;
-  capabilities?: IntegrationWebhookTriggerCapabilities | undefined;
   satisfiedRequirementSet?: IntegrationWebhookTriggerRequirementSet | undefined;
   status: IntegrationWebhookTriggerCapabilityEventStatus;
   unsatisfiedRequirementSets: readonly IntegrationWebhookTriggerRequirementSet[];
@@ -206,7 +205,6 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
     if (requirements === undefined) {
       return {
         eventDefinition,
-        ...(input.capabilities === undefined ? {} : { capabilities: input.capabilities }),
         status: "enabled",
         unsatisfiedRequirementSets: [],
       };
@@ -231,7 +229,6 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
     if (satisfiedRequirementSet !== undefined) {
       return {
         eventDefinition,
-        capabilities,
         satisfiedRequirementSet,
         status: "enabled",
         unsatisfiedRequirementSets: [],
@@ -240,7 +237,6 @@ export function resolveWebhookTriggerCapabilityEvents(input: {
 
     return {
       eventDefinition,
-      capabilities,
       status: "not_enabled",
       unsatisfiedRequirementSets: requirements.anyOf,
     };
